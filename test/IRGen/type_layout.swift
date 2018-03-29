@@ -26,10 +26,10 @@ struct AlignedFourInts { var x: FourInts }
 // CHECK:       define internal swiftcc %swift.metadata_response @"$S11type_layout14TypeLayoutTestVMr"
 struct TypeLayoutTest<T> {
   // -- dynamic layout, projected from metadata
-  // CHECK:       [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 257, %swift.type* %T)
+  // CHECK:       [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 319, %swift.type* %T)
   // CHECK:       [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK:       [[T_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-  // CHECK:       [[T_OK:%.*]] = icmp ule [[INT]] [[T_STATUS]], 1
+  // CHECK:       [[T_OK:%.*]] = icmp ule [[INT]] [[T_STATUS]], 63
   // CHECK:       br i1 [[T_OK]],
   // CHECK:       [[T0:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
   // CHECK:       [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], {{i32|i64}} -1
@@ -63,10 +63,10 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** [[T_LAYOUT]]
   var i: GSing<T>
   // -- Multi-element generic struct, need to derive from metadata
-  // CHECK:       [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S11type_layout5GMultVMa"([[INT]] 257, %swift.type* [[T_CHECKED]])
+  // CHECK:       [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S11type_layout5GMultVMa"([[INT]] 319, %swift.type* [[T_CHECKED]])
   // CHECK:       [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK:       [[METADATA_STATUS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 1
-  // CHECK:       [[METADATA_OK:%.*]] = icmp ule [[INT]] [[METADATA_STATUS]], 1
+  // CHECK:       [[METADATA_OK:%.*]] = icmp ule [[INT]] [[METADATA_STATUS]], 63
   // CHECK:       br i1 [[METADATA_OK]],
   // CHECK:       [[T0:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
   // CHECK:       [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], {{i32|i64}} -1

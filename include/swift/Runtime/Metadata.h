@@ -3438,6 +3438,8 @@ public:
     return getFullGenericContextHeader();
   }
 
+  llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
+
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(void*).
   int32_t getGenericArgumentOffset() const;
@@ -3575,6 +3577,7 @@ public:
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
   using TargetTypeContextDescriptor<Runtime>::getTypeContextDescriptorFlags;
 
   /// The superclass of this class.  This pointer can be interpreted
@@ -3791,6 +3794,7 @@ public:
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
 
   /// The number of stored properties in the struct.
   /// If there is a field offset vector, this is its length.
@@ -3833,6 +3837,7 @@ public:
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
 
   /// The number of non-empty cases in the enum are in the low 24 bits;
   /// the offset of the payload size in the metadata record in words,
@@ -3932,6 +3937,21 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
   case ContextDescriptorKind::Struct:
     return llvm::cast<TargetStructDescriptor<Runtime>>(this)
         ->getFullGenericContextHeader();
+  default:
+    swift_runtime_unreachable("Not a type context descriptor.");
+  }
+}
+
+template <typename Runtime>
+llvm::ArrayRef<GenericParamDescriptor> 
+TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
+  switch (this->getKind()) {
+  case ContextDescriptorKind::Class:
+    return llvm::cast<TargetClassDescriptor<Runtime>>(this)->getGenericParams();
+  case ContextDescriptorKind::Enum:
+    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)->getGenericParams();
+  case ContextDescriptorKind::Struct:
+    return llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
   default:
     swift_runtime_unreachable("Not a type context descriptor.");
   }

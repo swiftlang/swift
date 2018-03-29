@@ -298,7 +298,8 @@ public:
 /// as a MetadataResponse makes this straightforward.
 class MetadataResponse {
   llvm::Value *Metadata;
-  llvm::PointerIntPair<llvm::Value*, 2, MetadataState> State;
+  llvm::Value *DynamicState;
+  MetadataState StaticState;
 
 public:
   MetadataResponse() : Metadata(nullptr) {}
@@ -306,7 +307,8 @@ public:
   /// A metadata response that might not be dynamically complete.
   explicit MetadataResponse(llvm::Value *metadata, llvm::Value *state,
                             MetadataState staticLowerBoundState)
-      : Metadata(metadata), State(state, staticLowerBoundState) {
+      : Metadata(metadata), DynamicState(state),
+        StaticState(staticLowerBoundState) {
     assert(metadata && "must be valid");
   }
 
@@ -341,7 +343,7 @@ public:
   /// Does this response have a dynamic state value?
   bool hasDynamicState() const {
     assert(isValid());
-    return State.getPointer() != nullptr;
+    return DynamicState != nullptr;
   }
 
   /// Ensure that this response has a dynamic state value, by re-checking it
@@ -351,13 +353,13 @@ public:
   llvm::Value *getDynamicState() const {
     assert(isValid());
     assert(hasDynamicState() && "must ensure dynamic state before fetching it");
-    return State.getPointer();
+    return DynamicState;
   }
 
   /// Return the best lower bound state on the state of this metadata.
   MetadataState getStaticLowerBoundOnState() const {
     assert(isValid());
-    return State.getInt();
+    return StaticState;
   }
 
   static MetadataResponse handle(IRGenFunction &IGF,
