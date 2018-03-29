@@ -201,9 +201,11 @@ public:
                           SILType T, bool isOutlined) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
-                 asImpl().Impl::getSize(IGF, T),
-                 std::min(dest.getAlignment(), src.getAlignment()).getValue());
+      IGF.Builder.CreateMemCpy(dest.getAddress(),
+                               dest.getAlignment().getValue(),
+                               src.getAddress(),
+                               src.getAlignment().getValue(),
+                 asImpl().Impl::getSize(IGF, T));
       return;
     }
 
