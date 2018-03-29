@@ -15,19 +15,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/RemoteAST/RemoteAST.h"
-#include "swift/Remote/MetadataReader.h"
-#include "swift/Strings.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTTypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Remote/MetadataReader.h"
+#include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
@@ -81,7 +82,7 @@ public:
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
-class RemoteASTTypeBuilder {
+class RemoteASTTypeBuilder : public MangledNameTypeBuilder {
   ASTContext &Ctx;
   Demangle::NodeFactory Factory;
 
@@ -95,7 +96,8 @@ public:
   using BuiltType = swift::Type;
   using BuiltNominalTypeDecl = swift::NominalTypeDecl *;
   using BuiltProtocolDecl = swift::ProtocolDecl *;
-  explicit RemoteASTTypeBuilder(ASTContext &ctx) : Ctx(ctx) {}
+  explicit RemoteASTTypeBuilder(ASTContext &ctx)
+      : MangledNameTypeBuilder(ctx), Ctx(ctx) {}
 
   std::unique_ptr<IRGenContext> createIRGenContext() {
     return IRGenContext::create(Ctx, getNotionalDC());
@@ -125,11 +127,6 @@ public:
   }
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
-
-  Type createBuiltinType(const std::string &mangledName) {
-    // TODO
-    return Type();
-  }
 
   NominalTypeDecl *createNominalTypeDecl(StringRef mangledName) {
     Demangle::Demangler Dem;
@@ -291,27 +288,6 @@ public:
     return genericType;
   }
 
-  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
-                       bool isVariadic) {
-    // Just bail out on variadic tuples for now.
-    if (isVariadic) return Type();
-
-    SmallVector<TupleTypeElt, 4> elements;
-    elements.reserve(eltTypes.size());
-    for (auto eltType : eltTypes) {
-      Identifier label;
-      if (!labels.empty()) {
-        auto split = labels.split(' ');
-        if (!split.first.empty())
-          label = Ctx.getIdentifier(split.first);
-        labels = split.second;
-      }
-      elements.emplace_back(eltType, label);
-    }
-
-    return TupleType::get(elements, Ctx);
-  }
-
   Type createFunctionType(ArrayRef<remote::FunctionParam<Type>> params,
                           Type output, FunctionTypeFlags flags) {
     FunctionTypeRepresentation representation;
@@ -374,22 +350,6 @@ public:
     return ProtocolCompositionType::get(Ctx, members, isClassBound);
   }
 
-  Type createExistentialMetatypeType(Type instance) {
-    if (!instance->isAnyExistentialType())
-      return Type();
-    return ExistentialMetatypeType::get(instance);
-  }
-
-  Type createMetatypeType(Type instance, bool wasAbstract=false) {
-    // FIXME: Plumb through metatype representation and generalize silly
-    // 'wasAbstract' flag
-    return MetatypeType::get(instance);
-  }
-
-  Type createGenericTypeParameterType(unsigned depth, unsigned index) {
-    return GenericTypeParamType::get(depth, index, Ctx);
-  }
-
   Type createDependentMemberType(StringRef member, Type base,
                                  ProtocolDecl *protocol) {
     if (!base->isTypeParameter())
@@ -402,28 +362,6 @@ public:
     }
 
     return Type();
-  }
-
-  Type createUnownedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnownedStorageType::get(base, Ctx);
-  }
-
-  Type createUnmanagedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnmanagedStorageType::get(base, Ctx);
-  }
-
-  Type createWeakStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return WeakStorageType::get(base, Ctx);
-  }
-
-  Type createSILBoxType(Type base) {
-    return SILBoxType::get(base->getCanonicalType());
   }
 
   Type createObjCClassType(StringRef name) {
@@ -440,14 +378,6 @@ public:
     if (!typeDecl) return Type();
 
     return createNominalType(typeDecl, /*parent*/ Type());
-  }
-
-  Type getUnnamedForeignClassType() {
-    return Type();
-  }
-
-  Type getOpaqueType() {
-    return Type();
   }
 
 private:
