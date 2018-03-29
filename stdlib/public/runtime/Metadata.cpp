@@ -3339,7 +3339,7 @@ void swift::resumeMetadataCompletion(
                                  // This array comes from the metadata, so
                                  // we can just "unslice" it to get the
                                  // non-key arguments.
-                                 key.KeyData.begin());
+                                 key.begin());
     }
 
     void forOtherMetadata(const Metadata *metadata) && {

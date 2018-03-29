@@ -291,26 +291,19 @@ public:
   }
 };
 
-// A wrapper around a pointer to a metadata cache entry that provides
-// DenseMap semantics that compare values in the key vector for the metadata
-// instance.
-//
-// This is stored as a pointer to the arguments buffer, so that we can save
-// an offset while looking for the matching argument given a key.
-class KeyDataRef {
-  const void * const *Args;
-  unsigned Length;
-
-  KeyDataRef(const void * const *args, unsigned length)
-    : Args(args), Length(length) {}
+/// A key value as provided to the concurrent map.
+class MetadataCacheKey {
+  const void * const *Data;
+  uint32_t Length;
+  uint32_t Hash;
 
 public:
-  static KeyDataRef forArguments(const void * const *args,
-                                 unsigned numArguments) {
-    return KeyDataRef(args, numArguments);
-  }
+  MetadataCacheKey(const void * const *data, size_t size)
+    : Data(data), Length(size), Hash(computeHash()) {}
+  MetadataCacheKey(const void * const *data, size_t size, uint32_t hash)
+    : Data(data), Length(size), Hash(hash) {}
 
-  bool operator==(KeyDataRef rhs) const {
+  bool operator==(MetadataCacheKey rhs) const {
     // Compare the sizes.
     unsigned asize = size(), bsize = rhs.size();
     if (asize != bsize) return false;
@@ -322,46 +315,49 @@ public:
     return true;
   }
 
-  int compare(KeyDataRef rhs) const {
+  int compare(const MetadataCacheKey &rhs) const {
+    // Compare the hashes.
+    if (auto hashComparison = compareIntegers(Hash, rhs.Hash)) {
+      return hashComparison;
+    }
+
     // Compare the sizes.
-    unsigned asize = size(), bsize = rhs.size();
-    if (asize != bsize) {
-      return (asize < bsize ? -1 : 1);
+    if (auto sizeComparison = compareIntegers(size(), rhs.size())) {
+      return sizeComparison;
     }
 
     // Compare the content.
-    auto abegin = begin(), bbegin = rhs.begin();
-    for (unsigned i = 0; i < asize; ++i) {
-      if (abegin[i] != bbegin[i])
-        return (uintptr_t(abegin[i]) < uintptr_t(bbegin[i]) ? -1 : 1);
+    auto lbegin = begin(), rbegin = rhs.begin();
+    for (unsigned i = 0, e = size(); i != e; ++i) {
+      if (auto ptrComparison = comparePointers(lbegin[i], rbegin[i]))
+        return ptrComparison;
     }
 
+    // Equal.
     return 0;
   }
 
-  size_t hash() {
-    size_t H = 0x56ba80d1 * Length ;
-    for (unsigned i = 0; i < Length; i++) {
-      H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
-      H ^= ((size_t)Args[i]) ^ ((size_t)Args[i] >> 19);
-    }
-    H *= 0x27d4eb2d;
-    return (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
+  uint32_t hash() const {
+    return Hash;
   }
 
-  const void * const *begin() const { return Args; }
-  const void * const *end() const { return Args + Length; }
+  const void * const *begin() const { return Data; }
+  const void * const *end() const { return Data + Length; }
   unsigned size() const { return Length; }
-};
 
-/// A key value as provided to the concurrent map.
-struct MetadataCacheKey {
-  size_t Hash;
-  KeyDataRef KeyData;
+private:
+  uint32_t computeHash() const {
+    size_t H = 0x56ba80d1 * Length;
+    for (unsigned i = 0; i < Length; i++) {
+      H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
+      H ^= (reinterpret_cast<size_t>(Data[i])
+            ^ (reinterpret_cast<size_t>(Data[i]) >> 19));
+    }
+    H *= 0x27d4eb2d;
 
-  MetadataCacheKey(KeyDataRef data) : Hash(data.hash()), KeyData(data) {}
-  MetadataCacheKey(const void *const *data, size_t size)
-    : MetadataCacheKey(KeyDataRef::forArguments(data, size)) {}
+    // Rotate right by 10 and then truncate to 32 bits.
+    return uint32_t((H >> 10) | (H << ((sizeof(size_t) * 8) - 10)));
+  }
 };
 
 /// A helper class for ConcurrentMap entry types which allows trailing objects
@@ -622,14 +618,14 @@ protected:
   static size_t numTrailingObjects(OverloadToken<const void *>,
                                    const MetadataCacheKey &key,
                                    Args &&...extraArgs) {
-    return key.KeyData.size();
+    return key.size();
   }
 
   using super::asImpl;
 
 private:
   /// These are set during construction and never changed.
-  const size_t Hash;
+  const uint32_t Hash;
   const uint16_t KeyLength;
 
   /// What kind of data is stored in the LockedStorage field below?
@@ -665,13 +661,12 @@ private:
 
 public:
   MetadataCacheEntryBase(const MetadataCacheKey &key)
-      : Hash(key.Hash), KeyLength(key.KeyData.size()),
+      : Hash(key.hash()), KeyLength(key.size()),
         TrackingInfo(PrivateMetadataTrackingInfo::initial().getRawValue()) {
     LockedStorageKind = LSK::AllocatingThread;
     LockedStorage.AllocatingThread = std::this_thread::get_id();
-    memcpy(this->template getTrailingObjects<const void*>(),
-           key.KeyData.begin(),
-           KeyLength * sizeof(void*));
+    memcpy(this->template getTrailingObjects<const void *>(),
+           key.begin(), key.size() * sizeof(const void *));
   }
 
   ~MetadataCacheEntryBase() {
@@ -684,10 +679,9 @@ public:
            LockedStorage.AllocatingThread == std::this_thread::get_id();
   }
 
-  KeyDataRef getKeyData() const {
-    return KeyDataRef::forArguments(
-                              this->template getTrailingObjects<const void*>(),
-                                    KeyLength);
+  MetadataCacheKey getKey() const {
+    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
+                            KeyLength, Hash);
   }
 
   intptr_t getKeyIntValueForDump() const {
@@ -695,12 +689,7 @@ public:
   }
 
   int compareWithKey(const MetadataCacheKey &key) const {
-    // Order by hash first, then by the actual key data.
-    if (auto comparison = compareIntegers(key.Hash, Hash)) {
-      return comparison;
-    } else {
-      return key.KeyData.compare(getKeyData());
-    }
+    return key.compare(getKey());
   }
 
   /// Given that this thread doesn't own the right to initialize the
