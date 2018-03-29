@@ -60,7 +60,7 @@ static llvm::cl::opt<bool> AbortOnFailure(
 
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(false));
+                              llvm::cl::init(true));
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -4587,6 +4587,9 @@ public:
       }
       if (DS != LastSeenScope) {
         DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
+        DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
+        DEBUG(llvm::dbgs() <<
+          "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");
