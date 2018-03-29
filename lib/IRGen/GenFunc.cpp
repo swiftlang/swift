@@ -1346,7 +1346,7 @@ void irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
-  bool isNoEscapeFunction = outType->isNoEscape();
+  assert(!outType->isNoEscape());
 
   // Reserve space for polymorphic bindings.
   SubstitutionMap subMap;
@@ -1476,10 +1476,7 @@ void irgen::emitFunctionPartialApplication(
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
-    if (isNoEscapeFunction)
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.OpaquePtrTy);
-    else
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
     return;
   }
@@ -1520,10 +1517,7 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     if (isIndirectFormalParameter(*singleRefcountedConvention))
       ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
-    if (isNoEscapeFunction)
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.OpaquePtrTy);
-    else
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
     return;
   }
@@ -1614,8 +1608,6 @@ void irgen::emitFunctionPartialApplication(
                                                               argConventions);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
-  if (isNoEscapeFunction)
-    data = IGF.Builder.CreateBitCast(data, IGF.IGM.OpaquePtrTy);
   out.add(data);
 }
 

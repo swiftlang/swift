@@ -937,7 +937,7 @@ static bool isResilientConformance(const NormalProtocolConformance *conformance)
 
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-static bool isDependentConformance(IRGenModule &IGM,
+bool irgen::isDependentConformance(IRGenModule &IGM,
                              const NormalProtocolConformance *conformance,
                                    ResilienceExpansion expansion) {
   // If the conformance is resilient, this is always true.
@@ -946,6 +946,9 @@ static bool isDependentConformance(IRGenModule &IGM,
 
   // Check whether any of the inherited conformances are dependent.
   for (auto inherited : conformance->getProtocol()->getInheritedProtocols()) {
+    if (inherited->isObjC())
+      continue;
+
     if (isDependentConformance(IGM,
                                conformance->getInheritedConformance(inherited)
                                  ->getRootNormalConformance(),
@@ -2066,6 +2069,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (isAvailableExternally(wt->getLinkage()))
     return;
 
+  auto *conf = wt->getConformance();
+
   // Build the witnesses.
   ConstantInitBuilder builder(*this);
   auto wtableContents = builder.beginArray(Int8PtrTy);
@@ -2080,23 +2085,26 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
 
+  bool isDependent = isDependentConformance(*this, conf,
+                                            ResilienceExpansion::Maximal);
   auto global = cast<llvm::GlobalVariable>(
-                    getAddrOfWitnessTable(wt->getConformance(), initializer));
+    isDependent
+      ? getAddrOfWitnessTablePattern(conf, initializer)
+      : getAddrOfWitnessTable(conf, initializer));
   global->setConstant(true);
   global->setAlignment(getWitnessTableAlignment().getValue());
 
-  // FIXME: resilience; this should use the conformance's publishing scope.
+  // Always emit an accessor function.
   wtableBuilder.buildAccessFunction(global);
 
   // Behavior conformances can't be reflected.
-  if (wt->getConformance()->isBehaviorConformance())
+  if (conf->isBehaviorConformance())
     return;
 
-  NormalProtocolConformance *Conf = wt->getConformance();
-  addProtocolConformance(Conf);
+  addProtocolConformance(conf);
 
   // Trigger the lazy emission of the foreign type metadata.
-  CanType conformingType = Conf->getType()->getCanonicalType();
+  CanType conformingType = conf->getType()->getCanonicalType();
   if (requiresForeignTypeMetadata(conformingType))
     (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
 }
