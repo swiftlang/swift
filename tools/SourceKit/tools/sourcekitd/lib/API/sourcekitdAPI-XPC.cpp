@@ -204,6 +204,10 @@ void ResponseBuilder::Dictionary::set(UIdent Key, llvm::StringRef Str) {
   xpc_dictionary_set_string(Impl, Key.c_str(), Buf.c_str());
 }
 
+void ResponseBuilder::Dictionary::set(UIdent Key, const std::string &Str) {
+  xpc_dictionary_set_string(Impl, Key.c_str(), Str.c_str());
+}
+
 void ResponseBuilder::Dictionary::set(UIdent Key, int64_t val) {
   xpc_dictionary_set_int64(Impl, Key.c_str(), val);
 }
@@ -215,6 +219,16 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
   for (auto Str : Strs) {
     Buf = Str;
     xpc_array_set_string(arr, XPC_ARRAY_APPEND, Buf.c_str());
+  }
+  xpc_dictionary_set_value(Impl, Key.c_str(), arr);
+  xpc_release(arr);
+}
+
+void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
+                                      ArrayRef<std::string> Strs) {
+  xpc_object_t arr = xpc_array_create(nullptr, 0);
+  for (auto Str : Strs) {
+    xpc_array_set_string(arr, XPC_ARRAY_APPEND, Str.c_str());
   }
   xpc_dictionary_set_value(Impl, Key.c_str(), arr);
   xpc_release(arr);

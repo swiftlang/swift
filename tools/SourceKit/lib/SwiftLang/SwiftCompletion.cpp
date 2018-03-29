@@ -111,8 +111,8 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
                                   ArrayRef<const char *> Args,
                                   std::string &Error) {
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedInit(trace::OperationKind::CodeCompletionInit);
+  if (TracedInit.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs,
                          UnresolvedInputFile->getBufferIdentifier(),
@@ -120,7 +120,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
     SwiftArgs.addFile(UnresolvedInputFile->getBufferIdentifier(),
                       UnresolvedInputFile->getBuffer());
 
-    TracedOp.start(trace::OperationKind::CodeCompletionInit, SwiftArgs,
+    TracedInit.start(SwiftArgs,
                    { std::make_pair("Offset", std::to_string(Offset)),
                      std::make_pair("InputBufferSize",
                                     std::to_string(UnresolvedInputFile->getBufferSize()))});
@@ -186,9 +186,11 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
     return true;
   }
 
-  TracedOp.finish();
+  TracedInit.finish();
 
-  if (trace::enabled()) {
+
+  trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
     trace::initTraceFiles(SwiftArgs, CI);
@@ -201,7 +203,7 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
                     }
                   });
 
-    TracedOp.start(trace::OperationKind::CodeCompletion, SwiftArgs,
+    TracedOp.start(SwiftArgs,
                    {std::make_pair("OriginalOffset", std::to_string(Offset)),
                     std::make_pair("Offset",
                       std::to_string(CodeCompletionOffset))});

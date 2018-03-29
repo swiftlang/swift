@@ -341,6 +341,24 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     prepareMangleRequest(Req, Opts);
     break;
 
+  case SourceKitRequest::EnableCompileNotifications: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestEnableCompileNotifications);
+    int64_t value = 1;
+    for (auto &Opt : Opts.RequestOptions) {
+      auto KeyValue = StringRef(Opt).split('=');
+      if (KeyValue.first == "value") {
+        KeyValue.second.getAsInteger(0, value);
+      } else {
+        llvm::errs() << "unknown parameter '" << KeyValue.first
+                     << "' in -req-opts";
+        return 1;
+      }
+    }
+    sourcekitd_request_dictionary_set_int64(Req, KeyValue, value);
+    break;
+  }
+
   case SourceKitRequest::Index:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndex);
     break;
@@ -819,10 +837,23 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::PrintDiags:
       llvm_unreachable("print-annotations/print-diags is handled elsewhere");
 
+    case SourceKitRequest::EnableCompileNotifications:
+      // Ignore the response.  If it was an error it is handled above.
+      break;
+
     case SourceKitRequest::Open:
-    case SourceKitRequest::Edit:
       getSemanticInfo(Info, SourceFile);
       KeepResponseAlive = true;
+      break;
+
+    case SourceKitRequest::Edit:
+      if (Opts.Length == 0 && Opts.ReplaceText->empty()) {
+        // Length=0, replace="" is a nop and will not trigger sema.
+        sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+      } else {
+        getSemanticInfo(Info, SourceFile);
+        KeepResponseAlive = true;
+      }
       break;
 
     case SourceKitRequest::DemangleNames:
@@ -1048,9 +1079,10 @@ static void notification_receiver(sourcekitd_response_t resp) {
   sourcekitd_variant_t payload = sourcekitd_response_get_value(resp);
   sourcekitd_uid_t note =
       sourcekitd_variant_dictionary_get_uid(payload, KeyNotification);
-  semaName = sourcekitd_variant_dictionary_get_string(payload, KeyName);
 
   if (note == NoteDocUpdate) {
+    semaName = sourcekitd_variant_dictionary_get_string(payload, KeyName);
+
     sourcekitd_object_t edReq = sourcekitd_request_dictionary_create(nullptr,
                                                                 nullptr, 0);
     sourcekitd_request_dictionary_set_uid(edReq, KeyRequest,
@@ -1060,6 +1092,8 @@ static void notification_receiver(sourcekitd_response_t resp) {
     semaResponse = sourcekitd_send_request_sync(edReq);
     sourcekitd_request_release(edReq);
     semaSemaphore.signal();
+  } else {
+    sourcekitd_response_description_dump_filedesc(resp, STDOUT_FILENO);
   }
 }
 

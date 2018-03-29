@@ -148,16 +148,19 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("localize-string", SourceKitRequest::LocalizeString)
         .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Case("stats", SourceKitRequest::Statistics)
+        .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
         .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
-        llvm::errs() << "error: invalid request, expected one of "
+        llvm::errs() << "error: invalid request '" << InputArg->getValue()
+            << "'\nexpected one of "
             << "version/demangle/mangle/index/complete/complete.open/complete.cursor/"
                "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/"
                "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
                "open/close/edit/print-annotations/print-diags/extract-comment/module-groups/"
-               "range/syntactic-rename/find-rename-ranges/translate/markup-xml/stats\n";
+               "range/syntactic-rename/find-rename-ranges/translate/markup-xml/stats/"
+               "track-compiles\n";
         return true;
       }
       break;
