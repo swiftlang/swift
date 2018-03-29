@@ -15,7 +15,7 @@
 #===----------------------------------------------------------------------===#
 
 find_package(PythonLibs 2.7 EXACT REQUIRED)
-message(STATUS "Building CPython overlay.")
+message(STATUS "Building CPython.")
 
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY)
@@ -31,10 +31,6 @@ else()
   set(cmake_symlink_option "create_symlink")
 endif()
 
-set(sources
-  CPython.swift
-  module.modulemap)
-
 set(output_dir "${SWIFTLIB_DIR}/CPython")
 set(outputs)
 
@@ -42,50 +38,33 @@ add_custom_command(
   OUTPUT "${output_dir}"
   COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
 
-# Symlink Python header files.
+# Copy Python header files.
 add_custom_command(
-  OUTPUT "${output_dir}/python"
+  OUTPUT "${output_dir}/include"
   COMMAND
-    "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
+    "${CMAKE_COMMAND}" "-E" "copy_directory"
     "${PYTHON_INCLUDE_DIRS}"
-    "${output_dir}/python"
-  COMMENT "Symlinking Python 2.7 headers into ${output_dir}/python")
-list(APPEND outputs "${output_dir}/python")
+    "${output_dir}/include"
+  COMMENT "Copying Python 2.7 headers into ${output_dir}/include")
+list(APPEND outputs "${output_dir}/include")
 
-# Copy sources.
-foreach(input ${sources})
-  add_custom_command(
-    OUTPUT "${output_dir}/${input}"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "copy_if_different"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-      "${output_dir}/${input}")
-  list(APPEND outputs "${output_dir}/${input}")
-endforeach()
+# Copy modulemap.
+add_custom_command(
+  OUTPUT "${output_dir}/module.modulemap"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap"
+  COMMAND
+  "${CMAKE_COMMAND}" "-E" "copy_if_different"
+  "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap"
+  "${output_dir}/module.modulemap")
+list(APPEND outputs "${output_dir}/module.modulemap")
 
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
 
 add_custom_target(cpython_modulemap
   DEPENDS ${outputs}
-  COMMENT "Copying CPython module to ${output_dir}.")
+  COMMENT "Copying CPython module to ${output_dir}")
 
 swift_install_in_component(sdk-overlay
   DIRECTORY "${output_dir}/"
   DESTINATION "lib/swift/CPython")
-
-add_swift_library(swiftCPython ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  CPython.swift
-  DEPENDS cpython_modulemap
-  SWIFT_MODULE_DEPENDS_IOS Darwin
-  SWIFT_MODULE_DEPENDS_OSX Darwin
-  SWIFT_MODULE_DEPENDS_TVOS Darwin
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
-  SWIFT_MODULE_DEPENDS_LINUX Glibc
-  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
-  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
-  SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
-  INTERFACE_LINK_LIBRARIES "${PYTHON_LIBRARIES}"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
