@@ -371,6 +371,12 @@ func statementTests() {
 #if FOO
     case let (x, y)  where !x, n3l where false:
       break
+#elseif BAR
+    case let y:
+      break
+#else
+    case .foo(let x):
+      break
 #endif
     default:
       break
