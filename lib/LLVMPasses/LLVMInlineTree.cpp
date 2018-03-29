@@ -65,8 +65,8 @@ namespace {
 class InlineTree {
   struct Node;
 
-  typedef DenseMap<StringRef, Node *> NodeMap;
-  typedef SmallVector<Node *, 8> NodeList;
+  using NodeMap = DenseMap<StringRef, Node *>;
+  using NodeList = SmallVector<Node *, 8>;
 
   /// Defines a unique inline location.
   /// Used to distinguish between different instances of an inlined function.
