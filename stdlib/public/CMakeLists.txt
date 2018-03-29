@@ -60,6 +60,13 @@ if(SWIFT_BUILD_STDLIB)
   endif()
 endif()
 
+# SWIFT_ENABLE_TENSORFLOW
+find_package(PythonLibs 2.7 EXACT)
+if(SWIFT_BUILD_STDLIB AND PYTHONLIBS_FOUND)
+  add_subdirectory(CPython)
+  add_subdirectory(Python)
+endif()
+
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(Reflection)
   add_subdirectory(SwiftRemoteMirror)
@@ -67,9 +74,6 @@ endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
   add_subdirectory(Platform)
-  # SWIFT_ENABLE_TENSORFLOW
-  add_subdirectory(CPython)
-  add_subdirectory(Python)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
