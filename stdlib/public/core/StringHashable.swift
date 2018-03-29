@@ -123,10 +123,29 @@ extension _UnmanagedOpaqueString {
   }
 }
 
+extension _SmallUTF8String {
+  @_versioned
+  @_inlineable
+  internal func computeHashValue(into hasher: inout _Hasher) {
+#if arch(i386) || arch(arm)
+    unsupportedOn32bit()
+#else
+    if isASCII {
+      return self.withUnmanagedASCII { $0.computeHashValue(into: &hasher) }
+    }
+    return self.withUnmanagedUTF16 { $0.computeHashValue(into: &hasher) }
+#endif // 64-bit
+  }
+}
+
 extension _StringGuts {
   @_versioned
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(into hasher: inout _Hasher) {
+    if _isSmall {
+      return _smallUTF8String.computeHashValue(into: &hasher)
+    }
+
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
       _asOpaque().computeHashValue(into: &hasher)
@@ -142,6 +161,10 @@ extension _StringGuts {
   @_versioned
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
+    if _isSmall {
+      return _smallUTF8String[range].computeHashValue(into: &hasher)
+    }
+
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
       _asOpaque()[range].computeHashValue(into: &hasher)

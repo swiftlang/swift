@@ -1802,8 +1802,7 @@ extension BinaryInteger {
     if isNegative {
       result.append(UInt8(("-" as Unicode.Scalar).value))
     }
-    return String._fromWellFormedCodeUnitSequence(
-      UTF8.self, input: result.reversed())
+    return String._fromASCII(result.reversed())
   }
 
   /// A textual representation of this value.
