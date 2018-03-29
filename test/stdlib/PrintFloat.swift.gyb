@@ -631,13 +631,23 @@ PrintTests.test("Printable_Double") {
 
   // Verify NaNs
   expectNaN("nan", Double.nan)
+  expectNaN("-nan", -Double.nan)
+#if arch(i386)
+  expectNaN("nan", Double(nan: 65535, signaling: false))
+  expectNaN("nan", Float64(bitPattern: 0x7fff_ffff_ffff_ffff))
+  expectNaN("nan", Float64(bitPattern: 0x7ffb_ffff_ffff_ffff))
+  expectNaN("-nan", -Double(nan: 65535, signaling: false))
+  expectNaN("nan", Double.signalingNaN)
+  expectNaN("-nan", -Double.signalingNaN)
+  expectNaN("nan", Double(nan: 65535, signaling: true))
+  expectNaN("-nan", -Double(nan: 65535, signaling: true))
+  expectNaN("nan", Float64(bitPattern: 0x7ff7_ffff_ffff_ffff))
+#else
+  // 32-bit i386 lacks signaling Double nans or payloads on NaNs
   expectNaN("nan(0xffff)", Double(nan: 65535, signaling: false))
   expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7fff_ffff_ffff_ffff))
   expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7ffb_ffff_ffff_ffff))
-  expectNaN("-nan", -Double.nan)
   expectNaN("-nan(0xffff)", -Double(nan: 65535, signaling: false))
-#if !arch(i386)
-  // 32-bit i386 lacks signaling Double nans
   expectNaN("snan", Double.signalingNaN)
   expectNaN("-snan", -Double.signalingNaN)
   expectNaN("snan(0xffff)", Double(nan: 65535, signaling: true))
