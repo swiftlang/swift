@@ -187,10 +187,12 @@ extension LazyDropWhileCollection.Index: Equatable, Comparable {
 }
 
 extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return base.hashValue
   }
 
+  @_inlineable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
     hasher.append(base)
   }

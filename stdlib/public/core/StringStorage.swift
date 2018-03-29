@@ -61,6 +61,13 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     count: Int = 0
   ) -> _SwiftStringStorage<CodeUnit> {
     _sanityCheck(count >= 0 && count <= capacity)
+
+#if arch(i386) || arch(arm)
+#else
+    _sanityCheck((CodeUnit.self != UInt8.self || capacity > 15),
+      "Should prefer a small representation")
+#endif // 64-bit
+
     let storage = Builtin.allocWithTailElems_1(
       _SwiftStringStorage<CodeUnit>.self,
       capacity._builtinWordValue, CodeUnit.self)
@@ -265,6 +272,12 @@ extension _SwiftStringStorage {
     opaqueOther other: _StringGuts, range: Range<Int>
   ) {
     _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String[range].withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
     defer { _fixLifetime(other) }
     _appendInPlace(other._asOpaque()[range])
   }
@@ -289,6 +302,12 @@ extension _SwiftStringStorage {
   @_versioned // @opaque
   internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
     _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String.withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
     defer { _fixLifetime(other) }
     _appendInPlace(other._asOpaque())
   }

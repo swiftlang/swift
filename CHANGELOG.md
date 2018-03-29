@@ -67,6 +67,15 @@ Swift 4.2
   functions have been made generic over `[Binary]FloatingPoint` so that they
   will automatically be available for any conforming type.
 
+* [SE-0143][]
+
+  The standard library types `Optional`, `Array`, `ArraySlice`,
+  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, and
+  `ClosedRange` now conform to the `Hashable` protocol when their element or
+  bound types (as the case may be) conform to `Hashable`.  This makes
+  synthesized `Hashable` implementations available for types that include stored
+  properties of these types.
+
 * [SE-0196][]
   
   Custom compile-time warnings or error messages can be emitted using the
@@ -158,12 +167,12 @@ Swift 4.1
   s[keyPath: p] // "H"
   ```
 
-* [SE-0143][] The standard library types `Optional`, `Array`, and
-	`Dictionary` now conform to the `Equatable` protocol when their element types
-	conform to `Equatable`. This allows the `==` operator to compose (e.g., one
-	can compare two values of type `[Int : [Int?]?]` with `==`), as well as use
-  various algorthims defined for `Equatable` element types, such as
-	`index(of:)`.
+* [SE-0143][] The standard library types `Optional`, `Array`, `ArraySlice`,
+  `ContiguousArray`, and `Dictionary` now conform to the `Equatable` protocol
+  when their element types conform to `Equatable`. This allows the `==` operator
+  to compose (e.g., one can compare two values of type `[Int : [Int?]?]` with
+  `==`), as well as use various algorithms defined for `Equatable` element
+  types, such as `index(of:)`.
 
 * [SE-0157][] is implemented. Associated types can now declare "recursive"
 	constraints, which require that the associated type conform to the enclosing

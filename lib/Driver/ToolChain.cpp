@@ -280,14 +280,17 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
   return false;
 }
 
-/// Debugging only: return whether the set of \p jobs is an ordered subsequence
-/// of the sequence of top-level input files in the \c Compilation \p C.
-static bool
-jobsAreSubsequenceOfCompilationInputs(ArrayRef<const Job *> jobs,
-                                      Compilation &C) {
-  llvm::SmallVector<const Job *, 16> sortedJobs;
+/// Unfortunately the success or failure of a Swift compilation is currently
+/// sensitive to the order in which files are processed, at least in terms of
+/// the order of processing extensions (and likely other ways we haven't
+/// discovered yet). So long as this is true, we need to make sure any batch job
+/// we build names its inputs in an order that's a subsequence of the sequence
+/// of inputs the driver was initially invoked with.
+static void sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
+                                             SmallVectorImpl<const Job *> &sortedJobs,
+                                             Compilation &C) {
   llvm::StringMap<const Job *> jobsByInput;
-  for (const Job *J : jobs) {
+  for (const Job *J : unsortedJobs) {
     const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
     const InputAction* IA = findSingleSwiftInput(CJA);
     auto R = jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(),
@@ -300,40 +303,34 @@ jobsAreSubsequenceOfCompilationInputs(ArrayRef<const Job *> jobs,
       sortedJobs.push_back(I->second);
     }
   }
-  if (sortedJobs.size() != jobs.size())
-    return false;
-  for (size_t i = 0; i < sortedJobs.size(); ++i) {
-    if (sortedJobs[i] != jobs[i])
-      return false;
-  }
-  return true;
 }
 
 /// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
 /// input \c Job and \c Action members. Call through to \c constructInvocation
 /// on \p BatchJob, to build the \c InvocationInfo.
 std::unique_ptr<Job>
-ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
+ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
                              Compilation &C) const
 {
-  if (jobs.empty())
+  if (unsortedJobs.empty())
     return nullptr;
 
-  assert(jobsAreSubsequenceOfCompilationInputs(jobs, C));
+  llvm::SmallVector<const Job *, 16> sortedJobs;
+  sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs, C);
 
   // Synthetic OutputInfo is a slightly-modified version of the initial
   // compilation's OI.
   auto OI = C.getOutputInfo();
   OI.CompilerMode = OutputInfo::Mode::BatchModeCompile;
 
-  auto const *executablePath = jobs[0]->getExecutable();
-  auto outputType = jobs[0]->getOutput().getPrimaryOutputType();
-  auto output = makeBatchCommandOutput(jobs, C, outputType);
+  auto const *executablePath = sortedJobs[0]->getExecutable();
+  auto outputType = sortedJobs[0]->getOutput().getPrimaryOutputType();
+  auto output = makeBatchCommandOutput(sortedJobs, C, outputType);
 
   llvm::SmallSetVector<const Job *, 16> inputJobs;
   llvm::SmallSetVector<const Action *, 16> inputActions;
   auto *batchCJA = C.createAction<CompileJobAction>(outputType);
-  if (mergeBatchInputs(jobs, inputJobs, inputActions, batchCJA))
+  if (mergeBatchInputs(sortedJobs, inputJobs, inputActions, batchCJA))
     return nullptr;
 
   JobContext context{C, inputJobs.getArrayRef(), inputActions.getArrayRef(),
@@ -346,7 +343,7 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
                                      std::move(invocationInfo.Arguments),
                                      std::move(invocationInfo.ExtraEnvironment),
                                      std::move(invocationInfo.FilelistInfos),
-                                     jobs);
+                                     sortedJobs);
 }
 
 bool
