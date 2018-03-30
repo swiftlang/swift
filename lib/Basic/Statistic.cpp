@@ -45,8 +45,14 @@ getChildrenMaxResidentSetSize() {
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
   int64_t M = static_cast<int64_t>(RU.ru_maxrss);
-  if (M < 0)
+  if (M < 0) {
     M = std::numeric_limits<int64_t>::max();
+  } else {
+#ifndef __APPLE__
+    // Apple systems report bytes; everything else appears to report KB.
+    M <<= 10;
+#endif
+  }
   return M;
 #else
   return 0;
