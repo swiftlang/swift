@@ -834,6 +834,10 @@ void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node); // protocol conformance
 }
 
+void Remangler::mangleResilientProtocolWitnessTable(Node *node) {
+  unreachable("todo");
+}
+
 void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
                                                                   Node *node) {
   Out << "WI";

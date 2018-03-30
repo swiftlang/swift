@@ -3169,21 +3169,71 @@ static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
 /// If there's no initializer, no private storage, and all requirements
 /// are present, we don't have to instantiate anything; just return the
 /// witness table template.
-///
-/// Most of the time IRGen should be able to determine this statically;
-/// the one case is with resilient conformances, where the resilient
-/// protocol has not yet changed in a way that's incompatible with the
-/// conformance.
 static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
-  if (genericTable->Instantiator.isNull() &&
-      genericTable->WitnessTablePrivateSizeInWords == 0 &&
-      genericTable->WitnessTableSizeInWords ==
-        (genericTable->Protocol->NumRequirements +
-           WitnessTableFirstRequirementOffset)) {
-    return true;
+  // If we have resilient witnesses, we require instantiation.
+  if (!genericTable->ResilientWitnesses.isNull()) {
+    return false;
   }
 
-  return false;
+  // If we don't have resilient witnesses, the template must provide
+  // everything.
+  assert (genericTable->WitnessTableSizeInWords ==
+          (genericTable->Protocol->NumRequirements +
+           WitnessTableFirstRequirementOffset));
+
+  // If we have an instantiation function or private data, we require
+  // instantiation.
+  if (!genericTable->Instantiator.isNull() ||
+      genericTable->WitnessTablePrivateSizeInWords > 0) {
+    return false;
+  }
+
+  return true;
+}
+
+/// Initialize witness table entries from order independent resilient
+/// witnesses stored in the generic witness table structure itself.
+static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
+                                            void **table) {
+  auto protocol = genericTable->Protocol.get();
+
+  auto requirements = protocol->Requirements.get();
+  auto witnesses = genericTable->ResilientWitnesses->getWitnesses();
+
+  for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
+    auto &reqt = requirements[i];
+
+    // Only function-like requirements are filled in from the
+    // resilient witness table.
+    switch (reqt.Flags.getKind()) {
+    case ProtocolRequirementFlags::Kind::Method:
+    case ProtocolRequirementFlags::Kind::Init:
+    case ProtocolRequirementFlags::Kind::Getter:
+    case ProtocolRequirementFlags::Kind::Setter:
+    case ProtocolRequirementFlags::Kind::MaterializeForSet:
+      break;
+    case ProtocolRequirementFlags::Kind::BaseProtocol:
+    case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
+    case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
+      continue;
+    }
+
+    void *fn = reqt.Function.get();
+    void *impl = reqt.DefaultImplementation.get();
+
+    // Find the witness if there is one, otherwise we use the default.
+    for (auto &witness : witnesses) {
+      if (witness.Function.get() == fn) {
+        impl = witness.Witness.get();
+        break;
+      }
+    }
+
+    assert(impl != nullptr && "no implementation for witness");
+
+    unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
+    table[witnessIndex] = impl;
+  }
 }
 
 /// Instantiate a brand new witness table for a resilient or generic
@@ -3195,11 +3245,6 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
   auto protocol = genericTable->Protocol.get();
-
-  // The number of mandatory requirements, i.e. requirements lacking
-  // default implementations.
-  assert(numPatternWitnesses >= protocol->NumMandatoryRequirements +
-                                    WitnessTableFirstRequirementOffset);
 
   // The total number of requirements.
   size_t numRequirements =
@@ -3219,7 +3264,6 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
   auto pattern = reinterpret_cast<void * const *>(&*genericTable->Pattern);
-  auto requirements = protocol->Requirements.get();
 
   // Fill in the provided part of the requirements from the pattern.
   for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
@@ -3227,14 +3271,8 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   }
 
   // Fill in any default requirements.
-  for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
-    size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
-    void *defaultImpl =
-      requirements[requirementIndex].DefaultImplementation.get();
-    assert(defaultImpl &&
-           "no default implementation for missing requirement");
-    table[i] = defaultImpl;
-  }
+  if (genericTable->ResilientWitnesses)
+    initializeResilientWitnessTable(genericTable, table);
 
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 

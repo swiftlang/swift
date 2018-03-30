@@ -205,8 +205,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy,              // objc properties
     Int32Ty,                // size
     Int32Ty,                // flags
-    Int16Ty,                // mandatory requirement count
-    Int16Ty,                // total requirement count
+    Int32Ty,                // total requirement count
     Int32Ty,                // requirements array
     RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names
@@ -1118,17 +1117,12 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
     return getPrimaryIGM();
   }
 
-  if (DeclContext *ctxt = f->getDeclContext()) {
-    if (SourceFile *SF = ctxt->getParentSourceFile()) {
-      IRGenModule *IGM = GenModules[SF];
-      assert(IGM);
-      return IGM;
-    }
-  }
-  // We have no source file for the function.
-  // Let's use the IGM from which the function is referenced the first time.
-  if (IRGenModule *IGM = DefaultIGMForFunction[f])
-    return IGM;
+  auto found = DefaultIGMForFunction.find(f);
+  if (found != DefaultIGMForFunction.end())
+    return found->second;
+
+  if (auto *dc = f->getDeclContext())
+    return getGenModule(dc);
 
   return getPrimaryIGM();
 }

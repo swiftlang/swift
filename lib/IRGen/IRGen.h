@@ -204,26 +204,6 @@ enum class SymbolReferenceKind : uint8_t {
   Far_Relative_Indirectable,
 };
 
-/// Destructor variants.
-enum class DestructorKind : uint8_t {
-  /// A deallocating destructor destroys the object and deallocates
-  /// the memory associated with it.
-  Deallocating,
-
-  /// A destroying destructor destroys the object but does not
-  /// deallocate the memory associated with it.
-  Destroying
-};
-
-/// Constructor variants.
-enum class ConstructorKind : uint8_t {
-  /// An allocating constructor allocates an object and initializes it.
-  Allocating,
-
-  /// An initializing constructor just initializes an existing object.
-  Initializing
-};
-
 /// An initial value for a definition of an llvm::GlobalVariable.
 class ConstantInit {
   llvm::PointerUnion<ConstantInitFuture, llvm::Type*> Data;
@@ -446,7 +426,7 @@ inline Alignment Alignment::alignmentAtOffset(Size S) const {
   return *this;
 }
 
-/// Get this alignment asx a Size value.
+/// Get this alignment as a Size value.
 inline Size Alignment::asSize() const {
   return Size(getValue());
 }

@@ -2087,6 +2087,10 @@ NodePointer Demangler::demangleWitness() {
       return createWithChild(Node::Kind::ProtocolRequirementArray,
                              popProtocol());
 
+    case 'r':
+      return createWithChild(Node::Kind::ResilientProtocolWitnessTable,
+                             popProtocolConformance());
+
     case 'l': {
       NodePointer Conf = popProtocolConformance();
       NodePointer Type = popNode(Node::Kind::Type);

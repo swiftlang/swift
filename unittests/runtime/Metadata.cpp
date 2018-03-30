@@ -708,6 +708,7 @@ struct GenericWitnessTableStorage {
   uint16_t WitnessTablePrivateSizeInWords;
   int32_t Protocol;
   int32_t Pattern;
+  int32_t ResilientWitnesses;
   int32_t Instantiator;
   int32_t PrivateData;
 };
@@ -725,11 +726,11 @@ static void witnessTableInstantiator(WitnessTable *instantiatedTable,
                                      void **const *instantiationArgs) {
   EXPECT_EQ(type, nullptr);
 
-  EXPECT_EQ(((void **) instantiatedTable)[1], (void*) 123);
-  EXPECT_EQ(((void **) instantiatedTable)[2], (void*) 234);
+  EXPECT_EQ(((void **) instantiatedTable)[2], (void*) 123);
+  EXPECT_EQ(((void **) instantiatedTable)[3], (void*) 234);
 
   // The last witness is computed dynamically at instantiation time.
-  ((void **) instantiatedTable)[3] = (void *) 345;
+  ((void **) instantiatedTable)[4] = (void *) 345;
 
   auto conditionalTables =
       reinterpret_cast<const WitnessTable *const *>(instantiationArgs);
@@ -741,6 +742,12 @@ static void witnessTableInstantiator(WitnessTable *instantiatedTable,
 static void fakeDefaultWitness1() {}
 static void fakeDefaultWitness2() {}
 
+static void fakeRequirement1() {}
+static void fakeRequirement2() {}
+static void fakeRequirement3() {}
+static void fakeRequirement4() {}
+static void fakeRequirement5() {}
+
 // A mock protocol descriptor with some default witnesses at the end.
 //
 // Note: It is not standards-compliant to compare function pointers for
@@ -748,52 +755,64 @@ static void fakeDefaultWitness2() {}
 struct TestProtocol {
   ProtocolDescriptor descriptor;
   union {
-    ProtocolRequirement requirements[5];
+    ProtocolRequirement requirements[6];
   };
 
   TestProtocol()
     : descriptor("TestProtocol",
                  nullptr,
                  ProtocolDescriptorFlags().withResilient(true)) {
-    descriptor.NumMandatoryRequirements = 3;
-    descriptor.NumRequirements = 5;
+    descriptor.NumRequirements = 6;
     initializeRelativePointer(
       (int32_t *) &descriptor.Requirements,
       requirements);
 
     using Flags = ProtocolRequirementFlags;
 
-    requirements[0].Flags = Flags(Flags::Kind::Method);
-    requirements[0].DefaultImplementation = nullptr;
+    requirements[0].Flags = Flags(Flags::Kind::BaseProtocol);
     requirements[1].Flags = Flags(Flags::Kind::Method);
+    initializeRelativePointer(
+      (int32_t *) &requirements[1].Function,
+      fakeRequirement1);
     requirements[1].DefaultImplementation = nullptr;
     requirements[2].Flags = Flags(Flags::Kind::Method);
+    initializeRelativePointer(
+      (int32_t *) &requirements[2].Function,
+      fakeRequirement2);
     requirements[2].DefaultImplementation = nullptr;
     requirements[3].Flags = Flags(Flags::Kind::Method);
     initializeRelativePointer(
-      (int32_t *) &requirements[3].DefaultImplementation,
-      fakeDefaultWitness1);
+      (int32_t *) &requirements[3].Function,
+      fakeRequirement3);
+    requirements[3].DefaultImplementation = nullptr;
     requirements[4].Flags = Flags(Flags::Kind::Method);
     initializeRelativePointer(
+      (int32_t *) &requirements[4].Function,
+      fakeRequirement4);
+    initializeRelativePointer(
       (int32_t *) &requirements[4].DefaultImplementation,
+      fakeDefaultWitness1);
+    requirements[5].Flags = Flags(Flags::Kind::Method);
+    initializeRelativePointer(
+      (int32_t *) &requirements[5].Function,
+      fakeRequirement5);
+    initializeRelativePointer(
+      (int32_t *) &requirements[5].DefaultImplementation,
       fakeDefaultWitness2);
   }
 };
 
 // All of these have to be global to relative reference each other, and
 // the instantiator function.
-TestProtocol testProtocol;
-GenericWitnessTableStorage tableStorage1;
-GenericWitnessTableStorage tableStorage2;
-GenericWitnessTableStorage tableStorage3;
-GenericWitnessTableStorage tableStorage4;
-GenericWitnessTable::PrivateDataType tablePrivateData1;
+static TestProtocol testProtocol;
+static GenericWitnessTableStorage tableStorage1;
+static GenericWitnessTableStorage tableStorage2;
+static GenericWitnessTable::PrivateDataType tablePrivateData1;
 GenericWitnessTable::PrivateDataType tablePrivateData2;
-GenericWitnessTable::PrivateDataType tablePrivateData3;
-GenericWitnessTable::PrivateDataType tablePrivateData4;
 
 const void *witnesses[] = {
   (void *) 0,   // protocol descriptor
+  (void *) 777, // base protocol reference
   (void *) 123,
   (void *) 234,
   (void *) 0,   // filled in by instantiator function
@@ -806,15 +825,10 @@ WitnessTable *conditionalTablesBuffer[] = {(WitnessTable *)678};
 TEST(WitnessTableTest, getGenericWitnessTable) {
   EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
 
-  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(3),
-            (void *) fakeDefaultWitness1);
-  EXPECT_EQ(testProtocol.descriptor.getDefaultWitness(4),
-            (void *) fakeDefaultWitness2);
-
   // Conformance provides all requirements, and we don't have an
   // instantiator, so we can just return the pattern.
   {
-    tableStorage1.WitnessTableSizeInWords = 6;
+    tableStorage1.WitnessTableSizeInWords = 7;
     tableStorage1.WitnessTablePrivateSizeInWords = 0;
     initializeRelativePointer(&tableStorage1.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage1.Pattern, witnesses);
@@ -837,7 +851,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
   // Conformance provides all requirements, but we have private storage
   // and an initializer, so we must instantiate.
   {
-    tableStorage2.WitnessTableSizeInWords = 6;
+    tableStorage2.WitnessTableSizeInWords = 7;
     tableStorage2.WitnessTablePrivateSizeInWords = 1 + 1;
     initializeRelativePointer(&tableStorage2.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage2.Pattern, witnesses);
@@ -861,27 +875,91 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
                   reinterpret_cast<void *>(678));
 
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
-                  reinterpret_cast<void *>(123));
+                  reinterpret_cast<void *>(777));
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
-                  reinterpret_cast<void *>(234));
+                  reinterpret_cast<void *>(123));
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
-                  reinterpret_cast<void *>(345));
+                  reinterpret_cast<void *>(234));
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
-                  reinterpret_cast<void *>(456));
+                  reinterpret_cast<void *>(345));
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[5],
+                  reinterpret_cast<void *>(456));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[6],
                   reinterpret_cast<void *>(567));
 
         return instantiatedTable;
       });
   }
+}
 
-  // Conformance needs one default requirement to be filled in
+static GenericWitnessTableStorage tableStorage3;
+static GenericWitnessTable::PrivateDataType tablePrivateData3;
+
+static void *gotFakeRequirement1[] = { (void *) fakeRequirement1 };
+static void *gotFakeRequirement2[] = { (void *) fakeRequirement2 };
+static void *gotFakeRequirement3[] = { (void *) fakeRequirement3 };
+static void *gotFakeRequirement5[] = { (void *) fakeRequirement5 };
+
+static void fakeWitness1() {}
+static void fakeWitness2() {}
+static void fakeWitness3() {}
+static void fakeWitness5() {}
+
+struct ResilientWitnessStorage {
+  int32_t Requirement;
+  int32_t Witness;
+};
+
+struct ResilientWitnessTableStorage {
+  int32_t numWitnesses;
+  ResilientWitnessStorage witnesses[4];
+
+  ResilientWitnessTableStorage() {
+    // Note the funny order -- we want to make sure it's order-independent.
+    numWitnesses = 4;
+
+    initializeRelativePointer(
+      &witnesses[0].Requirement,
+      &gotFakeRequirement3);
+    initializeRelativePointer(
+      &witnesses[0].Witness,
+      fakeWitness3);
+
+    initializeRelativePointer(
+      &witnesses[1].Requirement,
+      &gotFakeRequirement2);
+    initializeRelativePointer(
+      &witnesses[1].Witness,
+      fakeWitness2);
+
+    initializeRelativePointer(
+      &witnesses[2].Requirement,
+      &gotFakeRequirement1);
+    initializeRelativePointer(
+      &witnesses[2].Witness,
+      fakeWitness1);
+
+    initializeRelativePointer(
+      &witnesses[3].Requirement,
+      &gotFakeRequirement5);
+    initializeRelativePointer(
+      &witnesses[3].Witness,
+      fakeWitness5);
+  }
+};
+
+static ResilientWitnessTableStorage resilientWitnesses;
+
+TEST(WitnessTableTest, ResilientWitnessTable) {
+  ResilientWitnessTableStorage wtable;
+
+  // Conformance needs both default requirements to be filled in
   {
-    tableStorage3.WitnessTableSizeInWords = 5;
-    tableStorage3.WitnessTablePrivateSizeInWords = 1 + 1;
+    tableStorage3.WitnessTableSizeInWords = 2;
     initializeRelativePointer(&tableStorage3.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage3.Pattern, witnesses);
-    initializeRelativePointer(&tableStorage3.Instantiator, witnessTableInstantiator);
+    initializeRelativePointer(&tableStorage3.ResilientWitnesses,
+                              &resilientWitnesses);
     initializeRelativePointer(&tableStorage3.PrivateData, &tablePrivateData3);
 
     GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
@@ -894,61 +972,22 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
 
         EXPECT_NE(instantiatedTable, table->Pattern.get());
 
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-2],
-                  reinterpret_cast<void *>(0));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-1],
-                  reinterpret_cast<void *>(678));
-
+        // From the pattern
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
-                  reinterpret_cast<void *>(123));
+                  reinterpret_cast<void *>(777));
+
+        // The rest come from the order-independent resilient witness
+        // descriptors
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
-                  reinterpret_cast<void *>(234));
+                  reinterpret_cast<void *>(fakeWitness1));
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
-                  reinterpret_cast<void *>(345));
+                  reinterpret_cast<void *>(fakeWitness2));
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
-                  reinterpret_cast<void *>(456));
+                  reinterpret_cast<void *>(fakeWitness3));
         EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[5],
-                  reinterpret_cast<void *>(fakeDefaultWitness2));
-
-        return instantiatedTable;
-      });
-  }
-
-  // Third case: conformance needs both default requirements
-  // to be filled in
-  {
-    tableStorage4.WitnessTableSizeInWords = 4;
-    tableStorage4.WitnessTablePrivateSizeInWords = 1 + 1;
-    initializeRelativePointer(&tableStorage4.Protocol, &testProtocol.descriptor);
-    initializeRelativePointer(&tableStorage4.Pattern, witnesses);
-    initializeRelativePointer(&tableStorage4.Instantiator, witnessTableInstantiator);
-    initializeRelativePointer(&tableStorage4.PrivateData, &tablePrivateData4);
-
-    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
-        &tableStorage4);
-
-    RaceTest_ExpectEqual<const WitnessTable *>(
-      [&]() -> const WitnessTable * {
-        const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void ***)conditionalTablesBuffer);
-
-        EXPECT_NE(instantiatedTable, table->Pattern.get());
-
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-2],
-                  reinterpret_cast<void *>(0));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-1],
-                  reinterpret_cast<void *>(678));
-
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
-                  reinterpret_cast<void *>(123));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
-                  reinterpret_cast<void *>(234));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
-                  reinterpret_cast<void *>(345));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
                   reinterpret_cast<void *>(fakeDefaultWitness1));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[5],
-                  reinterpret_cast<void *>(fakeDefaultWitness2));
+        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[6],
+                  reinterpret_cast<void *>(fakeWitness5));
 
         return instantiatedTable;
       });
