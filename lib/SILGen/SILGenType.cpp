@@ -248,6 +248,8 @@ public:
 
     addVTableEntries(ancestor);
   }
+  
+  void addCanaryPlaceholder() {}
 
   // Try to find an overridden entry.
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {

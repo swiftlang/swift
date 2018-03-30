@@ -230,6 +230,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   public:
     VTableVisitor(TBDGenVisitor &TBD, ClassDecl *CD)
         : TBD(TBD), CD(CD) {}
+    
+    void addCanaryPlaceholder() {}
 
     void addMethod(SILDeclRef method) {
       if (method.getDecl()->getDeclContext() == CD)

@@ -323,6 +323,10 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       }
       super::addGenericArgument(argType, forClass);
     }
+    
+    void addCanaryPlaceholder() {
+      super::addCanaryPlaceholder();
+    }
 
     void addMethod(SILDeclRef fn) {
       if (fn.getDecl()->getDeclContext() == Target) {

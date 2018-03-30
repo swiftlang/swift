@@ -181,6 +181,7 @@ public:
   void addClassAddressPoint() { addInt32(); }
   void addClassCacheData() { addPointer(); addPointer(); }
   void addClassDataPointer() { addPointer(); }
+  void addCanaryPlaceholder() { addPointer(); }
   void addMethod(SILDeclRef declRef) {
     addPointer();
   }

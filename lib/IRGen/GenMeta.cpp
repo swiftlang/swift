@@ -66,6 +66,8 @@
 using namespace swift;
 using namespace irgen;
 
+#define CANARY_PLACEHOLDER_VALUE 0x1234567890abcdef
+
 static Address emitAddressOfMetadataSlotAtIndex(IRGenFunction &IGF,
                                                 llvm::Value *metadata,
                                                 int index,
@@ -847,6 +849,10 @@ namespace {
       B.addInt32(VTableSize);
       
       addVTableEntries(getType());
+    }
+    
+    void addCanaryPlaceholder() {
+      B.addInt(IGM.SizeTy, CANARY_PLACEHOLDER_VALUE);
     }
     
     void addMethod(SILDeclRef fn) {
@@ -1836,6 +1842,10 @@ namespace {
     
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
       Members.addFieldOffsetPlaceholders(placeholder);
+    }
+    
+    void addCanaryPlaceholder() {
+      B.addInt(IGM.SizeTy, CANARY_PLACEHOLDER_VALUE);
     }
 
     void addMethod(SILDeclRef fn) {
