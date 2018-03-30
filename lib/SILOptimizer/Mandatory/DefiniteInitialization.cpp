@@ -3139,10 +3139,14 @@ static bool fixupConvertEscapeToNoEscapeLifetime(SILFunction &Fn) {
       auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Inst);
       if (!Cvt || Cvt->isLifetimeGuaranteed())
         continue;
+
       // First try to peephole a known pattern.
       if (!DIDisableConvertEscapeToNoEscapeSwitchEnumPeephole &&
-          (Changed |= trySwitchEnumPeephole(Cvt)))
+          trySwitchEnumPeephole(Cvt)) {
+        Changed |= true;
         continue;
+      }
+
       // Otherwise, extend the lifetime of the operand to the end of the
       // function.
       extendLifetimeToEndOfFunction(Fn, Cvt);
