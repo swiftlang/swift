@@ -9,6 +9,11 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===---------------------------------------------------------------------===//
+//
+// Note: This is really a C file, but Swift's build system for Linux is
+// partially allergic to C, so it's being compiled as ".cpp" for now.  Please
+// don't infect it with C++-isms.
+//
 ///
 /// The core algorithm here (see `swift_decompose_double` below) is a
 /// modified form of the Grisu2 algorithm from Florian Loitsch;
@@ -170,7 +175,6 @@ typedef struct {
      (dest).c = (uint32_t)(high64),                     \
      (dest).high = (uint32_t)((high64) >> 32))
 #endif
-static const uint64_t powersOf10_Float[];
 static int binaryExponentFor10ToThe(int p);
 static int decimalExponentFor2ToThe(int e);
 #endif
@@ -238,7 +242,6 @@ static void clearIntegerPart128(swift_uint128_t *fixed128, int fractionBits) {
     fixed128->high &= ((uint32_t)1 << highFractionBits) - 1;
 }
 #endif
-static const uint64_t powersOf10_Double[];
 static swift_uint128_t multiply128x64RoundingDown(swift_uint128_t lhs, uint64_t rhs);
 static swift_uint128_t multiply128x64RoundingUp(swift_uint128_t lhs, uint64_t rhs);
 static swift_uint128_t shiftRightRoundingDown128(swift_uint128_t lhs, int shift);
@@ -269,7 +272,6 @@ typedef struct {uint32_t low, b, c, d, e, high;} swift_uint192_t;
      (dest).e = (uint64_t)(high64),                               \
      (dest).high = (uint64_t)(high64) >> 32)
 #endif
-static const uint64_t powersOf10_Float80[];
 static void multiply192x64RoundingDown(swift_uint192_t *lhs, uint64_t rhs);
 static void multiply192x64RoundingUp(swift_uint192_t *lhs, uint64_t rhs);
 static void multiply192xi32(swift_uint192_t *lhs, uint32_t rhs);
@@ -862,8 +864,8 @@ int swift_decompose_float80(long double d,
     int base10Exponent = decimalExponentFor2ToThe(binaryExponent);
 
     // Step 4: Compute a power-of-10 scale factor
-    swift_uint192_t powerOfTenRoundedDown = {0};
-    swift_uint192_t powerOfTenRoundedUp = {0};
+    swift_uint192_t powerOfTenRoundedDown;
+    swift_uint192_t powerOfTenRoundedUp;
     int powerOfTenExponent = 0;
     intervalContainingPowerOf10_Float80(-base10Exponent,
                                         &powerOfTenRoundedDown,
@@ -2035,152 +2037,6 @@ static void shiftRightRoundingUp192(swift_uint192_t *lhs, int shift) {
 // ------------ Power of 10 calculation ----------------
 //
 
-#if SWIFT_DTOA_FLOAT_SUPPORT || SWIFT_DTOA_DOUBLE_SUPPORT || SWIFT_DTOA_FLOAT80_SUPPORT
-// The power-of-10 tables do not directly store the associated binary
-// exponent.  That's because the binary exponent is a simple linear
-// function of the decimal power (and vice versa), so it's just as
-// fast (and uses much less memory) to compute it:
-
-// The binary exponent corresponding to a particular power of 10.
-// This matches the power-of-10 tables across the full range of Float80.
-static int binaryExponentFor10ToThe(int p) {
-    return (int)(((((int64_t)p) * 55732705) >> 24) + 1);
-}
-
-// A decimal exponent that approximates a particular binary power.
-static int decimalExponentFor2ToThe(int e) {
-    return (int)(((int64_t)e * 20201781) >> 26);
-}
-#endif
-
-#if SWIFT_DTOA_FLOAT_SUPPORT
-// Given a power `p`, this returns three values:
-// * 64-bit fractions `lower` and `upper`
-// * integer `exponent`
-//
-// The returned values satisty the following:
-// ```
-//    lower * 2^exponent <= 10^p <= upper * 2^exponent
-// ```
-//
-// In particular, if `10^p` can be exactly represented, this routine
-// may return the same value for `lower` and `upper`.
-//
-static void intervalContainingPowerOf10_Float(int p, uint64_t *lower, uint64_t *upper, int *exponent) {
-    if (p < 0) {
-        uint64_t base = powersOf10_Float[p + 40];
-        int baseExponent = binaryExponentFor10ToThe(p + 40);
-        uint64_t tenToTheMinus40 = 0x8b61313bbabce2c6; // x 2^-132 ~= 10^-40
-        *lower = multiply64x64RoundingDown(base, tenToTheMinus40);
-        *upper = multiply64x64RoundingUp(base + 1, tenToTheMinus40 + 1);
-        *exponent = baseExponent - 132;
-    } else if (p <= 27) {
-        uint64_t exact = powersOf10_Float[p];
-        *upper = exact;
-        *lower = exact;
-        *exponent = binaryExponentFor10ToThe(p);
-    } else {
-        uint64_t exact = powersOf10_Float[p];
-        *upper = exact + 1;
-        *lower = exact;
-        *exponent = binaryExponentFor10ToThe(p);
-    }
-}
-#endif
-
-#if SWIFT_DTOA_DOUBLE_SUPPORT
-// As above, but returning 128-bit fractions suitable for
-// converting doubles.
-static void intervalContainingPowerOf10_Double(int p, swift_uint128_t *lower, swift_uint128_t *upper, int *exponent) {
-    if (p >= 0 && p <= 54) {
-        if (p <= 27) {
-            // Use one 64-bit exact value
-            swift_uint128_t exact;
-            initialize128WithHigh64(exact, powersOf10_Float[p]);
-            *upper = exact;
-            *lower = exact;
-            *exponent = binaryExponentFor10ToThe(p);
-            return;
-        } else {
-            // Multiply two 64-bit exact values to get a 128-bit exact value
-            swift_uint128_t base;
-            initialize128WithHigh64(base, powersOf10_Float[p - 27]);
-            int baseExponent = binaryExponentFor10ToThe(p - 27);
-            uint64_t extra = powersOf10_Float[27];
-            int extraExponent = binaryExponentFor10ToThe(27);
-            swift_uint128_t exact = multiply128x64RoundingDown(base, extra);
-            *upper = exact;
-            *lower = exact;
-            *exponent = baseExponent + extraExponent;
-            return;
-        }
-    }
-
-    // Multiply a 128-bit approximate value with a 64-bit exact value
-    int index = p + 400;
-    // Copy a pair of uint64_t into a swift_uint128_t
-    const uint64_t *base_p = powersOf10_Double + (index / 28) * 2;
-    swift_uint128_t base;
-    initialize128WithHighLow64(base, base_p[1], base_p[0]);
-    int extraPower = index % 28;
-    int baseExponent = binaryExponentFor10ToThe(p - extraPower);
-
-    int e = baseExponent;
-    if (extraPower > 0) {
-        int64_t extra = powersOf10_Float[extraPower];
-        e += binaryExponentFor10ToThe(extraPower);
-        *lower = multiply128x64RoundingDown(base, extra);
-        increment128(base);
-        *upper = multiply128x64RoundingUp(base, extra);
-    } else {
-        *lower = base;
-        increment128(base);
-        *upper = base;
-    }
-    *exponent = e;
-}
-#endif
-
-#if SWIFT_DTOA_FLOAT80_SUPPORT
-// As above, but returning 192-bit fractions suitable for
-// converting float80.
-static void intervalContainingPowerOf10_Float80(int p, swift_uint192_t *lower, swift_uint192_t *upper, int *exponent) {
-    if (p >= 0 && p <= 27) {
-        // We have an exact form, return a zero-width interval.
-        uint64_t exact = powersOf10_Float[p];
-        initialize192WithHighMidLow64(*upper, exact, 0, 0);
-        initialize192WithHighMidLow64(*lower, exact, 0, 0);
-        *exponent = binaryExponentFor10ToThe(p);
-        return;
-    }
-
-    int index = p + 5063;
-    const uint64_t *base_p = powersOf10_Float80 + (index / 83) * 3;
-    // Note: The low-order value in the Float80 table above
-    // is never UINT64_MAX, so there's never a carry from
-    // the increment here.
-    initialize192WithHighMidLow64(*upper, base_p[2], base_p[1], base_p[0] + 1);
-    initialize192WithHighMidLow64(*lower, base_p[2], base_p[1], base_p[0]);
-    int extraPower = index % 83;
-    int e = binaryExponentFor10ToThe(p - extraPower);
-
-    while (extraPower > 27) {
-        uint64_t power27 = powersOf10_Float[27];
-        multiply192x64RoundingDown(lower, power27);
-        multiply192x64RoundingUp(upper, power27);
-        e += binaryExponentFor10ToThe(27);
-        extraPower -= 27;
-    }
-    if (extraPower > 0) {
-        uint64_t extra = powersOf10_Float[extraPower];
-        multiply192x64RoundingDown(lower, extra);
-        multiply192x64RoundingUp(upper, extra);
-        e += binaryExponentFor10ToThe(extraPower);
-    }
-    *exponent = e;
-}
-#endif
-
 //
 // ------------  Power-of-10 tables. --------------------------
 //
@@ -2212,7 +2068,7 @@ static void intervalContainingPowerOf10_Float80(int p, swift_uint192_t *lower, s
 //
 // For Double and Float80, we use the 28 exact values
 // here to help reduce the size of those tables.
-static const uint64_t powersOf10_Float[] = {
+static const uint64_t powersOf10_Float[40] = {
     0x8000000000000000, // x 2^1 == 10^0 exactly
     0xa000000000000000, // x 2^4 == 10^1 exactly
     0xc800000000000000, // x 2^7 == 10^2 exactly
@@ -2434,3 +2290,150 @@ static const uint64_t powersOf10_Float80[] = {
     0x1a648c339e28cc45, 0xbd14f0fa3e24b6ae, 0x933a7ad2419ea0b5, // x 2^16544 ~= 10^4980
 };
 #endif
+
+#if SWIFT_DTOA_FLOAT_SUPPORT || SWIFT_DTOA_DOUBLE_SUPPORT || SWIFT_DTOA_FLOAT80_SUPPORT
+// The power-of-10 tables do not directly store the associated binary
+// exponent.  That's because the binary exponent is a simple linear
+// function of the decimal power (and vice versa), so it's just as
+// fast (and uses much less memory) to compute it:
+
+// The binary exponent corresponding to a particular power of 10.
+// This matches the power-of-10 tables across the full range of Float80.
+static int binaryExponentFor10ToThe(int p) {
+    return (int)(((((int64_t)p) * 55732705) >> 24) + 1);
+}
+
+// A decimal exponent that approximates a particular binary power.
+static int decimalExponentFor2ToThe(int e) {
+    return (int)(((int64_t)e * 20201781) >> 26);
+}
+#endif
+
+#if SWIFT_DTOA_FLOAT_SUPPORT
+// Given a power `p`, this returns three values:
+// * 64-bit fractions `lower` and `upper`
+// * integer `exponent`
+//
+// The returned values satisty the following:
+// ```
+//    lower * 2^exponent <= 10^p <= upper * 2^exponent
+// ```
+//
+// In particular, if `10^p` can be exactly represented, this routine
+// may return the same value for `lower` and `upper`.
+//
+static void intervalContainingPowerOf10_Float(int p, uint64_t *lower, uint64_t *upper, int *exponent) {
+    if (p < 0) {
+        uint64_t base = powersOf10_Float[p + 40];
+        int baseExponent = binaryExponentFor10ToThe(p + 40);
+        uint64_t tenToTheMinus40 = 0x8b61313bbabce2c6; // x 2^-132 ~= 10^-40
+        *lower = multiply64x64RoundingDown(base, tenToTheMinus40);
+        *upper = multiply64x64RoundingUp(base + 1, tenToTheMinus40 + 1);
+        *exponent = baseExponent - 132;
+    } else if (p <= 27) {
+        uint64_t exact = powersOf10_Float[p];
+        *upper = exact;
+        *lower = exact;
+        *exponent = binaryExponentFor10ToThe(p);
+    } else {
+        uint64_t exact = powersOf10_Float[p];
+        *upper = exact + 1;
+        *lower = exact;
+        *exponent = binaryExponentFor10ToThe(p);
+    }
+}
+#endif
+
+#if SWIFT_DTOA_DOUBLE_SUPPORT
+// As above, but returning 128-bit fractions suitable for
+// converting doubles.
+static void intervalContainingPowerOf10_Double(int p, swift_uint128_t *lower, swift_uint128_t *upper, int *exponent) {
+    if (p >= 0 && p <= 54) {
+        if (p <= 27) {
+            // Use one 64-bit exact value
+            swift_uint128_t exact;
+            initialize128WithHigh64(exact, powersOf10_Float[p]);
+            *upper = exact;
+            *lower = exact;
+            *exponent = binaryExponentFor10ToThe(p);
+            return;
+        } else {
+            // Multiply two 64-bit exact values to get a 128-bit exact value
+            swift_uint128_t base;
+            initialize128WithHigh64(base, powersOf10_Float[p - 27]);
+            int baseExponent = binaryExponentFor10ToThe(p - 27);
+            uint64_t extra = powersOf10_Float[27];
+            int extraExponent = binaryExponentFor10ToThe(27);
+            swift_uint128_t exact = multiply128x64RoundingDown(base, extra);
+            *upper = exact;
+            *lower = exact;
+            *exponent = baseExponent + extraExponent;
+            return;
+        }
+    }
+
+    // Multiply a 128-bit approximate value with a 64-bit exact value
+    int index = p + 400;
+    // Copy a pair of uint64_t into a swift_uint128_t
+    const uint64_t *base_p = powersOf10_Double + (index / 28) * 2;
+    swift_uint128_t base;
+    initialize128WithHighLow64(base, base_p[1], base_p[0]);
+    int extraPower = index % 28;
+    int baseExponent = binaryExponentFor10ToThe(p - extraPower);
+
+    int e = baseExponent;
+    if (extraPower > 0) {
+        int64_t extra = powersOf10_Float[extraPower];
+        e += binaryExponentFor10ToThe(extraPower);
+        *lower = multiply128x64RoundingDown(base, extra);
+        increment128(base);
+        *upper = multiply128x64RoundingUp(base, extra);
+    } else {
+        *lower = base;
+        increment128(base);
+        *upper = base;
+    }
+    *exponent = e;
+}
+#endif
+
+#if SWIFT_DTOA_FLOAT80_SUPPORT
+// As above, but returning 192-bit fractions suitable for
+// converting float80.
+static void intervalContainingPowerOf10_Float80(int p, swift_uint192_t *lower, swift_uint192_t *upper, int *exponent) {
+    if (p >= 0 && p <= 27) {
+        // We have an exact form, return a zero-width interval.
+        uint64_t exact = powersOf10_Float[p];
+        initialize192WithHighMidLow64(*upper, exact, 0, 0);
+        initialize192WithHighMidLow64(*lower, exact, 0, 0);
+        *exponent = binaryExponentFor10ToThe(p);
+        return;
+    }
+
+    int index = p + 5063;
+    const uint64_t *base_p = powersOf10_Float80 + (index / 83) * 3;
+    // Note: The low-order value in the Float80 table above
+    // is never UINT64_MAX, so there's never a carry from
+    // the increment here.
+    initialize192WithHighMidLow64(*upper, base_p[2], base_p[1], base_p[0] + 1);
+    initialize192WithHighMidLow64(*lower, base_p[2], base_p[1], base_p[0]);
+    int extraPower = index % 83;
+    int e = binaryExponentFor10ToThe(p - extraPower);
+
+    while (extraPower > 27) {
+        uint64_t power27 = powersOf10_Float[27];
+        multiply192x64RoundingDown(lower, power27);
+        multiply192x64RoundingUp(upper, power27);
+        e += binaryExponentFor10ToThe(27);
+        extraPower -= 27;
+    }
+    if (extraPower > 0) {
+        uint64_t extra = powersOf10_Float[extraPower];
+        multiply192x64RoundingDown(lower, extra);
+        multiply192x64RoundingUp(upper, extra);
+        e += binaryExponentFor10ToThe(extraPower);
+    }
+    *exponent = e;
+}
+#endif
+
