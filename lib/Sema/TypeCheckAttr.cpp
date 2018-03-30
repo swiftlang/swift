@@ -2085,7 +2085,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 }
 
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
-  switch (D->getModuleContext()->getResilienceStrategy()) {
+  auto *ED = cast<EnumDecl>(D);
+
+  switch (ED->getModuleContext()->getResilienceStrategy()) {
   case ResilienceStrategy::Default:
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
     return;
@@ -2093,11 +2095,11 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
     break;
   }
 
-  if (cast<EnumDecl>(D)->getFormalAccess() >= AccessLevel::Public)
-    return;
-  if (D->getAttrs().hasAttribute<UsableFromInlineAttr>())
-    return;
-  diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  auto access = ED->getFormalAccess(/*useDC=*/nullptr,
+                                    /*isUsageFromInline=*/true);
+  if (access < AccessLevel::Public) {
+    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
