@@ -2,7 +2,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
@@ -42,12 +41,12 @@ import Foundation
     return f(x)
   }
 
-  // GUARANTEED-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSo8NSStringCABIyBya_S2SIeggo_TR : $@convention(thin) (@guaranteed String, @guaranteed @convention(block) @noescape (NSString) -> @autoreleased NSString) -> @owned String {
-  // GUARANTEED: bb0(%0 : @guaranteed $String, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (NSString) -> @autoreleased NSString):
-  // GUARANTEED:   [[BRIDGE:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
-  // GUARANTEED:   [[NSSTR:%.*]] = apply [[BRIDGE]](%0)
-  // GUARANTEED:   apply [[BLOCK]]([[NSSTR]]) : $@convention(block) @noescape (NSString) -> @autoreleased NSString
-  // GUARANTEED: } // end sil function '$SSo8NSStringCABIyBya_S2SIeggo_TR'
+  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSo8NSStringCABIyBya_S2SIeggo_TR : $@convention(thin) (@guaranteed String, @guaranteed @convention(block) @noescape (NSString) -> @autoreleased NSString) -> @owned String {
+  // CHECK: bb0(%0 : @guaranteed $String, [[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (NSString) -> @autoreleased NSString):
+  // CHECK:   [[BRIDGE:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+  // CHECK:   [[NSSTR:%.*]] = apply [[BRIDGE]](%0)
+  // CHECK:   apply [[BLOCK]]([[NSSTR]]) : $@convention(block) @noescape (NSString) -> @autoreleased NSString
+  // CHECK: }
 
   // CHECK-LABEL: sil hidden [thunk] @$S20objc_blocks_bridging3FooC3bas_1xSSSgA2FXE_AFtFTo : $@convention(objc_method) (@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, Optional<NSString>, Foo) -> @autoreleased Optional<NSString> {
   // CHECK:       bb0([[BLOCK:%.*]] : @unowned $@convention(block) @noescape (Optional<NSString>) -> @autoreleased Optional<NSString>, [[OPT_STRING:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $Foo):
@@ -171,7 +170,7 @@ func bridgeNonnullBlockResult() {
 }
 
 // CHECK-LABEL: sil hidden @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tF
-func bridgeNoescapeBlock(fn: () -> ()) {
+func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU_
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
@@ -241,6 +240,8 @@ func bridgeNoescapeBlock(fn: () -> ()) {
   // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
   // CHECK: apply [[FN]]([[BLOCK]])
   noescapeNonnullBlock(fn)
+
+  noescapeBlock(optFn)
 
   noescapeBlockAlias { }
   noescapeBlockAlias(fn)
