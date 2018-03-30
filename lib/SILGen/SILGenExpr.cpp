@@ -2091,9 +2091,9 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
 
   if (srcTy != destTy) {
-    bool dontPostponeToNoEscapeCleanup = isa<BindOptionalExpr>(e->getSubExpr());
+    bool postponeToNoEscapeCleanup = !isa<BindOptionalExpr>(e->getSubExpr());
     result = SGF.emitTransformedValue(e, result, srcTy, destTy, SGFContext(),
-                                      dontPostponeToNoEscapeCleanup);
+                                      postponeToNoEscapeCleanup);
   }
 
   if (destTy != destRepTy)
