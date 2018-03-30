@@ -1052,6 +1052,7 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   // point.
   for (auto *FinalRelease : Tracker.getFinalReleases()) {
     Builder.setInsertionPoint(FinalRelease);
+    Builder.setCurrentDebugScope(FinalRelease->getDebugScope());
     for (unsigned i : indices(Args)) {
       SILValue Arg = Args[i];
       SILParameterInfo Param = Params[i];
