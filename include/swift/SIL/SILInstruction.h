@@ -3946,18 +3946,26 @@ class ConvertEscapeToNoEscapeInst final
           ConvertEscapeToNoEscapeInst, ConversionInst> {
   friend SILBuilder;
 
+  bool lifetimeGuaranteed;
+
   ConvertEscapeToNoEscapeInst(SILDebugLocation DebugLoc, SILValue Operand,
-                               ArrayRef<SILValue> TypeDependentOperands,
-                               SILType Ty)
+                              ArrayRef<SILValue> TypeDependentOperands,
+                              SILType Ty, bool isLifetimeGuaranteed)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty) {
+            DebugLoc, Operand, TypeDependentOperands, Ty),
+        lifetimeGuaranteed(isLifetimeGuaranteed) {
     assert(!Operand->getType().castTo<SILFunctionType>()->isNoEscape());
     assert(Ty.castTo<SILFunctionType>()->isNoEscape());
   }
 
   static ConvertEscapeToNoEscapeInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         bool lifetimeGuaranteed);
+public:
+  bool isLifetimeGuaranteed() const {
+    return lifetimeGuaranteed;
+  }
 };
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a

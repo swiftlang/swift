@@ -984,10 +984,10 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createConvertEscapeToNoEscape(
-                          getOpLocation(Inst->getLoc()),
-                          getOpValue(Inst->getOperand()),
-                          getOpType(Inst->getType())));
+  doPostProcess(
+      Inst, getBuilder().createConvertEscapeToNoEscape(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()), Inst->isLifetimeGuaranteed()));
 }
 
 template<typename ImplClass>
