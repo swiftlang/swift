@@ -69,11 +69,11 @@ public typealias Indexable = Collection
 ///         }
 ///     }
 ///
-/// The `CollectionOfTwo` type uses the default iterator type,
-/// `IndexingIterator`, because it doesn't define its own `makeIterator()`
-/// method or `Iterator` associated type. This example shows how a
-/// `CollectionOfTwo` instance can be created holding the values of a point,
-/// and then iterated over using a `for`-`in` loop.
+/// Because `CollectionOfTwo` doesn't define its own `makeIterator()`
+/// method or `Iterator` associated type, it uses the default iterator type,
+/// `IndexingIterator`. This example shows how a `CollectionOfTwo` instance
+/// can be created holding the values of a point, and then iterated over
+/// using a `for`-`in` loop.
 ///
 ///     let point = CollectionOfTwo(15.0, 20.0)
 ///     for element in point {
@@ -426,22 +426,35 @@ public protocol Collection: Sequence where SubSequence: Collection {
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
-  /// The accessed slice uses the same indices for the same elements as the
-  /// original collection uses. Always use the slice's `startIndex` property
-  /// instead of assuming that its indices start at a particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
+  /// For example, using a `PartialRangeFrom` range expression with an array
+  /// accesses the subrange from the start of the range expression until the
+  /// end of the array.
   ///
   ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
+  ///     let streetsSlice = streets[2..<5]
   ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
+  ///     // ["Channing", "Douglas", "Evarts"]
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
-  ///     print(streets[index!])
-  ///     // Prints "Evarts"
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection. This example searches `streetsSlice` for one of the
+  /// strings in the slice, and then uses that index in the original array.
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")!    // 4
+  ///     print(streets[index])
+  ///     // "Evarts"
+  ///
+  /// Always use the slice's `startIndex` property instead of assuming that its
+  /// indices start at a particular value. Attempting to access an element by
+  /// using an index outside the bounds of the slice may result in a runtime
+  /// error, even if that index is valid for the original collection.
+  ///
+  ///     print(streetsSlice.startIndex)
+  ///     // 2
+  ///     print(streetsSlice[2])
+  ///     // "Channing"
+  ///
+  ///     print(streetsSlice[0])
+  ///     // error: Index out of bounds
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
@@ -591,7 +604,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
   ///     }
-  ///     // Prints "Hi ho, Silver!")
+  ///     // Prints "Hi ho, Silver!"
   ///
   /// - Complexity: O(1)
   var isEmpty: Bool { get }
@@ -1120,7 +1133,7 @@ extension Collection where SubSequence == Slice<Self> {
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
-  /// original collection uses. Always use the slice's `startIndex` property
+  /// original collection. Always use the slice's `startIndex` property
   /// instead of assuming that its indices start at a particular value.
   ///
   /// This example demonstrates getting a slice of an array of strings, finding
@@ -1274,7 +1287,7 @@ extension Collection {
   /// to lowercase strings and then to count their characters.
   ///
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let lowercaseNames = cast.map { $0.lowercaseString }
+  ///     let lowercaseNames = cast.map { $0.lowercased() }
   ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
   ///     let letterCounts = cast.map { $0.count }
   ///     // 'letterCounts' == [6, 6, 3, 4]

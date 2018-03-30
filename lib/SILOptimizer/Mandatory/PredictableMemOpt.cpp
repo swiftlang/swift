@@ -1394,6 +1394,12 @@ namespace {
 
 class PredictableMemoryOptimizations : public SILFunctionTransform {
   /// The entry point to the transformation.
+  ///
+  /// FIXME: This pass should not need to rerun on deserialized
+  /// functions. Nothing should have changed in the upstream pipeline after
+  /// deserialization. However, rerunning does improve some benchmarks. This
+  /// either indicates that this pass missing some opportunities the first time,
+  /// or has a pass order dependency on other early passes.
   void run() override {
     if (optimizeMemoryAllocations(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

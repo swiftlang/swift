@@ -480,6 +480,7 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
+    TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/true);
     TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);
 
     Expr *theCall = DS->getCallExpr();
@@ -599,16 +600,7 @@ public:
       return nullptr;
     }
     
-    // If the sequence is an implicitly unwrapped optional, force it.
     Expr *sequence = S->getSequence();
-    if (auto objectTy
-          = sequence->getType()->getImplicitlyUnwrappedOptionalObjectType()) {
-      sequence = new (TC.Context) ForceValueExpr(sequence,
-                                                 sequence->getEndLoc());
-      sequence->setType(objectTy);
-      sequence->setImplicit();
-      S->setSequence(sequence);
-    }
 
     // Invoke iterator() to get an iterator from the sequence.
     Type generatorTy;
@@ -840,6 +832,14 @@ public:
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
 
+    // Pre-emptively visit all Decls (#if/#warning/#error) that still exist in
+    // the list of raw cases.
+    for (auto node : S->getRawCases()) {
+      if (!node.is<Decl*>()) continue;
+      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/true);
+      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/false);
+    }
+
     auto cases = S->getCases();
     CaseStmt *previousBlock = nullptr;
     for (auto i = cases.begin(), e = cases.end(); i != e; ++i) {
@@ -942,7 +942,7 @@ public:
     }
 
     if (!S->isImplicit()) {
-      TC.checkSwitchExhaustiveness(S, /*limitChecking*/hadError);
+      TC.checkSwitchExhaustiveness(S, DC, /*limitChecking*/hadError);
     }
 
     return S;
@@ -1032,7 +1032,7 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 static bool isDiscardableType(Type type) {
   return (type->hasError() ||
           type->isUninhabited() ||
-          type->lookThroughAllAnyOptionalTypes()->isVoid());
+          type->lookThroughAllOptionalTypes()->isVoid());
 }
 
 static void diagnoseIgnoredLiteral(TypeChecker &TC, LiteralExpr *LE) {
@@ -1340,6 +1340,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
       break;
 
+    TC.typeCheckDecl(SubDecl, /*isFirstPass*/true);
     TC.typeCheckDecl(SubDecl, /*isFirstPass*/false);
   }
   
@@ -1349,14 +1350,13 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 /// Check the default arguments that occur within this pattern.
 static void checkDefaultArguments(TypeChecker &tc,
                                   ParameterList *params,
-                                  unsigned &nextArgIndex,
-                                  AbstractFunctionDecl *func) {
+                                  unsigned &nextArgIndex) {
   for (auto &param : *params) {
     ++nextArgIndex;
     if (!param->getDefaultValue() || !param->hasType() ||
         param->getType()->hasError())
       continue;
-    
+
     Expr *e = param->getDefaultValue();
     auto initContext = param->getDefaultArgumentInitContext();
 
@@ -1379,21 +1379,34 @@ static void checkDefaultArguments(TypeChecker &tc,
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc,
-                                  AbstractFunctionDecl *func) {
+void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
+                                        ValueDecl *VD) {
   // In Swift 4 mode, default argument bodies are inlined into the
   // caller.
-  auto expansion = func->getResilienceExpansion();
-  if (!tc.Context.isSwiftVersion3() &&
-      func->getFormalAccessScope(/*useDC=*/nullptr,
-                                 /*respectVersionedAttr=*/true).isPublic())
-    expansion = ResilienceExpansion::Minimal;
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(VD)) {
+    auto expansion = func->getResilienceExpansion();
+    if (!Context.isSwiftVersion3() &&
+        func->getFormalAccessScope(/*useDC=*/nullptr,
+                                   /*respectVersionedAttr=*/true).isPublic())
+      expansion = ResilienceExpansion::Minimal;
 
-  func->setDefaultArgumentResilienceExpansion(expansion);
+    func->setDefaultArgumentResilienceExpansion(expansion);
+  } else {
+    auto *EED = cast<EnumElementDecl>(VD);
+    auto expansion = EED->getParentEnum()->getResilienceExpansion();
+    // Enum payloads parameter lists may have default arguments as of Swift 5.
+    if (Context.isSwiftVersionAtLeast(5) &&
+        EED->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*respectVersionedAttr=*/true).isPublic())
+      expansion = ResilienceExpansion::Minimal;
+
+    EED->setDefaultArgumentResilienceExpansion(expansion);
+  }
+
 
   unsigned nextArgIndex = 0;
-  for (auto paramList : func->getParameterLists())
-    checkDefaultArguments(tc, paramList, nextArgIndex, func);
+  for (auto *paramList : paramLists)
+    ::checkDefaultArguments(*this, paramList, nextArgIndex);
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
@@ -1417,14 +1430,15 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (!AFD->getBody())
     return false;
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
+
+  for (auto paramList : AFD->getParameterLists())
+    requestRequiredNominalTypeLayoutForParameters(paramList);
 
   if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
     return true;
@@ -1437,7 +1451,8 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
-  checkDefaultArguments(*this, FD);
+  // Check the default argument definitions.
+  checkDefaultArguments(FD->getParameterLists(), FD);
 
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
@@ -1460,7 +1475,8 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
                                               SourceLoc(), /*Implicit=*/true);
   Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
-                                            Context.Id_init, DeclNameLoc(),
+                                            DeclBaseName::createConstructor(),
+                                            DeclNameLoc(),
                                             /*Implicit=*/true);
   r = CallExpr::createImplicit(Context, r, { }, { });
 
@@ -1540,7 +1556,8 @@ static bool isKnownEndOfConstructor(ASTNode N) {
 
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
-  checkDefaultArguments(*this, ctor);
+  // Check the default argument definitions.
+  checkDefaultArguments(ctor->getParameterLists(), ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)
@@ -1619,9 +1636,12 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     }
 
     // An inlinable constructor in a class must always be delegating,
-    // unless the class is formally '@_fixed_layout'.
-    if (!isDelegating &&
-        ClassD->isFormallyResilient() &&
+    // unless the class is '@_fixed_layout'.
+    // Note: This is specifically not using isFormallyResilient. We relax this
+    // rule for classes in non-resilient modules so that they can have inlinable
+    // constructors, as long as those constructors don't reference private
+    // declarations.
+    if (!isDelegating && ClassD->isResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       diagnose(ctor, diag::class_designated_init_inlineable_resilient,
                ClassD->getDeclaredInterfaceType(),

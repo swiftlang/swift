@@ -12,9 +12,9 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
@@ -81,9 +81,11 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
 
-static bool ParseFrontendArgs(FrontendOptions &opts, ArgList &args,
-                              DiagnosticEngine &diags) {
-  return ArgsToFrontendOptionsConverter(diags, args, opts).convert();
+static bool ParseFrontendArgs(
+    FrontendOptions &opts, ArgList &args, DiagnosticEngine &diags,
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
+  ArgsToFrontendOptionsConverter converter(diags, args, opts);
+  return converter.convert(buffers);
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
@@ -208,7 +210,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -308,6 +309,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    OPT_disable_nskeyedarchiver_diagnostics,
                    Opts.EnableNSKeyedArchiverDiagnostics);
 
+  Opts.EnableNonFrozenEnumExhaustivityDiagnostics =
+    Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
+                 OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
+                 Opts.EnableNonFrozenEnumExhaustivityDiagnostics);
+
   if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
     Opts.OptimizationRemarkPassedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
@@ -327,6 +333,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
+  Opts.EnableKeyPathResilience |= Args.hasArg(OPT_enable_key_path_resilience);
+  
 #if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
   Opts.UseDarwinPreStableABIBit = false;
 #else
@@ -529,11 +537,6 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
   }
-  if (Opts.shouldOptimize() && Opts.EnforceExclusivityDynamic) {
-    Diags.diagnose(SourceLoc(),
-                   diag::warning_argument_not_supported_with_optimization,
-                   A->getOption().getPrefixedName() + A->getValue());
-  }
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
@@ -670,8 +673,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.EnableGuaranteedNormalArguments |=
-      Args.hasArg(OPT_enable_guaranteed_normal_arguments);
+  Opts.EnableGuaranteedNormalArguments &=
+      !Args.hasArg(OPT_disable_guaranteed_normal_arguments);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
@@ -679,18 +682,18 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.InputsAndOutputs.getSingleOutputFilename();
+    std::string BaseName = FEOpts.InputsAndOutputs.getSingleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
       BaseName = FEOpts.ModuleName;
-    Opts.SILOutputFileNameForDebugging = BaseName.str();
+    Opts.SILOutputFileNameForDebugging = BaseName;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
     Opts.Sanitizers = parseSanitizerArgValues(
         Args, A, Triple, Diags,
-        /* sanitizerRuntimeLibExists= */[](StringRef libName) {
+        /* sanitizerRuntimeLibExists= */[](StringRef libName, bool shared) {
 
           // The driver has checked the existence of the library
           // already.
@@ -699,7 +702,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.Sanitizers = Opts.Sanitizers;
   }
 
-  if (Opts.shouldOptimize())
+  if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
+                               OPT_disable_verify_exclusivity)) {
+    Opts.VerifyExclusivity
+      = A->getOption().matches(OPT_enable_verify_exclusivity);
+  }
+  if (Opts.shouldOptimize() && !Opts.VerifyExclusivity)
     Opts.EnforceExclusivityDynamic = false;
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
@@ -825,18 +833,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
-  // TODO: investigate whether these should be removed, in favor of definitions
-  // in other classes.
-  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const InputFile *input =
-                 FrontendOpts.InputsAndOutputs.getUniquePrimaryInput()) {
-    Opts.MainInputFilename = input->file();
-  } else if (FrontendOpts.InputsAndOutputs.hasSingleInput()) {
-    Opts.MainInputFilename =
-        FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput();
-  }
-  Opts.OutputFilenames = FrontendOpts.InputsAndOutputs.copyOutputFilenames();
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))
@@ -919,8 +915,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
-bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
-                       StringRef ResourcePath, ArgList &Args,
+bool ParseMigratorArgs(MigratorOptions &Opts,
+                       const FrontendOptions &FrontendOpts,
+                       const llvm::Triple &Triple,
+                       StringRef ResourcePath, const ArgList &Args,
                        DiagnosticEngine &Diags) {
   using namespace options;
 
@@ -969,12 +967,30 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
     }
   }
 
+  if (Opts.shouldRunMigrator()) {
+    assert(!FrontendOpts.InputsAndOutputs.isWholeModule());
+    // FIXME: In order to support batch mode properly, the migrator would have
+    // to support having one remap file path and one migrated file path per
+    // primary input. The easiest way to do this would be to move processing of
+    // these paths into FrontendOptions, like other supplementary outputs, and
+    // to call migrator::updateCodeAndEmitRemapIfNeeded once for each primary
+    // file.
+    //
+    // Supporting WMO would be similar, but WMO is set up to only produce one
+    // supplementary output for the whole compilation instead of one per input,
+    // so it's probably not worth it.
+    FrontendOpts.InputsAndOutputs.assertMustNotBeMoreThanOnePrimaryInput();
+  }
+
   return false;
 }
 
-bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
-                                   DiagnosticEngine &Diags,
-                                   StringRef workingDirectory) {
+bool CompilerInvocation::parseArgs(
+    ArrayRef<const char *> Args,
+    DiagnosticEngine &Diags,
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
+        *ConfigurationFileBuffers,
+    StringRef workingDirectory) {
   using namespace options;
 
   if (Args.empty())
@@ -1000,7 +1016,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags)) {
+  if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
+                        ConfigurationFileBuffers)) {
     return true;
   }
 
@@ -1033,7 +1050,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseMigratorArgs(MigratorOpts, LangOpts.Target,
+  if (ParseMigratorArgs(MigratorOpts, FrontendOpts, LangOpts.Target,
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }

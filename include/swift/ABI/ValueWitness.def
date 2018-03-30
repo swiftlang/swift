@@ -180,15 +180,15 @@ FUNCTION_VALUE_WITNESS(initializeBufferWithTakeOfBuffer,
                        MUTABLE_VALUE_TYPE,
                        (MUTABLE_BUFFER_TYPE, MUTABLE_BUFFER_TYPE, TYPE_TYPE))
 
-/// int (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases)
+/// unsigned (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases)
 /// Given an instance of valid single payload enum with a payload of this
 /// witness table's type (e.g Optional<ThisType>) , get the tag of the enum.
 FUNCTION_VALUE_WITNESS(getEnumTagSinglePayload,
                        GetEnumTagSinglePayload,
-                       INT_TYPE,
+                       UINT_TYPE,
                        (IMMUTABLE_VALUE_TYPE, UINT_TYPE, TYPE_TYPE))
 
-/// void (*storeEnumTagSinglePayload)(T* enum, INT_TYPE whichCase,
+/// void (*storeEnumTagSinglePayload)(T* enum, UINT_TYPE whichCase,
 ///                                   UINT_TYPE emptyCases)
 /// Given uninitialized memory for an instance of a single payload enum with a
 /// payload of this witness table's type (e.g Optional<ThisType>), store the
@@ -196,7 +196,7 @@ FUNCTION_VALUE_WITNESS(getEnumTagSinglePayload,
 FUNCTION_VALUE_WITNESS(storeEnumTagSinglePayload,
                        StoreEnumTagSinglePayload,
                        VOID_TYPE,
-                       (MUTABLE_VALUE_TYPE, INT_TYPE, UINT_TYPE, TYPE_TYPE))
+                       (MUTABLE_VALUE_TYPE, UINT_TYPE, UINT_TYPE, TYPE_TYPE))
 
 END_VALUE_WITNESS_RANGE(RequiredValueWitnessFunction,
                         StoreEnumTagSinglePayload)
@@ -327,11 +327,11 @@ END_VALUE_WITNESS_RANGE(ExtraInhabitantValueWitness,
 // The following value witnesses are conditionally present if the witnessed
 // type is an enum.
 
-///   int (*getEnumTag)(T *obj, M *self);
+///   unsigned (*getEnumTag)(T *obj, M *self);
 ///
 /// Given a valid object of this enum type, extracts the tag value indicating
 /// which case of the enum is inhabited. Returned values are in the range
-/// [-ElementsWithPayload..ElementsWithNoPayload-1].
+/// [0..NumElements-1].
 FUNCTION_VALUE_WITNESS(getEnumTag,
                        GetEnumTag,
                        INT_TYPE,
@@ -348,14 +348,14 @@ FUNCTION_VALUE_WITNESS(destructiveProjectEnumData,
                        VOID_TYPE,
                        (MUTABLE_VALUE_TYPE, TYPE_TYPE))
 
-///   void (*destructiveInjectEnumTag)(T *obj, int tag, M *self);
+///   void (*destructiveInjectEnumTag)(T *obj, unsigned tag, M *self);
 /// Given an enum case tag and a valid object of case's payload type,
 /// destructively inserts the tag into the payload. The given tag value
 /// must be in the range [-ElementsWithPayload..ElementsWithNoPayload-1].
 FUNCTION_VALUE_WITNESS(destructiveInjectEnumTag,
                        DestructiveInjectEnumTag,
                        VOID_TYPE,
-                       (MUTABLE_VALUE_TYPE, INT_TYPE, TYPE_TYPE))
+                       (MUTABLE_VALUE_TYPE, UINT_TYPE, TYPE_TYPE))
 
 END_VALUE_WITNESS_RANGE(EnumValueWitness,
                         DestructiveInjectEnumTag)

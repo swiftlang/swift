@@ -688,11 +688,9 @@ func test() {
   var x = Foo()
   let y = Foo()
 
-  // FIXME: Bad diagnostics
-
   // rdar://15708430
-  (&x).method()  // expected-error {{type of expression is ambiguous without more context}}
-  (&x).mutatingMethod() // expected-error {{cannot use mutating member on immutable value of type 'inout Foo'}}
+  (&x).method()  // expected-error {{use of extraneous '&'}}
+  (&x).mutatingMethod() // expected-error {{use of extraneous '&'}}
 }
 
 
@@ -825,6 +823,10 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
 
   &_ // expected-error {{expression type 'inout _' is ambiguous without more context}}
+
+  // The next error is awful, but we don't want regress and let non-immediate
+  // inout usage slip through.
+  inoutTests((&x, 24).0) // expected-error {{cannot pass immutable value of type 'inout Int' as inout argument}}
 
   inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
   inoutTests(&x)

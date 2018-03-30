@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 //
 // REQUIRES: CPU=x86_64
 
@@ -17,7 +17,8 @@ sil_vtable TestClass {}
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @alloc_on_stack
 // CHECK:      %reference.raw = alloca i8, i32 28, align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK-NEXT: [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast i8* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C:.*TestClass.*]]*
@@ -34,7 +35,8 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 28, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
@@ -46,7 +48,8 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_3_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}CMa"()
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}CMa"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 40, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
@@ -60,7 +63,8 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[S:%[0-9]+]] = mul i64 4, %0
 // CHECK-NEXT: [[A:%[0-9]+]] = add i64 20, [[S]]
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 [[A]], i64 7)
@@ -73,7 +77,8 @@ bb0(%c : $Builtin.Word):
 }
 
 // CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_2_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[S1:%[0-9]+]] = mul i64 1, %0
 // CHECK-NEXT: [[S2:%[0-9]+]] = add i64 17, [[S1]]
 // CHECK-NEXT: [[S3:%[0-9]+]] = add i64 [[S2]], 3
@@ -95,7 +100,8 @@ bb0(%c1 : $Builtin.Word, %c2 : $Builtin.Word):
 // CHECK-NEXT: [[S3:%[0-9]+]] = and i64 [[S1]], [[S2]]
 // CHECK-NEXT: [[S4:%[0-9]+]] = mul i64 %stride, %0
 // CHECK-NEXT: [[S5:%[0-9]+]] = add i64 [[S3]], [[S4]]
-// CHECK:      call noalias %swift.refcounted* @swift_allocObject(%swift.type* %{{[0-9]+}}, i64 [[S5]], i64 7)
+// CHECK-NEXT: [[A:%[0-9]+]] = or i64 7, %flags.alignmentMask
+// CHECK:      call noalias %swift.refcounted* @swift_allocObject(%swift.type* %{{[0-9]+}}, i64 [[S5]], i64 [[A]])
 // CHECK:      ret
 sil @alloc_generic : $@convention(thin) <T> (Builtin.Word, @thick T.Type) -> @owned TestClass {
 bb0(%0 : $Builtin.Word, %1 : $@thick T.Type):
@@ -110,10 +116,15 @@ bb0(%0 : $Builtin.Word, %1 : $@thick T.Type):
 // CHECK-NEXT: [[INT_PTR:%[0-9]+]] = bitcast i8* [[SIZE_ADDR]] to i32*
 // CHECK-NEXT: [[SIZE:%[0-9]+]] = load i32, i32* [[INT_PTR]]
 // CHECK-NEXT: [[SIZE64:%[0-9]+]] = zext i32 [[SIZE]] to i64
-// CHECK:      [[ALIGN_TMP:%[0-9]+]] = add i64 [[SIZE64]], 3
+// CHECK-NEXT: [[ALIGN_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 52
+// CHECK-NEXT: [[SHORT_PTR:%[0-9]+]] = bitcast i8* [[ALIGN_ADDR]] to i16*
+// CHECK-NEXT: [[ALIGN:%[0-9]+]] = load i16, i16* [[SHORT_PTR]]
+// CHECK-NEXT: [[ALIGN64:%[0-9]+]] = zext i16 [[ALIGN]] to i64
+// CHECK-NEXT: [[ALIGN_TMP:%[0-9]+]] = add i64 [[SIZE64]], 3
 // CHECK-NEXT: [[ALIGNED:%[0-9]+]] = and i64 [[ALIGN_TMP]], -4
 // CHECK-NEXT: [[TOTAL_SIZE:%[0-9]+]] = add i64 [[ALIGNED]], 12
-// CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[TOTAL_SIZE]], i64 {{.*}})
+// CHECK-NEXT: [[TOTAL_ALIGN:%[0-9]+]] = or i64 [[ALIGN64]], 3
+// CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[TOTAL_SIZE]], i64 [[TOTAL_ALIGN]])
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %{{.*TestClassC}}*
 // CHECK-NEXT:  ret %{{.*TestClassC}}* [[O2]]
 sil @alloc_dynamic : $@convention(thin) (@thick TestClass.Type) -> @owned TestClass {
@@ -199,7 +210,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Int32):
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_index_generic_struct
-// CHECK: call %swift.type* @{{.*Str.*}}(%swift.type* %T)
+// CHECK: call swiftcc %swift.metadata_response @{{.*Str.*}}([[INT]] 0, %swift.type* %T)
 // CHECK: load
 // CHECK: and
 // CHECK: xor

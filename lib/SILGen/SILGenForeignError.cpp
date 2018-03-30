@@ -47,7 +47,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
   // If the pointer itself is optional, we need to branch based on
   // whether it's really there.
   if (SILType errorPtrObjectTy =
-        foreignErrorSlot->getType().getAnyOptionalObjectType()) {
+          foreignErrorSlot->getType().getOptionalObjectType()) {
     SILBasicBlock *contBB = SGF.createBasicBlock();
     SILBasicBlock *noSlotBB = SGF.createBasicBlock();
     SILBasicBlock *hasSlotBB = SGF.createBasicBlock();
@@ -221,10 +221,9 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 
   // If an error is signalled by a nil result, inject a non-nil result.
   case ForeignErrorConvention::NilResult: {
-    ManagedValue bridgedResult =
-      emitNativeToBridgedValue(loc, emitManagedRValueWithCleanup(result),
-                               formalNativeType, formalBridgedType,
-                               bridgedType.getAnyOptionalObjectType());
+    ManagedValue bridgedResult = emitNativeToBridgedValue(
+        loc, emitManagedRValueWithCleanup(result), formalNativeType,
+        formalBridgedType, bridgedType.getOptionalObjectType());
 
     auto someResult =
       B.createOptionalSome(loc, bridgedResult.forward(*this), bridgedType);
@@ -255,6 +254,7 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
                                            Optional<ManagedValue> errorSlot) {
   SILGenSavedInsertionPoint savedIP(*this, errorBB,
                                     FunctionSection::Postmatter);
+  Scope scope(Cleanups, CleanupLocation::get(loc));
 
   // Load the error (taking responsibility for it).  In theory, this
   // is happening within conditional code, so we need to be only
@@ -275,10 +275,10 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
   ManagedValue error = emitManagedRValueWithCleanup(errorV);
 
   // Turn the error into an Error value.
-  error = emitBridgedToNativeError(loc, error);
+  error = scope.popPreservingValue(emitBridgedToNativeError(loc, error));
 
   // Propagate.
-  FullExpr scope(Cleanups, CleanupLocation::get(loc));
+  FullExpr throwScope(Cleanups, CleanupLocation::get(loc));
   emitThrow(loc, error);
 }
 
@@ -350,8 +350,7 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // Take local ownership of the optional result value.
   SILValue optionalResult = origResult.forward(SGF);
 
-  SILType resultObjectType =
-    optionalResult->getType().getAnyOptionalObjectType();
+  SILType resultObjectType = optionalResult->getType().getOptionalObjectType();
 
   ASTContext &ctx = SGF.getASTContext();
 

@@ -47,8 +47,8 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
-  DoubleWidth.swift.gyb
-  DropWhile.swift.gyb
+  Dictionary.swift
+  DropWhile.swift
   Dump.swift
   EmptyCollection.swift
   Equatable.swift
@@ -61,7 +61,6 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   Hashable.swift
-  HashedCollections.swift.gyb
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
   AnyHashable.swift
@@ -87,21 +86,21 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
-  NewtypeWrapper.swift.gyb
-  ObjCMirrors.swift
+  NewtypeWrapper.swift
+  NormalizedCodeUnitIterator.swift
   ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
   OutputStream.swift
   Pointer.swift
   Policy.swift
-  PrefixWhile.swift.gyb
+  PrefixWhile.swift
   Print.swift
   Random.swift
   RandomAccessCollection.swift
   Range.swift
   RangeReplaceableCollection.swift
-  ReflectionLegacy.swift
+  ReflectionMirror.swift
   Repeat.swift
   REPL.swift
   Reverse.swift
@@ -110,12 +109,14 @@ set(SWIFTLIB_ESSENTIAL
   SipHash.swift.gyb
   SentinelCollection.swift
   Sequence.swift
-  SequenceAlgorithms.swift.gyb
+  SequenceAlgorithms.swift
   SequenceWrapper.swift
+  Set.swift
   SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
+  SmallString.swift
   Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb
@@ -124,15 +125,19 @@ set(SWIFTLIB_ESSENTIAL
   String.swift
   StringBridge.swift
   StringComparable.swift
+  StringComparison.swift
   StringGuts.swift
+  StringGutsVisitor.swift
   StringObject.swift
+  StringProtocol.swift
   StringIndex.swift
   StringInterpolation.swift
   StringLegacy.swift
-  StringRangeReplaceableCollection.swift.gyb
+  StringRangeReplaceableCollection.swift
   StringStorage.swift
   StringSwitch.swift
   StringIndexConversions.swift
+  StringNormalization.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
@@ -171,6 +176,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
+  PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift
   Tuple.swift.gyb

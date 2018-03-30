@@ -163,7 +163,7 @@ def compare_sizes(old_sizes, new_sizes, name_key, title, total_size_key="",
     if old_size is not None and new_size is not None:
         if old_size != 0:
             perc = "%.1f%%" % (
-                (1.0 - float(new_size) / float(old_size)) * 100.0)
+                (float(new_size) / float(old_size) - 1.0) * 100.0)
         else:
             perc = "- "
 
@@ -232,7 +232,7 @@ def compare_sizes_of_file(old_files, new_files, all_sections, list_categories,
         compare_sizes(old_sizes, new_sizes, "__objc_const", section_title,
                       csv=csv)
         compare_sizes(old_sizes, new_sizes, "__data", section_title, csv=csv)
-        compare_sizes(old_sizes, new_sizes, "__swift5_proto", section_title,
+        compare_sizes(old_sizes, new_sizes, "__swift4_proto", section_title,
                       csv=csv)
         compare_sizes(old_sizes, new_sizes, "__common", section_title, csv=csv)
         compare_sizes(old_sizes, new_sizes, "__bss", section_title, csv=csv)

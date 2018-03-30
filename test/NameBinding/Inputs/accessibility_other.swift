@@ -26,4 +26,4 @@ extension OriginallyEmpty {
 
 private func privateInBothFiles() {}
 func privateInPrimaryFile() {} // expected-note {{previously declared here}}
-private func privateInOtherFile() {} // expected-error {{invalid redeclaration}}
+private func privateInOtherFile() {}

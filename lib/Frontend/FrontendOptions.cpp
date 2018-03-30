@@ -94,8 +94,21 @@ bool FrontendOptions::isActionImmediate(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
+bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
+  switch (action) {
+  case FrontendOptions::ActionType::Parse:
+  case FrontendOptions::ActionType::DumpParse:
+  case FrontendOptions::ActionType::EmitSyntax:
+  case FrontendOptions::ActionType::DumpInterfaceHash:
+  case FrontendOptions::ActionType::EmitImportedModules:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void FrontendOptions::forAllOutputPaths(
-    const InputFile &input, std::function<void(const std::string &)> fn) const {
+    const InputFile &input, std::function<void(StringRef)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
     if (InputsAndOutputs.isWholeModule())
@@ -103,29 +116,15 @@ void FrontendOptions::forAllOutputPaths(
     else
       fn(input.outputFilename());
   }
-  const std::string *outputs[] = {
-    &ModuleOutputPath,
-    &ModuleDocOutputPath,
-    &ObjCHeaderOutputPath
-  };
+  const SupplementaryOutputPaths &outs =
+      input.getPrimarySpecificPaths().SupplementaryOutputs;
+  const std::string *outputs[] = {&outs.ModuleOutputPath,
+                                  &outs.ModuleDocOutputPath,
+                                  &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
       fn(*next);
   }
-}
-
-
-StringRef FrontendOptions::originalPath() const {
-  if (InputsAndOutputs.hasNamedOutputFile())
-    // Put the serialized diagnostics file next to the output file.
-    return InputsAndOutputs.getSingleOutputFilename();
-
-  // If we have a primary input, so use that as the basis for the name of the
-  // serialized diagnostics file, otherwise fall back on the
-  // module name.
-  const auto input = InputsAndOutputs.getUniquePrimaryInput();
-  return input ? llvm::sys::path::filename(input->file())
-               : StringRef(ModuleName);
 }
 
 const char *
@@ -182,11 +181,6 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedDependenciesFilePath() const {
-  return !DependenciesFilePath.empty() &&
-         !canActionEmitDependencies(RequestedAction);
-}
-
 bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
@@ -218,11 +212,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   }
 }
 
-bool FrontendOptions::hasUnusedObjCHeaderOutputPath() const {
-  return !ObjCHeaderOutputPath.empty() && !canActionEmitHeader(RequestedAction);
-}
-
-bool FrontendOptions::canActionEmitHeader(ActionType action) {
+bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::DumpParse:
@@ -251,11 +241,6 @@ bool FrontendOptions::canActionEmitHeader(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedLoadedModuleTracePath() const {
-  return !LoadedModuleTracePath.empty() &&
-         !canActionEmitLoadedModuleTrace(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
@@ -287,14 +272,6 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
-}
-
-bool FrontendOptions::hasUnusedModuleOutputPath() const {
-  return !ModuleOutputPath.empty() && !canActionEmitModule(RequestedAction);
-}
-
-bool FrontendOptions::hasUnusedModuleDocOutputPath() const {
-  return !ModuleDocOutputPath.empty() && !canActionEmitModule(RequestedAction);
 }
 
 bool FrontendOptions::canActionEmitModule(ActionType action) {
@@ -395,4 +372,14 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitIR:
     return true;
   }
+}
+
+const PrimarySpecificPaths &
+FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
+  return InputsAndOutputs.getPrimarySpecificPathsForAtMostOnePrimary();
+}
+
+const PrimarySpecificPaths &
+FrontendOptions::getPrimarySpecificPathsForPrimary(StringRef filename) const {
+  return InputsAndOutputs.getPrimarySpecificPathsForPrimary(filename);
 }

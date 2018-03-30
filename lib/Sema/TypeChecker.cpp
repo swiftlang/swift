@@ -171,18 +171,18 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
                     { Context.getIdentifier("_colorLiteralRed"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
   }
   case ObjectLiteralExpr::imageLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
                     { Context.getIdentifier("imageLiteralResourceName") });
   }
   case ObjectLiteralExpr::fileLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
             { Context.getIdentifier("fileReferenceLiteralResourceName") });
   }
   }
@@ -323,7 +323,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
       if (extendedNominal) {
         extendedType = extendedNominal->getDeclaredType();
-        ED->getExtendedTypeLoc().setType(extendedType);
+        if (!isPassThroughTypealias(aliasDecl))
+          ED->getExtendedTypeLoc().setType(extendedType);
       }
     }
   }
@@ -420,9 +421,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       // but that gets tricky with synthesized function bodies.
       if (AFD->isBodyTypeChecked()) continue;
 
-      UnifiedStatsReporter::FrontendStatsTracer Tracer;
-      if (TC.Context.Stats)
-        Tracer = TC.Context.Stats->getStatsTracer("typecheck-fn", AFD);
+      FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-fn", AFD);
       PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
 
@@ -696,8 +695,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
-  SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();
+  FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
   Ctx.diagnoseAttrsRequiringFoundation(SF);
   Ctx.diagnoseObjCMethodConflicts(SF);
   Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);

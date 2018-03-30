@@ -117,7 +117,7 @@ struct UUIDCodingWrapper : Codable, Equatable {
 // MARK: - Tests
 class TestCodable : TestCodableSuper {
     // MARK: - AffineTransform
-#if os(OSX)
+#if os(macOS)
     lazy var affineTransformValues: [Int : AffineTransform] = [
         #line : AffineTransform.identity,
         #line : AffineTransform(),
@@ -694,7 +694,7 @@ class TestCodable : TestCodableSuper {
     }
 
     func test_URLComponents_Plist() {
-    for (testLine, components) in urlComponentsValues {
+        for (testLine, components) in urlComponentsValues {
             expectRoundTripEqualityThroughPlist(for: components, lineNumber: testLine)
         }
     }
@@ -776,7 +776,7 @@ var tests = [
     "test_UUID_Plist" : TestCodable.test_UUID_Plist,
 ]
 
-#if os(OSX)
+#if os(macOS)
     tests["test_AffineTransform_JSON"] = TestCodable.test_AffineTransform_JSON
     tests["test_AffineTransform_Plist"] = TestCodable.test_AffineTransform_Plist
 #endif

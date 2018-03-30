@@ -1207,7 +1207,7 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
 
   // If we have no other arguments, represent the trailing closure as a
   // parenthesized expression.
-  if (args.size() == 0) {
+  if (args.empty()) {
     auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
                                    /*hasTrailingClosure=*/true);
     computeSingleArgumentType(ctx, arg, implicit, getType);
@@ -2297,12 +2297,8 @@ struct ExprTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 
 static ExprTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName, const Expr *E) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, E, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Expr *>() {
+  return &TF;
 }

@@ -16,7 +16,9 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/TypeOrExtensionDecl.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/DenseMap.h"
 #include <limits.h>
 #include <vector>
 
@@ -36,16 +38,19 @@ enum DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
+
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
   TypeBase *BaseType;
-  NominalTypeDecl *Nominal = nullptr;
+  TypeOrExtensionDecl Decl;
 
   explicit TypeTransformContext(Type T);
-  explicit TypeTransformContext(NominalTypeDecl* NTD);
+  explicit TypeTransformContext(TypeOrExtensionDecl D);
 
   Type getBaseType() const;
-  NominalTypeDecl *getNominal() const;
+  TypeOrExtensionDecl getDecl() const;
+
+  DeclContext *getDeclContext() const;
 
   bool isPrintingSynthesizedExtension() const;
 };
@@ -280,6 +285,7 @@ struct PrintOptions {
     ArgumentOnly,
     MatchSource,
     BothAlways,
+    EnumElement,
   };
 
   /// Whether to print the doc-comment from the conformance if a member decl
@@ -397,6 +403,7 @@ struct PrintOptions {
     result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
+    result.PrintDocumentationComments = false;
     return result;
   }
 
@@ -413,6 +420,7 @@ struct PrintOptions {
     result.ElevateDocCommentFromConformance = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
+    result.PrintDocumentationComments = true;
     return result;
   }
 
@@ -421,7 +429,7 @@ struct PrintOptions {
 
   void setBaseType(Type T);
 
-  void initForSynthesizedExtension(NominalTypeDecl *D);
+  void initForSynthesizedExtension(TypeOrExtensionDecl D);
 
   void clearSynthesizedExtension();
 
@@ -461,6 +469,7 @@ struct PrintOptions {
     result.PrintForSIL = true;
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
+    result.PrintIfConfig = false;
     return result;
   }
 

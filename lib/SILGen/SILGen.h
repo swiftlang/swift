@@ -168,11 +168,6 @@ public:
     return Types.getTypeLowering(t).getLoweredType();
   }
 
-  /// Translate a formal enum element decl into its lowered form.
-  ///
-  /// This just turns ImplicitlyUnwrappedOptional's cases into Optional's.
-  EnumElementDecl *getLoweredEnumElementDecl(EnumElementDecl *element);
-  
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(
@@ -213,6 +208,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
   void visitIfConfigDecl(IfConfigDecl *icd);
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
@@ -332,6 +328,23 @@ public:
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
   
+  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
+                                 AccessKind accessKind);
+  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
+
+  KeyPathPatternComponent
+  emitKeyPathComponentForDecl(SILLocation loc,
+                              GenericEnvironment *genericEnv,
+                              unsigned &baseOperand,
+                              bool &needsGenericContext,
+                              SubstitutionList subs,
+                              AbstractStorageDecl *storage,
+                              ArrayRef<ProtocolConformanceRef> indexHashables,
+                              CanType baseTy,
+                              bool forPropertyDescriptor);
+
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
@@ -420,6 +433,9 @@ public:
   SubstitutionList
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
+  /// Emit a property descriptor for the given storage decl if it needs one.
+  void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
+  
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);

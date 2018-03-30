@@ -676,7 +676,7 @@ RValue Lowering::emitConditionalCheckedCast(
     SGFContext C, ProfileCounter TrueCount, ProfileCounter FalseCount) {
   // Drill into the result type.
   CanType resultObjectType =
-    optTargetType->getCanonicalType().getAnyOptionalObjectType();
+      optTargetType->getCanonicalType().getOptionalObjectType();
   assert(resultObjectType);
 
   // Handle collection downcasts directly; they have specific library
@@ -705,9 +705,9 @@ RValue Lowering::emitConditionalCheckedCast(
       (C.getEmitInto() && C.getEmitInto()->canPerformInPlaceInitialization())) {
     SILType resultTy = resultTL.getLoweredType();
     resultBuffer = SGF.getBufferForExprResult(loc, resultTy, C);
-    resultObjectBuffer =
-      SGF.B.createInitEnumDataAddr(loc, resultBuffer, someDecl,
-                    resultTy.getAnyOptionalObjectType().getAddressType());
+    resultObjectBuffer = SGF.B.createInitEnumDataAddr(
+        loc, resultBuffer, someDecl,
+        resultTy.getOptionalObjectType().getAddressType());
     resultObjectTemp.emplace(resultObjectBuffer, CleanupHandle::invalid());
     resultObjectCtx = SGFContext(&resultObjectTemp.getValue());
   }

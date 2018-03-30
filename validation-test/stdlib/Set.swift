@@ -3365,11 +3365,14 @@ SetTestSuite.test("popFirst") {
   do {
     var popped = [Int]()
     var s = Set([1010, 2020, 3030])
-    let expected = Array(s)
+    let expected = [1010, 2020, 3030]
     while let element = s.popFirst() {
       popped.append(element)
     }
-    expectEqualSequence(expected, Array(popped))
+    // Note that removing an element may reorder remaining items, so we
+    // can't compare ordering here.
+    popped.sort()
+    expectEqualSequence(expected, popped)
     expectTrue(s.isEmpty)
   }
 }
@@ -4253,6 +4256,48 @@ SetTestSuite.test("SetAlgebra.UpdateWith.EmptySet") {
   
   let member2 = s.update(with: 1010)
   expectOptionalEqual(1010, member2)
+}
+
+SetTestSuite.test("localHashSeeds") {
+  // With global hashing, copying elements in hash order between hash tables
+  // can become quadratic. (See https://bugs.swift.org/browse/SR-3268)
+  //
+  // We defeat this by mixing the local storage capacity into the global hash
+  // seed, thereby breaking the correlation between bucket indices across
+  // hash tables with different sizes.
+  //
+  // Verify this works by copying a small sampling of elements near the
+  // beginning of a large Set into a smaller one. If the elements end up in the
+  // same order in the smaller Set, then that indicates we do not use
+  // size-dependent seeding.
+
+  let count = 100_000
+  // Set a large table size to reduce frequency/length of collision chains.
+  var large = Set<Int>(minimumCapacity: 4 * count)
+  for i in 1 ..< count {
+    large.insert(i)
+  }
+
+  let bunch = count / 100 // 1 percent's worth of elements
+
+  // Copy two bunches of elements into another set that's half the size of the
+  // first. We start after the initial bunch because the hash table may begin
+  // with collided elements wrapped over from the end, and these would be sorted
+  // into irregular slots in the smaller table.
+  let slice = large.prefix(3 * bunch).dropFirst(bunch)
+  var small = Set<Int>(minimumCapacity: large.capacity / 2)
+  expectLT(small.capacity, large.capacity)
+  for element in slice {
+    small.insert(element)
+  }
+
+  // Compare the second halves of the new set and the slice.  Ignore the first
+  // halves; the first few elements may not be in the correct order if we
+  // happened to start copying from the middle of a collision chain.
+  let smallElements = small.dropFirst(bunch)
+  let sliceElements = slice.dropFirst(bunch)
+  // If this test fails, there is a problem with local hash seeding.
+  expectFalse(smallElements.elementsEqual(sliceElements))
 }
 
 runAllTests()

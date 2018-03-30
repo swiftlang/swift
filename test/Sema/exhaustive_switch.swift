@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
@@ -784,5 +784,162 @@ func checkLiteralTuples() {
   case (23.45, 4.23): break
   case (4.23, 23.45): break
   default: break
+  }
+}
+
+func sr6975() {
+  enum E {
+    case a, b
+  }
+
+  let e = E.b
+  switch e {
+  case .a as E: // expected-warning {{'as' test is always true}}
+    print("a")
+  case .b: // Valid!
+    print("b")
+  case .a: // expected-warning {{case is already handled by previous patterns; consider removing it}}
+    print("second a")
+  }
+
+  func foo(_ str: String) -> Int {
+    switch str { // expected-error {{switch must be exhaustive}}
+    // expected-note@-1 {{do you want to add a default clause?}}
+    case let (x as Int) as Any:
+      return x
+    }
+  }
+  _ = foo("wtf")
+}
+
+public enum NonExhaustive {
+  case a, b
+}
+
+@_frozen public enum TemporalProxy {
+  case seconds(Int)
+  case milliseconds(Int)
+  case microseconds(Int)
+  case nanoseconds(Int)
+  @_downgrade_exhaustivity_check
+  case never
+}
+
+// Inlineable code is considered "outside" the module and must include a default
+// case.
+@_inlineable
+public func testNonExhaustive(_ value: NonExhaustive, for interval: TemporalProxy, flag: Bool) {
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
+  case .a: break
+  }
+
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
+  case .a: break
+  case .b: break
+  }
+  
+  switch value {
+  case .a: break
+  case .b: break
+  default: break // no-warning
+  }
+
+  // Test being part of other spaces.
+  switch value as Optional { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.some(_)'}}
+  case .a?: break
+  case .b?: break
+  case nil: break
+  }
+
+  switch value as Optional {
+  case _?: break
+  case nil: break
+  } // no-warning
+
+  switch (value, flag) { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, false)'}}
+  case (.a, _): break
+  case (.b, false): break
+  case (_, true): break
+  }
+
+  switch (flag, value) { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(false, _)'}}
+  case (_, .a): break
+  case (false, .b): break
+  case (true, _): break
+  }
+
+  // Test interaction with @_downgrade_exhaustivity_check.
+  switch (value, interval) { // expected-error {{switch must be exhaustive}} {{none}}
+  // expected-note@-1 {{add missing case: '(_, .milliseconds(_))'}}
+  // expected-note@-2 {{add missing case: '(_, .microseconds(_))'}}
+  // expected-note@-3 {{add missing case: '(_, .nanoseconds(_))'}}
+  // expected-note@-4 {{add missing case: '(_, .never)'}}
+  case (_, .seconds): break
+  case (.a, _): break
+  case (.b, _): break
+  }
+
+  switch (value, interval) { // expected-error {{switch must be exhaustive}} {{none}}
+  // expected-note@-1 {{add missing case: '(_, .seconds(_))'}}
+  // expected-note@-2 {{add missing case: '(_, .milliseconds(_))'}}
+  // expected-note@-3 {{add missing case: '(_, .microseconds(_))'}}
+  // expected-note@-4 {{add missing case: '(_, .nanoseconds(_))'}}
+  case (_, .never): break
+  case (.a, _): break
+  case (.b, _): break
+  }
+}
+
+public func testNonExhaustiveWithinModule(_ value: NonExhaustive, for interval: TemporalProxy, flag: Bool) {
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}}
+  case .a: break
+  }
+
+  switch value { // no-warning
+  case .a: break
+  case .b: break
+  }
+  
+  switch value {
+  case .a: break
+  case .b: break
+  default: break // no-warning
+  }
+
+  // Test being part of other spaces.
+  switch value as Optional { // no-warning
+  case .a?: break
+  case .b?: break
+  case nil: break
+  }
+
+  switch value as Optional {
+  case _?: break
+  case nil: break
+  } // no-warning
+
+  switch (value, flag) { // no-warning
+  case (.a, _): break
+  case (.b, false): break
+  case (_, true): break
+  }
+
+  switch (flag, value) { // no-warning
+  case (_, .a): break
+  case (false, .b): break
+  case (true, _): break
+  }
+
+  // Test interaction with @_downgrade_exhaustivity_check.
+  switch (value, interval) { // no-warning
+  case (_, .seconds): break
+  case (.a, _): break
+  case (.b, _): break
+  }
+
+  switch (value, interval) { // no-warning
+  case (_, .never): break
+  case (.a, _): break
+  case (.b, _): break
   }
 }

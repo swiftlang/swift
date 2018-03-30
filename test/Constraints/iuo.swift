@@ -167,3 +167,14 @@ func cast<T : P>(_ t: T) {
   let _: (Bool) -> T? = id(T.iuoResultStatic as (Bool) -> T?)
   let _: T! = id(T.iuoResultStatic(true))
 }
+
+class rdar37241550 {
+  public init(blah: Float) { fatalError() }
+  public convenience init() { fatalError() }
+  public convenience init!(with void: ()) { fatalError() }
+
+  static func f(_ fn: () -> rdar37241550) {}
+  static func test() {
+    f(rdar37241550.init) // no error, the failable init is not applicable
+  }
+}

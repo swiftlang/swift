@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name switch -emit-silgen %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -430,11 +431,10 @@ class D1 : C {}
 class D2 : D1 {}
 class E : C {}
 
-// CHECK-LABEL: sil hidden @$S6switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@owned B) -> () {
+// CHECK-LABEL: sil hidden @$S6switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@guaranteed B) -> () {
 func test_isa_class_1(x: B) {
   // CHECK: bb0([[X:%.*]] : $B):
-  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-  // CHECK:   [[X_COPY:%.*]] = copy_value [[BORROWED_X]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   switch x {
 
@@ -519,7 +519,6 @@ func test_isa_class_1(x: B) {
   // CHECK: [[CONT]]:
   // CHECK:   [[F_FUNC:%.*]] = function_ref @$S6switch1fyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[F_FUNC]]()
-  // CHECK:   destroy_value [[X]]
   f()
 }
 // CHECK: } // end sil function '$S6switch16test_isa_class_11xyAA1BC_tF'
@@ -527,8 +526,7 @@ func test_isa_class_1(x: B) {
 // CHECK-LABEL: sil hidden @$S6switch16test_isa_class_21xyXlAA1BC_tF : $@convention(thin)
 func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : $B):
-  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-  // CHECK:   [[X_COPY:%.*]] = copy_value [[BORROWED_X]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
   switch x {
 
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
@@ -626,17 +624,14 @@ func test_isa_class_2(x: B) -> AnyObject {
   default:
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   function_ref @$S6switch1eyyF
-  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-  // CHECK:   [[X_COPY_2:%.*]] = copy_value [[BORROWED_X]]
+  // CHECK:   [[X_COPY_2:%.*]] = copy_value [[X]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[X_COPY_2]]
-  // CHECK:   end_borrow [[BORROWED_X]] from [[X]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     e()
     return x
   }
 
   // CHECK: [[CONT]]([[T0:%.*]] : $AnyObject):
-  // CHECK:   destroy_value [[X]]
   // CHECK:   return [[T0]]
 }
 // CHECK: } // end sil function '$S6switch16test_isa_class_21xyXlAA1BC_tF'
@@ -694,11 +689,10 @@ func test_union_1(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden @$S6switch12test_union_31uyAA9MaybePairO_tF : $@convention(thin) (@owned MaybePair) -> () {
+// CHECK-LABEL: sil hidden @$S6switch12test_union_31uyAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> () {
 func test_union_3(u: MaybePair) {
   // CHECK: bb0([[ARG:%.*]] : $MaybePair):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   switch_enum [[SUBJECT]] : $MaybePair,
   // CHECK:     case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
   // CHECK:     case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
@@ -737,7 +731,6 @@ func test_union_3(u: MaybePair) {
   // CHECK: [[CONT]]:
   // CHECK-NOT: switch_enum [[ARG]]
   // CHECK:   function_ref @$S6switch1eyyF
-  // CHECK:   destroy_value [[ARG]]
   e()
 }
 

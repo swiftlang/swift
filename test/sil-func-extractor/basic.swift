@@ -56,10 +56,8 @@
 
 // EXTRACT-NOW-LABEL:   sil [serialized] @$S5basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
-// EXTRACT-NOW:           ref_element_addr
-// EXTRACT-NOW-NEXT:      begin_access [read] [dynamic]
-// EXTRACT-NOW-NEXT:      load
-// EXTRACT-NOW-NEXT:      end_access
+// EXTRACT-NOW:           class_method
+// EXTRACT-NOW-NEXT:      apply
 // EXTRACT-NOW-NEXT:      return
 
 public struct X {

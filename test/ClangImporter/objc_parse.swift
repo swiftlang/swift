@@ -247,27 +247,27 @@ func almostSubscriptableValueMismatch(_ as1: AlmostSubscriptable, a: A) {
 func almostSubscriptableKeyMismatch(_ bc: BadCollection, key: NSString) {
   // FIXME: We end up importing this as read-only due to the mismatch between
   // getter/setter element types.
-  var _ : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to Any}}
+  var _ : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ bc: BadCollectionChild,
                                              key: String) {
-  var value : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to Any}}
+  var value : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   bc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
                                              key: String) {
-  var value : Any = roc[key] // expected-warning {{expression implicitly coerced from 'Any?' to Any}}
+  var value : Any = roc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   roc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
@@ -407,22 +407,22 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   type(of: rev).classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: Any
-  value = obj.protoProp() // expected-warning {{expression implicitly coerced from 'Any?' to Any}}
+  value = obj.protoProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
-  value = obj.protoPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to Any}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = obj.protoPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
-  value = type(of: obj).protoClassProp() // expected-warning {{expression implicitly coerced from 'Any?' to Any}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = type(of: obj).protoClassProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
-  value = type(of: obj).protoClassPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to Any}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = type(of: obj).protoClassPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
   // expected-note@-1 {{force-unwrap the value to avoid this warning}}
   // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to Any with 'as Any' to silence this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   _ = value
 }
 
@@ -651,6 +651,10 @@ class NewtypeUser {
   @objc func stringNewtypeOptional(a: SNTErrorDomain?) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{39-53=ErrorDomain}}
   @objc func intNewtype(a: MyInt) {}
   @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeArray(a: [MyInt]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func cfNewtype(a: CFNewType) {}
+  @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
 func testTypeAndValue() {
@@ -670,4 +674,20 @@ func testBridgeFunctionPointerTypedefs(fptrTypedef: FPTypedef) {
   // See also print_clang_bool_bridging.swift.
   let _: Int = fptrTypedef // expected-error{{'@convention(c) (String) -> String'}}
   let _: Int = getFP() // expected-error{{'@convention(c) (String) -> String'}}
+}
+
+func testNonTrivialStructs() {
+  _ = NonTrivialToCopy() // expected-error {{use of unresolved identifier 'NonTrivialToCopy'}}
+  _ = NonTrivialToCopyWrapper() // expected-error {{use of unresolved identifier 'NonTrivialToCopyWrapper'}}
+  _ = TrivialToCopy() // okay
+}
+
+func testErrorNewtype() {
+  _ = ErrorNewType(3) // expected-error {{argument type 'Int' does not conform to expected type 'Error'}}
+
+  // Since we import NSError as Error, and Error is not Hashable...we end up
+  // losing the types for these functions, even though the above assignment 
+  // works.
+  testErrorDictionary(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}
+  testErrorDictionaryNewtype(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '[AnyHashable : String]'}}
 }

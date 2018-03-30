@@ -155,6 +155,9 @@ public:
     CompletedPassesMap.clear();
   }
 
+  /// \brief Notify the pass manager of a newly create function for tracing.
+  void notifyOfNewFunction(SILFunction *F, SILTransform *T);
+
   /// \brief Add the function \p F to the function pass worklist.
   /// If not null, the function \p DerivedFrom is the function from which \p F
   /// is derived. This is used to avoid an infinite amount of functions pushed
@@ -290,6 +293,9 @@ private:
 
   /// Return true if all analyses are unlocked.
   bool analysesUnlocked();
+
+  /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
+  void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F);
 
   /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
   void dumpPassInfo(const char *Title, unsigned TransIdx,

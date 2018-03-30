@@ -118,9 +118,9 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       // If this is a non-address-only stored 'let' constant, we can capture it
       // by value.  If it is address-only, then we can't load it, so capture it
       // by its address (like a var) instead.
-      if ((var->isLet() || var->isShared())
-          && (!SILModuleConventions(M).useLoweredAddresses() ||
-              !getTypeLowering(var->getType()).isAddressOnly()))
+      if (var->isImmutable() &&
+          (!SILModuleConventions(M).useLoweredAddresses() ||
+           !getTypeLowering(var->getType()).isAddressOnly()))
         return CaptureKind::Constant;
 
       // In-out parameters are captured by address.
@@ -230,8 +230,13 @@ namespace {
     }
     
     RetTy visitSILFunctionType(CanSILFunctionType type) {
-      if (type->getExtInfo().hasContext())
+      // Only escaping closures are references.
+      bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
+                             type->getExtInfo().getRepresentation() ==
+                                 SILFunctionType::Representation::Thick;
+      if (type->getExtInfo().hasContext() && !isSwiftEscaping)
         return asImpl().handleReference(type);
+      // No escaping closures are trivial types.
       return asImpl().handleTrivial(type);
     }
 
@@ -465,8 +470,8 @@ namespace {
       // We have to look through optionals here without grabbing the
       // type lowering because the way that optionals are reabstracted
       // can trip recursion checks if we try to build a lowered type.
-      if (D->classifyAsOptionalType()) {
-        return visit(type.getAnyOptionalObjectType());
+      if (D->isOptionalDecl()) {
+        return visit(type.getOptionalObjectType());
       }
 
       // Consult the type lowering.
@@ -1467,16 +1472,15 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
 static CanType getLoweredOptionalType(TypeConverter &tc,
                                       AbstractionPattern origType,
                                       CanType substType,
-                                      CanType substObjectType,
-                                      OptionalTypeKind optKind) {
-  assert(substType.getAnyOptionalObjectType() == substObjectType);
+                                      CanType substObjectType) {
+  assert(substType.getOptionalObjectType() == substObjectType);
 
   CanType loweredObjectType =
-    tc.getLoweredType(origType.getAnyOptionalObjectType(), substObjectType)
-      .getSwiftRValueType();
+      tc.getLoweredType(origType.getOptionalObjectType(), substObjectType)
+          .getSwiftRValueType();
 
   // If the object type didn't change, we don't have to rebuild anything.
-  if (loweredObjectType == substObjectType && optKind == OTK_Optional) {
+  if (loweredObjectType == substObjectType) {
     return substType;
   }
 
@@ -1651,10 +1655,8 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
   }
 
   // Lower the object type of optional types.
-  OptionalTypeKind optKind;
-  if (auto substObjectType = substType.getAnyOptionalObjectType(optKind)) {
-    return getLoweredOptionalType(*this, origType, substType,
-                                  substObjectType, optKind);
+  if (auto substObjectType = substType.getOptionalObjectType()) {
+    return getLoweredOptionalType(*this, origType, substType, substObjectType);
   }
 
   // The Swift type directly corresponds to the lowered type.
@@ -1720,14 +1722,16 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
-                                                     AbstractFunctionDecl *AFD,
+                                                     ValueDecl *VD,
+                                                     DeclContext *DC,
                                                      unsigned DefaultArgIndex) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
+  auto resultTy = getDefaultArgumentInfo(VD, DefaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
-  CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
+  CanType canResultTy = resultTy->getCanonicalType(
+                            DC->getGenericSignatureOfContext());
 
   // Remove @noescape from function return types. A @noescape
   // function return type is a contradiction.
@@ -1738,7 +1742,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   }
 
   // Get the generic signature from the surrounding context.
-  auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
+  auto funcInfo = TC.getConstantInfo(SILDeclRef(VD));
   return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
                                  TupleType::getEmpty(TC.Context),
                                  canResultTy);
@@ -1912,8 +1916,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorInterfaceType(*this,
-                                               cast<AbstractFunctionDecl>(vd),
+    return getDefaultArgGeneratorInterfaceType(*this, vd, vd->getDeclContext(),
                                                c.defaultArgIndex);
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(*this,
@@ -2069,25 +2072,28 @@ CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
   auto selfMetatypeType = MetatypeType::get(selfType,
                                             MetatypeRepresentation::Thick);
 
+  auto canSelfType = selfType->getCanonicalType(genericSig);
+  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
+  auto selfConvention = (storage->isSetterMutating()
+                         ? ParameterConvention::Indirect_Inout
+                         : ParameterConvention::Indirect_In_Guaranteed);
+
   {
     GenericContextScope scope(*this, genericSig);
 
     // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
     // selfMetatypeType.
-    if (auto metatype = selfType->getAs<MetatypeType>()) {
+    if (auto metatype = canSelfType->getAs<MetatypeType>()) {
       if (!metatype->hasRepresentation())
-        selfType = getLoweredType(metatype).getSwiftRValueType();
+        canSelfType = getLoweredType(metatype).getSwiftRValueType();
     }
   }
-
-  auto canSelfType = selfType->getCanonicalType(genericSig);
-  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
     { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
     { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { canSelfType, ParameterConvention::Indirect_Inout },
+    { canSelfType, selfConvention },
     { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
   };
   ArrayRef<SILResultInfo> results = {};
@@ -2253,11 +2259,11 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
   // Unwrap optionals, but remember that we did.
   bool type1WasOptional = false;
   bool type2WasOptional = false;
-  if (auto object = type1.getAnyOptionalObjectType()) {
+  if (auto object = type1.getOptionalObjectType()) {
     type1WasOptional = true;
     type1 = object;
   }
-  if (auto object = type2.getAnyOptionalObjectType()) {
+  if (auto object = type2.getOptionalObjectType()) {
     type2WasOptional = true;
     type2 = object;
   }

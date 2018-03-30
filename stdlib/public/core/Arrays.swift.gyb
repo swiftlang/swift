@@ -491,8 +491,20 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
 }
 
 extension ${Self}: RandomAccessCollection, MutableCollection {
+  /// The index type for arrays, `Int`.
+  %if Self == 'ArraySlice':
+  ///
+  /// `ArraySlice` instances are not always indexed from zero. Use `startIndex`
+  /// and `endIndex` as the bounds for any element access, instead of `0` and
+  /// `count`.
+  %end
   public typealias Index = Int
+
+  /// The type that represents the indices that are valid for subscripting an
+  /// array, in ascending order.
   public typealias Indices = Range<Int>
+
+  /// The type that allows iteration over an array's elements.
   public typealias Iterator = IndexingIterator<${Self}>
 
 %if Self == 'ArraySlice':
@@ -541,6 +553,11 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
 %end
   }
 
+  /// Returns the position immediately after the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
+  /// - Returns: The index immediately after `i`.
   @_inlineable
   public func index(after i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -551,6 +568,10 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
     return i + 1
   }
 
+  /// Replaces the given index with its successor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be less than
+  ///   `endIndex`.
   @_inlineable
   public func formIndex(after i: inout Int) {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -561,6 +582,11 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
     i += 1
   }
 
+  /// Returns the position immediately before the given index.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
+  /// - Returns: The index immediately before `i`.
   @_inlineable
   public func index(before i: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -571,6 +597,10 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
     return i - 1
   }
 
+  /// Replaces the given index with its predecessor.
+  ///
+  /// - Parameter i: A valid index of the collection. `i` must be greater than
+  ///   `startIndex`.
   @_inlineable
   public func formIndex(before i: inout Int) {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -997,8 +1027,9 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
 // error path.
 @_inlineable
 @_semantics("array.dealloc_uninitialized")
-public func _deallocateUninitialized${Self}<Element>(
-  _ array: ${Self}<Element>
+public // COMPILER_INTRINSIC
+func _deallocateUninitializedArray<Element>(
+  _ array: __owned Array<Element>
 ) {
   var array = array
   array._deallocateUninitialized()
@@ -1146,7 +1177,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_versioned
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
-    _ storage: _ContiguousArrayStorage<Element>, count: Int
+    _ storage: __owned _ContiguousArrayStorage<Element>, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
 
     let innerBuffer = _ContiguousArrayBuffer<Element>(
@@ -1518,24 +1549,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
 %else:
-  /// Removes and returns the last element of the array.
-  ///
-  /// - Returns: The last element of the array if the array is not empty;
-  ///   otherwise, `nil`.
-  ///
-  /// - Complexity: O(*n*) if the array is bridged, where *n* is the length
-  ///   of the array; otherwise, O(1).
-  @_inlineable
-  public mutating func popLast() -> Element? {
-    let newCount = _getCount() - 1
-    guard !isEmpty else { return nil }
-    return _customRemoveLast().unsafelyUnwrapped
-    let pointer = (_buffer.firstElementAddress + newCount)
-    let element = pointer.move()
-    _buffer.count = newCount
-    return element
-  }
-
   @_inlineable
   public mutating func _customRemoveLast() -> Element? {
     let newCount = _getCount() - 1
@@ -2218,7 +2231,15 @@ extension _ArrayBufferProtocol {
 % for (Self, a_Self) in arrayTypes:
 
 extension ${Self} : Equatable where Element : Equatable {
-  /// Returns `true` if these arrays contain the same elements.
+  /// Returns a Boolean value indicating whether two arrays contain the same
+  /// elements in the same order.
+  ///
+  /// You can use the equal-to operator (`==`) to compare any two arrays
+  /// that store the same, `Equatable`-conforming element type.
+  ///
+  /// - Parameters:
+  ///   - lhs: An array to compare.
+  ///   - rhs: Another array to compare.
   @_inlineable
   public static func ==(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
     let lhsCount = lhs.count
@@ -2261,10 +2282,32 @@ extension ${Self} : Equatable where Element : Equatable {
     return true
   }
 
-  /// Returns `true` if the arrays do not contain the same elements.
+  /// Returns a Boolean value indicating whether two arrays are not equal.
+  ///
+  /// Two arrays are equal if they contain the same elements in the same order.
+  /// You can use the not-equal-to operator (`!=`) to compare any two arrays
+  /// that store the same, `Equatable`-conforming element type.
+  ///
+  /// - Parameters:
+  ///   - lhs: An array to compare.
+  ///   - rhs: Another array to compare.
   @_inlineable
   public static func !=(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
     return !(lhs == rhs)
+  }
+}
+
+extension ${Self}: Hashable where Element: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    for element in self {
+      hasher.append(element)
+    }
   }
 }
 
@@ -2353,6 +2396,15 @@ extension ${Self} {
 %end
 
 #if _runtime(_ObjC)
+// We isolate the bridging of the Cocoa Array -> Swift Array here so that
+// in the future, we can eagerly bridge the Cocoa array. We need this function
+// to do the bridging in an ABI safe way. Even though this looks useless,
+// DO NOT DELETE!
+@_versioned internal
+func _bridgeCocoaArray<T>(_ _immutableCocoaArray: _NSArrayCore) -> Array<T> {
+  return Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
+}
+
 extension Array {
   @_inlineable
   public // @SPI(Foundation)
@@ -2386,7 +2438,7 @@ extension Array {
   ///   is a reference type).
   @_inlineable
   public init(_immutableCocoaArray: _NSArrayCore) {
-    self = Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
+    self = _bridgeCocoaArray(_immutableCocoaArray)
   }
 }
 #endif

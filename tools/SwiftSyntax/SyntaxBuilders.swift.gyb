@@ -31,11 +31,9 @@ guaranted to be structurally (if not syntactically) valid.
 %   if node.is_buildable():
 %     Builder = node.name + "Builder"
 public struct ${Builder} {
-  private var layout = [
-%     for child in node.children:
-    ${make_missing_swift_child(child)},
-%     end
-  ]
+  private var layout =
+    Array<RawSyntax?>(repeating: nil, count: ${len(node.children)})
+
   internal init() {}
 %     for child in node.children:
 %       child_node = NODE_MAP.get(child.syntax_kind)
@@ -45,7 +43,12 @@ public struct ${Builder} {
 
   public mutating func add${child_elt}(_ elt: ${child_elt_type}) {
     let idx = ${node.name}.Cursor.${child.swift_name}.rawValue
-    layout[idx] = layout[idx].appending(elt.raw)
+    if let list = layout[idx] {
+      layout[idx] = list.appending(elt.raw)
+    } else {
+      layout[idx] = RawSyntax.node(
+        .${child.swift_syntax_kind}, [elt.raw], .present)
+    }
   }
 %       else:
 
@@ -56,7 +59,15 @@ public struct ${Builder} {
 %       end
 %     end
 
-  internal func buildData() -> SyntaxData {
+  internal mutating func buildData() -> SyntaxData {
+%     for (idx, child) in enumerate(node.children):
+%       if not child.is_optional:
+    if (layout[${idx}] == nil) {
+      layout[${idx}] = ${make_missing_swift_child(child)}
+    }
+%       end
+%     end
+
     return SyntaxData(raw: .node(.${node.swift_syntax_kind},
                                  layout, .present))
   }

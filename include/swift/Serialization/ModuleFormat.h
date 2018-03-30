@@ -54,7 +54,9 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 394; // Remove IUO serialization and decl
+/// Don't worry about adhering to the 80-column limit for this line.
+
+const uint16_t VERSION_MINOR = 406; // Last change: EnumElementDecl resilience expansion
 
 using DeclIDField = BCFixed<31>;
 
@@ -209,9 +211,10 @@ enum class VarDeclSpecifier : uint8_t {
   Var,
   InOut,
   Shared,
+  Owned,
 };
-using VarDeclSpecifierField = BCFixed<2>;
-  
+using VarDeclSpecifierField = BCFixed<3>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class ParameterConvention : uint8_t {
@@ -310,13 +313,23 @@ using AssociativityField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
-enum Ownership : uint8_t {
+enum ReferenceOwnership : uint8_t {
   Strong = 0,
   Weak,
   Unowned,
   Unmanaged,
 };
-using OwnershipField = BCFixed<2>;
+using ReferenceOwnershipField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum ValueOwnership : uint8_t {
+  Default = 0,
+  InOut,
+  Shared,
+  Owned
+};
+using ValueOwnershipField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -368,6 +381,7 @@ using OptionalTypeKindField = BCFixed<2>;
 enum class DeclNameKind: uint8_t {
   Normal,
   Subscript,
+  Constructor,
   Destructor
 };
 
@@ -382,6 +396,8 @@ enum SpecialIdentifierID : uint8_t {
   OBJC_HEADER_MODULE_ID,
   /// Special value for the special subscript name
   SUBSCRIPT_ID,
+  /// Special value for the special constructor name
+  CONSTRUCTOR_ID,
   /// Special value for the special destructor name
   DESTRUCTOR_ID,
 
@@ -626,10 +642,18 @@ namespace decls_block {
 #include "swift/Serialization/DeclTypeRecordNodes.def"
   };
 
+  using BuiltinAliasTypeLayout = BCRecordLayout<
+    BUILTIN_ALIAS_TYPE,
+    DeclIDField, // typealias decl
+    TypeIDField  // canonical type (a fallback)
+  >;
+
   using NameAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
     DeclIDField, // typealias decl
-    TypeIDField  // canonical type (a fallback)
+    TypeIDField, // parent type
+    TypeIDField  // underlying type
+    // trailing substitutions
   >;
 
   using GenericTypeParamTypeLayout = BCRecordLayout<
@@ -655,8 +679,7 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>,         // inout?
-    BCFixed<1>          // shared?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -670,8 +693,7 @@ namespace decls_block {
     BCFixed<1>,         // vararg?
     BCFixed<1>,         // autoclosure?
     BCFixed<1>,         // escaping?
-    BCFixed<1>,         // inout?
-    BCFixed<1>          // shared?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using FunctionTypeLayout = BCRecordLayout<
@@ -799,8 +821,8 @@ namespace decls_block {
 
   using ReferenceStorageTypeLayout = BCRecordLayout<
     REFERENCE_STORAGE_TYPE,
-    OwnershipField,  // ownership
-    TypeIDField      // implementation type
+    ReferenceOwnershipField, // ownership
+    TypeIDField              // implementation type
   >;
 
   using UnboundGenericTypeLayout = BCRecordLayout<
@@ -874,7 +896,8 @@ namespace decls_block {
     DeclContextIDField,// context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // requires stored property initial values
+    BCFixed<1>,        // requires stored property initial values?
+    BCFixed<1>,        // inherits convenience initializers from its superclass?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,       // superclass
     AccessLevelField, // access level
@@ -1061,14 +1084,19 @@ namespace decls_block {
 
   using EnumElementLayout = BCRecordLayout<
     ENUM_ELEMENT_DECL,
-    IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // interface type
-    BCFixed<1>,  // has argument type?
     BCFixed<1>,  // implicit?
+    BCFixed<1>,  // has payload?
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // negative raw value?
-    BCBlob       // raw value
+    IdentifierIDField, // raw value
+    BCFixed<1>,   // default argument resilience expansion
+    BCVBR<5>, // number of parameter name components
+    BCArray<IdentifierIDField> // name components,
+
+    // The record is trailed by:
+    // - its argument parameters, if any
   >;
 
   using SubscriptLayout = BCRecordLayout<
@@ -1288,6 +1316,7 @@ namespace decls_block {
   using XRefTypePathPieceLayout = BCRecordLayout<
     XREF_TYPE_PATH_PIECE,
     IdentifierIDField, // name
+    IdentifierIDField, // private discriminator
     BCFixed<1>         // restrict to protocol extension
   >;
 
@@ -1408,7 +1437,8 @@ namespace decls_block {
   >;
 
   // Stub layouts, unused.
-  using OwnershipDeclAttrLayout = BCRecordLayout<Ownership_DECL_ATTR>;
+  using ReferenceOwnershipDeclAttrLayout
+    = BCRecordLayout<ReferenceOwnership_DECL_ATTR>;
   using RawDocCommentDeclAttrLayout = BCRecordLayout<RawDocComment_DECL_ATTR>;
   using AccessControlDeclAttrLayout = BCRecordLayout<AccessControl_DECL_ATTR>;
   using SetterAccessDeclAttrLayout = BCRecordLayout<SetterAccess_DECL_ATTR>;

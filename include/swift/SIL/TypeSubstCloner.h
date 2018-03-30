@@ -170,7 +170,11 @@ public:
 
 protected:
   SILType remapType(SILType Ty) {
-    return Ty.subst(Original.getModule(), SubsMap);
+    SILType &Sty = TypeCache[Ty];
+    if (!Sty) {
+      Sty = Ty.subst(Original.getModule(), SubsMap);
+    }
+    return Sty;
   }
 
   CanType remapASTType(CanType ty) {
@@ -286,6 +290,8 @@ protected:
   ModuleDecl *SwiftMod;
   /// The substitutions list for the specialization.
   SubstitutionMap SubsMap;
+  /// Cache for substituted types.
+  llvm::DenseMap<SILType, SILType> TypeCache;
   /// The original function to specialize.
   SILFunction &Original;
   /// The substitutions used at the call site.

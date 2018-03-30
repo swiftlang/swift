@@ -147,6 +147,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::DynamicMemberLookup:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TupleIndex:
@@ -251,27 +252,6 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
     return {SelfTypeRelationship::ConformedToBy, conformance};
 
   return {SelfTypeRelationship::ConformsTo, conformance};
-}
-
-// Given a type and a declaration context, return a type with a curried
-// 'self' type as input if the declaration context describes a type.
-static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
-  if (!dc->isTypeContext())
-    return type;
-
-  GenericSignature *sig = dc->getGenericSignatureOfContext();
-  if (auto *genericFn = type->getAs<GenericFunctionType>()) {
-    sig = genericFn->getGenericSignature();
-    type = FunctionType::get(genericFn->getInput(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
-  }
-
-  auto selfTy = dc->getDeclaredInterfaceType();
-  if (sig)
-    return GenericFunctionType::get(sig, selfTy, type,
-                                    AnyFunctionType::ExtInfo());
-  return FunctionType::get(selfTy, type);
 }
 
 /// \brief Given two generic function declarations, signal if the first is more
@@ -383,6 +363,21 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
   return param.getType();
 }
 
+// Is a particular parameter of a function or subscript declaration
+// declared to be an IUO?
+static bool paramIsIUO(Decl *decl, int paramNum) {
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    auto *paramList =
+        fn->getParameterList(fn->getDeclContext()->isTypeContext());
+    auto *param = paramList->get(paramNum);
+    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  }
+
+  auto *subscript = cast<SubscriptDecl>(decl);
+  auto *index = subscript->getIndices()->get(paramNum);
+  return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -464,8 +459,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         }
       } else {
         // Add a curried 'self' type.
-        type1 = addCurriedSelfType(tc.Context, type1, outerDC1);
-        type2 = addCurriedSelfType(tc.Context, type2, outerDC2);
+        type1 = type1->addCurriedSelfType(outerDC1);
+        type2 = type2->addCurriedSelfType(outerDC2);
 
         // For a subscript declaration, only look at the input type (i.e., the
         // indices).
@@ -675,6 +670,17 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             continue;
           }
 
+          // Emulate behavior from when IUO was a type, where IUOs
+          // were considered subtypes of plain optionals, but not
+          // vice-versa.  This wouldn't normally happen, but there are
+          // cases where we can rename imported APIs so that we have a
+          // name collision, and where the parameter type(s) are the
+          // same except for details of the kind of optional declared.
+          auto param1IsIUO = paramIsIUO(decl1, param1);
+          auto param2IsIUO = paramIsIUO(decl2, param2);
+          if (param2IsIUO && !param1IsIUO)
+            return false;
+
           if (!maybeAddSubtypeConstraint(params1[param1], params2[param2]))
             return false;
 
@@ -855,6 +861,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DynamicMemberLookup:
       break;
     }
     
@@ -979,7 +986,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         if (!VD->getModuleContext()->isStdlibModule())
           return false;
         auto fnTy = VD->getInterfaceType()->castTo<AnyFunctionType>();
-        if (!fnTy->getResult()->getAnyOptionalObjectType())
+        if (!fnTy->getResult()->getOptionalObjectType())
           return false;
 
         // Check that the standard library hasn't added another overload of
@@ -987,11 +994,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
         auto inputTypes = inputTupleTy->getElementTypes();
         assert(inputTypes.size() == 2);
-        assert(inputTypes[0]->getAnyOptionalObjectType());
+        assert(inputTypes[0]->getOptionalObjectType());
         auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
         assert(autoclosure->isAutoClosure());
         auto secondParamTy = autoclosure->getResult();
-        assert(secondParamTy->getAnyOptionalObjectType());
+        assert(secondParamTy->getOptionalObjectType());
         (void)secondParamTy;
 
         return true;
@@ -1026,32 +1033,11 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
-    // If one type is an implicitly unwrapped optional of the other,
-    // prefer the non-optional.    
-    bool type1Better = false;
-    bool type2Better = false;
-    if (auto type1Obj = type1->getImplicitlyUnwrappedOptionalObjectType()) {
-      if (type1Obj->isEqual(type2))
-        type2Better = true;
-    }
-    if (auto type2Obj = type2->getImplicitlyUnwrappedOptionalObjectType()) {
-      if (type2Obj->isEqual(type1))
-        type1Better = true;
-    }
-
-    if (type1Better || type2Better) {
-      if (type1Better)
-        ++score1;
-      if (type2Better)
-        ++score2;
-      continue;
-    }
-
     // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
-    type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
+    auto type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
+    auto type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;

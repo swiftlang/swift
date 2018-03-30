@@ -61,6 +61,13 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     count: Int = 0
   ) -> _SwiftStringStorage<CodeUnit> {
     _sanityCheck(count >= 0 && count <= capacity)
+
+#if arch(i386) || arch(arm)
+#else
+    _sanityCheck((CodeUnit.self != UInt8.self || capacity > 15),
+      "Should prefer a small representation")
+#endif // 64-bit
+
     let storage = Builtin.allocWithTailElems_1(
       _SwiftStringStorage<CodeUnit>.self,
       capacity._builtinWordValue, CodeUnit.self)
@@ -247,28 +254,62 @@ extension _SwiftStringStorage {
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      _appendInPlace(other._asOpaque()[range])
-    } else if other.isASCII {
+      _opaqueAppendInPlace(opaqueOther: other, range: range)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView[range])
     } else {
       _appendInPlace(other._unmanagedUTF16View[range])
     }
   }
 
+  @_versioned // @opaque
+  internal final func _opaqueAppendInPlace(
+    opaqueOther other: _StringGuts, range: Range<Int>
+  ) {
+    _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String[range].withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
+    defer { _fixLifetime(other) }
+    _appendInPlace(other._asOpaque()[range])
+  }
+
   @_inlineable
   @_versioned
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      _appendInPlace(other._asOpaque())
-    } else if other.isASCII {
+      _opaqueAppendInPlace(opaqueOther: other)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView)
     } else {
       _appendInPlace(other._unmanagedUTF16View)
     }
+  }
+
+  @_versioned // @opaque
+  internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
+    _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String.withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
+    defer { _fixLifetime(other) }
+    _appendInPlace(other._asOpaque())
   }
 
   @_inlineable

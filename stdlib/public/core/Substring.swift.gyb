@@ -338,6 +338,7 @@ extension Substring : CustomReflectable {
 
 extension Substring : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
@@ -472,10 +473,6 @@ extension Substring {
   ///
   /// - Complexity: O(1)
   @_inlineable // FIXME(sil-serialize-all)
-  % if property == 'characters':
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  % end
   public init(_ content: ${View}) {
     self = content._wholeString[content.startIndex..<content.endIndex]
   }
@@ -527,22 +524,6 @@ extension Substring.UnicodeScalarView : RangeReplaceableCollection {
     _slice.replaceSubrange(target, with: replacement)
   }
 }
-
-#if _runtime(_ObjC)
-
-extension Substring {
-  @_inlineable // FIXME(sil-serialize-all)
-  public func hasPrefix(_ prefix: String) -> Bool {
-    return String(self).hasPrefix(prefix)
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public func hasSuffix(_ suffix: String) -> Bool {
-    return String(self).hasSuffix(suffix)
-  }
-}
-
-#endif
 
 extension Substring : RangeReplaceableCollection {
   @_inlineable // FIXME(sil-serialize-all)

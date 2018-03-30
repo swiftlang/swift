@@ -27,7 +27,7 @@ namespace sys {
 
 class Task; // forward declared to allow for platform-specific implementations
 
-typedef llvm::sys::ProcessInfo::ProcessId ProcessId;
+using ProcessId = llvm::sys::ProcessInfo::ProcessId;
 
 /// \brief Indicates how a TaskQueue should respond to the task finished event.
 enum class TaskFinishedResponse {
@@ -63,7 +63,7 @@ public:
   ///
   /// \param Pid the ProcessId of the task which just began execution.
   /// \param Context the context which was passed when the task was added
-  typedef std::function<void(ProcessId Pid, void *Context)> TaskBeganCallback;
+  using TaskBeganCallback = std::function<void(ProcessId Pid, void *Context)>;
 
   /// \brief A callback which will be executed after each task finishes
   /// execution.
@@ -79,9 +79,9 @@ public:
   ///
   /// \returns true if further execution of tasks should stop,
   /// false if execution should continue
-  typedef std::function<TaskFinishedResponse(ProcessId Pid, int ReturnCode,
-                                             StringRef Output, StringRef Errors, void *Context)>
-    TaskFinishedCallback;
+  using TaskFinishedCallback = std::function<TaskFinishedResponse(
+      ProcessId Pid, int ReturnCode, StringRef Output, StringRef Errors,
+      void *Context)>;
 
   /// \brief A callback which will be executed if a task exited abnormally due
   /// to a signal.
@@ -101,10 +101,9 @@ public:
   ///
   /// \returns a TaskFinishedResponse indicating whether or not execution
   /// should proceed
-  typedef std::function<TaskFinishedResponse(ProcessId Pid, StringRef ErrorMsg,
-                                             StringRef Output, StringRef Errors,
-                                             void *Context, Optional<int> Signal)>
-    TaskSignalledCallback;
+  using TaskSignalledCallback = std::function<TaskFinishedResponse(
+      ProcessId Pid, StringRef ErrorMsg, StringRef Output, StringRef Errors,
+      void *Context, Optional<int> Signal)>;
 #pragma clang diagnostic pop
 
   /// \brief Indicates whether TaskQueue supports buffering output on the
@@ -150,7 +149,7 @@ public:
 
   /// Returns true if there are any tasks that have been queued but have not
   /// yet been executed.
-  bool hasRemainingTasks() {
+  virtual bool hasRemainingTasks() {
     return !QueuedTasks.empty();
   }
 };
@@ -180,14 +179,20 @@ public:
   DummyTaskQueue(unsigned NumberOfParallelTasks = 0);
   virtual ~DummyTaskQueue();
 
-  virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                       ArrayRef<const char *> Env = llvm::None,
-                       void *Context = nullptr, bool SeparateErrors = false);
+  void addTask(const char *ExecPath, ArrayRef<const char *> Args,
+               ArrayRef<const char *> Env = llvm::None,
+               void *Context = nullptr, bool SeparateErrors = false) override;
 
-  virtual bool
+  bool
   execute(TaskBeganCallback Began = TaskBeganCallback(),
           TaskFinishedCallback Finished = TaskFinishedCallback(),
-          TaskSignalledCallback Signalled = TaskSignalledCallback());
+          TaskSignalledCallback Signalled = TaskSignalledCallback()) override;
+
+  bool hasRemainingTasks() override {
+    // Need to override here because QueuedTasks is redeclared.
+    return !QueuedTasks.empty();
+  }
+
 };
 
 } // end namespace sys

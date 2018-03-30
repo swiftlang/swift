@@ -88,7 +88,7 @@ TEST(ThreadSafeCachingTests, ReturnGetExpression) {
   Pool P;
 
   for (unsigned i = 0; i < 10000; ++i) {
-    auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne, None);
+    auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne);
 
     auto Future1 = P.run(getExpressionFrom, Return);
     auto Future2 = P.run(getExpressionFrom, Return);

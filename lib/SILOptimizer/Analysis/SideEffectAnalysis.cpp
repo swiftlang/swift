@@ -159,6 +159,11 @@ bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
     return true;
   }
   switch (F->getEffectsKind()) {
+    case EffectsKind::ReleaseNone:
+      Effects.GlobalEffects.Reads = true;
+      Effects.GlobalEffects.Writes = true;
+      Effects.GlobalEffects.Releases = false;
+      return true;
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:
@@ -483,7 +488,7 @@ void SideEffectAnalysis::recompute(FunctionInfo *Initial) {
 }
 
 void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS) {
-  assert(ApplyEffects.ParamEffects.size() == 0 &&
+  assert(ApplyEffects.ParamEffects.empty() &&
          "Not using a new ApplyEffects?");
   ApplyEffects.ParamEffects.resize(FAS.getNumArguments());
 

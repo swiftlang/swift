@@ -520,7 +520,7 @@ private:
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
                                                PotentialReason reason) {
-    assert(param->getType()->lookThroughAllAnyOptionalTypes()->castTo<AnyFunctionType>()->throws());
+    assert(param->getType()->lookThroughAllOptionalTypes()->castTo<AnyFunctionType>()->throws());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
@@ -706,7 +706,7 @@ private:
 
     // Otherwise, if the original parameter type was not a throwing
     // function type, it does not contribute to 'rethrows'.
-    auto paramFnType = paramType->lookThroughAllAnyOptionalTypes()->getAs<AnyFunctionType>();
+    auto paramFnType = paramType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
     if (!paramFnType || !paramFnType->throws())
       return Classification();
 

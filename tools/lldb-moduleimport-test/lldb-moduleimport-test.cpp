@@ -18,6 +18,7 @@
 
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/Dwarf.h"
@@ -61,8 +62,51 @@ static void printValidationInfo(llvm::StringRef data) {
   }
 }
 
+static void resolveDeclFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  std::string Error;
+  for (auto &Mangled : MangledNames) {
+    swift::Decl *ResolvedDecl =
+        swift::ide::getDeclFromMangledSymbolName(Ctx, Mangled, Error);
+    if (!ResolvedDecl) {
+      llvm::errs() << "Can't resolve decl of " << Mangled << "\n";
+    } else {
+      ResolvedDecl->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+}
+
+static void resolveTypeFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  std::string Error;
+  for (auto &Mangled : MangledNames) {
+    swift::Type ResolvedType =
+        swift::ide::getTypeFromMangledSymbolname(Ctx, Mangled, Error);
+    if (!ResolvedType) {
+      llvm::errs() << "Can't resolve type of " << Mangled << "\n";
+    } else {
+      ResolvedType->print(llvm::errs());
+      llvm::errs() << "\n";
+    }
+  }
+}
+
+static void
+collectMangledNames(const std::string &FilePath,
+                    llvm::SmallVectorImpl<std::string> &MangledNames) {
+  std::string Name;
+  std::ifstream InputStream(FilePath);
+  while (std::getline(InputStream, Name)) {
+    if (Name.empty())
+      continue;
+    MangledNames.push_back(Name);
+  }
+}
+
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   // Command line handling.
   llvm::cl::list<std::string> InputNames(
@@ -76,6 +120,9 @@ int main(int argc, char **argv) {
     "dump-module", llvm::cl::desc(
       "Dump the imported module after checking it imports just fine"));
 
+  llvm::cl::opt<bool> Verbose(
+      "verbose", llvm::cl::desc("Dump informations on the loaded module"));
+
   llvm::cl::opt<std::string> ModuleCachePath(
     "module-cache-path", llvm::cl::desc("Clang module cache path"));
 
@@ -85,6 +132,16 @@ int main(int argc, char **argv) {
   llvm::cl::list<std::string> FrameworkPaths(
     "F", llvm::cl::desc("add a directory to the framework search path"));
 
+  llvm::cl::opt<std::string> DumpDeclFromMangled(
+      "decl-from-mangled", llvm::cl::desc("dump decl from mangled names list"));
+
+  llvm::cl::opt<std::string> DumpTypeFromMangled(
+      "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
+
+  // FIXME: we should infer this from the module.
+  llvm::cl::opt<std::string> TargetTriple(
+      "target-triple", llvm::cl::desc("specify target triple"));
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
@@ -92,8 +149,10 @@ int main(int argc, char **argv) {
   ImportPaths.removeArgument();
   ModuleCachePath.removeArgument();
   DumpModule.removeArgument();
+  DumpTypeFromMangled.removeArgument();
   SDK.removeArgument();
   InputNames.removeArgument();
+  TargetTriple.removeArgument();
 
   // If no SDK was specified via -sdk, check environment variable SDKROOT.
   if (SDK.getNumOccurrences() == 0) {
@@ -112,7 +171,13 @@ int main(int argc, char **argv) {
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   Invocation.setSDKPath(SDK);
-  Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+
+  // FIXME: we should infer this from the module.
+  if (!TargetTriple.empty())
+    Invocation.setTargetTriple(TargetTriple);
+  else
+    Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setImportSearchPaths(ImportPaths);
@@ -161,10 +226,12 @@ int main(int argc, char **argv) {
             exit(1);
           }
 
-          for (auto path : modules)
-            llvm::outs() << "Loaded module " << path << " from " << name
-                         << "\n";
-          printValidationInfo(fileBuf.get()->getBuffer());
+          if (Verbose) {
+            for (auto path : modules)
+              llvm::outs() << "Loaded module " << path << " from " << name
+                           << "\n";
+            printValidationInfo(fileBuf.get()->getBuffer());
+          }
 
           // Deliberately leak the llvm::MemoryBuffer. We can't delete it
           // while it's in use anyway.
@@ -182,10 +249,12 @@ int main(int argc, char **argv) {
         if (!parseASTSection(CI.getSerializedModuleLoader(), Buf, modules))
           exit(1);
 
-        for (auto path : modules)
-          llvm::outs() << "Loaded module " << path << " from " << name
-                       << "\n";
-        printValidationInfo(Buf);
+        if (Verbose) {
+          for (auto path : modules)
+            llvm::outs() << "Loaded module " << path << " from " << name
+                         << "\n";
+          printValidationInfo(Buf);
+        }
       }
     }
     ObjFiles.push_back(std::move(*OF));
@@ -193,7 +262,8 @@ int main(int argc, char **argv) {
 
   // Attempt to import all modules we found.
   for (auto path : modules) {
-    llvm::outs() << "Importing " << path << "... ";
+    if (Verbose)
+      llvm::outs() << "Importing " << path << "... ";
 
 #ifdef SWIFT_SUPPORTS_SUBMODULES
     std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
@@ -210,16 +280,28 @@ int main(int argc, char **argv) {
 
     auto Module = CI.getASTContext().getModule(AccessPath);
     if (!Module) {
-      llvm::errs() << "FAIL!\n";
+      if (Verbose)
+        llvm::errs() << "FAIL!\n";
       return 1;
     }
-    llvm::outs() << "ok!\n";
+    if (Verbose)
+      llvm::outs() << "ok!\n";
     if (DumpModule) {
       llvm::SmallVector<swift::Decl*, 10> Decls;
       Module->getTopLevelDecls(Decls);
       for (auto Decl : Decls) {
         Decl->dump(llvm::outs());
       }
+    }
+    if (!DumpTypeFromMangled.empty()) {
+      llvm::SmallVector<std::string, 8> MangledNames;
+      collectMangledNames(DumpTypeFromMangled, MangledNames);
+      resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
+    }
+    if (!DumpDeclFromMangled.empty()) {
+      llvm::SmallVector<std::string, 8> MangledNames;
+      collectMangledNames(DumpDeclFromMangled, MangledNames);
+      resolveDeclFromMangledNameList(CI.getASTContext(), MangledNames);
     }
   }
   return 0;

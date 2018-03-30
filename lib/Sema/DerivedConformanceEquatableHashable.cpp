@@ -42,27 +42,16 @@ bool allAssociatedValuesConformToProtocol(TypeChecker &tc, EnumDecl *theEnum,
   auto declContext = theEnum->getDeclContext();
 
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->getArgumentTypeLoc().getType())
+    if (!elt->hasInterfaceType())
       tc.validateDecl(elt);
 
-    auto argumentType = elt->getArgumentTypeLoc().getType();
-    if (!argumentType)
+    auto PL = elt->getParameterList();
+    if (!PL)
       continue;
 
-    if (auto tupleType = argumentType->getAs<TupleType>()) {
-      // One associated value with a label or multiple associated values
-      // (labeled or unlabeled) are tuple types.
-      for (auto tupleElementType : tupleType->getElementTypes()) {
-        if (!tc.conformsToProtocol(tupleElementType, protocol, declContext,
-                                   ConformanceCheckFlags::Used)) {
-          return false;
-        }
-      }
-    } else {
-      // One associated value with no label is represented as a paren type.
-      auto actualType = argumentType->getWithoutParens();
-      if (!tc.conformsToProtocol(actualType, protocol, declContext,
-                                 ConformanceCheckFlags::Used)) {
+    for (auto param : *PL) {
+      if (!tc.conformsToProtocol(param->getType(), protocol, declContext,
+                                        ConformanceCheckFlags::Used)) {
         return false;
       }
     }
@@ -154,12 +143,11 @@ enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
   auto parentDC = enumElementDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto argumentTypeLoc = enumElementDecl->getArgumentTypeLoc();
-  if (argumentTypeLoc.isNull())
-    // No arguments, so no subpattern to match.
+  // No arguments, so no subpattern to match.
+  if (!enumElementDecl->hasAssociatedValues())
     return nullptr;
 
-  auto argumentType = argumentTypeLoc.getType();
+  auto argumentType = enumElementDecl->getArgumentInterfaceType();
   if (auto tupleType = argumentType->getAs<TupleType>()) {
     // Either multiple (labeled or unlabeled) arguments, or one labeled
     // argument. Return a tuple pattern that matches the enum element in arity,
@@ -591,10 +579,10 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   auto enumTy = parentDC->getDeclaredTypeInContext();
   auto enumIfaceTy = parentDC->getDeclaredInterfaceType();
 
-  auto getParamDecl = [&](StringRef s) -> ParamDecl* {
-    auto *param = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                    Identifier(), SourceLoc(), C.getIdentifier(s),
-                                    enumTy, parentDC);
+  auto getParamDecl = [&](StringRef s) -> ParamDecl * {
+    auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+                                    SourceLoc(), Identifier(), SourceLoc(),
+                                    C.getIdentifier(s), enumTy, parentDC);
     param->setInterfaceType(enumIfaceTy);
     return param;
   };
@@ -671,6 +659,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   }
   eqDecl->setInterfaceType(interfaceTy);
   eqDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  eqDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -775,29 +764,6 @@ static Expr* combineHashValuesAssignmentExpr(ASTContext &C,
   return assignExpr;
 }
 
-/// Returns a new assignment expression that invokes _mixInt on a variable and
-/// assigns the result back to the same variable.
-/// \p C The AST context.
-/// \p resultVar The integer variable to be mixed.
-/// \return The expression that mixes the integer value.
-static Expr* mixIntAssignmentExpr(ASTContext &C, VarDecl* resultVar) {
-  auto mixinFunc = C.getMixIntDecl();
-  auto mixinFuncExpr = new (C) DeclRefExpr(mixinFunc, DeclNameLoc(),
-                                           /*implicit*/ true);
-  auto rhsResultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
-                                          /*implicit*/ true);
-  // _mixInt(result)
-  auto mixedResultExpr = CallExpr::createImplicit(C, mixinFuncExpr,
-                                                  { rhsResultRef }, {});
-
-  // result = _mixInt(result)
-  auto lhsResultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
-                                          /*implicit*/ true);
-  auto assignExpr = new (C) AssignExpr(lhsResultRef, SourceLoc(),
-                                       mixedResultExpr, /*implicit*/ true);
-  return assignExpr;
-}
-
 static void
 deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   auto parentDC = hashValueDecl->getDeclContext();
@@ -838,7 +804,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   for (auto elt : enumDecl->getAllElements()) {
     // case .<elt>(let a0, let a1, ...):
     SmallVector<VarDecl*, 3> payloadVars;
-    SmallVector<ASTNode, 3> mixExpressions;
+    SmallVector<ASTNode, 3> combineExprs;
 
     auto payloadPattern = enumElementPayloadSubpattern(elt, 'a', hashValueDecl,
                                                        payloadVars);
@@ -863,7 +829,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
                                            /*implicit*/ true);
       auto assignExpr = new (C) AssignExpr(resultRef, SourceLoc(),
                                            ordinalExpr, /*implicit*/ true);
-      mixExpressions.emplace_back(ASTNode(assignExpr));
+      combineExprs.emplace_back(ASTNode(assignExpr));
     }
 
     if (!hasNoAssociatedValues) {
@@ -873,18 +839,14 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
         auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
                                                  /*implicit*/ true);
         // result = _combineHashValues(result, <payloadVar>.hashValue)
-        auto mixExpr = combineHashValuesAssignmentExpr(C, resultVar,
-                                                       payloadVarRef);
-        mixExpressions.emplace_back(ASTNode(mixExpr));
+        auto combineExpr = combineHashValuesAssignmentExpr(C, resultVar,
+                                                           payloadVarRef);
+        combineExprs.emplace_back(ASTNode(combineExpr));
       }
-
-      // result = _mixInt(result)
-      auto assignExpr = mixIntAssignmentExpr(C, resultVar);
-      mixExpressions.emplace_back(ASTNode(assignExpr));
     }
 
     auto hasBoundDecls = !payloadVars.empty();
-    auto body = BraceStmt::create(C, SourceLoc(), mixExpressions, SourceLoc());
+    auto body = BraceStmt::create(C, SourceLoc(), combineExprs, SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
                                      SourceLoc(), body));
   }
@@ -963,16 +925,12 @@ deriveBodyHashable_struct_hashValue(AbstractFunctionDecl *hashValueDecl) {
     auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
                                                       selfRef);
     // result = _combineHashValues(result, <property>.hashValue)
-    auto mixExpr = combineHashValuesAssignmentExpr(C, resultVar,
-                                                   selfPropertyExpr);
-    statements.emplace_back(ASTNode(mixExpr));
+    auto combineExpr = combineHashValuesAssignmentExpr(C, resultVar,
+                                                       selfPropertyExpr);
+    statements.emplace_back(ASTNode(combineExpr));
   }
 
   {
-    // result = _mixInt(result)
-    auto assignExpr = mixIntAssignmentExpr(C, resultVar);
-    statements.push_back(assignExpr);
-
     // return result
     auto resultRef = new (C) DeclRefExpr(resultVar, DeclNameLoc(),
                                          /*implicit*/ true,
@@ -1021,7 +979,6 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   //       result = _combineHashValues(result, a0.hashValue)
   //       result = _combineHashValues(result, a1.hashValue)
   //     }
-  //     result = _mixInt(result)
   //     return result
   //   }
   // }
@@ -1030,10 +987,9 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   //   var x: Int
   //   var y: String
   //   @derived var hashValue: Int {
-  //     var result: Int = 0
+  //     var result = 0
   //     result = _combineHashValues(result, x.hashValue)
   //     result = _combineHashValues(result, y.hashValue)
-  //     result = _mixInt(result)
   //     return result
   //   }
   // }
@@ -1095,6 +1051,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
                                       AnyFunctionType::ExtInfo());
 
   getterDecl->setInterfaceType(interfaceType);
+  getterDecl->setValidationStarted();
   getterDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
@@ -1106,6 +1063,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
+  hashValueDecl->setValidationStarted();
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
   hashValueDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);

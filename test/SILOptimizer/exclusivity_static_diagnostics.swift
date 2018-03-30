@@ -527,3 +527,28 @@ func testKeyPathWithClassFinalStoredProperty() {
   // model.
   takesTwoInouts(&local[keyPath: getI], &local[keyPath: getI])
 }
+
+func takesInoutAndOptionalClosure(_: inout Int, _ f: (()->())?) {
+  f!()
+}
+
+// An optional closure is not considered @noescape:
+// This violation will only be caught dynamically.
+//
+// apply %takesInoutAndOptionalClosure(%closure)
+//   : $@convention(thin) (@inout Int, @owned Optional<@callee_guaranteed () -> ()>) -> ()
+func testOptionalClosure() {
+  var x = 0
+  takesInoutAndOptionalClosure(&x) { x += 1 }
+}
+
+func takesInoutAndOptionalBlock(_: inout Int, _ f: (@convention(block) ()->())?) {
+  f!()
+}
+
+// An optional block is not be considered @noescape.
+// This violation will only be caught dynamically.
+func testOptionalBlock() {
+  var x = 0
+  takesInoutAndOptionalBlock(&x) { x += 1 }
+}

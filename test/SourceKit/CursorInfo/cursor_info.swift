@@ -442,10 +442,10 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // RUN: %sourcekitd-test -req=cursor -pos=81:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK34
 // CHECK34: source.lang.swift.decl.function.method.instance (81:8-81:62)
 // CHECK34-NEXT: foo(_:_:_:)
-// CHECK34-NEXT: s:11cursor_info2S2V3fooyyycqd___qd__yyctqd_0_Rsd__r0_lF
+// CHECK34-NEXT: s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF
 // CHECK34-NEXT: <T, U, V, W where T == U, V == W> (S2<T, U>) -> (V, W, () -> ()) -> () -> ()
-// CHECK34: <Declaration>func foo&lt;V, W&gt;(_: <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyctqd_0_Rsd__r0_lF1VL_qd__mfp">V</Type>, _: <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyctqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</Type>, _ closure: () -&gt; ()) -&gt; () -&gt; () where V == W</Declaration>
-// CHECK34: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyctqd_0_Rsd__r0_lF1VL_qd__mfp"><decl.generic_type_param.name>V</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyctqd_0_Rsd__r0_lF1WL_qd_0_mfp"><decl.generic_type_param.name>W</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyctqd_0_Rsd__r0_lF1VL_qd__mfp">V</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyctqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>V == W</decl.generic_type_requirement></decl.function.method.instance>
+// CHECK34: <Declaration>func foo&lt;V, W&gt;(_: <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp">V</Type>, _: <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</Type>, _ closure: () -&gt; ()) -&gt; () -&gt; () where V == W</Declaration>
+// CHECK34: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp"><decl.generic_type_param.name>V</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp"><decl.generic_type_param.name>W</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp">V</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>V == W</decl.generic_type_requirement></decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=83:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK35
 // CHECK35: source.lang.swift.decl.class (83:7-83:9)
@@ -488,7 +488,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK40-NEXT: s:11cursor_info2E2O2C2yACSi_SStcACmF
 // CHECK40-NEXT: (E2.Type) -> (Int, String) -> E2
 // CHECK40: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>y</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.enumelement>
+// CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:SS">String</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=92:31 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK41
 // CHECK41: source.lang.swift.decl.enumelement (92:31-92:33)
@@ -496,8 +496,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK41-NEXT: s:11cursor_info2E2O2C3yACSicACmF
 // CHECK41-NEXT: (E2.Type) -> (Int) -> E2
 // CHECK41: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<ref.struct usr="s:Si">Int</ref.struct>)</decl.enumelement>
-// FIXME: Wrap parameters in <decl.var.parameter>
+// CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<decl.var.parameter><decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=96:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK42
 // CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
@@ -517,13 +516,13 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK44: source.lang.swift.ref.enumelement (92:8-92:10)
 // CHECK44-NEXT: C2
 // CHECK44: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK44-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref
+// CHECK44-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref
 
 // RUN: %sourcekitd-test -req=cursor -pos=102:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK45
 // CHECK45: source.lang.swift.ref.enumelement (92:8-92:10)
 // CHECK45-NEXT: C2
 // CHECK45: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK45-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x
+// CHECK45-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x
 
 // RUN: %sourcekitd-test -req=cursor -pos=103:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK46
 // CHECK46: source.lang.swift.ref.enumelement (96:8-96:9)

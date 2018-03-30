@@ -25,7 +25,7 @@
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
-@_fixed_layout
+@_frozen
 public enum Never {}
 
 //===----------------------------------------------------------------------===//
@@ -474,39 +474,44 @@ public protocol _BitwiseOperations {
   static var allZeros: Self { get }
 }
 
-/// Calculates the union of bits sets in the two arguments and stores the result
-/// in the first argument.
-///
-/// - Parameters:
-///   - lhs: A value to update with the union of bits set in the two arguments.
-///   - rhs: Another value.
-@_inlineable // FIXME(sil-serialize-all)
-public func |= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
-  lhs = lhs | rhs
-}
+extension _BitwiseOperations {
+  /// Calculates the union of bits sets in the two arguments and stores the result
+  /// in the first argument.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to update with the union of bits set in the two arguments.
+  ///   - rhs: Another value.
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4.1)
+  public static func |= (lhs: inout Self, rhs: Self) {
+    lhs = lhs | rhs
+  }
 
-/// Calculates the intersections of bits sets in the two arguments and stores
-/// the result in the first argument.
-///
-/// - Parameters:
-///   - lhs: A value to update with the intersections of bits set in the two
-///     arguments.
-///   - rhs: Another value.
-@_inlineable // FIXME(sil-serialize-all)
-public func &= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
-  lhs = lhs & rhs
-}
+  /// Calculates the intersections of bits sets in the two arguments and stores
+  /// the result in the first argument.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to update with the intersections of bits set in the two
+  ///     arguments.
+  ///   - rhs: Another value.
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4.1)
+  public static func &= (lhs: inout Self, rhs: Self) {
+    lhs = lhs & rhs
+  }
 
-/// Calculates the bits that are set in exactly one of the two arguments and
-/// stores the result in the first argument.
-///
-/// - Parameters:
-///   - lhs: A value to update with the bits that are set in exactly one of the
-///     two arguments.
-///   - rhs: Another value.
-@_inlineable // FIXME(sil-serialize-all)
-public func ^= <T : _BitwiseOperations>(lhs: inout T, rhs: T) {
-  lhs = lhs ^ rhs
+  /// Calculates the bits that are set in exactly one of the two arguments and
+  /// stores the result in the first argument.
+  ///
+  /// - Parameters:
+  ///   - lhs: A value to update with the bits that are set in exactly one of the
+  ///     two arguments.
+  ///   - rhs: Another value.
+  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, obsoleted: 4.1)
+  public static func ^= (lhs: inout Self, rhs: Self) {
+    lhs = lhs ^ rhs
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -693,10 +698,13 @@ infix operator || : LogicalDisjunctionPrecedence
 // Compound
 
 infix operator   *= : AssignmentPrecedence
+infix operator  &*= : AssignmentPrecedence
 infix operator   /= : AssignmentPrecedence
 infix operator   %= : AssignmentPrecedence
 infix operator   += : AssignmentPrecedence
+infix operator  &+= : AssignmentPrecedence
 infix operator   -= : AssignmentPrecedence
+infix operator  &-= : AssignmentPrecedence
 infix operator  <<= : AssignmentPrecedence
 infix operator &<<= : AssignmentPrecedence
 infix operator  >>= : AssignmentPrecedence

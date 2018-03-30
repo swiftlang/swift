@@ -111,8 +111,8 @@ static NSError *_NSErrorWithFilePathAndErrno(NSInteger posixErrno, id pathOrURL,
     return error;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-BOOL __NSDataWriteToURL(NSData *SWIFT_NS_RELEASES_ARGUMENT data, NSURL *SWIFT_NS_RELEASES_ARGUMENT url, NSDataWritingOptions writingOptions, NSError **_Nullable errorPtr) {
+SWIFT_RUNTIME_STDLIB_INTERNAL
+BOOL __NSDataWriteToURL(NSData * _Nonnull data NS_RELEASES_ARGUMENT, NSURL * _Nonnull url NS_RELEASES_ARGUMENT, NSDataWritingOptions writingOptions, NSError **errorPtr) {
     assert((writingOptions & NSDataWritingAtomic) == 0);
 
     NSString *path = url.path;

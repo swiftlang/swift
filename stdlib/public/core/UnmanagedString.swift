@@ -74,6 +74,14 @@ struct _UnmanagedString<CodeUnit>
     self.start = start
     self.count = count
   }
+
+  @_inlineable
+  @_versioned
+  init(_ bufPtr: UnsafeBufferPointer<CodeUnit>) {
+    self.init(
+      start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+      count: bufPtr.count)
+  }
 }
 
 extension _UnmanagedString {
@@ -172,6 +180,36 @@ extension _UnmanagedString : _StringVariant {
     return _UnmanagedString(
       start: start + offsetRange.lowerBound,
       count: offsetRange.count)
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.lowerBound >= 0)
+    return _UnmanagedString(
+      start: start + offsetRange.lowerBound, 
+      count: self.count - offsetRange.lowerBound
+    )
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound <= count)
+    return _UnmanagedString(
+      start: start, 
+      count: offsetRange.upperBound
+    )
+  }
+  
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound < count)
+    return _UnmanagedString(
+      start: start, 
+      count: offsetRange.upperBound + 1
+    )
   }
 
   @_inlineable // FIXME(sil-serialize-all)

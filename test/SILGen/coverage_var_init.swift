@@ -7,7 +7,7 @@ final class VarInit {
     return "Hello"
   }()
 
-  // CHECK: sil_coverage_map {{.*}} $S17coverage_var_init7VarInitC05basicdE033_49373CB2DFB47C8DC62FA963604688DFLLSSvpfiSSycfU_ 
+  // CHECK: sil_coverage_map {{.*}} $S17coverage_var_init7VarInitC05basicdE033_49373CB2DFB47C8DC62FA963604688DFLLSSvpfiSSyXEfU_ 
   // CHECK-NEXT: [[@LINE+1]]:38 -> [[@LINE+3]]:4 : 0
   private var basicVarInit: String = {
     return "Hello"

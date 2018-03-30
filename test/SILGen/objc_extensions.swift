@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name objc_extensions -enable-sil-ownership -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -89,10 +90,9 @@ extension Sub {
     // CHECK:    destroy_value [[BRIDGED_NEW_STRING]]
     // CHECK:    destroy_value [[UPCAST_SELF_COPY]]
     // CHECK:    [[BORROWED_OLD_NSSTRING_BRIDGED:%.*]] = begin_borrow [[OLD_NSSTRING_BRIDGED]]
-    // CHECK:    [[COPIED_OLD_NSSTRING_BRIDGED:%.*]] = copy_value [[BORROWED_OLD_NSSTRING_BRIDGED]]
     // This is an identity cast that should be eliminated by SILGen peepholes.
-    // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @$S15objc_extensions3SubC4propSSSgvW : $@convention(method) (@owned Optional<String>, @guaranteed Sub) -> ()
-    // CHECK:    apply [[DIDSET_NOTIFIER]]([[COPIED_OLD_NSSTRING_BRIDGED]], [[SELF]])
+    // CHECK:    [[DIDSET_NOTIFIER:%.*]] = function_ref @$S15objc_extensions3SubC4propSSSgvW : $@convention(method) (@guaranteed Optional<String>, @guaranteed Sub) -> ()
+    // CHECK:    apply [[DIDSET_NOTIFIER]]([[BORROWED_OLD_NSSTRING_BRIDGED]], [[SELF]])
     // CHECK:    end_borrow [[BORROWED_OLD_NSSTRING_BRIDGED]] from [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    destroy_value [[OLD_NSSTRING_BRIDGED]]
     // CHECK:    destroy_value [[NEW_VALUE]]
@@ -108,9 +108,8 @@ extension Sub {
 
 // CHECK-LABEL: sil hidden @$S15objc_extensions20testOverridePropertyyyAA3SubCF
 func testOverrideProperty(_ obj: Sub) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $Sub):
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: = objc_method [[BORROWED_ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String?) -> ()
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $Sub):
+  // CHECK: = objc_method [[ARG]] : $Sub, #Sub.prop!setter.1.foreign : (Sub) -> (String?) -> ()
   obj.prop = "abc"
 } // CHECK: } // end sil function '$S15objc_extensions20testOverridePropertyyyAA3SubCF'
 

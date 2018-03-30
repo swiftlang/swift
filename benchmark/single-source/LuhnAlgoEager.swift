@@ -144,7 +144,7 @@ let charToString = { (c: Character) -> String in String(c) }
 let charToInt = stringToInt • charToString
 
 func sum<S: Sequence>(_ nums: S)->S.Iterator.Element where S.Iterator.Element: FixedWidthInteger {
-    return nums.reduce(0) { $0.0 + $0.1 }
+    return nums.reduce(0, +)
 }
 
 func reverse<C: LazyCollectionProtocol>(

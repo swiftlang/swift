@@ -1,19 +1,13 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name auto_closures -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 struct Bool {}
 var false_ = Bool()
 
-// CHECK-LABEL: sil hidden @$S13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Bool) -> Bool
+// CHECK-LABEL: sil hidden @$S13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
-  // CHECK: bb0([[CLOSURE:%.*]] : $@noescape @callee_guaranteed () -> Bool):
-  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
-  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
-  // CHECK: [[B:%.*]] = begin_borrow [[CLOSURE_COPY]]
-  // CHECK: [[RET:%.*]] = apply [[B]]()
-  // CHECK: end_borrow [[B]]
-  // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
-  // CHECK: destroy_value [[CLOSURE]]
+  // CHECK: bb0([[CLOSURE:%.*]] : @trivial $@noescape @callee_guaranteed () -> Bool):
+  // CHECK: [[RET:%.*]] = apply [[CLOSURE]]()
   // CHECK: return [[RET]]
   return x()
 }
@@ -22,7 +16,7 @@ func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
 func test_auto_closure_with_capture(_ x: Bool) -> Bool {
   // CHECK: [[CLOSURE:%.*]] = function_ref @$S13auto_closures05test_A21_closure_with_capture
   // CHECK: [[WITHCAPTURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]](
-  // CHECK: [[CVT:%.*]] = convert_function [[WITHCAPTURE]]
+  // CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[WITHCAPTURE]]
   // CHECK: [[RET:%.*]] = apply {{%.*}}([[CVT]])
   // CHECK: return [[RET]]
   return call_auto_closure(x)
@@ -44,11 +38,11 @@ public class Base {
 
 public class Sub : Base {
   // CHECK-LABEL: sil hidden @$S13auto_closures3SubC1xAA4BoolVvg : $@convention(method) (@guaranteed Sub) -> Bool {
-  // CHECK: bb0([[SELF:%.*]] : $Sub):
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
   // CHECK: [[AUTOCLOSURE_FUNC:%.*]] = function_ref @$S13auto_closures3SubC1xAA4BoolVvgAFyXKfu_ : $@convention(thin) (@guaranteed Sub) -> Bool
   // CHECK: [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK: [[AUTOCLOSURE:%.*]] = partial_apply [callee_guaranteed] [[AUTOCLOSURE_FUNC]]([[SELF_COPY]])
-  // CHECK: [[CVT:%.*]] = convert_function [[AUTOCLOSURE]]
+  // CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[AUTOCLOSURE]]
   // CHECK: [[AUTOCLOSURE_CONSUMER:%.*]] = function_ref @$S13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin)
   // CHECK: [[RET:%.*]] = apply [[AUTOCLOSURE_CONSUMER]]([[CVT]])
   // CHECK: return [[RET]] : $Bool
@@ -65,7 +59,7 @@ public class Sub : Base {
 // CHECK: }
 // CHECK-LABEL: sil private [transparent] @$S13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil private @$S13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private @$S13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXKfu_A2DXEfU_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
 func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {

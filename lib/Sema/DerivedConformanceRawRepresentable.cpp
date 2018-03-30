@@ -292,14 +292,14 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
-  auto *rawDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                    C.Id_rawValue, SourceLoc(),
-                                    C.Id_rawValue, rawType, parentDC);
+  auto *rawDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_rawValue, SourceLoc(), C.Id_rawValue, rawType, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
   
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
   
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
@@ -344,6 +344,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->copyFormalAccessAndVersionedAttrFrom(enumDecl);
+  initDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -417,7 +418,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   if (requirement->getBaseName() == tc.Context.Id_rawValue)
     return deriveRawRepresentable_raw(tc, parentDecl, enumDecl);
 
-  if (requirement->getBaseName() == tc.Context.Id_init)
+  if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveRawRepresentable_init(tc, parentDecl, enumDecl);
   
   tc.diagnose(requirement->getLoc(),

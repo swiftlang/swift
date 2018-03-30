@@ -245,7 +245,7 @@ func _introSort<C>(
   }
   // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
   // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
-  let depthLimit = 2 * _floorLog2(Int64(count))
+  let depthLimit = 2 * count._binaryLogarithm()
   ${try_} _introSortImpl(
     &elements,
     subRange: range,

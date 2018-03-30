@@ -750,9 +750,13 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
         _uninitializedCount: newCapacity, minimumCapacity: 0)
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
-      newResult.firstElementAddress.moveInitialize(
-        from: result.firstElementAddress, count: result.capacity)
-      result.count = 0
+      if !result.isEmpty {
+        // This check prevents a data race writting to _swiftEmptyArrayStorage
+        // Since count is always 0 there, this code does nothing anyway
+        newResult.firstElementAddress.moveInitialize(
+          from: result.firstElementAddress, count: result.capacity)
+        result.count = 0
+      }
       (result, newResult) = (newResult, result)
     }
     addWithExistingCapacity(element)

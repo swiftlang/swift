@@ -251,6 +251,10 @@ public:
   bool isLoadable(SILModule &M) const {
     return !isAddressOnly(M);
   }
+  /// True if either:
+  /// 1) The type, or the referenced type of an address type, is loadable.
+  /// 2) The SIL Module conventions uses lowered addresses
+  bool isLoadableOrOpaque(SILModule &M) const;
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const;
@@ -382,7 +386,7 @@ public:
   bool isBlockPointerCompatible() const {
     // Look through one level of optionality.
     SILType ty = *this;
-    if (auto optPayload = ty.getAnyOptionalObjectType()) {
+    if (auto optPayload = ty.getOptionalObjectType()) {
       ty = optPayload;
     }
       
@@ -481,7 +485,7 @@ public:
 
   /// Returns the lowered type for T if this type is Optional<T>;
   /// otherwise, return the null type.
-  SILType getAnyOptionalObjectType() const;
+  SILType getOptionalObjectType() const;
 
   /// Unwraps one level of optional type.
   /// Returns the lowered T if the given type is Optional<T>.
@@ -615,7 +619,7 @@ namespace llvm {
 // Allow the low bit of SILType to be used for nefarious purposes, e.g. putting
 // a SILType into a PointerUnion.
 template<>
-class PointerLikeTypeTraits<swift::SILType> {
+struct PointerLikeTypeTraits<swift::SILType> {
 public:
   static inline void *getAsVoidPointer(swift::SILType T) {
     return T.getOpaqueValue();

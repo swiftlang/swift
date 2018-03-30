@@ -18,7 +18,7 @@ import SwiftPrivate
 import SwiftPrivatePthreadExtras
 import SwiftPrivateLibcExtras
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
@@ -588,10 +588,10 @@ func _stdlib_getline() -> String? {
       if result.isEmpty {
         return nil
       }
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
+      return String(decoding: result, as: UTF8.self)
     }
     if c == CInt(Unicode.Scalar("\n").value) {
-      return String._fromWellFormedCodeUnitSequence(UTF8.self, input: result)
+      return String(decoding: result, as: UTF8.self)
     }
     result.append(UInt8(c))
   }
@@ -1089,6 +1089,7 @@ struct PersistentState {
   static var runNoTestsWasCalled: Bool = false
   static var ranSomething: Bool = false
   static var complaintInstalled = false
+  static var hashingKeyOverridden = false
 
   static func complainIfNothingRuns() {
     if !complaintInstalled {
@@ -1406,7 +1407,7 @@ public final class TestSuite {
   var _testNameToIndex: [String : Int] = [:]
 }
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 @_silgen_name("getSystemVersionPlistProperty")
 func _getSystemVersionPlistPropertyImpl(
   _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
@@ -1510,7 +1511,7 @@ func _getOSVersion() -> OSVersion {
 #else
   let productVersion = _getSystemVersionPlistProperty("ProductVersion")!
   let (major, minor, bugFix) = _parseDottedVersionTriple(productVersion)
-  #if os(OSX)
+  #if os(macOS)
   return .osx(major: major, minor: minor, bugFix: bugFix)
   #elseif os(iOS)
   return .iOS(major: major, minor: minor, bugFix: bugFix)

@@ -14,6 +14,6 @@ struct rdar19612086 {
     return "\(i)" + Stringly(format: "%.2f", x) +
            "\(i+1)" + Stringly(format: "%.2f", x) +
            "\(i+2)" + Stringly(format: "%.2f", x)
-    // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
+    // expected-error@-1 {{reasonable time}}
   }
 }

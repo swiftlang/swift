@@ -49,21 +49,25 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   
   @_inlineable // FIXME(sil-serialize-all)
   final public var hashValue: Int {
-    var hash = 0
-    withBuffer {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    return withBuffer {
       var buffer = $0
       while true {
         let (component, type) = buffer.next()
-        hash ^= _mixInt(component.value.hashValue)
+        hasher.append(component.value)
         if let type = type {
-          hash ^= _mixInt(unsafeBitCast(type, to: Int.self))
+          hasher.append(unsafeBitCast(type, to: Int.self))
         } else {
           break
         }
       }
     }
-    return hash
   }
+  
   @_inlineable // FIXME(sil-serialize-all)
   public static func ==(a: AnyKeyPath, b: AnyKeyPath) -> Bool {
     // Fast-path identical objects
@@ -163,7 +167,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathKind { case readOnly, value, reference }
 
@@ -400,7 +404,7 @@ public class ReferenceWritableKeyPath<
 
 // MARK: Implementation details
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponentKind {
   /// The keypath projects within the storage of the outer value, like a
@@ -452,11 +456,14 @@ internal struct ComputedPropertyID: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var hashValue: Int {
-    var hash = 0
-    hash ^= _mixInt(value)
-    hash ^= _mixInt(isStoredProperty ? 13 : 17)
-    hash ^= _mixInt(isTableOffset ? 19 : 23)
-    return hash
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(value)
+    hasher.append(isStoredProperty)
+    hasher.append(isTableOffset)
   }
 }
 
@@ -473,6 +480,7 @@ internal struct ComputedArgumentWitnesses {
     (_ xInstanceArguments: UnsafeRawPointer,
      _ yInstanceArguments: UnsafeRawPointer,
      _ size: Int) -> Bool
+  // FIXME(hasher) Append to an inout _Hasher instead
   internal typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
      _ size: Int) -> Int
@@ -487,7 +495,7 @@ internal struct ComputedArgumentWitnesses {
   internal let hash: Hash
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal enum KeyPathComponent: Hashable {
   @_fixed_layout // FIXME(sil-serialize-all)
@@ -584,46 +592,54 @@ internal enum KeyPathComponent: Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal var hashValue: Int {
-    var hash: Int = 0
-    func mixHashFromArgument(_ argument: KeyPathComponent.ArgumentRef?) {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal func _hash(into hasher: inout _Hasher) {
+    var hasher = hasher
+    func appendHashFromArgument(
+      _ argument: KeyPathComponent.ArgumentRef?
+    ) {
       if let argument = argument {
-        let addedHash = argument.witnesses.pointee.hash(
+        let hash = argument.witnesses.pointee.hash(
           argument.data.baseAddress.unsafelyUnwrapped,
           argument.data.count)
         // Returning 0 indicates that the arguments should not impact the
         // hash value of the overall key path.
-        if addedHash != 0 {
-          hash ^= _mixInt(addedHash)
+        // FIXME(hasher): hash witness should just mutate hasher directly
+        if hash != 0 {
+          hasher.append(hash)
         }
       }
     }
     switch self {
     case .struct(offset: let a):
-      hash ^= _mixInt(0)
-      hash ^= _mixInt(a)
+      hasher.append(0)
+      hasher.append(a)
     case .class(offset: let b):
-      hash ^= _mixInt(1)
-      hash ^= _mixInt(b)
+      hasher.append(1)
+      hasher.append(b)
     case .optionalChain:
-      hash ^= _mixInt(2)
+      hasher.append(2)
     case .optionalForce:
-      hash ^= _mixInt(3)
+      hasher.append(3)
     case .optionalWrap:
-      hash ^= _mixInt(4)
+      hasher.append(4)
     case .get(id: let id, get: _, argument: let argument):
-      hash ^= _mixInt(5)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.append(5)
+      hasher.append(id)
+      appendHashFromArgument(argument)
     case .mutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hash ^= _mixInt(6)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.append(6)
+      hasher.append(id)
+      appendHashFromArgument(argument)
     case .nonmutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hash ^= _mixInt(7)
-      hash ^= _mixInt(id.hashValue)
-      mixHashFromArgument(argument)
+      hasher.append(7)
+      hasher.append(id)
+      appendHashFromArgument(argument)
     }
-    return hash
   }
 }
 
@@ -1193,7 +1209,7 @@ internal struct RawKeyPathComponent {
       count: buffer.count - componentSize)
   }
 
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_frozen // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
   internal enum ProjectionResult<NewValue, LeafValue> {
     /// Continue projecting the key path with the given new value.

@@ -19,11 +19,12 @@
 #include "Explosion.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
-#include "GenMeta.h"
+#include "GenHeap.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "TypeInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -114,6 +115,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
     targetMetadata
       = emitClassHeapMetadataRef(IGF, toType.getSwiftRValueType(),
                                  MetadataValueType::ObjCClass,
+                                 MetadataState::Complete,
                                  /*allowUninitialized*/ allowConservative);
   }
 
@@ -247,7 +249,8 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
     // Get the ObjC metadata for the type we're checking.
     toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType(),
-                                          MetadataValueType::ObjCClass);
+                                          MetadataValueType::ObjCClass,
+                                          MetadataState::Complete);
     switch (mode) {
     case CheckedCastMode::Unconditional:
       castFn = IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFn();
@@ -422,10 +425,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
 
   case CheckedCastMode::Unconditional: {
-    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
-                                                    llvm::Intrinsic::ID::trap);
-    IGF.Builder.CreateCall(trapIntrinsic, {});
-    IGF.Builder.CreateUnreachable();
+    IGF.emitTrap(/*EmitUnreachable=*/true);
     break;
   }
   }
@@ -805,7 +805,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   assert(sourceType.isObject());
   assert(targetType.isObject());
 
-  if (auto sourceOptObjectType = sourceType.getAnyOptionalObjectType()) {
+  if (auto sourceOptObjectType = sourceType.getOptionalObjectType()) {
 
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe

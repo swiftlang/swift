@@ -141,7 +141,8 @@ static ManagedValue emitBuiltinUnpin(SILGenFunction &SGF,
 
   if (requireIsOptionalNativeObject(SGF, loc, subs[0].getReplacement())) {
     // Unpinning takes responsibility for the +1 handle.
-    SGF.B.createStrongUnpin(loc, args[0].forward(SGF), SGF.B.getDefaultAtomicity());
+    SGF.B.createStrongUnpin(loc, args[0].ensurePlusOne(SGF, loc).forward(SGF),
+                            SGF.B.getDefaultAtomicity());
   }
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
@@ -268,7 +269,7 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &SGF,
   // Build the value to be assigned, reconstructing tuples if needed.
   auto src = RValue(SGF, args.slice(0, args.size() - 1), assignFormalType);
   
-  std::move(src).assignInto(SGF, loc, addr);
+  std::move(src).ensurePlusOne(SGF, loc).assignInto(SGF, loc, addr);
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
@@ -293,7 +294,7 @@ static ManagedValue emitBuiltinInit(SILGenFunction &SGF,
 
   TemporaryInitialization init(addr, CleanupHandle::invalid());
   SGF.emitExprInto(args[0], &init);
-  
+
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
@@ -389,16 +390,8 @@ static ManagedValue emitCastFromReferenceType(SILGenFunction &SGF,
     SILValue result = SILUndef::get(destType, SGF.SGM.M);
     return ManagedValue::forUnmanaged(result);
   }
-  
-  // Save the cleanup on the argument so we can forward it onto the cast
-  // result.
-  auto cleanup = args[0].getCleanup();
 
-  // Take the reference type argument and cast it.
-  SILValue result = SGF.B.createUncheckedRefCast(loc, args[0].getValue(),
-                                                 destType);
-  // Return the cast result with the original cleanup.
-  return ManagedValue(result, cleanup);
+  return SGF.B.createUncheckedRefCast(loc, args[0], destType);
 }
 
 /// Specialized emitter for Builtin.castFromNativeObject.
@@ -552,14 +545,16 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   auto &toTL = SGF.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
-  if (!fromTL.isAddress() || !toTL.isAddress()) { 
-    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0].getValue(),
+  // TODO: Fix this API.
+  if (!fromTL.isAddress() || !toTL.isAddress()) {
+    if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, args[0],
                                                        toTL.getLoweredType())) {
       // Create a reference cast, forwarding the cleanup.
       // The cast takes the source reference.
-      return ManagedValue(refCast, args[0].getCleanup());
+      return refCast;
     }
   }
+
   // We are either casting between address-only types, or cannot promote to a
   // cast of reference values.
   //
@@ -571,7 +566,7 @@ emitBuiltinCastReference(SILGenFunction &SGF,
   // TODO: For now, we leave invalid casts in address form so that the runtime
   // will trap. We could emit a noreturn call here instead which would provide
   // more information to the optimizer.
-  SILValue srcVal = args[0].forward(SGF);
+  SILValue srcVal = args[0].ensurePlusOne(SGF, loc).forward(SGF);
   SILValue fromAddr;
   if (!fromTL.isAddress()) {
     // Move the loadable value into a "source temp".  Since the source and
@@ -644,16 +639,17 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &SGF,
         });
   }
   // Create the appropriate bitcast based on the source and dest types.
-  auto &in = args[0];
-  SILValue out = SGF.B.createUncheckedBitCast(loc, in.getValue(),
-                                              toTL.getLoweredType());
+  ManagedValue in = args[0];
+  SILType resultTy = toTL.getLoweredType();
+  if (resultTy.isTrivial(SGF.getModule()))
+    return SGF.B.createUncheckedTrivialBitCast(loc, in, resultTy);
 
-  // If the cast reduces to unchecked_ref_cast, then the source and dest
-  // have identical cleanup, so just forward the cleanup as an optimization.
-  if (isa<UncheckedRefCastInst>(out))
-    return ManagedValue(out, in.getCleanup());
+  // If we can perform a ref cast, just return.
+  if (auto refCast = SGF.B.tryCreateUncheckedRefCast(loc, in, resultTy))
+    return refCast;
 
   // Otherwise leave the original cleanup and retain the cast value.
+  SILValue out = SGF.B.createUncheckedBitwiseCast(loc, in.getValue(), resultTy);
   return SGF.emitManagedRetain(loc, out, toTL);
 }
 
@@ -677,11 +673,8 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
     SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
     return ManagedValue::forUnmanaged(undef);
   }
-  
-  // Save the cleanup on the argument so we can forward it onto the cast
-  // result.
-  auto refCleanup = args[0].getCleanup();
-  SILValue ref = args[0].getValue();
+
+  ManagedValue ref = args[0];
   SILValue bits = args[1].getUnmanagedValue();
   
   // If the argument is existential, open it.
@@ -691,9 +684,8 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &SGF,
     SILType loweredOpenedTy = SGF.getLoweredLoadableType(openedTy);
     ref = SGF.B.createOpenExistentialRef(loc, ref, loweredOpenedTy);
   }
-  
-  SILValue result = SGF.B.createRefToBridgeObject(loc, ref, bits);
-  return ManagedValue(result, refCleanup);
+
+  return SGF.B.createRefToBridgeObject(loc, ref, bits);
 }
 
 /// Specialized emitter for Builtin.castReferenceFromBridgeObject.
@@ -749,6 +741,19 @@ static ManagedValue emitBuiltinClassifyBridgeObject(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(result);
 }
 
+static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
+                                                   SILLocation loc,
+                                                   SubstitutionList subs,
+                                                   ArrayRef<ManagedValue> args,
+                                                   SGFContext C) {
+  assert(args.size() == 1 && "ValueToBridgeObject should have one argument");
+  assert(subs.size() == 1 && "ValueToBridgeObject should have one sub");
+  auto &fromTL = SGF.getTypeLowering(subs[0].getReplacement());
+  assert(fromTL.isTrivial() && "Expected a trivial type");
+
+  SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
+  return SGF.emitManagedRetain(loc, result);
+}
 
 // This should only accept as an operand type single-refcounted-pointer types,
 // class existentials, or single-payload enums (optional). Type checking must be

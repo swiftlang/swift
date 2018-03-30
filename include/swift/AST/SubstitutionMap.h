@@ -36,6 +36,10 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
+namespace llvm {
+  class FoldingSetNodeID;
+}
+
 namespace swift {
 
 class GenericSignature;
@@ -162,6 +166,10 @@ public:
                           unsigned origDepthOrIndex,
                           GenericSignature *genericSig);
 
+  /// Swap archetypes in the substitution map's replacement types with their
+  /// interface types.
+  SubstitutionMap mapReplacementTypesOutOfContext() const;
+
   /// Verify that this substitution map is valid.
   void verify() const;
 
@@ -169,6 +177,9 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
+
+  /// Profile the substitution map, for use with LLVM's FoldingSet.
+  void profile(llvm::FoldingSetNodeID &id) const;
 
 private:
   friend class GenericSignature;

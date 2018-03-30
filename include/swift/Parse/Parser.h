@@ -201,11 +201,11 @@ public:
   Token Tok;
 
   /// \brief leading trivias for \c Tok.
-  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia LeadingTrivia;
 
   /// \brief trailing trivias for \c Tok.
-  /// Always empty if !SF.shouldKeepSyntaxInfo().
+  /// Always empty if !SF.shouldBuildSyntaxTree().
   syntax::Trivia TrailingTrivia;
 
   /// \brief The receiver to collect all consumed tokens.
@@ -276,7 +276,7 @@ public:
   /// Describes the kind of a lexical structure marker, indicating
   /// what kind of structural element we started parsing at a
   /// particular location.
-  enum class StructureMarkerKind : unsigned char {
+  enum class StructureMarkerKind : uint8_t {
     /// The start of a declaration.
     Declaration,
     /// The start of a statement.
@@ -755,6 +755,9 @@ public:
   ParserResult<IfConfigDecl> parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
 
+  /// Parse a #error or #warning diagnostic.
+  ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
+
   /// Parse a #line/#sourceLocation directive.
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
@@ -985,7 +988,7 @@ public:
 
     /// Set the parsed context for all the initializers to the given
     /// function.
-    void setFunctionContext(AbstractFunctionDecl *AFD);
+    void setFunctionContext(DeclContext *DC, MutableArrayRef<ParameterList *> paramList);
     
     DefaultArgumentInfo(bool inTypeContext) {
       NextIndex = inTypeContext ? 1 : 0;
@@ -1002,7 +1005,7 @@ public:
     SourceLoc SpecifierLoc;
     
     /// The parsed specifier kind, if present.
-    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Owned;
+    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Default;
 
     /// The location of the first name.
     ///
@@ -1047,6 +1050,8 @@ public:
     Subscript,
     /// A curried argument clause.
     Curried,
+    /// An enum element.
+    EnumElement,
   };
 
   /// Parse a parameter-clause.
@@ -1171,7 +1176,7 @@ public:
                                             bool periodHasKeyPathBehavior,
                                             bool &hasBindOptional);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
-  ParserResult<Expr> parseExprPostfixWithoutSuffix(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprPrimary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
@@ -1278,15 +1283,14 @@ public:
   /// Parse an object literal.
   ///
   /// \param LK The literal kind as determined by the first token.
-  /// \param NewName New name for a legacy literal.
   ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
-                                            bool isExprBasic,
-                                            StringRef NewName = StringRef());
+                                            bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
-  ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
+  ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
@@ -1425,7 +1429,8 @@ ParsedDeclName parseDeclName(StringRef name) LLVM_READONLY;
 DeclName formDeclName(ASTContext &ctx,
                       StringRef baseName,
                       ArrayRef<StringRef> argumentLabels,
-                      bool isFunctionName);
+                      bool isFunctionName,
+                      bool isInitializer);
 
 /// Parse a stringified Swift declaration name, e.g. "init(frame:)".
 DeclName parseDeclName(ASTContext &ctx, StringRef name);
@@ -1441,7 +1446,8 @@ tokenizeWithTrivia(const LangOptions &LangOpts,
                    const SourceManager &SM,
                    unsigned BufferID,
                    unsigned Offset = 0,
-                   unsigned EndOffset = 0);
+                   unsigned EndOffset = 0,
+                   DiagnosticEngine *Diags = nullptr);
 } // end namespace swift
 
 #endif

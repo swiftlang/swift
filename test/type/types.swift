@@ -51,8 +51,8 @@ func testInvalidUseOfParameterAttr() {
   var bad_is : (Int) -> (__shared Int, Int)  // expected-error {{'__shared' may only be used on parameters}}
   func bad_is2(_ a: (__shared Int, Int)) {}    // expected-error {{'__shared' may only be used on parameters}}
   
-  var bad_iow : (Int) -> (__owned Int, Int)
-  func bad_iow2(_ a: (__owned Int, Int)) {}
+  var bad_iow : (Int) -> (__owned Int, Int)  // expected-error {{'__owned' may only be used on parameters}}
+  func bad_iow2(_ a: (__owned Int, Int)) {}  // expected-error {{'__owned' may only be used on parameters}}
 }
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work

@@ -1,13 +1,14 @@
+
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -enable-sil-ownership -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -enable-sil-ownership -emit-silgen -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name struct_resilience -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -enable-sil-ownership -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -module-name struct_resilience -I %t -enable-sil-ownership -emit-silgen -enable-resilience %s | %FileCheck %s
 
 import resilient_struct
 
 // Resilient structs are always address-only
 
-// CHECK-LABEL: sil hidden @$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FctF : $@convention(thin) (@in Size, @owned @noescape @callee_guaranteed (@in Size) -> @out Size) -> @out Size
-// CHECK:       bb0(%0 : @trivial $*Size, %1 : @trivial $*Size, %2 : @owned $@noescape @callee_guaranteed (@in Size) -> @out Size):
+// CHECK-LABEL: sil hidden @$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Size, @noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size) -> @out Size
+// CHECK:       bb0(%0 : @trivial $*Size, %1 : @trivial $*Size, %2 : @trivial $@noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size):
 func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 
   // Stored properties of resilient structs from outside our resilience
@@ -29,11 +30,8 @@ func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK:         [[RESULT:%.*]] = apply [[FN]]([[SIZE_BOX]])
   _ = s.h
 
-// CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %2
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*Size
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPIED_CLOSURE]]
-// CHECK:         apply [[BORROW]](%0, [[SIZE_BOX]])
-// CHECK:         destroy_value [[COPIED_CLOSURE]]
+// CHECK:         apply %2(%0, %1)
+// CHECK-NOT:         destroy_value %2
 // CHECK:         return
   return f(s)
 }
@@ -57,8 +55,8 @@ func resilientInOutTest(_ s: inout Size) {
 
 // Fixed-layout structs may be trivial or loadable
 
-// CHECK-LABEL: sil hidden @$S17struct_resilience28functionWithFixedLayoutTypes_1f010resilient_A05PointVAF_A2FctF : $@convention(thin) (Point, @owned @noescape @callee_guaranteed (Point) -> Point) -> Point
-// CHECK:       bb0(%0 : @trivial $Point, %1 : @owned $@noescape @callee_guaranteed (Point) -> Point):
+// CHECK-LABEL: sil hidden @$S17struct_resilience28functionWithFixedLayoutTypes_1f010resilient_A05PointVAF_A2FXEtF : $@convention(thin) (Point, @noescape @callee_guaranteed (Point) -> Point) -> Point
+// CHECK:       bb0(%0 : @trivial $Point, %1 : @trivial $@noescape @callee_guaranteed (Point) -> Point):
 func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 
   // Stored properties of fixed layout structs are accessed directly
@@ -72,18 +70,15 @@ func functionWithFixedLayoutTypes(_ p: Point, f: (Point) -> Point) -> Point {
 // CHECK:         [[RESULT:%.*]] = struct_extract %0 : $Point, #Point.y
   _ = p.y
 
-// CHECK:         [[COPIED_CLOSURE:%.*]] = copy_value %1
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[COPIED_CLOSURE]]
-// CHECK:         [[NEW_POINT:%.*]] = apply [[BORROW]](%0)
-// CHECK:         destroy_value [[COPIED_CLOSURE]]
+// CHECK:         [[NEW_POINT:%.*]] = apply %1(%0)
 // CHECK:         return [[NEW_POINT]]
   return f(p)
 }
 
 // Fixed-layout struct with resilient stored properties is still address-only
 
-// CHECK-LABEL: sil hidden @$S17struct_resilience39functionWithFixedLayoutOfResilientTypes_1f010resilient_A09RectangleVAF_A2FctF : $@convention(thin) (@in Rectangle, @owned @noescape @callee_guaranteed (@in Rectangle) -> @out Rectangle) -> @out Rectangle
-// CHECK:        bb0(%0 : @trivial $*Rectangle, %1 : @trivial $*Rectangle, %2 : @owned $@noescape @callee_guaranteed (@in Rectangle) -> @out Rectangle):
+// CHECK-LABEL: sil hidden @$S17struct_resilience39functionWithFixedLayoutOfResilientTypes_1f010resilient_A09RectangleVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Rectangle, @noescape @callee_guaranteed (@in_guaranteed Rectangle) -> @out Rectangle) -> @out Rectangle
+// CHECK:        bb0(%0 : @trivial $*Rectangle, %1 : @trivial $*Rectangle, %2 : @trivial $@noescape @callee_guaranteed (@in_guaranteed Rectangle) -> @out Rectangle):
 func functionWithFixedLayoutOfResilientTypes(_ r: Rectangle, f: (Rectangle) -> Rectangle) -> Rectangle {
   return f(r)
 }
@@ -133,7 +128,7 @@ public struct MySize {
   public static var copyright: Int = 0
 }
 
-// CHECK-LABEL: sil @$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EctF : $@convention(thin) (@in MySize, @owned @noescape @callee_guaranteed (@in MySize) -> @out MySize) -> @out MySize
+// CHECK-LABEL: sil @$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EXEtF : $@convention(thin) (@in_guaranteed MySize, @noescape @callee_guaranteed (@in_guaranteed MySize) -> @out MySize) -> @out MySize
 public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
 
   // Stored properties of resilient structs from inside our resilience
@@ -153,17 +148,13 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK:         [[RESULT:%.*]] = load [trivial] [[RESULT_ADDR]] : $*Int
   _ = s.h
 
-// CHECK:         [[BORROWED_CLOSURE:%.*]] = begin_borrow %2
-// CHECK:         [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
-// CHECK:         copy_addr %1 to [initialization] [[SIZE_BOX:%.*]] : $*MySize
-// CHECK:         [[BORROW:%.*]] = begin_borrow [[CLOSURE_COPY]]
-// CHECK:         apply [[BORROW]](%0, [[SIZE_BOX]])
-// CHECK:         destroy_value [[CLOSURE_COPY]]
+// CHECK:         apply %2(%0, %1)
+// CHECK-NOT:         destroy_value %2
 // CHECK:         return
   return f(s)
 }
 
-// CHECK-LABEL: sil [transparent] [serialized] @$S17struct_resilience25publicTransparentFunctionySiAA6MySizeVF : $@convention(thin) (@in MySize) -> Int
+// CHECK-LABEL: sil [transparent] [serialized] @$S17struct_resilience25publicTransparentFunctionySiAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> Int
 @_transparent public func publicTransparentFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
@@ -176,12 +167,11 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
 // CHECK-NEXT:    destroy_addr [[SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF]]
-// CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 }
 
-// CHECK-LABEL: sil [transparent] [serialized] @$S17struct_resilience30publicTransparentLocalFunctionySiycAA6MySizeVF : $@convention(thin) (@in MySize) -> @owned @callee_guaranteed () -> Int
+// CHECK-LABEL: sil [transparent] [serialized] @$S17struct_resilience30publicTransparentLocalFunctionySiycAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> @owned @callee_guaranteed () -> Int
 @_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
 // CHECK-LABEL: sil shared [serialized] @$S17struct_resilience30publicTransparentLocalFunctionySiycAA6MySizeVFSiycfU_ : $@convention(thin) (@guaranteed { var MySize }) -> Int
@@ -192,7 +182,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$S17struct_resilience27internalTransparentFunctionySiAA6MySizeVF : $@convention(thin) (@in MySize) -> Int
+// CHECK-LABEL: sil hidden [transparent] @$S17struct_resilience27internalTransparentFunctionySiAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> Int
 // CHECK: bb0([[ARG:%.*]] : @trivial $*MySize):
 @_transparent func internalTransparentFunction(_ s: MySize) -> Int {
 
@@ -201,12 +191,11 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 // CHECK:         [[W_ADDR:%.*]] = struct_element_addr [[ARG]] : $*MySize, #MySize.w
 // CHECK-NEXT:    [[RESULT:%.*]] = load [trivial] [[W_ADDR]] : $*Int
-// CHECK-NEXT:    destroy_addr [[ARG]]
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 }
 
-// CHECK-LABEL: sil [serialized] [always_inline] @$S17struct_resilience26publicInlineAlwaysFunctionySiAA6MySizeVF : $@convention(thin) (@in MySize) -> Int
+// CHECK-LABEL: sil [serialized] [always_inline] @$S17struct_resilience26publicInlineAlwaysFunctionySiAA6MySizeVF : $@convention(thin) (@in_guaranteed MySize) -> Int
 @inline(__always) public func publicInlineAlwaysFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
@@ -219,7 +208,6 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 // CHECK-NEXT:    [[RESULT:%.*]] = apply [[GETTER]]([[SELF]])
 // CHECK-NEXT:    destroy_addr [[SELF]]
 // CHECK-NEXT:    dealloc_stack [[SELF]]
-// CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    return [[RESULT]]
   return s.w
 
@@ -257,7 +245,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   }
 }
 
-// CHECK-LABEL: sil [transparent] [serialized] @$S17struct_resilience27useVersionedResilientStructyAA0deF0VADF : $@convention(thin) (@in VersionedResilientStruct) -> @out VersionedResilientStruct
+// CHECK-LABEL: sil [transparent] [serialized] @$S17struct_resilience27useVersionedResilientStructyAA0deF0VADF : $@convention(thin) (@in_guaranteed VersionedResilientStruct) -> @out VersionedResilientStruct
 @_versioned
 @_transparent func useVersionedResilientStruct(_ s: VersionedResilientStruct)
     -> VersionedResilientStruct {

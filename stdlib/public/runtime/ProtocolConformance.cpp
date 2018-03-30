@@ -217,7 +217,9 @@ namespace {
     const ProtocolDescriptor *Proto;
 
     ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
-      : Type(type), Proto(proto) {}
+        : Type(type), Proto(proto) {
+      assert(type);
+    }
   };
 
   struct ConformanceCacheEntry {
@@ -401,6 +403,15 @@ struct ConformanceCacheResult {
   }
 };
 
+/// Retrieve the type key from the given metadata, to be used when looking
+/// into the conformance cache.
+static const void *getConformanceCacheTypeKey(const Metadata *type) {
+  if (auto description = type->getTypeContextDescriptor())
+    return description;
+
+  return type;
+}
+
 /// Search for a witness table in the ConformanceCache.
 static
 ConformanceCacheResult
@@ -455,10 +466,10 @@ recur:
     // For generic and resilient types, nondependent conformances
     // are keyed by the nominal type descriptor rather than the
     // metadata, so try that.
-    const auto *description = type->getTypeContextDescriptor();
+    auto typeKey = getConformanceCacheTypeKey(type);
 
     // Hash and lookup the type-protocol pair in the cache.
-    if (auto *Value = C.findCached(description, protocol)) {
+    if (auto *Value = C.findCached(typeKey, protocol)) {
       if (Value->isSuccessful())
         return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
 
@@ -470,7 +481,7 @@ recur:
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (classHasSuperclass(classType)) {
-      type = getMetadataForClass(classType->SuperClass);
+      type = getMetadataForClass(classType->Superclass);
       goto recur;
     }
   }
@@ -505,7 +516,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     if (!candidateIsMetadata) {
       const auto *description = type->getTypeContextDescriptor();
       auto candidateDescription =
-      static_cast<const TypeContextDescriptor *>(candidate);
+        static_cast<const TypeContextDescriptor *>(candidate);
       if (description && equalContexts(description, candidateDescription))
         return true;
     }
@@ -513,7 +524,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
       if (classHasSuperclass(classType)) {
-        type = getMetadataForClass(classType->SuperClass);
+        type = getMetadataForClass(classType->Superclass);
         continue;
       }
     }
@@ -747,15 +758,16 @@ bool swift::_checkGenericRequirements(
     // Check the requirement.
     switch (req.getKind()) {
     case GenericRequirementKind::Protocol: {
-      // Look for a witness table to satisfy this conformance.
-      auto witnessTable =
-        swift_conformsToProtocol(subjectType, req.getProtocol());
-      if (!witnessTable) return true;
+      const WitnessTable *witnessTable = nullptr;
+      if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
+                               &witnessTable))
+        return true;
 
-      // If this requirement provides an extra argument, add the witness table
-      // as that argument.
-      if (req.getFlags().hasExtraArgument())
+      // If we need a witness table, add it.
+      if (req.getProtocol()->Flags.needsWitnessTable()) {
+        assert(witnessTable);
         extraArguments.push_back(witnessTable);
+      }
 
       continue;
     }
@@ -777,8 +789,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::Layout: {
       switch (req.getLayout()) {
       case GenericRequirementLayoutKind::Class:
-        // Check whether the subject type is a class.
-        if (!subjectType->isAnyClass()) return true;
+        if (!subjectType->satisfiesClassConstraint())
+          return true;
         continue;
       }
 

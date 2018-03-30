@@ -80,25 +80,51 @@ extension RangeExpression {
   }  
 }
 
-/// A half-open interval over a comparable type, from a lower bound up to, but
-/// not including, an upper bound.
+/// A half-open interval from a lower bound up to, but not including, an upper
+/// bound.
 ///
-/// You create `Range` instances by using the half-open range operator (`..<`).
+/// You create a `Range` instance by using the half-open range operator
+/// (`..<`).
 ///
 ///     let underFive = 0.0..<5.0
 ///
 /// You can use a `Range` instance to quickly check if a value is contained in
 /// a particular range of values. For example:
 ///
-///     print(underFive.contains(3.14))     // Prints "true"
-///     print(underFive.contains(6.28))     // Prints "false"
-///     print(underFive.contains(5.0))      // Prints "false"
+///     underFive.contains(3.14)
+///     // true
+///     underFive.contains(6.28)
+///     // false
+///     underFive.contains(5.0)
+///     // false
 ///
 /// `Range` instances can represent an empty interval, unlike `ClosedRange`.
 ///
 ///     let empty = 0.0..<0.0
-///     print(empty.contains(0.0))          // Prints "false"
-///     print(empty.isEmpty)                // Prints "true"
+///     empty.contains(0.0)
+///     // false
+///     empty.isEmpty
+///     // true
+///
+/// Using a Range as a Collection of Consecutive Values
+/// ----------------------------------------------------
+///
+/// When a range uses integers as its lower and upper bounds, or any other type
+/// that conforms to the `Strideable` protocol with an integer stride, you can
+/// use that range in a `for`-`in` loop or with any sequence or collection
+/// method. The elements of the range are the consecutive values from its
+/// lower bound up to, but not including, its upper bound.
+///
+///     for n in 3..<5 {
+///         print(n)
+///     }
+///     // Prints "3"
+///     // Prints "4"
+///
+/// Because floating-point types such as `Float` and `Double` are their own
+/// `Stride` types, they cannot be used as the bounds of a countable range. If
+/// you need to iterate over consecutive floating-point values, see the
+/// `stride(from:to:by:)` function.
 @_fixed_layout
 public struct Range<Bound : Comparable> {
   /// The range's lower bound.
@@ -224,6 +250,11 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element < upperBound
   }
 
+  @_inlineable
+  public func _customIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    return lowerBound <= element && element < upperBound ? element : nil
+  }
+
   /// Accesses the element at specified position.
   ///
   /// You can subscript a collection with any valid index other than the
@@ -267,6 +298,15 @@ extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
 }
 
 extension Range: RangeExpression {
+  /// Returns the range of indices described by this range expression within
+  /// the given collection.
+  ///
+  /// - Parameter collection: The collection to evaluate this range expression
+  ///   in relation to.
+  /// - Returns: A range suitable for slicing `collection`. The returned range
+  ///   is *not* guaranteed to be inside the bounds of `collection`. Callers
+  ///   should apply the same preconditions to the return value as they would
+  ///   to a range provided directly by the user.
   @_inlineable // FIXME(sil-serialize-all)
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
@@ -280,16 +320,16 @@ extension Range {
   /// The bounds of the result are always limited to the bounds of `limits`.
   /// For example:
   ///
-  ///     let x: Range = 0${op}20
-  ///     print(x.clamped(to: 10${op}1000))
-  ///     // Prints "10${op}20"
+  ///     let x: Range = 0..<20
+  ///     print(x.clamped(to: 10..<1000))
+  ///     // Prints "10..<20"
   ///
   /// If the two ranges do not overlap, the result is an empty range within the
   /// bounds of `limits`.
   ///
-  ///     let y: Range = 0${op}5
-  ///     print(y.clamped(to: 10${op}1000))
-  ///     // Prints "10${op}10"
+  ///     let y: Range = 0..<5
+  ///     print(y.clamped(to: 10..<1000))
+  ///     // Prints "10..<10"
   ///
   /// - Parameter limits: The range to clamp the bounds of this range.
   /// - Returns: A new range clamped to the bounds of `limits`.
@@ -358,6 +398,19 @@ extension Range: Equatable {
   }
 }
 
+extension Range: Hashable where Bound: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(lowerBound)
+    hasher.append(upperBound)
+  }
+}
+
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
 /// You create `PartialRangeUpTo` instances by using the prefix half-open range
@@ -402,7 +455,7 @@ extension PartialRangeUpTo: RangeExpression {
   }
 }
 
-/// A partial half-open interval up to, and including, an upper bound.
+/// A partial interval up to, and including, an upper bound.
 ///
 /// You create `PartialRangeThrough` instances by using the prefix closed range
 /// operator (prefix `...`).
@@ -445,39 +498,40 @@ extension PartialRangeThrough: RangeExpression {
   }
 }
 
-/// A partial interval extending upward from a lower bound that forms a
-/// sequence of increasing values.
+/// A partial interval extending upward from a lower bound.
 ///
-/// You create `PartialRangeFrom` instances by using the postfix range
-/// operator (postfix `...`).
+/// You create `PartialRangeFrom` instances by using the postfix range operator
+/// (postfix `...`).
 ///
 ///     let atLeastFive = 5...
 ///
-/// You can use a countable partial range to quickly check if a value is
-/// contained in a particular range of values. For example:
+/// You can use a partial range to quickly check if a value is contained in a
+/// particular range of values. For example:
 ///
-///     atLeastFive.contains(4)     // false
-///     atLeastFive.contains(5)     // true
-///     atLeastFive.contains(6)     // true
+///     atLeastFive.contains(4)
+///     // false
+///     atLeastFive.contains(5)
+///     // true
+///     atLeastFive.contains(6)
+///     // true
 ///
-/// You can use a countable partial range of a collection's indices to
-/// represent the range from the partial range's lower bound up to the end of
-/// the collection.
+/// You can use a partial range of a collection's indices to represent the
+/// range from the partial range's lower bound up to the end of the
+/// collection.
 ///
 ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
 ///     print(numbers[3...])
 ///     // Prints "[40, 50, 60, 70]"
 ///
-/// You can create a countable partial range over any type that conforms to the
-/// `Strideable` protocol and uses an integer as its associated `Stride` type.
-/// By default, Swift's integer and pointer types are usable as the bounds of
-/// a countable range.
-///
 /// Using a Partial Range as a Sequence
-/// ===================================
+/// -----------------------------------
 ///
-/// You can iterate over a countable partial range using a `for`-`in` loop, or
-/// call any sequence method that doesn't require that the sequence is finite.
+/// When a partial range uses integers as its lower and upper bounds, or any
+/// other type that conforms to the `Strideable` protocol with an integer
+/// stride, you can use that range in a `for`-`in` loop or with any sequence
+/// method that doesn't require that the sequence is finite. The elements of
+/// a partial range are the consecutive values from its lower bound continuing
+/// upward indefinitely.
 ///
 ///     func isTheMagicNumber(_ x: Int) -> Bool {
 ///         return x == 3
@@ -495,13 +549,13 @@ extension PartialRangeThrough: RangeExpression {
 ///     // "2 wasn't it..."
 ///     // "3 is the magic number!"
 ///
-/// Because a `PartialRangeFrom` sequence counts upward indefinitely,
-/// do not use one with methods that read the entire sequence before
-/// returning, such as `map(_:)`, `filter(_:)`, or `suffix(_:)`. It is safe to
-/// use operations that put an upper limit on the number of elements they
-/// access, such as `prefix(_:)` or `dropFirst(_:)`, and operations that you
-/// can guarantee will terminate, such as passing a closure you know will
-/// eventually return `true` to `first(where:)`.
+/// Because a `PartialRangeFrom` sequence counts upward indefinitely, do not
+/// use one with methods that read the entire sequence before returning, such
+/// as `map(_:)`, `filter(_:)`, or `suffix(_:)`. It is safe to use operations
+/// that put an upper limit on the number of elements they access, such as
+/// `prefix(_:)` or `dropFirst(_:)`, and operations that you can guarantee
+/// will terminate, such as passing a closure you know will eventually return
+/// `true` to `first(where:)`.
 ///
 /// In the following example, the `asciiTable` sequence is made by zipping
 /// together the characters in the `alphabet` string with a partial range
@@ -523,8 +577,8 @@ extension PartialRangeThrough: RangeExpression {
 ///
 /// The behavior of incrementing indefinitely is determined by the type of
 /// `Bound`. For example, iterating over an instance of
-/// `PartialRangeFrom<Int>` traps when the sequence's next value
-/// would be above `Int.max`.
+/// `PartialRangeFrom<Int>` traps when the sequence's next value would be
+/// above `Int.max`.
 @_fixed_layout
 public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
@@ -574,8 +628,8 @@ extension Comparable {
   /// Returns a half-open range that contains its lower bound but not its upper
   /// bound.
   ///
-  /// Use the half-open range operator (`..<`) to create a range of any type that
-  /// conforms to the `Comparable` protocol. This example creates a
+  /// Use the half-open range operator (`..<`) to create a range of any type
+  /// that conforms to the `Comparable` protocol. This example creates a
   /// `Range<Double>` from zero up to, but not including, 5.0.
   ///
   ///     let lessThanFive = 0.0..<5.0
@@ -678,18 +732,95 @@ extension Comparable {
   }
 }
 
-// FIXME: replace this with a computed var named `...` when the language makes
-// that possible.
-@_fixed_layout // FIXME(sil-serialize-all)
+/// A range expression that represents the entire range of a collection.
+///
+/// You can use the unbounded range operator (`...`) to create a slice of a
+/// collection that contains all of the collection's elements. Slicing with an
+/// unbounded range is essentially a conversion of a collection instance into
+/// its slice type.
+///
+/// For example, the following code declares `levenshteinDistance(_:_:)`, a
+/// function that calculates the number of changes required to convert one
+/// string into another. `levenshteinDistance(_:_:)` uses `Substring`, a
+/// string's slice type, for its parameters.
+///
+///     func levenshteinDistance(_ s1: Substring, _ s2: Substring) -> Int {
+///         if s1.isEmpty { return s2.count }
+///         if s2.isEmpty { return s1.count }
+///
+///         let cost = s1.first == s2.first ? 0 : 1
+///
+///         return min(
+///             levenshteinDistance(s1.dropFirst(), s2) + 1,
+///             levenshteinDistance(s1, s2.dropFirst()) + 1,
+///             levenshteinDistance(s1.dropFirst(), s2.dropFirst()) + cost)
+///     }
+///
+/// To call `levenshteinDistance(_:_:)` with two strings, use an unbounded
+/// range in each string's subscript to convert it to a `Substring`.
+///
+///     let word1 = "grizzly"
+///     let word2 = "grisly"
+///     let distance = levenshteinDistance(word1[...], word2[...])
+///     // distance == 2
+@_frozen // FIXME(sil-serialize-all)
 public enum UnboundedRange_ {
+  // FIXME: replace this with a computed var named `...` when the language makes
+  // that possible.
+
+  /// Creates an unbounded range expression.
+  ///
+  /// The unbounded range operator (`...`) is valid only within a collection's
+  /// subscript.
   @_inlineable // FIXME(sil-serialize-all)
   public static postfix func ... (_: UnboundedRange_) -> () {
     fatalError("uncallable")
   }
 }
+
+/// The type of an unbounded range operator.
 public typealias UnboundedRange = (UnboundedRange_)->()
 
 extension Collection {
+  /// Accesses the contiguous subrange of the collection's elements specified
+  /// by a range expression.
+  ///
+  /// The range expression is converted to a concrete subrange relative to this
+  /// collection. For example, using a `PartialRangeFrom` range expression
+  /// with an array accesses the subrange from the start of the range
+  /// expression until the end of the array.
+  ///
+  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
+  ///     let streetsSlice = streets[2...]
+  ///     print(streetsSlice)
+  ///     // ["Channing", "Douglas", "Evarts"]
+  ///
+  /// The accessed slice uses the same indices for the same elements as the
+  /// original collection uses. This example searches `streetsSlice` for one
+  /// of the strings in the slice, and then uses that index in the original
+  /// array.
+  ///
+  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     print(streets[index!])
+  ///     // "Evarts"
+  ///
+  /// Always use the slice's `startIndex` property instead of assuming that its
+  /// indices start at a particular value. Attempting to access an element by
+  /// using an index outside the bounds of the slice's indices may result in a
+  /// runtime error, even if that index is valid for the original collection.
+  ///
+  ///     print(streetsSlice.startIndex)
+  ///     // 2
+  ///     print(streetsSlice[2])
+  ///     // "Channing"
+  ///
+  ///     print(streetsSlice[0])
+  ///     // error: Index out of bounds
+  ///
+  /// - Parameter bounds: A range of the collection's indices. The bounds of
+  ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   @_inlineable
   public subscript<R: RangeExpression>(r: R)
   -> SubSequence where R.Bound == Index {
@@ -760,5 +891,5 @@ extension Range {
 }
 
 @available(*, deprecated, renamed: "Range")
-public typealias CountableRange<Bound: Comparable> = Range<Bound>
-
+public typealias CountableRange<Bound: Strideable> = Range<Bound>
+  where Bound.Stride : SignedInteger

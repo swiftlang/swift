@@ -118,7 +118,7 @@
 ///
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
-@_fixed_layout
+@_frozen
 public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
@@ -409,6 +409,30 @@ extension Optional : Equatable where Wrapped : Equatable {
   }
 }
 
+extension Optional: Hashable where Wrapped: Hashable {
+  /// The hash value for the optional instance.
+  ///
+  /// Two optionals that are equal will always have equal hash values.
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    switch self {
+    case .none:
+      hasher.append(0 as UInt8)
+    case .some(let wrapped):
+      hasher.append(1 as UInt8)
+      hasher.append(wrapped)
+    }
+  }
+}
+
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
 @_fixed_layout
@@ -453,7 +477,7 @@ extension Optional {
   ///   - rhs: A value to match against `nil`.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  static public func ~=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
+  public static func ~=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some(_):
       return false
@@ -488,7 +512,7 @@ extension Optional {
   ///   - rhs: A `nil` literal.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  static public func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
+  public static func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
     case .some(_):
       return false
@@ -520,7 +544,7 @@ extension Optional {
   ///   - rhs: A `nil` literal.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  static public func !=(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
+  public static func !=(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
     case .some(_):
       return true
@@ -552,7 +576,7 @@ extension Optional {
   ///   - rhs: A value to compare to `nil`.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  static public func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
+  public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some(_):
       return false
@@ -584,7 +608,7 @@ extension Optional {
   ///   - rhs: A value to compare to `nil`.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  static public func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
+  public static func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some(_):
       return true

@@ -12,6 +12,7 @@
 
 #include "swift/Basic/Range.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "Private.h"
 
@@ -22,6 +23,214 @@
 #endif
 
 using namespace swift;
+
+Demangle::NodePointer
+swift::_buildDemanglingForContext(const ContextDescriptor *context,
+                                  llvm::ArrayRef<NodePointer> demangledGenerics,
+                                  bool concretizedGenerics,
+                                  Demangle::Demangler &Dem) {
+  unsigned usedDemangledGenerics = 0;
+  NodePointer node = nullptr;
+
+  // Walk up the context tree.
+  std::vector<const ContextDescriptor *> descriptorPath;
+  {
+    const ContextDescriptor *parent = context;
+    while (parent) {
+      descriptorPath.push_back(parent);
+      parent = parent->Parent;
+    }
+  }
+
+  auto getGenericArgsTypeListForContext =
+    [&](const ContextDescriptor *context) -> NodePointer {
+      // ABI TODO: As a hack to maintain existing broken behavior,
+      // if there were any generic arguments eliminated by same type
+      // constraints, we don't mangle any of them into intermediate contexts,
+      // and pile all of the non-concrete arguments into the innermost context.
+      if (concretizedGenerics)
+        return nullptr;
+      
+      if (demangledGenerics.empty())
+        return nullptr;
+      
+      auto generics = context->getGenericContext();
+      if (!generics)
+        return nullptr;
+      
+      auto numParams = generics->getGenericContextHeader().NumParams;
+      if (numParams <= usedDemangledGenerics)
+        return nullptr;
+      
+      auto genericArgsList = Dem.createNode(Node::Kind::TypeList);
+      for (unsigned e = generics->getGenericContextHeader().NumParams;
+           usedDemangledGenerics < e;
+           ++usedDemangledGenerics) {
+        genericArgsList->addChild(demangledGenerics[usedDemangledGenerics],
+                                  Dem);
+      }
+      return genericArgsList;
+    };
+  
+  auto innermostComponent = descriptorPath.front();
+  for (auto component : reversed(descriptorPath)) {
+    switch (auto kind = component->getKind()) {
+    case ContextDescriptorKind::Module: {
+      assert(node == nullptr && "module should be top level");
+      auto name = llvm::cast<ModuleContextDescriptor>(component)->Name.get();
+      node = Dem.createNode(Node::Kind::Module, name);
+      break;
+    }
+    
+    case ContextDescriptorKind::Extension: {
+      auto extension = llvm::cast<ExtensionContextDescriptor>(component);
+      // Demangle the extension self type.
+      auto selfType = Dem.demangleType(extension->getMangledExtendedContext());
+      assert(selfType->getKind() == Node::Kind::Type);
+      selfType = selfType->getChild(0);
+      
+      // Substitute in the generic arguments.
+      // TODO: This kludge only kinda works if there are no same-type
+      // constraints. We'd need to handle those correctly everywhere else too
+      // though.
+      auto genericArgsList = getGenericArgsTypeListForContext(component);
+      
+      if (selfType->getKind() == Node::Kind::BoundGenericEnum
+          || selfType->getKind() == Node::Kind::BoundGenericStructure
+          || selfType->getKind() == Node::Kind::BoundGenericClass
+          || selfType->getKind() == Node::Kind::BoundGenericOtherNominalType) {
+        if (genericArgsList) {
+          auto substSelfType = Dem.createNode(selfType->getKind());
+          substSelfType->addChild(selfType->getChild(0), Dem);
+          substSelfType->addChild(genericArgsList, Dem);
+          selfType = substSelfType;
+        } else {
+          // TODO: Use the unsubstituted type if we can't handle the
+          // substitutions yet.
+          selfType = selfType->getChild(0)->getChild(0);
+        }
+      }
+      
+      auto extNode = Dem.createNode(Node::Kind::Extension);
+      extNode->addChild(node, Dem);
+      extNode->addChild(selfType, Dem);
+      
+      // TODO: Turn the generic signature into a demangling as the third
+      // generic argument.
+      
+      node = extNode;
+      break;
+    }
+
+    default:
+      // Form a type context demangling for type contexts.
+      if (auto type = llvm::dyn_cast<TypeContextDescriptor>(component)) {
+        auto name = type->Name.get();
+        Node::Kind nodeKind;
+        Node::Kind genericNodeKind;
+        switch (kind) {
+        case ContextDescriptorKind::Class:
+          nodeKind = Node::Kind::Class;
+          genericNodeKind = Node::Kind::BoundGenericClass;
+          break;
+        case ContextDescriptorKind::Struct:
+          nodeKind = Node::Kind::Structure;
+          genericNodeKind = Node::Kind::BoundGenericStructure;
+          break;
+        case ContextDescriptorKind::Enum:
+          nodeKind = Node::Kind::Enum;
+          genericNodeKind = Node::Kind::BoundGenericEnum;
+          break;
+        default:
+          // We don't know about this kind of type. Use an "other type" mangling
+          // for it.
+          nodeKind = Node::Kind::OtherNominalType;
+          genericNodeKind = Node::Kind::BoundGenericOtherNominalType;
+          break;
+        }
+        
+        // Override the node kind if this is a Clang-imported type so we give it
+        // a stable mangling.
+        auto typeFlags = type->getTypeContextDescriptorFlags();
+        if (typeFlags.isCTag()) {
+          nodeKind = Node::Kind::Structure;
+        } else if (typeFlags.isCTypedef()) {
+          nodeKind = Node::Kind::TypeAlias;
+        }
+        
+        auto typeNode = Dem.createNode(nodeKind);
+        typeNode->addChild(node, Dem);
+        auto identifier = Dem.createNode(Node::Kind::Identifier, name);
+        typeNode->addChild(identifier, Dem);
+        node = typeNode;
+        
+        // Apply generic arguments if the context is generic.
+        if (auto genericArgsList = getGenericArgsTypeListForContext(component)){
+          auto unspecializedType = Dem.createNode(Node::Kind::Type);
+          unspecializedType->addChild(node, Dem);
+
+          auto genericNode = Dem.createNode(genericNodeKind);
+          genericNode->addChild(unspecializedType, Dem);
+          genericNode->addChild(genericArgsList, Dem);
+          node = genericNode;
+        }
+        
+        // ABI TODO: If there were concretized generic arguments, just pile
+        // all the non-concretized generic arguments into the innermost context.
+        if (concretizedGenerics
+            && !demangledGenerics.empty()
+            && component == innermostComponent) {
+          auto unspecializedType = Dem.createNode(Node::Kind::Type);
+          unspecializedType->addChild(node, Dem);
+
+          auto genericTypeList = Dem.createNode(Node::Kind::TypeList);
+          for (auto arg : demangledGenerics) {
+            if (!arg) continue;
+            genericTypeList->addChild(arg, Dem);
+          }
+          
+          if (genericTypeList->getNumChildren() > 0) {
+            auto genericNode = Dem.createNode(genericNodeKind);
+            genericNode->addChild(unspecializedType, Dem);
+            genericNode->addChild(genericTypeList, Dem);
+            node = genericNode;
+          }
+        }
+        
+        break;
+      }
+
+      // This runtime doesn't understand this context, or it's a context with
+      // no richer runtime information available about it (such as an anonymous
+      // context). Use an unstable mangling to represent the context by its
+      // pointer identity.
+      char addressBuf[sizeof(void*) * 2 + 2 + 1];
+      snprintf(addressBuf, sizeof(addressBuf), "0x%" PRIxPTR, (uintptr_t)component);
+      
+      auto anonNode = Dem.createNode(Node::Kind::AnonymousContext);
+      CharVector addressStr;
+      addressStr.append(addressBuf, Dem);
+      auto name = Dem.createNode(Node::Kind::Identifier, addressStr);
+      anonNode->addChild(name, Dem);
+      anonNode->addChild(node, Dem);
+      
+      // Collect generic arguments if the context is generic.
+      auto genericArgsList = getGenericArgsTypeListForContext(component);
+      if (!genericArgsList)
+        genericArgsList = Dem.createNode(Node::Kind::TypeList);
+      anonNode->addChild(genericArgsList, Dem);
+      
+      node = anonNode;
+      
+      break;
+    }
+  }
+  
+  // Wrap the final result in a top-level Type node.
+  auto top = Dem.createNode(Node::Kind::Type);
+  top->addChild(node, Dem);
+  return top;
+}
 
 // FIXME: This stuff should be merged with the existing logic in
 // include/swift/Reflection/TypeRefBuilder.h as part of the rewrite
@@ -54,7 +263,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 #if SWIFT_OBJC_INTEROP
     // Peek through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->SuperClass;
+      classType = classType->Superclass;
 #endif
     description = classType->getDescription();
     break;
@@ -68,6 +277,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   case MetadataKind::Struct: {
     auto structType = static_cast<const StructMetadata *>(type);
     description = structType->Description;
+    break;
+  }
+  case MetadataKind::ForeignClass: {
+    auto foreignType = static_cast<const ForeignClassMetadata *>(type);
+    description = foreignType->Description;
     break;
   }
   default:
@@ -124,206 +338,9 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
     // requirements to get the argument values.
     // ABI TODO
   }
-  unsigned usedDemangledGenerics = 0;
   
-  // Walk up the context tree.
-  std::vector<const ContextDescriptor *> descriptorPath;
-  {
-    const ContextDescriptor *parent = description;
-    while (parent) {
-      descriptorPath.push_back(parent);
-      parent = parent->Parent;
-    }
-  }
-
-  // Build a demangling tree from the context path.
-  NodePointer node = nullptr;
-  
-  auto getGenericArgsTypeListForContext =
-    [&](const ContextDescriptor *context) -> NodePointer {
-      // ABI TODO: As a hack to maintain existing broken behavior,
-      // if there were any generic arguments eliminated by same type
-      // constraints, we don't mangle any of them into intermediate contexts,
-      // and pile all of the non-concrete arguments into the innermost context.
-      if (concretizedGenerics)
-        return nullptr;
-      
-      auto generics = context->getGenericContext();
-      if (!generics)
-        return nullptr;
-      
-      auto numParams = generics->getGenericContextHeader().NumParams;
-      if (numParams <= usedDemangledGenerics)
-        return nullptr;
-      
-      auto genericArgsList = Dem.createNode(Node::Kind::TypeList);
-      for (unsigned e = generics->getGenericContextHeader().NumParams;
-           usedDemangledGenerics < e;
-           ++usedDemangledGenerics) {
-        genericArgsList->addChild(demangledGenerics[usedDemangledGenerics],
-                                  Dem);
-      }
-      return genericArgsList;
-    };
-  
-  auto innermostComponent = descriptorPath.front();
-  for (auto component : reversed(descriptorPath)) {
-    switch (auto kind = component->getKind()) {
-    case ContextDescriptorKind::Module: {
-      assert(node == nullptr && "module should be top level");
-      auto name = llvm::cast<ModuleContextDescriptor>(component)->Name.get();
-      node = Dem.createNode(Node::Kind::Module, name);
-      break;
-    }
-    
-    case ContextDescriptorKind::Extension: {
-      auto extension = llvm::cast<ExtensionContextDescriptor>(component);
-      // Demangle the extension self type.
-      auto selfType = Dem.demangleType(extension->ExtendedContext.get());
-      assert(selfType->getKind() == Node::Kind::Type);
-      selfType = selfType->getChild(0);
-      
-      // Substitute in the generic arguments.
-      // TODO: This kludge only kinda works if there are no same-type
-      // constraints. We'd need to handle those correctly everywhere else too
-      // though.
-      auto genericArgsList = getGenericArgsTypeListForContext(component);
-      
-      if (selfType->getKind() == Node::Kind::BoundGenericEnum
-          || selfType->getKind() == Node::Kind::BoundGenericStructure
-          || selfType->getKind() == Node::Kind::BoundGenericClass
-          || selfType->getKind() == Node::Kind::BoundGenericOtherNominalType) {
-        if (genericArgsList) {
-          auto substSelfType = Dem.createNode(selfType->getKind());
-          substSelfType->addChild(selfType->getChild(0), Dem);
-          substSelfType->addChild(genericArgsList, Dem);
-          selfType = substSelfType;
-        } else {
-          // TODO: Use the unsubstituted type if we can't handle the
-          // substitutions yet.
-          selfType = selfType->getChild(0)->getChild(0);
-        }
-      }
-      
-      auto extNode = Dem.createNode(Node::Kind::Extension);
-      extNode->addChild(node, Dem);
-      extNode->addChild(selfType, Dem);
-      
-      // TODO: Turn the generic signature into a demangling as the third
-      // generic argument.
-      
-      node = extNode;
-      break;
-    }
-
-    default:
-      // Form a type context demangling for type contexts.
-      if (auto type = llvm::dyn_cast<TypeContextDescriptor>(component)) {      
-        auto name = type->Name.get();
-        Node::Kind nodeKind;
-        Node::Kind genericNodeKind;
-        switch (kind) {
-        case ContextDescriptorKind::Class:
-          nodeKind = Node::Kind::Class;
-          genericNodeKind = Node::Kind::BoundGenericClass;
-          break;
-        case ContextDescriptorKind::Struct:
-          nodeKind = Node::Kind::Structure;
-          genericNodeKind = Node::Kind::BoundGenericStructure;
-          break;
-        case ContextDescriptorKind::Enum:
-          nodeKind = Node::Kind::Enum;
-          genericNodeKind = Node::Kind::BoundGenericEnum;
-          break;
-        default:
-          // We don't know about this kind of type. Use an "other type" mangling
-          // for it.
-          nodeKind = Node::Kind::OtherNominalType;
-          genericNodeKind = Node::Kind::BoundGenericOtherNominalType;
-          break;
-        }
-        
-        // Override the node kind if this is a Clang-imported type so we give it
-        // a stable mangling.
-        auto typeFlags = type->Flags.getKindSpecificFlags();
-        if (typeFlags & (uint16_t)TypeContextDescriptorFlags::IsCTag) {
-          nodeKind = Node::Kind::Structure;
-        } else if (typeFlags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef) {
-          nodeKind = Node::Kind::TypeAlias;
-        }
-        
-        auto typeNode = Dem.createNode(nodeKind);
-        typeNode->addChild(node, Dem);
-        auto identifier = Dem.createNode(Node::Kind::Identifier, name);
-        typeNode->addChild(identifier, Dem);
-        node = typeNode;
-        
-        // Apply generic arguments if the context is generic.
-        if (auto genericArgsList = getGenericArgsTypeListForContext(component)){
-          auto unspecializedType = Dem.createNode(Node::Kind::Type);
-          unspecializedType->addChild(node, Dem);
-
-          auto genericNode = Dem.createNode(genericNodeKind);
-          genericNode->addChild(unspecializedType, Dem);
-          genericNode->addChild(genericArgsList, Dem);
-          node = genericNode;
-        }
-        
-        // ABI TODO: If there were concretized generic arguments, just pile
-        // all the non-concretized generic arguments into the innermost context.
-        if (concretizedGenerics && component == innermostComponent) {
-          auto unspecializedType = Dem.createNode(Node::Kind::Type);
-          unspecializedType->addChild(node, Dem);
-
-          auto genericTypeList = Dem.createNode(Node::Kind::TypeList);
-          for (auto arg : demangledGenerics) {
-            if (!arg) continue;
-            genericTypeList->addChild(arg, Dem);
-          }
-          
-          if (genericTypeList->getNumChildren() > 0) {
-            auto genericNode = Dem.createNode(genericNodeKind);
-            genericNode->addChild(unspecializedType, Dem);
-            genericNode->addChild(genericTypeList, Dem);
-            node = genericNode;
-          }
-        }
-        
-        break;
-      }
-
-      // This runtime doesn't understand this context, or it's a context with
-      // no richer runtime information available about it (such as an anonymous
-      // context). Use an unstable mangling to represent the context by its
-      // pointer identity.
-      // ABI TODO: extensions fall into this path, but they shouldn't. we
-      // should try to demangle them accurately.
-      char addressBuf[sizeof(void*) * 2 + 2 + 1];
-      snprintf(addressBuf, sizeof(addressBuf), "0x%" PRIxPTR, (uintptr_t)component);
-      
-      auto anonNode = Dem.createNode(Node::Kind::AnonymousContext);
-      CharVector addressStr;
-      addressStr.append(addressBuf, Dem);
-      auto name = Dem.createNode(Node::Kind::Identifier, addressStr);
-      anonNode->addChild(name, Dem);
-      anonNode->addChild(node, Dem);
-      
-      // Collect generic arguments if the context is generic.
-      auto genericArgsList = getGenericArgsTypeListForContext(component);
-      if (!genericArgsList)
-        genericArgsList = Dem.createNode(Node::Kind::TypeList);
-      anonNode->addChild(genericArgsList, Dem);
-      
-      node = anonNode;
-      
-      break;
-    }
-  }
-
-  // Wrap the final result in a top-level Type node.
-  auto top = Dem.createNode(Node::Kind::Type);
-  top->addChild(node, Dem);
-  return top;
+  return _buildDemanglingForContext(description, demangledGenerics,
+                                    concretizedGenerics, Dem);
 }
 
 // Build a demangled type tree for a type.
@@ -337,6 +354,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Enum:
   case MetadataKind::Optional:
   case MetadataKind::Struct:
+  case MetadataKind::ForeignClass:
     return _buildDemanglingForNominalType(type, Dem);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
@@ -354,10 +372,6 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     assert(false && "no ObjC interop");
     return nullptr;
 #endif
-  }
-  case MetadataKind::ForeignClass: {
-    auto foreign = static_cast<const ForeignClassMetadata *>(type);
-    return Dem.demangleType(foreign->getName());
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
@@ -461,7 +475,10 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     Node::Kind kind;
     switch (func->getConvention()) {
     case FunctionMetadataConvention::Swift:
-      kind = Node::Kind::FunctionType;
+      if (!func->isEscaping())
+        kind = Node::Kind::NoEscapeFunctionType;
+      else
+        kind = Node::Kind::FunctionType;
       break;
     case FunctionMetadataConvention::Block:
       kind = Node::Kind::ObjCBlock;
@@ -480,14 +497,24 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       auto flags = func->getParameterFlags(i);
       auto input = _swift_buildDemanglingForMetadata(param, Dem);
 
-      if (flags.isInOut()) {
-        NodePointer inout = Dem.createNode(Node::Kind::InOut);
-        inout->addChild(input, Dem);
-        input = inout;
-      } else if (flags.isShared()) {
-        NodePointer shared = Dem.createNode(Node::Kind::Shared);
-        shared->addChild(input, Dem);
-        input = shared;
+      auto wrapInput = [&](Node::Kind kind) {
+        auto parent = Dem.createNode(kind);
+        parent->addChild(input, Dem);
+        input = parent;
+      };
+      switch (flags.getValueOwnership()) {
+      case ValueOwnership::Default:
+        /* nothing */
+        break;
+      case ValueOwnership::InOut:
+        wrapInput(Node::Kind::InOut);
+        break;
+      case ValueOwnership::Shared:
+        wrapInput(Node::Kind::Shared);
+        break;
+      case ValueOwnership::Owned:
+        wrapInput(Node::Kind::Owned);
+        break;
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -619,4 +646,48 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   }
   // Not a type.
   return nullptr;
+}
+
+// NB: This function is not used directly in the Swift codebase, but is
+// exported for Xcode support and is used by the sanitizers. Please coordinate
+// before changing.
+char *swift_demangle(const char *mangledName,
+                     size_t mangledNameLength,
+                     char *outputBuffer,
+                     size_t *outputBufferSize,
+                     uint32_t flags) {
+  if (flags != 0) {
+    swift::fatalError(0, "Only 'flags' value of '0' is currently supported.");
+  }
+  if (outputBuffer != nullptr && outputBufferSize == nullptr) {
+    swift::fatalError(0, "'outputBuffer' is passed but the size is 'nullptr'.");
+  }
+
+  // Check if we are dealing with Swift mangled name, otherwise, don't try
+  // to demangle and send indication to the user.
+  if (!Demangle::isSwiftSymbol(mangledName))
+    return nullptr; // Not a mangled name
+
+  // Demangle the name.
+  auto options = Demangle::DemangleOptions();
+  options.DisplayDebuggerGeneratedModule = false;
+  auto result =
+      Demangle::demangleSymbolAsString(mangledName,
+                                       mangledNameLength,
+                                       options);
+
+  // If the output buffer is not provided, malloc memory ourselves.
+  if (outputBuffer == nullptr || *outputBufferSize == 0) {
+    return strdup(result.c_str());
+  }
+
+  // Indicate a failure if the result does not fit and will be truncated
+  // and set the required outputBufferSize.
+  if (*outputBufferSize < result.length() + 1) {
+    *outputBufferSize = result.length() + 1;
+  }
+
+  // Copy into the provided buffer.
+  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
+  return outputBuffer;
 }

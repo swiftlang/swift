@@ -339,6 +339,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
     return KindBuildConfigKeyword;
   case SyntaxNodeKind::BuildConfigId:
     return KindBuildConfigId;
+  case SyntaxNodeKind::PoundDirectiveKeyword:
+    return KindPoundDirectiveKeyword;
   case SyntaxNodeKind::AttributeId:
     return KindAttributeId;
   case SyntaxNodeKind::AttributeBuiltin:

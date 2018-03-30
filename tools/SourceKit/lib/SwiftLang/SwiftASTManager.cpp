@@ -21,6 +21,7 @@
 #include "SourceKit/Support/Tracing.h"
 
 #include "swift/Basic/Cache.h"
+#include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Strings.h"
@@ -370,49 +371,6 @@ SwiftASTManager::getMemoryBuffer(StringRef Filename, std::string &Error) {
   return Impl.getMemoryBuffer(Filename, Error);
 }
 
-static void setModuleName(CompilerInvocation &Invocation) {
-  if (!Invocation.getModuleName().empty())
-    return;
-
-  StringRef Filename = Invocation.getOutputFilename();
-  if (Filename.empty()) {
-    if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-      Invocation.setModuleName("__main__");
-      return;
-    }
-    Filename = Invocation.getFrontendOptions()
-                   .InputsAndOutputs.getFilenameOfFirstInput();
-  }
-  Filename = llvm::sys::path::filename(Filename);
-  StringRef ModuleName = llvm::sys::path::stem(Filename);
-  if (ModuleName.empty() || !Lexer::isIdentifier(ModuleName)) {
-    Invocation.setModuleName("__main__");
-    return;
-  }
-  Invocation.setModuleName(ModuleName);
-}
-
-static void sanitizeCompilerArgs(ArrayRef<const char *> Args,
-                                 SmallVectorImpl<const char *> &NewArgs) {
-  for (const char *CArg : Args) {
-    StringRef Arg = CArg;
-    if (Arg.startswith("-j"))
-      continue;
-    if (Arg == "-c")
-      continue;
-    if (Arg == "-v")
-      continue;
-    if (Arg == "-Xfrontend")
-      continue;
-    if (Arg == "-embed-bitcode")
-      continue;
-    if (Arg == "-enable-bridging-pch" ||
-        Arg == "-disable-bridging-pch")
-      continue;
-    NewArgs.push_back(CArg);
-  }
-}
-
 static FrontendInputsAndOutputs
 convertFileContentsToInputs(const SmallVectorImpl<FileContent> &contents) {
   FrontendInputsAndOutputs inputsAndOutputs;
@@ -456,19 +414,20 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
-                                             ArrayRef<const char *> OrigArgs,
+                                             ArrayRef<const char *> Args,
                                              DiagnosticEngine &Diags,
                                              StringRef UnresolvedPrimaryFile,
                                              std::string &Error) {
-  SmallVector<const char *, 16> Args;
-  sanitizeCompilerArgs(OrigArgs, Args);
-
-  Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
-  if (Invocation.parseArgs(Args, Diags)) {
+  if (auto driverInvocation = driver::createCompilerInvocation(Args, Diags)) {
+    Invocation = *driverInvocation;
+  } else {
     // FIXME: Get the actual diagnostic.
     Error = "error when parsing the compiler arguments";
     return true;
   }
+
+  Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
+
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
           Invocation.getFrontendOptions().InputsAndOutputs,
@@ -479,11 +438,10 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
 
-  setModuleName(Invocation);
-  Invocation.setSerializedDiagnosticsPath(StringRef());
+  assert(!Invocation.getModuleName().empty());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().DiagnosticsEditorMode = true;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
   auto &FrontendOpts = Invocation.getFrontendOptions();
   if (FrontendOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
@@ -496,6 +454,13 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // Disable the index-store functionality for the sourcekitd requests.
   FrontendOpts.IndexStorePath.clear();
   ImporterOpts.IndexStorePath.clear();
+
+  // Force the action type to be -typecheck. This affects importing the
+  // SwiftONoneSupport module.
+  FrontendOpts.RequestedAction = FrontendOptions::ActionType::Typecheck;
+
+  // We don't care about LLVMArgs
+  FrontendOpts.LLVMArgs.clear();
 
   return false;
 }
@@ -517,6 +482,27 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
       Error = ErrOS.str();
     return true;
   }
+  return false;
+}
+
+bool SwiftASTManager::initCompilerInvocationNoInputs(
+    swift::CompilerInvocation &Invocation, ArrayRef<const char *> OrigArgs,
+    swift::DiagnosticEngine &Diags, std::string &Error, bool AllowInputs) {
+
+  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  // Use stdin as a .swift input to satisfy the driver.
+  Args.push_back("-");
+  if (initCompilerInvocation(Invocation, Args, Diags, "", Error))
+    return true;
+
+  if (!AllowInputs &&
+      Invocation.getFrontendOptions().InputsAndOutputs.inputCount() > 1) {
+    Error = "unexpected input in compiler arguments";
+    return true;
+  }
+
+  // Clear the inputs.
+  Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   return false;
 }
 
@@ -716,7 +702,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
       Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
   for (const auto &input :
        Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    StringRef File = input.file();
+    const std::string &File = input.file();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {
@@ -806,9 +792,9 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
 
+  trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
   trace::SwiftInvocation TraceInfo;
-
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     TraceInfo.Args.PrimaryFile = InvokRef->Impl.Opts.PrimaryFile;
     TraceInfo.Args.Args = InvokRef->Impl.Opts.Args;
   }
@@ -818,7 +804,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
 
-    if (trace::enabled()) {
+    if (TracedOp.enabled()) {
       TraceInfo.addFile(Content.Buffer->getBufferIdentifier(),
                         Content.Buffer->getBuffer());
     }
@@ -833,7 +819,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   InvokRef->Impl.Opts.applyToSubstitutingInputs(
       Invocation, convertFileContentsToInputs(Contents));
 
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
 
   if (CompIns.setup(Invocation)) {
     // FIXME: Report the diagnostic.
@@ -842,9 +828,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     return nullptr;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    TracedOp.start(trace::OperationKind::PerformSema, TraceInfo);
+  if (TracedOp.enabled()) {
+    TracedOp.start(TraceInfo);
   }
 
   CloseClangModuleFiles scopedCloseFiles(
@@ -903,7 +888,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
   for (const auto &input :
        Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
-    StringRef File = input.file();
+    const std::string &File = input.file();
     bool IsPrimary = input.isPrimary();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {

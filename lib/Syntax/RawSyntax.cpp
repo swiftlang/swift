@@ -30,7 +30,7 @@ static bool isTrivialSyntaxKind(SyntaxKind Kind) {
     return true;
   switch(Kind) {
   case SyntaxKind::SourceFile:
-  case SyntaxKind::TopLevelCodeDecl:
+  case SyntaxKind::CodeBlockItem:
   case SyntaxKind::ExpressionStmt:
   case SyntaxKind::DeclarationStmt:
     return true;
@@ -179,6 +179,8 @@ RawSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
       Trailer.accumulateAbsolutePosition(Pos);
   } else {
     for (auto &Child : getLayout()) {
+      if (!Child)
+        continue;
       auto Result = Child->accumulateAbsolutePosition(Pos);
       if (!Ret && Result)
         Ret = Result;
@@ -254,6 +256,8 @@ void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     }
   } else {
     for (auto &Child : getLayout()) {
+      if (!Child)
+        continue;
       OS << "\n";
       Child->dump(OS, Indent + 1);
     }

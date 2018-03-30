@@ -290,9 +290,7 @@ extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible
   /// A textual representation of the Unicode scalar.
   @_inlineable // FIXME(sil-serialize-all)
   public var description: String {
-    return String._fromWellFormedCodeUnitSequence(
-      UTF32.self,
-      input: repeatElement(self.value, count: 1))
+    return String(self)
   }
 
   /// An escaped textual representation of the Unicode scalar, suitable for

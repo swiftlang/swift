@@ -178,9 +178,13 @@ extension Bool : Equatable, Hashable {
   ///   invocations of the same program. Do not persist the hash value across
   ///   program runs.
   @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
   public var hashValue: Int {
-    return self ? 1 : 0
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append((self ? 1 : 0) as UInt8)
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -316,5 +320,21 @@ extension Bool {
   public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
       -> Bool {
     return lhs ? true : try rhs()
+  }
+}
+
+extension Bool {
+  @_inlineable
+  /// Toggles the value of the Boolean. 
+  ///
+  /// Calling this method sets the variable to `true` if it was `false`,
+  /// and sets it to `false` if it was `true`. For example:
+  ///
+  ///    var bools = [true, false]
+  ///
+  ///    bools[0].toggle()
+  ///    // bools now contains [false, false]
+  public mutating func toggle() {
+    self = !self
   }
 }

@@ -94,14 +94,13 @@ in the current build. This is covered by checking if the input has been
 modified since the last build; if it hasn't, we only need to recompile if
 something it depends on has changed.
 
-
-Execute: Running the Jobs in a Compilation using a TaskQueue
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Schedule: Ordering and skipping jobs by dependency analysis
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A Compilation's goal is to make sure every Job in its list of Jobs is handled.
 If a Job needs to be run, the Compilation attempts to *schedule* it. If the
 Job's dependencies have all been completed (or determined to be skippable), it
-is added to the TaskQueue; otherwise it is marked as *blocked.*
+is scheduled for execution; otherwise it is marked as *blocked.*
 
 To support Jobs compiling individual Swift files, which may or may not need to
 be run, the Compilation keeps track of a DependencyGraph. (If file A depends on
@@ -110,6 +109,22 @@ completes successfully, the Compilation will both re-attempt to schedule Jobs
 that were directly blocked on it, and check to see if any other Jobs now need
 to run based on the DependencyGraph. See the section on :doc:`DependencyAnalysis`
 for more information.
+
+Batch: Optionally combine similar jobs
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Driver has an experimental "batch mode" that examines the set of scheduled
+jobs just prior to execution, looking for jobs that are identical to one another
+aside from the primary input file they are compiling in a module. If it finds
+such a set, it may replace the set with a single BatchJob, before handing it off
+to the TaskQueue; this helps minimize the overall number of frontend processes
+that run (and thus do potentially redundant work).
+
+Once any batching has taken place, the set of scheduled jobs (batched or
+otherwise) is transferred to the TaskQueue for execution.
+
+Execute: Running the Jobs in a Compilation using a TaskQueue
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The Compilation's TaskQueue controls the low-level aspects of managing
 subprocesses. Multiple Jobs may execute simultaneously, but communication with

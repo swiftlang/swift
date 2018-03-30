@@ -206,7 +206,7 @@ namespace irgen {
   /// The type must be dynamically known to have enum witnesses.
   void emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
                                         SILType T,
-                                        unsigned tag,
+                                        llvm::Value *tag,
                                         Address srcObject);
 
   /// Emit a load of the 'size' value witness.

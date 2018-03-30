@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+
+// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -172,8 +173,9 @@ func assign_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) 
 
 // CHECK: define hidden {{.*}}void @"$S8builtins16init_object_test{{[_0-9a-zA-Z]*}}F"
 func init_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) {
-  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to %swift.refcounted**
-  // CHECK-NEXT: store [[REFCOUNT]]* {{%.*}}, [[REFCOUNT]]** [[DEST]]
+  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to [[REFCOUNT]]**
+  // CHECK-NEXT: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[SRC:%.*]])
+  // CHECK-NEXT: store [[REFCOUNT]]* [[SRC]], [[REFCOUNT]]** [[DEST]]
   Builtin.initialize(value, ptr)
 }
 
@@ -838,6 +840,15 @@ func atomicload(_ p: Builtin.RawPointer) {
   // CHECK: [[D1:%.*]] = bitcast float [[D]] to i32
   // CHECK: store atomic volatile i32 [[D1]], i32* {{.*}} seq_cst, align 4
   Builtin.atomicstore_seqcst_volatile_FPIEEE32(p, d)
+}
+
+// CHECK-LABEL: define {{.*}} @"$S8builtins14stringObjectOryS2u_SutF"(i64, i64)
+// CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: %2 = or i64 %0, %1
+// CHECK-NEXT: ret i64 %2
+func stringObjectOr(_ x: UInt, _ y: UInt) -> UInt {
+  return UInt(Builtin.stringObjectOr_Int64(
+  x._value, y._value))
 }
 
 func createInt(_ fn: () -> ()) throws {}

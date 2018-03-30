@@ -62,7 +62,7 @@ struct TextRange {
 
 struct TextEntity {
   const Decl *Dcl = nullptr;
-  const Decl *SynthesizeTarget = nullptr;
+  TypeOrExtensionDecl SynthesizeTarget;
   const Decl *DefaultImplementationOf = nullptr;
   StringRef Argument;
   TextRange Range;
@@ -70,26 +70,26 @@ struct TextEntity {
   std::vector<TextEntity> SubEntities;
   const bool IsSynthesizedExtension;
 
-  TextEntity(const Decl *D, const Decl *SynthesizeTarget,
-             const Decl* DefaultImplementationOf,
-             unsigned StartOffset, bool IsSynthesizedExtension)
-    : Dcl(D), SynthesizeTarget(SynthesizeTarget),
-      DefaultImplementationOf(DefaultImplementationOf), Range{StartOffset, 0},
-      IsSynthesizedExtension(IsSynthesizedExtension) {}
+  TextEntity(const Decl *D, TypeOrExtensionDecl SynthesizeTarget,
+             const Decl *DefaultImplementationOf, unsigned StartOffset,
+             bool IsSynthesizedExtension)
+      : Dcl(D), SynthesizeTarget(SynthesizeTarget),
+        DefaultImplementationOf(DefaultImplementationOf), Range{StartOffset, 0},
+        IsSynthesizedExtension(IsSynthesizedExtension) {}
 
-  TextEntity(const Decl *D, const Decl *SynthesizeTarget,
-             const Decl* DefaultImplementationOf, TextRange TR,
-             unsigned LocOffset, bool IsSynthesizedExtension) : Dcl(D),
-             DefaultImplementationOf(DefaultImplementationOf), Range(TR),
-              LocOffset(LocOffset),
-              IsSynthesizedExtension(IsSynthesizedExtension) {}
+  TextEntity(const Decl *D, TypeOrExtensionDecl SynthesizeTarget,
+             const Decl *DefaultImplementationOf, TextRange TR,
+             unsigned LocOffset, bool IsSynthesizedExtension)
+      : Dcl(D), DefaultImplementationOf(DefaultImplementationOf), Range(TR),
+        LocOffset(LocOffset), IsSynthesizedExtension(IsSynthesizedExtension) {}
 
-  TextEntity(const Decl *D, const Decl *SynthesizeTarget,
-             const Decl* DefaultImplementationOf, StringRef Arg,
-             TextRange TR, unsigned LocOffset, bool IsSynthesizedExtension)
-    : Dcl(D), SynthesizeTarget(SynthesizeTarget),
-      DefaultImplementationOf(DefaultImplementationOf), Argument(Arg), Range(TR),
-      LocOffset(LocOffset), IsSynthesizedExtension(IsSynthesizedExtension) {}
+  TextEntity(const Decl *D, TypeOrExtensionDecl SynthesizeTarget,
+             const Decl *DefaultImplementationOf, StringRef Arg, TextRange TR,
+             unsigned LocOffset, bool IsSynthesizedExtension)
+      : Dcl(D), SynthesizeTarget(SynthesizeTarget),
+        DefaultImplementationOf(DefaultImplementationOf), Argument(Arg),
+        Range(TR), LocOffset(LocOffset),
+        IsSynthesizedExtension(IsSynthesizedExtension) {}
 };
 
 struct TextReference {
@@ -103,8 +103,8 @@ struct TextReference {
 
 class AnnotatingPrinter : public StreamPrinter {
 
-  std::pair<const ExtensionDecl *, const NominalTypeDecl *>
-    SynthesizedExtensionInfo = {nullptr, nullptr};
+  std::pair<const ExtensionDecl *, TypeOrExtensionDecl>
+      SynthesizedExtensionInfo = {nullptr, {}};
 
   typedef llvm::SmallDenseMap<ValueDecl*, ValueDecl*> DefaultImplementMap;
   llvm::SmallDenseMap<ProtocolDecl*, DefaultImplementMap> AllDefaultMaps;
@@ -175,22 +175,22 @@ public:
   }
 
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    const NominalTypeDecl *NTD,
+                                    TypeOrExtensionDecl Target,
                                     Optional<BracketOptions> Bracket) override {
     assert(!SynthesizedExtensionInfo.first);
-    SynthesizedExtensionInfo = {ED, NTD};
+    SynthesizedExtensionInfo = {ED, Target};
     if (!shouldContinuePre(ED, Bracket))
       return;
     unsigned StartOffset = OS.tell();
-    EntitiesStack.emplace_back(ED, SynthesizedExtensionInfo.second, nullptr,
-                               StartOffset, true);
+    EntitiesStack.emplace_back(ED, Target, nullptr, StartOffset, true);
   }
 
-  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                     const NominalTypeDecl *NTD,
-                                     Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                TypeOrExtensionDecl Target,
+                                Optional<BracketOptions> Bracket) override {
     assert(SynthesizedExtensionInfo.first);
-    SynthesizedExtensionInfo = {nullptr, nullptr};
+    SynthesizedExtensionInfo = {nullptr, {}};
     if (!shouldContinuePost(ED, Bracket))
       return;
     TextEntity Entity = std::move(EntitiesStack.back());
@@ -207,8 +207,8 @@ public:
       return;
     unsigned StartOffset = OS.tell();
     initDefaultMapToUse(D);
-    const NominalTypeDecl *SynthesizedTarget = nullptr;
     // If D is declared in the extension, then the synthesized target is valid.
+    TypeOrExtensionDecl SynthesizedTarget;
     if (D->getDeclContext() == SynthesizedExtensionInfo.first)
       SynthesizedTarget = SynthesizedExtensionInfo.second;
     EntitiesStack.emplace_back(D, SynthesizedTarget,
@@ -297,10 +297,10 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   }
 }
 
-static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
-                              const Decl *DefaultImplementationOf,
-                              bool IsRef, bool IsSynthesizedExtension,
-                              DocEntityInfo &Info,
+static bool initDocEntityInfo(const Decl *D,
+                              TypeOrExtensionDecl SynthesizedTarget,
+                              const Decl *DefaultImplementationOf, bool IsRef,
+                              bool IsSynthesizedExtension, DocEntityInfo &Info,
                               StringRef Arg = StringRef()) {
   if (!IsRef && D->isImplicit())
     return true;
@@ -320,9 +320,13 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
     return false;
   }
 
-  if (IsSynthesizedExtension)
-    Info.Kind = SwiftLangSupport::getUIDForExtensionOfDecl(SynthesizedTarget);
-  else
+  auto SynthesizedTargetNTD =
+      SynthesizedTarget ? SynthesizedTarget.getBaseNominal() : nullptr;
+
+  if (IsSynthesizedExtension) {
+    Info.Kind =
+        SwiftLangSupport::getUIDForExtensionOfDecl(SynthesizedTargetNTD);
+  } else
     Info.Kind = SwiftLangSupport::getUIDForDecl(D, IsRef);
 
   if (Info.Kind.isInvalid())
@@ -335,7 +339,7 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
       SwiftLangSupport::printUSR(VD, OS);
       if (SynthesizedTarget) {
         OS << SwiftLangSupport::SynthesizedUSRSeparator;
-        SwiftLangSupport::printUSR(dyn_cast<ValueDecl>(SynthesizedTarget), OS);
+        SwiftLangSupport::printUSR(SynthesizedTargetNTD, OS);
         {
           llvm::raw_svector_ostream OS(Info.OriginalUSR);
           SwiftLangSupport::printUSR(VD, OS);
@@ -375,8 +379,7 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
         SecondPart = SecondPart.substr(ExtendedName.size());
         llvm::SmallString<128> UpdatedDocBuffer;
         UpdatedDocBuffer.append(FirstPart);
-        UpdatedDocBuffer.append(((const NominalTypeDecl*)SynthesizedTarget)->getName().
-                                str());
+        UpdatedDocBuffer.append(SynthesizedTargetNTD->getName().str());
         UpdatedDocBuffer.append(SecondPart);
         OS << UpdatedDocBuffer;
       } else
@@ -392,9 +395,7 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
       llvm::raw_svector_ostream OS(Info.FullyAnnotatedDecl);
       if (SynthesizedTarget)
         SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
-            VD, const_cast<NominalTypeDecl *>(
-                    static_cast<const NominalTypeDecl *>(SynthesizedTarget)),
-            OS);
+            VD, SynthesizedTarget, OS);
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     }
@@ -454,20 +455,20 @@ static bool initDocEntityInfo(const TextEntity &Entity,
 }
 
 static const TypeDecl *getTypeDeclFromType(Type Ty) {
-  if (auto Alias = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return Alias->getDecl();
+  if (auto alias = dyn_cast<NameAliasType>(Ty.getPointer()))
+    return alias->getDecl();
   return Ty->getAnyNominal();
 }
 
 static void passInherits(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
+  if (initDocEntityInfo(D, {}, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleInheritsEntity(EntInfo);
 }
 static void passConforms(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
+  if (initDocEntityInfo(D, {}, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleConformsToEntity(EntInfo);
 }
@@ -503,7 +504,7 @@ static void passConforms(ArrayRef<ValueDecl *> Dcls,
 }
 static void passExtends(const ValueDecl *D, DocInfoConsumer &Consumer) {
   DocEntityInfo EntInfo;
-  if (initDocEntityInfo(D, nullptr, nullptr, /*IsRef=*/true, false, EntInfo))
+  if (initDocEntityInfo(D, {}, nullptr, /*IsRef=*/true, false, EntInfo))
     return;
   Consumer.handleExtendsEntity(EntInfo);
 }
@@ -516,15 +517,15 @@ static void passInheritsAndConformancesForValueDecl(const ValueDecl *VD,
                Consumer);
 }
 
-static void reportRelated(ASTContext &Ctx,
-                          const Decl *D,
-                          const Decl* SynthesizedTarget,
+static void reportRelated(ASTContext &Ctx, const Decl *D,
+                          TypeOrExtensionDecl SynthesizedTarget,
                           DocInfoConsumer &Consumer) {
   if (!D || isa<ParamDecl>(D))
     return;
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (SynthesizedTarget) {
-      passExtends((const ValueDecl*)SynthesizedTarget, Consumer);
+      auto Extends = SynthesizedTarget.getBaseNominal();
+      passExtends(Extends, Consumer);
     } else if (Type T = ED->getExtendedType()) {
       if (auto TD = getTypeDeclFromType(T))
         passExtends(TD, Consumer);
@@ -645,7 +646,8 @@ static void reportDocEntities(ASTContext &Ctx,
       continue;
     Consumer.startSourceEntity(EntInfo);
     reportRelated(Ctx, Entity.Dcl,
-          Entity.IsSynthesizedExtension ? Entity.SynthesizeTarget : nullptr,
+                  Entity.IsSynthesizedExtension ? Entity.SynthesizeTarget
+                                                : TypeOrExtensionDecl(),
                   Consumer);
     reportDocEntities(Ctx, Entity.SubEntities, Consumer);
     reportAttributes(Ctx, Entity.Dcl, Consumer);
@@ -702,6 +704,7 @@ public:
     case SyntaxNodeKind::TypeId:
     case SyntaxNodeKind::BuildConfigKeyword:
     case SyntaxNodeKind::BuildConfigId:
+    case SyntaxNodeKind::PoundDirectiveKeyword:
     case SyntaxNodeKind::AttributeId:
     case SyntaxNodeKind::AttributeBuiltin:
     case SyntaxNodeKind::ObjectLiteral:
@@ -759,8 +762,7 @@ private:
       const TextReference &Ref = References.front();
       References = References.slice(1);
       DocEntityInfo Info;
-      if (initDocEntityInfo(Ref.Dcl, nullptr, nullptr, /*IsRef=*/true, false,
-                            Info))
+      if (initDocEntityInfo(Ref.Dcl, {}, nullptr, /*IsRef=*/true, false, Info))
         continue;
       Info.Offset = Ref.Range.Offset;
       Info.Length = Ref.Range.Length;
@@ -826,7 +828,7 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
         SM.getLocOffsetInBuffer(Lexer::getLocForEndOfToken(SM, TypeRange.End),
                                 BufferID);
       TextRange TR{ StartOffs, EndOffs-StartOffs };
-      TextEntity Param(param, nullptr, nullptr, Arg, TR, StartOffs, false);
+      TextEntity Param(param, {}, nullptr, Arg, TR, StartOffs, false);
       Ent.SubEntities.push_back(std::move(Param));
     }
   }
@@ -1020,7 +1022,8 @@ public:
       return true;
     TextRange TR = getTextRange(D->getSourceRange());
     unsigned LocOffset = getOffset(Range.getStart());
-    EntitiesStack.emplace_back(D, nullptr, nullptr, TR, LocOffset, false);
+    EntitiesStack.emplace_back(D, TypeOrExtensionDecl(), nullptr, TR, LocOffset,
+                               false);
     return true;
   }
 
@@ -1359,9 +1362,8 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     CompilerInstance &ParseCI, std::string &Error) {
   CompilerInvocation Invocation;
 
-  bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,
-                                                       ParseCI.getDiags(),
-                                                       StringRef(), Error);
+  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+      Invocation, Args, ParseCI.getDiags(), Error);
   if (Failed) {
     Error = "Compiler invocation init failed";
     return nullptr;
@@ -1415,14 +1417,14 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
 
   CompilerInvocation Invocation;
   std::string Error;
-  bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,
-                                                       CI.getDiags(),
-                                                       StringRef(),
-                                                       Error);
+  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+      Invocation, Args, CI.getDiags(), Error, /*AllowInputs=*/false);
+
   if (Failed) {
     Consumer.failed(Error);
     return;
   }
+
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
 
   if (!ModuleName.empty()) {
@@ -1451,8 +1453,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   CI.addDiagnosticConsumer(&PrintDiags);
   std::vector<StringRef> Groups;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+                                                     CI.getDiags(), Error)) {
     Receiver(Groups, Error);
     return;
   }

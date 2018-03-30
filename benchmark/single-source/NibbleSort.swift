@@ -29,8 +29,6 @@ public func run_NibbleSort(_ N: Int) {
 }
 
 struct NibbleCollection: RandomAccessCollection, MutableCollection {
-  typealias Indices = CountableRange<UInt64>
-
   var val: UInt64
   init(_ val: UInt64) { self.val = val }
 

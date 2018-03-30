@@ -28,7 +28,11 @@ public typealias CUnsignedShort = UInt16
 public typealias CUnsignedInt = UInt32
 
 /// The C 'unsigned long' type.
+#if os(Windows) && arch(x86_64)
+public typealias CUnsignedLong = UInt32
+#else
 public typealias CUnsignedLong = UInt
+#endif
 
 /// The C 'unsigned long long' type.
 public typealias CUnsignedLongLong = UInt64
@@ -42,21 +46,15 @@ public typealias CShort = Int16
 /// The C 'int' type.
 public typealias CInt = Int32
 
-#if os(Windows) && arch(x86_64)
 /// The C 'long' type.
+#if os(Windows) && arch(x86_64)
 public typealias CLong = Int32
 #else
-/// The C 'long' type.
 public typealias CLong = Int
 #endif
 
-#if os(Windows) && arch(x86_64)
-/// The C 'long long' type.
-public typealias CLongLong = Int
-#else
 /// The C 'long long' type.
 public typealias CLongLong = Int64
-#endif
 
 /// The C 'float' type.
 public typealias CFloat = Float
@@ -64,7 +62,27 @@ public typealias CFloat = Float
 /// The C 'double' type.
 public typealias CDouble = Double
 
-// FIXME: long double
+/// The C 'long double' type.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+// On Darwin, long double is Float80 on x86, and Double otherwise.
+#if arch(x86_64) || arch(i386)
+public typealias CLongDouble = Float80
+#else
+public typealias CLongDouble = Double
+#endif
+#elseif os(Windows)
+// On Windows, long double is always Double.
+public typealias CLongDouble = Double
+#elseif os(Linux)
+// On Linux/x86, long double is Float80.
+// TODO: Fill in definitions for additional architectures as needed. IIRC
+// armv7 should map to Double, but arm64 and ppc64le should map to Float128,
+// which we don't yet have in Swift.
+#if arch(x86_64) || arch(i386)
+public typealias CLongDouble = Float80
+#endif
+// TODO: Fill in definitions for other OSes.
+#endif
 
 // FIXME: Is it actually UTF-32 on Darwin?
 //
@@ -164,7 +182,12 @@ extension OpaquePointer: Hashable {
   /// program runs.
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_rawValue))
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
 

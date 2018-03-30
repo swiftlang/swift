@@ -129,21 +129,22 @@ public:
     assert(DeclUSRs.empty() && "unmatched printDeclLoc call ?");
   }
 
-
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    const NominalTypeDecl *Target,
+                                    TypeOrExtensionDecl Target,
                                     Optional<BracketOptions> Bracket) override {
     // When we start print a synthesized extension, record the target's USR.
     llvm::SmallString<64> Buf;
     llvm::raw_svector_ostream OS(Buf);
-    if (!SwiftLangSupport::printUSR(Target, OS)) {
+    auto TargetNTD = Target.getBaseNominal();
+    if (!SwiftLangSupport::printUSR(TargetNTD, OS)) {
       TargetUSR = OS.str();
     }
   }
 
-  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                     const NominalTypeDecl *Target,
-                                     Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                TypeOrExtensionDecl Target,
+                                Optional<BracketOptions> Bracket) override {
     // When we leave a synthesized extension, clear target's USR.
     TargetUSR = "";
   }
@@ -700,19 +701,19 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, Args, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+                                                     CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
     // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenInterface, SwiftArgs,
+    TracedOp.start(SwiftArgs,
                    {std::make_pair("Name", Name),
                     std::make_pair("ModuleName", ModuleName)});
   }
@@ -782,13 +783,13 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
     Consumer->handleRequestError(Error.c_str());
     return;
   }
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
     // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenInterface, SwiftArgs,
+    TracedOp.start(SwiftArgs,
                    {std::make_pair("Name", Name),
                      std::make_pair("SourceName", SourceName)});
   }
@@ -804,7 +805,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  ArrayRef<const char *> Args,
                                                  bool UsingSwiftArgs,
                                                  bool SynthesizedExtensions,
-                                              Optional<unsigned> swiftVersion) {
+                                                 StringRef swiftVersion) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -814,8 +815,8 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   std::string Error;
 
   ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
-  if (getASTManager().initCompilerInvocation(Invocation, SwiftArgs, CI.getDiags(),
-                                             StringRef(), Error)) {
+  if (getASTManager().initCompilerInvocationNoInputs(Invocation, SwiftArgs,
+                                                     CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
   }
@@ -825,21 +826,24 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
     return;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::OpenHeaderInterface);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     // NOTE: do not use primary file
     // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenHeaderInterface, SwiftArgs,
+    TracedOp.start(SwiftArgs,
                    {std::make_pair("Name", Name),
                     std::make_pair("HeaderName", HeaderName)});
   }
 
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
-  if (swiftVersion.hasValue()) {
-    auto swiftVer = version::Version({swiftVersion.getValue()});
-    Invocation.getLangOptions().EffectiveLanguageVersion = swiftVer;
+  if (!swiftVersion.empty()) {
+    auto swiftVer = version::Version::parseVersionString(swiftVersion,
+                                                         SourceLoc(), nullptr);
+    if (swiftVer.hasValue())
+      Invocation.getLangOptions().EffectiveLanguageVersion =
+          swiftVer.getValue();
   }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,

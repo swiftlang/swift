@@ -1,7 +1,8 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_set_bridging -emit-silgen %s -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -19,9 +20,10 @@ import gizmo
     // CHECK:   [[OPT_NSSET:%[0-9]+]] = enum $Optional<NSSet>, #Optional.some!enumelt.1, [[NSSET_COPY]] : $NSSet
     // CHECK:   [[SET_META:%[0-9]+]] = metatype $@thin Set<Foo>.Type
     // CHECK:   [[SET:%[0-9]+]] = apply [[CONVERTER]]<Foo>([[OPT_NSSET]], [[SET_META]])
+    // CHECK:   [[BORROWED_SET:%.*]] = begin_borrow [[SET]]
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-    // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @$S17objc_set_bridging3FooC16bridge_Set_param{{[_0-9a-zA-Z]*}}F : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
-    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[SET]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Set<Foo>, @guaranteed Foo) -> ()
+    // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @$S17objc_set_bridging3FooC16bridge_Set_param{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Set<Foo>, @guaranteed Foo) -> ()
+    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[BORROWED_SET]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Set<Foo>, @guaranteed Foo) -> ()
     // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
     // CHECK:   destroy_value [[SELF_COPY]]
     // CHECK:   return [[RESULT]] : $()

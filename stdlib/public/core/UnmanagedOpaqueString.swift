@@ -304,6 +304,39 @@ extension _UnmanagedOpaqueString : _StringVariant {
 
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound <= range.count)
+    let b: Range<Int> =
+      range.lowerBound ..<
+      range.lowerBound + offsetRange.upperBound
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound <= range.count)
+    let b: Range<Int> =
+      range.lowerBound ..<
+      range.lowerBound + offsetRange.upperBound + 1
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.lowerBound < range.count)
+    let b: Range<Int> =
+      range.lowerBound + offsetRange.lowerBound ..<
+      range.upperBound
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
   internal func _copy(
     into dest: UnsafeMutableBufferPointer<UTF16.CodeUnit>
   ) {
@@ -340,6 +373,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @_versioned // FIXME(sil-serialize-all)
+  @_fixed_layout // FIXME(resilience)
   internal struct UnicodeScalarIterator : IteratorProtocol {
     var _base: _UnmanagedOpaqueString.Iterator
     var _peek: UTF16.CodeUnit?

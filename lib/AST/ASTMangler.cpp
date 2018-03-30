@@ -476,7 +476,6 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
   std::string OldName = mangleNodeOld(NewGlobal);
-  verifyOld(OldName);
   return OldName;
 #endif
 }
@@ -504,6 +503,7 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   } else if (isa<AssociatedTypeDecl>(Decl)) {
     appendContextOf(Decl);
     appendDeclName(Decl);
+    appendOperator("Qa");
   } else {
     appendEntity(Decl);
   }
@@ -736,11 +736,14 @@ void ASTMangler::appendType(Type type) {
                             cast<BuiltinVectorType>(tybase)->getNumElements());
     case TypeKind::NameAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
-      auto NameAliasTy = cast<NameAliasType>(tybase);
-      TypeAliasDecl *decl = NameAliasTy->getDecl();
+      auto aliasTy = cast<NameAliasType>(tybase);
+
+      // It's not possible to mangle the context of the builtin module.
+      // FIXME: We also cannot yet mangle references to typealiases that
+      // involve generics.
+      TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-        // It's not possible to mangle the context of the builtin module.
-        return appendType(NameAliasTy->getSinglyDesugaredType());
+        return appendType(aliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,
@@ -754,10 +757,6 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Optional:
     case TypeKind::Dictionary:
       return appendSugaredType<SyntaxSugarType>(type);
-
-    case TypeKind::ImplicitlyUnwrappedOptional: {
-      llvm_unreachable("Should no longer have IUOs");
-    }
 
     case TypeKind::ExistentialMetatype: {
       ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
@@ -1500,6 +1499,15 @@ const clang::NamedDecl *ASTMangler::getClangDeclForMangling(const ValueDecl *vd)
   return namedDecl;
 }
 
+void ASTMangler::appendSymbolicReference(const DeclContext *context) {
+  // Drop in a placeholder. The real reference value has to be filled in during
+  // lowering to IR.
+  Buffer << '\1';
+  auto offset = Buffer.str().size();
+  Buffer << StringRef("\0\0\0\0", 4);
+  SymbolicReferences.emplace_back(context, offset);
+}
+
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Check for certain standard types.
   if (tryAppendStandardSubstitution(decl))
@@ -1519,6 +1527,15 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Try to mangle the entire name as a substitution.
   if (tryMangleSubstitution(key.getPointer()))
     return;
+  
+  // Try to mangle a symbolic reference.
+  if (CanSymbolicReference
+      && CanSymbolicReference(key->getAnyNominal())) {
+    appendSymbolicReference(key->getAnyNominal());
+    // Substitutions can refer back to the symbolic reference.
+    addSubstitution(key.getPointer());
+    return;
+  }
 
   appendContextOf(decl);
 
@@ -1596,7 +1613,7 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
       else
         appendOperator("_");
     }
-  } else if (parameters.size() > 0) {
+  } else if (!parameters.empty()) {
     appendOperator("y");
   }
 
@@ -1629,8 +1646,14 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    if (fn->isAutoClosure())
-      return appendOperator("XK");
+    if (fn->isAutoClosure()) {
+      if (fn->isNoEscape())
+        return appendOperator("XK");
+      else
+        return appendOperator("XA");
+    } else if (fn->isNoEscape()) {
+      return appendOperator("XE");
+    }
     return appendOperator("c");
 
   case AnyFunctionType::Representation::CFunctionPointer:
@@ -1705,10 +1728,20 @@ void ASTMangler::appendTypeList(Type listTy) {
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
                                        ParameterTypeFlags flags) {
   appendType(elementType->getInOutObjectType());
-  if (flags.isInOut())
+  switch (flags.getValueOwnership()) {
+  case ValueOwnership::Default:
+    /* nothing */
+    break;
+  case ValueOwnership::InOut:
     appendOperator("z");
-  if (flags.isShared())
+    break;
+  case ValueOwnership::Shared:
     appendOperator("h");
+    break;
+  case ValueOwnership::Owned:
+    appendOperator("n");
+    break;
+  }
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())

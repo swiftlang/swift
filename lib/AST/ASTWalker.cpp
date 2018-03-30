@@ -188,6 +188,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return false;
   }
 
+  bool visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+    // By default, ignore #error/#warning.
+    return false;
+  }
+
   bool visitOperatorDecl(OperatorDecl *OD) {
     return false;
   }
@@ -344,10 +349,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
-    if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
-      if (doIt(TR)) {
-        return true;
-      }
+    if (auto *PL = ED->getParameterList()) {
+      visit(PL);
     }
 
     // The getRawValueExpr should remain the untouched original LiteralExpr for
@@ -1476,7 +1479,8 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
       } else
         return nullptr;
     } else {
-      assert(isa<IfConfigDecl>(N.get<Decl*>()));
+      assert(isa<IfConfigDecl>(N.get<Decl*>()) || 
+             isa<PoundDiagnosticDecl>(N.get<Decl*>()));
       if (doIt(N.get<Decl*>()))
         return nullptr;
     }
@@ -1688,6 +1692,10 @@ bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
 }
 
 bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
+bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
   return doIt(T->getBase());
 }
 

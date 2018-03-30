@@ -447,6 +447,7 @@ extension String.UTF16View : CustomReflectable {
 
 extension String.UTF16View : CustomPlaygroundQuickLookable {
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "UTF16View.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
   }
@@ -545,7 +546,7 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 }
 
-// backward compatibility for index interchange.  
+// backward compatibility for index interchange.
 extension String.UTF16View {
   @_inlineable // FIXME(sil-serialize-all)
   @available(

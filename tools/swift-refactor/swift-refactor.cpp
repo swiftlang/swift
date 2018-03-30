@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/CommandLine.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/Refactoring.h"
 #include "swift/IDE/Utils.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 
 #include <regex>
 
@@ -218,7 +219,8 @@ RangeConfig getRange(unsigned BufferID, SourceManager &SM,
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char *argv[]) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift refactor\n");
   if (options::SourceFilename.empty()) {
     llvm::errs() << "cannot find source filename\n";
@@ -236,7 +238,8 @@ int main(int argc, char *argv[]) {
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);

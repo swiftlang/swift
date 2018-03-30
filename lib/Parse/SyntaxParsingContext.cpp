@@ -39,7 +39,7 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            BufferID)),
       CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
       Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
-      Enabled(SF.shouldKeepSyntaxInfo()) {
+      Enabled(SF.shouldBuildSyntaxTree()) {
   CtxtHolder = this;
   Storage.reserve(128);
 }
@@ -68,17 +68,10 @@ RC<RawSyntax> SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
   if (Parts.size() == 1) {
     auto RawNode = Parts.front();
     switch (Kind) {
-    case SyntaxContextKind::Stmt: {
-      if (RawNode->isStmt())
-        return RawNode;
-      else if (RawNode->isDecl())
-        return createSyntaxAs(SyntaxKind::DeclarationStmt, Parts);
-      else if (RawNode->isExpr())
-        return createSyntaxAs(SyntaxKind::ExpressionStmt, Parts);
-      else
+    case SyntaxContextKind::Stmt:
+      if (!RawNode->isStmt())
         return makeUnknownSyntax(SyntaxKind::UnknownStmt, Parts);
       break;
-    }
     case SyntaxContextKind::Decl:
       if (!RawNode->isDecl())
         return makeUnknownSyntax(SyntaxKind::UnknownDecl, Parts);
@@ -186,6 +179,9 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
     createNodeInPlace(Kind, Pair.first);
     break;
   }
+  case SyntaxKind::CodeBlockItem:
+  case SyntaxKind::IdentifierExpr:
+  case SyntaxKind::SpecializeExpr:
   case SyntaxKind::MemberAccessExpr:
   case SyntaxKind::DotSelfExpr:
   case SyntaxKind::ImplicitMemberExpr:
@@ -253,8 +249,8 @@ void finalizeSourceFile(RootContextData &RootData,
 
   if (SF.hasSyntaxRoot()) {
     auto SourceRaw = SF.getSyntaxRoot().getRaw();
-    auto Decls = SourceRaw->getChild(SourceFileSyntax::Cursor::TopLevelDecls)
-                     ->getLayout();
+    auto Decls =
+        SourceRaw->getChild(SourceFileSyntax::Cursor::Statements)->getLayout();
     std::copy(Decls.begin(), Decls.end(), std::back_inserter(AllTopLevel));
     EOFToken = SourceRaw->getChild(SourceFileSyntax::Cursor::EOFToken);
   }
@@ -265,12 +261,13 @@ void finalizeSourceFile(RootContextData &RootData,
   }
 
   for (auto RawNode : Parts) {
-    if (RawNode->getKind() != SyntaxKind::StmtList)
+    if (RawNode->getKind() != SyntaxKind::CodeBlockItemList)
       // FIXME: Skip toplevel garbage nodes for now. we shouldn't emit them in
       // the first place.
       continue;
-    AllTopLevel.push_back(
-        SyntaxFactory::createRaw(SyntaxKind::TopLevelCodeDecl, {RawNode}));
+
+    auto Items = RawNode->getLayout();
+    std::copy(Items.begin(), Items.end(), std::back_inserter(AllTopLevel));
   }
 
   if (!EOFToken)
@@ -279,8 +276,10 @@ void finalizeSourceFile(RootContextData &RootData,
   auto newRaw = SyntaxFactory::createRaw(
       SyntaxKind::SourceFile,
       {
-          SyntaxFactory::createRaw(SyntaxKind::DeclList, AllTopLevel), EOFToken,
+          SyntaxFactory::createRaw(SyntaxKind::CodeBlockItemList, AllTopLevel),
+          EOFToken,
       });
+  assert(newRaw);
   SF.setSyntaxRoot(make<SourceFileSyntax>(newRaw));
 
   if (SF.getASTContext().LangOpts.VerifySyntaxTree) {

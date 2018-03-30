@@ -14,7 +14,7 @@ typealias MyFloat = Float
 // CHECK-SAME:                        %[[ALLOCA]], metadata ![[A:[0-9]+]]
 
 // Closure with promoted capture.
-// PROMO-CHECK: define {{.*}}@"$S5inout13modifyFooHeapyys5Int64Vz_SftFADycfU_"
+// PROMO-CHECK: define {{.*}}@"$S5inout13modifyFooHeapyys5Int64Vz_SftFADyXEfU_"
 // PROMO-CHECK: call void @llvm.dbg.declare(metadata %Ts5Int64V** %
 // PROMO-CHECK-SAME:   metadata ![[A1:[0-9]+]], metadata !DIExpression())
 

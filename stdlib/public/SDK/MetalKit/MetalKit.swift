@@ -12,7 +12,6 @@
 
 @_exported import MetalKit // Clang module
 
-@available(swift 4)
 @available(macOS 10.11, iOS 9.0, tvOS 9.0, *)
 extension MTKMesh {
     public class func newMeshes(asset: MDLAsset, device: MTLDevice) throws -> (modelIOMeshes: [MDLMesh], metalKitMeshes: [MTKMesh]) {

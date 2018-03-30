@@ -209,7 +209,7 @@ std::string sourcekitd::getRuntimeLibPath() {
 }
 
 static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
-                                            xpc_object_t event) {
+                                                xpc_object_t event) {
   xpc_type_t type = xpc_get_type(event);
   if (type == XPC_TYPE_ERROR) {
     if (event == XPC_ERROR_CONNECTION_INVALID) {
@@ -291,7 +291,7 @@ static void getInitializationInfo(xpc_connection_t peer) {
   }
 
   if (TracingEnabled) {
-    SourceKit::trace::enable();
+    sourcekitd::trace::enableXPCTracing();
   }
 }
 
@@ -305,6 +305,10 @@ static void sourcekitdServer_event_handler(xpc_connection_t peer) {
     sourcekitdServer_peer_event_handler(peer, event);
   });
 
+  // Update the main connection
+  xpc_retain(peer);
+  if (MainConnection)
+    xpc_release(MainConnection);
   MainConnection = peer;
 
   // This will tell the connection to begin listening for events. If you
@@ -329,7 +333,6 @@ int main(int argc, const char *argv[]) {
   llvm::install_fatal_error_handler(fatal_error_handler, 0);
   sourcekitd::enableLogging("sourcekit-serv");
   sourcekitd::initialize();
-  sourcekitd::trace::initialize();
 
   // Increase the file descriptor limit.
   // FIXME: Portability ?
@@ -370,14 +373,9 @@ void SKUIDToUIDMap::set(sourcekitd_uid_t SKDUID, UIdent UID) {
 }
 
 void sourcekitd::trace::sendTraceMessage(trace::sourcekitd_trace_message_t Msg) {
-  if (!SourceKit::trace::enabled()) {
-    xpc_release(Msg);
-    return;
-  }
-
   xpc_connection_t Peer = MainConnection;
   if (!Peer) {
-    SourceKit::trace::disable();
+    trace::disableXPCTracing();
     xpc_release(Msg);
     return;
   }
@@ -399,7 +397,7 @@ void sourcekitd::trace::sendTraceMessage(trace::sourcekitd_trace_message_t Msg) 
   xpc_release(Message);
 
   if (xpc_get_type(Reply) == XPC_TYPE_ERROR) {
-    SourceKit::trace::disable();
+    trace::disableXPCTracing();
     xpc_release(Reply);
     return;
   }

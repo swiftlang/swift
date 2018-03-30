@@ -71,6 +71,25 @@ ValueDecl *getDerivableRequirement(TypeChecker &tc,
                                    NominalTypeDecl *nominal,
                                    ValueDecl *requirement);
 
+
+/// Derive a CaseIterable requirement for an enum if it has no associated
+/// values for any of its cases.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *deriveCaseIterable(TypeChecker &tc,
+                              Decl *parentDecl,
+                              NominalTypeDecl *type,
+                              ValueDecl *requirement);
+
+/// Derive a CaseIterable type witness for an enum if it has no associated
+/// values for any of its cases.
+///
+/// \returns the derived member, which will also be added to the type.
+Type deriveCaseIterable(TypeChecker &tc,
+                        Decl *parentDecl,
+                        NominalTypeDecl *type,
+                        AssociatedTypeDecl *assocType);
+
 /// Derive a RawRepresentable requirement for an enum, if it has a valid
 /// raw type and raw values for all of its cases.
 ///

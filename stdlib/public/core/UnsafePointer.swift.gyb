@@ -428,7 +428,7 @@ public struct ${Self}<Pointee>: _Pointer {
   /// - Parameter count: The amount of memory to allocate, counted in instances
   ///   of `Pointee`.
   @_inlineable
-  static public func allocate(capacity count: Int)
+  public static func allocate(capacity count: Int)
     -> UnsafeMutablePointer<Pointee> {
     let size = MemoryLayout<Pointee>.stride * count
     let rawPtr =
@@ -577,6 +577,8 @@ public struct ${Self}<Pointee>: _Pointer {
   /// `Pointee` must be a trivial type. After calling
   /// `assign(from:count:)`, the region is initialized.
   ///
+  /// - Note: Returns without performing work if `self` and `source` are equal.
+  ///
   /// - Parameters:
   ///   - source: A pointer to at least `count` initialized instances of type
   ///     `Pointee`. The memory regions referenced by `source` and this
@@ -596,7 +598,7 @@ public struct ${Self}<Pointee>: _Pointer {
       //   self[i] = source[i]
       // }
     }
-    else {
+    else if UnsafePointer(self) != source {
       // assign backward from a non-following overlapping range.
       Builtin.assignCopyArrayBackToFront(
         Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
@@ -902,10 +904,15 @@ extension ${Self}: Hashable {
   /// program runs.
   @_inlineable
   public var hashValue: Int {
-    return Int(bitPattern: self)
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(Int(bitPattern: self))
   }
 }
-  
+
 extension ${Self}: Strideable {
   /// Returns a pointer to the next consecutive instance.
   ///
@@ -1004,6 +1011,7 @@ extension ${Self} : CustomPlaygroundQuickLookable {
   }
 
   @_inlineable // FIXME(sil-serialize-all)
+  @available(*, deprecated, message: "${Self}.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }

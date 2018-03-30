@@ -191,11 +191,7 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
 //===----------------------------------------------------------------------===//
 
 namespace {
-  enum class DIKind : unsigned char {
-    No,
-    Yes,
-    Partial
-  };
+enum class DIKind : uint8_t { No, Yes, Partial };
 } // end anonymous namespace
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
@@ -965,7 +961,8 @@ static void maybeSuggestNoArgSelfInit(SILModule &module, SILLocation loc,
     return;
 
   ASTContext &ctx = module.getASTContext();
-  DeclName noArgInit(ctx, ctx.Id_init, ArrayRef<Identifier>());
+  DeclName noArgInit(ctx, DeclBaseName::createConstructor(),
+                     ArrayRef<Identifier>());
 
   auto lookupResults = theStruct->lookupDirect(noArgInit);
   if (lookupResults.size() != 1)
@@ -1350,7 +1347,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   // Only allow enums forming an optional.
-  if (!EI->getType().getAnyOptionalObjectType())
+  if (!EI->getType().getOptionalObjectType())
     return false;
 
   if (!EI->hasOneUse()) return false;
@@ -1636,7 +1633,14 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                                            bool SuperInitDone,
                                            bool FailedSelfUse) {
   SILInstruction *Inst = Use.Inst;
-  
+
+  // Stores back to the 'self' box are OK.
+  if (auto store = dyn_cast<StoreInst>(Inst)) {
+    if (store->getDest() == TheMemory.MemoryInst
+        && TheMemory.isClassInitSelf())
+      return;
+  }
+
   if (FailedSelfUse) {
     emitSelfConsumedDiagnostic(Inst);
     return;
@@ -2956,6 +2960,10 @@ class DefiniteInitialization : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
+
     // Walk through and promote all of the alloc_box's that we can.
     if (checkDefiniteInitialization(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

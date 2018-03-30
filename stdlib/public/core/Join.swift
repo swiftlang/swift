@@ -48,7 +48,7 @@ extension JoinedSequence {
     @_versioned // FIXME(sil-serialize-all)
     internal var _separator: ContiguousArray<Element>.Iterator?
     
-    @_fixed_layout // FIXME(sil-serialize-all)
+    @_frozen // FIXME(sil-serialize-all)
     @_versioned // FIXME(sil-serialize-all)
     internal enum JoinIteratorState {
       case start

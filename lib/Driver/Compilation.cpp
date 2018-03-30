@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Program.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
@@ -24,8 +25,12 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
+#include "swift/Driver/ToolChain.h"
+#include "swift/Frontend/OutputFileMap.h"
+#include "swift/Option/Options.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Option/Arg.h"
@@ -34,11 +39,17 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "CompilationRecord.h"
+
+#define DEBUG_TYPE "batch-mode"
+
+// Batch-mode has a sub-mode for testing that randomizes batch partitions,
+// by user-provided seed. That is the only thing randomized here.
+#include <random>
 
 using namespace swift;
 using namespace swift::sys;
@@ -85,34 +96,46 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const LogJobSet &ljs) {
 
 
 Compilation::Compilation(DiagnosticEngine &Diags,
-                         const ToolChain &TC, OutputLevel Level,
+                         const ToolChain &TC,
+                         OutputInfo const &OI,
+                         OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
                          StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
+                         bool EnableBatchMode,
+                         unsigned BatchSeed,
+                         bool ForceOneBatchRepartition,
                          bool SkipTaskExecution,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
-  : Diags(Diags), TheToolChain(TC), Level(Level),
+  : Diags(Diags), TheToolChain(TC),
+    TheOutputInfo(OI),
+    Level(Level),
     RawInputArgs(std::move(InputArgs)),
-    TranslatedArgs(std::move(TranslatedArgs)), 
+    TranslatedArgs(std::move(TranslatedArgs)),
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
+    EnableBatchMode(EnableBatchMode),
+    BatchSeed(BatchSeed),
+    ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)) {
 };
 
-static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
+static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
+                                     DiagnosticEngine &diags);
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
-
+using CommandSetVector = llvm::SetVector<const Job*>;
+using BatchPartition = std::vector<std::vector<const Job*>>;
 
 using InputInfoMap = llvm::SmallMapVector<const llvm::opt::Arg *,
                                           CompileJobAction::InputInfo, 16>;
@@ -128,6 +151,17 @@ namespace driver {
     /// they've finished execution), or which have been determined that they
     /// don't need to run.
     CommandSet ScheduledCommands;
+
+    /// A temporary buffer to hold commands that were scheduled but haven't been
+    /// added to the Task Queue yet, because we might try batching them together
+    /// first.
+    CommandSetVector PendingExecution;
+
+    /// Set of synthetic BatchJobs that serve to cluster subsets of jobs waiting
+    /// in PendingExecution. Also used to identify (then unpack) BatchJobs back
+    /// to their underlying non-Batch Jobs, when running a callback from
+    /// TaskQueue.
+    CommandSet BatchJobs;
 
     /// All jobs which have finished execution or which have been determined
     /// that they don't need to run.
@@ -215,14 +249,25 @@ namespace driver {
         return;
       }
 
+      // Adding to scheduled means we've committed to its completion (not
+      // distinguished from skipping). We never remove it once inserted.
+      ScheduledCommands.insert(Cmd);
+
+      // Adding to pending means it should be in the next round of additions to
+      // the task queue (either batched or singularly); we remove Jobs from
+      // PendingExecution once we hand them over to the TaskQueue.
+      PendingExecution.insert(Cmd);
+    }
+
+    void addPendingJobToTaskQueue(const Job *Cmd) {
       // FIXME: Failing here should not take down the whole process.
-      bool success = writeFilelistIfNecessary(Cmd, Comp.Diags);
+      bool success =
+          writeFilelistIfNecessary(Cmd, *Comp.TranslatedArgs.get(), Comp.Diags);
       assert(success && "failed to write filelist");
       (void)success;
 
       assert(Cmd->getExtraEnvironment().empty() &&
              "not implemented for compilations with multiple jobs");
-      ScheduledCommands.insert(Cmd);
       if (Comp.ShowJobLifecycle)
         llvm::outs() << "Added to TaskQueue: " << LogJob(Cmd) << "\n";
       TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
@@ -275,13 +320,25 @@ namespace driver {
         DriverTimers[BeganCmd]->startTimer();
       }
 
-      // For verbose output, print out each command as it begins execution.
-      if (Comp.Level == OutputLevel::Verbose)
+      switch (Comp.Level) {
+      case OutputLevel::Normal:
+        break;
+        // For command line or verbose output, print out each command as it
+        // begins execution.
+      case OutputLevel::PrintJobs:
+        BeganCmd->printCommandLineAndEnvironment(llvm::outs());
+        break;
+      case OutputLevel::Verbose:
         BeganCmd->printCommandLine(llvm::errs());
-      else if (Comp.Level == OutputLevel::Parseable)
+        break;
+      case OutputLevel::Parseable:
         parseable_output::emitBeganMessage(llvm::errs(), *BeganCmd, Pid);
+        break;
+      }
     }
 
+    /// Note that a .swiftdeps file failed to load and take corrective actions:
+    /// disable incremental logic and schedule all existing deferred commands.
     void
     dependencyLoadFailed(StringRef DependenciesFile, bool Warn=true) {
       if (Warn && Comp.ShowIncrementalBuildDecisions)
@@ -294,16 +351,17 @@ namespace driver {
       DeferredCommands.clear();
     }
 
-    /// Helper that reloads a job's .swiftdeps file after the job exits, and
-    /// re-runs transitive marking to ensure everything is properly invalidated
-    /// by any new dependency edges introduced by it.
+    /// Helper that attmepts to reload a job's .swiftdeps file after the job
+    /// exits, and re-run transitive marking to ensure everything is properly
+    /// invalidated by any new dependency edges introduced by it. If reloading
+    /// fails, this can cause deferred jobs to be immediately scheduled.
     template <unsigned N>
     void reloadAndRemarkDeps(const Job *FinishedCmd,
                              int ReturnCode,
                              SmallVector<const Job *, N> &Dependents) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
-        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
+          Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
 
       if (DependenciesFile.empty()) {
         // If this job doesn't track dependencies, it must always be run.
@@ -374,6 +432,29 @@ namespace driver {
       }
     }
 
+    /// Unpack a \c BatchJob that has finished into its constituent \c Job
+    /// members, and call \c taskFinished on each, propagating any \c
+    /// TaskFinishedResponse other than \c
+    /// TaskFinishedResponse::ContinueExecution from any of the constituent
+    /// calls.
+    TaskFinishedResponse
+    unpackAndFinishBatch(int ReturnCode, StringRef Output,
+                         StringRef Errors, const BatchJob *B) {
+      if (Comp.ShowJobLifecycle)
+        llvm::outs() << "Batch job finished: " << LogJob(B) << "\n";
+      auto res = TaskFinishedResponse::ContinueExecution;
+      for (const Job *J : B->getCombinedJobs()) {
+        if (Comp.ShowJobLifecycle)
+          llvm::outs() << "  ==> Unpacked batch constituent finished: "
+                       << LogJob(J) << "\n";
+        auto r = taskFinished(llvm::sys::ProcessInfo::InvalidPid, ReturnCode, Output,
+                              Errors, (void *)J);
+        if (r != TaskFinishedResponse::ContinueExecution)
+          res = r;
+      }
+      return res;
+    }
+
     /// Callback which will be called immediately after a task has finished
     /// execution. Determines if execution should continue, and also schedule
     /// any additional Jobs which we now know we need to run.
@@ -382,19 +463,34 @@ namespace driver {
                  StringRef Errors, void *Context) {
       const Job *FinishedCmd = (const Job *)Context;
 
-      if (Comp.ShowDriverTimeCompilation) {
-        DriverTimers[FinishedCmd]->stopTimer();
+      if (Pid != llvm::sys::ProcessInfo::InvalidPid) {
+
+        if (Comp.ShowDriverTimeCompilation) {
+          DriverTimers[FinishedCmd]->stopTimer();
+        }
+
+        switch (Comp.Level) {
+        case OutputLevel::PrintJobs:
+          // Only print the jobs, not the outputs
+          break;
+        case OutputLevel::Normal:
+        case OutputLevel::Verbose:
+          // Send the buffered output to stderr, though only if we
+          // support getting buffered output.
+          if (TaskQueue::supportsBufferingOutput())
+            llvm::errs() << Output;
+          break;
+        case OutputLevel::Parseable:
+          // Parseable output was requested.
+          parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
+                                                ReturnCode, Output);
+          break;
+        }
       }
 
-      if (Comp.Level == OutputLevel::Parseable) {
-        // Parseable output was requested.
-        parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
-                                              ReturnCode, Output);
-      } else {
-        // Otherwise, send the buffered output to stderr, though only if we
-        // support getting buffered output.
-        if (TaskQueue::supportsBufferingOutput())
-          llvm::errs() << Output;
+      if (BatchJobs.count(FinishedCmd) != 0) {
+        return unpackAndFinishBatch(ReturnCode, Output, Errors,
+                                    static_cast<const BatchJob *>(FinishedCmd));
       }
 
       // In order to handle both old dependencies that have disappeared and new
@@ -458,7 +554,6 @@ namespace driver {
         if (TaskQueue::supportsBufferingOutput())
           llvm::errs() << Output;
       }
-
       if (!ErrorMsg.empty())
         Comp.Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
                             ErrorMsg);
@@ -507,7 +602,8 @@ namespace driver {
         // FIXME: We can probably do better here!
         Job::Condition Condition = Job::Condition::Always;
         StringRef DependenciesFile =
-          Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+            Cmd->getOutput().getAdditionalOutputForType(
+                file_types::TY_SwiftDeps);
         if (!DependenciesFile.empty()) {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
@@ -589,31 +685,260 @@ namespace driver {
       }
     }
 
+    /// Insert all jobs in \p Cmds (of descriptive name \p Kind) to the \c
+    /// TaskQueue, and clear \p Cmds.
+    template <typename Container>
+    void transferJobsToTaskQueue(Container &Cmds, StringRef Kind) {
+      for (const Job *Cmd : Cmds) {
+        if (Comp.ShowJobLifecycle)
+          llvm::outs() << "Adding " << Kind
+                       << " job to task queue: "
+                       << LogJob(Cmd) << "\n";
+        addPendingJobToTaskQueue(Cmd);
+      }
+      Cmds.clear();
+    }
+
+    /// Partition the jobs in \c PendingExecution into those that are \p
+    /// Batchable and those that are \p NonBatchable, clearing \p
+    /// PendingExecution.
+    void getPendingBatchableJobs(CommandSetVector &Batchable,
+                                 CommandSetVector &NonBatchable) {
+      for (const Job *Cmd : PendingExecution) {
+        if (Comp.getToolChain().jobIsBatchable(Comp, Cmd)) {
+          if (Comp.ShowJobLifecycle)
+            llvm::outs() << "Batchable: " << LogJob(Cmd) << "\n";
+          Batchable.insert(Cmd);
+        } else {
+          if (Comp.ShowJobLifecycle)
+            llvm::outs() << "Not batchable: " << LogJob(Cmd) << "\n";
+          NonBatchable.insert(Cmd);
+        }
+      }
+    }
+
+    /// If \p Batch is nonempty, construct a new \c BatchJob from its
+    /// contents by calling \p ToolChain::constructBatchJob, then insert the
+    /// new \c BatchJob into \p Batches.
+    void
+    formBatchJobFromPartitionBatch(std::vector<const Job *> &Batches,
+                                   std::vector<const Job *> const &Batch) {
+      if (Batch.empty())
+        return;
+      if (Comp.ShowJobLifecycle)
+        llvm::outs() << "Forming batch job from "
+                     << Batch.size() << " constituents\n";
+      auto const &TC = Comp.getToolChain();
+      auto J = TC.constructBatchJob(Batch, Comp);
+      if (J)
+        Batches.push_back(Comp.addJob(std::move(J)));
+    }
+
+    /// Build a vector of partition indices, one per Job: the i'th index says
+    /// which batch of the partition the i'th Job will be assigned to. If we are
+    /// shuffling due to -driver-batch-seed, the returned indices will not be
+    /// arranged in contiguous runs. We shuffle partition-indices here, not
+    /// elements themselves, to preserve the invariant that each batch is a
+    /// subsequence of the full set of inputs, not just a subset.
+    std::vector<size_t>
+    assignJobsToPartitions(size_t PartitionSize,
+                           size_t NumJobs) {
+      size_t Remainder = NumJobs % PartitionSize;
+      size_t TargetSize = NumJobs / PartitionSize;
+      std::vector<size_t> PartitionIndex;
+      PartitionIndex.reserve(NumJobs);
+      for (size_t P = 0; P < PartitionSize; ++P) {
+        // Spread remainder evenly across partitions by adding 1 to the target
+        // size of the first Remainder of them.
+        size_t FillCount = TargetSize + ((P < Remainder) ? 1 : 0);
+        std::fill_n(std::back_inserter(PartitionIndex), FillCount, P);
+      }
+      if (Comp.BatchSeed != 0) {
+        std::minstd_rand gen(Comp.BatchSeed);
+        std::shuffle(PartitionIndex.begin(), PartitionIndex.end(), gen);
+      }
+      assert(PartitionIndex.size() == NumJobs);
+      return PartitionIndex;
+    }
+
+    /// Create \c NumberOfParallelCommands batches and assign each job to a
+    /// batch either filling each partition in order or, if seeded with a
+    /// nonzero value, pseudo-randomly (but determinstically and nearly-evenly).
+    void partitionIntoBatches(std::vector<const Job *> Batchable,
+                              BatchPartition &Partition) {
+      if (Comp.ShowJobLifecycle) {
+        llvm::outs() << "Found " << Batchable.size() << " batchable jobs\n";
+        llvm::outs() << "Forming into " << Partition.size() << " batches\n";
+      }
+
+      assert(!Partition.empty());
+      auto PartitionIndex = assignJobsToPartitions(Partition.size(),
+                                                   Batchable.size());
+      assert(PartitionIndex.size() == Batchable.size());
+      auto const &TC = Comp.getToolChain();
+      for_each(Batchable, PartitionIndex, [&](const Job *Cmd, size_t Idx) {
+          assert(Idx < Partition.size());
+          std::vector<const Job*> &P = Partition[Idx];
+          if (P.empty() || TC.jobsAreBatchCombinable(Comp, P[0], Cmd)) {
+            if (Comp.ShowJobLifecycle)
+              llvm::outs() << "Adding " << LogJob(Cmd)
+                           << " to batch " << Idx << '\n';
+            P.push_back(Cmd);
+          } else {
+            // Strange but theoretically possible that we have a batchable job
+            // that's not combinable with others; tack a new batch on for it.
+            if (Comp.ShowJobLifecycle)
+              llvm::outs() << "Adding " << LogJob(Cmd)
+                           << " to new batch " << Partition.size() << '\n';
+            Partition.push_back(std::vector<const Job*>());
+            Partition.back().push_back(Cmd);
+          }
+        });
+    }
+
+    // Due to the multiplication of the number of additional files and the
+    // number of files in a batch, it's pretty easy to construct too-long
+    // command lines here, which will then fail to exec. We address this crudely
+    // by re-forming batches with a finer partition when we overflow.
+    //
+    // Now that we're passing OutputFileMaps to frontends, this should never
+    // happen, but keep this as insurance, because the decision to pass output
+    // file maps cannot know the exact length of the command line, so may
+    // possibly fail to use the OutputFileMap.
+    //
+    // In order to be able to exercise as much of the code paths as possible,
+    // take a flag to force a retry, but only once.
+    bool shouldRetryWithMorePartitions(std::vector<const Job *> const &Batches,
+                                       bool &PretendTheCommandLineIsTooLongOnce,
+                                       size_t &NumPartitions) {
+
+      // Stop rebatching if we can't subdivide batches any further.
+      if (NumPartitions > PendingExecution.size())
+        return false;
+
+      for (auto const *B : Batches) {
+        if (!llvm::sys::commandLineFitsWithinSystemLimits(B->getExecutable(),
+                                                          B->getArguments()) ||
+            PretendTheCommandLineIsTooLongOnce) {
+          PretendTheCommandLineIsTooLongOnce = false;
+          // To avoid redoing the batch loop too many times, repartition pretty
+          // aggressively by doubling partition count / halving size.
+          NumPartitions *= 2;
+          DEBUG(llvm::dbgs()
+                << "Should have used a supplementary output file map.\n");
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /// Select jobs that are batch-combinable from \c PendingExecution, combine
+    /// them together into \p BatchJob instances (also inserted into \p
+    /// BatchJobs), and enqueue all \c PendingExecution jobs (whether batched or
+    /// not) into the \c TaskQueue for execution.
+    void formBatchJobsAndAddPendingJobsToTaskQueue() {
+
+      // If batch mode is not enabled, just transfer the set of pending jobs to
+      // the task queue, as-is.
+      if (!Comp.getBatchModeEnabled()) {
+        transferJobsToTaskQueue(PendingExecution, "standard");
+        return;
+      }
+
+      size_t NumPartitions = Comp.NumberOfParallelCommands;
+      CommandSetVector Batchable, NonBatchable;
+      std::vector<const Job *> Batches;
+      bool PretendTheCommandLineIsTooLongOnce =
+          Comp.getForceOneBatchRepartition();
+      do {
+        // We might be restarting loop; clear these before proceeding.
+        Batchable.clear();
+        NonBatchable.clear();
+        Batches.clear();
+
+        // Split the batchable from non-batchable pending jobs.
+        getPendingBatchableJobs(Batchable, NonBatchable);
+
+        // Partition the batchable jobs into sets.
+        BatchPartition Partition(NumPartitions);
+        partitionIntoBatches(Batchable.takeVector(), Partition);
+
+        // Construct a BatchJob from each batch in the partition.
+        for (auto const &Batch : Partition) {
+          formBatchJobFromPartitionBatch(Batches, Batch);
+        }
+
+      } while (shouldRetryWithMorePartitions(
+          Batches, PretendTheCommandLineIsTooLongOnce, NumPartitions));
+      PendingExecution.clear();
+
+      // Save batches so we can locate and decompose them on task-exit.
+      for (const Job *Cmd : Batches)
+        BatchJobs.insert(Cmd);
+
+      // Enqueue the resulting jobs, batched and non-batched alike.
+      transferJobsToTaskQueue(Batches, "batch");
+      transferJobsToTaskQueue(NonBatchable, "non-batch");
+    }
+
     void runTaskQueueToCompletion() {
       do {
         using namespace std::placeholders;
         // Ask the TaskQueue to execute.
-        TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
-                              _1, _2),
-                    std::bind(&PerformJobsState::taskFinished, this,
-                              _1, _2, _3, _4, _5),
-                    std::bind(&PerformJobsState::taskSignalled, this,
-                              _1, _2, _3, _4, _5, _6));
+        if (TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
+                                  _1, _2),
+                        std::bind(&PerformJobsState::taskFinished, this,
+                                  _1, _2, _3, _4, _5),
+                        std::bind(&PerformJobsState::taskSignalled, this,
+                                  _1, _2, _3, _4, _5, _6))) {
+          if (Result == EXIT_SUCCESS) {
+            // FIXME: Error from task queue while Result == EXIT_SUCCESS most
+            // likely means some fork/exec or posix_spawn failed; TaskQueue saw
+            // "an error" at some stage before even calling us with a process
+            // exit / signal (or else a poll failed); unfortunately the task
+            // causing it was dropped on the floor and we have no way to recover
+            // it here, so we report a very poor, generic error.
+            Comp.Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
+                                "<unknown>");
+            Result = -2;
+            AnyAbnormalExit = true;
+            return;
+          }
+        }
 
-        // Mark all remaining deferred commands as skipped.
+        // Returning without error from TaskQueue::execute should mean either an
+        // empty TaskQueue or a failed subprocess.
+        assert(!(Result == 0 && TQ->hasRemainingTasks()));
+
+        // Task-exit callbacks from TaskQueue::execute may have unblocked jobs,
+        // which means there might be PendingExecution jobs to enqueue here. If
+        // there are, we need to continue trying to make progress on the
+        // TaskQueue before we start marking deferred jobs as skipped, below.
+        if (!PendingExecution.empty() && Result == 0) {
+          formBatchJobsAndAddPendingJobsToTaskQueue();
+          continue;
+        }
+
+        // If we got here, all the queued and pending work we know about is
+        // done; mark anything still in deferred state as skipped.
         for (const Job *Cmd : DeferredCommands) {
           if (Comp.Level == OutputLevel::Parseable) {
-            // Provide output indicating this command was skipped if parseable output
-            // was requested.
+            // Provide output indicating this command was skipped if parseable
+            // output was requested.
             parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
           }
-
           ScheduledCommands.insert(Cmd);
           markFinished(Cmd, /*Skipped=*/true);
         }
         DeferredCommands.clear();
 
-        // ...which may allow us to go on and do later tasks.
+        // It's possible that by marking some jobs as skipped, we unblocked
+        // some jobs and thus have entries in PendingExecution again; push
+        // those through to the TaskQueue.
+        formBatchJobsAndAddPendingJobsToTaskQueue();
+
+        // If we added jobs to the TaskQueue, and we are not in an error state,
+        // we want to give the TaskQueue another run.
       } while (Result == 0 && TQ->hasRemainingTasks());
     }
 
@@ -626,7 +951,8 @@ namespace driver {
         for (const Job *Cmd : Comp.getJobs()) {
           // Skip files that don't use dependency analysis.
           StringRef DependenciesFile =
-            Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+              Cmd->getOutput().getAdditionalOutputForType(
+                  file_types::TY_SwiftDeps);
           if (DependenciesFile.empty())
             continue;
 
@@ -788,7 +1114,8 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
-static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
+static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
+                                     DiagnosticEngine &diags) {
   bool ok = true;
   for (const FilelistInfo &filelistInfo : job->getFilelistInfos()) {
     if (filelistInfo.path.empty())
@@ -813,23 +1140,37 @@ static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags) {
           for (auto &output : outputInfo.getPrimaryOutputFilenames())
             out << output << "\n";
         } else {
-          auto &output = outputInfo.getAnyOutputForType(filelistInfo.type);
+          auto output = outputInfo.getAnyOutputForType(filelistInfo.type);
           if (!output.empty())
             out << output << "\n";
         }
       }
       break;
     case FilelistInfo::WhichFiles::PrimaryInputs:
-      for (const Action *A : job->getSource().getInputs()) {
-        const auto *IA = cast<InputAction>(A);
-        out << IA->getInputArg().getValue() << "\n";
+      // Ensure that -index-file-path works in conjunction with
+      // -driver-use-filelists. It needs to be the only primary.
+      if (Arg *A = args.getLastArg(options::OPT_index_file_path))
+        out << A->getValue() << "\n";
+      else {
+        // The normal case for non-single-compile jobs.
+        for (const Action *A : job->getSource().getInputs()) {
+          // A could be a GeneratePCHJobAction
+          if (!isa<InputAction>(A))
+            continue;
+          const auto *IA = cast<InputAction>(A);
+          out << IA->getInputArg().getValue() << "\n";
+        }
       }
       break;
-    case FilelistInfo::WhichFiles::Output:
+    case FilelistInfo::WhichFiles::Output: {
       const CommandOutput &outputInfo = job->getOutput();
       assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
       for (auto &output : outputInfo.getPrimaryOutputFilenames())
         out << output << "\n";
+      break;
+    }
+    case FilelistInfo::WhichFiles::SupplementaryOutput:
+      job->getOutput().writeOutputFileMap(out);
       break;
     }
   }
@@ -841,6 +1182,7 @@ int Compilation::performJobsImpl(bool &abnormalExit) {
 
   State.scheduleInitialJobs();
   State.scheduleAdditionalJobs();
+  State.formBatchJobsAndAddPendingJobsToTaskQueue();
   State.runTaskQueueToCompletion();
   State.checkUnfinishedJobs();
 
@@ -869,11 +1211,20 @@ int Compilation::performSingleCommand(const Job *Cmd) {
     break;
   }
 
-  if (!writeFilelistIfNecessary(Cmd, Diags))
+  if (!writeFilelistIfNecessary(Cmd, *TranslatedArgs.get(), Diags))
     return 1;
 
-  if (Level == OutputLevel::Verbose)
+  switch (Level) {
+  case OutputLevel::Normal:
+  case OutputLevel::Parseable:
+    break;
+  case OutputLevel::PrintJobs:
+    Cmd->printCommandLineAndEnvironment(llvm::outs());
+    return 0;
+  case OutputLevel::Verbose:
     Cmd->printCommandLine(llvm::errs());
+    break;
+  }
 
   SmallVector<const char *, 128> Argv;
   Argv.push_back(Cmd->getExecutable());
@@ -912,7 +1263,7 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
   }
 
   for (auto inputPair : inputFiles) {
-    if (!types::isPartOfSwiftCompilation(inputPair.first))
+    if (!file_types::isPartOfSwiftCompilation(inputPair.first))
       continue;
     out << inputPair.second->getValue() << "\n";
   }

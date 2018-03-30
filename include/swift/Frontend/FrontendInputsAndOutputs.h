@@ -14,6 +14,8 @@
 #define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
 #include "swift/AST/Module.h"
+#include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/MapVector.h"
@@ -33,8 +35,8 @@ class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllInputs;
-
-  llvm::StringMap<unsigned> PrimaryInputs;
+  llvm::StringMap<unsigned> PrimaryInputsByName;
+  std::vector<unsigned> PrimaryInputsInOrder;
 
   /// In Single-threaded WMO mode, all inputs are used
   /// both for importing and compiling.
@@ -71,6 +73,9 @@ public:
 
   std::vector<std::string> getInputFilenames() const;
 
+  /// \return nullptr if not a primary input file.
+  const InputFile *primaryInputNamed(StringRef name) const;
+
   unsigned inputCount() const { return AllInputs.size(); }
 
   bool hasInputs() const { return !AllInputs.empty(); }
@@ -82,27 +87,31 @@ public:
 
   const InputFile &lastInput() const { return AllInputs.back(); }
 
-  StringRef getFilenameOfFirstInput() const;
+  const std::string &getFilenameOfFirstInput() const;
 
   bool isReadingFromStdin() const;
 
-  void forEachInput(llvm::function_ref<void(const InputFile &)> fn) const;
+  /// If \p fn returns true, exits early and returns true.
+  bool forEachInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
   // Primaries:
 
   const InputFile &firstPrimaryInput() const;
   const InputFile &lastPrimaryInput() const;
 
-  void
-  forEachPrimaryInput(llvm::function_ref<void(const InputFile &)> fn) const;
+  /// If \p fn returns true, exit early and return true.
+  bool
+  forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
-  unsigned primaryInputCount() const { return PrimaryInputs.size(); }
+  unsigned primaryInputCount() const { return PrimaryInputsInOrder.size(); }
 
   // Primary count readers:
 
   bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
 
   bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
+
+  bool hasMultiplePrimaryInputs() const { return primaryInputCount() > 1; }
 
   /// Fails an assertion if there is more than one primary input.
   /// Used in situations where only one primary input can be handled
@@ -124,11 +133,8 @@ public:
 
   const InputFile &getRequiredUniquePrimaryInput() const;
 
-  /// \return the name of the unique primary input, or an empty StrinRef if
-  /// there isn't one.
-  StringRef getNameOfUniquePrimaryInputFile() const;
-
-  /// Combines all primaries for stats reporter
+  /// FIXME: Should combine all primaries for the result
+  /// instead of just answering "batch" if there is more than one primary.
   std::string getStatsFileMangledInputName() const;
 
   bool isInputPrimary(StringRef file) const;
@@ -162,10 +168,16 @@ public:
 private:
   friend class ArgsToFrontendOptionsConverter;
 
-  void setMainOutputs(ArrayRef<std::string> outputFiles);
+  void setMainAndSupplementaryOutputs(
+      ArrayRef<std::string> outputFiles,
+      ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
 
 public:
   unsigned countOfInputsProducingMainOutputs() const;
+
+  bool hasInputsProducingMainOutputs() const {
+    return countOfInputsProducingMainOutputs() != 0;
+  }
 
   const InputFile &firstInputProducingOutput() const;
   const InputFile &lastInputProducingOutput() const;
@@ -173,17 +185,18 @@ public:
   /// Under single-threaded WMO, we pretend that the first input
   /// generates the main output, even though it will include code
   /// generated from all of them.
-  void forEachInputProducingAMainOutputFile(
-      llvm::function_ref<void(const InputFile &)> fn) const;
+  ///
+  /// If \p fn returns true, return early and return true.
+  bool forEachInputProducingAMainOutputFile(
+      llvm::function_ref<bool(const InputFile &)> fn) const;
 
   std::vector<std::string> copyOutputFilenames() const;
 
-  void
-  forEachOutputFilename(llvm::function_ref<void(const std::string &)> fn) const;
+  void forEachOutputFilename(llvm::function_ref<void(StringRef)> fn) const;
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
-  StringRef getSingleOutputFilename() const;
+  std::string getSingleOutputFilename() const;
 
   bool isOutputFilenameStdout() const;
   bool isOutputFileDirectory() const;
@@ -191,8 +204,34 @@ public:
 
   // Supplementary outputs
 
-  void forEachInputProducingSupplementaryOutput(
-      llvm::function_ref<void(const InputFile &)> fn) const;
+  unsigned countOfFilesProducingSupplementaryOutput() const;
+
+  /// If \p fn returns true, exit early and return true.
+  bool forEachInputProducingSupplementaryOutput(
+      llvm::function_ref<bool(const InputFile &)> fn) const;
+
+  /// Assumes there is not more than one primary input file, if any.
+  /// Otherwise, you would need to call getPrimarySpecificPathsForPrimary
+  /// to tell it which primary input you wanted the outputs for.
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
+
+  bool hasSupplementaryOutputPath(
+      llvm::function_ref<const std::string &(const SupplementaryOutputPaths &)>
+          extractorFn) const;
+
+  bool hasDependenciesPath() const;
+  bool hasReferenceDependenciesPath() const;
+  bool hasObjCHeaderOutputPath() const;
+  bool hasLoadedModuleTracePath() const;
+  bool hasModuleOutputPath() const;
+  bool hasModuleDocOutputPath() const;
+  bool hasTBDPath() const;
+
+  bool hasDependencyTrackerPath() const;
 };
 
 } // namespace swift

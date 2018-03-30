@@ -26,8 +26,11 @@
 using namespace swift;
 using namespace swift::migrator;
 
-bool migrator::updateCodeAndEmitRemap(CompilerInstance *Instance,
-                                      const CompilerInvocation &Invocation) {
+bool migrator::updateCodeAndEmitRemapIfNeeded(
+    CompilerInstance *Instance, const CompilerInvocation &Invocation) {
+  if (!Invocation.getMigratorOptions().shouldRunMigrator())
+    return false;
+
   // Delete the remap file, in case someone is re-running the Migrator. If the
   // file fails to compile and we don't get a chance to overwrite it, the old
   // changes may get picked up.

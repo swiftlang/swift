@@ -192,9 +192,19 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   auto genericSig = getGenericSignature();
 
-  // If the type doesn't conform to this protocol, fail.
-  if (!genericSig->conformsToProtocol(type, proto))
+  // If the type doesn't conform to this protocol, the result isn't formed
+  // from these requirements.
+  if (!genericSig->conformsToProtocol(type, proto)) {
+    // Check whether the superclass conforms.
+    if (auto superclass = genericSig->getSuperclassBound(type)) {
+      return LookUpConformanceInSignature(*getGenericSignature())(
+                                                 type->getCanonicalType(),
+                                                 superclass,
+                                                 proto->getDeclaredType());
+    }
+
     return None;
+  }
 
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);
@@ -267,6 +277,10 @@ void SubstitutionMap::
 addConformance(CanType type, ProtocolConformanceRef conformance) {
   assert(!isa<ArchetypeType>(type));
   conformanceMap[type].push_back(conformance);
+}
+
+SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
+  return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
 }
 
 SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
@@ -519,3 +533,27 @@ void SubstitutionMap::dump(llvm::raw_ostream &out) const {
 void SubstitutionMap::dump() const {
   return dump(llvm::errs());
 }
+
+void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
+  // Generic signature.
+  id.AddPointer(genericSig);
+
+  if (empty() || !genericSig) return;
+
+  // Replacement types.
+  for (Type gp : genericSig->getGenericParams()) {
+    id.AddPointer(gp.subst(*this).getPointer());
+  }
+
+  // Conformance requirements.
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto conformance =
+      lookupConformance(req.getFirstType()->getCanonicalType(),
+                        req.getSecondType()->castTo<ProtocolType>()->getDecl());
+    id.AddPointer(conformance ? conformance->getOpaqueValue() : nullptr);
+  }
+}
+

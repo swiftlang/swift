@@ -1,6 +1,5 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
-// RUN: rm -rfv %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 // FIXME: <rdar://problem/29281364> sil-opt -verify is broken
 // RUN: %target-sil-opt %s -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -emit-sib -o %t/tmp.sib -module-name opaqueval
 // RUN: %target-sil-opt %t/tmp.sib -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval

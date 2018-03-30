@@ -975,6 +975,18 @@ class RefCounts {
       return bits.getIsDeiniting();
   }
 
+  bool hasSideTable() const {
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    return bits.hasSideTable();
+  }
+
+  void *getSideTable() const {
+    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (!bits.hasSideTable())
+      return nullptr;
+    return bits.getSideTable();
+  }
+
   /// Return true if the object can be freed directly right now.
   /// (transition DEINITING -> DEAD)
   /// This is used in swift_deallocObject().
@@ -1264,12 +1276,11 @@ class RefCounts {
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const;
-
-
+  
   private:
   HeapObject *getHeapObject();
   
-  HeapObjectSideTableEntry* allocateSideTable();
+  HeapObjectSideTableEntry* allocateSideTable(bool failIfDeiniting);
 };
 
 typedef RefCounts<InlineRefCountBits> InlineRefCounts;
@@ -1451,6 +1462,10 @@ class HeapObjectSideTableEntry {
 
   uint32_t getWeakCount() const {
     return refCounts.getWeakCount();
+  }
+  
+  void *getSideTable() {
+    return refCounts.getSideTable();
   }
 };
 

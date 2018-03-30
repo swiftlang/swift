@@ -338,7 +338,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 #include "swift/AST/Attr.def"
   case DAK_Inline:
   case DAK_AccessControl:
-  case DAK_Ownership:
+  case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
     if (DeclAttribute::isDeclModifier(getKind())) {
@@ -498,14 +498,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_StaticInitializeObjCMetadata:
-    Printer.printAttrName("@_staticInitializeObjCMetadata");
-    break;
-
-  case DAK_DowngradeExhaustivityCheck:
-    Printer.printAttrName("@_downgrade_exhaustivity_check");
-    break;
-
   case DAK_ClangImporterSynthesizedType: {
     Printer.printAttrName("@_clangImporterSynthesizedType");
     auto *attr = cast<ClangImporterSynthesizedTypeAttr>(this);
@@ -517,8 +509,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
+#define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
+#include "swift/AST/Attr.def"
+    llvm_unreachable("handled above");
+
   default:
-    llvm_unreachable("handled before this switch");
+    assert(DeclAttribute::isDeclModifier(getKind()) &&
+           "handled above");
   }
 
   return true;
@@ -604,6 +601,8 @@ StringRef DeclAttribute::getAttrName() const {
         return "effects(readnone)";
       case EffectsKind::ReadOnly:
         return "effects(readonly)";
+      case EffectsKind::ReleaseNone:
+        return "effects(releasenone)";
       case EffectsKind::ReadWrite:
         return "effects(readwrite)";
       case EffectsKind::Unspecified:
@@ -625,12 +624,16 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("bad access level");
 
-  case DAK_Ownership:
-    switch (cast<OwnershipAttr>(this)->get()) {
-    case Ownership::Strong: llvm_unreachable("Never present in the attribute");
-    case Ownership::Weak:      return "weak";
-    case Ownership::Unowned:   return "unowned";
-    case Ownership::Unmanaged: return "unowned(unsafe)";
+  case DAK_ReferenceOwnership:
+    switch (cast<ReferenceOwnershipAttr>(this)->get()) {
+    case ReferenceOwnership::Strong:
+      llvm_unreachable("Never present in the attribute");
+    case ReferenceOwnership::Weak:
+      return "weak";
+    case ReferenceOwnership::Unowned:
+      return "unowned";
+    case ReferenceOwnership::Unmanaged:
+      return "unowned(unsafe)";
     }
     llvm_unreachable("bad ownership kind");
   case DAK_RawDocComment:

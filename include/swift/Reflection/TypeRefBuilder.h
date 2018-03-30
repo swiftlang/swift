@@ -34,6 +34,8 @@ class NodePointer;
 namespace swift {
 namespace reflection {
 
+template <typename Runtime> class ReflectionContext;
+
 template <typename Iterator>
 class ReflectionSection {
   using const_iterator = Iterator;
@@ -51,6 +53,13 @@ public:
 
   void *startAddress() {
     return const_cast<void *>(Begin);
+  }
+  const void *startAddress() const {
+    return Begin;
+  }
+  
+  const void *endAddress() const {
+    return End;
   }
 
   const_iterator begin() const {
@@ -329,11 +338,35 @@ public:
   void addReflectionInfo(ReflectionInfo I) {
     ReflectionInfos.push_back(I);
   }
+  
+  const std::vector<ReflectionInfo> &getReflectionInfos() {
+    return ReflectionInfos;
+  }
 
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
+  
+  uint64_t getRemoteAddrOfTypeRefPointer(const void *pointer);
 
 public:
+  template<typename Runtime>
+  void setSymbolicReferenceResolverReader(
+                      remote::MetadataReader<Runtime, TypeRefBuilder> &reader) {
+    // Have the TypeRefBuilder demangle symbolic references by reading their
+    // demangling out of the referenced context descriptors in the target
+    // process.
+    Dem.setSymbolicReferenceResolver(
+      [this, &reader](int32_t offset, const void *base) -> Demangle::NodePointer {
+        // Resolve the reference to a remote address.
+        auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
+        if (remoteAddress == 0)
+          return nullptr;
+        
+        return reader.readDemanglingForContextDescriptor(remoteAddress + offset,
+                                                         Dem);
+      });
+  }
+
   TypeConverter &getTypeConverter() { return TC; }
 
   const TypeRef *
@@ -345,13 +378,13 @@ public:
   lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
-  std::pair<const FieldDescriptor *, uintptr_t>
+  std::pair<const FieldDescriptor *, const ReflectionInfo *>
   getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
   bool getFieldTypeRefs(const TypeRef *TR,
-                        const std::pair<const FieldDescriptor *, uintptr_t> &FD,
-                        std::vector<FieldTypeInfo> &Fields);
+           const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD,
+           std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.
   const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
@@ -368,7 +401,7 @@ public:
   /// Dumping typerefs, field declarations, associated types
   ///
 
-  void dumpTypeRef(const std::string &MangledName,
+  void dumpTypeRef(llvm::StringRef MangledName,
                    std::ostream &OS, bool printTypeName = false);
   void dumpFieldSection(std::ostream &OS);
   void dumpAssociatedTypeSection(std::ostream &OS);

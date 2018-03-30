@@ -7,7 +7,7 @@ add_swift_library(swiftSILGen STATIC
   ResultPlan.cpp
   RValue.cpp
   Scope.cpp
-  SwitchCaseFullExpr.cpp
+  SwitchEnumBuilder.cpp
   SILGen.cpp
   SILGenApply.cpp
   SILGenBridging.cpp

@@ -194,6 +194,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
 
+  // Emit non-mergeable traps only.
+  if (IGF.Builder.isTrapIntrinsic(IID)) {
+    IGF.Builder.CreateNonMergeableTrap(IGF.IGM);
+    return;
+  }
+
   // Calls to the int_instrprof_increment intrinsic are emitted during SILGen.
   // At that stage, the function name GV used by the profiling pass is hidden.
   // Fix the intrinsic call here by pointing it to the correct GV.
@@ -252,7 +258,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  // TODO: A linear series of ifs is suboptimal.
+  if (Builtin.ID == BuiltinValueKind::StringObjectOr) {
+    llvm::Value *lhs = args.claimNext();
+    llvm::Value *rhs = args.claimNext();
+    llvm::Value *v = IGF.Builder.CreateOr(lhs, rhs);
+    return out.add(v);
+  }
+
+    // TODO: A linear series of ifs is suboptimal.
 #define BUILTIN_SIL_OPERATION(id, name, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
     llvm_unreachable(name " builtin should be lowered away by SILGen!");

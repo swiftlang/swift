@@ -83,7 +83,8 @@ namespace {
     void handleImport(const clang::Module *imported) {
       if (!imported)
         return;
-      Impl.DeferredHeaderImports.push_back(imported);
+      Impl.ImportedHeaderExports.push_back(
+          const_cast<clang::Module *>(imported));
     }
 
     void InclusionDirective(clang::SourceLocation HashLoc,
@@ -405,27 +406,6 @@ void ClangImporter::clearTypeResolver() {
 
 #define SHIMS_INCLUDE_FLAG "-isystem"
 
-static StringRef
-getMinVersionOptNameForDarwinTriple(const llvm::Triple &triple) {
-  switch(getDarwinPlatformKind(triple)) {
-    case DarwinPlatformKind::MacOS:
-      return "-mmacosx-version-min=";
-    case DarwinPlatformKind::IPhoneOS:
-      return "-mios-version-min=";
-    case DarwinPlatformKind::IPhoneOSSimulator:
-      return "-mios-simulator-version-min=";
-    case DarwinPlatformKind::TvOS:
-      return "-mtvos-version-min=";
-    case DarwinPlatformKind::TvOSSimulator:
-      return "-mtvos-simulator-version-min=";
-    case DarwinPlatformKind::WatchOS:
-      return "-mwatchos-version-min=";
-    case DarwinPlatformKind::WatchOSSimulator:
-      return "-mwatchos-simulator-version-min=";
-  }
-  llvm_unreachable("Unsupported Darwin platform");
-}
-
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -583,14 +563,21 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
   } else {
-    // On Darwin, Clang uses -isysroot to specify the include
-    // system root. On other targets, it seems to use --sysroot.
-    if (triple.isOSDarwin()) {
-      invocationArgStrs.push_back("-isysroot");
+    if (triple.isWindowsMSVCEnvironment()) {
+      llvm::SmallString<261> path; // MAX_PATH + 1
+      path = searchPathOpts.SDKPath;
+      llvm::sys::path::append(path, "usr", "include");
+      llvm::sys::path::native(path);
+
+      invocationArgStrs.push_back("-isystem");
+      invocationArgStrs.push_back(path.str());
     } else {
-      invocationArgStrs.push_back("--sysroot");
+      // On Darwin, Clang uses -isysroot to specify the include
+      // system root. On other targets, it seems to use --sysroot.
+      invocationArgStrs.push_back(triple.isOSDarwin() ? "-isysroot"
+                                                      : "--sysroot");
+      invocationArgStrs.push_back(searchPathOpts.SDKPath);
     }
-    invocationArgStrs.push_back(searchPathOpts.SDKPath);
   }
 
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
@@ -624,12 +611,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   }
   invocationArgStrs.push_back("-iapinotes-modules");
   invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
-
-  // Map the Swift major version into the API notes version for Swift. This
-  // has the effect of allowing API notes to effect changes only on Swift
-  // major versions, not minor versions.
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
-                              llvm::itostr(languageVersion[0]));
+      languageVersion.asAPINotesVersionString());
 }
 
 static void
@@ -657,24 +640,6 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   invocationArgStrs.push_back("-target");
   invocationArgStrs.push_back(triple.str());
-
-  if (triple.isOSDarwin()) {
-    std::string minVersionBuf;
-    llvm::raw_string_ostream minVersionOpt{minVersionBuf};
-    minVersionOpt << getMinVersionOptNameForDarwinTriple(triple);
-
-    unsigned major, minor, micro;
-    if (triple.isiOS()) {
-      triple.getiOSVersion(major, minor, micro);
-    } else if (triple.isWatchOS()) {
-      triple.getWatchOSVersion(major, minor, micro);
-    } else {
-      assert(triple.isMacOSX());
-      triple.getMacOSXVersion(major, minor, micro);
-    }
-    minVersionOpt << clang::VersionTuple(major, minor, micro);
-    invocationArgStrs.push_back(std::move(minVersionOpt.str()));
-  }
 
   invocationArgStrs.push_back(ImporterImpl::moduleImportBufferName);
 
@@ -994,6 +959,7 @@ ClangImporter::create(ASTContext &ctx,
   if (importerOpts.Mode == ClangImporterOptions::Modes::EmbedBitcode)
     return importer;
 
+  instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
   if (!canBegin)
@@ -1106,6 +1072,27 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
   return false;
 }
 
+clang::SourceLocation
+ClangImporter::Implementation::getNextIncludeLoc() {
+  clang::SourceManager &srcMgr = getClangInstance()->getSourceManager();
+
+  if (!DummyIncludeBuffer.isValid()) {
+    clang::SourceLocation includeLoc =
+        srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
+    DummyIncludeBuffer = srcMgr.createFileID(
+        llvm::make_unique<ZeroFilledMemoryBuffer>(
+          256*1024, StringRef(moduleImportBufferName)),
+        clang::SrcMgr::C_User, /*LoadedID*/0, /*LoadedOffset*/0, includeLoc);
+  }
+
+  clang::SourceLocation clangImportLoc =
+      srcMgr.getLocForStartOfFile(DummyIncludeBuffer)
+            .getLocWithOffset(IncludeCounter++);
+  assert(srcMgr.isInFileID(clangImportLoc, DummyIncludeBuffer) &&
+         "confused Clang's source manager with our fake locations");
+  return clangImportLoc;
+}
+
 bool ClangImporter::Implementation::importHeader(
     ModuleDecl *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
@@ -1123,22 +1110,17 @@ bool ClangImporter::Implementation::importHeader(
 
   bool hadError = clangDiags.hasErrorOccurred();
 
-  clang::ASTContext &ClangCtx = getClangASTContext();
-  clang::Preprocessor &pp = getClangPreprocessor();
-
-  clang::SourceManager &sourceMgr = ClangCtx.getSourceManager();
-
-  clang::SourceLocation includeLoc =
-    sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
+  clang::SourceManager &sourceMgr = getClangInstance()->getSourceManager();
   clang::FileID bufferID = sourceMgr.createFileID(std::move(sourceBuffer),
                                                   clang::SrcMgr::C_User,
                                                   /*LoadedID=*/0,
                                                   /*LoadedOffset=*/0,
-                                                  includeLoc);
+                                                  getNextIncludeLoc());
   auto &consumer =
       static_cast<HeaderParsingASTConsumer &>(Instance->getASTConsumer());
   consumer.reset();
 
+  clang::Preprocessor &pp = getClangPreprocessor();
   pp.EnterSourceFile(bufferID, /*Dir=*/nullptr, /*Loc=*/{});
   // Force the import to occur.
   pp.LookAhead(0);
@@ -1356,6 +1338,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
+  invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
 
   clang::CompilerInstance emitInstance(
     Impl.Instance->getPCHContainerOperations());
@@ -1451,7 +1434,6 @@ ModuleDecl *ClangImporter::loadModule(
                           Impl.exportSourceLoc(component.second) } );
   }
 
-  auto &srcMgr = clangContext.getSourceManager();
   auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
   auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
 
@@ -1474,27 +1456,7 @@ ModuleDecl *ClangImporter::loadModule(
       }
     }
 
-    // FIXME: The source location here is completely bogus. It can't be
-    // invalid, it can't be the same thing twice in a row, and it has to come
-    // from an actual buffer, so we make a fake buffer and just use a counter.
-    if (!Impl.DummyImportBuffer.isValid()) {
-      clang::SourceLocation includeLoc =
-          srcMgr.getLocForStartOfFile(srcMgr.getMainFileID());
-      // Zero offset is reserved for the bridging header. Increase the offset
-      // so that headers from the bridging header are considered as coming
-      // before headers that are imported from swift code.
-      includeLoc = includeLoc.getLocWithOffset(1);
-      Impl.DummyImportBuffer = srcMgr.createFileID(
-          llvm::make_unique<ZeroFilledMemoryBuffer>(
-              256*1024, StringRef(Implementation::moduleImportBufferName)),
-          clang::SrcMgr::C_User,
-          /*LoadedID*/0, /*LoadedOffset*/0, includeLoc);
-    }
-    clang::SourceLocation clangImportLoc
-      = srcMgr.getLocForStartOfFile(Impl.DummyImportBuffer)
-              .getLocWithOffset(Impl.ImportCounter++);
-    assert(srcMgr.isInFileID(clangImportLoc, Impl.DummyImportBuffer) &&
-           "confused Clang's source manager with our fake locations");
+    clang::SourceLocation clangImportLoc = Impl.getNextIncludeLoc();
 
     clang::ModuleLoadResult result =
         Impl.Instance->loadModule(clangImportLoc, path, visibility,
@@ -1518,11 +1480,22 @@ ModuleDecl *ClangImporter::loadModule(
 
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
-  for (auto component : path.slice(1)) {
+  for (auto &component : path.slice(1)) {
     submodule = submodule->findSubmodule(component.first.str());
-    // FIXME: Specialize the error for a missing submodule?
-    if (!submodule)
+
+    // Special case: a submodule named "Foo.Private" can be moved to a top-level
+    // module named "Foo_Private". Clang has special support for this.
+    // We're limiting this to just submodules named "Private" because this will
+    // put the Clang AST in a fatal error state if it /doesn't/ exist.
+    if (!submodule && component.first.str() == "Private" &&
+        (&component) == (&path[1])) {
+      submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2), false);
+    }
+
+    if (!submodule) {
+      // FIXME: Specialize the error for a missing submodule?
       return nullptr;
+    }
   }
 
   // Finally, load the submodule and make it visible.
@@ -1596,16 +1569,15 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
 void ClangImporter::Implementation::handleDeferredImports()
 {
   clang::ASTReader &R = *Instance->getModuleManager();
+  llvm::SmallSet<clang::serialization::SubmoduleID, 32> seenSubmodules;
   for (clang::serialization::SubmoduleID ID : PCHImportedSubmodules) {
-    DeferredHeaderImports.push_back(R.getSubmodule(ID));
+    if (!seenSubmodules.insert(ID).second)
+      continue;
+    ImportedHeaderExports.push_back(R.getSubmodule(ID));
   }
   PCHImportedSubmodules.clear();
-  for (const clang::Module *M : DeferredHeaderImports) {
-    ModuleDecl *nativeImported =
-      finishLoadingClangModule(M, /*preferAdapter=*/true);
-    ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
-  }
-  DeferredHeaderImports.clear();
+  for (const clang::Module *M : ImportedHeaderExports)
+    (void)finishLoadingClangModule(M, /*preferAdapter=*/true);
 }
 
 ModuleDecl *ClangImporter::getImportedHeaderModule() const {
@@ -3015,45 +2987,44 @@ void ClangModuleUnit::getImportedModules(
   if (filter != ModuleDecl::ImportFilter::Public)
     imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
 
+  SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
     // This is the special "imported headers" module.
     if (filter != ModuleDecl::ImportFilter::Private) {
-      imports.append(owner.ImportedHeaderExports.begin(),
-                     owner.ImportedHeaderExports.end());
+      imported.append(owner.ImportedHeaderExports.begin(),
+                      owner.ImportedHeaderExports.end());
     }
-    return;
+
+  } else {
+    clangModule->getExportedModules(imported);
+    if (filter != ModuleDecl::ImportFilter::Public) {
+      if (filter == ModuleDecl::ImportFilter::All) {
+        llvm::SmallPtrSet<clang::Module *, 8> knownModules;
+        imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+        imported.erase(std::remove_if(imported.begin(), imported.end(),
+                                      [&](clang::Module *mod) -> bool {
+                                        return !knownModules.insert(mod).second;
+                                      }),
+                       imported.end());
+      } else {
+        llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
+                                                           imported.end());
+        SmallVector<clang::Module *, 8> privateImports;
+        std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
+                     std::back_inserter(privateImports), [&](clang::Module *mod) {
+                       return knownModules.count(mod) == 0;
+        });
+        imported.swap(privateImports);
+      }
+
+      // FIXME: The parent module isn't exactly a private import, but it is
+      // needed for link dependencies.
+      if (clangModule->Parent)
+        imported.push_back(clangModule->Parent);
+    }
   }
 
   auto topLevelAdapter = getAdapterModule();
-
-  SmallVector<clang::Module *, 8> imported;
-  clangModule->getExportedModules(imported);
-  if (filter != ModuleDecl::ImportFilter::Public) {
-    if (filter == ModuleDecl::ImportFilter::All) {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
-      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-      imported.erase(std::remove_if(imported.begin(), imported.end(),
-                                    [&](clang::Module *mod) -> bool {
-                                      return !knownModules.insert(mod).second;
-                                    }),
-                     imported.end());
-    } else {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
-                                                         imported.end());
-      SmallVector<clang::Module *, 8> privateImports;
-      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                   std::back_inserter(privateImports), [&](clang::Module *mod) {
-                     return knownModules.count(mod) == 0;
-      });
-      imported.swap(privateImports);
-    }
-
-    // FIXME: The parent module isn't exactly a private import, but it is
-    // needed for link dependencies.
-    if (clangModule->Parent)
-      imported.push_back(clangModule->Parent);
-  }
-
   for (auto importMod : imported) {
     auto wrapper = owner.getWrapperForModule(importMod);
 
@@ -3062,11 +3033,12 @@ void ClangModuleUnit::getImportedModules(
       // HACK: Deal with imports of submodules by importing the top-level module
       // as well.
       auto importTopLevel = importMod->getTopLevelModule();
-      if (importTopLevel != importMod &&
-          importTopLevel != clangModule->getTopLevelModule()) {
-        auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
-        imports.push_back({ ModuleDecl::AccessPathTy(),
-                            topLevelWrapper->getParentModule() });
+      if (importTopLevel != importMod) {
+        if (!clangModule || importTopLevel != clangModule->getTopLevelModule()){
+          auto topLevelWrapper = owner.getWrapperForModule(importTopLevel);
+          imports.push_back({ ModuleDecl::AccessPathTy(),
+                              topLevelWrapper->getParentModule() });
+        }
       }
       actualMod = wrapper->getParentModule();
     } else if (actualMod == topLevelAdapter) {
@@ -3081,13 +3053,6 @@ void ClangModuleUnit::getImportedModules(
 void ClangModuleUnit::getImportedModulesForLookup(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
 
-  if (!clangModule) {
-    // This is the special "imported headers" module.
-    imports.append(owner.ImportedHeaderExports.begin(),
-                   owner.ImportedHeaderExports.end());
-    return;
-  }
-
   // Reuse our cached list of imports if we have one.
   if (!importedModulesForLookup.empty()) {
     imports.append(importedModulesForLookup.begin(),
@@ -3096,11 +3061,20 @@ void ClangModuleUnit::getImportedModulesForLookup(
   }
 
   size_t firstImport = imports.size();
-  auto topLevel = clangModule->getTopLevelModule();
-  auto topLevelAdapter = getAdapterModule();
 
   SmallVector<clang::Module *, 8> imported;
-  clangModule->getExportedModules(imported);
+  const clang::Module *topLevel;
+  ModuleDecl *topLevelAdapter = getAdapterModule();
+  if (!clangModule) {
+    // This is the special "imported headers" module.
+    imported.append(owner.ImportedHeaderExports.begin(),
+                    owner.ImportedHeaderExports.end());
+    topLevel = nullptr;
+  } else {
+    clangModule->getExportedModules(imported);
+    topLevel = clangModule->getTopLevelModule();
+  }
+
   if (imported.empty())
     return;
 
@@ -3392,8 +3366,7 @@ ClangImporter::Implementation::loadNamedMembers(
   // prohibitively complex (also they're not stored in by-name lookup, for
   // reasons unclear).
   if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
-        return (table.lookupGlobalsAsMembers(
-                  effectiveClangContext).size() > 0);
+        return (!table.lookupGlobalsAsMembers(effectiveClangContext).empty());
       }))
     return None;
 

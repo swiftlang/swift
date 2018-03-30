@@ -1,3 +1,4 @@
+#import <Foundation.h>
 extern int ANTGlobalValue;
 
 @interface NewType
@@ -9,4 +10,14 @@ extern int ANTGlobalValue;
   -(void) minusPrint;
   +(void) plusPrint;
   -(int) getPropertyA;
+@end
+
+@protocol ObjcProt
+  -(void) ProtMemberFunc;
+  -(void) ProtMemberFunc2;
+  -(void) ProtMemberFunc3;
+@end
+
+@interface AnimalStatusDescriptor
+- (nonnull AnimalStatusDescriptor *)animalStatusDescriptorByAddingAttributes:(nonnull NSDictionary<NSString*, id> *)attributes;
 @end

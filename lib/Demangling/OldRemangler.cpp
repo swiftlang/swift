@@ -372,7 +372,8 @@ static NodePointer applyParamLabels(NodePointer LabelList, NodePointer OrigType,
   };
 
   auto visitTypeChild = [&](NodePointer Child) -> NodePointer {
-    if (Child->getKind() != Node::Kind::FunctionType)
+    if (Child->getKind() != Node::Kind::FunctionType &&
+        Child->getKind() != Node::Kind::NoEscapeFunctionType)
       return Child;
 
     auto FuncType = Factory.createNode(Node::Kind::FunctionType);
@@ -701,6 +702,21 @@ void Remangler::mangleTypeMetadataAccessFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataInstantiationCache(Node *node) {
+  Out << "MI";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
+  Out << "Mi";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
+  Out << "Mr";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Out << "ML";
   mangleSingleChildNode(node); // type
@@ -721,6 +737,10 @@ void Remangler::mangleNominalTypeDescriptor(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::manglePropertyDescriptor(Node *node) {
+  unreachable("not supported");
+}
+
 void Remangler::mangleTypeMetadata(Node *node) {
   Out << "M";
   mangleSingleChildNode(node); // type
@@ -734,6 +754,14 @@ void Remangler::mangleFullTypeMetadata(Node *node) {
 void Remangler::mangleProtocolDescriptor(Node *node) {
   Out << "Mp";
   mangleProtocolWithoutPrefix(node->begin()[0]);
+}
+
+void Remangler::mangleProtocolRequirementArray(Node *node) {
+  unreachable("todo");
+}
+
+void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
+  unreachable("todo");
 }
 
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
@@ -791,6 +819,11 @@ void Remangler::mangleFieldOffset(Node *node) {
   mangleChildNodes(node); // directness, entity
 }
 
+void Remangler::mangleEnumCase(Node *node) {
+  Out << "WC";
+  mangleSingleChildNode(node); // enum case
+}
+
 void Remangler::mangleProtocolWitnessTable(Node *node) {
   Out << "WP";
   mangleSingleChildNode(node); // protocol conformance
@@ -799,6 +832,10 @@ void Remangler::mangleProtocolWitnessTable(Node *node) {
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   Out << "WG";
   mangleSingleChildNode(node); // protocol conformance
+}
+
+void Remangler::mangleResilientProtocolWitnessTable(Node *node) {
+  unreachable("todo");
 }
 
 void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -1107,9 +1144,13 @@ void Remangler::mangleEntityType(Node *node, EntityContext &ctx) {
 
   // Expand certain kinds of type within the entity context.
   switch (node->getKind()) {
+  case Node::Kind::NoEscapeFunctionType:
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType: {
-    Out << (node->getKind() == Node::Kind::FunctionType ? 'F' : 'f');
+    Out << ((node->getKind() == Node::Kind::FunctionType ||
+             node->getKind() == Node::Kind::NoEscapeFunctionType)
+                ? 'F'
+                : 'f');
     unsigned inputIndex = node->getNumChildren() - 2;
     assert(inputIndex <= 1);
     for (unsigned i = 0; i <= inputIndex; ++i)
@@ -1227,6 +1268,16 @@ void Remangler::mangleCFunctionPointer(Node *node) {
 }
 
 void Remangler::mangleAutoClosureType(Node *node) {
+  Out << 'K';
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+void Remangler::mangleNoEscapeFunctionType(Node *node) {
+  Out << 'F';
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+void Remangler::mangleEscapingAutoClosureType(Node *node) {
   Out << 'K';
   mangleChildNodes(node); // argument tuple, result type
 }
@@ -1433,6 +1484,11 @@ void Remangler::mangleWeak(Node *node) {
 
 void Remangler::mangleShared(Node *node) {
   Out << 'h';
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleOwned(Node *node) {
+  Out << 'n';
   mangleSingleChildNode(node); // type
 }
 
@@ -2036,6 +2092,14 @@ void Remangler::mangleAnonymousDescriptor(Node *node) {
 }
 
 void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleUnresolvedSymbolicReference(Node *node, EntityContext&) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 

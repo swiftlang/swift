@@ -16,7 +16,7 @@
 #include "RValue.h"
 #include "SILGen.h"
 #include "Scope.h"
-#include "SwitchCaseFullExpr.h"
+#include "SwitchEnumBuilder.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILArgument.h"
@@ -816,10 +816,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   SILBasicBlock *failExitingBlock = createBasicBlock();
   SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrValue);
 
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalSomeDecl(), createBasicBlock(),
-      loopDest.getBlock(),
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+  switchEnumBuilder.addOptionalSomeCase(
+      createBasicBlock(), loopDest.getBlock(),
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         SGF.emitProfilerIncrement(S->getBody());
 
         // Emit the loop body.
@@ -847,7 +846,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           }
 
           if (!inputValue.isInContext())
-            RValue(SGF, S, optTy.getAnyOptionalObjectType(), inputValue)
+            RValue(SGF, S, optTy.getOptionalObjectType(), inputValue)
                 .forwardInto(SGF, S, initLoopVars.get());
 
           // Now that the pattern has been initialized, check any where
@@ -868,8 +867,10 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
         // If we emitted an unreachable in the body, we will not have a valid
         // insertion point. Just return early.
-        if (!SGF.B.hasValidInsertionPoint())
+        if (!SGF.B.hasValidInsertionPoint()) {
+          scope.unreachableExit();
           return;
+        }
 
         // Otherwise, associate the loop body's closing brace with this branch.
         RegularLocation L(S->getBody());
@@ -881,10 +882,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // We add loop fail block, just to be defensive about intermediate
   // transformations performing cleanups at scope.exit(). We still jump to the
   // contBlock.
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalNoneDecl(), createBasicBlock(),
-      failExitingBlock,
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+  switchEnumBuilder.addOptionalNoneCase(
+      createBasicBlock(), failExitingBlock,
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);
       },

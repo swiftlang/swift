@@ -18,6 +18,7 @@ func testDowngradableOmittedPatternIsUnreachable(pat : Downgradable?) {
   case .hat:
     break
   // CHECK: [[DEFAULT_CASE]]({{%.*}} : @trivial $Downgradable):
+  // CHECK-NEXT:   builtin "int_trap"()
   // CHECK-NEXT:   unreachable
   }
   
@@ -33,14 +34,17 @@ func testDowngradableOmittedPatternIsUnreachable(pat : Downgradable?) {
   case (.hat, .hat):
     break
   // CHECK: [[TUPLE_DEFAULT_CASE_2]]({{%.*}} : @trivial $Downgradable):
+  // CHECK-NEXT:   builtin "int_trap"()
   // CHECK-NEXT:   unreachable
     
   // CHECK: switch_enum [[Y]] : $Downgradable, case #Downgradable.spoon!enumelt: {{bb[0-9]+}}, case #Downgradable.hat!enumelt: {{bb[0-9]+}}, default [[TUPLE_DEFAULT_CASE_3:bb[0-9]+]]
     
   // CHECK: [[TUPLE_DEFAULT_CASE_3]]({{%.*}} : @trivial $Downgradable):
+  // CHECK-NEXT:   builtin "int_trap"()
   // CHECK-NEXT:   unreachable
     
   // CHECK: [[TUPLE_DEFAULT_CASE_1]]({{%.*}} : @trivial $Downgradable):
+  // CHECK-NEXT:   builtin "int_trap"()
   // CHECK-NEXT:   unreachable
   }
   

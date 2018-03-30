@@ -800,6 +800,24 @@ extension RangeReplaceableCollection
 extension RangeReplaceableCollection where Self : BidirectionalCollection {
   /// Removes and returns the last element of the collection.
   ///
+  /// Calling this method may invalidate all saved indices of this
+  /// collection. Do not rely on a previously stored index value after
+  /// altering a collection with any operation that can change its length.
+  ///
+  /// - Returns: The last element of the collection if the collection is not
+  /// empty; otherwise, `nil`.
+  ///
+  /// - Complexity: O(1)
+  @_inlineable
+  public mutating func popLast() -> Element? {
+    if isEmpty { return nil }
+    // duplicate of removeLast logic below, to avoid redundant precondition
+    if let result = _customRemoveLast() { return result }
+    return remove(at: index(before: endIndex))
+  }
+
+  /// Removes and returns the last element of the collection.
+  ///
   /// The collection must not be empty.
   ///
   /// Calling this method may invalidate all saved indices of this
@@ -813,9 +831,9 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   @discardableResult
   public mutating func removeLast() -> Element {
     _precondition(!isEmpty, "Can't remove last element from an empty collection")
-    if let result = _customRemoveLast() {
-      return result
-    }
+    // NOTE if you change this implementation, change popLast above as well
+    // AND change the tie-breaker implementations in the next extension
+    if let result = _customRemoveLast() { return result }
     return remove(at: index(before: endIndex))
   }
 
@@ -848,10 +866,27 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   }
 }
 
-// FIXME: swift-3-indexing-model: file a bug for the compiler?
 /// Ambiguity breakers.
 extension RangeReplaceableCollection
-  where Self : BidirectionalCollection, SubSequence == Self {
+where Self : BidirectionalCollection, SubSequence == Self {
+  /// Removes and returns the last element of the collection.
+  ///
+  /// Calling this method may invalidate all saved indices of this
+  /// collection. Do not rely on a previously stored index value after
+  /// altering a collection with any operation that can change its length.
+  ///
+  /// - Returns: The last element of the collection if the collection is not
+  /// empty; otherwise, `nil`.
+  ///
+  /// - Complexity: O(1)
+  @_inlineable
+  public mutating func popLast() -> Element? {
+    if isEmpty { return nil }
+    // duplicate of removeLast logic below, to avoid redundant precondition
+    if let result = _customRemoveLast() { return result }
+    return remove(at: index(before: endIndex))
+  }
+
   /// Removes and returns the last element of the collection.
   ///
   /// The collection must not be empty.
@@ -867,9 +902,8 @@ extension RangeReplaceableCollection
   @discardableResult
   public mutating func removeLast() -> Element {
     _precondition(!isEmpty, "Can't remove last element from an empty collection")
-    if let result = _customRemoveLast() {
-      return result
-    }
+    // NOTE if you change this implementation, change popLast above as well
+    if let result = _customRemoveLast() { return result }
     return remove(at: index(before: endIndex))
   }
 

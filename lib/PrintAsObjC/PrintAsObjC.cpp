@@ -309,7 +309,8 @@ private:
   getObjectTypeAndOptionality(const Decl *D, Type ty) {
     OptionalTypeKind kind;
     if (auto objTy =
-            ty->getReferenceStorageReferent()->getAnyOptionalObjectType(kind)) {
+            ty->getReferenceStorageReferent()->getOptionalObjectType()) {
+      kind = OTK_Optional;
       if (D->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         kind = OTK_ImplicitlyUnwrappedOptional;
 
@@ -420,7 +421,9 @@ private:
       os << ", " << customName
          << ", \"" << ED->getName() << "\"";
     }
-    os << ") {\n";
+    os << ", " << (ED->isExhaustive(/*useDC*/nullptr) ? "closed" : "open")
+       << ") {\n";
+
     for (auto Elt : ED->getAllElements()) {
       printDocumentationComment(Elt);
 
@@ -619,7 +622,7 @@ private:
       }
 
       // Zero-parameter methods.
-      if (params.size() == 0) {
+      if (params.empty()) {
         assert(paramIndex == 0);
         os << piece;
         paramIndex = 1;
@@ -962,7 +965,7 @@ private:
   }
 
   bool maybePrintIBOutletCollection(Type ty) {
-    if (auto unwrapped = ty->getAnyOptionalObjectType())
+    if (auto unwrapped = ty->getOptionalObjectType())
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
@@ -1022,7 +1025,7 @@ private:
     // allowing that object to disappear.
     Type ty = VD->getInterfaceType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
-      auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
+      auto innerTy = weakTy->getReferentType()->getOptionalObjectType();
       auto innerClass = innerTy->getClassOrBoundGenericClass();
       if ((innerClass &&
            innerClass->getForeignClassKind()!=ClassDecl::ForeignKind::CFType) ||
@@ -1035,9 +1038,11 @@ private:
       os << ", unsafe_unretained";
     } else {
       Type copyTy = ty;
-      OptionalTypeKind optionalType;
-      if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
+      bool isOptional = false;
+      if (auto unwrappedTy = copyTy->getOptionalObjectType()) {
+        isOptional = true;
         copyTy = unwrappedTy;
+      }
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
       if (nominal && isa<StructDecl>(nominal)) {
@@ -1053,8 +1058,8 @@ private:
           // Don't print unsafe_unretained twice.
           if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
             ty = boundTy->getGenericArgs().front();
-            if (optionalType != OTK_None)
-              ty = OptionalType::get(optionalType, ty);
+            if (isOptional)
+              ty = OptionalType::get(ty);
           }
         }
       } else if (auto fnTy = copyTy->getAs<FunctionType>()) {
@@ -1117,6 +1122,8 @@ private:
     }
 
     printSwift3ObjCDeprecatedInference(VD);
+
+    printAvailability(VD);
 
     os << ";";
     if (VD->isStatic()) {
@@ -1469,38 +1476,44 @@ private:
       clangTy->isObjCObjectPointerType();
   }
 
-  void visitNameAliasType(NameAliasType *aliasTy,
+  bool printImportedAlias(const TypeAliasDecl *alias,
                           Optional<OptionalTypeKind> optionalKind) {
+    if (!alias->hasClangNode()) {
+      if (!alias->isObjC()) return false;
+
+      os << alias->getName();
+      return true;
+    }
+
+    if (auto *clangTypeDecl =
+          dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
+      maybePrintTagKeyword(alias);
+      os << getNameForObjC(alias);
+
+      if (isClangPointerType(clangTypeDecl))
+        printNullability(optionalKind);
+    } else if (auto *clangObjCClass
+               = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
+      os << clangObjCClass->getName() << " *";
+      printNullability(optionalKind);
+    } else {
+      auto *clangCompatAlias =
+      cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
+      os << clangCompatAlias->getName() << " *";
+      printNullability(optionalKind);
+    }
+
+    return true;
+  }
+
+  void visitNameAliasType(NameAliasType *aliasTy,
+                               Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
     if (printIfKnownSimpleType(alias, optionalKind))
       return;
 
-    if (alias->hasClangNode()) {
-      if (auto *clangTypeDecl =
-            dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
-        maybePrintTagKeyword(alias);
-        os << getNameForObjC(alias);
-
-        if (isClangPointerType(clangTypeDecl))
-          printNullability(optionalKind);
-      } else if (auto *clangObjCClass
-                   = dyn_cast<clang::ObjCInterfaceDecl>(alias->getClangDecl())){
-        os << clangObjCClass->getName() << " *";
-        printNullability(optionalKind);
-      } else {
-        auto *clangCompatAlias =
-          cast<clang::ObjCCompatibleAliasDecl>(alias->getClangDecl());
-        os << clangCompatAlias->getName() << " *";
-        printNullability(optionalKind);
-      }
-
+    if (printImportedAlias(alias, optionalKind))
       return;
-    }
-
-    if (alias->isObjC()) {
-      os << alias->getName();
-      return;
-    }
 
     visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
   }
@@ -1670,9 +1683,8 @@ private:
                               optionalKind))
       return;
 
-    OptionalTypeKind innerOptionalKind;
-    if (auto underlying = BGT->getAnyOptionalObjectType(innerOptionalKind)) {
-      visitPart(underlying, innerOptionalKind);
+    if (auto underlying = BGT->getOptionalObjectType()) {
+      visitPart(underlying, OTK_Optional);
     } else
       visitType(BGT, optionalKind);
   }
@@ -1911,7 +1923,7 @@ public:
     PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
 
     if (isFuncParam)
-      if (auto fnTy = ty->lookThroughAllAnyOptionalTypes()
+      if (auto fnTy = ty->lookThroughAllOptionalTypes()
                         ->getAs<AnyFunctionType>())
         if (fnTy->isNoEscape())
           os << "SWIFT_NOESCAPE ";
@@ -2017,7 +2029,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
       return true;
 
     auto conformsTo = sig->getConformsTo(paramTy);
-    return conformsTo.size() > 0;
+    return !conformsTo.empty();
   }
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {
@@ -2565,24 +2577,26 @@ public:
            "#if !defined(SWIFT_ENUM_ATTR)\n"
            "# if defined(__has_attribute) && "
              "__has_attribute(enum_extensibility)\n"
-           "#  define SWIFT_ENUM_ATTR "
-             "__attribute__((enum_extensibility(open)))\n"
+           "#  define SWIFT_ENUM_ATTR(_extensibility) "
+             "__attribute__((enum_extensibility(_extensibility)))\n"
            "# else\n"
-           "#  define SWIFT_ENUM_ATTR\n"
+           "#  define SWIFT_ENUM_ATTR(_extensibility)\n"
            "# endif\n"
            "#endif\n"
            "#if !defined(SWIFT_ENUM)\n"
-           "# define SWIFT_ENUM(_type, _name) "
+           "# define SWIFT_ENUM(_type, _name, _extensibility) "
              "enum _name : _type _name; "
-             "enum SWIFT_ENUM_ATTR SWIFT_ENUM_EXTRA _name : _type\n"
+             "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA "
+             "_name : _type\n"
            "# if __has_feature(generalized_swift_name)\n"
-           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
+           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
+             "_extensibility) "
              "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); "
-             "enum SWIFT_COMPILE_NAME(SWIFT_NAME) SWIFT_ENUM_ATTR "
-             "SWIFT_ENUM_EXTRA _name : _type\n"
+             "enum SWIFT_COMPILE_NAME(SWIFT_NAME) "
+             "SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name : _type\n"
            "# else\n"
-           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
-             "SWIFT_ENUM(_type, _name)\n"
+           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, "
+             "_extensibility) SWIFT_ENUM(_type, _name, _extensibility)\n"
            "# endif\n"
            "#endif\n"
            "#if !defined(SWIFT_UNAVAILABLE)\n"

@@ -200,7 +200,10 @@ FileUnit *SerializedModuleLoader::loadAST(
                        isFramework, loadedModuleFile,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
-    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+    // In LLDB always use the default resilience strategy, so IRGen can query
+    // the size of resilient types.
+    if (!Ctx.LangOpts.DebuggerSupport)
+      M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,

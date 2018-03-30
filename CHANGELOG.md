@@ -7,6 +7,7 @@ CHANGELOG
 | Contents               |
 | :--------------------- |
 | [Swift 5.0](#swift-50) |
+| [Swift 4.2](#swift-42) |
 | [Swift 4.1](#swift-41) |
 | [Swift 4.0](#swift-40) |
 | [Swift 3.1](#swift-31) |
@@ -23,6 +24,77 @@ CHANGELOG
 Swift 5.0
 ---------
 
+- [SR-419][]
+
+  In Swift 5 mode, when setting a property from within its own `didSet` or `willSet` observer, the observer will now only avoid being recursively called if the property is set on `self` (either implicitly or explicitly).
+
+  For example:
+  ```swift
+  class Node {
+    var children = [Node]()
+
+    var depth: Int {
+      didSet {
+        if depth < 0 {
+          // Will not recursively call didSet, as setting depth on self (same
+          // with `self.depth = 0`).
+          depth = 0
+        }
+
+        // Will call didSet for each of the children, as we're not setting the
+        // property on self (prior to Swift 5, this did not trigger property
+        // observers to be called again).
+        for child in children {
+          child.depth = depth + 1
+        }
+      }
+    }
+
+    init(depth: Int) {
+      self.depth = depth
+    }
+  }
+  ```
+
+**Add new entries to the top of this section, not here!**
+
+Swift 4.2
+---------
+
+* The C `long double` type is now imported as `Float80` on i386 and x86_64
+  macOS and Linux. The tgmath functions in the Darwin and glibc modules now
+  support `Float80` as well as `Float` and `Double`. Several tgmath
+  functions have been made generic over `[Binary]FloatingPoint` so that they
+  will automatically be available for any conforming type.
+
+* [SE-0143][]
+
+  The standard library types `Optional`, `Array`, `ArraySlice`,
+  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, and
+  `ClosedRange` now conform to the `Hashable` protocol when their element or
+  bound types (as the case may be) conform to `Hashable`.  This makes
+  synthesized `Hashable` implementations available for types that include stored
+  properties of these types.
+
+* [SE-0196][]
+  
+  Custom compile-time warnings or error messages can be emitted using the
+  `#warning(_:)` and `#error(_:)` directives.
+
+  ```swift
+  #warning("this is incomplete")
+
+  #if MY_BUILD_CONFIG && MY_OTHER_BUILD_CONFIG
+    #error("MY_BUILD_CONFIG and MY_OTHER_BUILD_CONFIG cannot both be set")
+  #endif
+  ```
+
+* Public classes may now have internal `required` initializers. The rule for
+  `required` initializers is that they must be available everywhere the class
+  can be subclassed, but previously we said that `required` initializers on
+  public classes needed to be public themselves. (This limitation is a holdover
+  from before the introduction of the open/public distinction in Swift 3.)
+
 * C macros containing casts are no longer imported to Swift if the type in the
   cast is unavailable or deprecated, or produces some other diagnostic when
   referenced. (These macros were already only imported under very limited
@@ -33,11 +105,32 @@ Swift 5.0
 
 	Runtime query of conditional conformances is now implemented. Therefore,
 	a dynamic cast such as `value as? P`, where the dynamic type of `value`
-	conditional conforms to `P`, will succeed when the conditional
+	conditionally conforms to `P`, will succeed when the conditional
 	requirements are met.
+
+**Add new entries to the top of this section, not here!**
 
 Swift 4.1
 ---------
+
+* [SE-0075][]
+
+  Compile-time testing for the existence and importability of modules is now
+  implemented as a build configuration test.  The `canImport` test allows
+  the development of features that require a possibly-failing import 
+  declaration across multiple platforms.  
+
+  ```swift
+  #if canImport(UIKit)
+    import UIKit
+    class MyView : UIView {}
+  #elseif canImport(AppKit)
+    import AppKit
+    class MyView : NSView {}
+  #else
+    class MyView : CustomView {}
+  #endif
+  ```
 
 * [SE-0189][]
 
@@ -74,12 +167,12 @@ Swift 4.1
   s[keyPath: p] // "H"
   ```
 
-* [SE-0143][] The standard library types `Optional`, `Array`, and
-	`Dictionary` now conform to the `Equatable` protocol when their element types
-	conform to `Equatable`. This allows the `==` operator to compose (e.g., one
-	can compare two values of type `[Int : [Int?]?]` with `==`), as well as use
-  various algorthims defined for `Equatable` element types, such as
-	`index(of:)`.
+* [SE-0143][] The standard library types `Optional`, `Array`, `ArraySlice`,
+  `ContiguousArray`, and `Dictionary` now conform to the `Equatable` protocol
+  when their element types conform to `Equatable`. This allows the `==` operator
+  to compose (e.g., one can compare two values of type `[Int : [Int?]?]` with
+  `==`), as well as use various algorithms defined for `Equatable` element
+  types, such as `index(of:)`.
 
 * [SE-0157][] is implemented. Associated types can now declare "recursive"
 	constraints, which require that the associated type conform to the enclosing
@@ -87,17 +180,19 @@ Swift 4.1
 	recursive constraints. For example, the `SubSequence` associated type of
 	`Sequence` follows the enclosing protocol:
 
-        protocol Sequence {
-          associatedtype Element
-          associatedtype SubSequence: Sequence
-            where SubSequence.Element == Element,
-                  SubSequence.SubSequence == SubSequence
-          // ...
-        }
+  ```swift
+  protocol Sequence {
+    associatedtype Element
+    associatedtype SubSequence: Sequence
+      where SubSequence.Element == Element,
+            SubSequence.SubSequence == SubSequence
+    // ...
+  }
 
-        protocol Collection: Sequence where Self.SubSequence: Collection {
-          // ...
-        }
+  protocol Collection: Sequence where Self.SubSequence: Collection {
+    // ...
+  }
+  ```
 
   As a result, a number of new constraints have been introduced into the
 	standard library protocols:
@@ -160,8 +255,6 @@ Swift 4.1
   ```
 
   If you wish to provide your own implementation of `==`/`hashValue`, you still can; a custom implementation will replace the one synthesized by the compiler.
-
-  **Add new entries to the top of this file, not here!**
 
 Swift 4.0
 ---------
@@ -236,7 +329,7 @@ Swift 4.0
   CFHash and CFEqual as the implementation. This change applies even to "Swift
   3 mode", so if you were previously adding this conformance yourself, use
   `#if swift(>=3.2)` to restrict the extension to Swift 3.1 and below.
-  ([SR-2388](https://bugs.swift.org/browse/SR-2388))
+  ([SR-2388][])
 
 * [SE-0156][]
 
@@ -385,7 +478,7 @@ Swift 4.0
   slice[i..<j] = buffer[k..<l]
   ```
 
-* [SR-1529](https://bugs.swift.org/browse/SR-1529):
+* [SR-1529][]:
 
   Covariant method overrides are now fully supported, fixing many crashes
   and compile-time assertions when defining or calling such methods.
@@ -468,7 +561,7 @@ Swift 3.1
   side effects, leading to bugs when Swift code attempted to override
   `initialize`.
 
-* [SR-2394](https://bugs.swift.org/browse/SR-2394)
+* [SR-2394][]
 
   C functions that "return twice" are no longer imported into Swift. Instead,
   they are explicitly made unavailable, so attempting to reference them will
@@ -545,7 +638,7 @@ Swift 3.1
   is not guaranteed to work in future versions of Swift, and will
   now raise a warning.
 
-* [SR-1446](https://bugs.swift.org/browse/SR-1446)
+* [SR-1446][]
 
   Nested types may now appear inside generic types, and nested types may have their own generic parameters:
 
@@ -565,7 +658,7 @@ Swift 3.1
   extension OuterGeneric.InnerGeneric {}
   ```
 
-* [SR-1009](https://bugs.swift.org/browse/SR-1009):
+* [SR-1009][]:
 
   Constrained extensions allow same-type constraints between generic parameters and concrete types. This enables you to create extensions, for example, on `Array` with `Int` elements:
 
@@ -787,7 +880,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
     var x2 = p as! [Int]
     ```
 
-* [SR-2131](https://bugs.swift.org/browse/SR-2131):
+* [SR-2131][]:
 
   The `hasPrefix` and `hasSuffix` functions now consider the empty string to be a prefix and suffix of all strings.
 
@@ -6869,3 +6962,17 @@ Swift 1.0
 [SE-0191]: <https://github.com/apple/swift-evolution/blob/master/proposals/0191-eliminate-indexdistance.md>
 [SE-0192]: <https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md>
 [SE-0193]: <https://github.com/apple/swift-evolution/blob/master/proposals/0193-cross-module-inlining-and-specialization.md>
+[SE-0194]: <https://github.com/apple/swift-evolution/blob/master/proposals/0194-derived-collection-of-enum-cases.md>
+[SE-0195]: <https://github.com/apple/swift-evolution/blob/master/proposals/0195-dynamic-member-lookup.md>
+[SE-0196]: <https://github.com/apple/swift-evolution/blob/master/proposals/0196-diagnostic-directives.md>
+[SE-0197]: <https://github.com/apple/swift-evolution/blob/master/proposals/0197-remove-where.md>
+[SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
+[SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
+
+[SR-419]: <https://bugs.swift.org/browse/SR-419>
+[SR-1009]: <https://bugs.swift.org/browse/SR-1009>
+[SR-1446]: <https://bugs.swift.org/browse/SR-1446>
+[SR-1529]: <https://bugs.swift.org/browse/SR-1529>
+[SR-2131]: <https://bugs.swift.org/browse/SR-2131>
+[SR-2388]: <https://bugs.swift.org/browse/SR-2388>
+[SR-2394]: <https://bugs.swift.org/browse/SR-2394>

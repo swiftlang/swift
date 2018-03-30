@@ -31,11 +31,14 @@ class LLVM_LIBRARY_VISIBILITY Scope {
   CleanupsDepth depth;
   CleanupsDepth savedInnermostScope;
   CleanupLocation loc;
+  PostponedCleanup *currentlyActivePostponedCleanup;
 
 public:
   explicit Scope(CleanupManager &cleanups, CleanupLocation loc)
       : cleanups(cleanups), depth(cleanups.getCleanupsDepth()),
-        savedInnermostScope(cleanups.innermostScope), loc(loc) {
+        savedInnermostScope(cleanups.innermostScope), loc(loc),
+        currentlyActivePostponedCleanup(
+            cleanups.SGF.CurrentlyActivePostponedCleanup) {
     assert(depth.isValid());
     cleanups.stack.checkIterator(cleanups.innermostScope);
     cleanups.innermostScope = depth;

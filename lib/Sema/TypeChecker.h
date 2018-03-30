@@ -910,6 +910,8 @@ private:
 public:
   TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }
   TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags);
+  TypeChecker(const TypeChecker&) = delete;
+  TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();
 
   LangOptions &getLangOpts() const { return Context.LangOpts; }
@@ -1275,19 +1277,6 @@ public:
                               DeclContext *dc,
                               bool *unwrappedIUO = nullptr);
 
-  /// \brief Determine whether one type would be a valid substitution for an
-  /// archetype.
-  ///
-  /// \param type The potential type.
-  ///
-  /// \param archetype The archetype for which type may (or may not) be
-  /// substituted.
-  ///
-  /// \param dc The context of the check.
-  ///
-  /// \returns true if \c t1 is a valid substitution for \c t2.
-  bool isSubstitutableFor(Type type, ArchetypeType *archetype, DeclContext *dc);
-
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
@@ -1316,10 +1305,13 @@ public:
   void checkDeclAttributes(Decl *D);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
 
-  void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
+  void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
 
   void computeAccessLevel(ValueDecl *D);
   void computeDefaultAccessLevel(ExtensionDecl *D);
+
+  /// Check the default arguments that occur within this value decl.
+  void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
 
   virtual void resolveAccessControl(ValueDecl *VD) override {
     validateAccessControl(VD);
@@ -1417,7 +1409,8 @@ public:
                         bool allowConcreteGenericParams,
                         ExtensionDecl *ext,
                         llvm::function_ref<void(GenericSignatureBuilder &)>
-                          inferRequirements);
+                          inferRequirements,
+                        bool mustInferRequirements);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1437,7 +1430,8 @@ public:
                         ExtensionDecl *ext) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
                                    allowConcreteGenericParams, ext,
-                                   [&](GenericSignatureBuilder &) { });
+                                   [&](GenericSignatureBuilder &) { },
+                                   /*mustInferRequirements=*/false);
   }
 
   /// Validate the signature of a generic type.
@@ -1729,10 +1723,12 @@ public:
   ///
   /// \param stmt The switch statement to be type-checked.  No modification of
   /// the statement occurs.
+  /// \param DC The decl context containing \p stmt.
   /// \param limitChecking The checking process relies on the switch statement
   /// being well-formed.  If it is not, pass true to this flag to run a limited
   /// form of analysis.
-  void checkSwitchExhaustiveness(SwitchStmt *stmt, bool limitChecking);
+  void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
+                                 bool limitChecking);
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
@@ -1809,11 +1805,19 @@ public:
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
+  /// Request nominal layout for any types that could be sources of typemetadata
+  /// or conformances.
+  void requestRequiredNominalTypeLayoutForParameters(ParameterList *PL);
+
   /// Type check a parameter list.
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
                               GenericTypeResolver &resolver);
-  
+
+  /// Type check all parameter lists of a function.
+  bool typeCheckParameterLists(AbstractFunctionDecl *fd,
+                               GenericTypeResolver &resolver);
+
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -2398,27 +2402,6 @@ public:
       const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
       bool ForInout);
 
-  /// Returns true if the reference or any of its parents is an
-  /// implicit function.
-  bool isInsideImplicitFunction(SourceRange ReferenceRange,
-                                const DeclContext *DC);
-
-  /// Returns true if the reference or any of its parents is an
-  /// unavailable (or obsoleted) declaration.
-  bool isInsideUnavailableDeclaration(SourceRange ReferenceRange,
-                                      const DeclContext *DC);
-
-  /// Returns true if the reference or any of its parents is an
-  /// unconditional unavailable declaration for the same platform.
-  bool isInsideCompatibleUnavailableDeclaration(SourceRange ReferenceRange,
-                                                const DeclContext *DC,
-                                                const AvailableAttr *attr);
-
-  /// Returns true if the reference is lexically contained in a declaration
-  /// that is deprecated on all deployment targets.
-  bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
-                                     const DeclContext *DC);
-
   /// Returns the availability attribute indicating deprecation if the
   /// declaration is deprecated or null otherwise.
   static const AvailableAttr *getDeprecated(const Decl *D);
@@ -2546,6 +2529,33 @@ public:
   /// The unescaped message to display to the user.
   const StringRef Message;
 };
+
+/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
+/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
+/// requirement.
+bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                              DeclContext *DC,
+                                              TypeChecker &TC);
+
+/// Determine whether this is a "pass-through" typealias, which has the
+/// same type parameters as the nominal type it references and specializes
+/// the underlying nominal type with exactly those type parameters.
+/// For example, the following typealias \c GX is a pass-through typealias:
+///
+/// \code
+/// struct X<T, U> { }
+/// typealias GX<A, B> = X<A, B>
+/// \endcode
+///
+/// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+/// different type parameters and \c GX3 doesn't pass its type parameters
+/// directly through.
+///
+/// \code
+/// typealias GX2<A> = X<A, A>
+/// typealias GX3<A, B> = X<B, A>
+/// \endcode
+bool isPassThroughTypealias(TypeAliasDecl *typealias);
 
 } // end namespace swift
 

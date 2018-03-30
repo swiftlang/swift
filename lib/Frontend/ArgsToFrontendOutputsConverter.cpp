@@ -9,13 +9,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
+#include "ArgsToFrontendOutputsConverter.h"
 
+#include "ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
@@ -31,16 +32,28 @@
 using namespace swift;
 using namespace llvm::opt;
 
-Optional<std::vector<std::string>> ArgsToFrontendOutputsConverter::convert() {
-  const auto requestedAction =
-      ArgsToFrontendOptionsConverter::determineRequestedAction(Args);
+bool ArgsToFrontendOutputsConverter::convert(
+    std::vector<std::string> &mainOutputs,
+    std::vector<SupplementaryOutputPaths> &supplementaryOutputs) {
 
-  if (!FrontendOptions::doesActionProduceOutput(requestedAction))
-    return std::vector<std::string>();
+  Optional<OutputFilesComputer> ofc =
+      OutputFilesComputer::create(Args, Diags, InputsAndOutputs);
+  if (!ofc)
+    return true;
+  Optional<std::vector<std::string>> mains = ofc->computeOutputFiles();
+  if (!mains)
+    return true;
 
-  if (auto ofc = OutputFilesComputer::create(Args, Diags, InputsAndOutputs))
-    return ofc->computeOutputFiles();
-  return None;
+  Optional<std::vector<SupplementaryOutputPaths>> supplementaries =
+      SupplementaryOutputPathsComputer(Args, Diags, InputsAndOutputs, *mains,
+                                       ModuleName)
+          .computeOutputPaths();
+  if (!supplementaries)
+    return true;
+
+  mainOutputs = std::move(*mains);
+  supplementaryOutputs = std::move(*supplementaries);
+  return false;
 }
 
 Optional<std::vector<std::string>>
@@ -88,9 +101,10 @@ OutputFilesComputer::create(const llvm::opt::ArgList &args,
   ArrayRef<std::string> outputFileArguments =
       outputDirectoryArgument.empty() ? ArrayRef<std::string>(*outputArguments)
                                       : ArrayRef<std::string>();
-  const StringRef firstInput = inputsAndOutputs.hasSingleInput()
-                                   ? inputsAndOutputs.getFilenameOfFirstInput()
-                                   : StringRef();
+  const StringRef firstInput =
+      inputsAndOutputs.hasSingleInput()
+          ? StringRef(inputsAndOutputs.getFilenameOfFirstInput())
+          : StringRef();
   const FrontendOptions::ActionType requestedAction =
       ArgsToFrontendOptionsConverter::determineRequestedAction(args);
 
@@ -128,21 +142,19 @@ OutputFilesComputer::OutputFilesComputer(
 Optional<std::vector<std::string>>
 OutputFilesComputer::computeOutputFiles() const {
   std::vector<std::string> outputFiles;
-  bool hadError = false;
   unsigned i = 0;
-  InputsAndOutputs.forEachInputProducingAMainOutputFile(
-      [&](const InputFile &input) -> void {
+  bool hadError = InputsAndOutputs.forEachInputProducingAMainOutputFile(
+      [&](const InputFile &input) -> bool {
 
         StringRef outputArg = OutputFileArguments.empty()
                                   ? StringRef()
                                   : StringRef(OutputFileArguments[i++]);
 
         Optional<std::string> outputFile = computeOutputFile(outputArg, input);
-        if (!outputFile) {
-          hadError = true;
-          return;
-        }
+        if (!outputFile)
+          return true;
         outputFiles.push_back(*outputFile);
+        return false;
       });
   return hadError ? None : Optional<std::vector<std::string>>(outputFiles);
 }
@@ -150,6 +162,13 @@ OutputFilesComputer::computeOutputFiles() const {
 Optional<std::string>
 OutputFilesComputer::computeOutputFile(StringRef outputArg,
                                        const InputFile &input) const {
+  // Return an empty string to signify no output.
+  // The frontend does not currently produce a diagnostic
+  // if a -o argument is present for such an action
+  // for instance swiftc -frontend -o foo -interpret foo.swift
+  if (!FrontendOptions::doesActionProduceOutput(RequestedAction))
+    return std::string();
+
   if (!OutputDirectoryArgument.empty())
     return deriveOutputFileForDirectory(input);
 
@@ -186,7 +205,7 @@ Optional<std::string> OutputFilesComputer::deriveOutputFileForDirectory(
 
 std::string
 OutputFilesComputer::determineBaseNameOfOutput(const InputFile &input) const {
-  StringRef nameToStem =
+  std::string nameToStem =
       input.isPrimary()
           ? input.file()
           : ModuleNameArg ? ModuleNameArg->getValue() : FirstInput;
@@ -201,4 +220,321 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
   llvm::sys::path::append(path, base);
   llvm::sys::path::replace_extension(path, Suffix);
   return path.str();
+}
+
+SupplementaryOutputPathsComputer::SupplementaryOutputPathsComputer(
+    const ArgList &args, DiagnosticEngine &diags,
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    ArrayRef<std::string> outputFiles, StringRef moduleName)
+    : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
+      OutputFiles(outputFiles), ModuleName(moduleName),
+      RequestedAction(
+          ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
+
+Optional<std::vector<SupplementaryOutputPaths>>
+SupplementaryOutputPathsComputer::computeOutputPaths() const {
+  Optional<std::vector<SupplementaryOutputPaths>> pathsFromUser =
+      Args.hasArg(options::OPT_supplementary_output_file_map)
+          ? readSupplementaryOutputFileMap()
+          : getSupplementaryOutputPathsFromArguments();
+  if (!pathsFromUser)
+    return None;
+
+  if (InputsAndOutputs.hasPrimaryInputs())
+    assert(OutputFiles.size() == pathsFromUser->size());
+  else if (InputsAndOutputs.isSingleThreadedWMO())
+    assert(OutputFiles.size() == pathsFromUser->size() &&
+           pathsFromUser->size() == 1);
+  else {
+    // Multi-threaded WMO is the exception
+    assert(OutputFiles.size() == InputsAndOutputs.inputCount() &&
+                   pathsFromUser->size() == InputsAndOutputs.hasInputs()
+               ? 1
+               : 0);
+  }
+
+  std::vector<SupplementaryOutputPaths> outputPaths;
+  unsigned i = 0;
+  bool hadError = InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &input) -> bool {
+        if (auto suppPaths = computeOutputPathsForOneInput(
+                OutputFiles[i], (*pathsFromUser)[i], input)) {
+          ++i;
+          outputPaths.push_back(*suppPaths);
+          return false;
+        }
+        return true;
+      });
+  if (hadError)
+    return None;
+  return outputPaths;
+}
+
+Optional<std::vector<SupplementaryOutputPaths>>
+SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
+    const {
+
+  auto objCHeaderOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_objc_header_path);
+  auto moduleOutput =
+      getSupplementaryFilenamesFromArguments(options::OPT_emit_module_path);
+  auto moduleDocOutput =
+      getSupplementaryFilenamesFromArguments(options::OPT_emit_module_doc_path);
+  auto dependenciesFile = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_dependencies_path);
+  auto referenceDependenciesFile = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_reference_dependencies_path);
+  auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
+      options::OPT_serialize_diagnostics_path);
+  auto fixItsOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_fixits_path);
+  auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_loaded_module_trace_path);
+  auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
+
+  if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
+      !dependenciesFile || !referenceDependenciesFile ||
+      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD) {
+    return None;
+  }
+  std::vector<SupplementaryOutputPaths> result;
+
+  const unsigned N =
+      InputsAndOutputs.countOfFilesProducingSupplementaryOutput();
+  for (unsigned i = 0; i < N; ++i) {
+    SupplementaryOutputPaths sop;
+    sop.ObjCHeaderOutputPath = (*objCHeaderOutput)[i];
+    sop.ModuleOutputPath = (*moduleOutput)[i];
+    sop.ModuleDocOutputPath = (*moduleDocOutput)[i];
+    sop.DependenciesFilePath = (*dependenciesFile)[i];
+    sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
+    sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
+    sop.FixItsOutputPath = (*fixItsOutput)[i];
+    sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
+    sop.TBDPath = (*TBD)[i];
+
+    result.push_back(sop);
+  }
+  return result;
+}
+
+// Extend this routine for filelists if/when we have them.
+
+Optional<std::vector<std::string>>
+SupplementaryOutputPathsComputer::getSupplementaryFilenamesFromArguments(
+    options::ID pathID) const {
+  std::vector<std::string> paths = Args.getAllArgValues(pathID);
+
+  const unsigned N =
+      InputsAndOutputs.countOfFilesProducingSupplementaryOutput();
+
+  if (paths.size() == N)
+    return paths;
+
+  if (paths.empty())
+    return std::vector<std::string>(N, std::string());
+
+  Diags.diagnose(SourceLoc(), diag::error_wrong_number_of_arguments,
+                 Args.getLastArg(pathID)->getOption().getPrefixedName(), N,
+                 paths.size());
+  return None;
+}
+
+Optional<SupplementaryOutputPaths>
+SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
+    StringRef outputFile, const SupplementaryOutputPaths &pathsFromArguments,
+    const InputFile &input) const {
+  StringRef defaultSupplementaryOutputPathExcludingExtension =
+      deriveDefaultSupplementaryOutputPathExcludingExtension(outputFile, input);
+
+  using namespace options;
+
+  auto dependenciesFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_dependencies, pathsFromArguments.DependenciesFilePath, "d", "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
+  auto referenceDependenciesFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_reference_dependencies,
+      pathsFromArguments.ReferenceDependenciesFilePath, "swiftdeps", "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
+  auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
+      OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
+      "dia", "", defaultSupplementaryOutputPathExcludingExtension);
+
+  // There is no non-path form of -emit-fixits-path
+  auto fixItsOutputPath = pathsFromArguments.FixItsOutputPath;
+
+  auto objcHeaderOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_objc_header, pathsFromArguments.ObjCHeaderOutputPath, "h", "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
+  auto loadedModuleTracePath = determineSupplementaryOutputFilename(
+      OPT_emit_loaded_module_trace, pathsFromArguments.LoadedModuleTracePath,
+      "trace.json", "", defaultSupplementaryOutputPathExcludingExtension);
+
+  auto tbdPath = determineSupplementaryOutputFilename(
+      OPT_emit_tbd, pathsFromArguments.TBDPath, "tbd", "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
+  auto moduleDocOutputPath = determineSupplementaryOutputFilename(
+      OPT_emit_module_doc, pathsFromArguments.ModuleDocOutputPath,
+      SERIALIZED_MODULE_DOC_EXTENSION, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
+  ID emitModuleOption;
+  std::string moduleExtension;
+  std::string mainOutputIfUsableForModule;
+  deriveModulePathParameters(emitModuleOption, moduleExtension,
+                             mainOutputIfUsableForModule);
+
+  auto moduleOutputPath = determineSupplementaryOutputFilename(
+      emitModuleOption, pathsFromArguments.ModuleOutputPath, moduleExtension,
+      mainOutputIfUsableForModule,
+      defaultSupplementaryOutputPathExcludingExtension);
+
+  SupplementaryOutputPaths sop;
+  sop.ObjCHeaderOutputPath = objcHeaderOutputPath;
+  sop.ModuleOutputPath = moduleOutputPath;
+  sop.ModuleDocOutputPath = moduleDocOutputPath;
+  sop.DependenciesFilePath = dependenciesFilePath;
+  sop.ReferenceDependenciesFilePath = referenceDependenciesFilePath;
+  sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
+  sop.FixItsOutputPath = fixItsOutputPath;
+  sop.LoadedModuleTracePath = loadedModuleTracePath;
+  sop.TBDPath = tbdPath;
+  return sop;
+}
+
+StringRef SupplementaryOutputPathsComputer::
+    deriveDefaultSupplementaryOutputPathExcludingExtension(
+        StringRef outputFilename, const InputFile &input) const {
+  // Put the supplementary output file next to the output file if possible.
+  if (!outputFilename.empty() && outputFilename != "-")
+    return outputFilename;
+
+  if (input.isPrimary() && input.file() != "-")
+    return llvm::sys::path::filename(input.file());
+
+  return ModuleName;
+}
+
+std::string
+SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
+    options::ID emitOpt, std::string pathFromArguments, StringRef extension,
+    StringRef mainOutputIfUsable,
+    StringRef defaultSupplementaryOutputPathExcludingExtension) const {
+
+  if (!pathFromArguments.empty())
+    return pathFromArguments;
+
+  if (!Args.hasArg(emitOpt))
+    return std::string();
+
+  if (!mainOutputIfUsable.empty()) {
+    return mainOutputIfUsable.str();
+  }
+
+  llvm::SmallString<128> path(defaultSupplementaryOutputPathExcludingExtension);
+  llvm::sys::path::replace_extension(path, extension);
+  return path.str().str();
+};
+
+void SupplementaryOutputPathsComputer::deriveModulePathParameters(
+    options::ID &emitOption, std::string &extension,
+    std::string &mainOutputIfUsable) const {
+
+  bool isSIB = RequestedAction == FrontendOptions::ActionType::EmitSIB ||
+               RequestedAction == FrontendOptions::ActionType::EmitSIBGen;
+
+  emitOption = !isSIB ? options::OPT_emit_module
+                      : RequestedAction == FrontendOptions::ActionType::EmitSIB
+                            ? options::OPT_emit_sib
+                            : options::OPT_emit_sibgen;
+
+  bool canUseMainOutputForModule =
+      RequestedAction == FrontendOptions::ActionType::MergeModules ||
+      RequestedAction == FrontendOptions::ActionType::EmitModuleOnly || isSIB;
+
+  extension = isSIB ? SIB_EXTENSION : SERIALIZED_MODULE_EXTENSION;
+
+  mainOutputIfUsable =
+      canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
+}
+
+static SupplementaryOutputPaths
+createFromTypeToPathMap(const TypeToPathMap *map) {
+  SupplementaryOutputPaths paths;
+  if (!map)
+    return paths;
+  const std::pair<file_types::ID, std::string &> typesAndStrings[] = {
+      {file_types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
+      {file_types::TY_SwiftModuleFile, paths.ModuleOutputPath},
+      {file_types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
+      {file_types::TY_Dependencies, paths.DependenciesFilePath},
+      {file_types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
+      {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
+      {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
+      {file_types::TY_TBD, paths.TBDPath}};
+  for (const std::pair<file_types::ID, std::string &> &typeAndString :
+       typesAndStrings) {
+    auto const out = map->find(typeAndString.first);
+    typeAndString.second = out == map->end() ? "" : out->second;
+  }
+  return paths;
+}
+
+Optional<std::vector<SupplementaryOutputPaths>>
+SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
+  if (Arg *A = Args.getLastArg(options::OPT_emit_objc_header_path,
+                               options::OPT_emit_module_path,
+                               options::OPT_emit_module_doc_path,
+                               options::OPT_emit_dependencies_path,
+                               options::OPT_emit_reference_dependencies_path,
+                               options::OPT_serialize_diagnostics_path,
+                               options::OPT_emit_loaded_module_trace_path,
+                               options::OPT_emit_tbd_path)) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_cannot_have_supplementary_outputs,
+                   A->getSpelling(), "-supplementary-output-file-map");
+    return None;
+  }
+  const StringRef supplementaryFileMapPath =
+      Args.getLastArgValue(options::OPT_supplementary_output_file_map);
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
+      llvm::MemoryBuffer::getFile(supplementaryFileMapPath);
+  if (!buffer) {
+    Diags.diagnose(SourceLoc(), diag::cannot_open_file,
+                   supplementaryFileMapPath, buffer.getError().message());
+    return None;
+  }
+  llvm::Expected<OutputFileMap> OFM =
+      OutputFileMap::loadFromBuffer(std::move(buffer.get()), "");
+  if (auto Err = OFM.takeError()) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_unable_to_load_supplementary_output_file_map,
+                   supplementaryFileMapPath, llvm::toString(std::move(Err)));
+    return None;
+  }
+
+  std::vector<SupplementaryOutputPaths> outputPaths;
+  bool hadError = false;
+  InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+      [&](const InputFile &input) -> bool {
+        const TypeToPathMap *mapForInput =
+            OFM->getOutputMapForInput(input.file());
+        if (!mapForInput) {
+          Diags.diagnose(
+              SourceLoc(),
+              diag::error_missing_entry_in_supplementary_output_file_map,
+              supplementaryFileMapPath, input.file());
+          hadError = true;
+        }
+        outputPaths.push_back(createFromTypeToPathMap(mapForInput));
+        return false;
+      });
+  if (hadError)
+    return None;
+
+  return outputPaths;
 }
