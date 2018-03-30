@@ -117,6 +117,27 @@ struct AsyncResponseInfo {
 
 static std::vector<AsyncResponseInfo> asyncResponses;
 
+struct NotificationBuffer {
+  std::vector<sourcekitd_response_t> notes;
+  /// Add a notification to the buffer, taking ownership of it. Must be called
+  /// from the main queue.
+  void add(sourcekitd_response_t note) {
+    notes.push_back(note);
+  }
+  /// Call the given handler for all notifications currently buffered.
+  void handleNotifications(llvm::function_ref<void(sourcekitd_response_t)> f) {
+    // Notifications are handled on the main queue.
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      for (auto note : notes) {
+        f(note);
+        sourcekitd_response_dispose(note);
+      }
+      notes.clear();
+    });
+  }
+};
+static NotificationBuffer notificationBuffer;
+
 static int skt_main(int argc, const char **argv);
 
 int main(int argc, const char **argv) {
@@ -151,6 +172,12 @@ static int skt_main(int argc, const char **argv) {
 #define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
 
+  auto printBufferedNotifications = []{
+    notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
+      sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
+    });
+  };
+
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
@@ -168,6 +195,7 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_shutdown();
       return ret;
     }
+    printBufferedNotifications();
     Args = Args.slice(i+1);
   }
 
@@ -187,6 +215,7 @@ static int skt_main(int argc, const char **argv) {
       return 1;
     }
   }
+  printBufferedNotifications();
 
   sourcekitd_shutdown();
   return 0;
@@ -1093,7 +1122,7 @@ static void notification_receiver(sourcekitd_response_t resp) {
     sourcekitd_request_release(edReq);
     semaSemaphore.signal();
   } else {
-    sourcekitd_response_description_dump_filedesc(resp, STDOUT_FILENO);
+    notificationBuffer.add(resp);
   }
 }
 
