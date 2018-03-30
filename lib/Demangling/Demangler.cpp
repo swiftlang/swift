@@ -2072,6 +2072,9 @@ NodePointer Demangler::demangleWitness() {
     case 'P':
       return createWithChild(Node::Kind::ProtocolWitnessTable,
                              popProtocolConformance());
+    case 'p':
+      return createWithChild(Node::Kind::ProtocolWitnessTablePattern,
+                             popProtocolConformance());
     case 'G':
       return createWithChild(Node::Kind::GenericProtocolWitnessTable,
                              popProtocolConformance());
@@ -2079,6 +2082,11 @@ NodePointer Demangler::demangleWitness() {
       return createWithChild(
                   Node::Kind::GenericProtocolWitnessTableInstantiationFunction,
                   popProtocolConformance());
+
+    case 'R':
+      return createWithChild(Node::Kind::ProtocolRequirementArray,
+                             popProtocol());
+
     case 'l': {
       NodePointer Conf = popProtocolConformance();
       NodePointer Type = popNode(Node::Kind::Type);

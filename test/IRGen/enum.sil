@@ -226,7 +226,7 @@ sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK-64: entry:
 // CHECK-32: entry:
 entry(%u : $Singleton):
-// CHECK-32:  call %T4enum9SingletonO* @"$S4enum9SingletonOWb0_"
+// CHECK-32:  call %T4enum9SingletonO* @"$S4enum9SingletonOWOb"
 // CHECK-64:   br label %[[PREDEST:[0-9]+]]
 // CHECK-32:   br label %[[PREDEST:[0-9]+]]
   switch_enum %u : $Singleton, case #Singleton.value!enumelt.1: dest
@@ -2686,10 +2686,10 @@ entry(%x : $*MyOptional):
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S4enum16DynamicSingletonOMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[WORD]] 257, %swift.type* [[T]])
+// CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[WORD]] 319, %swift.type* [[T]])
 // CHECK:   [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[T_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK:   [[T_OK:%.*]] = icmp ule [[WORD]] [[T_STATUS]], 1
+// CHECK:   [[T_OK:%.*]] = icmp ule [[WORD]] [[T_STATUS]], 63
 // CHECK:   br i1 [[T_OK]],
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1
@@ -2705,10 +2705,10 @@ entry(%x : $*MyOptional):
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S4enum20DynamicSinglePayloadOMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[WORD]] 257, %swift.type* [[T]])
+// CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[WORD]] 319, %swift.type* [[T]])
 // CHECK:   [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   [[T_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK:   [[T_OK:%.*]] = icmp ule [[WORD]] [[T_STATUS]], 1
+// CHECK:   [[T_OK:%.*]] = icmp ule [[WORD]] [[T_STATUS]], 63
 // CHECK:   br i1 [[T_OK]],
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1

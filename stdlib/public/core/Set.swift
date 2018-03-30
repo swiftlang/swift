@@ -2161,8 +2161,8 @@ extension _NativeSetBuffer where Element: Hashable
   @_versioned // FIXME(sil-serialize-all)
   internal func unsafeAddNew(key newKey: Element) {
     let (i, found) = _find(newKey, startBucket: _bucket(newKey))
-    _sanityCheck(
-      !found, "unsafeAddNew was called, but the key is already present")
+    _precondition(
+      !found, "Duplicate element found in Set. Elements may have been mutated after insertion")
     initializeKey(newKey, at: i.offset)
   }
 

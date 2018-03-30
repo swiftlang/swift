@@ -1446,6 +1446,25 @@ extension Dictionary: Equatable where Value: Equatable {
   }
 }
 
+extension Dictionary: Hashable where Value: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    var commutativeHash = 0
+    for (k, v) in self {
+      var elementHasher = _Hasher()
+      elementHasher.append(k)
+      elementHasher.append(v)
+      commutativeHash ^= elementHasher.finalize()
+    }
+    hasher.append(commutativeHash)
+  }
+}
+
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   @_inlineable // FIXME(sil-serialize-all)
   @_versioned // FIXME(sil-serialize-all)
@@ -2538,8 +2557,8 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @_versioned // FIXME(sil-serialize-all)
   internal func unsafeAddNew(key newKey: Key, value: Value) {
     let (i, found) = _find(newKey, startBucket: _bucket(newKey))
-    _sanityCheck(
-      !found, "unsafeAddNew was called, but the key is already present")
+    _precondition(
+      !found, "Duplicate key found in Dictionary. Keys may have been mutated after insertion")
     initializeKey(newKey, value: value, at: i.offset)
   }
 

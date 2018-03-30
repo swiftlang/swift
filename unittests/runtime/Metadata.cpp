@@ -20,131 +20,79 @@
 #include <iterator>
 #include <functional>
 #include <vector>
-#include <pthread.h>
-
-#if !defined(_POSIX_BARRIERS) || _POSIX_BARRIERS < 0
-// Implement pthread_barrier_* for platforms that don't implement them (Darwin)
-
-#define PTHREAD_BARRIER_SERIAL_THREAD 1
-struct pthread_barrier_t {
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
-
-  unsigned count;
-  unsigned numThreadsWaiting;
-};
-typedef void *pthread_barrierattr_t;
-
-static int pthread_barrier_init(pthread_barrier_t *barrier,
-                                pthread_barrierattr_t*, unsigned count) {
-  if (count == 0) {
-    errno = EINVAL;
-    return -1;
-  }
-  if (pthread_mutex_init(&barrier->mutex, nullptr) != 0) {
-    return -1;
-  }
-  if (pthread_cond_init(&barrier->cond, nullptr) != 0) {
-    pthread_mutex_destroy(&barrier->mutex);
-    return -1;
-  }
-  barrier->count = count;
-  barrier->numThreadsWaiting = 0;
-  return 0;
-}
-
-static int pthread_barrier_destroy(pthread_barrier_t *barrier) {
-  // want to destroy both even if destroying one fails.
-  int ret = 0;
-  if (pthread_cond_destroy(&barrier->cond) != 0) {
-    ret = -1;
-  }
-  if (pthread_mutex_destroy(&barrier->mutex) != 0) {
-    ret = -1;
-  }
-  return ret;
-}
-
-static int pthread_barrier_wait(pthread_barrier_t *barrier) {
-  if (pthread_mutex_lock(&barrier->mutex) != 0) {
-    return -1;
-  }
-  ++barrier->numThreadsWaiting;
-  if (barrier->numThreadsWaiting < barrier->count) {
-    // Put the thread to sleep.
-    if (pthread_cond_wait(&barrier->cond, &barrier->mutex) != 0) {
-      return -1;
-    }
-    if (pthread_mutex_unlock(&barrier->mutex) != 0) {
-      return -1;
-    }
-    return 0;
-  } else {
-    // Reset thread count.
-    barrier->numThreadsWaiting = 0;
-
-    // Wake up all threads.
-    if (pthread_cond_broadcast(&barrier->cond) != 0) {
-      return -1;
-    }
-    if (pthread_mutex_unlock(&barrier->mutex) != 0) {
-      return -1;
-    }
-    return PTHREAD_BARRIER_SERIAL_THREAD;
-  }
-}
-#endif
+#include <thread>
+#include <condition_variable>
 
 using namespace swift;
 
 // Race testing.
 
 template <typename T>
-struct RaceArgs {
+struct RaceThreadContext {
   std::function<T()> code;
-  pthread_barrier_t *go;
+  T result;
+
+  unsigned numThreads;
+  unsigned &numThreadsReady;
+  std::mutex &sharedMutex;
+  std::condition_variable &start_condition;
 };
 
-void *RaceThunk(void *vargs) {
-  RaceArgs<void*> *args = static_cast<RaceArgs<void*> *>(vargs);
-  // Signal ready. Wait for go.
-  pthread_barrier_wait(args->go);
-  return args->code();
+template <typename T>
+void RaceThunk(RaceThreadContext<T> &ctx) {
+  // update shared state
+  std::unique_lock<std::mutex> lk(ctx.sharedMutex);
+  ++ctx.numThreadsReady;
+  bool isLastThread = ctx.numThreadsReady == ctx.numThreads;
+
+  // wait until the rest of the thunks are ready
+  ctx.start_condition.wait(lk, [&ctx]{ // waiting releases the lock
+    return ctx.numThreadsReady == ctx.numThreads;
+  });
+  lk.unlock();
+
+  // The last thread will signal the condition_variable to kick off the rest
+  // of the waiting threads to start.
+  if (isLastThread) ctx.start_condition.notify_all();
+
+  ctx.result = ctx.code();
 }
 
-/// RaceTest(code) runs code in many threads simultaneously, 
+/// RaceTest(code) runs code in many threads simultaneously,
 /// and returns a vector of all returned results.
-template <typename T, int NumThreads = 64>
-std::vector<T> 
-RaceTest(std::function<T()> code)
-{
-  const unsigned threadCount = NumThreads;
+template <typename T, unsigned NumThreads = 64>
+std::vector<T> RaceTest(std::function<T()> code) {
+  unsigned numThreadsReady = 0;
+  std::mutex sharedMutex;
+  std::condition_variable start_condition;
+  T result = NULL;
 
-  pthread_barrier_t go;
-  pthread_barrier_init(&go, nullptr, threadCount);
+  // Create the contexts
+  std::vector<RaceThreadContext<T>> contexts(NumThreads, {
+		  code,
+		  result,
+		  NumThreads,
+		  numThreadsReady,
+		  sharedMutex,
+		  start_condition});
 
-  // Create the threads.
-  pthread_t threads[threadCount];
-  std::vector<RaceArgs<T>> args(threadCount, {code, &go});
-
-  for (unsigned i = 0; i < threadCount; i++) {
-    pthread_create(&threads[i], nullptr, &RaceThunk, &args[i]);
-  }
+  // Create the threads
+  std::vector<std::thread> threads;
+  threads.reserve(NumThreads);
+  for (unsigned i = 0; i < NumThreads; i++)
+    threads.emplace_back(std::bind(RaceThunk<T>, std::ref(contexts[i])));
 
   // Collect results.
   std::vector<T> results;
-  for (unsigned i = 0; i < threadCount; i++) {
-    void *result;
-    pthread_join(threads[i], &result);
-    results.push_back(static_cast<T>(result));
+  results.reserve(NumThreads);
+  for (unsigned i = 0; i < NumThreads; i++) {
+    threads[i].join();
+    results.emplace_back(contexts[i].result);
   }
-
-  pthread_barrier_destroy(&go);
-
   return results;
 }
 
-/// RaceTest_ExpectEqual(code) runs code in many threads simultaneously, 
+/// RaceTest_ExpectEqual(code) runs code in many threads simultaneously,
 /// verifies that they all returned the same value, and returns that value.
 template<typename T>
 T RaceTest_ExpectEqual(std::function<T()> code)
@@ -474,7 +422,7 @@ TEST(MetadataTest, getExistentialMetadata) {
                 mixedWitnessTable->getSuperclassConstraint());
       return mixedWitnessTable;
     });
-  
+
   const ValueWitnessTable *ExpectedErrorValueWitnesses;
 #if SWIFT_OBJC_INTEROP
   ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(BO);

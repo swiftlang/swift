@@ -14,7 +14,7 @@ import resilient_protocol
 
 // Protocol is public -- needs resilient witness table
 
-// CHECK: [[RP_REQTS:@.*]] = internal unnamed_addr constant [8 x %swift.protocol_requirement]
+// CHECK: [[RP_REQTS:@"\$S19protocol_resilience17ResilientProtocolWR"]] = internal constant [8 x %swift.protocol_requirement]
 // CHECK-SAME:  [%swift.protocol_requirement { i32 6, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0, i32 0 },
 

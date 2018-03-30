@@ -43,7 +43,8 @@ public // @testable
 func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return UnsafeMutablePointer(mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
+  return UnsafeMutablePointer(
+    mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
 /// Loading Foundation initializes these function variables
@@ -114,7 +115,38 @@ internal func _cocoaStringSubscript(
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned // FIXME(sil-serialize-all)
 internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
-  return 0x0600
+  @inline(__always) get { return 0x0600 }
+}
+@_inlineable // FIXME(sil-serialize-all)
+@_versioned // FIXME(sil-serialize-all)
+internal var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+  @inline(__always) get { return 0x8000100 }
+}
+
+@_versioned // @opaque
+internal func _bridgeASCIICocoaString(
+  _ cocoa: _CocoaString,
+  intoUTF8 bufPtr: UnsafeMutableRawBufferPointer
+) -> Int? {
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked.assumingMemoryBound(
+    to: UInt8.self)
+  let length = _stdlib_binary_CFStringGetLength(cocoa)
+  var count = 0
+  let numCharWritten = _swift_stdlib_CFStringGetBytes(
+    cocoa, _swift_shims_CFRange(location: 0, length: length),
+    kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
+  return length == numCharWritten ? count : nil
+}
+
+public // @testable
+func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
+  return small.withUTF8CodeUnits { bufPtr in
+      return _swift_stdlib_CFStringCreateWithBytes(
+          nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          bufPtr.count,
+          small.isASCII ? kCFStringEncodingASCII : kCFStringEncodingUTF8, 0)
+      as AnyObject
+  }
 }
 
 internal func _getCocoaStringPointer(
@@ -151,8 +183,10 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
   } else if let wrapped = cocoaString as? _NSContiguousString {
     return wrapped._guts
   } else if _isObjCTaggedPointer(cocoaString) {
-    // TODO(SSO): small check
-    return _StringGuts(_taggedCocoaObject: cocoaString)
+    guard let small = _SmallUTF8String(_cocoaString: cocoaString) else {
+      fatalError("Internal invariant violated: large tagged NSStrings")
+    }
+    return _StringGuts(small)
   }
   // "copy" it into a value to be sure nobody will modify behind
   // our backs.  In practice, when value is already immutable, this
@@ -161,16 +195,32 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
 
   if _isObjCTaggedPointer(immutableCopy) {
-    // TODO(SSO): small check
-    return _StringGuts(_taggedCocoaObject: immutableCopy)
+    guard let small = _SmallUTF8String(_cocoaString: cocoaString) else {
+      fatalError("Internal invariant violated: large tagged NSStrings")
+    }
+    return _StringGuts(small)
   }
 
   let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)
 
-  // TODO(SSO): small check
-
   let length = _StringGuts.getCocoaLength(
     _unsafeBitPattern: Builtin.reinterpretCast(immutableCopy))
+
+  // TODO(SSO): And also for UTF-16 strings and non-contiguous strings
+  if let ptr = start, !isUTF16 && length <= _SmallUTF8String.capacity {
+    if let small = _SmallUTF8String(
+      UnsafeBufferPointer(
+        start: ptr.assumingMemoryBound(to: UInt8.self), count: length)
+    ) {
+      return _StringGuts(small)
+    } else {
+#if arch(i386) || arch(arm)
+#else
+      _sanityCheckFailure("Couldn't fit 15-char ASCII small string?")
+#endif
+    }
+  }
+
   return _StringGuts(
     _largeNonTaggedCocoaObject: immutableCopy,
     count: length,
@@ -361,6 +411,9 @@ extension String {
   /// library.
   @_inlineable // FIXME(sil-serialize-all)
   public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
+    if _guts._isSmall {
+      return _bridgeToCocoa(_guts._smallUTF8String)
+    }
     if let cocoa = _guts._underlyingCocoaString {
       return cocoa
     }

@@ -47,6 +47,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "ConstantBuilder.h"
@@ -58,6 +59,7 @@
 #include "GenMeta.h"
 #include "GenObjC.h"
 #include "GenOpaque.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -1557,10 +1559,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ProtocolDescriptor:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
+  case Kind::ProtocolRequirementArray:
+    return SILLinkage::Private;
+
   case Kind::DirectProtocolWitnessTable:
   case Kind::ProtocolWitnessTableAccessFunction:
   case Kind::ProtocolConformanceDescriptor:
     return getLinkageAsConformance();
+
+  case Kind::ProtocolWitnessTablePattern:
+    if (getLinkageAsConformance() == SILLinkage::Shared)
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable: {
@@ -1667,6 +1677,8 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ProtocolConformanceDescriptor:
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::ProtocolRequirementArray:
   case Kind::ObjCClassRef:
   case Kind::ModuleDescriptor:
   case Kind::ExtensionDescriptor:
@@ -2725,31 +2737,29 @@ namespace {
     void addWitnessTable() {
       using ConformanceKind = ConformanceFlags::ConformanceKind;
 
-     // Figure out what kind of witness table we have.
-      auto proto = Conformance->getProtocol();
+      // Figure out what kind of witness table we have.
       llvm::Constant *witnessTableVar;
-      if (!IGM.isResilient(proto, ResilienceExpansion::Maximal) &&
-          Conformance->getConditionalRequirements().empty()) {
-        Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
 
-        // If the conformance is in this object's table, then the witness table
-        // should also be in this object file, so we can always directly
-        // reference it.
-        witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
-      } else {
-        if (Conformance->getConditionalRequirements().empty()) {
+      if (Conformance->getConditionalRequirements().empty()) {
+        if (!isDependentConformance(IGM, Conformance,
+                                    ResilienceExpansion::Maximal)) {
+          Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
+          witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
+        } else {
           Flags = Flags.withConformanceKind(
                                         ConformanceKind::WitnessTableAccessor);
-        } else {
-          Flags =
-            Flags.withConformanceKind(
-                ConformanceKind::ConditionalWitnessTableAccessor)
-              .withNumConditionalRequirements(
-                              Conformance->getConditionalRequirements().size());
+          witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+              Conformance, ForDefinition);
         }
+      } else {
+        Flags =
+          Flags.withConformanceKind(
+              ConformanceKind::ConditionalWitnessTableAccessor)
+            .withNumConditionalRequirements(
+              Conformance->getConditionalRequirements().size());
 
         witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
-            Conformance, ForDefinition);
+          Conformance, ForDefinition);
       }
 
       // Relative reference to the witness table.
@@ -3489,6 +3499,14 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                ProtocolDescriptorStructTy, DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::getAddrOfProtocolRequirementArray(ProtocolDecl *D,
+                                                               ConstantInit definition) {
+  auto entity = LinkEntity::forProtocolRequirementArray(D);
+  return getAddrOfLLVMVariable(entity, Alignment(4), definition,
+                               definition.getType(),
+                               DebugTypeInfo());
+}
+
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const NormalProtocolConformance *conformance,
                                 ConstantInit definition) {
@@ -4113,16 +4131,27 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 
 /// Look up the address of a witness table.
 ///
-/// TODO: This needs to take a flag for the access mode of the witness table,
-/// which may be direct, lazy, or a runtime instantiation template.
-/// TODO: Use name from witness table here to lookup witness table instead of
-/// recomputing it.
+/// This can only be used with non-dependent conformances.
 llvm::Constant*
 IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 
   auto entity = LinkEntity::forDirectProtocolWitnessTable(conf);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
+                               WitnessTableTy, DebugTypeInfo());
+}
+
+/// Look up the address of a witness table pattern.
+///
+/// This can only be used with dependent conformances from inside the
+/// defining module.
+llvm::Constant*
+IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
+                                          ConstantInit definition) {
+  IRGen.addLazyWitnessTable(conf);
+
+  auto entity = LinkEntity::forProtocolWitnessTablePattern(conf);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
                                WitnessTableTy, DebugTypeInfo());
 }
@@ -4226,243 +4255,4 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
   }
 
   return fn;
-}
-
-std::pair<CanType, CanGenericSignature>
-irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
-  auto loweredType = type.getSwiftRValueType();
-  if (loweredType->hasArchetype()) {
-    GenericEnvironment *env = nullptr;
-    loweredType.findIf([&env](Type t) -> bool {
-        if (auto arch = t->getAs<ArchetypeType>()) {
-          env = arch->getGenericEnvironment();
-          return true;
-        }
-        return false;
-      });
-    assert(env && "has archetype but no archetype?!");
-    return {loweredType->mapTypeOutOfContext()->getCanonicalType(),
-        env->getGenericSignature()->getCanonicalSignature()};
-  }
-  return {loweredType, nullptr};
-}
-
-llvm::Constant *IRGenModule::getOrCreateRetainFunction(const TypeInfo &objectTI,
-                                                       SILType t,
-                                                       llvm::Type *llvmType) {
-  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
-  assert(loadableTI && "Should only be called on Loadable types");
-  IRGenMangler mangler;
-  auto manglingBits =
-    getTypeAndGenericSignatureForManglingOutlineFunction(t);
-  auto funcName = mangler.mangleOutlinedRetainFunction(manglingBits.first,
-                                                       manglingBits.second);
-  llvm::Type *argTys[] = {llvmType};
-  return getOrCreateHelperFunction(
-      funcName, llvmType, argTys,
-      [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, loadableTI->getFixedAlignment());
-        Explosion loaded;
-        loadableTI->loadAsTake(IGF, addr, loaded);
-        Explosion out;
-        loadableTI->copy(IGF, loaded, out, irgen::Atomicity::Atomic);
-        (void)out.claimAll();
-        IGF.Builder.CreateRet(addr.getAddress());
-      },
-      true /*setIsNoInline*/);
-}
-
-llvm::Constant *
-IRGenModule::getOrCreateReleaseFunction(const TypeInfo &objectTI,
-                                        SILType t,
-                                        llvm::Type *llvmType) {
-  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&objectTI);
-  assert(loadableTI && "Should only be called on Loadable types");
-  IRGenMangler mangler;
-  auto manglingBits =
-    getTypeAndGenericSignatureForManglingOutlineFunction(t);
-  auto funcName = mangler.mangleOutlinedReleaseFunction(manglingBits.first,
-                                                        manglingBits.second);
-  llvm::Type *argTys[] = {llvmType};
-  return getOrCreateHelperFunction(
-      funcName, llvmType, argTys,
-      [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, loadableTI->getFixedAlignment());
-        Explosion loaded;
-        loadableTI->loadAsTake(IGF, addr, loaded);
-        loadableTI->consume(IGF, loaded, irgen::Atomicity::Atomic);
-        IGF.Builder.CreateRet(addr.getAddress());
-      },
-      true /*setIsNoInline*/);
-}
-
-void IRGenModule::generateCallToOutlinedCopyAddr(
-    IRGenFunction &IGF, const TypeInfo &objectTI, Address dest, Address src,
-    SILType T, const OutlinedCopyAddrFunction MethodToCall,
-    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
-  llvm::SmallVector<llvm::Value *, 4> argsVec;
-  argsVec.push_back(src.getAddress());
-  argsVec.push_back(dest.getAddress());
-  if (typeToMetadataVec) {
-    for (auto &typeDataPair : *typeToMetadataVec) {
-      auto *metadata = typeDataPair.second;
-      assert(metadata && metadata->getType() == IGF.IGM.TypeMetadataPtrTy &&
-             "Expeceted TypeMetadataPtrTy");
-      argsVec.push_back(metadata);
-    }
-  }
-  llvm::Type *llvmType = dest->getType();
-  auto *outlinedF =
-      (this->*MethodToCall)(objectTI, llvmType, T, typeToMetadataVec);
-  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
-  call->setCallingConv(DefaultCC);
-}
-
-void IRGenModule::generateCallToOutlinedDestroy(
-    IRGenFunction &IGF, const TypeInfo &objectTI, Address addr, SILType T,
-    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
-  IRGenMangler mangler;
-  auto manglingBits =
-    getTypeAndGenericSignatureForManglingOutlineFunction(T);
-  auto funcName = mangler.mangleOutlinedDestroyFunction(manglingBits.first,
-                                                        manglingBits.second);
-
-  llvm::SmallVector<llvm::Type *, 4> argsTysVec;
-  llvm::SmallVector<llvm::Value *, 4> argsVec;
-  llvm::Type *llvmType = addr.getType();
-  argsTysVec.push_back(llvmType);
-  argsVec.push_back(addr.getAddress());
-  if (typeToMetadataVec) {
-    for (auto &typeDataPair : *typeToMetadataVec) {
-      auto *metadata = typeDataPair.second;
-      assert(metadata && metadata->getType() == IGF.IGM.TypeMetadataPtrTy &&
-             "Expeceted TypeMetadataPtrTy");
-      argsTysVec.push_back(metadata->getType());
-      argsVec.push_back(metadata);
-    }
-  }
-
-  auto *outlinedF = getOrCreateHelperFunction(
-      funcName, llvmType, argsTysVec,
-      [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address addr(&*it++, objectTI.getBestKnownAlignment());
-        if (typeToMetadataVec) {
-          for (auto &typeDataPair : *typeToMetadataVec) {
-            llvm::Value *arg = &*it++;
-            CanType abstractType = typeDataPair.first;
-            getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
-          }
-        }
-        objectTI.destroy(IGF, addr, T, true);
-        IGF.Builder.CreateRet(addr.getAddress());
-      },
-      true /*setIsNoInline*/);
-
-  llvm::CallInst *call = IGF.Builder.CreateCall(outlinedF, argsVec);
-  call->setCallingConv(DefaultCC);
-}
-
-llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    std::string funcName,
-    llvm::function_ref<void(const TypeInfo &objectTI, IRGenFunction &IGF,
-                            Address dest, Address src, SILType T)>
-        Generate,
-    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
-  llvm::SmallVector<llvm::Type *, 4> argsTysVec;
-  argsTysVec.push_back(llvmType);
-  argsTysVec.push_back(llvmType);
-  if (typeToMetadataVec) {
-    for (auto &typeDataPair : *typeToMetadataVec) {
-      auto *metadata = typeDataPair.second;
-      argsTysVec.push_back(metadata->getType());
-    }
-  }
-  return getOrCreateHelperFunction(
-      funcName, llvmType, argsTysVec,
-      [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address src(&*it++, objectTI.getBestKnownAlignment());
-        Address dest(&*it++, objectTI.getBestKnownAlignment());
-        if (typeToMetadataVec) {
-          for (auto &typeDataPair : *typeToMetadataVec) {
-            llvm::Value *arg = &*it++;
-            CanType abstractType = typeDataPair.first;
-            getArgAsLocalSelfTypeMetadata(IGF, arg, abstractType);
-          }
-        }
-        Generate(objectTI, IGF, dest, src, addrTy);
-        IGF.Builder.CreateRet(dest.getAddress());
-      },
-      true /*setIsNoInline*/);
-}
-
-llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
-  IRGenMangler mangler;
-  auto manglingBits =
-    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
-  auto funcName = mangler.mangleOutlinedInitializeWithTakeFunction(manglingBits.first,
-                                                                   manglingBits.second);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
-                    Address src, SILType T) {
-    objectTI.initializeWithTake(IGF, dest, src, T, true);
-  };
-  return getOrCreateOutlinedCopyAddrHelperFunction(
-      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
-}
-
-llvm::Constant *IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
-  IRGenMangler mangler;
-  auto manglingBits =
-    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
-  auto funcName =
-    mangler.mangleOutlinedInitializeWithCopyFunction(manglingBits.first,
-                                                     manglingBits.second);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
-                    Address src, SILType T) {
-    objectTI.initializeWithCopy(IGF, dest, src, T, true);
-  };
-  return getOrCreateOutlinedCopyAddrHelperFunction(
-      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
-}
-
-llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithTakeFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
-  IRGenMangler mangler;
-  auto manglingBits =
-    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
-  auto funcName =
-    mangler.mangleOutlinedAssignWithTakeFunction(manglingBits.first,
-                                                 manglingBits.second);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
-                    Address src, SILType T) {
-    objectTI.assignWithTake(IGF, dest, src, T, true);
-  };
-  return getOrCreateOutlinedCopyAddrHelperFunction(
-      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
-}
-
-llvm::Constant *IRGenModule::getOrCreateOutlinedAssignWithCopyFunction(
-    const TypeInfo &objectTI, llvm::Type *llvmType, SILType addrTy,
-    const llvm::MapVector<CanType, llvm::Value *> *typeToMetadataVec) {
-  IRGenMangler mangler;
-  auto manglingBits =
-    getTypeAndGenericSignatureForManglingOutlineFunction(addrTy);
-  auto funcName =
-    mangler.mangleOutlinedAssignWithCopyFunction(manglingBits.first,
-                                                 manglingBits.second);
-  auto GenFunc = [](const TypeInfo &objectTI, IRGenFunction &IGF, Address dest,
-                    Address src, SILType T) {
-    objectTI.assignWithCopy(IGF, dest, src, T, true);
-  };
-  return getOrCreateOutlinedCopyAddrHelperFunction(
-      objectTI, llvmType, addrTy, funcName, GenFunc, typeToMetadataVec);
 }

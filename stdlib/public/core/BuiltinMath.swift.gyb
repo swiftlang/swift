@@ -62,7 +62,7 @@ def TypedUnaryIntrinsicFunctions():
 // Note these have a corresponding LLVM intrinsic
 % for T, CT, bits, ufunc in TypedUnaryIntrinsicFunctions():
 %  if bits == 80:
-#if arch(i386) || arch(x86_64)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 %  end
 @_inlineable // FIXME(sil-serialize-all)
 @_transparent

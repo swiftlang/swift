@@ -74,6 +74,14 @@ struct _UnmanagedString<CodeUnit>
     self.start = start
     self.count = count
   }
+
+  @_inlineable
+  @_versioned
+  init(_ bufPtr: UnsafeBufferPointer<CodeUnit>) {
+    self.init(
+      start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+      count: bufPtr.count)
+  }
 }
 
 extension _UnmanagedString {

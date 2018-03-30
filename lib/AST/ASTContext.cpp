@@ -2945,8 +2945,7 @@ NameAliasType *NameAliasType::get(
 
   // Profile the type.
   llvm::FoldingSetNodeID id;
-  NameAliasType::Profile(id, typealias, parent, substitutions,
-                              underlying);
+  NameAliasType::Profile(id, typealias, parent, substitutions, underlying);
 
   // Did we already record this type?
   void *insertPos;
@@ -2957,13 +2956,12 @@ NameAliasType *NameAliasType::get(
   // Build a new type.
   unsigned numSubstitutions =
     genericSig ? genericSig->getSubstitutionListSize() : 0;
-  assert(static_cast<bool>(genericSig) == numSubstitutions > 0);
   auto size =
     totalSizeToAlloc<Type, GenericSignature *, Substitution>(
                         parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
   auto mem = ctx.Allocate(size, alignof(NameAliasType), arena);
   auto result = new (mem) NameAliasType(typealias, parent, substitutions,
-                                             underlying, storedProperties);
+                                        underlying, storedProperties);
   types.InsertNode(result, insertPos);
   return result;
 }

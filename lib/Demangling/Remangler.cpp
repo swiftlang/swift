@@ -1508,6 +1508,11 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
+void Remangler::mangleProtocolRequirementArray(Node *node) {
+  manglePureProtocol(getSingleChild(node));
+  Buffer << "WR";
+}
+
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->getChild(0));
   Buffer << "Mc";
@@ -1555,6 +1560,11 @@ void Remangler::mangleProtocolWitness(Node *node) {
 void Remangler::mangleProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "WP";
+}
+
+void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wp";
 }
 
 void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {

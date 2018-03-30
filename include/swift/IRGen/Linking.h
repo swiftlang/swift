@@ -169,10 +169,14 @@ class LinkEntity {
     /// The module descriptor for a module.
     /// The pointer is a ModuleDecl*.
     ModuleDescriptor,
-    
+
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
+
+    /// An array of protocol requirement descriptors for a protocol.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolRequirementArray,
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
@@ -194,6 +198,10 @@ class LinkEntity {
     /// A direct protocol witness table. The secondary pointer is a
     /// ProtocolConformance*.
     DirectProtocolWitnessTable,
+
+    /// A protocol witness table pattern. The secondary pointer is a
+    /// ProtocolConformance*.
+    ProtocolWitnessTablePattern,
 
     /// A witness accessor function. The secondary pointer is a
     /// ProtocolConformance*.
@@ -280,7 +288,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolDescriptor;
+    return k <= Kind::ProtocolRequirementArray;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -567,6 +575,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forProtocolRequirementArray(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolRequirementArray, decl);
+    return entity;
+  }
+
   static LinkEntity forValueWitness(CanType concreteType, ValueWitness witness) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
@@ -602,6 +616,13 @@ public:
   forDirectProtocolWitnessTable(const ProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::DirectProtocolWitnessTable, C);
+    return entity;
+  }
+
+  static LinkEntity
+  forProtocolWitnessTablePattern(const ProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(Kind::ProtocolWitnessTablePattern, C);
     return entity;
   }
 

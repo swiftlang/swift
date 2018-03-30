@@ -142,6 +142,9 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::ProtocolDescriptor:
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
+    case Kind::ProtocolRequirementArray:
+      return mangler.mangleProtocolRequirementArray(cast<ProtocolDecl>(getDecl()));
+
     case Kind::ProtocolConformanceDescriptor:
       return mangler.mangleProtocolConformanceDescriptor(
                      cast<NormalProtocolConformance>(getProtocolConformance()));
@@ -166,6 +169,9 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::ProtocolWitnessTableAccessFunction:
       return mangler.mangleProtocolWitnessTableAccessFunction(
                                                       getProtocolConformance());
+
+    case Kind::ProtocolWitnessTablePattern:
+      return mangler.mangleProtocolWitnessTablePattern(getProtocolConformance());
 
     case Kind::ProtocolWitnessTableLazyAccessFunction:
       return mangler.mangleProtocolWitnessTableLazyAccessFunction(getType(),

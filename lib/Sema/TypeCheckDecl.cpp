@@ -959,9 +959,12 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // Get the overload signature type.
     CanType otherSigType = other->getOverloadSignatureType();
 
+    bool wouldBeSwift5Redeclaration = false;
+    auto isRedeclaration = conflicting(tc.Context, currentSig, currentSigType,
+                                       otherSig, otherSigType,
+                                       &wouldBeSwift5Redeclaration);
     // If there is another conflict, complain.
-    if (currentSigType == otherSigType ||
-        currentSig.Name.isCompoundName() != otherSig.Name.isCompoundName()) {
+    if (isRedeclaration || wouldBeSwift5Redeclaration) {
       // If the two declarations occur in the same source file, make sure
       // we get the diagnostic ordering to be sensible.
       if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
@@ -1060,9 +1063,23 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
-      tc.diagnose(current, diag::invalid_redecl, current->getFullName());
-      tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
-      markInvalid();
+      // If this isn't a redeclaration in the current version of Swift, but
+      // would be in Swift 5 mode, emit a warning instead of an error.
+      if (wouldBeSwift5Redeclaration) {
+        tc.diagnose(current, diag::invalid_redecl_swift5_warning,
+                    current->getFullName());
+        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+      } else {
+        tc.diagnose(current, diag::invalid_redecl, current->getFullName());
+        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+        markInvalid();
+      }
+
+      // Make sure we don't do this checking again for the same decl. We also
+      // set this at the beginning of the function, but we might have swapped
+      // the decls for diagnostics; so ensure we also set this for the actual
+      // decl we diagnosed on.
+      current->setCheckedRedeclaration(true);
       break;
     }
   }
@@ -1717,7 +1734,9 @@ static void checkTypeAccess(
   if (isa<ParamDecl>(context)) {
     context = dyn_cast<AbstractFunctionDecl>(DC);
     if (!context)
-      context = cast<SubscriptDecl>(DC);
+      context = dyn_cast<SubscriptDecl>(DC);
+    if (!context)
+      context = cast<EnumDecl>(DC);
     DC = context->getDeclContext();
   }
 
@@ -2342,20 +2361,22 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
   case DeclKind::EnumElement: {
     auto EED = cast<EnumElementDecl>(D);
 
-    if (!EED->getArgumentTypeLoc().getType())
+    if (!EED->hasAssociatedValues())
       return;
-    checkTypeAccess(TC, EED->getArgumentTypeLoc(), EED,
-                    [&](AccessScope typeAccessScope,
-                        const TypeRepr *complainRepr,
-                        DowngradeToWarning downgradeToWarning) {
-      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-      auto diagID = diag::enum_case_access;
-      if (downgradeToWarning == DowngradeToWarning::Yes)
-        diagID = diag::enum_case_access_warn;
-      auto diag = TC.diagnose(EED, diagID,
-                              EED->getFormalAccess(), typeAccess);
-      highlightOffendingType(TC, diag, complainRepr);
-    });
+    for (auto &P : *EED->getParameterList()) {
+      checkTypeAccess(TC, P->getTypeLoc(), P,
+                             [&](AccessScope typeAccessScope,
+                                 const TypeRepr *complainRepr,
+                                 DowngradeToWarning downgradeToWarning) {
+        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+        auto diagID = diag::enum_case_access;
+        if (downgradeToWarning == DowngradeToWarning::Yes)
+          diagID = diag::enum_case_access_warn;
+        auto diag = TC.diagnose(EED, diagID,
+                                EED->getFormalAccess(), typeAccess);
+        highlightOffendingType(TC, diag, complainRepr);
+      });
+    }
 
     return;
   }
@@ -7839,13 +7860,18 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     EED->setIsBeingValidated(true);
 
-    if (!EED->getArgumentTypeLoc().isNull()) {
-      if (validateType(EED->getArgumentTypeLoc(), EED->getDeclContext(),
-                       TypeResolutionFlags::EnumCase)) {
-        EED->setIsBeingValidated(false);
+    if (auto *PL = EED->getParameterList()) {
+      GenericTypeToArchetypeResolver resolver(EED->getParentEnum());
+
+      bool isInvalid
+        = typeCheckParameterList(PL, EED->getParentEnum(),
+                                 TypeResolutionFlags::EnumCase, resolver);
+
+      if (isInvalid || EED->isInvalid()) {
         EED->setInterfaceType(ErrorType::get(Context));
         EED->setInvalid();
-        break;
+      } else {
+        checkDefaultArguments(PL, EED);
       }
     }
 
@@ -7870,7 +7896,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Now that we have an argument type we can set the element's declared
     // type.
-    if (!EED->computeType())
+    if (!EED->hasInterfaceType() && !EED->computeType())
       break;
 
     // Require the carried type to be materializable.

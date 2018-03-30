@@ -31,6 +31,8 @@
 #include <cctype>
 #include <condition_variable>
 #include <new>
+#include <unordered_set>
+#include <vector>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -166,6 +168,14 @@ swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
   return bounds.ImmediateMembersOffset / sizeof(void*);
 }
 
+static bool
+areAllTransitiveMetadataComplete_cheap(const Metadata *metadata,
+                                 const TypeContextDescriptor *description);
+
+static MetadataDependency
+checkTransitiveCompleteness(const Metadata *metadata,
+                            const TypeContextDescriptor *description);
+
 namespace {
   struct GenericCacheEntry final : MetadataCacheEntryBase<GenericCacheEntry> {
     static const char *getName() { return "GenericCache"; }
@@ -185,42 +195,71 @@ namespace {
       auto metadata =
         pattern->InstantiationFunction(description, arguments, pattern);
 
-      MetadataState state;
+      // If there's no completion function, do a quick-and-dirty check to
+      // see if all of the type arguments are already complete.  If they
+      // are, we can broadcast completion immediately and potentially avoid
+      // some extra locking.
+      PrivateMetadataState state;
       if (pattern->CompletionFunction.isNull()) {
-        state = MetadataState::Complete;
+        if (areAllTransitiveMetadataComplete_cheap(metadata, description)) {
+          state = PrivateMetadataState::Complete;
+        } else {
+          state = PrivateMetadataState::NonTransitiveComplete;
+        }
       } else {
         state = inferStateForMetadata(metadata);
       }
+
       return { metadata, state };
     }
 
-    MetadataState inferStateForMetadata(Metadata *metadata) {
+    PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
       if (metadata->getValueWitnesses()->isIncomplete())
-        return MetadataState::Abstract;
+        return PrivateMetadataState::Abstract;
 
       // TODO: internal vs. external layout-complete?
-      return MetadataState::LayoutComplete;
+      return PrivateMetadataState::LayoutComplete;
     }
 
     // Note that we have to pass 'arguments' separately here instead of
     // using the key data because there might be non-key arguments,
     // like protocol conformances.
     TryInitializeResult tryInitialize(Metadata *metadata,
-                                      MetadataCompletionContext *context,
+                                      PrivateMetadataState state,
+                                      PrivateMetadataCompletionContext *context,
                                       const TypeContextDescriptor *description,
                                       const void * const *arguments) {
-      // Find a pattern.  Currently we always use the default pattern.
-      auto &generics = description->getFullGenericContextHeader();
-      auto pattern = generics.DefaultInstantiationPattern.get();
+      assert(state != PrivateMetadataState::Complete);
 
-      // Complete the metadata's instantiation.
-      auto dependency = pattern->CompletionFunction(metadata, context, pattern);
+      // Finish the completion function.
+      if (state < PrivateMetadataState::NonTransitiveComplete) {
+        // Find a pattern.  Currently we always use the default pattern.
+        auto &generics = description->getFullGenericContextHeader();
+        auto pattern = generics.DefaultInstantiationPattern.get();
 
-      auto state = dependency.Value == nullptr
-                     ? MetadataState::Complete
-                     : inferStateForMetadata(metadata);
+        // Complete the metadata's instantiation.
+        auto dependency =
+          pattern->CompletionFunction(metadata, &context->Public, pattern);
 
-      return { state, dependency.State, dependency.Value };
+        // If this failed with a dependency, infer the current metadata state
+        // and return.
+        if (dependency.Value) {
+          return { inferStateForMetadata(metadata),
+                   dependency.State, dependency.Value };
+        }
+      }
+
+      // Check for transitive completeness.
+      auto dependency =
+        checkTransitiveCompleteness(metadata, description);
+      if (dependency.Value) {
+        return { PrivateMetadataState::NonTransitiveComplete,
+                 dependency.State, dependency.Value };
+      }
+
+      // We're done.
+      return { PrivateMetadataState::Complete,
+               MetadataState::Complete, nullptr };
     }
   };
 } // end anonymous namespace
@@ -3332,6 +3371,153 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
   } callbacks = { request };
 
   return performOnMetadataCache<MetadataResponse>(type, std::move(callbacks));
+}
+
+/// Search all the metadata that the given type has transitive completeness
+/// requirements on for something that matches the given predicate.
+template <class T>
+static bool findAnyTransitiveMetadata(const Metadata *type,
+                                      const TypeContextDescriptor *description,
+                                      T &&predicate) {
+  // Classes require their superclass to be transitively complete.
+  //
+  // We check for a class by looking at the type descriptor because we'll be
+  // loading the descriptor flags again when checking for a generic type,
+  // whereas we won't otherwise be touching the metadata kind.
+  if (isa<ClassDescriptor>(description)) {
+    if (auto super = cast<ClassMetadata>(type)->Superclass) {
+      if (super->isTypeMetadata() && predicate(super))
+        return true;
+    }
+  }
+
+  // Generic types require their type arguments to be transitively complete.
+  if (description->isGeneric()) {
+    auto &generics = description->getFullGenericContextHeader();
+
+    auto keyArguments = description->getGenericArguments(type);
+    auto extraArguments = keyArguments + generics.Base.NumKeyArguments;
+
+    for (auto &param : description->getGenericParams()) {
+      if (param.hasKeyArgument()) {
+        if (predicate(*keyArguments++))
+          return true;
+      } else if (param.hasExtraArgument()) {
+        if (predicate(*extraArguments++))
+          return true;
+      }
+      // Ignore parameters that don't have a key or an extra argument.
+    }
+  }
+
+  // Didn't find anything.
+  return false;
+}
+
+/// Do a quick check to see if all the transitive type metadata are complete.
+static bool
+areAllTransitiveMetadataComplete_cheap(const Metadata *type,
+                                     const TypeContextDescriptor *description) {
+  // Look for any transitive metadata that's incomplete.
+  return !findAnyTransitiveMetadata(type, description,
+                                    [](const Metadata *type) {
+    struct IsIncompleteCallbacks {
+      bool forGenericMetadata(const Metadata *type,
+                              const TypeContextDescriptor *description,
+                              GenericMetadataCache &cache,
+                              MetadataCacheKey key) && {
+        // Metadata cache lookups aren't really cheap enough for this
+        // optimization.
+        return true;
+      }
+
+      bool forOtherMetadata(const Metadata *type) && {
+        return false;
+      }
+    } callbacks;
+
+    return performOnMetadataCache<bool>(type, std::move(callbacks));
+  });
+}
+
+/// Check for transitive completeness.
+///
+/// The key observation here is that all we really care about is whether
+/// the transitively-observable types are *actually* all complete; we don't
+/// need them to *think* they're transitively complete.  So if we find
+/// something that thinks it's still transitively incomplete, we can just
+/// scan its transitive metadata and actually try to find something that's
+/// incomplete.  If we don't find anything, then we know all the transitive
+/// dependencies actually hold, and we can keep going.
+static MetadataDependency
+checkTransitiveCompleteness(const Metadata *initialType,
+                            const TypeContextDescriptor *initialDescription) {
+  // TODO: it would nice to avoid allocating memory in common cases here.
+  // In particular, we don't usually add *anything* to the worklist, and we
+  // usually only add a handful of types to the map.
+  std::vector<const Metadata *> worklist;
+  std::unordered_set<const Metadata *> presumedCompleteTypes;
+
+  MetadataDependency dependency;
+  auto isIncomplete = [&](const Metadata *type) -> bool {
+    // Add the type to the presumed-complete-types set.  If this doesn't
+    // succeed, we've already inserted it, which means we must have already
+    // decided it was complete.
+    if (!presumedCompleteTypes.insert(type).second)
+      return false;
+
+    // Check the metadata's current state with a non-blocking request.
+    auto request = MetadataRequest(MetadataState::Complete,
+                                   /*non-blocking*/ true);
+    auto state = swift_checkMetadataState(request, type).State;
+
+    // If it's transitively complete, we're done.
+    // This is the most likely result.
+    if (state == MetadataState::Complete)
+      return false;
+
+    // Otherwise, if the state is actually incomplete, set a dependency
+    // and leave.  We set the dependency at non-transitive completeness
+    // because we can potentially resolve ourselves if we find completeness.
+    if (!isAtLeast(state, MetadataState::NonTransitiveComplete)) {
+      dependency = MetadataDependency{type,
+                                      MetadataState::NonTransitiveComplete};
+      return true;
+    }
+
+    // Otherwise, we have to add it to the worklist.
+    worklist.push_back(type);
+    return false;
+  };
+
+  // Consider the type itself to be presumed-complete.  We're looking for
+  // a greatest fixed point.
+  presumedCompleteTypes.insert(initialType);
+  if (findAnyTransitiveMetadata(initialType, initialDescription, isIncomplete))
+    return dependency;
+
+  // Drain the worklist.  The order we do things in doesn't really matter,
+  // so optimize for locality and convenience by using a stack.
+  while (!worklist.empty()) {
+    auto type = worklist.back();
+    worklist.pop_back();
+
+    // Only nominal types have transitive dependencies (for now).
+    const TypeContextDescriptor *description;
+    if (auto classType = dyn_cast<ClassMetadata>(type)) {
+      description = classType->getDescription();
+    } else {
+      description = cast<ValueMetadata>(type)->getDescription();
+    }
+
+    // Search for incomplete dependencies.  This will set Dependency
+    // if it finds anything.
+    if (findAnyTransitiveMetadata(type, description, isIncomplete))
+      return dependency;
+  }
+
+  // Otherwise, we're transitively complete.
+  return { nullptr, MetadataState::Complete };
 }
 
 /***************************************************************************/

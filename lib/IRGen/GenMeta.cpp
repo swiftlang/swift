@@ -1910,9 +1910,8 @@ namespace {
     void emitStoreOfSuperclass(IRGenFunction &IGF, CanType superclassType,
                                llvm::Value *metadata,
                                MetadataDependencyCollector *collector) {
-      auto request =
-        DynamicMetadataRequest::getNonBlocking(MetadataState::Complete,
-                                               collector);
+      auto request = DynamicMetadataRequest::getNonBlocking(
+                               MetadataState::NonTransitiveComplete, collector);
 
       llvm::Value *superMetadata =
         emitClassHeapMetadataRef(IGF, superclassType,
@@ -3619,10 +3618,12 @@ namespace {
 #endif
 
       auto global =
-        reqtsArray.finishAndCreateGlobal("", Alignment(4), /*constant*/ true,
-                                         llvm::GlobalVariable::InternalLinkage);
-      global->setUnnamedAddr(llvm::GlobalVariable::UnnamedAddr::Global);
+        cast<llvm::GlobalVariable>(
+          IGM.getAddrOfProtocolRequirementArray(Protocol,
+                                                reqtsArray.finishAndCreateFuture()));
+      global->setConstant(true);
       B.addRelativeOffset(IGM.Int32Ty, global);
+      IGM.setTrueConstGlobal(global);
     }
 
     struct RequirementInfo {

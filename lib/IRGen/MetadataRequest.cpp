@@ -32,6 +32,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -113,7 +115,7 @@ void MetadataResponse::ensureDynamicState(IRGenFunction &IGF) & {
   // If we're statically known complete, we can just fill in
   // MetadataState::Complete.
   if (isStaticallyKnownComplete()) {
-    State.setPointer(getCompletedState(IGF.IGM));
+    DynamicState = getCompletedState(IGF.IGM);
     return;
   }
 

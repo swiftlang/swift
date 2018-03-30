@@ -127,7 +127,7 @@ public class Concrete : Derived<Int> {
 //// and installs overrides for 'init()' and 'm3()'.
 
 // CHECK-LABEL: define private void @initialize_metadata_Concrete(i8*)
-// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCySiGMa"(i64 0)
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_vtable7DerivedCySiGMa"(i64 1)
 // CHECK: [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @"$S14generic_vtable8ConcreteCMf"
 // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, i64 96, i64 1)
