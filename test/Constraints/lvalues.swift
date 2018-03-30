@@ -158,8 +158,8 @@ func testInOut(_ arg: inout Int) {
 }
 
 // Don't infer inout types.
-var ir = &i // expected-error{{expression type 'inout Int' is ambiguous without more context}}
-var ir2 = ((&i)) // expected-error{{expression type 'inout Int' is ambiguous without more context}}
+var ir = &i // expected-error {{use of extraneous '&'}}
+var ir2 = ((&i)) // expected-error {{use of extraneous '&'}}
 
 // <rdar://problem/17133089>
 func takeArrayRef(_ x: inout Array<String>) { }

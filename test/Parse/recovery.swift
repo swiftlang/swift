@@ -749,7 +749,7 @@ func test23550816(ss: [String], s: String) {
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
 func test23719432() {
   var x = 42
-  &(Int:x)  // expected-error {{expression type 'inout _' is ambiguous without more context}}
+  &(Int:x) // expected-error {{use of extraneous '&'}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator

@@ -1098,6 +1098,8 @@ ERROR(expected_operator_ref,none,
       "expected operator name in operator reference", ())
 ERROR(invalid_postfix_operator,none,
       "operator with postfix spacing cannot start a subexpression", ())
+ERROR(extraneous_amp_prefix,none,
+      "use of extraneous '&'", ())
 
 ERROR(expected_member_name,PointsToFirstBadToken,
       "expected member name following '.'", ())
