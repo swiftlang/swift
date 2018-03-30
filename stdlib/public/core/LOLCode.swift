@@ -12,6 +12,17 @@
 
 public enum _LOLCodeType: String {
   case yarn, numbar, numbr, noob, bukkit, troof
+
+  var defaultValue: Any {
+    switch self {
+    case .bukkit: return [Any]()
+    case .noob: return ()
+    case .numbar: return 0.0
+    case .numbr: return 0
+    case .troof: return false
+    case .yarn: return ""
+    }
+  }
 }
 
 public enum _LOLCodeValue: Equatable {
@@ -37,6 +48,7 @@ public enum _LOLCodeValue: Equatable {
     switch (self, type) {
     case (_, .troof): return .troof(asTroof)
     case (_, .yarn): return .yarn("\(self.value)")
+    case (.noob, let ty): return ty.defaultValue
     case let (.numbr(n), .numbar): return .numbar(Double(n))
     case let (.numbar(d), .numbr): return .numbr(Int(d))
     case let (.yarn(s), .numbar):
