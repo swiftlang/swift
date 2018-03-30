@@ -232,7 +232,7 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
 static bool isSemanticEditorDisabled();
 
 static void fillDictionaryForDiagnosticInfo(
-    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info);
 
 static void enableCompileNotifications(bool value);
 
@@ -1466,30 +1466,7 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
     Arr = TopDict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
@@ -2335,7 +2312,38 @@ bool SKEditorConsumer::recordFormattedText(StringRef Text) {
   return true;
 }
 
+static void fillDictionaryForDiagnosticInfoBase(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+
 static void fillDictionaryForDiagnosticInfo(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info) {
+
+  UIdent SeverityUID;
+  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
+  static UIdent UIDKindDiagError(KindDiagError.str());
+  switch (Info.Severity) {
+  case DiagnosticSeverityKind::Warning:
+    SeverityUID = UIDKindDiagWarning;
+    break;
+  case DiagnosticSeverityKind::Error:
+    SeverityUID = UIDKindDiagError;
+    break;
+  }
+
+  Elem.set(KeySeverity, SeverityUID);
+  fillDictionaryForDiagnosticInfoBase(Elem, Info);
+
+  if (!Info.Notes.empty()) {
+    auto NotesArr = Elem.setArray(KeyDiagnostics);
+    for (auto &NoteDiag : Info.Notes) {
+      auto NoteElem = NotesArr.appendDictionary();
+      NoteElem.set(KeySeverity, KindDiagNote);
+      fillDictionaryForDiagnosticInfoBase(NoteElem, NoteDiag);
+    }
+  }
+}
+
+static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
   Elem.set(KeyDescription, Info.Description);
@@ -2383,31 +2391,8 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
     Arr = Dict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   Elem.set(KeyDiagnosticStage, DiagStage);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
