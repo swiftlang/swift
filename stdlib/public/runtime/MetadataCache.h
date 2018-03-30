@@ -538,16 +538,26 @@ struct PrivateMetadataCompletionContext {
 };
 
 struct MetadataCompletionQueueEntry {
-  /// The metadata whose completion is blocked.
+  /// The owning metadata, i.e. the metadata whose completion is blocked.
   Metadata * const Value;
 
+  /// The completion queue for the blocked metadata.
+  /// Only accessed under the lock for the owning metadata.
+  MetadataCompletionQueueEntry *CompletionQueue = nullptr;
+
   /// The next entry in the completion queue.
-  std::unique_ptr<MetadataCompletionQueueEntry> Next;
+  MetadataCompletionQueueEntry *Next = nullptr;
 
   /// The saved state of the completion function.
   PrivateMetadataCompletionContext CompletionContext;
 
-  Metadata *Dependency = nullptr;
+  /// The metadata we're enqueued on and the state we're waiting for it
+  /// to achieve.  These fields are only ever modified under the lock for
+  /// the owning metadata, and only when the metadata is not enqueued
+  /// on another metadata's completion queue.  This latter condition is
+  /// important because it allows these fields to be read outside of the
+  /// lock by the initializing thread of the dependent metadata.
+  const Metadata *Dependency = nullptr;
   MetadataState DependencyRequirement = MetadataState::Abstract;
 
   MetadataCompletionQueueEntry(Metadata *value,
@@ -559,13 +569,13 @@ struct MetadataCompletionQueueEntry {
 ///
 /// \return false if the entry was not added because the dependency
 ///   has already reached the desired requirement
-bool addToMetadataQueue(std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
+bool addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
                         const Metadata *dependency,
                         MetadataState dependencyRequirement);
 
-
-void resumeMetadataCompletion(
-                    std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry);
+/// Resume completion of the given queue entry, given that it has been
+/// removed from its dependency's metadata queue.
+void resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry);
 
 /// A base class offerring a reasonable default implementation for entries
 /// in a generic metadata cache.  Supports variably-sized keys.
@@ -632,8 +642,32 @@ private:
   ///
   /// This is only ever modified under the lock.
   enum class LSK : uint8_t {
+    /// We're just storing the allocating thread.  The cache entry will be
+    /// in this state initially, and it will stay in this state until either
+    /// the metadata needs to enqueue itself on another metadata's completion
+    /// queue or another metadata needs to enqueue itself on this metadata's
+    /// completion queue.  It's possible (likely, even) that the cache entry
+    /// will just stay in this state forever, e.g. if it manages to complete
+    /// itself before another metadata needs to wait on it.
     AllocatingThread,
+
+    /// We're storing a completion queue without having a queue entry
+    /// ourselves.  This can happen if another metadata needs to add itself
+    /// to the completion queue for this metadata during its first attempt
+    /// at initialization.
     CompletionQueue,
+
+    /// We're storing a queue entry, meaning that the metadata has set itself
+    /// up to be enqueued at least once.  (It's possible that the actual
+    /// enqueuing never actually succeeded.)  The metadata's completion
+    /// queue can be found at LockedStorage.QueueEntry->CompletionQueue.
+    /// 
+    /// The cache entry owns its queue entry, but it must not destroy it
+    /// while it is blocked on another queue.
+    QueueEntry,
+
+    /// We've completed ourselves and are storing nothing.
+    Complete
   };
   LSK LockedStorageKind;
 
@@ -652,8 +686,11 @@ private:
     /// The thread that is allocating the entry.
     std::thread::id AllocatingThread;
 
-    /// The completion queue.  This is only ever accessed under the lock.
-    std::unique_ptr<MetadataCompletionQueueEntry> CompletionQueue;
+    /// The completion queue.
+    MetadataCompletionQueueEntry *CompletionQueue;
+
+    /// The metadata's own queue entry.
+    MetadataCompletionQueueEntry *QueueEntry;
 
     LockedStorage_t() {}
     ~LockedStorage_t() {}
@@ -670,8 +707,8 @@ public:
   }
 
   ~MetadataCacheEntryBase() {
-    if (LockedStorageKind == LSK::CompletionQueue)
-      LockedStorage.CompletionQueue.~unique_ptr();
+    if (LockedStorageKind == LSK::QueueEntry)
+      delete LockedStorage.QueueEntry;
   }
 
   bool isBeingAllocatedByCurrentThread() const {
@@ -744,8 +781,7 @@ public:
   /// Resume initialization after a previous failure resulted in the
   /// metadata being enqueued on another metadata cache.
   ///
-  /// We expect the first argument here to be of type
-  /// std::unique_ptr<MetadataCompletionQueueEntry> &&.
+  /// We expect the first argument here to be a MetadataCompletionQueueEntry*.
   template <class... Args>
   Status resumeInitialization(ConcurrencyControl &concurrency, Args &&...args) {
     return doInitialization(concurrency, std::forward<Args>(args)...);
@@ -765,7 +801,7 @@ private:
   /// This is the initializing thread.  The lock is not held.
   template <class... Args>
   Status doInitialization(ConcurrencyControl &concurrency,
-                     std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
+                          MetadataCompletionQueueEntry *queueEntry,
                           MetadataRequest request,
                           Args &&...args) {
     // We should always have fully synchronized with any previous threads
@@ -789,10 +825,12 @@ private:
       context = &scratchContext;
     }
 
+    bool hasProgressSinceLastEnqueueAttempt = false;
+    MetadataCompletionQueueEntry *claimedQueue = nullptr;
+
     // Try the complete the metadata.  This only loops if initialization
     // has a dependency, but the new dependency is resolved when we go to
     // add ourselves to its queue.
-    bool hasProgress = false;
     while (true) {
       TryInitializeResult tryInitializeResult =
         asImpl().tryInitialize(value, curTrackingInfo.getState(), context,
@@ -806,7 +844,7 @@ private:
       // threads immediately) if we've made any progress.  This seems prudent,
       // but it might mean acquiring the lock multiple times.
       if (curTrackingInfo.getState() < newState) {
-        hasProgress = true;
+        hasProgressSinceLastEnqueueAttempt = true;
         curTrackingInfo = PrivateMetadataTrackingInfo(newState);
         publishPrivateMetadataState(concurrency, newState);
       }
@@ -815,7 +853,16 @@ private:
       if (!tryInitializeResult.Dependency) {
         assert(newState == PrivateMetadataState::Complete &&
                "initialization didn't report a dependency but isn't complete");
-        hasProgress = true;
+        assert(hasProgressSinceLastEnqueueAttempt);
+
+        // Claim any satisfied completion-queue entries (i.e. all of them).
+        concurrency.Lock.withLock([&] {
+          claimSatisfiedQueueEntriesWithLock(curTrackingInfo, claimedQueue);
+        });
+
+        // That will destroy the queue entry if we had one, so make sure we
+        // don't try to use it.
+        queueEntry = nullptr;
         break;
       }
 
@@ -827,17 +874,31 @@ private:
       // Create a queue entry if necessary.  Start using its context
       // as the continuation context.
       if (!queueEntry) {
-        queueEntry.reset(
-          new MetadataCompletionQueueEntry(value, scratchContext));
+        queueEntry = new MetadataCompletionQueueEntry(value, scratchContext);
         context = &queueEntry->CompletionContext;
       }
+
+      // Set the dependency on the queue entry.  This has to happen under
+      // the lock to protect against other threads checking for dependency
+      // cycles.
+      concurrency.Lock.withLock([&] {
+        prepareToEnqueueWithLock(queueEntry, tryInitializeResult.Dependency,
+                                 tryInitializeResult.DependencyRequirement);
+        assert(LockedStorageKind == LSK::QueueEntry);
+
+        // Grab any satisfied queue entries while we have the lock.
+        if (hasProgressSinceLastEnqueueAttempt) {
+          hasProgressSinceLastEnqueueAttempt = false;
+          claimSatisfiedQueueEntriesWithLock(curTrackingInfo, claimedQueue);
+        }
+      });
 
       // Try to block this metadata initialization on that queue.
       // If this succeeds, we can't consider ourselves the initializing
       // thread anymore.  The small amount of notification we do at the
       // end of this function is okay to race with another thread
       // potentially taking over initialization.
-      if (addToMetadataQueue(std::move(queueEntry),
+      if (addToMetadataQueue(queueEntry,
                              tryInitializeResult.Dependency,
                              tryInitializeResult.DependencyRequirement))
         break;
@@ -846,18 +907,10 @@ private:
       assert(queueEntry);
     }
 
-    // If we made progress, claim all the completion-queue entries that
-    // are now satisfied and try to make progress on them.
-    if (hasProgress) {
-      auto queue = concurrency.Lock.withLock([&] {
-        return claimSatisfiedQueueEntriesWithLock(curTrackingInfo);
-      });
-
-      // Immediately process all the entries we extracted.
-      while (auto cur = std::move(queue)) {
-        queue = std::move(cur->Next);
-        resumeMetadataCompletion(std::move(cur));
-      }
+    // Immediately process all the queue entries we claimed.
+    while (auto cur = claimedQueue) {
+      claimedQueue = cur->Next;
+      resumeMetadataCompletion(cur);
     }
 
     // If we're not actually satisfied by the current state, we might need
@@ -869,28 +922,81 @@ private:
     return { value, curTrackingInfo.getAccomplishedRequestState() };
   }
 
+  /// Prepare to enqueue this metadata on another metadata's completion
+  /// queue, given that we're holding the lock.
+  void prepareToEnqueueWithLock(MetadataCompletionQueueEntry *queueEntry,
+                                const Metadata *dependency,
+                                MetadataState dependencyRequirement) {
+    queueEntry->Dependency = dependency;
+    queueEntry->DependencyRequirement = dependencyRequirement;
+
+    switch (LockedStorageKind) {
+    case LSK::QueueEntry:
+      assert(LockedStorage.QueueEntry == queueEntry);
+      return;
+
+    case LSK::CompletionQueue:
+      // Move the existing completion queue to the cache entry.
+      queueEntry->CompletionQueue = LockedStorage.CompletionQueue;
+      LLVM_FALLTHROUGH;
+
+    case LSK::AllocatingThread:
+      LockedStorageKind = LSK::QueueEntry;
+      LockedStorage.QueueEntry = queueEntry;
+      return;
+
+    case LSK::Complete:
+      swift_runtime_unreachable("preparing to enqueue when already complete?");
+    }
+    swift_runtime_unreachable("bad kind");
+  }
+
   /// Claim all the satisfied completion queue entries, given that
   /// we're holding the lock.
-  std::unique_ptr<MetadataCompletionQueueEntry>
-  claimSatisfiedQueueEntriesWithLock(PrivateMetadataTrackingInfo newInfo) {
+  void claimSatisfiedQueueEntriesWithLock(PrivateMetadataTrackingInfo newInfo,
+                                  MetadataCompletionQueueEntry *&claimedQueue) {
     // Collect anything in the metadata's queue whose target state has been
     // reached to the queue in result.  Note that we repurpose the Next field
     // in the collected entries.
 
-    std::unique_ptr<MetadataCompletionQueueEntry> result;
-
-    // If we're not even currently storing a completion queue,
-    // there's nothing to do but wake waiting threads.
-    if (LockedStorageKind != LSK::CompletionQueue) {
-      return result;
+    MetadataCompletionQueueEntry **completionQueue;
+    if (LockedStorageKind == LSK::CompletionQueue) {
+      completionQueue = &LockedStorage.CompletionQueue;
+    } else if (LockedStorageKind == LSK::QueueEntry) {
+      completionQueue = &LockedStorage.QueueEntry->CompletionQueue;
+    } else {
+      // If we're not even currently storing a completion queue,
+      // there's nothing to do but wake waiting threads.
+      return;
     }
 
-    auto nextToResume = &result;
-    assert(!*nextToResume && "already items in queue?");
+    // We want to append to the claimed queue, so find the end.
+    auto nextToResume = &claimedQueue;
+    while (auto next = *nextToResume) {
+      nextToResume = &next->Next;
+    }
+    assert(!*nextToResume);
 
-    // Walk the completion queue.
-    auto *nextWaiter = &LockedStorage.CompletionQueue;
-    while (auto waiter = nextWaiter->get()) {
+    // If the new state is complete, we can just claim the entire queue
+    // and destroy the metadata's own queue entry if it exists.
+    if (newInfo.isComplete()) {
+      *nextToResume = *completionQueue;
+      *completionQueue = nullptr;
+
+      if (LockedStorageKind == LSK::QueueEntry) {
+        delete LockedStorage.QueueEntry;
+      }
+
+      // Mark that we're no longer storing a queue.
+      LockedStorageKind = LSK::Complete;
+
+      return;
+    }
+
+    // Otherwise, we have to walk the completion queue looking specifically
+    // for entries that match.
+    auto *nextWaiter = completionQueue;
+    while (auto waiter = *nextWaiter) {
       // If the new state of this entry doesn't satisfy the waiter's
       // requirements, skip over it.
       if (!newInfo.satisfies(waiter->DependencyRequirement)) {
@@ -900,16 +1006,14 @@ private:
 
       // Add the waiter to the end of the next-to-resume queue, and update
       // the end to the waiter's Next field.
-      *nextToResume = std::move(*nextWaiter); // owning pointer to waiter
+      *nextToResume = *nextWaiter;
       nextToResume = &waiter->Next;
 
       // Splice the waiter out of the completion queue.
-      *nextWaiter = std::move(waiter->Next);
+      *nextWaiter = waiter->Next;
 
       assert(!*nextToResume);
     }
-
-    return result;
   }
 
   /// Publish a new metadata state.  Wake waiters if we had any.
@@ -979,7 +1083,7 @@ public:
   ///
   /// This is always called from the initializing thread.  The lock is not held.
   bool enqueue(ConcurrencyControl &concurrency,
-               std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry) {
+               MetadataCompletionQueueEntry *queueEntry) {
     assert(queueEntry);
     assert(!queueEntry->Next);
 
@@ -992,15 +1096,30 @@ public:
       // Note that we don't set the waiters bit because we're not actually
       // blocking any threads.
 
-      // Transition the locked storage to the completion queue.
-      if (LockedStorageKind != LSK::CompletionQueue) {
+      // Ensure that there's a completion queue.
+      MetadataCompletionQueueEntry **completionQueue;
+
+      switch (LockedStorageKind) {
+      case LSK::Complete:
+        swift_runtime_unreachable("enqueuing on complete cache entry?");
+
+      case LSK::AllocatingThread:
         LockedStorageKind = LSK::CompletionQueue;
-        new (&LockedStorage.CompletionQueue)
-          std::unique_ptr<MetadataCompletionQueueEntry>();
+        LockedStorage.CompletionQueue = nullptr;
+        completionQueue = &LockedStorage.CompletionQueue;
+        break;
+
+      case LSK::CompletionQueue:
+        completionQueue = &LockedStorage.CompletionQueue;
+        break;
+
+      case LSK::QueueEntry:
+        completionQueue = &LockedStorage.QueueEntry->CompletionQueue;
+        break;
       }
 
-      queueEntry->Next = std::move(LockedStorage.CompletionQueue);
-      LockedStorage.CompletionQueue = std::move(queueEntry);
+      queueEntry->Next = *completionQueue;
+      *completionQueue = queueEntry;
       return true;
     });
   }

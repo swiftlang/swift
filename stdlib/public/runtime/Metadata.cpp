@@ -3332,35 +3332,30 @@ static Result performOnMetadataCache(const Metadata *metadata,
                                                  getCache(generics), key);
 }
 
-bool swift::addToMetadataQueue(
-                  std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
-                  const Metadata *dependency,
-                  MetadataState dependencyRequirement) {
+bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
+                               const Metadata *dependency,
+                               MetadataState dependencyRequirement) {
   struct EnqueueCallbacks {
-    std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
+    MetadataCompletionQueueEntry *QueueEntry;
 
     bool forGenericMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description,
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
-      return cache.enqueue(key, std::move(QueueEntry));
+      return cache.enqueue(key, QueueEntry);
     }
 
     bool forOtherMetadata(const Metadata *metadata) && {
       swift_runtime_unreachable("metadata should always be complete");
     }
-  } callbacks = { std::move(queueEntry) };
-
-  // Set the requirement.
-  queueEntry->DependencyRequirement = dependencyRequirement;
+  } callbacks = { queueEntry };
 
   return performOnMetadataCache<bool>(dependency, std::move(callbacks));
 }
 
-void swift::resumeMetadataCompletion(
-                   std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry) {
+void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
   struct ResumeCallbacks {
-    std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
+    MetadataCompletionQueueEntry *QueueEntry;
 
     static MetadataRequest getRequest() {
       return MetadataRequest(MetadataState::Complete,
@@ -3371,7 +3366,7 @@ void swift::resumeMetadataCompletion(
                             const TypeContextDescriptor *description,
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
-      cache.resumeInitialization(key, std::move(QueueEntry),
+      cache.resumeInitialization(key, QueueEntry,
                                  getRequest(),
                                  description,
                                  // This array comes from the metadata, so
@@ -3383,7 +3378,7 @@ void swift::resumeMetadataCompletion(
     void forOtherMetadata(const Metadata *metadata) && {
       swift_runtime_unreachable("metadata should always be complete");
     }
-  } callbacks = { std::move(queueEntry) };
+  } callbacks = { queueEntry };
 
   auto metadata = queueEntry->Value;
   performOnMetadataCache<void>(metadata, std::move(callbacks));
