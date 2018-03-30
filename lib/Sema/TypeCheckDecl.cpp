@@ -4010,6 +4010,15 @@ public:
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
       }
+
+      // Add local types to per-source file list.
+      if (auto *TD = dyn_cast<TypeDecl>(VD)) {
+        auto *DC = TD->getDeclContext();
+        if (DC->isLocalContext()) {
+          auto *SF = DC->getParentSourceFile();
+          SF->LocalTypeDecls.insert(TD);
+        }
+      }
     }
 
     if (!IsFirstPass) {

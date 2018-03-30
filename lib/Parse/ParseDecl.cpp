@@ -2161,10 +2161,6 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
     return;
 
-  if (auto TD = dyn_cast<TypeDecl>(D))
-    if (!getScopeInfo().isInactiveConfigBlock())
-      SF.LocalTypeDecls.insert(TD);
-
   Identifier name = D->getBaseName().getIdentifier();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
