@@ -1354,7 +1354,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
       .highlight(AttrRange);
-    diagnose(DuplicateAttribute->getLocation(), diag::previous_attribute, DeclAttribute::isDeclModifier(DK))
+    diagnose(DuplicateAttribute->getLocation(),
+             diag::previous_attribute,
+             DeclAttribute::isDeclModifier(DK))
       .highlight(DuplicateAttribute->getRange());
   }
 
@@ -1464,14 +1466,35 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
 
-  if (DK == DAK_Count && Tok.getText() == "availability") {
-    // We renamed @availability to @available, so if we see the former,
-    // treat it as the latter and emit a Fix-It.
-    DK = DAK_Available;
-    diagnose(Tok, diag::attr_availability_renamed)
-        .fixItReplace(Tok.getLoc(), "available");
-  }
+  auto checkRenamedAttr = [&](StringRef oldName, StringRef newName,
+                              DeclAttrKind kind, bool warning) {
+    if (DK == DAK_Count && Tok.getText() == oldName) {
+      // We renamed @availability to @available, so if we see the former,
+      // treat it as the latter and emit a Fix-It.
+      DK = kind;
+      if (warning) {
+        diagnose(Tok, diag::attr_renamed_warning, oldName, newName)
+            .fixItReplace(Tok.getLoc(), newName);
+      } else {
+        diagnose(Tok, diag::attr_renamed, oldName, newName)
+            .fixItReplace(Tok.getLoc(), newName);
+      }
+    }
+  };
 
+  // FIXME: This renaming happened before Swift 3, we can probably remove
+  // the specific fallback path at some point.
+  checkRenamedAttr("availability", "available", DAK_Available, false);
+
+  // In Swift 5 and above, these become hard errors. Otherwise, emit a
+  // warning for compatibility.
+  if (!Context.isSwiftVersionAtLeast(5)) {
+    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, true);
+    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, true);
+  } else {
+    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, false);
+    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, false);
+  }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
