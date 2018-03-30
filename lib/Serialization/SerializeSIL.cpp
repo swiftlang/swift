@@ -580,18 +580,11 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
 
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
-__attribute__((noinline))
-static unsigned getZeroOrOne(bool getOne) {
-  if (getOne)
-    return 0x1;
-  return 0x0;
-}
-
 void SILSerializer::writeConversionLikeInstruction(
     const SingleValueInstruction *I, bool guaranteed) {
   assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
-  writeOneTypeOneOperandLayout(I->getKind(), getZeroOrOne(guaranteed),
-                               I->getType(), I->getOperand(0));
+  writeOneTypeOneOperandLayout(I->getKind(), guaranteed ? 1 : 0, I->getType(),
+                               I->getOperand(0));
 }
 
 void
