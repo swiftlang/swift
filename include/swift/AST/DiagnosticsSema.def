@@ -3758,7 +3758,7 @@ ERROR(class_designated_init_inlinable_resilient,none,
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
-      none, "'@%0' attribute cannot be applied to stored properties", (StringRef))
+      none, "'%0' attribute cannot be applied to stored properties", (DeclAttribute))
 
 ERROR(inlinable_dynamic_not_supported,
       none, "'@inlinable' attribute cannot be applied to 'dynamic' declarations", ())

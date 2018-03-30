@@ -292,7 +292,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
     if (VD->hasStorage())
       return diagnoseAndRemoveAttr(attr,
                                    diag::attribute_invalid_on_stored_property,
-                                   attr->getAttrName());
+                                   attr);
   }
 }
 
@@ -1948,12 +1948,8 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
                                     /*isUsageFromInline=*/true);
   if (access < AccessLevel::Public) {
-    TC.diagnose(attr->getLocation(),
-                diag::fixed_layout_attr_on_internal_type,
-                VD->getFullName(),
-                access)
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
+                          VD->getFullName(), access);
   }
 }
 
@@ -1963,29 +1959,22 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // FIXME: Once protocols can contain nominal types, do we want to allow
   // these nominal types to have access control (and also @usableFromInline)?
   if (isa<ProtocolDecl>(VD->getDeclContext())) {
-    TC.diagnose(attr->getLocation(),
-                diag::versioned_attr_in_protocol)
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::versioned_attr_in_protocol);
     return;
   }
 
   // @usableFromInline can only be applied to internal declarations.
   if (VD->getFormalAccess() != AccessLevel::Internal) {
-    TC.diagnose(attr->getLocation(), diag::versioned_attr_with_explicit_access,
-                VD->getFullName(),
-                VD->getFormalAccess())
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::versioned_attr_with_explicit_access,
+                          VD->getFullName(),
+                          VD->getFormalAccess());
     return;
   }
 
   // Symbols of dynamically-dispatched declarations are never referenced
   // directly, so marking them as @usableFromInline does not make sense.
   if (VD->isDynamic()) {
-    TC.diagnose(attr->getLocation(),
-                diag::versioned_dynamic_not_supported);
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::versioned_dynamic_not_supported);
     return;
   }
 }
@@ -1998,11 +1987,9 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
   // because clients cannot directly access storage.
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->hasStorage() || VD->getAttrs().hasAttribute<LazyAttr>()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attribute_invalid_on_stored_property,
-                  attr->getAttrName())
-        .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
+      diagnoseAndRemoveAttr(attr,
+                            diag::attribute_invalid_on_stored_property,
+                            attr);
       return;
     }
   }
@@ -2012,9 +1999,7 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
   // Calls to dynamically-dispatched declarations are never devirtualized,
   // so marking them as @inlinable does not make sense.
   if (VD->isDynamic()) {
-    TC.diagnose(attr->getLocation(),
-                diag::inlinable_dynamic_not_supported);
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::inlinable_dynamic_not_supported);
     return;
   }
 
@@ -2023,12 +2008,9 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
                                     /*isUsageFromInline=*/true);
   if (access < AccessLevel::Public) {
-    TC.diagnose(attr->getLocation(),
-                diag::inlinable_decl_not_public,
-                VD->getBaseName(),
-                access)
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::inlinable_decl_not_public,
+                          VD->getBaseName(),
+                          access);
     return;
   }
 }
@@ -2036,11 +2018,9 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
 void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->hasStorage()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attribute_invalid_on_stored_property,
-                  attr->getAttrName())
-      .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
+      diagnoseAndRemoveAttr(attr,
+                            diag::attribute_invalid_on_stored_property,
+                            attr);
       return;
     }
   }
@@ -2051,10 +2031,9 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
     if (auto result = FD->getResultInterfaceType()) {
       auto resultIsVoid = result->isVoid();
       if (resultIsVoid || result->isUninhabited()) {
-        auto warn = diag::discardable_result_on_void_never_function;
-        auto diagnostic = TC.diagnose(D->getStartLoc(), warn, resultIsVoid);
-        diagnostic.fixItRemove(attr->getRangeWithAt());
-        attr->setInvalid();
+        diagnoseAndRemoveAttr(attr,
+                              diag::discardable_result_on_void_never_function,
+                              resultIsVoid);
       }
     }
   }
