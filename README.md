@@ -54,7 +54,7 @@ supported host development operating systems.
 
 #### macOS
 
-To build for macOS, you need [Xcode 9.3 beta](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 9.3](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
