@@ -411,9 +411,8 @@ internal func _float${bits}ToString(
   var buffer = _Buffer32()
   return buffer.withBytes { (bufferPtr) in
     let actualLength = _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
-    return String._fromWellFormedCodeUnitSequence(
-               UTF8.self,
-               input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+    return String._fromASCII(
+      UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
   }
 }
 
