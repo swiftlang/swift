@@ -80,7 +80,7 @@ def sequence(debugger, command, exec_ctx, result, internal_dict):
         breakpoint command add -o 'seq frame info; reg read arg1 arg2 arg3'
 
         command regex b
-        s/b (.+) if (.+)/seq _regexp-break %1; break mod -c "%2"/
+        s/(.+) if (.+)/seq _regexp-break %1; break mod -c "%2"/
         s/(.*)/_regexp-break %1/
     """
     interpreter = debugger.GetCommandInterpreter()
