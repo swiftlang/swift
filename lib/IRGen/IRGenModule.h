@@ -337,13 +337,11 @@ public:
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
-  
-  void addLazyFunction(SILFunction *f) {
-    // Add it to the queue if it hasn't already been put there.
-    if (LazilyEmittedFunctions.insert(f).second) {
-      LazyFunctionDefinitions.push_back(f);
-      DefaultIGMForFunction[f] = CurrentIGM;
-    }
+
+  void addLazyFunction(SILFunction *f);
+
+  void forceLocalEmitOfLazyFunction(SILFunction *f) {
+    DefaultIGMForFunction[f] = CurrentIGM;
   }
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
@@ -1208,6 +1206,9 @@ public:
   llvm::Constant *
   getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
                                     ForDefinition_t forDefinition);
+  llvm::Constant *
+  getAddrOfResilientWitnessTable(const NormalProtocolConformance *C,
+                                 ConstantInit definition);
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(
                                     const NormalProtocolConformance *C);
@@ -1229,6 +1230,10 @@ public:
   getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
        llvm::Type *defaultType,
        ConstantReference::Directness forceIndirect = ConstantReference::Direct);
+
+  ConstantReference
+  getFunctionGOTEquivalent(LinkEntity entity,
+                           llvm::Function *func);
 
   llvm::Constant *
   emitRelativeReference(ConstantReference target,

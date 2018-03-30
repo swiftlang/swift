@@ -3561,20 +3561,13 @@ namespace {
     void addRequirements() {
       auto &pi = IGM.getProtocolInfo(Protocol);
 
-      B.addInt16(DefaultWitnesses
-                   ? DefaultWitnesses->getMinimumWitnessTableSize()
-                   : pi.getNumWitnesses());
-      B.addInt16(pi.getNumWitnesses());
+      B.addInt32(pi.getNumWitnesses());
 
       // If there are no entries, just add a null reference and return.
       if (pi.getNumWitnesses() == 0) {
         B.addInt(IGM.RelativeAddressTy, 0);
         return;
       }
-
-#ifndef NDEBUG
-      unsigned numDefaultWitnesses = 0;
-#endif
 
       ConstantInitBuilder reqtBuilder(IGM);
       auto reqtsArray = reqtBuilder.beginArray(IGM.ProtocolRequirementStructTy);
@@ -3591,11 +3584,6 @@ namespace {
 
         // Default implementation.
         reqt.addRelativeAddressOrNull(info.DefaultImpl);
-#ifndef NDEBUG
-        assert((info.DefaultImpl || numDefaultWitnesses == 0) &&
-               "adding mandatory witness after defaulted witness");
-        if (info.DefaultImpl) numDefaultWitnesses++;
-#endif
 
         // Add the associated type name to the list.
         if (entry.isAssociatedType()) {
@@ -3606,16 +3594,6 @@ namespace {
 
         reqt.finishAndAddTo(reqtsArray);
       }
-
-#ifndef NDEBUG
-      if (DefaultWitnesses) {
-        assert(numDefaultWitnesses
-                 == DefaultWitnesses->getDefaultWitnessTableSize() &&
-               "didn't use all the default witnesses!");
-      } else {
-        assert(numDefaultWitnesses == 0);
-      }
-#endif
 
       auto global =
         cast<llvm::GlobalVariable>(
@@ -3671,8 +3649,8 @@ namespace {
     llvm::Constant *findDefaultWitness(SILDeclRef func) {
       if (!DefaultWitnesses) return nullptr;
 
-      for (auto &entry : DefaultWitnesses->getResilientDefaultEntries()) {
-        if (entry.getRequirement() != func)
+      for (auto &entry : DefaultWitnesses->getEntries()) {
+        if (!entry.isValid() || entry.getRequirement() != func)
           continue;
         return IGM.getAddrOfSILFunction(entry.getWitness(), NotForDefinition);
       }

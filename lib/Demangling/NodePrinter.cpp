@@ -443,6 +443,7 @@ private:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
     case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
@@ -1314,6 +1315,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
     Printer << "instantiation function for generic protocol witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ResilientProtocolWitnessTable:
+    Printer << "resilient protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::VTableThunk: {

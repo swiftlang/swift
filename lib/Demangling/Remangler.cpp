@@ -1056,6 +1056,11 @@ void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(Node *nod
   Buffer << "WI";
 }
 
+void Remangler::mangleResilientProtocolWitnessTable(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Wr";
+}
+
 void Remangler::mangleGenericPartialSpecialization(Node *node) {
   for (NodePointer Child : *node) {
     if (Child->getKind() == Node::Kind::GenericSpecializationParam) {
