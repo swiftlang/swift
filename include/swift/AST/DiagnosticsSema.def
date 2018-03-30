@@ -2930,6 +2930,9 @@ ERROR(fallthrough_into_case_with_var_binding,none,
 ERROR(unnecessary_cast_over_optionset,none,
       "unnecessary cast over raw value of %0", (Type))
 
+ERROR(mutability_mismatch_multiple_pattern_list,none,
+      "'%select{var|let}0' pattern binding must match previous "
+      "'%select{var|let}1' pattern binding", (bool, bool))
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
 ERROR(type_mismatch_fallthrough_pattern_list,none,
