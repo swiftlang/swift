@@ -2777,14 +2777,21 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
   if (!options.contains(TypeResolutionFlags::AllowIUO)) {
-    Diagnostic diag = diag::
-        implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional;
-
-    if (TC.Context.isSwiftVersionAtLeast(5))
-      diag = diag::implicitly_unwrapped_optional_in_illegal_position;
-
-    TC.diagnose(repr->getStartLoc(), diag)
-        .fixItReplace(repr->getExclamationLoc(), "?");
+    if (options.contains(TypeResolutionFlags::AllowIUODeprecated)) {
+      TC.diagnose(
+          repr->getStartLoc(),
+          diag::implicitly_unwrapped_optional_deprecated_in_this_position);
+    } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
+      TC.diagnose(
+            repr->getStartLoc(),
+            diag::
+                implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
+          .fixItReplace(repr->getExclamationLoc(), "?");
+    } else {
+      TC.diagnose(repr->getStartLoc(),
+                  diag::implicitly_unwrapped_optional_in_illegal_position)
+          .fixItReplace(repr->getExclamationLoc(), "?");
+    }
   }
 
   auto elementOptions = withoutContext(options, true);
