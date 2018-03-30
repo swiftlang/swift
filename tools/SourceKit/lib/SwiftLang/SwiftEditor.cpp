@@ -46,6 +46,28 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static std::vector<unsigned> getSortedBufferIDs(
+    const llvm::DenseMap<unsigned, std::vector<DiagnosticEntryInfo>> &Map) {
+  std::vector<unsigned> bufferIDs;
+  bufferIDs.reserve(Map.size());
+  for (auto I = Map.begin(), E = Map.end(); I != E; ++I) {
+    bufferIDs.push_back(I->getFirst());
+  }
+  llvm::array_pod_sort(bufferIDs.begin(), bufferIDs.end());
+  return bufferIDs;
+}
+
+void EditorDiagConsumer::getAllDiagnostics(
+    SmallVectorImpl<DiagnosticEntryInfo> &Result) {
+  // Note: we cannot reuse InputBufIds because there may be diagnostics outside
+  // the inputs.  Instead, sort the extant buffers.
+  auto bufferIDs = getSortedBufferIDs(BufferDiagnostics);
+  for (unsigned bufferID : bufferIDs) {
+    const auto &diags = BufferDiagnostics[bufferID];
+    Result.append(diags.begin(), diags.end());
+  }
+}
+
 void EditorDiagConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
