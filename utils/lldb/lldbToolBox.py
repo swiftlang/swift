@@ -75,10 +75,14 @@ def sequence(debugger, command, exec_ctx, result, internal_dict):
     This command is particularly useful for defining aliases and breakpoint
     commands. Some examples:
 
+        # Define an alias that prints rax and also steps one instruction.
         command alias xs sequence p/x $rax; stepi
 
+        # Breakpoint command to show the frame's info and arguments.
         breakpoint command add -o 'seq frame info; reg read arg1 arg2 arg3'
 
+        # Override `b` to allow a condition to be specified. For example:
+        #     b someMethod if someVar > 2
         command regex b
         s/(.+) if (.+)/seq _regexp-break %1; break mod -c "%2"/
         s/(.*)/_regexp-break %1/
