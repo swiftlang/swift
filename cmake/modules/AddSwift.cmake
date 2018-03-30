@@ -123,10 +123,11 @@ function(_add_variant_c_compile_link_flags)
     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}${DEPLOYMENT_VERSION}")
   endif()
 
+  set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
   if(IS_DARWIN)
-    list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
-    list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+    list(APPEND result "-isysroot" "${_sysroot}")
+  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
+    list(APPEND result "--sysroot=${_sysroot}")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
@@ -294,9 +295,9 @@ function(_add_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
-  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH, so don't include it.
+  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
   if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
+    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
   is_darwin_based_sdk("${sdk}" IS_DARWIN)
@@ -314,7 +315,7 @@ function(_add_variant_swift_compile_flags
 
   if(IS_DARWIN)
     list(APPEND result
-        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
+      "-F" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
   is_build_type_optimized("${build_type}" optimized)
@@ -1619,7 +1620,7 @@ function(add_swift_library name)
         # Add PrivateFrameworks, rdar://28466433
         set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
         if(SWIFTLIB_IS_SDK_OVERLAY)
-          list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_PATH}/System/Library/PrivateFrameworks/")
+          list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
         endif()
        
        if("${sdk}" STREQUAL "IOS_SIMULATOR")
