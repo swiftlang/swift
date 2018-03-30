@@ -252,7 +252,8 @@ namespace {
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
 
-    void writeConversionLikeInstruction(const SingleValueInstruction *I);
+    void writeConversionLikeInstruction(const SingleValueInstruction *I,
+                                        bool guaranteed);
     void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
@@ -581,9 +582,10 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
 
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
-void SILSerializer::writeConversionLikeInstruction(const SingleValueInstruction *I) {
+void SILSerializer::writeConversionLikeInstruction(
+    const SingleValueInstruction *I, bool guaranteed) {
   assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
-  writeOneTypeOneOperandLayout(I->getKind(), 0, I->getType(),
+  writeOneTypeOneOperandLayout(I->getKind(), guaranteed ? 1 : 0, I->getType(),
                                I->getOperand(0));
 }
 
@@ -1448,7 +1450,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ProjectBlockStorageInst: {
-    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI));
+    bool guaranteed = false;
+    if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst)
+      guaranteed = cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed();
+    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI),
+                                   guaranteed);
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {
