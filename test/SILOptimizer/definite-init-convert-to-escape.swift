@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // Make sure that we keep the escaping closures alive accross the ultimate call.
