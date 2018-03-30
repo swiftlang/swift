@@ -13,6 +13,7 @@
 #include "CodeCompletionOrganizer.h"
 #include "SwiftASTManager.h"
 #include "SwiftLangSupport.h"
+#include "SwiftEditorDiagConsumer.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
@@ -138,6 +139,12 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
+  EditorDiagConsumer TraceDiags;
+  trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
+  if (TracedOp.enabled()) {
+    CI.addDiagnosticConsumer(&TraceDiags);
+  }
+
   CompilerInvocation Invocation;
   bool Failed = Lang.getASTManager().initCompilerInvocation(
       Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(), Error);
@@ -188,8 +195,6 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
 
   TracedInit.finish();
 
-
-  trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
   if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
@@ -215,6 +220,13 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
                            &CompletionContext);
   CI.performSema();
   SwiftConsumer.clearContext();
+
+  if (TracedOp.enabled()) {
+    SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
+    TraceDiags.getAllDiagnostics(Diagnostics);
+    TracedOp.finish(Diagnostics);
+  }
+
   return true;
 }
 
