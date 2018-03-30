@@ -11,13 +11,13 @@ import Foundation
 // CHECK:  retain_value %0
 // CHECK:  retain_value %0
 // CHECK: bb2
-// CHECK:  convert_escape_to_noescape
+// CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release
 // CHECK: bb6
 // CHECK:  retain_value %1
 // CHECK:  retain_value %1
 // CHECK: bb8
-// CHECK:  convert_escape_to_noescape
+// CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release
 // CHECK: bb12
 // CHECK:  [[F:%.*]] = function_ref @noescapeBlock3
@@ -44,7 +44,7 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:  retain_value [[V1]]
 // CHECK:  switch_enum {{.*}}bb2
 // CHECK: bb2([[V2:%.*]]: $@callee_guaranteed () -> ()):
-// CHECK:  convert_escape_to_noescape
+// CHECK:  convert_escape_to_noescape %
 // CHECK:  strong_release [[V2]]
 // CHECK: bb6({{.*}} : $Optional<@convention(block) @noescape () -> ()>)
 // CHECK:  [[F:%.*]] = function_ref @noescapeBlock
@@ -63,7 +63,7 @@ public func returnOptionalEscape() -> (() ->())?
 // NOPEEPHOLE:  destroy_addr [[SLOT]]
 // NOPEEPHOLE:  [[SOME:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1, [[V2]]
 // NOPEEPHOLE:  store [[SOME]] to [[SLOT]]
-// NOPEEPHOLE:  convert_escape_to_noescape
+// NOPEEPHOLE:  convert_escape_to_noescape %
 // NOPEEPHOLE-NOT:  strong_release
 // NOPEEPHOLE:  br
 // NOPEEPHOLE: bb6({{.*}} : $Optional<@convention(block) @noescape () -> ()>)
