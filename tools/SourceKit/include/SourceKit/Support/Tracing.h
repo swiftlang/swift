@@ -13,13 +13,17 @@
 #ifndef LLVM_SOURCEKIT_SUPPORT_TRACING_H
 #define LLVM_SOURCEKIT_SUPPORT_TRACING_H
 
+#include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/Basic/OptionSet.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 
 #include <vector>
 
 namespace SourceKit {
+  struct DiagnosticEntryInfo;
+
 namespace trace {
 
 struct SwiftArguments {
@@ -76,7 +80,8 @@ public:
                                 const StringPairs &OpArgs) = 0;
 
   // Operation previously started with startXXX has finished
-  virtual void operationFinished(uint64_t OpId, OperationKind OpKind) = 0;
+  virtual void operationFinished(uint64_t OpId, OperationKind OpKind,
+                                 ArrayRef<DiagnosticEntryInfo> Diagnostics) = 0;
 
   /// Returns the set of operations this consumer is interested in.
   ///
@@ -99,7 +104,8 @@ uint64_t startOperation(OperationKind OpKind,
                         const StringPairs &OpArgs = StringPairs());
 
 // Operation previously started with startXXX has finished
-void operationFinished(uint64_t OpId, OperationKind OpKind);
+void operationFinished(uint64_t OpId, OperationKind OpKind,
+                       ArrayRef<DiagnosticEntryInfo> Diagnostics);
 
 // Register trace consumer.
 void registerConsumer(TraceConsumer *Consumer);
@@ -134,9 +140,9 @@ public:
     OpId = startOperation(OpKind, Inv, OpArgs);
   }
 
-  void finish() {
+  void finish(ArrayRef<DiagnosticEntryInfo> Diagnostics = llvm::None) {
     if (OpId.hasValue()) {
-      operationFinished(OpId.getValue(), OpKind);
+      operationFinished(OpId.getValue(), OpKind, Diagnostics);
       OpId.reset();
     }
   }

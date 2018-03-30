@@ -2695,7 +2695,8 @@ public:
   void operationStarted(uint64_t OpId, trace::OperationKind OpKind,
                         const trace::SwiftInvocation &Inv,
                         const trace::StringPairs &OpArgs) override;
-  void operationFinished(uint64_t OpId, trace::OperationKind OpKind) override;
+  void operationFinished(uint64_t OpId, trace::OperationKind OpKind,
+                         ArrayRef<DiagnosticEntryInfo> Diagnostics) override;
   swift::OptionSet<trace::OperationKind> desiredOperations() override {
     return swift::OptionSet<trace::OperationKind>() |
            trace::OperationKind::PerformSema |
@@ -2721,8 +2722,9 @@ void CompileTrackingConsumer::operationStarted(
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 
-void CompileTrackingConsumer::operationFinished(uint64_t OpId,
-                                                trace::OperationKind OpKind) {
+void CompileTrackingConsumer::operationFinished(
+    uint64_t OpId, trace::OperationKind OpKind,
+    ArrayRef<DiagnosticEntryInfo> Diagnostics) {
   if (!desiredOperations().contains(OpKind))
     return;
 
@@ -2731,7 +2733,11 @@ void CompileTrackingConsumer::operationFinished(uint64_t OpId,
   auto Dict = RespBuilder.getDictionary();
   Dict.set(KeyNotification, CompileDidFinishUID);
   Dict.set(KeyCompileID, std::to_string(OpId));
-  // Diagnostics
+  auto DiagArray = Dict.setArray(KeyDiagnostics);
+  for (const auto &DiagInfo : Diagnostics) {
+    fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
+  }
+
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 
