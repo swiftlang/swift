@@ -1861,6 +1861,9 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
   FoundCCToken = false;
   if (Tok.isNot(tok::at_sign))
     return false;
+
+  bool error = false;
+
   SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   do {
     if (peekToken().is(tok::code_complete)) {
@@ -1871,10 +1874,12 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
     }
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     SourceLoc AtLoc = consumeToken();
-    if (parseDeclAttribute(Attributes, AtLoc))
-      return true;
+    if (parseDeclAttribute(Attributes, AtLoc)) {
+      // Consume any remaining attributes for better error recovery.
+      error = true;
+    }
   } while (Tok.is(tok::at_sign));
-  return false;
+  return error;
 }
 
 /// \brief This is the internal implementation of \c parseTypeAttributeList,
