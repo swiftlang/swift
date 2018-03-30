@@ -8,6 +8,7 @@ to the swift checkout.
 """
 
 import argparse
+import lldb
 import os
 import shlex
 import subprocess
@@ -67,9 +68,40 @@ def disassemble_to_file(debugger, command, exec_ctx, result, internal_dict):
     args.file.write(exec_ctx.frame.disassembly)
 
 
+def sequence(debugger, command, exec_ctx, result, internal_dict):
+    """
+    Combine multiple semicolon separated lldb commands into one command.
+
+    This command is particularly useful for defining aliases and breakpoint
+    commands. Some examples:
+
+        command alias xs sequence p/x $rax; stepi
+
+        breakpoint command add -o 'seq frame info; reg read arg1 arg2 arg3'
+
+        command regex b
+        s/b (.+) if (.+)/seq _regexp-break %1; break mod -c "%2"/
+        s/(.*)/_regexp-break %1/
+    """
+    interpreter = debugger.GetCommandInterpreter()
+    for subcommand in command.split(';'):
+        ret = lldb.SBCommandReturnObject()
+        interpreter.HandleCommand(subcommand.strip(), exec_ctx, ret)
+        if ret.GetOutput():
+            print >>result, ret.GetOutput().strip()
+
+        if not ret.Succeeded():
+            result.SetError(ret.GetError())
+            result.SetStatus(ret.GetStatus())
+            return
+
+
 def __lldb_init_module(debugger, internal_dict):
     import_llvm_dataformatters(debugger)
     debugger.HandleCommand('command script add disassemble-asm-cfg '
                            '-f lldbToolBox.disassemble_asm_cfg')
     debugger.HandleCommand('command script add disassemble-to-file '
                            '-f lldbToolBox.disassemble_to_file')
+    debugger.HandleCommand('command script add sequence '
+                           '-h "Run multiple semicolon separated commands" '
+                           '-f lldbToolBox.sequence')
