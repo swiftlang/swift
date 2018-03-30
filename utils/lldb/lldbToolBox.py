@@ -89,8 +89,12 @@ def sequence(debugger, command, exec_ctx, result, internal_dict):
     """
     interpreter = debugger.GetCommandInterpreter()
     for subcommand in command.split(';'):
+        subcommand = subcommand.strip()
+        if not subcommand:
+            continue # skip empty commands
+
         ret = lldb.SBCommandReturnObject()
-        interpreter.HandleCommand(subcommand.strip(), exec_ctx, ret)
+        interpreter.HandleCommand(subcommand, exec_ctx, ret)
         if ret.GetOutput():
             print >>result, ret.GetOutput().strip()
 
