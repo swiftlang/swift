@@ -871,25 +871,41 @@ public:
           // For each variable in the pattern, make sure its type is identical to what it
           // was in the first label item's pattern.
           auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
-          if (pattern != firstPattern) {
-            SmallVector<VarDecl *, 4> vars;
-            firstPattern->collectVariables(vars);
-            pattern->forEachVariable([&](VarDecl *VD) {
-              if (!VD->hasName())
-                return;
-              for (auto *expected : vars) {
-                if (expected->hasName() && expected->getName() == VD->getName()) {
-                  if (!VD->getType()->isEqual(expected->getType())) {
-                    TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
-                                VD->getType(), expected->getType());
-                    VD->markInvalid();
-                    expected->markInvalid();
-                  }
-                  return;
+          SmallVector<VarDecl *, 4> vars;
+          firstPattern->collectVariables(vars);
+          pattern->forEachVariable([&](VarDecl *VD) {
+            if (!VD->hasName())
+              return;
+            for (auto *expected : vars) {
+              if (expected->hasName() && expected->getName() == VD->getName()) {
+                if (VD->hasType() && expected->hasType() && !expected->isInvalid() &&
+                    !VD->getType()->isEqual(expected->getType())) {
+                  TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,
+                              VD->getType(), expected->getType());
+                  VD->markInvalid();
+                  expected->markInvalid();
                 }
+                if (expected->isLet() != VD->isLet()) {
+                  auto diag = TC.diagnose(VD->getLoc(),
+                                          diag::mutability_mismatch_multiple_pattern_list,
+                                          VD->isLet(), expected->isLet());
+
+                  VarPattern *foundVP = nullptr;
+                  VD->getParentPattern()->forEachNode([&](Pattern *P) {
+                    if (auto *VP = dyn_cast<VarPattern>(P))
+                      if (VP->getSingleVar() == VD)
+                        foundVP = VP;
+                  });
+                  if (foundVP)
+                    diag.fixItReplace(foundVP->getLoc(),
+                                      expected->isLet() ? "let" : "var");
+                  VD->markInvalid();
+                  expected->markInvalid();
+                }
+                return;
               }
-            });
-          }
+            }
+          });
         }
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
