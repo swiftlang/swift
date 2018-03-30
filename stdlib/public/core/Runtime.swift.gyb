@@ -407,37 +407,13 @@ internal func _float${bits}ToStringImpl(
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> String {
-
-  if !value.isFinite {
-    let significand = value.significandBitPattern
-    if significand == 0 {
-      // Infinity
-      return value.sign == .minus ? "-inf" : "inf"
-    }
-    else {
-      // NaN
-      if !debug {
-        return "nan"
-      }
-      let isSignaling = (significand & Float${bits}._quietNaNMask) == 0
-      let payload = significand & ((Float${bits}._quietNaNMask >> 1) - 1)
-      // FIXME(performance): Inefficient String manipulation. We could move
-      // this to C function.
-      return
-        (value.sign == .minus ? "-" : "")
-        + (isSignaling ? "snan" : "nan")
-        + (payload == 0 ? "" : ("(0x" + String(payload, radix: 16) + ")"))
-    }
-  }
-
   _sanityCheck(MemoryLayout<_Buffer32>.size == 32)
-  _sanityCheck(MemoryLayout<_Buffer72>.size == 72)
-
   var buffer = _Buffer32()
   return buffer.withBytes { (bufferPtr) in
     let actualLength = _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
-    return String._fromASCII(
-      UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+    return String._fromWellFormedCodeUnitSequence(
+               UTF8.self,
+               input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
   }
 }
 
