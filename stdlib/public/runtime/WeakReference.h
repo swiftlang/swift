@@ -113,7 +113,7 @@ class WeakReferenceBits {
 
  public:
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  WeakReferenceBits() { }
+  WeakReferenceBits() noexcept { }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   WeakReferenceBits(HeapObjectSideTableEntry *newValue) {
