@@ -146,9 +146,14 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
     return type->getAnyNominal()->getDeclaredType();
   case DeclTypeKind::DeclaredTypeInContext:
     return type;
-  case DeclTypeKind::DeclaredInterfaceType:
+  case DeclTypeKind::DeclaredInterfaceType: {
     // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-    return type->getAnyNominal()->getDeclaredInterfaceType();
+    if (auto nominal = type->getAnyNominal())
+      return nominal->getDeclaredInterfaceType();
+
+    auto typealias = cast<TypeAliasDecl>(type->getAnyGeneric());
+    return typealias->getUnderlyingTypeLoc().getType();
+  }
   }
 
   llvm_unreachable("Unhandled DeclTypeKind in switch.");
