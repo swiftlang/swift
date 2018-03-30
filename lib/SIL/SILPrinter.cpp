@@ -1435,7 +1435,8 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
+          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());

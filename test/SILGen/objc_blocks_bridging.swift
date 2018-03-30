@@ -174,9 +174,9 @@ func bridgeNonnullBlockResult() {
   nonnullStringBlockResult { return "test" }
 }
 
-// CHECK-LABEL: sil hidden @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tF
-func bridgeNoescapeBlock(fn: () -> ()) {
-  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU_
+// CHECK-LABEL: sil hidden @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtF
+func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtFyyXEfU_
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
   // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
@@ -216,7 +216,7 @@ func bridgeNoescapeBlock(fn: () -> ()) {
   // CHECK: apply [[FN]]([[NIL_BLOCK]])
   noescapeBlock(nil)
 
-  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU0_
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtF
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
   // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
@@ -246,12 +246,26 @@ func bridgeNoescapeBlock(fn: () -> ()) {
   // CHECK: apply [[FN]]([[BLOCK]])
   noescapeNonnullBlock(fn)
 
+  noescapeBlock(optFn)
+
   noescapeBlockAlias { }
   noescapeBlockAlias(fn)
   noescapeBlockAlias(nil)
 
   noescapeNonnullBlockAlias { }
   noescapeNonnullBlockAlias(fn)
+}
+
+public func bridgeNoescapeBlock( optFn: ((String?) -> ())?, optFn2: ((String?) -> ())?) {
+  noescapeBlock3(optFn, optFn2, "Foobar")
+}
+
+
+@_silgen_name("_returnOptionalEscape")
+public func returnOptionalEscape() -> (() ->())?
+
+public func bridgeNoescapeBlock() {
+  noescapeBlock(returnOptionalEscape())
 }
 
 class ObjCClass : NSObject {}

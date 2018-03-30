@@ -2947,6 +2947,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
+    bool guaranteed = true;
+    if (Opcode == SILInstructionKind::ConvertEscapeToNoEscapeInst)
+      if(parseSILOptional(guaranteed, *this, "not_guaranteed"))
+        return true;
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc,
                            diag::expected_tok_in_sil_instr, "to") ||
@@ -2980,7 +2984,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       ResultVal = B.createConvertFunction(InstLoc, Val, Ty);
       break;
     case SILInstructionKind::ConvertEscapeToNoEscapeInst:
-      ResultVal = B.createConvertEscapeToNoEscape(InstLoc, Val, Ty);
+      ResultVal = B.createConvertEscapeToNoEscape(InstLoc, Val, Ty, guaranteed);
       break;
     case SILInstructionKind::AddressToPointerInst:
       ResultVal = B.createAddressToPointer(InstLoc, Val, Ty);

@@ -351,6 +351,12 @@ public:
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy);
 
+  using SILBuilder::createConvertEscapeToNoEscape;
+  ManagedValue
+  createConvertEscapeToNoEscape(SILLocation loc, ManagedValue fn,
+                                SILType resultTy,
+                                bool postponeToNoEscapeCleanup = true);
+
   using SILBuilder::createStore;
   /// Forward \p value into \p address.
   ///

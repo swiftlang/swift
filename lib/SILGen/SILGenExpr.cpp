@@ -2090,8 +2090,11 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   if (srcRepTy != srcTy)
     result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
 
-  if (srcTy != destTy)
-    result = SGF.emitTransformedValue(e, result, srcTy, destTy);
+  if (srcTy != destTy) {
+    bool postponeToNoEscapeCleanup = !isa<BindOptionalExpr>(e->getSubExpr());
+    result = SGF.emitTransformedValue(e, result, srcTy, destTy, SGFContext(),
+                                      postponeToNoEscapeCleanup);
+  }
 
   if (destTy != destRepTy)
     result = convertFunctionRepresentation(SGF, e, result, destTy, destRepTy);
