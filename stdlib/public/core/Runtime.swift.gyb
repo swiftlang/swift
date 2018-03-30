@@ -411,9 +411,8 @@ internal func _float${bits}ToString(
   var buffer = _Buffer32()
   return buffer.withBytes { (bufferPtr) in
     let actualLength = _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
-    return String._fromWellFormedCodeUnitSequence(
-               UTF8.self,
-               input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+    return String._fromASCII(
+      UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
   }
 }
 
@@ -442,18 +441,16 @@ internal func _int64ToString(
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _int64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      return String._fromASCII(
+        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   } else {
     var buffer = _Buffer72()
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _int64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      return String._fromASCII(
+        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   }
 }
@@ -476,18 +473,16 @@ func _uint64ToString(
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _uint64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      return String._fromASCII(
+        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   } else {
     var buffer = _Buffer72()
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _uint64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromWellFormedCodeUnitSequence(
-        UTF8.self,
-        input: UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      return String._fromASCII(
+        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   }
 }

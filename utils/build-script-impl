@@ -2864,7 +2864,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         -E "${DOTEST_EXTRA}"
                 else
                     with_pushd "${results_dir}" \
-                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
                         SWIFTLIBS="${swift_build_dir}/lib/swift" \
                         "${LLDB_SOURCE_DIR}"/test/dotest.py \
                         --executable "${lldb_executable}" \

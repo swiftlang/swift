@@ -1177,7 +1177,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_versioned
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
-    _ storage: _ContiguousArrayStorage<Element>, count: Int
+    _ storage: __owned _ContiguousArrayStorage<Element>, count: Int
   ) -> (Array, UnsafeMutablePointer<Element>) {
 
     let innerBuffer = _ContiguousArrayBuffer<Element>(
@@ -2294,6 +2294,20 @@ extension ${Self} : Equatable where Element : Equatable {
   @_inlineable
   public static func !=(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
     return !(lhs == rhs)
+  }
+}
+
+extension ${Self}: Hashable where Element: Hashable {
+  @_inlineable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    for element in self {
+      hasher.append(element)
+    }
   }
 }
 

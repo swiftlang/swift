@@ -610,6 +610,10 @@ ERROR(reserved_member_name,none,
       " 'foo.%1' expression", (DeclName, StringRef))
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
+WARNING(invalid_redecl_swift5_warning,none,
+        "redeclaration of %0 is deprecated and will be illegal in Swift 5",
+        (DeclName))
+
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
@@ -885,6 +889,9 @@ ERROR(missing_explicit_conversion,none,
 ERROR(missing_address_of,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
+ERROR(extraneous_address_of,none,
+      "use of extraneous '&'",
+      ())
 ERROR(extra_address_of,none,
       "'&' used with non-inout argument of type %0",
       (Type))
@@ -1404,6 +1411,9 @@ NOTE(type_does_not_inherit_or_conform_requirement,none,
 ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
+ERROR(types_not_equal_in_call,none,
+      "%0 requires the types %1 and %2 be equivalent to use %3",
+      (Type, Type, Type, DeclName))
 ERROR(type_does_not_conform_owner,none,
       "%0 requires that %1 conform to %2", (Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
@@ -2162,10 +2172,6 @@ ERROR(dynamic_self_non_method,none,
 ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
-
-// Duplicate declarations
-ERROR(duplicate_enum_element,none,
-      "duplicate definition of enum element",())
 
 // Property behaviors
 ERROR(property_behavior_not_protocol,none,

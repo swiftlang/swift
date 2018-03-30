@@ -169,10 +169,14 @@ class LinkEntity {
     /// The module descriptor for a module.
     /// The pointer is a ModuleDecl*.
     ModuleDescriptor,
-    
+
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
+
+    /// An array of protocol requirement descriptors for a protocol.
+    /// The pointer is a ProtocolDecl*.
+    ProtocolRequirementArray,
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
@@ -195,6 +199,10 @@ class LinkEntity {
     /// ProtocolConformance*.
     DirectProtocolWitnessTable,
 
+    /// A protocol witness table pattern. The secondary pointer is a
+    /// ProtocolConformance*.
+    ProtocolWitnessTablePattern,
+
     /// A witness accessor function. The secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTableAccessFunction,
@@ -206,6 +214,9 @@ class LinkEntity {
     /// The instantiation function for a generic protocol witness table.
     /// The secondary pointer is a ProtocolConformance*.
     GenericProtocolWitnessTableInstantiationFunction,
+
+    /// A list of key/value pairs that resiliently specify a witness table.
+    ResilientProtocolWitnessTable,
 
     /// A function which returns the type metadata for the associated type
     /// of a protocol.  The secondary pointer is a ProtocolConformance*.
@@ -280,7 +291,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::ProtocolDescriptor;
+    return k <= Kind::ProtocolRequirementArray;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -567,6 +578,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forProtocolRequirementArray(ProtocolDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ProtocolRequirementArray, decl);
+    return entity;
+  }
+
   static LinkEntity forValueWitness(CanType concreteType, ValueWitness witness) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
@@ -606,6 +623,13 @@ public:
   }
 
   static LinkEntity
+  forProtocolWitnessTablePattern(const ProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(Kind::ProtocolWitnessTablePattern, C);
+    return entity;
+  }
+
+  static LinkEntity
   forProtocolWitnessTableAccessFunction(const ProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTableAccessFunction,
@@ -617,6 +641,13 @@ public:
   forGenericProtocolWitnessTableCache(const ProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::GenericProtocolWitnessTableCache, C);
+    return entity;
+  }
+
+  static LinkEntity
+  forResilientProtocolWitnessTable(const ProtocolConformance *C) {
+    LinkEntity entity;
+    entity.setForProtocolConformance(Kind::ResilientProtocolWitnessTable, C);
     return entity;
   }
 
@@ -855,7 +886,7 @@ public:
 
 /// Allow LinkEntity to be used as a key for a DenseMap.
 template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
-  typedef swift::irgen::LinkEntity LinkEntity;
+  using LinkEntity = swift::irgen::LinkEntity;
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
     entity.Pointer = nullptr;

@@ -48,7 +48,6 @@ set(SWIFTLIB_ESSENTIAL
   CTypes.swift
   DebuggerSupport.swift
   Dictionary.swift
-  DoubleWidth.swift.gyb
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
@@ -116,6 +115,7 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
+  SmallString.swift
   Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb

@@ -741,7 +741,7 @@ extension ${mattype} {
 %   if rows == cols:
   /// Inverse of the matrix if it exists, otherwise the contents of the
   /// resulting matrix are undefined.
-  @available(OSX 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
+  @available(macOS 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
   @_transparent
   public var inverse: ${mattype} {
     return simd_inverse(self)
@@ -845,7 +845,7 @@ public func matrix_from_diagonal(_ d: ${diagtype}) -> ${mattype} {
 }
 
 @available(swift, deprecated: 4, message: "Use the .inverse property instead.")
-@available(OSX 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
+@available(macOS 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
 public func matrix_invert(_ x: ${mattype}) -> ${mattype} {
   return x.inverse
 }

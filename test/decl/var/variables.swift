@@ -82,7 +82,7 @@ func tuplePatternDestructuring(_ x : Int, y : Int) {
   _ = i+j
 
   // <rdar://problem/20395243> QoI: type variable reconstruction failing for tuple types
-  let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{tuple type '(b: Int, a: Int)' is not convertible to tuple '(x: _, a: _)'}}
+  let (x: g1, a: h1) = (b: x, a: y)  // expected-error {{tuple type '(b: Int, a: Int)' is not convertible to tuple '(x: Int, a: Int)'}}
 }
 
 // <rdar://problem/21057425> Crash while compiling attached test-app.

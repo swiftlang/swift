@@ -890,6 +890,8 @@ tests.test("binaryLogarithm/generic") {
   expectEqual(
     Int((42 as MockBinaryInteger<UInt>)._binaryLogarithm()),
     Int((42 as UInt)._binaryLogarithm()))
+// FIXME: DoubleWidth is no longer part of the standard library
+#if false
   expectEqual(
     Int((42 as MockBinaryInteger<DoubleWidth<Int>>)._binaryLogarithm()),
     Int((42 as DoubleWidth<Int>)._binaryLogarithm()))
@@ -900,6 +902,7 @@ tests.test("binaryLogarithm/generic") {
     Int((42 as MockBinaryInteger<DoubleWidth<DoubleWidth<Int>>>)
       ._binaryLogarithm()),
     Int((42 as DoubleWidth<DoubleWidth<Int>>)._binaryLogarithm()))
+#endif
 }
 
 runAllTests()

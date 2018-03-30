@@ -588,7 +588,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(TC, *TranslatedArgList, Inputs, OI);
+  buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -776,8 +776,7 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
   return A;
 }
 
-
-typedef std::function<void(InputArgList &, unsigned)> RemainingArgsHandler;
+using RemainingArgsHandler = std::function<void(InputArgList &, unsigned)>;
 
 std::unique_ptr<InputArgList>
 parseArgsUntil(const llvm::opt::OptTable& Opts,
@@ -1094,27 +1093,21 @@ static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
 }
 
 void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
-                             const InputFileList &Inputs,
+                             const bool BatchMode, const InputFileList &Inputs,
                              OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
   // appropriately below if linking is required.
 
-  if (driverKind == DriverKind::Interactive) {
-    OI.CompilerMode = OutputInfo::Mode::Immediate;
-    if (Inputs.empty())
-      OI.CompilerMode = OutputInfo::Mode::REPL;
-    OI.CompilerOutputType = file_types::TY_Nothing;
+  OI.CompilerOutputType = driverKind == DriverKind::Interactive
+                              ? file_types::TY_Nothing
+                              : file_types::TY_Object;
 
-  } else { // DriverKind::Batch
-    OI.CompilerMode = OutputInfo::Mode::StandardCompile;
-    if (Args.hasArg(options::OPT_whole_module_optimization,
-                    options::OPT_index_file))
-      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
-    OI.CompilerOutputType = file_types::TY_Object;
-  }
+  OI.CompilerMode = computeCompilerMode(Args, Inputs);
 
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
-    if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
+    if (BatchMode) {
+      Diags.diagnose(SourceLoc(), diag::warning_cannot_multithread_batch_mode);
+    } else if (StringRef(A->getValue()).getAsInteger(10, OI.numThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
@@ -1376,6 +1369,31 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   }
 
+}
+
+OutputInfo::Mode
+Driver::computeCompilerMode(const DerivedArgList &Args,
+                            const InputFileList &Inputs) const {
+
+  if (driverKind == Driver::DriverKind::Interactive)
+    return Inputs.empty() ? OutputInfo::Mode::REPL
+                          : OutputInfo::Mode::Immediate;
+
+  const Arg *ArgRequiringWMO = Args.getLastArg(
+      options::OPT_whole_module_optimization, options::OPT_index_file);
+
+  if (!ArgRequiringWMO)
+    return OutputInfo::Mode::StandardCompile;
+
+  // Test for -enable-batch-mode, rather than the BatchMode flag that is
+  // passed into the caller because the diagnostic is intended to warn against
+  // overriding *explicit* batch mode. No warning should be given if in batch
+  // mode by default.
+  if (Args.hasArg(options::OPT_enable_batch_mode))
+    Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
+                   ArgRequiringWMO->getOption().getPrefixedName());
+
+  return OutputInfo::Mode::SingleCompile;
 }
 
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
@@ -2305,6 +2323,15 @@ void Driver::computeMainOutput(
       file_types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
     // output file: one for each input files.
+
+    // In batch mode, the driver will try to reserve multiple differing main
+    // outputs to a bridging header. Another assertion will trip, but the cause
+    // will be harder to track down. Since the driver now ignores -num-threads
+    // in batch mode, the user should never be able to falsify this assertion.
+    assert(!C.getBatchModeEnabled() && "Batch mode produces only one main "
+                                       "output per input action, cannot have "
+                                       "batch mode & num-threads");
+
     auto OutputFunc = [&](StringRef Base, StringRef Primary) {
       const TypeToPathMap *OMForInput = nullptr;
       if (OFM)

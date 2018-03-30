@@ -481,10 +481,28 @@ func testX1WithP2Overloading<T>(_: X1WithP2<T>) {
 }
 
 // Extend using the inferred requirement.
-// FIXME: Currently broken.
 extension X1WithP2 {
   func f() {
-    _ = X5<T>() // FIXME: expected-error{{type 'T' does not conform to protocol 'P2'}}
+    _ = X5<T>() // okay: inferred T: P2 from generic typealias
+  }
+}
+
+extension X1: P1 {
+  func p1() { }
+}
+
+typealias X1WithP2Changed<T: P2> = X1<X1<T>>
+typealias X1WithP2MoreArgs<T: P2, U> = X1<T>
+
+extension X1WithP2Changed {
+  func bad1() {
+    _ = X5<T>() // expected-error{{type 'T' does not conform to protocol 'P2'}}
+  }
+}
+
+extension X1WithP2MoreArgs {
+  func bad2() {
+    _ = X5<T>() // expected-error{{type 'T' does not conform to protocol 'P2'}}
   }
 }
 

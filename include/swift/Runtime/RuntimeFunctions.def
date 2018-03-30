@@ -826,6 +826,13 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
+// MetadataResponse swift_checkMetadataState(MetadataRequest request,
+//                                           cosnt Metadata *type);
+FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // const ProtocolWitnessTable *
 // swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
 //                              const Metadata *type,
@@ -914,14 +921,15 @@ FUNCTION(RelocateClassMetadata,
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// void swift_initClassMetadata_UniversalStrategy(Metadata *self,
-//                                                size_t numFields,
-//                                                TypeLayout * const *fieldTypes,
-//                                                size_t *fieldOffsets);
-FUNCTION(InitClassMetadataUniversal,
-         swift_initClassMetadata_UniversalStrategy, C_CC,
+// void swift_initClassMetadata(Metadata *self,
+//                              ClassLayoutFlags flags,
+//                              size_t numFields,
+//                              TypeLayout * const *fieldTypes,
+//                              size_t *fieldOffsets);
+FUNCTION(InitClassMetadata,
+         swift_initClassMetadata, C_CC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, SizeTy,
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
@@ -934,7 +942,8 @@ FUNCTION(InitClassMetadataUniversal,
 FUNCTION(InitStructMetadata,
          swift_initStructMetadata, C_CC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(0),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 

@@ -792,9 +792,9 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
 
+  trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
   trace::SwiftInvocation TraceInfo;
-
-  if (trace::enabled()) {
+  if (TracedOp.enabled()) {
     TraceInfo.Args.PrimaryFile = InvokRef->Impl.Opts.PrimaryFile;
     TraceInfo.Args.Args = InvokRef->Impl.Opts.Args;
   }
@@ -804,7 +804,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
 
-    if (trace::enabled()) {
+    if (TracedOp.enabled()) {
       TraceInfo.addFile(Content.Buffer->getBufferIdentifier(),
                         Content.Buffer->getBuffer());
     }
@@ -828,9 +828,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     return nullptr;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    TracedOp.start(trace::OperationKind::PerformSema, TraceInfo);
+  if (TracedOp.enabled()) {
+    TracedOp.start(TraceInfo);
   }
 
   CloseClangModuleFiles scopedCloseFiles(

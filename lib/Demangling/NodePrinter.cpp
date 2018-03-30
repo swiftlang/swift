@@ -399,9 +399,11 @@ private:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolRequirementArray:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
+    case Node::Kind::ProtocolWitnessTablePattern:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::RelatedEntityDeclName:
@@ -441,6 +443,7 @@ private:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
     case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
@@ -1302,12 +1305,20 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
+  case Node::Kind::ProtocolWitnessTablePattern:
+    Printer << "protocol witness table pattern for ";
+    print(Node->getFirstChild());
+    return nullptr;
   case Node::Kind::GenericProtocolWitnessTable:
     Printer << "generic protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
     Printer << "instantiation function for generic protocol witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ResilientProtocolWitnessTable:
+    Printer << "resilient protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::VTableThunk: {
@@ -1451,6 +1462,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ProtocolRequirementArray:
+    Printer << "protocol requirement array for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::FullTypeMetadata:

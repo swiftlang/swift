@@ -107,7 +107,7 @@ namespace {
   template <class Impl, class Base, class FieldInfoType = StructFieldInfo>
   class StructTypeInfoBase :
      public RecordTypeInfo<Impl, Base, FieldInfoType> {
-    typedef RecordTypeInfo<Impl, Base, FieldInfoType> super;
+    using super = RecordTypeInfo<Impl, Base, FieldInfoType>;
 
   protected:
     template <class... As>
@@ -517,13 +517,6 @@ namespace {
                                    const StructFieldInfo &field) const {
       return StructNonFixedOffsets(T).getFieldAccessStrategy(IGM,
                                               field.getNonFixedElementIndex());
-    }
-
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      emitInitializeFieldOffsetVector(IGF, T, metadata, isVWTMutable);
     }
   };
 

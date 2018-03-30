@@ -30,7 +30,7 @@ namespace {
     CommandInput(StringRef Path) : Path(Path) {}
   };
 
-  typedef std::pair<file_types::ID, std::string> OutputPair;
+  using OutputPair = std::pair<file_types::ID, std::string>;
 } // end anonymous namespace
 
 namespace swift {

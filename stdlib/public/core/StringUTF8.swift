@@ -493,6 +493,10 @@ extension String.UTF8View.Iterator : IteratorProtocol {
       defer { _nextOffset += 1 }
       return _guts._unmanagedASCIIView.buffer[_nextOffset]
     }
+    if _guts._isSmall {
+      defer { _nextOffset += 1 }
+      return _guts._smallUTF8String[_nextOffset]
+    }
 
     if _fastPath(!_buffer.isEmpty) {
       return _buffer.removeFirst()

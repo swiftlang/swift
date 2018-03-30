@@ -81,8 +81,7 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
-  return ._fromWellFormedCodeUnitSequence(UTF8.self,
-    input: UnsafeBufferPointer(start: stringPtr, count: count))
+  return ._fromASCII(UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
 /// Lookup a class given a name. Until the demangled encoding of type

@@ -31,6 +31,8 @@
 #include <cctype>
 #include <condition_variable>
 #include <new>
+#include <unordered_set>
+#include <vector>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 // Avoid defining macro max(), min() which conflict with std::max(), std::min()
@@ -166,6 +168,14 @@ swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
   return bounds.ImmediateMembersOffset / sizeof(void*);
 }
 
+static bool
+areAllTransitiveMetadataComplete_cheap(const Metadata *metadata,
+                                 const TypeContextDescriptor *description);
+
+static MetadataDependency
+checkTransitiveCompleteness(const Metadata *metadata,
+                            const TypeContextDescriptor *description);
+
 namespace {
   struct GenericCacheEntry final : MetadataCacheEntryBase<GenericCacheEntry> {
     static const char *getName() { return "GenericCache"; }
@@ -185,42 +195,71 @@ namespace {
       auto metadata =
         pattern->InstantiationFunction(description, arguments, pattern);
 
-      MetadataRequest::BasicKind state;
+      // If there's no completion function, do a quick-and-dirty check to
+      // see if all of the type arguments are already complete.  If they
+      // are, we can broadcast completion immediately and potentially avoid
+      // some extra locking.
+      PrivateMetadataState state;
       if (pattern->CompletionFunction.isNull()) {
-        state = MetadataRequest::Complete;
+        if (areAllTransitiveMetadataComplete_cheap(metadata, description)) {
+          state = PrivateMetadataState::Complete;
+        } else {
+          state = PrivateMetadataState::NonTransitiveComplete;
+        }
       } else {
         state = inferStateForMetadata(metadata);
       }
+
       return { metadata, state };
     }
 
-    MetadataRequest::BasicKind inferStateForMetadata(Metadata *metadata) {
+    PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
       if (metadata->getValueWitnesses()->isIncomplete())
-        return MetadataRequest::Abstract;
+        return PrivateMetadataState::Abstract;
 
       // TODO: internal vs. external layout-complete?
-      return MetadataRequest::LayoutComplete;
+      return PrivateMetadataState::LayoutComplete;
     }
 
     // Note that we have to pass 'arguments' separately here instead of
     // using the key data because there might be non-key arguments,
     // like protocol conformances.
     TryInitializeResult tryInitialize(Metadata *metadata,
-                                      MetadataCompletionContext *context,
+                                      PrivateMetadataState state,
+                                      PrivateMetadataCompletionContext *context,
                                       const TypeContextDescriptor *description,
                                       const void * const *arguments) {
-      // Find a pattern.  Currently we always use the default pattern.
-      auto &generics = description->getFullGenericContextHeader();
-      auto pattern = generics.DefaultInstantiationPattern.get();
+      assert(state != PrivateMetadataState::Complete);
 
-      // Complete the metadata's instantiation.
-      auto dependency = pattern->CompletionFunction(metadata, context, pattern);
+      // Finish the completion function.
+      if (state < PrivateMetadataState::NonTransitiveComplete) {
+        // Find a pattern.  Currently we always use the default pattern.
+        auto &generics = description->getFullGenericContextHeader();
+        auto pattern = generics.DefaultInstantiationPattern.get();
 
-      auto state = dependency.Value == nullptr
-                     ? MetadataRequest::Complete
-                     : inferStateForMetadata(metadata);
+        // Complete the metadata's instantiation.
+        auto dependency =
+          pattern->CompletionFunction(metadata, &context->Public, pattern);
 
-      return { state, dependency.State, dependency.Value };
+        // If this failed with a dependency, infer the current metadata state
+        // and return.
+        if (dependency.Value) {
+          return { inferStateForMetadata(metadata),
+                   dependency.State, dependency.Value };
+        }
+      }
+
+      // Check for transitive completeness.
+      auto dependency =
+        checkTransitiveCompleteness(metadata, description);
+      if (dependency.Value) {
+        return { PrivateMetadataState::NonTransitiveComplete,
+                 dependency.State, dependency.Value };
+      }
+
+      // We're done.
+      return { PrivateMetadataState::Complete,
+               MetadataState::Complete, nullptr };
     }
   };
 } // end anonymous namespace
@@ -1087,22 +1126,15 @@ static const ValueWitnessTable tuple_witnesses_nonpod_noninline = {
   0
 };
 
-namespace {
-struct BasicLayout {
-  size_t size;
-  ValueWitnessFlags flags;
-  size_t stride;
+static constexpr TypeLayout getInitialLayoutForValueType() {
+  return {0, ValueWitnessFlags().withAlignment(1).withPOD(true), 0};
+}
 
-  static constexpr BasicLayout initialForValueType() {
-    return {0, ValueWitnessFlags().withAlignment(1).withPOD(true), 0};
-  }
-
-  static constexpr BasicLayout initialForHeapObject() {
-    return {sizeof(HeapObject),
-            ValueWitnessFlags().withAlignment(alignof(HeapObject)),
-            sizeof(HeapObject)};
-  }
-};
+static constexpr TypeLayout getInitialLayoutForHeapObject() {
+  return {sizeof(HeapObject),
+          ValueWitnessFlags().withAlignment(alignof(HeapObject)),
+          sizeof(HeapObject)};
+}
 
 static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
   return (size + alignMask) & ~alignMask;
@@ -1114,10 +1146,10 @@ static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
 /// FUNCTOR should have signature:
 ///   void (size_t index, const Metadata *type, size_t offset)
 template<typename FUNCTOR, typename LAYOUT>
-void performBasicLayout(BasicLayout &layout,
-                        const LAYOUT * const *elements,
-                        size_t numElements,
-                        FUNCTOR &&f) {
+static void performBasicLayout(TypeLayout &layout,
+                               const LAYOUT * const *elements,
+                               size_t numElements,
+                               FUNCTOR &&f) {
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
@@ -1147,7 +1179,6 @@ void performBasicLayout(BasicLayout &layout,
                                     .withInlineStorage(isInline);
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
-} // end anonymous namespace
 
 const TupleTypeMetadata *
 swift::swift_getTupleTypeMetadata(TupleTypeFlags flags,
@@ -1201,7 +1232,7 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Data.Labels = key.Labels;
 
   // Perform basic layout on the tuple.
-  auto layout = BasicLayout::initialForValueType();
+  auto layout = getInitialLayoutForValueType();
   performBasicLayout(layout, key.Elements, key.NumElements,
     [&](size_t i, const Metadata *elt, size_t offset) {
       Data.getElement(i).Type = elt;
@@ -1477,15 +1508,16 @@ static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
   return (hasExtraInhabitants << 48) | (size << 16) | alignmentMask;
 }
 
-void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
-  auto flags = vwtable->flags;
+void swift::installCommonValueWitnesses(const TypeLayout &layout,
+                                        ValueWitnessTable *vwtable) {
+  auto flags = layout.flags;
   if (flags.isPOD()) {
     // Use POD value witnesses.
     // If the value has a common size and alignment, use specialized value
     // witnesses we already have lying around for the builtin types.
     const ValueWitnessTable *commonVWT;
     bool hasExtraInhabitants = flags.hasExtraInhabitants();
-    switch (sizeWithAlignmentMask(vwtable->size, vwtable->getAlignmentMask(),
+    switch (sizeWithAlignmentMask(layout.size, flags.getAlignmentMask(),
                                   hasExtraInhabitants)) {
     default:
       // For uncommon layouts, use value witnesses that work with an arbitrary
@@ -1585,6 +1617,11 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
                                     alignof(ValueWitnessTable));
     newTable = new (memory) ValueWitnessTable(*oldTable);
   }
+
+  // If we ever need to check layout-completeness asynchronously from
+  // initialization, we'll need this to be a store-release (and rely on
+  // consume ordering on the asynchronous check path); and we'll need to
+  // ensure that the current state says that the type is incomplete.
   self->setValueWitnesses(newTable);
 
   return newTable;
@@ -1597,7 +1634,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
                                      size_t numFields,
                                      const TypeLayout * const *fieldTypes,
                                      size_t *fieldOffsets) {
-  auto layout = BasicLayout::initialForValueType();
+  auto layout = getInitialLayoutForValueType();
   performBasicLayout(layout, fieldTypes, numFields,
     [&](size_t i, const TypeLayout *fieldType, size_t offset) {
       assignUnlessEqual(fieldOffsets[i], offset);
@@ -1608,15 +1645,11 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   auto vwtable =
     getMutableVWTableForInit(structType, layoutFlags, hasExtraInhabitants);
 
-  vwtable->size = layout.size;
-  vwtable->flags = layout.flags;
-  vwtable->stride = layout.stride;
-  
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
   if (hasExtraInhabitants) {
-    vwtable->flags = vwtable->flags.withExtraInhabitants(true);
-    auto xiVWT = cast<ExtraInhabitantsValueWitnessTable>(vwtable);
+    layout.flags = layout.flags.withExtraInhabitants(true);
+    auto xiVWT = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
     xiVWT->extraInhabitantFlags = fieldTypes[0]->getExtraInhabitantFlags();
 
     // The compiler should already have initialized these.
@@ -1625,7 +1658,9 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   }
 
   // Substitute in better value witnesses if we have them.
-  installCommonValueWitnesses(vwtable);
+  installCommonValueWitnesses(layout, vwtable);
+
+  vwtable->publishLayout(layout);
 }
 
 /***************************************************************************/
@@ -1845,10 +1880,11 @@ swift::swift_relocateClassMetadata(ClassMetadata *self,
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 void
-swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                                 size_t numFields,
-                                           const TypeLayout * const *fieldTypes,
-                                                 size_t *fieldOffsets) {
+swift::swift_initClassMetadata(ClassMetadata *self,
+                               ClassLayoutFlags layoutFlags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets) {
   _swift_initializeSuperclass(self);
 
   // Start layout by appending to a standard heap object header.
@@ -1882,7 +1918,7 @@ swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 
   // If we don't have a formal superclass, start with the basic heap header.
   } else {
-    auto heapLayout = BasicLayout::initialForHeapObject();
+    auto heapLayout = getInitialLayoutForHeapObject();
     size = heapLayout.size;
     alignMask = heapLayout.flags.getAlignmentMask();
   }
@@ -3133,21 +3169,71 @@ static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
 /// If there's no initializer, no private storage, and all requirements
 /// are present, we don't have to instantiate anything; just return the
 /// witness table template.
-///
-/// Most of the time IRGen should be able to determine this statically;
-/// the one case is with resilient conformances, where the resilient
-/// protocol has not yet changed in a way that's incompatible with the
-/// conformance.
 static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
-  if (genericTable->Instantiator.isNull() &&
-      genericTable->WitnessTablePrivateSizeInWords == 0 &&
-      genericTable->WitnessTableSizeInWords ==
-        (genericTable->Protocol->NumRequirements +
-           WitnessTableFirstRequirementOffset)) {
-    return true;
+  // If we have resilient witnesses, we require instantiation.
+  if (!genericTable->ResilientWitnesses.isNull()) {
+    return false;
   }
 
-  return false;
+  // If we don't have resilient witnesses, the template must provide
+  // everything.
+  assert (genericTable->WitnessTableSizeInWords ==
+          (genericTable->Protocol->NumRequirements +
+           WitnessTableFirstRequirementOffset));
+
+  // If we have an instantiation function or private data, we require
+  // instantiation.
+  if (!genericTable->Instantiator.isNull() ||
+      genericTable->WitnessTablePrivateSizeInWords > 0) {
+    return false;
+  }
+
+  return true;
+}
+
+/// Initialize witness table entries from order independent resilient
+/// witnesses stored in the generic witness table structure itself.
+static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
+                                            void **table) {
+  auto protocol = genericTable->Protocol.get();
+
+  auto requirements = protocol->Requirements.get();
+  auto witnesses = genericTable->ResilientWitnesses->getWitnesses();
+
+  for (size_t i = 0, e = protocol->NumRequirements; i < e; ++i) {
+    auto &reqt = requirements[i];
+
+    // Only function-like requirements are filled in from the
+    // resilient witness table.
+    switch (reqt.Flags.getKind()) {
+    case ProtocolRequirementFlags::Kind::Method:
+    case ProtocolRequirementFlags::Kind::Init:
+    case ProtocolRequirementFlags::Kind::Getter:
+    case ProtocolRequirementFlags::Kind::Setter:
+    case ProtocolRequirementFlags::Kind::MaterializeForSet:
+      break;
+    case ProtocolRequirementFlags::Kind::BaseProtocol:
+    case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
+    case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
+      continue;
+    }
+
+    void *fn = reqt.Function.get();
+    void *impl = reqt.DefaultImplementation.get();
+
+    // Find the witness if there is one, otherwise we use the default.
+    for (auto &witness : witnesses) {
+      if (witness.Function.get() == fn) {
+        impl = witness.Witness.get();
+        break;
+      }
+    }
+
+    assert(impl != nullptr && "no implementation for witness");
+
+    unsigned witnessIndex = WitnessTableFirstRequirementOffset + i;
+    table[witnessIndex] = impl;
+  }
 }
 
 /// Instantiate a brand new witness table for a resilient or generic
@@ -3159,11 +3245,6 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
   auto protocol = genericTable->Protocol.get();
-
-  // The number of mandatory requirements, i.e. requirements lacking
-  // default implementations.
-  assert(numPatternWitnesses >= protocol->NumMandatoryRequirements +
-                                    WitnessTableFirstRequirementOffset);
 
   // The total number of requirements.
   size_t numRequirements =
@@ -3183,7 +3264,6 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
   auto pattern = reinterpret_cast<void * const *>(&*genericTable->Pattern);
-  auto requirements = protocol->Requirements.get();
 
   // Fill in the provided part of the requirements from the pattern.
   for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
@@ -3191,14 +3271,8 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   }
 
   // Fill in any default requirements.
-  for (size_t i = numPatternWitnesses, e = numRequirements; i < e; ++i) {
-    size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
-    void *defaultImpl =
-      requirements[requirementIndex].DefaultImplementation.get();
-    assert(defaultImpl &&
-           "no default implementation for missing requirement");
-    table[i] = defaultImpl;
-  }
+  if (genericTable->ResilientWitnesses)
+    initializeResilientWitnessTable(genericTable, table);
 
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 
@@ -3236,13 +3310,16 @@ static Result performOnMetadataCache(const Metadata *metadata,
   const TypeContextDescriptor *description;
   if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
     description = classMetadata->getDescription();
-  } else {
-    auto valueMetadata = cast<ValueMetadata>(metadata);
+  } else if (auto valueMetadata = dyn_cast<ValueMetadata>(metadata)) {
     description = valueMetadata->getDescription();
+  } else {
+    return std::move(callbacks).forOtherMetadata(metadata);
   }
 
-  assert(description->isGeneric() &&
-         "only generic metadata can delay evaluation for now");
+  if (!description->isGeneric()) {
+    return std::move(callbacks).forOtherMetadata(metadata);
+  }
+
   auto &generics = description->getFullGenericContextHeader();
 
   auto genericArgs =
@@ -3258,7 +3335,7 @@ static Result performOnMetadataCache(const Metadata *metadata,
 bool swift::addToMetadataQueue(
                   std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
                   const Metadata *dependency,
-                  MetadataRequest::BasicKind dependencyRequirement) {
+                  MetadataState dependencyRequirement) {
   struct EnqueueCallbacks {
     std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
 
@@ -3267,6 +3344,10 @@ bool swift::addToMetadataQueue(
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
       return cache.enqueue(key, std::move(QueueEntry));
+    }
+
+    bool forOtherMetadata(const Metadata *metadata) && {
+      swift_runtime_unreachable("metadata should always be complete");
     }
   } callbacks = { std::move(queueEntry) };
 
@@ -3282,7 +3363,7 @@ void swift::resumeMetadataCompletion(
     std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
 
     static MetadataRequest getRequest() {
-      return MetadataRequest(MetadataRequest::Complete,
+      return MetadataRequest(MetadataState::Complete,
                              /*non-blocking*/ true);
     }
 
@@ -3298,10 +3379,183 @@ void swift::resumeMetadataCompletion(
                                  // non-key arguments.
                                  key.KeyData.begin());
     }
+
+    void forOtherMetadata(const Metadata *metadata) && {
+      swift_runtime_unreachable("metadata should always be complete");
+    }
   } callbacks = { std::move(queueEntry) };
 
   auto metadata = queueEntry->Value;
   performOnMetadataCache<void>(metadata, std::move(callbacks));
+}
+
+MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
+                                                 const Metadata *type) {
+  struct CheckStateCallbacks {
+    MetadataRequest Request;
+
+    /// Generic types just need to be awaited.
+    MetadataResponse forGenericMetadata(const Metadata *type,
+                                      const TypeContextDescriptor *description,
+                                      GenericMetadataCache &cache,
+                                      MetadataCacheKey key) && {
+      return cache.await(key, Request);
+    }
+
+    /// All other type metadata are always complete.
+    MetadataResponse forOtherMetadata(const Metadata *type) && {
+      return MetadataResponse{type, MetadataState::Complete};
+    }
+  } callbacks = { request };
+
+  return performOnMetadataCache<MetadataResponse>(type, std::move(callbacks));
+}
+
+/// Search all the metadata that the given type has transitive completeness
+/// requirements on for something that matches the given predicate.
+template <class T>
+static bool findAnyTransitiveMetadata(const Metadata *type,
+                                      const TypeContextDescriptor *description,
+                                      T &&predicate) {
+  // Classes require their superclass to be transitively complete.
+  //
+  // We check for a class by looking at the type descriptor because we'll be
+  // loading the descriptor flags again when checking for a generic type,
+  // whereas we won't otherwise be touching the metadata kind.
+  if (isa<ClassDescriptor>(description)) {
+    if (auto super = cast<ClassMetadata>(type)->Superclass) {
+      if (super->isTypeMetadata() && predicate(super))
+        return true;
+    }
+  }
+
+  // Generic types require their type arguments to be transitively complete.
+  if (description->isGeneric()) {
+    auto &generics = description->getFullGenericContextHeader();
+
+    auto keyArguments = description->getGenericArguments(type);
+    auto extraArguments = keyArguments + generics.Base.NumKeyArguments;
+
+    for (auto &param : description->getGenericParams()) {
+      if (param.hasKeyArgument()) {
+        if (predicate(*keyArguments++))
+          return true;
+      } else if (param.hasExtraArgument()) {
+        if (predicate(*extraArguments++))
+          return true;
+      }
+      // Ignore parameters that don't have a key or an extra argument.
+    }
+  }
+
+  // Didn't find anything.
+  return false;
+}
+
+/// Do a quick check to see if all the transitive type metadata are complete.
+static bool
+areAllTransitiveMetadataComplete_cheap(const Metadata *type,
+                                     const TypeContextDescriptor *description) {
+  // Look for any transitive metadata that's incomplete.
+  return !findAnyTransitiveMetadata(type, description,
+                                    [](const Metadata *type) {
+    struct IsIncompleteCallbacks {
+      bool forGenericMetadata(const Metadata *type,
+                              const TypeContextDescriptor *description,
+                              GenericMetadataCache &cache,
+                              MetadataCacheKey key) && {
+        // Metadata cache lookups aren't really cheap enough for this
+        // optimization.
+        return true;
+      }
+
+      bool forOtherMetadata(const Metadata *type) && {
+        return false;
+      }
+    } callbacks;
+
+    return performOnMetadataCache<bool>(type, std::move(callbacks));
+  });
+}
+
+/// Check for transitive completeness.
+///
+/// The key observation here is that all we really care about is whether
+/// the transitively-observable types are *actually* all complete; we don't
+/// need them to *think* they're transitively complete.  So if we find
+/// something that thinks it's still transitively incomplete, we can just
+/// scan its transitive metadata and actually try to find something that's
+/// incomplete.  If we don't find anything, then we know all the transitive
+/// dependencies actually hold, and we can keep going.
+static MetadataDependency
+checkTransitiveCompleteness(const Metadata *initialType,
+                            const TypeContextDescriptor *initialDescription) {
+  // TODO: it would nice to avoid allocating memory in common cases here.
+  // In particular, we don't usually add *anything* to the worklist, and we
+  // usually only add a handful of types to the map.
+  std::vector<const Metadata *> worklist;
+  std::unordered_set<const Metadata *> presumedCompleteTypes;
+
+  MetadataDependency dependency;
+  auto isIncomplete = [&](const Metadata *type) -> bool {
+    // Add the type to the presumed-complete-types set.  If this doesn't
+    // succeed, we've already inserted it, which means we must have already
+    // decided it was complete.
+    if (!presumedCompleteTypes.insert(type).second)
+      return false;
+
+    // Check the metadata's current state with a non-blocking request.
+    auto request = MetadataRequest(MetadataState::Complete,
+                                   /*non-blocking*/ true);
+    auto state = swift_checkMetadataState(request, type).State;
+
+    // If it's transitively complete, we're done.
+    // This is the most likely result.
+    if (state == MetadataState::Complete)
+      return false;
+
+    // Otherwise, if the state is actually incomplete, set a dependency
+    // and leave.  We set the dependency at non-transitive completeness
+    // because we can potentially resolve ourselves if we find completeness.
+    if (!isAtLeast(state, MetadataState::NonTransitiveComplete)) {
+      dependency = MetadataDependency{type,
+                                      MetadataState::NonTransitiveComplete};
+      return true;
+    }
+
+    // Otherwise, we have to add it to the worklist.
+    worklist.push_back(type);
+    return false;
+  };
+
+  // Consider the type itself to be presumed-complete.  We're looking for
+  // a greatest fixed point.
+  presumedCompleteTypes.insert(initialType);
+  if (findAnyTransitiveMetadata(initialType, initialDescription, isIncomplete))
+    return dependency;
+
+  // Drain the worklist.  The order we do things in doesn't really matter,
+  // so optimize for locality and convenience by using a stack.
+  while (!worklist.empty()) {
+    auto type = worklist.back();
+    worklist.pop_back();
+
+    // Only nominal types have transitive dependencies (for now).
+    const TypeContextDescriptor *description;
+    if (auto classType = dyn_cast<ClassMetadata>(type)) {
+      description = classType->getDescription();
+    } else {
+      description = cast<ValueMetadata>(type)->getDescription();
+    }
+
+    // Search for incomplete dependencies.  This will set Dependency
+    // if it finds anything.
+    if (findAnyTransitiveMetadata(type, description, isIncomplete))
+      return dependency;
+  }
+
+  // Otherwise, we're transitively complete.
+  return { nullptr, MetadataState::Complete };
 }
 
 /***************************************************************************/

@@ -48,19 +48,12 @@ extension String {
   ///     string.
   @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
+    precondition(count >= 0, "Negative count not allowed")
     guard count > 1 else {
       self = count == 0 ? "" : repeatedValue
       return
     }
-
-    precondition(count > 0, "Negative count not allowed")
-    self = _visitGuts(repeatedValue._guts, range: nil, args: count,
-      ascii: { ascii, count in
-        return String(_StringGuts(_large: ascii._repeated(count))) },
-      utf16: { utf16, count in
-        return String(_StringGuts(_large: utf16._repeated(count))) },
-      opaque: { opaque, count in
-        return String(_StringGuts(_large: opaque._repeated(count))) })
+    self = String(repeatedValue._guts._repeated(count))
   }
 
   /// A Boolean value indicating whether a string has no characters.
@@ -69,16 +62,6 @@ extension String {
     return _guts.count == 0
   }
 }
-
-extension String {
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(_ _c: Unicode.Scalar) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self,
-      input: repeatElement(_c.value, count: 1))
-  }
-}
-
 
 // TODO: since this is generally useful, make public via evolution proposal.
 extension BidirectionalCollection {
@@ -184,6 +167,23 @@ extension String {
     let prefixCount = prefix._guts.count
     if prefixCount == 0 { return true }
 
+    // TODO: replace with 2-way vistor
+    if self._guts._isSmall && prefix._guts._isSmall {
+      let selfSmall = self._guts._smallUTF8String
+      let prefixSmall = prefix._guts._smallUTF8String
+      if selfSmall.isASCII && prefixSmall.isASCII {
+        return selfSmall.withUnmanagedASCII { selfASCII in
+          return prefixSmall.withUnmanagedASCII { prefixASCII in
+            if prefixASCII.count > selfASCII.count { return false }
+            return (0 as CInt) == _stdlib_memcmp(
+                selfASCII.rawStart,
+                prefixASCII.rawStart,
+                prefixASCII.count)
+          }
+        }
+      }
+    }
+
     if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
       if self._guts.isASCII && prefix._guts.isASCII {
         let result: Bool
@@ -215,12 +215,29 @@ extension String {
     let suffixCount = suffix._guts.count
     if suffixCount == 0 { return true }
 
+    // TODO: replace with 2-way vistor
+    if self._guts._isSmall && suffix._guts._isSmall {
+      let selfSmall = self._guts._smallUTF8String
+      let suffixSmall = suffix._guts._smallUTF8String
+      if selfSmall.isASCII && suffixSmall.isASCII {
+        return selfSmall.withUnmanagedASCII { selfASCII in
+          return suffixSmall.withUnmanagedASCII { suffixASCII in
+            if suffixASCII.count > selfASCII.count { return false }
+            return (0 as CInt) == _stdlib_memcmp(
+                selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
+                suffixASCII.rawStart,
+                suffixASCII.count)
+          }
+        }
+      }
+    }
+
     if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
       if self._guts.isASCII && suffix._guts.isASCII {
         let result: Bool
         let selfASCII = self._guts._unmanagedASCIIView
         let suffixASCII = suffix._guts._unmanagedASCIIView
-        if suffixASCII.count > self._guts.count {
+        if suffixASCII.count > selfASCII.count {
           // Suffix is longer than self.
           result = false
         } else {
@@ -277,3 +294,22 @@ extension String {
     self = value._description(radix: radix, uppercase: uppercase)
   }
 }
+
+extension _StringGuts {
+  @_inlineable
+  @_versioned
+  func _repeated(_ n: Int) -> _StringGuts {
+    _sanityCheck(n > 1)
+    if self._isSmall {
+      // TODO: visitor pattern for something like this...
+      if let small = self._smallUTF8String._repeated(n) {
+        return _StringGuts(small)
+      }
+    }
+    return _visitGuts(self, range: nil, args: n,
+      ascii: { ascii, n in return _StringGuts(_large: ascii._repeated(n)) },
+      utf16: { utf16, n in return _StringGuts(_large: utf16._repeated(n)) },
+      opaque: { opaque, n in return _StringGuts(_large: opaque._repeated(n)) })
+  }
+}
+

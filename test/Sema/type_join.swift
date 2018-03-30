@@ -34,6 +34,10 @@ expectEqualType(Builtin.type_join(D?.self, Any.self), Any?.self)
 expectEqualType(Builtin.type_join(Any?.self, Any.self), Any?.self)
 expectEqualType(Builtin.type_join(Any.self, Any?.self), Any?.self)
 
+expectEqualType(Builtin.type_join(Builtin.Int1.self, Builtin.Int1.self), Builtin.Int1.self)
+expectEqualType(Builtin.type_join(Builtin.Int32.self, Builtin.Int1.self), Any.self)
+expectEqualType(Builtin.type_join(Builtin.Int1.self, Builtin.Int32.self), Any.self)
+
 func joinFunctions(
   _ escaping: @escaping () -> (),
   _ nonescaping: () -> ()
