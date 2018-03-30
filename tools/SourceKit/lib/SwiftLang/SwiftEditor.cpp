@@ -114,15 +114,10 @@ void EditorDiagConsumer::handleDiagnostic(
   if (!isInputBufferID(BufferID)) {
     if (Info.ID == diag::error_from_clang.ID ||
         Info.ID == diag::warning_from_clang.ID ||
-        Info.ID == diag::note_from_clang.ID) {
+        Info.ID == diag::note_from_clang.ID ||
+        !IsNote) {
       // Handle it as other diagnostics.
     } else {
-      if (!IsNote) {
-        LOG_WARN_FUNC("got swift diagnostic not pointing at input file, "
-                      "buffer name: " << SM.getIdentifierForBuffer(BufferID));
-        return;
-      }
-
       // FIXME: This is a note pointing to a synthesized declaration buffer for
       // a declaration coming from a module.
       // We should include the Decl* in the DiagnosticInfo and have a way for

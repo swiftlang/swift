@@ -38,3 +38,8 @@
 // CLANG_IMPORTER-NEXT:     key.filepath: "<{{.*}}>"
 // CLANG_IMPORTER-NEXT:     key.severity: source.diagnostic.severity.error,
 // CLANG_IMPORTER-NEXT:     key.description: {{.*}}not found
+
+// Note: we're missing the "compiler is in code completion mode" diagnostic,
+// which is probably just as well.
+// RUN: %sourcekitd-test -req=track-compiles == -req=complete -offset=0 %s -- %s | %FileCheck %s -check-prefix=NODIAGS
+// RUN: %sourcekitd-test -req=track-compiles == -req=complete -pos=2:1 %S/Inputs/sema-error.swift -- %S/Inputs/sema-error.swift | %FileCheck %s -check-prefix=SEMA
