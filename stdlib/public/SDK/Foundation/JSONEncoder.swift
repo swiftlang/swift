@@ -1013,7 +1013,7 @@ open class JSONDecoder {
             // Find the last non-underscore character
             var lastNonUnderscore = stringKey.index(before: stringKey.endIndex)
             while lastNonUnderscore > firstNonUnderscore && stringKey[lastNonUnderscore] == "_" {
-                stringKey.formIndex(before: &lastNonUnderscore);
+                stringKey.formIndex(before: &lastNonUnderscore)
             }
         
             let keyRange = firstNonUnderscore...lastNonUnderscore
