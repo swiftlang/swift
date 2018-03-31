@@ -18,8 +18,8 @@
 // else ARC.
 //
 extension String {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   @inline(__always)
   func _visit<Result>(
     range: (Range<Int>, performBoundsCheck: Bool)? = nil,
@@ -54,7 +54,7 @@ extension String {
     }
   }
 
-  @_versioned
+  @usableFromInline
   @effects(readonly)
   @inline(never) // @_outlined
   func _visitOpaque<Result>(
@@ -105,8 +105,8 @@ extension String {
     return opaque(view)
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   @inline(__always)
   func _visit<T, Result>(
     range: (Range<Int>, performBoundsCheck: Bool)?,
@@ -142,7 +142,7 @@ extension String {
     }
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   @effects(readonly)
   @inline(never)
   func _visitOpaque<T, Result>(
@@ -195,8 +195,8 @@ extension String {
   }
 }
 
-@_versioned
-@_inlineable
+@usableFromInline
+@inlinable
 @inline(__always)
 internal
 func _visitGuts<Result>(
@@ -210,8 +210,8 @@ func _visitGuts<Result>(
     range: range, ascii: ascii, utf16: utf16, opaque: opaque)
 }
 
-@_versioned
-@_inlineable
+@usableFromInline
+@inlinable
 @inline(__always)
 internal
 func _visitGuts<T, Result>(

@@ -146,9 +146,14 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
     return type->getAnyNominal()->getDeclaredType();
   case DeclTypeKind::DeclaredTypeInContext:
     return type;
-  case DeclTypeKind::DeclaredInterfaceType:
+  case DeclTypeKind::DeclaredInterfaceType: {
     // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-    return type->getAnyNominal()->getDeclaredInterfaceType();
+    if (auto nominal = type->getAnyNominal())
+      return nominal->getDeclaredInterfaceType();
+
+    auto typealias = cast<TypeAliasDecl>(type->getAnyGeneric());
+    return typealias->getUnderlyingTypeLoc().getType();
+  }
   }
 
   llvm_unreachable("Unhandled DeclTypeKind in switch.");
@@ -392,17 +397,17 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (AFD->isTransparent())
         return ResilienceExpansion::Minimal;
 
-      if (AFD->getAttrs().hasAttribute<InlineableAttr>())
+      if (AFD->getAttrs().hasAttribute<InlinableAttr>())
         return ResilienceExpansion::Minimal;
 
       if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
         if (attr->getKind() == InlineKind::Always)
           return ResilienceExpansion::Minimal;
 
-      // If a property or subscript is @_inlineable, the accessors are
-      // @_inlineable also.
+      // If a property or subscript is @inlinable, the accessors are
+      // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
-        if (accessor->getStorage()->getAttrs().getAttribute<InlineableAttr>())
+        if (accessor->getStorage()->getAttrs().getAttribute<InlinableAttr>())
           return ResilienceExpansion::Minimal;
     }
   }

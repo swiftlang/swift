@@ -16,12 +16,8 @@ import Foundation
 
 #if os(iOS)
 
-public protocol _AVCaptureDeviceFormatSupportedColorSpaces {
-  @available(iOS, introduced: 10.0)
-  var __supportedColorSpaces: [NSNumber] { get }
-}
-
-extension _AVCaptureDeviceFormatSupportedColorSpaces {
+@available(iOS, introduced: 10.0)
+extension AVCaptureDevice.Format {
   @available(swift, obsoleted: 4.0)
   @available(iOS, introduced: 10.0)
   @nonobjc
@@ -37,9 +33,5 @@ extension _AVCaptureDeviceFormatSupportedColorSpaces {
   }
 }
 
-@available(iOS, introduced: 10.0)
-extension AVCaptureDevice.Format : _AVCaptureDeviceFormatSupportedColorSpaces {
-}
-  
 #endif
 

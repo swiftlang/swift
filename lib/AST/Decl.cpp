@@ -2102,19 +2102,19 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 }
 
 /// Returns true if \p VD needs to be treated as publicly-accessible
-/// at the SIL, LLVM, and machine levels due to being versioned.
-bool ValueDecl::isVersionedInternalDecl() const {
+/// at the SIL, LLVM, and machine levels due to being @usableFromInline.
+bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() == AccessLevel::Internal);
 
-  if (getAttrs().hasAttribute<VersionedAttr>())
+  if (getAttrs().hasAttribute<UsableFromInlineAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    if (accessor->getStorage()->getAttrs().hasAttribute<VersionedAttr>())
+    if (accessor->getStorage()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
 
   if (auto *EED = dyn_cast<EnumElementDecl>(this))
-    if (EED->getParentEnum()->getAttrs().hasAttribute<VersionedAttr>())
+    if (EED->getParentEnum()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
 
   return false;
@@ -2251,15 +2251,15 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   llvm_unreachable("unknown access level");
 }
 
-void ValueDecl::copyFormalAccessAndVersionedAttrFrom(ValueDecl *source) {
+void ValueDecl::copyFormalAccessFrom(ValueDecl *source) {
   if (!hasAccess()) {
     setAccess(source->getFormalAccess());
   }
 
-  // Inherit the @_versioned attribute.
-  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
+  // Inherit the @usableFromInline attribute.
+  if (source->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     auto &ctx = getASTContext();
-    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+    auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     getAttrs().add(clonedAttr);
   }
 }
@@ -2806,7 +2806,7 @@ void ClassDecl::addImplicitDestructor() {
   setHasDestructor();
 
   // Propagate access control and versioned-ness.
-  DD->copyFormalAccessAndVersionedAttrFrom(this);
+  DD->copyFormalAccessFrom(this);
 
   // Wire up generic environment of DD.
   DD->setGenericEnvironment(getGenericEnvironmentOfContext());

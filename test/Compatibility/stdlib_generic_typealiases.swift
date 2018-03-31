@@ -22,3 +22,9 @@ extension DictionaryIndex {
     _ = RequiresHashable<Key>()
   }
 }
+
+extension CountableRange where Element == Int {
+  // expected-warning@-1{{'CountableRange' is deprecated: renamed to 'Range'}}
+  // expected-note@-2{{use 'Range' instead}}
+  func getLowerBoundAsInt() -> Int { return lowerBound }
+}

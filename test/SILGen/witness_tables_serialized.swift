@@ -2,13 +2,13 @@
 
 public protocol PublicProtocol {}
 
-@_versioned
+@usableFromInline
 internal protocol InternalProtocol {}
 
 @_fixed_layout
 public struct PublicStruct : PublicProtocol, InternalProtocol {}
 
-@_versioned
+@usableFromInline
 internal struct InternalStruct : PublicProtocol, InternalProtocol {}
 
 // CHECK-LABEL: sil_witness_table [serialized] PublicStruct: PublicProtocol

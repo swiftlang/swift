@@ -79,7 +79,7 @@ public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
 #endif
 }
 
-@_versioned
+@usableFromInline
 @_silgen_name("NSArray_getObjects")
 func NSArray_getObjects(
   nsArray: AnyObject,

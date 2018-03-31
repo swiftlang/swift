@@ -539,6 +539,9 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Is it okay to resolve an IUO sigil ("!") here?
   AllowIUO = 0x4000000,
+
+  /// Is it okay to resolve an IUO sigil ("!") here with a deprecation warning?
+  AllowIUODeprecated = 0x8000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -2290,16 +2293,16 @@ public:
 
   /// \name Resilience diagnostics
 
-  void diagnoseInlineableLocalType(const NominalTypeDecl *NTD);
+  void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
 
-  bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
-                                 const DeclContext *DC);
+  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+                                const DeclContext *DC);
 
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
     InlineAlways,
-    Inlineable,
+    Inlinable,
     DefaultArgument,
     PropertyInitializer
   };

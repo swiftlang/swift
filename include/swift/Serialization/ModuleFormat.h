@@ -56,7 +56,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 
-const uint16_t VERSION_MINOR = 406; // Last change: EnumElementDecl resilience expansion
+const uint16_t VERSION_MINOR = 407; // Last change: convert_escape_to_noescape
 
 using DeclIDField = BCFixed<31>;
 

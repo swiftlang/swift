@@ -31,6 +31,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
+#include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include <functional>
 #include <vector>
@@ -1025,9 +1026,8 @@ swift::_getTypeByMangledName(StringRef typeName,
   return {type, builder.getReferenceOwnership()};
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
+static const Metadata * _Nullable
+swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
                            size_t numberOfLevels,
                            size_t *parametersPerLevel,
                            const Metadata * const *flatSubstitutions) {
@@ -1148,3 +1148,6 @@ void swift::swift_getFieldAt(
     }
   }
 }
+
+#define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

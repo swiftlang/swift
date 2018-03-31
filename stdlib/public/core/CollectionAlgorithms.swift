@@ -24,7 +24,7 @@ extension BidirectionalCollection {
   ///         print(lastNumber)
   ///     }
   ///     // Prints "50"
-  @_inlineable
+  @inlinable
   public var last: Element? {
     return isEmpty ? nil : self[index(before: endIndex)]
   }
@@ -53,7 +53,7 @@ extension Collection where Element : Equatable {
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The first index where `element` is found. If `element` is not
   ///   found in the collection, returns `nil`.
-  @_inlineable
+  @inlinable
   public func index(of element: Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
@@ -91,7 +91,7 @@ extension Collection {
   /// - Returns: The index of the first element for which `predicate` returns
   ///   `true`. If no elements in the collection satisfy the given predicate,
   ///   returns `nil`.
-  @_inlineable
+  @inlinable
   public func index(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index? {
@@ -147,7 +147,7 @@ extension MutableCollection {
   ///   equal to the collection's `endIndex`.
   ///
   /// - Complexity: O(*n*)
-  @_inlineable
+  @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
@@ -212,7 +212,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   ///   equal to the collection's `endIndex`.
   ///
   /// - Complexity: O(*n*)
-  @_inlineable
+  @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
@@ -357,7 +357,7 @@ extension Sequence where Element : Comparable {
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
   /// - Returns: A sorted array of the sequence's elements.
-  @_inlineable
+  @inlinable
   public func sorted() -> [Element] {
     var result = ContiguousArray(self)
     result.sort()
@@ -441,7 +441,7 @@ extension Sequence {
   ///   first argument should be ordered before its second argument;
   ///   otherwise, `false`.
   /// - Returns: A sorted array of the sequence's elements.
-  @_inlineable
+  @inlinable
   public func sorted(
     by areInIncreasingOrder:
       (Element, Element) throws -> Bool
@@ -480,7 +480,7 @@ extension MutableCollection
   ///     students.sort(by: >)
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
-  @_inlineable
+  @inlinable
   public mutating func sort() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
@@ -563,7 +563,7 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///   otherwise, `false`. If `areInIncreasingOrder` throws an error during
   ///   the sort, the elements may be in a different order, but none will be
   ///   lost.
-  @_inlineable
+  @inlinable
   public mutating func sort(
     by areInIncreasingOrder:
       (Element, Element) throws -> Bool

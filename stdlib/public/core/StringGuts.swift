@@ -38,7 +38,7 @@ struct _StringGuts {
   public // FIXME for testing only
   var _otherBits: UInt // (Mostly) count or inline storage
 
-  @_inlineable
+  @inlinable
   @inline(__always)
   public
   init(object: _StringObject, otherBits: UInt) {
@@ -49,8 +49,8 @@ struct _StringGuts {
 
   public typealias _RawBitPattern = (_StringObject._RawBitPattern, UInt)
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var rawBits: _RawBitPattern {
     @inline(__always)
     get {
@@ -66,8 +66,8 @@ struct _StringGuts {
 }
 
 extension _StringGuts {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     _object._invariantCheck()
@@ -100,7 +100,7 @@ extension _StringGuts {
 #endif // INTERNAL_CHECKS_ENABLED
   }
 
-  @_inlineable
+  @inlinable
   @inline(__always)
   public // @testable
   mutating func isUniqueNative() -> Bool {
@@ -122,67 +122,67 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @_inlineable
+  @inlinable
   public // @testable
   var isASCII: Bool {
     // FIXME: Currently used to sometimes mean contiguous ASCII
     return _object.isContiguousASCII
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   var _isNative: Bool {
     return _object.isNative
   }
 
 #if _runtime(_ObjC)
-  @_inlineable
+  @inlinable
   public // @testable
   var _isCocoa: Bool {
     return _object.isCocoa
   }
 #endif
 
-  @_inlineable
+  @inlinable
   public // @testable
   var _isUnmanaged: Bool {
     return _object.isUnmanaged
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   var _isSmall: Bool {
     return _object.isSmall
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   var _owner: AnyObject? {
     return _object.owner
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   var isSingleByte: Bool {
     // FIXME: Currently used to sometimes mean contiguous ASCII
     return _object.isSingleByte
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   var _isEmptySingleton: Bool {
     return _object.isEmptySingleton
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   var byteWidth: Int {
     return _object.byteWidth
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   var _nativeCount: Int {
     @inline(__always) get {
@@ -197,7 +197,7 @@ extension _StringGuts {
   }
 
   // TODO(SSO): consider a small-checking variant
-  @_versioned
+  @usableFromInline
   @inline(__always)
   internal
   init<CodeUnit>(_large storage: _SwiftStringStorage<CodeUnit>)
@@ -210,7 +210,7 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @_inlineable
+  @inlinable
   @inline(__always)
   public // @testable
   init() {
@@ -224,15 +224,15 @@ extension _StringGuts {
   //
   // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
   //
-  @_versioned
+  @usableFromInline
   @effects(readonly)
   internal static func getCocoaLength(_unsafeBitPattern: UInt) -> Int {
     return _stdlib_binary_CFStringGetLength(
       Builtin.reinterpretCast(_unsafeBitPattern))
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   var _cocoaCount: Int {
     @inline(__always)
     get {
@@ -244,8 +244,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   var _cocoaRawStart: UnsafeRawPointer {
     @inline(__always)
     get {
@@ -257,8 +257,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   func _asContiguousCocoa<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self
   ) -> _UnmanagedString<CodeUnit>
@@ -270,7 +270,7 @@ extension _StringGuts {
   }
 
   // TODO(SSO): consider a small-checking variant
-  @_versioned
+  @usableFromInline
   internal
   init(
     _largeNonTaggedCocoaObject s: _CocoaString,
@@ -300,7 +300,7 @@ extension _StringGuts {
 extension _StringGuts {
   // TODO(SSO): consider a small-checking variant
   @inline(never)
-  @_versioned
+  @usableFromInline
   internal
   init<S: _OpaqueString>(_large opaqueString: S) {
     self.init(
@@ -311,8 +311,8 @@ extension _StringGuts {
 #endif // _runtime(_ObjC)
 
 extension _StringGuts {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var _unmanagedRawStart: UnsafeRawPointer {
     @inline(__always) get {
       _sanityCheck(_object.isUnmanaged)
@@ -320,8 +320,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var _unmanagedCount: Int {
     @inline(__always) get {
       _sanityCheck(_object.isUnmanaged)
@@ -329,8 +329,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   @inline(__always)
   internal
   func _asUnmanaged<CodeUnit>(
@@ -346,8 +346,8 @@ extension _StringGuts {
   }
 
   // TODO(SSO): consider a small-checking variant
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   init<CodeUnit>(_large s: _UnmanagedString<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _sanityCheck(s.count >= 0)
@@ -363,8 +363,8 @@ extension _StringGuts {
 
 // Small strings
 extension _StringGuts {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var _smallUTF8Count: Int {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
@@ -375,8 +375,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var _smallUTF8String: _SmallUTF8String {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
@@ -388,8 +388,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   @inline(__always)
   internal init(_ small: _SmallUTF8String) {
 #if arch(i386) || arch(arm)
@@ -403,8 +403,8 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   var _unmanagedASCIIView: _UnmanagedString<UInt8> {
     @effects(readonly)
@@ -425,8 +425,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   var _unmanagedUTF16View: _UnmanagedString<UTF16.CodeUnit> {
     @effects(readonly)
@@ -449,16 +449,16 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   var _isOpaque: Bool {
     @inline(__always)
     get { return _object.isOpaque }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   var _isContiguous: Bool {
     @inline(__always)
@@ -514,7 +514,7 @@ extension _StringGuts {
 #endif
   }
 
-  @_versioned
+  @usableFromInline
   internal var _opaqueCount: Int {
     fatalError("TODO: non-cocoa opaque string support")
   }
@@ -609,7 +609,7 @@ extension _StringGuts {
   // Return a contiguous _StringGuts with the same contents as this one.
   // Use the existing guts if possible; otherwise copy the string into a
   // new buffer.
-  @_versioned
+  @usableFromInline
   internal
   func _extractContiguous<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self
@@ -627,13 +627,13 @@ extension _StringGuts {
       _large: _copyToNativeStorage(of: CodeUnit.self, from: 0..<count))
   }
 
-  @_versioned
+  @usableFromInline
   internal
   func _extractContiguousUTF16() -> _StringGuts {
     return _extractContiguous(of: UTF16.CodeUnit.self)
   }
 
-  @_versioned
+  @usableFromInline
   internal
   func _extractContiguousASCII() -> _StringGuts {
     return _extractContiguous(of: UInt8.self)
@@ -642,7 +642,7 @@ extension _StringGuts {
   // Return a native storage object with the same contents as this string.
   // Use the existing buffer if possible; otherwise copy the string into a
   // new buffer.
-  @_versioned
+  @usableFromInline
   internal
   func _extractNativeStorage<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self
@@ -658,8 +658,8 @@ extension _StringGuts {
   @_specialize(where CodeUnit == UInt8)
   @_specialize(where CodeUnit == UInt16)
   @_specialize(where CodeUnit == UTF16.CodeUnit)
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   func _copyToNativeStorage<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self,
@@ -675,7 +675,7 @@ extension _StringGuts {
     return storage
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   func _extractSlice(_ range: Range<Int>) -> _StringGuts {
     if range.isEmpty { return _StringGuts() }
@@ -706,8 +706,8 @@ extension _StringGuts {
       _large: _copyToNativeStorage(of: UTF16.CodeUnit.self, from: range))
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal mutating func allocationParametersForMutableStorage<CodeUnit>(
     of type: CodeUnit.Type,
     unusedCapacity: Int
@@ -738,8 +738,8 @@ extension _StringGuts {
 
   // Convert ourselves (if needed) to a native string with the specified storage
   // parameters and call `body` on the resulting native storage.
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   mutating func withMutableStorage<CodeUnit, R>(
     of type: CodeUnit.Type = CodeUnit.self,
@@ -769,8 +769,8 @@ extension _StringGuts {
     return result
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   @inline(__always)
   internal
   mutating func withMutableASCIIStorage<R>(
@@ -781,8 +781,8 @@ extension _StringGuts {
       of: UInt8.self, unusedCapacity: unusedCapacity, body)
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   @inline(__always)
   internal
   mutating func withMutableUTF16Storage<R>(
@@ -798,25 +798,25 @@ extension _StringGuts {
 // String API
 //
 extension _StringGuts {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var _hasStoredCount: Bool {
     @inline(__always) get { return !_object.isSmallOrCocoa }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var startIndex: Int {
     return 0
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal var endIndex: Int {
     @inline(__always) get { return count }
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   var count: Int {
     if _slowPath(!_hasStoredCount) {
@@ -828,7 +828,7 @@ extension _StringGuts {
     return Int(bitPattern: self._otherBits)
   }
 
-  @_versioned
+  @usableFromInline
   internal
   var _nonStoredCount: Int {
     if _object.isSmall {
@@ -843,7 +843,7 @@ extension _StringGuts {
 #endif
   }
 
-  @_inlineable
+  @inlinable
   public // @testable
   var capacity: Int {
     if _fastPath(_object.isNative) {
@@ -859,7 +859,7 @@ extension _StringGuts {
   //
 
   /// Get the UTF-16 code unit stored at the specified position in this string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   subscript(position: Int) -> UTF16.CodeUnit {
     if _slowPath(_isOpaque) {
@@ -874,7 +874,7 @@ extension _StringGuts {
     return _unmanagedUTF16View[position]
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   internal func _opaquePosition(_ position: Int) -> UTF16.CodeUnit {
     // TODO: ascii fast path, and reconsider this whole API anyways
     if self._isSmall {
@@ -887,7 +887,7 @@ extension _StringGuts {
   }
 
   /// Get the UTF-16 code unit stored at the specified position in this string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   func codeUnit(atCheckedOffset offset: Int) -> UTF16.CodeUnit {
     if _slowPath(_isOpaque) {
@@ -899,7 +899,7 @@ extension _StringGuts {
     }
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   func _opaqueCodeUnit(atCheckedOffset offset: Int) -> UTF16.CodeUnit {
     _sanityCheck(_isOpaque)
     // TODO: ascii fast path, and reconsider this whole API anyways
@@ -915,8 +915,8 @@ extension _StringGuts {
 
 
   // Copy code units from a slice of this string into a buffer.
-  @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
+  @usableFromInline
+  @inlinable // FIXME(sil-serialize-all)
   internal func _copy<CodeUnit>(
     range: Range<Int>,
     into dest: UnsafeMutableBufferPointer<CodeUnit>)
@@ -936,7 +936,7 @@ extension _StringGuts {
     }
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   internal func _opaqueCopy<CodeUnit>(
     range: Range<Int>,
     into dest: UnsafeMutableBufferPointer<CodeUnit>)
@@ -952,7 +952,7 @@ extension _StringGuts {
     _asOpaque()[range]._copy(into: dest)
   }
 
-  @_inlineable
+  @inlinable
   public // TODO(StringGuts): for testing
   mutating func reserveUnusedCapacity(
     _ unusedCapacity: Int,
@@ -984,7 +984,7 @@ extension _StringGuts {
     _invariantCheck()
   }
 
-  @_inlineable
+  @inlinable
   public // TODO(StringGuts): for testing
   mutating func reserveCapacity(_ capacity: Int) {
     if _fastPath(isUniqueNative()) {
@@ -1011,8 +1011,8 @@ extension _StringGuts {
     _invariantCheck()
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   mutating func append(_ other: _UnmanagedASCIIString) {
     guard other.count > 0 else { return  }
@@ -1034,8 +1034,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   mutating func append(_ other: _UnmanagedUTF16String) {
     guard other.count > 0 else { return  }
@@ -1044,8 +1044,8 @@ extension _StringGuts {
     }
   }
 
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal
   mutating func append(_ other: _UnmanagedOpaqueString) {
     guard other.count > 0 else { return  }
@@ -1054,14 +1054,14 @@ extension _StringGuts {
     }
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal
   mutating func append<S: StringProtocol>(_ other: S) {
     self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
 
-  @_inlineable
+  @inlinable
   public // TODO(StringGuts): for testing only
   mutating func append(_ other: _StringGuts) {
     // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
@@ -1087,7 +1087,7 @@ extension _StringGuts {
     }
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   mutating func _opaqueAppend(opaqueOther other: _StringGuts) {
     if other._isSmall {
       // TODO: Fix the visitation pattern for append here. For now, we funnel
@@ -1103,7 +1103,7 @@ extension _StringGuts {
     self.append(other._asOpaque())
   }
 
-  @_inlineable
+  @inlinable
   public // TODO(StringGuts): for testing only
   mutating func append(_ other: _StringGuts, range: Range<Int>) {
     _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
@@ -1125,7 +1125,7 @@ extension _StringGuts {
     }
   }
 
-  @_versioned // @opaque
+  @usableFromInline // @opaque
   mutating func _opaqueAppend(opaqueOther other: _StringGuts, range: Range<Int>) {
     if other._isSmall {
       other._smallUTF8String.withUnmanagedASCII {
@@ -1144,8 +1144,8 @@ extension _StringGuts {
   // really have a less generic implementation, then we can drop @specialize.
   //
   @_specialize(where C == Character._SmallUTF16)
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   mutating func append<C : RandomAccessCollection>(contentsOf other: C)
   where C.Element == UInt16 {
     if self._isSmall {
@@ -1170,7 +1170,7 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @_versioned
+  @usableFromInline
   mutating func _replaceSubrange<C, CodeUnit>(
     _ bounds: Range<Int>,
     with newElements: C,
@@ -1266,19 +1266,19 @@ extension _StringGuts : Sequence {
   public struct Iterator : IteratorProtocol {
     public typealias Element = UTF16.CodeUnit
 
-    @_versioned
+    @usableFromInline
     internal let _guts: _StringGuts
-    @_versioned
+    @usableFromInline
     internal let _endOffset: Int
-    @_versioned
+    @usableFromInline
     internal var _nextOffset: Int
-    @_versioned
+    @usableFromInline
     internal var _buffer = _FixedArray16<Element>()
-    @_versioned
+    @usableFromInline
     internal var _bufferIndex: Int = 0
 
-    @_inlineable
-    @_versioned
+    @inlinable
+    @usableFromInline
     internal init(_ guts: _StringGuts, range: Range<Int>) {
       self._guts = guts
       self._endOffset = range.upperBound
@@ -1288,7 +1288,7 @@ extension _StringGuts : Sequence {
       }
     }
 
-    @_inlineable
+    @inlinable
     public mutating func next() -> Element? {
       if _fastPath(_bufferIndex < _buffer.count) {
         let result = _buffer[_bufferIndex]
@@ -1303,7 +1303,7 @@ extension _StringGuts : Sequence {
       return _buffer[0]
     }
 
-    @_versioned
+    @usableFromInline
     @inline(never)
     internal mutating func _fillBuffer() {
       _sanityCheck(_buffer.count == 0)
@@ -1318,13 +1318,13 @@ extension _StringGuts : Sequence {
     }
   }
 
-  @_inlineable
+  @inlinable
   public func makeIterator() -> Iterator {
     return Iterator(self, range: 0..<count)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal func makeIterator(in range: Range<Int>) -> Iterator {
     return Iterator(self, range: range)
   }
@@ -1333,8 +1333,8 @@ extension _StringGuts : Sequence {
 extension _StringGuts {
   // TODO: Drop or unify with String._fromCodeUnits
   //
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal
   static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
     _ input: Input,
@@ -1400,8 +1400,8 @@ extension _SwiftStringStorage {
   /// Returns true iff `input` was found to contain invalid code units in the
   /// specified encoding. If any invalid sequences are found, they are replaced
   /// with REPLACEMENT CHARACTER (U+FFFD).
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal
   func _initialize<Input : Sequence, Encoding: _UnicodeEncoding>(
     fromCodeUnits input: Input,

@@ -1311,6 +1311,12 @@ ERROR(attr_only_on_parameters_parse, none,
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
 
+// Attributes
+ERROR(attr_renamed, none,
+      "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+WARNING(attr_renamed_warning, none,
+        "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
@@ -1319,7 +1325,7 @@ ERROR(attr_availability_unavailable_deprecated,none,
       "'deprecated'", (StringRef))
 
 WARNING(attr_availability_unknown_platform,none,
-"unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+      "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
 ERROR(attr_availability_invalid_renamed,none,
       "'renamed' argument of '%0' attribute must be an operator, identifier, "
       "or full function name, optionally prefixed by a type name", (StringRef))
@@ -1333,9 +1339,6 @@ ERROR(attr_availability_expected_equal,none,
 
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
-
-ERROR(attr_availability_renamed, none,
-      "@availability has been renamed to @available", ())
 
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,

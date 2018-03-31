@@ -2,33 +2,33 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-testing
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience -enable-testing
-@_inlineable struct TestInlineableStruct {}
-// expected-error@-1 {{'@_inlineable' attribute cannot be applied to this declaration}}
+@inlinable struct TestInlinableStruct {}
+// expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 
 private func privateFunction() {}
-// expected-note@-1{{global function 'privateFunction()' is not '@_versioned' or public}}
+// expected-note@-1{{global function 'privateFunction()' is not '@usableFromInline' or public}}
 fileprivate func fileprivateFunction() {}
-// expected-note@-1{{global function 'fileprivateFunction()' is not '@_versioned' or public}}
+// expected-note@-1{{global function 'fileprivateFunction()' is not '@usableFromInline' or public}}
 func internalFunction() {}
-// expected-note@-1{{global function 'internalFunction()' is not '@_versioned' or public}}
-@_versioned func versionedFunction() {}
+// expected-note@-1{{global function 'internalFunction()' is not '@usableFromInline' or public}}
+@usableFromInline func versionedFunction() {}
 public func publicFunction() {}
 
 private struct PrivateStruct {}
-// expected-note@-1 3{{struct 'PrivateStruct' is not '@_versioned' or public}}
+// expected-note@-1 3{{struct 'PrivateStruct' is not '@usableFromInline' or public}}
 struct InternalStruct {}
-// expected-note@-1 4{{struct 'InternalStruct' is not '@_versioned' or public}}
-@_versioned struct VersionedStruct {
-  @_versioned init() {}
+// expected-note@-1 4{{struct 'InternalStruct' is not '@usableFromInline' or public}}
+@usableFromInline struct VersionedStruct {
+  @usableFromInline init() {}
 }
 public struct PublicStruct {
   public init() {}
 
-  @_inlineable public var storedProperty: Int
-  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to stored properties}}
+  @inlinable public var storedProperty: Int
+  // expected-error@-1 {{'@inlinable' attribute cannot be applied to stored properties}}
 
-  @_inlineable public lazy var lazyProperty: Int = 0
-  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to stored properties}}
+  @inlinable public lazy var lazyProperty: Int = 0
+  // expected-error@-1 {{'@inlinable' attribute cannot be applied to stored properties}}
 }
 
 public struct Struct {
@@ -49,31 +49,31 @@ public struct Struct {
     // expected-error@-1 {{global function 'privateFunction()' is private and cannot be referenced from a '@_transparent' function}}
   }
 
-  @_inlineable
-  public func publicInlineableMethod() {
+  @inlinable
+  public func publicInlinableMethod() {
     struct Nested {}
-    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@_inlineable' function}}
+    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inlinable' function}}
 
     let _: PublicStruct
     let _: VersionedStruct
     let _: InternalStruct
-    // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@_inlineable' function}}
+    // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@inlinable' function}}
     let _: PrivateStruct
-    // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@_inlineable' function}}
+    // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
 
     let _ = PublicStruct.self
     let _ = VersionedStruct.self
     let _ = InternalStruct.self
-    // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@_inlineable' function}}
+    // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@inlinable' function}}
     let _ = PrivateStruct.self
-    // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@_inlineable' function}}
+    // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
 
     let _ = PublicStruct()
     let _ = VersionedStruct()
     let _ = InternalStruct()
-    // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@_inlineable' function}}
+    // expected-error@-1 {{struct 'InternalStruct' is internal and cannot be referenced from an '@inlinable' function}}
     let _ = PrivateStruct()
-    // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@_inlineable' function}}
+    // expected-error@-1 {{struct 'PrivateStruct' is private and cannot be referenced from an '@inlinable' function}}
   }
 
   @inline(__always)
@@ -89,10 +89,10 @@ public struct Struct {
   }
 
   private func privateMethod() {}
-  // expected-note@-1 {{instance method 'privateMethod()' is not '@_versioned' or public}}
+  // expected-note@-1 {{instance method 'privateMethod()' is not '@usableFromInline' or public}}
 
   @_transparent
-  @_versioned
+  @usableFromInline
   func versionedTransparentMethod() {
     struct Nested {}
     // expected-error@-1 {{type 'Nested' cannot be nested inside a '@_transparent' function}}
@@ -100,15 +100,15 @@ public struct Struct {
     // expected-error@-1 {{instance method 'privateMethod()' is private and cannot be referenced from a '@_transparent' function}}
   }
 
-  @_inlineable
-  @_versioned
-  func versionedInlineableMethod() {
+  @inlinable
+  @usableFromInline
+  func versionedInlinableMethod() {
     struct Nested {}
-    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@_inlineable' function}}
+    // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inlinable' function}}
   }
 
   @inline(__always)
-  @_versioned
+  @usableFromInline
   func versionedInlineAlwaysMethod() {
     struct Nested {}
     // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inline(__always)' function}}
@@ -120,9 +120,9 @@ public struct Struct {
     // OK
   }
 
-  @_inlineable
-  func internalInlineableMethod() {
-  // expected-error@-2 {{'@_inlineable' attribute can only be applied to public declarations, but 'internalInlineableMethod' is internal}}
+  @inlinable
+  func internalInlinableMethod() {
+  // expected-error@-2 {{'@inlinable' attribute can only be applied to public declarations, but 'internalInlinableMethod' is internal}}
     struct Nested {}
     // OK
   }
@@ -135,8 +135,8 @@ public struct Struct {
 }
 
 // Make sure protocol extension members can reference protocol requirements
-// (which do not inherit the @_versioned attribute).
-@_versioned
+// (which do not inherit the @usableFromInline attribute).
+@usableFromInline
 protocol VersionedProtocol {
   associatedtype T
 
@@ -145,32 +145,32 @@ protocol VersionedProtocol {
 
 extension VersionedProtocol {
   func internalMethod() {}
-  // expected-note@-1 {{instance method 'internalMethod()' is not '@_versioned' or public}}
+  // expected-note@-1 {{instance method 'internalMethod()' is not '@usableFromInline' or public}}
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   func versionedMethod() -> T {
     internalMethod()
-    // expected-error@-1 {{instance method 'internalMethod()' is internal and cannot be referenced from an '@_inlineable' function}}
+    // expected-error@-1 {{instance method 'internalMethod()' is internal and cannot be referenced from an '@inlinable' function}}
 
     return requirement()
   }
 }
 
 enum InternalEnum {
-// expected-note@-1 2{{enum 'InternalEnum' is not '@_versioned' or public}}
+// expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
   case apple
   case orange
 }
 
-@_inlineable public func usesInternalEnum() {
+@inlinable public func usesInternalEnum() {
   _ = InternalEnum.apple
-  // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@_inlineable' function}}
+  // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@inlinable' function}}
   let _: InternalEnum = .orange
-  // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@_inlineable' function}}
+  // expected-error@-1 {{enum 'InternalEnum' is internal and cannot be referenced from an '@inlinable' function}}
 }
 
-@_versioned enum VersionedEnum {
+@usableFromInline enum VersionedEnum {
   case apple
   case orange
   // FIXME: Should this be banned?
@@ -178,29 +178,29 @@ enum InternalEnum {
   case persimmon(String)
 }
 
-@_inlineable public func usesVersionedEnum() {
+@inlinable public func usesVersionedEnum() {
   _ = VersionedEnum.apple
   let _: VersionedEnum = .orange
   _ = VersionedEnum.persimmon
 }
 
 // Inherited initializers - <rdar://problem/34398148>
-@_versioned
+@usableFromInline
 @_fixed_layout
 class Base {
-  @_versioned
+  @usableFromInline
   init(x: Int) {}
 }
 
-@_versioned
+@usableFromInline
 @_fixed_layout
 class Middle : Base {}
 
-@_versioned
+@usableFromInline
 @_fixed_layout
 class Derived : Middle {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   init(y: Int) {
     super.init(x: y)
   }
@@ -213,7 +213,7 @@ class Derived : Middle {
 // presence of a '@_fixed_layout' attribute determines the behavior here.
 
 let internalGlobal = 0
-// expected-note@-1 {{let 'internalGlobal' is not '@_versioned' or public}}
+// expected-note@-1 {{let 'internalGlobal' is not '@usableFromInline' or public}}
 public let publicGlobal = 0
 
 struct InternalStructWithInit {
