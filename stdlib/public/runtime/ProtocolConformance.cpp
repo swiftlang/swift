@@ -23,6 +23,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Unreachable.h"
+#include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
 
@@ -535,9 +536,9 @@ bool isRelatedType(const Metadata *type, const void *candidate,
   return false;
 }
 
-const WitnessTable *
-swift::swift_conformsToProtocol(const Metadata * const type,
-                                const ProtocolDescriptor *protocol) {
+static const WitnessTable *
+swift_conformsToProtocolImpl(const Metadata * const type,
+                             const ProtocolDescriptor *protocol) {
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
@@ -824,3 +825,6 @@ bool swift::_checkGenericRequirements(
   // Success!
   return false;
 }
+
+#define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"
