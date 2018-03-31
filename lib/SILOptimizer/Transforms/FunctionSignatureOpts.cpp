@@ -113,11 +113,11 @@ class FunctionSignatureTransform {
 
   /// Keep a "view" of precompiled information on arguments that we use 
   /// during our optimization.
-  llvm::SmallVector<ArgumentDescriptor, 4> &ArgumentDescList;
+  MutableArrayRef<ArgumentDescriptor> ArgumentDescList;
 
   /// Keep a "view" of precompiled information on the direct results that we
   /// will use during our optimization.
-  llvm::SmallVector<ResultDescriptor, 4> &ResultDescList;
+  MutableArrayRef<ResultDescriptor> ResultDescList;
 
   /// Return a function name based on ArgumentDescList and ResultDescList.
   std::string createOptimizedSILFunctionName();
