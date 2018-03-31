@@ -13,7 +13,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// CHECK: Loaded module ASTSection from
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: Importing ASTSection... ok!
 

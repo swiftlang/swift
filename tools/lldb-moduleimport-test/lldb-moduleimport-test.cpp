@@ -42,24 +42,28 @@ void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
 
-static void printValidationInfo(llvm::StringRef data) {
+static bool validateModule(llvm::StringRef data, bool Verbose) {
   swift::serialization::ExtendedValidationInfo extendedInfo;
   swift::serialization::ValidationInfo info =
       swift::serialization::validateSerializedAST(data, &extendedInfo);
   if (info.status != swift::serialization::Status::Valid)
-    return;
+    return false;
 
-  if (!info.shortVersion.empty())
-    llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
-  llvm::outs() << "- Target: " << info.targetTriple << "\n";
-  if (!extendedInfo.getSDKPath().empty())
-    llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
-  if (!extendedInfo.getExtraClangImporterOptions().empty()) {
-    llvm::outs() << "- -Xcc options:";
-    for (llvm::StringRef option : extendedInfo.getExtraClangImporterOptions())
-      llvm::outs() << " " << option;
-    llvm::outs() << "\n";
+  if (Verbose) {
+    if (!info.shortVersion.empty())
+      llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
+    llvm::outs() << "- Target: " << info.targetTriple << "\n";
+    if (!extendedInfo.getSDKPath().empty())
+      llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
+    if (!extendedInfo.getExtraClangImporterOptions().empty()) {
+      llvm::outs() << "- -Xcc options:";
+      for (llvm::StringRef option : extendedInfo.getExtraClangImporterOptions())
+        llvm::outs() << " " << option;
+      llvm::outs() << "\n";
+    }
   }
+
+  return true;
 }
 
 static void resolveDeclFromMangledNameList(
@@ -102,6 +106,64 @@ collectMangledNames(const std::string &FilePath,
       continue;
     MangledNames.push_back(Name);
   }
+}
+
+llvm::BumpPtrAllocator Alloc;
+
+static bool
+collectASTModules(llvm::cl::list<std::string> &InputNames,
+                  llvm::SmallVectorImpl<std::pair<char *, uint64_t>> &Modules) {
+  for (auto &name : InputNames) {
+    auto OF = llvm::object::ObjectFile::createObjectFile(name);
+    if (!OF) {
+      llvm::outs() << name << " is not an object file.\n";
+      return false;
+    }
+    auto *Obj = OF->getBinary();
+    auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
+    auto *ELF = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
+
+    if (MachO) {
+      for (auto &Symbol : Obj->symbols()) {
+        auto RawSym = Symbol.getRawDataRefImpl();
+        llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
+        if (nlist.n_type != N_AST)
+          continue;
+        auto Path = MachO->getSymbolName(RawSym);
+        if (!Path) {
+          llvm::outs() << "Cannot get symbol name\n;";
+          return false;
+        }
+
+        auto fileBuf = llvm::MemoryBuffer::getFile(*Path);
+        if (!fileBuf) {
+          llvm::outs() << "Cannot read from '" << *Path
+                       << "': " << fileBuf.getError().message();
+          return false;
+        }
+
+        uint64_t Size = fileBuf.get()->getBufferSize();
+        char *Module = Alloc.Allocate<char>(Size);
+        std::memcpy(Module, (void *)fileBuf.get()->getBufferStart(), Size);
+        Modules.push_back({Module, Size});
+      }
+    }
+
+    for (auto &Section : Obj->sections()) {
+      llvm::StringRef Name;
+      Section.getName(Name);
+      if ((MachO && Name == swift::MachOASTSectionName) ||
+          (ELF && Name == swift::ELFASTSectionName)) {
+        uint64_t Size = Section.getSize();
+        StringRef ContentsReference;
+        Section.getContents(ContentsReference);
+        char *Module = Alloc.Allocate<char>(Size);
+        std::memcpy(Module, (void *)ContentsReference.begin(), Size);
+        Modules.push_back({Module, Size});
+      }
+    }
+  }
+  return true;
 }
 
 int main(int argc, char **argv) {
@@ -154,6 +216,19 @@ int main(int argc, char **argv) {
   InputNames.removeArgument();
   TargetTriple.removeArgument();
 
+  // Fetch the serialized module bitstreams from the Mach-O files and
+  // register them with the module loader.
+  llvm::SmallVector<std::pair<char *, uint64_t>, 8> Modules;
+  if (!collectASTModules(InputNames, Modules))
+    return 1;
+
+  for (auto &Module : Modules) {
+    if (!validateModule(StringRef(Module.first, Module.second), Verbose)) {
+      llvm::errs() << "Malformed module!\n";
+      return 1;
+    }
+  }
+
   // If no SDK was specified via -sdk, check environment variable SDKROOT.
   if (SDK.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");
@@ -190,75 +265,10 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation))
     return 1;
 
-  std::vector<llvm::object::OwningBinary<llvm::object::ObjectFile>> ObjFiles;
-
-  // Fetch the serialized module bitstreams from the Mach-O files and
-  // register them with the module loader.
-  for (std::string name : InputNames) {
-    auto OF = llvm::object::ObjectFile::createObjectFile(name);
-    if (!OF) {
-      llvm::outs() << name << " is not an object file.\n";
-      exit(1);
-    }
-    auto *Obj = OF->getBinary();
-    auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
-    auto *ELF   = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
-    if (MachO) {
-      for (auto &Symbol : Obj->symbols()) {
-        auto RawSym = Symbol.getRawDataRefImpl();
-        llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
-        if (nlist.n_type == N_AST) {
-          auto Path = MachO->getSymbolName(RawSym);
-          if (!Path) {
-            llvm::outs() << "Cannot get symbol name\n;";
-            exit(1);
-          }
-
-          auto fileBuf = llvm::MemoryBuffer::getFile(*Path);
-          if (!fileBuf) {
-            llvm::outs() << "Cannot read from '" << *Path
-                         << "': " << fileBuf.getError().message();
-            exit(1);
-          }
-
-          if (!parseASTSection(CI.getSerializedModuleLoader(),
-                               fileBuf.get()->getBuffer(), modules)) {
-            exit(1);
-          }
-
-          if (Verbose) {
-            for (auto path : modules)
-              llvm::outs() << "Loaded module " << path << " from " << name
-                           << "\n";
-            printValidationInfo(fileBuf.get()->getBuffer());
-          }
-
-          // Deliberately leak the llvm::MemoryBuffer. We can't delete it
-          // while it's in use anyway.
-          fileBuf.get().release();
-        }
-      }
-    }
-    for (auto &Section : Obj->sections()) {
-      llvm::StringRef Name;
-      Section.getName(Name);
-      if ((MachO && Name == swift::MachOASTSectionName) ||
-          (ELF   && Name == swift::ELFASTSectionName)) {
-        llvm::StringRef Buf;
-        Section.getContents(Buf);
-        if (!parseASTSection(CI.getSerializedModuleLoader(), Buf, modules))
-          exit(1);
-
-        if (Verbose) {
-          for (auto path : modules)
-            llvm::outs() << "Loaded module " << path << " from " << name
-                         << "\n";
-          printValidationInfo(Buf);
-        }
-      }
-    }
-    ObjFiles.push_back(std::move(*OF));
-  }
+  for (auto &Module : Modules)
+    if (!parseASTSection(CI.getSerializedModuleLoader(),
+                         StringRef(Module.first, Module.second), modules))
+      return 1;
 
   // Attempt to import all modules we found.
   for (auto path : modules) {
