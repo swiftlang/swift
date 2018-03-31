@@ -74,6 +74,153 @@ enum class NominalTypeKind : uint32_t {
 #include "MetadataKind.def"
 };
 
+/// Flags stored in the value-witness table.
+template <typename int_type>
+class TargetValueWitnessFlags {
+public:
+  // The polarity of these bits is chosen so that, when doing struct layout, the
+  // flags of the field types can be mostly bitwise-or'ed together to derive the
+  // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
+  // still require additional fixup.)
+  enum : int_type {
+    AlignmentMask =       0x0000FFFF,
+    IsNonPOD =            0x00010000,
+    IsNonInline =         0x00020000,
+    HasExtraInhabitants = 0x00040000,
+    HasSpareBits =        0x00080000,
+    IsNonBitwiseTakable = 0x00100000,
+    HasEnumWitnesses =    0x00200000,
+    Incomplete =          0x00400000,
+
+    // Everything else is reserved.
+  };
+
+private:
+  int_type Data;
+
+public:
+  explicit constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
+  constexpr TargetValueWitnessFlags() : Data(0) {}
+
+  /// The required alignment of the first byte of an object of this
+  /// type, expressed as a mask of the low bits that must not be set
+  /// in the pointer.
+  ///
+  /// This representation can be easily converted to the 'alignof'
+  /// result by merely adding 1, but it is more directly useful for
+  /// performing dynamic structure layouts, and it grants an
+  /// additional bit of precision in a compact field without needing
+  /// to switch to an exponent representation.
+  ///
+  /// For example, if the type needs to be 8-byte aligned, the
+  /// appropriate alignment mask should be 0x7.
+  size_t getAlignmentMask() const {
+    return (Data & AlignmentMask);
+  }
+  constexpr TargetValueWitnessFlags withAlignmentMask(size_t alignMask) const {
+    return TargetValueWitnessFlags((Data & ~AlignmentMask) | alignMask);
+  }
+
+  size_t getAlignment() const { return getAlignmentMask() + 1; }
+  constexpr TargetValueWitnessFlags withAlignment(size_t alignment) const {
+    return withAlignmentMask(alignment - 1);
+  }
+
+  /// True if the type requires out-of-line allocation of its storage.
+  bool isInlineStorage() const { return !(Data & IsNonInline); }
+  constexpr TargetValueWitnessFlags withInlineStorage(bool isInline) const {
+    return TargetValueWitnessFlags((Data & ~IsNonInline) |
+                                   (isInline ? 0 : IsNonInline));
+  }
+
+  /// True if values of this type can be copied with memcpy and
+  /// destroyed with a no-op.
+  bool isPOD() const { return !(Data & IsNonPOD); }
+  constexpr TargetValueWitnessFlags withPOD(bool isPOD) const {
+    return TargetValueWitnessFlags((Data & ~IsNonPOD) |
+                                   (isPOD ? 0 : IsNonPOD));
+  }
+
+  /// True if values of this type can be taken with memcpy. Unlike C++ 'move',
+  /// 'take' is a destructive operation that invalidates the source object, so
+  /// most types can be taken with a simple bitwise copy. Only types with side
+  /// table references, like @weak references, or types with opaque value
+  /// semantics, like imported C++ types, are not bitwise-takable.
+  bool isBitwiseTakable() const { return !(Data & IsNonBitwiseTakable); }
+  constexpr TargetValueWitnessFlags withBitwiseTakable(bool isBT) const {
+    return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
+                                   (isBT ? 0 : IsNonBitwiseTakable));
+  }
+  /// True if this type's binary representation has extra inhabitants, that is,
+  /// bit patterns that do not form valid values of the type.
+  ///
+  /// If true, then the extra inhabitant value witness table entries are
+  /// available in this type's value witness table.
+  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
+  /// True if this type's binary representation is that of an enum, and the
+  /// enum value witness table entries are available in this type's value
+  /// witness table.
+  bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
+  constexpr TargetValueWitnessFlags
+  withExtraInhabitants(bool hasExtraInhabitants) const {
+    return TargetValueWitnessFlags((Data & ~HasExtraInhabitants) |
+                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
+  }
+  constexpr TargetValueWitnessFlags
+  withEnumWitnesses(bool hasEnumWitnesses) const {
+    return TargetValueWitnessFlags((Data & ~HasEnumWitnesses) |
+                                   (hasEnumWitnesses ? HasEnumWitnesses : 0));
+  }
+
+  /// True if the type with this value-witness table is incomplete,
+  /// meaning that its external layout (size, etc.) is meaningless
+  /// pending completion of the metadata layout.
+  bool isIncomplete() const { return Data & Incomplete; }
+  constexpr TargetValueWitnessFlags
+  withIncomplete(bool isIncomplete) const {
+    return TargetValueWitnessFlags((Data & ~Incomplete) |
+                                   (isIncomplete ? Incomplete : 0));
+  }
+
+  constexpr int_type getOpaqueValue() const { return Data; }
+  static constexpr TargetValueWitnessFlags getFromOpaqueValue(int_type data) {
+    return TargetValueWitnessFlags(data);
+  }
+};
+using ValueWitnessFlags = TargetValueWitnessFlags<size_t>;
+
+/// Flags stored in a value-witness table with extra inhabitants.
+template <typename int_type>
+class TargetExtraInhabitantFlags {
+public:
+  enum : int_type {
+    NumExtraInhabitantsMask = 0x7FFFFFFFU,
+    ExtraInhabitantFlags
+  };
+  int_type Data;
+
+  constexpr TargetExtraInhabitantFlags(int_type data) : Data(data) {}
+
+public:
+  constexpr TargetExtraInhabitantFlags() : Data(0) {}
+
+  /// The number of extra inhabitants in the type's representation.
+  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
+
+  constexpr TargetExtraInhabitantFlags
+  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
+    return TargetExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
+                                      numExtraInhabitants);
+  }
+
+  constexpr int_type getOpaqueValue() const { return Data; }
+  static constexpr TargetExtraInhabitantFlags getFromOpaqueValue(int_type data){
+    return TargetExtraInhabitantFlags(data);
+  }
+};
+using ExtraInhabitantFlags =
+  TargetExtraInhabitantFlags<size_t>;
+
 /// Flags for dynamic-cast operations.
 enum class DynamicCastFlags : size_t {
   /// All flags clear.
@@ -833,6 +980,27 @@ static inline bool isValueWitnessTableMutable(StructLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(StructLayoutFlags::IsVWTMutable);
 }
 
+/// Flags for class layout.
+enum class ClassLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+};
+static inline ClassLayoutFlags operator|(ClassLayoutFlags lhs,
+                                         ClassLayoutFlags rhs) {
+  return ClassLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline ClassLayoutFlags &operator|=(ClassLayoutFlags &lhs,
+                                           ClassLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline ClassLayoutFlags getLayoutAlgorithm(ClassLayoutFlags flags) {
+  return ClassLayoutFlags(uintptr_t(flags)
+                             & uintptr_t(ClassLayoutFlags::AlgorithmMask));
+}
+
 /// Flags for enum layout.
 enum class EnumLayoutFlags : uintptr_t {
   /// Reserve space for 256 layout algorithms.
@@ -1213,6 +1381,131 @@ public:
                                  MetadataKind,
                                  value_getMetadataKind,
                                  value_setMetadataKind)
+};
+
+/// The public state of a metadata.
+enum class MetadataState : size_t {
+  // The values of this enum are set up to give us some future flexibility
+  // in adding states.  The compiler emits unsigned comparisons against
+  // these values, so adding states that aren't totally ordered with at
+  // least the existing values will pose a problem; but we also use a
+  // gradually-shrinking bitset in case it's useful to track states as
+  // separate capabilities.  Specific values have been chosen so that a
+  // MetadataRequest of 0 represents a blocking complete request, which
+  // is the most likely request from ordinary code.  The total size of a
+  // state is kept to 8 bits so that a full request, even with additional
+  // flags, can be materialized as a single immediate on common ISAs, and
+  // so that the state can be extracted with a byte truncation.
+  // The spacing between states reflects guesswork about where new
+  // states/capabilities are most likely to be added.
+
+  /// The metadata is fully complete.  By definition, this is the
+  /// end-state of all metadata.  Generally, metadata is expected to be
+  /// complete before it can be passed to arbitrary code, e.g. as
+  /// a generic argument to a function or as a metatype value.
+  ///
+  /// In addition to the requirements of NonTransitiveComplete, certain
+  /// transitive completeness guarantees must hold.  Most importantly,
+  /// complete nominal type metadata transitively guarantee the completion
+  /// of their stored generic type arguments and superclass metadata.
+  Complete = 0x00,
+
+  /// The metadata is fully complete except for any transitive completeness
+  /// guarantees.
+  ///
+  /// In addition to the requirements of LayoutComplete, metadata in this
+  /// state must be prepared for all basic type operations.  This includes:
+  ///
+  ///   - any sort of internal layout necessary to allocate and work
+  ///     with concrete values of the type, such as the instance layout
+  ///     of a class;
+  ///
+  ///   - any sort of external dynamic registration that might be required
+  ///     for the type, such as the realization of a class by the Objective-C
+  ///     runtime; and
+  ///
+  ///   - the initialization of any other information kept in the metadata
+  ///     object, such as a class's v-table.
+  NonTransitiveComplete = 0x01,
+
+  /// The metadata is ready for the layout of other types that store values
+  /// of this type.
+  ///
+  /// In addition to the requirements of Abstract, metadata in this state
+  /// must have a valid value witness table, meaning that its size,
+  /// alignment, and basic type properties (such as POD-ness) have been
+  /// computed.
+  LayoutComplete = 0x3F,
+
+  /// The metadata has its basic identity established.  It is possible to
+  /// determine what formal type it corresponds to.  Among other things, it
+  /// is possible to use the runtime mangling facilities with the type.
+  ///
+  /// For example, a metadata for a generic struct has a metadata kind,
+  /// a type descriptor, and all of its type arguments.  However, it does not
+  /// necessarily have a meaningful value-witness table.
+  ///
+  /// References to other types that are not part of the type's basic identity
+  /// may not yet have been established.  Most crucially, this includes the
+  /// superclass pointer.
+  Abstract = 0xFF,
+};
+
+/// Something that can be static_asserted in all the places where we do
+/// comparisons on metadata states.
+constexpr const bool MetadataStateIsReverseOrdered = true;
+
+/// Return true if the first metadata state is at least as advanced as the
+/// second.
+inline bool isAtLeast(MetadataState lhs, MetadataState rhs) {
+  static_assert(MetadataStateIsReverseOrdered,
+                "relying on the ordering of MetadataState here");
+  return size_t(lhs) <= size_t(rhs);
+}
+
+/// Kinds of requests for metadata.
+class MetadataRequest : public FlagSet<size_t> {
+  using IntType = size_t;
+  using super = FlagSet<IntType>;
+
+public:
+  enum : IntType {
+    State_bit = 0,
+    State_width = 8,
+
+    /// A blocking request will not return until the runtime is able to produce
+    /// metadata with the given kind.  A non-blocking request will return
+    /// "immediately", producing an abstract metadata and a flag saying that
+    /// the operation failed.
+    ///
+    /// An abstract request will never be non-zero.
+    NonBlocking_bit = 8,
+  };
+
+  MetadataRequest(MetadataState state, bool isNonBlocking = false) {
+    setState(state);
+    setIsNonBlocking(isNonBlocking);
+  }
+  explicit MetadataRequest(IntType bits) : super(bits) {}
+  constexpr MetadataRequest() {}
+
+  FLAGSET_DEFINE_EQUALITY(MetadataRequest)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(State_bit,
+                                 State_width,
+                                 MetadataState,
+                                 getState,
+                                 setState)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(NonBlocking_bit,
+                                isNonBlocking,
+                                setIsNonBlocking)
+  bool isBlocking() const { return !isNonBlocking(); }
+
+  /// Is this request satisfied by a metadata that's in the given state?
+  bool isSatisfiedBy(MetadataState state) const {
+    return isAtLeast(state, getState());
+  }
 };
 
 } // end namespace swift

@@ -40,6 +40,7 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     Casting.cpp
+    CompatibilityOverride.cpp
     CygwinPort.cpp
     Demangle.cpp
     Enum.cpp

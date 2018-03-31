@@ -525,7 +525,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOptionalSomePattern(OptionalSomePattern *P) {
-      printCommon(P, "optional_some_element");
+      printCommon(P, "pattern_optional_some");
       OS << '\n';
       printRec(P->getSubPattern());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -757,9 +757,9 @@ namespace {
 
       if (NTD->hasInterfaceType()) {
         if (NTD->isResilient())
-          OS << " @_resilient_layout";
+          OS << " resilient";
         else
-          OS << " @_fixed_layout";
+          OS << " non-resilient";
       }
     }
 
@@ -3032,6 +3032,11 @@ namespace {
     void visitNameAliasType(NameAliasType *T, StringRef label) {
       printCommon(label, "name_alias_type");
       printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+
+      for (auto arg : T->getInnermostGenericArgs())
+        printRec(arg);
       OS << ")";
     }
 

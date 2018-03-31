@@ -82,7 +82,7 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
 
   // init(rawValue:) constructor name
-  DeclName ctorName(C, C.Id_init, paramList);
+  DeclName ctorName(C, DeclBaseName::createConstructor(), paramList);
 
   // self.init(rawValue:) expr
   auto *selfRef = createSelfDeclRef(initDecl);
@@ -131,7 +131,7 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
 
   // init(rawValue:) name
   auto *paramList = ParameterList::createWithoutLoc(rawDecl);
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   // init(rawValue:) decl
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
@@ -181,6 +181,7 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccess(enumDecl->getFormalAccess());
+  initDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -487,7 +488,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
 
     return deriveProperty(tc, parentDecl, enumDecl, optionalIntType,
                           C.Id_intValue, synth);
-  } else if (name == C.Id_init) {
+  } else if (name == DeclBaseName::createConstructor()) {
     auto argumentNames = requirement->getFullName().getArgumentNames();
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == C.Id_stringValue) {

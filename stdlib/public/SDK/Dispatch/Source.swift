@@ -17,7 +17,7 @@ public extension DispatchSourceProtocol {
 	typealias DispatchSourceHandler = @convention(block) () -> Void
 
 	public func setEventHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *),
+		if #available(macOS 10.10, iOS 8.0, *),
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
@@ -27,13 +27,13 @@ public extension DispatchSourceProtocol {
 		}
 	}
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public func setEventHandler(handler: DispatchWorkItem) {
 		_swift_dispatch_source_set_event_handler(self as! DispatchSource, handler._block)
 	}
 
 	public func setCancelHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *),
+		if #available(macOS 10.10, iOS 8.0, *),
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
@@ -43,13 +43,13 @@ public extension DispatchSourceProtocol {
 		}
 	}
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public func setCancelHandler(handler: DispatchWorkItem) {
 		_swift_dispatch_source_set_cancel_handler(self as! DispatchSource, handler._block)
 	}
 
 	public func setRegistrationHandler(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], handler: DispatchSourceHandler?) {
-		if #available(OSX 10.10, iOS 8.0, *),
+		if #available(macOS 10.10, iOS 8.0, *),
                    let h = handler,
                    qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: h)
@@ -59,12 +59,12 @@ public extension DispatchSourceProtocol {
 		}
 	}
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public func setRegistrationHandler(handler: DispatchWorkItem) {
 		_swift_dispatch_source_set_registration_handler(self as! DispatchSource, handler._block)
 	}
 
-	@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+	@available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
 	public func activate() {
 		(self as! DispatchSource).activate()
 	}

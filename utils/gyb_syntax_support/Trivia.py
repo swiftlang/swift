@@ -3,12 +3,13 @@ from kinds import lowercase_first_word
 
 class Trivia(object):
     def __init__(self, name, comment, characters=[], swift_characters=[],
-                 is_new_line=False):
+                 is_new_line=False, is_comment=False):
         self.name = name
         self.comment = comment
         self.characters = characters
         self.lower_name = lowercase_first_word(name)
         self.is_new_line = is_new_line
+        self.is_comment = is_comment
 
         # Swift sometimes doesn't support escaped characters like \f or \v;
         # we should allow specifying alternatives explicitly.
@@ -44,14 +45,18 @@ TRIVIAS = [
            'A backtick \'`\' character, used to escape identifiers.',
            characters=['`']),
 
-    Trivia('LineComment', 'A developer line comment, starting with \'//\''),
+    Trivia('LineComment', 'A developer line comment, starting with \'//\'',
+           is_comment=True),
     Trivia('BlockComment',
            'A developer block comment, starting with \'/*\' and ending with'
-           ' \'*/\'.'),
+           ' \'*/\'.',
+           is_comment=True),
     Trivia('DocLineComment',
-           'A documentation line comment, starting with \'///\'.'),
+           'A documentation line comment, starting with \'///\'.',
+           is_comment=True),
     Trivia('DocBlockComment',
            'A documentation block comment, starting with \'/**\' and ending '
-           'with \'*/\'.'),
+           'with \'*/\'.',
+           is_comment=True),
     Trivia('GarbageText', 'Any skipped garbage text.'),
 ]

@@ -55,7 +55,8 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 402; // Last change: effects(releasenone)
+
+const uint16_t VERSION_MINOR = 407; // Last change: convert_escape_to_noescape
 
 using DeclIDField = BCFixed<31>;
 
@@ -380,6 +381,7 @@ using OptionalTypeKindField = BCFixed<2>;
 enum class DeclNameKind: uint8_t {
   Normal,
   Subscript,
+  Constructor,
   Destructor
 };
 
@@ -394,6 +396,8 @@ enum SpecialIdentifierID : uint8_t {
   OBJC_HEADER_MODULE_ID,
   /// Special value for the special subscript name
   SUBSCRIPT_ID,
+  /// Special value for the special constructor name
+  CONSTRUCTOR_ID,
   /// Special value for the special destructor name
   DESTRUCTOR_ID,
 
@@ -638,10 +642,18 @@ namespace decls_block {
 #include "swift/Serialization/DeclTypeRecordNodes.def"
   };
 
+  using BuiltinAliasTypeLayout = BCRecordLayout<
+    BUILTIN_ALIAS_TYPE,
+    DeclIDField, // typealias decl
+    TypeIDField  // canonical type (a fallback)
+  >;
+
   using NameAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
     DeclIDField, // typealias decl
-    TypeIDField  // canonical type (a fallback)
+    TypeIDField, // parent type
+    TypeIDField  // underlying type
+    // trailing substitutions
   >;
 
   using GenericTypeParamTypeLayout = BCRecordLayout<
@@ -884,7 +896,8 @@ namespace decls_block {
     DeclContextIDField,// context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // requires stored property initial values
+    BCFixed<1>,        // requires stored property initial values?
+    BCFixed<1>,        // inherits convenience initializers from its superclass?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,       // superclass
     AccessLevelField, // access level
@@ -1071,14 +1084,19 @@ namespace decls_block {
 
   using EnumElementLayout = BCRecordLayout<
     ENUM_ELEMENT_DECL,
-    IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // interface type
-    BCFixed<1>,  // has argument type?
     BCFixed<1>,  // implicit?
+    BCFixed<1>,  // has payload?
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // negative raw value?
-    BCBlob       // raw value
+    IdentifierIDField, // raw value
+    BCFixed<1>,   // default argument resilience expansion
+    BCVBR<5>, // number of parameter name components
+    BCArray<IdentifierIDField> // name components,
+
+    // The record is trailed by:
+    // - its argument parameters, if any
   >;
 
   using SubscriptLayout = BCRecordLayout<

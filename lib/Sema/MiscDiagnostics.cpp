@@ -210,7 +210,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
 
         // Verify noescape parameter uses.
-        checkNoEscapeParameterUse(DRE, nullptr, OperandKind::None);
+        checkNoEscapeParameterUse(DRE, Parent.getAsExpr(), OperandKind::None);
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
@@ -703,7 +703,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
       // validates that the noescape bit didn't get stripped off), or as
-      // a special case, in the binding of a withoutActuallyEscaping block.
+      // a special case, e.g. in the binding of a withoutActuallyEscaping block
+      // or the argument of a type(of: ...).
       if (parent) {
         if (auto apply = dyn_cast<ApplyExpr>(parent)) {
           if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
@@ -713,6 +714,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                    && useKind == OperandKind::Argument) {
           return;
         } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
+          return;
+        } else if (isa<DynamicTypeExpr>(parent)) {
           return;
         }
       }
@@ -1423,27 +1426,42 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     }
     
-    /// Return true if this is 'nil' type checked as an Optional.  This looks
-    /// like this:
-    ///   (call_expr implicit type='Int?'
-    ///     (constructor_ref_call_expr implicit
-    ///       (declref_expr implicit decl=Optional.init(nilLiteral:)
-    static bool isTypeCheckedOptionalNil(Expr *E) {
-      auto CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr());
+    /// Return true if this is a 'nil' literal.  This looks
+    /// like this if the type is Optional<T>:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    /// Or like this if it is any other ExpressibleByNilLiteral type:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    bool isTypeCheckedOptionalNil(Expr *E) {
+      auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
       if (!CE || !CE->isImplicit())
         return false;
-      
+
+      // First case -- Optional.none
+      if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
+        return DRE->getDecl() == TC.Context.getOptionalNoneDecl();
+
+      // Second case -- init(nilLiteral:)
       auto CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getSemanticFn());
       if (!CRCE || !CRCE->isImplicit()) return false;
-      
-      auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn());
-      
-      SmallString<32> NameBuffer;
-      auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
-      return name == "init(nilLiteral:)";
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn())) {
+        SmallString<32> NameBuffer;
+        auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
+        return name == "init(nilLiteral:)";
+      }
+
+      return false;
     }
-    
-    
+
+
     /// Warn about surprising implicit optional promotions involving operands to
     /// calls.  Specifically, we warn about these expressions when the 'x'
     /// operand is implicitly promoted to optional:
@@ -3910,7 +3928,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     return None;
 
   // String'ify the arguments.
-  StringRef baseNameStr = name.getBaseIdentifier().str();
+  StringRef baseNameStr = name.getBaseName().userFacingName();
   SmallVector<StringRef, 4> argNameStrs;
   for (auto arg : name.getArgumentNames()) {
     if (arg.empty())
@@ -3958,23 +3976,24 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
-                                      Identifier old) -> Identifier{
+                                      DeclBaseName old) -> DeclBaseName{
     if (name.empty())
       return Identifier();
 
-    if (!old.empty() && name == old.str())
+    if (!old.empty() && name == old.userFacingName())
       return old;
 
     return Context.getIdentifier(name);
   };
 
-  Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseIdentifier());
+  auto newBaseName = getReplacementIdentifier(
+      baseNameStr, name.getBaseName());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
-    newArgNames.push_back(getReplacementIdentifier(argNameStrs[i],
-                                                   oldArgNames[i]));
+    auto argBaseName = getReplacementIdentifier(argNameStrs[i],
+                                                oldArgNames[i]);
+    newArgNames.push_back(argBaseName.getIdentifier());
   }
 
   return DeclName(Context, newBaseName, newArgNames);

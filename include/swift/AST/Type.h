@@ -398,7 +398,7 @@ class CanType : public Type {
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getOptionalObjectTypeImpl(CanType type, bool &isOptional);
+  static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -466,12 +466,7 @@ public:
   GenericTypeDecl *getAnyGeneric() const;
 
   CanType getOptionalObjectType() const {
-    bool isOptional;
-    return getOptionalObjectTypeImpl(*this, isOptional);
-  }
-
-  CanType getOptionalObjectType(bool &isOptional) const {
-    return getOptionalObjectTypeImpl(*this, isOptional);
+    return getOptionalObjectTypeImpl(*this);
   }
 
   CanType getReferenceStorageReferent() const {

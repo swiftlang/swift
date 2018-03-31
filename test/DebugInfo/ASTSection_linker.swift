@@ -7,15 +7,14 @@
 
 // Test the inline section mechanism.
 // RUN: %target-ld %t/ASTSection.o -sectcreate __SWIFT __ast %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -dylib -lSystem -lobjc
-// RUN: %lldb-moduleimport-test %t/ASTSection.dylib | %FileCheck %s
+// RUN: %lldb-moduleimport-test -verbose %t/ASTSection.dylib | %FileCheck %s
 
 // Test the symbol table entry.
 // RUN: %target-ld %t/ASTSection.o -add_ast_path %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -dylib -lSystem -lobjc
-// RUN: %lldb-moduleimport-test %t/ASTSection.dylib | %FileCheck %s
+// RUN: %lldb-moduleimport-test -verbose %t/ASTSection.dylib | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
-// CHECK: Loaded module ASTSection from
 // CHECK: - Swift Version: {{.+}}.{{.+}}
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: - SDK path: /fake/sdk/path{{$}}

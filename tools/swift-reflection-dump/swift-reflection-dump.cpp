@@ -122,17 +122,17 @@ findReflectionSection(const ObjectFile *objectFile,
 
 static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
   auto fieldSection = findReflectionSection<FieldSection>(
-      objectFile, {"__swift5_fieldmd", ".swift5_fieldmd", "swift5_fieldmd"});
+      objectFile, {"__swift4_fieldmd", ".swift4_fieldmd", "swift4_fieldmd"});
   auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
-      objectFile, {"__swift5_assocty", ".swift5_assocty", "swift5_assocty"});
+      objectFile, {"__swift4_assocty", ".swift4_assocty", "swift4_assocty"});
   auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
-      objectFile, {"__swift5_builtin", ".swift5_builtin", "swift5_builtin"});
+      objectFile, {"__swift4_builtin", ".swift4_builtin", "swift4_builtin"});
   auto captureSection = findReflectionSection<CaptureSection>(
-      objectFile, {"__swift5_capture", ".swift5_capture", "swift5_capture"});
+      objectFile, {"__swift4_capture", ".swift4_capture", "swift4_capture"});
   auto typeRefSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift5_typeref", ".swift5_typeref", "swift5_typeref"});
+      objectFile, {"__swift4_typeref", ".swift4_typeref", "swift4_typeref"});
   auto reflectionStringsSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift5_reflstr", ".swift5_reflstr", "swift5_reflstr"});
+      objectFile, {"__swift4_reflstr", ".swift4_reflstr", "swift4_reflstr"});
 
   // The entire object file is mapped into this process's memory, so the
   // local/remote mapping is identity.
@@ -161,12 +161,24 @@ public:
   {
   }
 
-  uint8_t getPointerSize() override {
-    return sizeof(uintptr_t);
+  bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                       void *outBuffer) override {
+    switch (type) {
+      case DLQ_GetPointerSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(void *);
+        return true;
+      }
+      case DLQ_GetSizeSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(size_t);
+        return true;
+      }
+    }
+
+    return false;
   }
-  uint8_t getSizeSize() override {
-    return sizeof(size_t);
-  }
+
   RemoteAddress getSymbolAddress(const std::string &name) override {
     for (auto &object : ObjectFiles) {
       for (auto &symbol : object->symbols()) {

@@ -150,7 +150,7 @@ __attribute__((availability(ios,introduced=8.0)))
 - (id)copyWithZone:(nullable NSZone *)zone;
 @end
 
-@interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
+@interface NSDictionary<KeyType, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
 - (nullable ObjectType)objectForKey:(nonnull KeyType)aKey;
 - (nonnull NSEnumerator *)keyEnumerator;
@@ -1074,6 +1074,10 @@ extern NSString *NSHTTPRequestKey;
 
 @property (strong) id propertyOfId;
 
+@end
+
+@protocol NSIdLoving
+- (void)takesIdViaProtocol:(id _Nonnull)x;
 @end
 
 #define NSTimeIntervalSince1970 978307200.0

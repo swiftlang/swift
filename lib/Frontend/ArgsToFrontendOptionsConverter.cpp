@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
+#include "ArgsToFrontendOptionsConverter.h"
 
+#include "ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendOutputsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
@@ -45,7 +45,8 @@ static void debugFailWithAssertion() {
 LLVM_ATTRIBUTE_NOINLINE
 static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
 
-bool ArgsToFrontendOptionsConverter::convert() {
+bool ArgsToFrontendOptionsConverter::convert(
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
   using namespace options;
 
   handleDebugCrashGroupArguments();
@@ -78,6 +79,8 @@ bool ArgsToFrontendOptionsConverter::convert() {
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
 
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
+
   computePlaygroundOptions();
 
   // This can be enabled independently of the playground transform.
@@ -93,9 +96,11 @@ bool ArgsToFrontendOptionsConverter::convert() {
 
   computeDumpScopeMapLocations();
 
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs)
-          .convert())
+  Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+      ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
+  if (!inputsAndOutputs)
     return true;
+  Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
 
   Opts.RequestedAction = determineRequestedAction(Args);
 

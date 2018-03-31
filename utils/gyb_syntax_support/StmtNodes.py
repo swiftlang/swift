@@ -39,7 +39,8 @@ STMT_NODES = [
 
     # switch-case-list -> switch-case switch-case-list?
     Node('SwitchCaseList', kind='SyntaxCollection',
-         element='SwitchCase'),
+         element='Syntax',
+         element_choices=['SwitchCase', 'IfConfigDecl']),
 
     # repeat-while-stmt -> label? ':'? 'repeat' code-block 'while' expr ';'?
     Node('RepeatWhileStmt', kind='Stmt',
@@ -257,7 +258,11 @@ STMT_NODES = [
     Node('SwitchCase', kind='Syntax',
          traits=['WithStatements'],
          children=[
-             Child('Label', kind='Syntax'),
+             Child('Label', kind='Syntax',
+                   node_choices=[
+                       Child('Default', kind='SwitchDefaultLabel'),
+                       Child('Case', kind='SwitchCaseLabel'),
+                   ]),
              Child('Statements', kind='CodeBlockItemList'),
          ]),
 

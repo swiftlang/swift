@@ -278,8 +278,14 @@ void Lexer::formToken(tok Kind, const char *TokStart, bool MultilineString) {
     Kind = tok::eof;
   }
   unsigned CommentLength = 0;
-  if (RetainComments == CommentRetentionMode::AttachToNextToken && SeenComment)
-    CommentLength = TokStart - LastCommentBlockStart;
+  if (RetainComments == CommentRetentionMode::AttachToNextToken) {
+    auto Iter = llvm::find_if(LeadingTrivia, [](const TriviaPiece &Piece) {
+      return Piece.isComment();
+    });
+    for (auto End = LeadingTrivia.end(); Iter != End; Iter++) {
+      CommentLength += Iter->getTextLength();
+    }
+  }
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
@@ -600,24 +606,16 @@ bool Lexer::isOperator(StringRef string) {
 
 
 tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
-  tok Kind = llvm::StringSwitch<tok>(Str)
-#define KEYWORD(kw) \
-    .Case(#kw, tok::kw_##kw)
+#define SIL_KEYWORD(kw)
+#define KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
 #include "swift/Syntax/TokenKinds.def"
-    .Default(tok::identifier);
 
   // SIL keywords are only active in SIL mode.
-  switch (Kind) {
-#define SIL_KEYWORD(kw) \
-    case tok::kw_##kw:
+  if (InSILMode) {
+#define SIL_KEYWORD(kw) if (Str == #kw) return tok::kw_##kw;
 #include "swift/Syntax/TokenKinds.def"
-      if (!InSILMode)
-        Kind = tok::identifier;
-      break;
-    default:
-      break;
   }
-  return Kind;
+  return tok::identifier;
 }
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
@@ -638,21 +636,6 @@ void Lexer::lexIdentifier() {
 /// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
 void Lexer::lexHash() {
   const char *TokStart = CurPtr-1;
-
-  // NOTE: legacy punctuator.  Remove in the future.
-  if (*CurPtr == ']') { // #]
-     ++CurPtr;
-     return formToken(tok::r_square_lit, TokStart);
-  }
-  
-  // Allow a hashbang #! line at the beginning of the file.
-  if (CurPtr - 1 == ContentStart && *CurPtr == '!') {
-    --CurPtr;
-    if (BufferID != SourceMgr.getHashbangBufferID())
-      diagnose(CurPtr, diag::lex_hashbang_not_allowed);
-    skipHashbang(/*EatNewline=*/true);
-    return lexImpl();
-  }
 
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
@@ -2177,10 +2160,6 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  // Remember where we started so that we can find the comment range.
-  LastCommentBlockStart = CurPtr;
-  SeenComment = false;
-
   lexTrivia(LeadingTrivia, /* IsForTrailingTrivia */ false);
 
   // Remember the start of the token so we can form the text range.
@@ -2239,29 +2218,16 @@ void Lexer::lexImpl() {
 
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
-  case '[': {
-     // NOTE: Legacy punctuator for old object literal syntax.
-     // Remove in the future.
-     if (*CurPtr == '#') { // [#
-       // NOTE: Do NOT include the '#' in the token, unlike in earlier
-       // versions of Swift that supported the old object literal syntax
-       // directly.  The '#' will be lexed as part of the object literal
-       // keyword token itself.
-       return formToken(tok::l_square_lit, TokStart);
-     }
-     return formToken(tok::l_square, TokStart);
-  }
+  case '[': return formToken(tok::l_square, TokStart);
   case '(': return formToken(tok::l_paren, TokStart);
   case '}': return formToken(tok::r_brace, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
-  case ')':
-    return formToken(tok::r_paren, TokStart);
+  case ')': return formToken(tok::r_paren, TokStart);
 
   case ',': return formToken(tok::comma, TokStart);
   case ';': return formToken(tok::semi, TokStart);
   case ':': return formToken(tok::colon, TokStart);
-  case '\\':
-    return formToken(tok::backslash, TokStart);
+  case '\\': return formToken(tok::backslash, TokStart);
 
   case '#':
     return lexHash();
@@ -2270,14 +2236,12 @@ void Lexer::lexImpl() {
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment(/*EatNewline=*/true);
-      SeenComment = true;
       assert(isKeepingComments() &&
              "Non token comment should be eaten by lexTrivia as LeadingTrivia");
       return formToken(tok::comment, TokStart);
     }
     if (CurPtr[0] == '*') { // "/*"
       skipSlashStarComment();
-      SeenComment = true;
       assert(isKeepingComments() &&
              "Non token comment should be eaten by lexTrivia as LeadingTrivia");
       return formToken(tok::comment, TokStart);
@@ -2410,7 +2374,6 @@ Restart:
       break;
     } else if (*CurPtr == '/') {
       // '// ...' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
@@ -2420,7 +2383,6 @@ Restart:
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
-      SeenComment = true;
       bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
       size_t Length = CurPtr - TriviaStart;

@@ -437,6 +437,9 @@ public:
       subPattern = getSubExprPattern(arg);
     }
     
+    if (ume->getName().getBaseName().isSpecial())
+      return nullptr;
+
     // FIXME: Compound names.
     return new (TC.Context) EnumElementPattern(
                               ume->getDotLoc(),
@@ -873,6 +876,17 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   return hadError;
 }
 
+bool TypeChecker::typeCheckParameterLists(AbstractFunctionDecl *fd,
+                                          GenericTypeResolver &resolver) {
+  bool hadError = false;
+  for (auto paramList : fd->getParameterLists()) {
+    hadError |= typeCheckParameterList(paramList, fd,
+                                       TypeResolutionOptions(),
+                                       resolver);
+  }
+
+  return hadError;
+}
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {

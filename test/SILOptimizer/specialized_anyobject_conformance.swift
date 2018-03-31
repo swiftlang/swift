@@ -1,5 +1,5 @@
-// REQUIRES: plus_one_runtime
-// RUN: %target-swift-frontend  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name specialized_anyobject_conformance -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 
 // rdar://problem/31910351
 
@@ -17,7 +17,7 @@ public func callee(_ t: C<Int32>?, _ p: P) {
   p.use(t!)
 }
 
-// CHECK-LABEL: sil @$S33specialized_anyobject_conformance7caller11pyAA1P_p_tF : $@convention(thin) (@in P) -> ()
+// CHECK-LABEL: sil @$S33specialized_anyobject_conformance7caller11pyAA1P_p_tF : $@convention(thin) (@in_guaranteed P) -> () {
 public func caller1(p: P) {
   callee(C<Int32>(), p)
 }

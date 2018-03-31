@@ -186,6 +186,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   TypeMetadataPtrTy = TypeMetadataStructTy->getPointerTo(DefaultAS);
 
+  TypeMetadataResponseTy = createStructType(*this, "swift.metadata_response", {
+    TypeMetadataPtrTy,
+    SizeTy
+  });
+
   // A protocol descriptor describes a protocol. It is not type metadata in
   // and of itself, but is referenced in the structure of existential type
   // metadata records.
@@ -200,8 +205,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy,              // objc properties
     Int32Ty,                // size
     Int32Ty,                // flags
-    Int16Ty,                // mandatory requirement count
-    Int16Ty,                // total requirement count
+    Int32Ty,                // total requirement count
     Int32Ty,                // requirements array
     RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names
@@ -212,6 +216,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ProtocolRequirementStructTy =
       createStructType(*this, "swift.protocol_requirement", {
     Int32Ty,                // flags
+    Int32Ty,                // thunk
     Int32Ty                 // default implementation
   });
   
@@ -562,18 +567,27 @@ IRGenModule::createStringConstant(StringRef Str,
   return { global, address };
 }
 
-llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
-  if (EmptyTupleMetadata)
-    return EmptyTupleMetadata;
-
-  EmptyTupleMetadata = Module.getOrInsertGlobal(
-                          MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)),
-                          FullTypeMetadataStructTy);
-  if (useDllStorage())
-    cast<llvm::GlobalVariable>(EmptyTupleMetadata)
-        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
-  return EmptyTupleMetadata;
+#define KNOWN_METADATA_ACCESSOR(NAME, SYM) \
+llvm::Constant *IRGenModule::get##NAME() { \
+  if (NAME) \
+    return NAME; \
+  NAME = Module.getOrInsertGlobal( \
+                          SYM, \
+                          FullTypeMetadataStructTy); \
+  if (useDllStorage()) \
+    cast<llvm::GlobalVariable>(NAME) \
+        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass); \
+  return NAME; \
 }
+
+KNOWN_METADATA_ACCESSOR(EmptyTupleMetadata,
+                        MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)))
+KNOWN_METADATA_ACCESSOR(AnyExistentialMetadata,
+                        MANGLE_AS_STRING(METADATA_SYM(ANY_MANGLING)))
+KNOWN_METADATA_ACCESSOR(AnyObjectExistentialMetadata,
+                        MANGLE_AS_STRING(METADATA_SYM(ANYOBJECT_MANGLING)))
+
+#undef KNOWN_METADATA_ACCESSOR
 
 llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {
   if (ObjCEmptyCachePtr)
@@ -1103,17 +1117,12 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
     return getPrimaryIGM();
   }
 
-  if (DeclContext *ctxt = f->getDeclContext()) {
-    if (SourceFile *SF = ctxt->getParentSourceFile()) {
-      IRGenModule *IGM = GenModules[SF];
-      assert(IGM);
-      return IGM;
-    }
-  }
-  // We have no source file for the function.
-  // Let's use the IGM from which the function is referenced the first time.
-  if (IRGenModule *IGM = DefaultIGMForFunction[f])
-    return IGM;
+  auto found = DefaultIGMForFunction.find(f);
+  if (found != DefaultIGMForFunction.end())
+    return found->second;
+
+  if (auto *dc = f->getDeclContext())
+    return getGenModule(dc);
 
   return getPrimaryIGM();
 }

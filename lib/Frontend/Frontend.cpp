@@ -751,6 +751,11 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   Diags.setSuppressWarnings(DidSuppressWarnings);
 
   if (mainIsPrimary && !Context->hadError() &&
+      Invocation.getFrontendOptions().DebuggerTestingTransform) {
+    performDebuggerTestingTransform(MainFile);
+  }
+
+  if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().PCMacro) {
     performPCMacro(MainFile, PersistentState.getTopLevelContext());
   }

@@ -60,10 +60,6 @@ SILGenModule::~SILGenModule() {
   M.verify();
 }
 
-EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
-  return elt;
-}
-
 static SILDeclRef
 getBridgingFn(Optional<SILDeclRef> &cacheSlot,
               SILGenModule &SGM,
@@ -1172,6 +1168,10 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
   if (!decl->getGetter())
     return false;
 
+  // If the getter is mutating, we cannot form a keypath to it at all.
+  if (decl->isGetterMutating())
+    return false;
+
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,
   // then we still do.
 
@@ -1205,6 +1205,9 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
+  if (!M.getASTContext().LangOpts.EnableKeyPathResilience)
+    return;
+  
   // TODO: Key path code emission doesn't handle opaque values properly yet.
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
@@ -1219,7 +1222,9 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
-    baseTy = decl->getDeclContext()->getSelfInterfaceType();
+    baseTy = decl->getDeclContext()->getSelfInterfaceType()
+                 ->getCanonicalType(decl->getInnermostDeclContext()
+                                        ->getGenericSignatureOfContext());
     if (decl->isStatic()) {
       // TODO: Static properties should eventually be referenceable as
       // keypaths from T.Type -> Element
@@ -1237,35 +1242,39 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (genericEnv)
     subs = genericEnv->getForwardingSubstitutions();
   
-  // TODO: The hashable conformances for the indices need to be provided by the
-  // client, since they may be post-hoc conformances, or a generic subscript
-  // may be invoked with hashable substitutions. We may eventually allow for
-  // non-hashable keypaths as well.
-  SmallVector<ProtocolConformanceRef, 4> indexHashables;
   if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
-    auto hashable = getASTContext().getProtocol(KnownProtocolKind::Hashable);
     for (auto *index : *sub->getIndices()) {
+      // Keypaths can't capture inout indices.
       if (index->isInOut())
         return;
+
+      // TODO: Handle reabstraction and tuple explosion in thunk generation.
+      // This wasn't previously a concern because anything that was Hashable
+      // had only one abstraction level and no explosion.
       auto indexTy = index->getInterfaceType();
+      
+      if (isa<TupleType>(indexTy->getCanonicalType(sub->getGenericSignature())))
+        return;
+      
       if (genericEnv)
         indexTy = genericEnv->mapTypeIntoContext(indexTy);
       
-      auto conformance = sub->getModuleContext()
-                            ->lookupConformance(indexTy, hashable);
-      if (!conformance)
+      auto indexLoweredTy = Types.getLoweredType(indexTy);
+      auto indexOpaqueLoweredTy =
+        Types.getLoweredType(AbstractionPattern::getOpaque(), indexTy);
+      
+      if (indexOpaqueLoweredTy.getAddressType()
+             != indexLoweredTy.getAddressType())
         return;
-      if (!conformance->getConditionalRequirements().empty())
-        return;
-      indexHashables.push_back(*conformance);
     }
   }
-  
+
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
                                                baseOperand, needsGenericContext,
-                                               subs, decl, indexHashables,
-                                               baseTy->getCanonicalType());
+                                               subs, decl, {},
+                                               baseTy->getCanonicalType(),
+                                               /*property descriptor*/ true);
   
   (void)SILProperty::create(M, /*serialized*/ false, decl, component);
 }

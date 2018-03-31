@@ -13,7 +13,7 @@ public func getVersion() -> Int {
 public struct AddInitializer {
   public var x: Int
 
-  // This could be @_inlineable, but we want to force inlining to take place
+  // This could be @inlinable, but we want to force inlining to take place
   // at -Onone to get better test coverage.
   @_transparent
   public init() {

@@ -1,12 +1,12 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-key-path-resilience %s | %FileCheck %s
 
 // TODO: globals should get descriptors
 public var a: Int = 0
 
-@_inlineable
+@inlinable
 public var b: Int { return 0 }
 
-@_versioned
+@usableFromInline
 internal var c: Int = 0
 
 // no descriptor
@@ -20,11 +20,11 @@ public struct A {
   public var a: Int = 0
 
   // CHECK-LABEL: sil_property #A.b
-  @_inlineable
+  @inlinable
   public var b: Int { return 0 }
 
   // CHECK-LABEL: sil_property #A.c
-  @_versioned
+  @usableFromInline
   internal var c: Int = 0
 
   // no descriptor
@@ -37,9 +37,9 @@ public struct A {
 
   // TODO: static vars should get descriptors
   public static var a: Int = 0
-  @_inlineable
+  @inlinable
   public static var b: Int { return 0 }
-  @_versioned
+  @usableFromInline
   internal static var c: Int = 0
 
   // no descriptor
@@ -50,13 +50,13 @@ public struct A {
   // CHECK-NOT: sil_property #A.f
   private static var f: Int = 0
 
-  // CHECK-LABEL: sil_property #A.subscript
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1a
   public subscript(a x: Int) -> Int { return x }
-  // CHECK-LABEL: sil_property #A.subscript
-  @_inlineable
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1b
+  @inlinable
   public subscript(b x: Int) -> Int { return x }
-  // CHECK-LABEL: sil_property #A.subscript
-  @_versioned
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1c
+  @usableFromInline
   internal subscript(c x: Int) -> Int { return x }
   
   // no descriptor
@@ -65,16 +65,32 @@ public struct A {
   fileprivate subscript(e x: Int) -> Int { return x }
   private subscript(f x: Int) -> Int { return x }
 
-  // TODO: Subscripts with non-hashable subscripts should get descriptors
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1a
   public subscript<T>(a x: T) -> T { return x }
-  @_inlineable
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1b
+  @inlinable
   public subscript<T>(b x: T) -> T { return x }
-  @_versioned
+  // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1c
+  @usableFromInline
   internal subscript<T>(c x: T) -> T { return x }
   
   // no descriptor
+  // CHECK-NOT: sil_property #A.subscript
   internal subscript<T>(d x: T) -> T { return x }
   fileprivate subscript<T>(e x: T) -> T { return x }
   private subscript<T>(f x: T) -> T { return x }
+
+  // no descriptor
+  public var count: Int {
+    mutating get {
+      _count += 1
+      return _count
+    }
+    set {
+      _count = newValue
+    }
+  }
+
+  private var _count: Int = 0
 }
 

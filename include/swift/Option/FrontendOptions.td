@@ -30,6 +30,9 @@ def primary_filelist : Separate<["-"], "primary-filelist">,
   HelpText<"Specify primary inputs in a file rather than on the command line">;
 def output_filelist : Separate<["-"], "output-filelist">,
   HelpText<"Specify outputs in a file rather than on the command line">;
+def supplementary_output_file_map : Separate<["-"], "supplementary-output-file-map">,
+  HelpText<"Specify supplementary outputs in a file rather than on the command line">;
+
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
@@ -261,8 +264,8 @@ def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
-def enable_guaranteed_normal_arguments : Flag<["-"], "enable-guaranteed-normal-arguments">,
-  HelpText<"If set to true, all normal parameters (except to inits/setters) will be passed at +0">;
+def disable_guaranteed_normal_arguments : Flag<["-"], "disable-guaranteed-normal-arguments">,
+  HelpText<"If set to true, all normal parameters (except to inits/setters) will be passed at +1">;
 
 def disable_mandatory_semantic_arc_opts : Flag<["-"], "disable-mandatory-semantic-arc-opts">,
   HelpText<"Disable the mandatory semantic arc optimizer">;
@@ -321,6 +324,13 @@ def disable_nskeyedarchiver_diagnostics :
   Flag<["-"], "disable-nskeyedarchiver-diagnostics">,
   HelpText<"Allow classes with unstable mangled names to adopt NSCoding">;
 
+def enable_nonfrozen_enum_exhaustivity_diagnostics :
+  Flag<["-"], "enable-nonfrozen-enum-exhaustivity-diagnostics">,
+  HelpText<"Diagnose switches over non-frozen enums without catch-all cases">;
+def disable_nonfrozen_enum_exhaustivity_diagnostics :
+  Flag<["-"], "disable-nonfrozen-enum-exhaustivity-diagnostics">,
+  HelpText<"Allow switches over non-frozen enums without catch-all cases">;
+
 def warn_long_function_bodies : Separate<["-"], "warn-long-function-bodies">,
   MetaVarName<"<n>">,
   HelpText<"Warns when type-checking a function takes longer than <n> ms">;
@@ -346,6 +356,10 @@ def import_module : Separate<["-"], "import-module">,
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
+
+def debugger_testing_transform : Flag<["-"], "debugger-testing-transform">,
+  HelpText<"Instrument the code with calls to an intrinsic that record the expected values of "
+           "local variables so they can be compared against the results from the debugger.">;
 
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;

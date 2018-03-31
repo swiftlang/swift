@@ -247,13 +247,25 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
     }
   }
 
+  // Check whether this is a member access on 'self'.
+  bool isAccessOnSelf = false;
+  if (auto *baseDRE = dyn_cast<DeclRefExpr>(base->getValueProvidingExpr()))
+    if (auto *baseVar = dyn_cast<VarDecl>(baseDRE->getDecl()))
+      isAccessOnSelf = baseVar->isSelfParameter();
+
   // If the value is always directly accessed from this context, do it.
-  return member->getAccessSemanticsFromContext(DC);
+  return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
 }
 
-void ConstraintSystem::propagateLValueAccessKind(Expr *E,
-                                                 AccessKind accessKind,
+void ConstraintSystem::propagateLValueAccessKind(Expr *E, AccessKind accessKind,
+                                                 bool isShallow,
                                                  bool allowOverwrite) {
+  // If solver is set up in "shallow" mode we expect that some of the
+  // sub-expressions are already type-checked which means that they
+  // already have access kind set.
+  if (isShallow && E->hasLValueAccessKind() && !allowOverwrite)
+    return;
+
   E->propagateLValueAccessKind(accessKind,
                                [&](Expr *E) -> Type {
                                  return getType(E);
@@ -434,6 +446,7 @@ namespace {
     DeclContext *dc;
     const Solution &solution;
     bool SuppressDiagnostics;
+    bool IsShallow;
 
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
@@ -885,7 +898,8 @@ namespace {
       // will handle this.
       if (record.OpaqueValue && record.OpaqueValue->hasLValueAccessKind())
         cs.propagateLValueAccessKind(record.ExistentialValue,
-                                  record.OpaqueValue->getLValueAccessKind());
+                                     record.OpaqueValue->getLValueAccessKind(),
+                                     IsShallow);
 
       // Form the open-existential expression.
       result = new (tc.Context) OpenExistentialExpr(
@@ -1846,9 +1860,9 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
-                 bool suppressDiagnostics)
-      : cs(cs), dc(cs.DC), solution(solution), 
-        SuppressDiagnostics(suppressDiagnostics) { }
+                 bool suppressDiagnostics, bool shallow = false)
+        : cs(cs), dc(cs.DC), solution(solution),
+          SuppressDiagnostics(suppressDiagnostics), IsShallow(shallow) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -1924,9 +1938,9 @@ namespace {
       tc.validateDecl(MaxIntegerTypeDecl);
       auto maxType = MaxIntegerTypeDecl->getUnderlyingTypeLoc().getType();
 
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_integerLiteral });
-      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+      DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinIntegerLiteral });
 
       return convertLiteral(
@@ -1957,7 +1971,42 @@ namespace {
           type = defaultType;
       }
 
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      // By far the most common 'nil' literal is for Optional<T>.none.
+      //
+      // Emit this case directly instead of calling Optional.init(nilLiteral:),
+      // since this generates more efficient SIL.
+      if (auto objectType = type->getOptionalObjectType()) {
+        auto *nilDecl = tc.Context.getOptionalNoneDecl();
+        tc.validateDecl(nilDecl);
+        if (!nilDecl->hasInterfaceType())
+          return nullptr;
+
+        Substitution sub(objectType, {});
+        ConcreteDeclRef concreteDeclRef(tc.Context, nilDecl, {sub});
+
+        auto nilType = FunctionType::get(
+            {MetatypeType::get(type)}, type);
+        auto *nilRefExpr = new (tc.Context) DeclRefExpr(
+            concreteDeclRef, DeclNameLoc(expr->getLoc()),
+              /*implicit=*/true, AccessSemantics::Ordinary,
+            nilType);
+        cs.cacheType(nilRefExpr);
+
+        auto *typeExpr = TypeExpr::createImplicitHack(
+            expr->getLoc(),
+            type,
+            tc.Context);
+        cs.cacheType(typeExpr);
+
+        auto *callExpr = new (tc.Context) DotSyntaxCallExpr(
+            nilRefExpr, expr->getLoc(), typeExpr, type);
+        callExpr->setImplicit(true);
+        cs.cacheType(callExpr);
+
+        return callExpr;
+      }
+
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_nilLiteral });
       return convertLiteral(expr, type, cs.getType(expr), protocol,
                             Identifier(), initName,
@@ -2017,9 +2066,9 @@ namespace {
       tc.validateDecl(MaxFloatTypeDecl);
       auto maxType = MaxFloatTypeDecl->getUnderlyingTypeLoc().getType();
 
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_floatLiteral });
-      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+      DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinFloatLiteral });
 
       return convertLiteral(
@@ -2052,9 +2101,9 @@ namespace {
         return nullptr;
 
       auto type = simplifyType(cs.getType(expr));
-      DeclName initName(tc.Context, tc.Context.Id_init,
+      DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_booleanLiteral });
-      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
+      DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
                                { tc.Context.Id_builtinBooleanLiteral });
       return convertLiteral(
                expr,
@@ -2137,7 +2186,7 @@ namespace {
         
         literalType = tc.Context.Id_StringLiteralType;
 
-        literalFuncName = DeclName(tc.Context, tc.Context.Id_init,
+        literalFuncName = DeclName(tc.Context, DeclBaseName::createConstructor(),
                                    { tc.Context.Id_stringLiteral });
 
         // If the string contains non-ASCII and the type can handle
@@ -2158,7 +2207,7 @@ namespace {
                                    ConformanceCheckFlags::InExpression))) {
           builtinProtocol = builtinConstUTF16StringProtocol;
           builtinLiteralFuncName =
-              DeclName(tc.Context, tc.Context.Id_init,
+              DeclName(tc.Context, DeclBaseName::createConstructor(),
                        {tc.Context.Id_builtinConstUTF16StringLiteral});
 
           if (stringLiteral)
@@ -2169,7 +2218,7 @@ namespace {
                                       type, builtinProtocol, cs.DC,
                                       ConformanceCheckFlags::InExpression))) {
           builtinLiteralFuncName =
-              DeclName(tc.Context, tc.Context.Id_init,
+              DeclName(tc.Context, DeclBaseName::createConstructor(),
                        {tc.Context.Id_builtinUTF16StringLiteral,
                         tc.Context.getIdentifier("utf16CodeUnitCount")});
 
@@ -2182,7 +2231,7 @@ namespace {
                                          ConformanceCheckFlags::InExpression)) {
           builtinProtocol = builtinConstStringProtocol;
           builtinLiteralFuncName =
-              DeclName(tc.Context, tc.Context.Id_init,
+              DeclName(tc.Context, DeclBaseName::createConstructor(),
                        {tc.Context.Id_builtinConstStringLiteral});
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF8ConstString);
@@ -2194,7 +2243,7 @@ namespace {
               expr->getLoc(),
               KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
           builtinLiteralFuncName 
-            = DeclName(tc.Context, tc.Context.Id_init,
+            = DeclName(tc.Context, DeclBaseName::createConstructor(),
                        { tc.Context.Id_builtinStringLiteral,
                          tc.Context.getIdentifier("utf8CodeUnitCount"),
                          tc.Context.getIdentifier("isASCII") });
@@ -2208,10 +2257,10 @@ namespace {
       } else if (isGraphemeClusterLiteral) {
         literalType = tc.Context.Id_ExtendedGraphemeClusterLiteralType;
         literalFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_extendedGraphemeClusterLiteral});
         builtinLiteralFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
                        tc.Context.getIdentifier("utf8CodeUnitCount"),
                        tc.Context.getIdentifier("isASCII") });
@@ -2231,7 +2280,7 @@ namespace {
                                   builtinUTF16ExtendedGraphemeClusterProtocol,
                                   cs.DC, ConformanceCheckFlags::InExpression)) {
           builtinLiteralFuncName
-            = DeclName(tc.Context, tc.Context.Id_init,
+            = DeclName(tc.Context, DeclBaseName::createConstructor(),
                        { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
                          tc.Context.getIdentifier("utf16CodeUnitCount") });
 
@@ -2248,10 +2297,10 @@ namespace {
         literalType = tc.Context.Id_UnicodeScalarLiteralType;
 
         literalFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_unicodeScalarLiteral});
         builtinLiteralFuncName
-          = DeclName(tc.Context, tc.Context.Id_init,
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      {tc.Context.Id_builtinUnicodeScalarLiteral});
 
         builtinProtocol = tc.getProtocol(
@@ -2294,7 +2343,7 @@ namespace {
                          KnownProtocolKind::ExpressibleByStringInterpolation);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
-      DeclName name(tc.Context, tc.Context.Id_init,
+      DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_stringInterpolation });
       auto member
         = findNamedWitnessImpl<ConstructorDecl>(
@@ -2302,7 +2351,7 @@ namespace {
             interpolationProto, name,
             diag::interpolation_broken_proto);
 
-      DeclName segmentName(tc.Context, tc.Context.Id_init,
+      DeclName segmentName(tc.Context, DeclBaseName::createConstructor(),
                            { tc.Context.Id_stringInterpolationSegment });
       auto segmentMember
         = findNamedWitnessImpl<ConstructorDecl>(
@@ -2921,7 +2970,7 @@ namespace {
                                                    tc.Context);
       cs.cacheExprTypes(typeRef);
 
-      DeclName name(tc.Context, tc.Context.Id_init,
+      DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
 
       // Restructure the argument to provide the appropriate labels in the
@@ -3002,7 +3051,7 @@ namespace {
                                                    tc.Context);
       cs.cacheExprTypes(typeRef);
 
-      DeclName name(tc.Context, tc.Context.Id_init,
+      DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_dictionaryLiteral });
 
       // Restructure the argument to provide the appropriate labels in the
@@ -3095,7 +3144,8 @@ namespace {
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
       if (!cs.getType(expr->getSubExpr())->is<UnresolvedType>())
-        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite);
+        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite,
+                                     IsShallow);
       auto objectTy = cs.getType(expr->getSubExpr())->getRValueType();
 
       // The type is simply inout of whatever the lvalue's object type was.
@@ -3124,12 +3174,10 @@ namespace {
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
       // A non-failable initializer cannot delegate to a failable
       // initializer.
-      bool isOptional;
       Expr *unwrappedSubExpr = expr->getSubExpr()->getSemanticsProvidingExpr();
-      Type valueTy =
-          cs.getType(unwrappedSubExpr)->getOptionalObjectType(isOptional);
+      Type valueTy = cs.getType(unwrappedSubExpr)->getOptionalObjectType();
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
-      if (isOptional && inCtor->getFailability() == OTK_None) {
+      if (valueTy && inCtor->getFailability() == OTK_None) {
         bool isChaining;
         auto *otherCtorRef = expr->getCalledConstructor(isChaining);
         ConstructorDecl *ctor = otherCtorRef->getDecl();
@@ -3630,24 +3678,11 @@ namespace {
 
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
-      // If we need to insert a force-unwrap for coercions of the form
-      // 'as! T!', do so now.
-      if (hasForcedOptionalResult(expr)) {
-        auto *coerced = handleForcedCheckedCastExpr(expr);
-        if (!coerced)
-          return nullptr;
-
-        return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
-      }
-
-      return handleForcedCheckedCastExpr(expr);
-    }
-
-    // Most of the logic for dealing with ForcedCheckedCastExpr.
-    Expr *handleForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
+      if (hasForcedOptionalResult(expr))
+        toType = toType->getOptionalObjectType();
+
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       checkForImportedUsedConformances(toType);
 
@@ -3805,7 +3840,8 @@ namespace {
       auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return nullptr;
-      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write);
+      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write,
+                                   IsShallow);
 
       // Convert the source to the simplified destination type.
       auto locator =
@@ -4114,7 +4150,7 @@ namespace {
 
         if (cs.getType(subExpr)->hasLValueType()) {
           // Treat this like a read of the property.
-          cs.propagateLValueAccessKind(subExpr, AccessKind::Read);
+          cs.propagateLValueAccessKind(subExpr, AccessKind::Read, IsShallow);
         }
 
         // Check that we requested a property getter or setter.
@@ -4612,6 +4648,8 @@ namespace {
       
         auto hashable =
           cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
+        auto equatable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
         for (auto indexType : indexTypes) {
           auto conformance =
             cs.TC.conformsToProtocol(indexType.getType(), hashable,
@@ -4626,6 +4664,17 @@ namespace {
             continue;
           }
           hashables.push_back(*conformance);
+          
+          // FIXME: Hashable implies Equatable, but we need to make sure the
+          // Equatable conformance is forced into existence during type checking
+          // so that it's available for SILGen.
+          auto eqConformance =
+            cs.TC.conformsToProtocol(indexType.getType(), equatable,
+                                     cs.DC,
+                                     (ConformanceCheckFlags::Used|
+                                      ConformanceCheckFlags::InExpression));
+          assert(eqConformance.hasValue());
+          (void)eqConformance;
         }
 
         if (allIndexesHashable) {
@@ -4921,8 +4970,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                     SourceLoc loc, ConcreteDeclRef &owner,
                     unsigned index) {
   auto &tc = cs.getTypeChecker();
-  auto ownerFn = cast<AbstractFunctionDecl>(owner.getDecl());
-  auto defArg = ownerFn->getDefaultArg(index);
+
+  auto defArg = getDefaultArgumentInfo(cast<ValueDecl>(owner.getDecl()), index);
   Expr *init = nullptr;
   switch (defArg.first) {
   case DefaultArgumentKind::None:
@@ -4982,7 +5031,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = ownerFn->mapTypeIntoContext(defArg.second);
+  auto defArgType = owner.getDecl()->getDeclContext()
+                       ->mapTypeIntoContext(defArg.second);
   auto resultTy = tc.typeCheckExpression(
       init, dc, TypeLoc::withoutLoc(defArgType), CTP_CannotFail);
   assert(resultTy && "Conversion cannot fail");
@@ -6341,7 +6391,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       // Load from the lvalue. If we're loading the result of a force,
       // swap the order so that we load first and force the result.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
       if (auto *forceExpr = dyn_cast<ForceValueExpr>(expr)) {
         fromType = cs.getType(forceExpr->getSubExpr())->getRValueType();
         auto *loadExpr = cs.cacheType(
@@ -6403,10 +6453,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::OptionalToOptional:
       return coerceOptionalToOptional(expr, toType, locator, typeFromPattern);
 
-    case ConversionRestrictionKind::ForceUnchecked: {
-      llvm_unreachable("should never see ForceUnchecked");
-    }
-
     case ConversionRestrictionKind::ArrayUpcast: {
       // Build the value conversion.
       return buildCollectionUpcastExpr(expr, toType, /*bridged=*/false,
@@ -6443,10 +6489,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
       PointerTypeKind pointerKind;
       auto toEltType = unwrappedTy->getAnyPointerElementType(pointerKind);
       assert(toEltType && "not a pointer type?"); (void) toEltType;
@@ -6454,8 +6502,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         // Overwrite the l-value access kind to be read-only if we're
         // converting to a non-mutable pointer type.
         auto *E = cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr();
-        cs.propagateLValueAccessKind(E,
-                                     AccessKind::Read, /*overwrite*/ true);
+        cs.propagateLValueAccessKind(E, AccessKind::Read, IsShallow,
+                                     /*overwrite*/ true);
       }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
@@ -6468,10 +6516,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::ArrayToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       Expr *result =
@@ -6483,10 +6533,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
     
     case ConversionRestrictionKind::StringToPointer: {
-      bool isOptional;
+      bool isOptional = false;
       Type unwrappedTy = toType;
-      if (Type unwrapped = toType->getOptionalObjectType(isOptional))
+      if (Type unwrapped = toType->getOptionalObjectType()) {
+        isOptional = true;
         unwrappedTy = unwrapped;
+      }
 
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       Expr *result =
@@ -6558,7 +6610,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // In an 'inout' operator like "i += 1", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
+      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
       return cs.cacheType(new (tc.Context)
                               InOutExpr(expr->getStartLoc(), expr,
                                         toIO->getObjectType(),
@@ -6577,7 +6629,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     if (performLoad) {
       // Load from the lvalue.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
       expr = cs.cacheType(new (tc.Context)
                               LoadExpr(expr, fromLValue->getObjectType()));
 
@@ -6834,7 +6886,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
 
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
-  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
+  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
   return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, 
                                           toInOutTy->getInOutObjectType(),
                                           /*isImplicit*/ true));
@@ -7772,7 +7824,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   // If we didn't manage to resolve directly to an expression, we don't
   // have a great diagnostic to give, so bail.
   if (!resolved || !resolved->getAnchor() ||
-      !resolved->getPath().empty())
+      (!resolved->getPath().empty() &&
+       fix.first.getKind() != FixKind::ExplicitlyEscaping &&
+       fix.first.getKind() != FixKind::ExplicitlyEscapingToAny))
     return false;
   
   Expr *affected = resolved->getAnchor();
@@ -7929,6 +7983,30 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     }
     return false;
   }
+
+  case FixKind::ExplicitlyEscaping: {
+    auto path = locator->getPath();
+    auto *anchor = locator->getAnchor();
+
+    if (path.empty())
+      return false;
+
+    auto &last = path.back();
+    if (last.getKind() == ConstraintLocator::Archetype) {
+      auto *archetype = last.getArchetype();
+      TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
+                  archetype);
+      return true;
+    }
+    break;
+  }
+
+  case FixKind::ExplicitlyEscapingToAny: {
+    auto *anchor = locator->getAnchor();
+    TC.diagnose(anchor->getLoc(), diag::converting_noescape_to_type,
+                getASTContext().TheAnyType);
+    return true;
+  }
   }
 
   // FIXME: It would be really nice to emit a follow-up note showing where
@@ -8007,7 +8085,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
                                              Expr *expr,
                                              bool suppressDiagnostics) {
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
+  ExprRewriter rewriter(*this, solution, suppressDiagnostics, true);
   rewriter.walkToExprPre(expr);
   Expr *result = rewriter.walkToExprPost(expr);
   if (result)

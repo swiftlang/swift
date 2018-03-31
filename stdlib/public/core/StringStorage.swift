@@ -28,14 +28,14 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
     _sanityCheckFailure("Use the create method")
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal var rawStart: UnsafeMutableRawPointer {
     _abstract()
   }
 
-  @_inlineable
+  @inlinable
   @nonobjc
   public // @testable
   final var unusedCapacity: Int {
@@ -53,14 +53,21 @@ public final class _SwiftStringStorage<CodeUnit>
 where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
   /// Create uninitialized storage of at least the specified capacity.
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal static func create(
     capacity: Int,
     count: Int = 0
   ) -> _SwiftStringStorage<CodeUnit> {
     _sanityCheck(count >= 0 && count <= capacity)
+
+#if arch(i386) || arch(arm)
+#else
+    _sanityCheck((CodeUnit.self != UInt8.self || capacity > 15),
+      "Should prefer a small representation")
+#endif // 64-bit
+
     let storage = Builtin.allocWithTailElems_1(
       _SwiftStringStorage<CodeUnit>.self,
       capacity._builtinWordValue, CodeUnit.self)
@@ -76,8 +83,8 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     return storage
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal override final var rawStart: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(start)
@@ -141,43 +148,43 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
 extension _SwiftStringStorage {
   // Basic properties
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final var start: UnsafeMutablePointer<CodeUnit> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, CodeUnit.self))
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final var end: UnsafeMutablePointer<CodeUnit> {
     return start + count
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final var capacityEnd: UnsafeMutablePointer<CodeUnit> {
     return start + capacity
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   var usedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
     return UnsafeMutableBufferPointer(start: start, count: count)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   var unusedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
     return UnsafeMutableBufferPointer(start: end, count: capacity - count)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   var unmanagedView: _UnmanagedString<CodeUnit> {
     return _UnmanagedString(start: self.start, count: self.count)
@@ -187,8 +194,8 @@ extension _SwiftStringStorage {
 extension _SwiftStringStorage {
   // Append operations
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<OtherCodeUnit>(
     _ other: _UnmanagedString<OtherCodeUnit>
@@ -200,8 +207,8 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _UnmanagedOpaqueString) {
     let otherCount = Int(other.count)
@@ -210,8 +217,8 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<C: Collection>(contentsOf other: C)
   where C.Element == CodeUnit {
@@ -224,8 +231,8 @@ extension _SwiftStringStorage {
     count += otherCount
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @_specialize(where C == Character._SmallUTF16, CodeUnit == UInt8)
   @nonobjc
   internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)
@@ -243,43 +250,77 @@ extension _SwiftStringStorage {
 }
 
 extension _SwiftStringStorage {
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      _appendInPlace(other._asOpaque()[range])
-    } else if other.isASCII {
+      _opaqueAppendInPlace(opaqueOther: other, range: range)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView[range])
     } else {
       _appendInPlace(other._unmanagedUTF16View[range])
     }
   }
 
-  @_inlineable
-  @_versioned
+  @usableFromInline // @opaque
+  internal final func _opaqueAppendInPlace(
+    opaqueOther other: _StringGuts, range: Range<Int>
+  ) {
+    _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String[range].withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
+    defer { _fixLifetime(other) }
+    _appendInPlace(other._asOpaque()[range])
+  }
+
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
-    defer { _fixLifetime(other) }
     if _slowPath(other._isOpaque) {
-      _appendInPlace(other._asOpaque())
-    } else if other.isASCII {
+      _opaqueAppendInPlace(opaqueOther: other)
+      return
+    }
+
+    defer { _fixLifetime(other) }
+    if other.isASCII {
       _appendInPlace(other._unmanagedASCIIView)
     } else {
       _appendInPlace(other._unmanagedUTF16View)
     }
   }
 
-  @_inlineable
-  @_versioned
+  @usableFromInline // @opaque
+  internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
+    _sanityCheck(other._isOpaque)
+    if other._isSmall {
+      other._smallUTF8String.withUnmanagedUTF16 {
+        self._appendInPlace($0)
+      }
+      return
+    }
+    defer { _fixLifetime(other) }
+    _appendInPlace(other._asOpaque())
+  }
+
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: String) {
     self._appendInPlace(other._guts)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<S : StringProtocol>(_ other: S) {
     self._appendInPlace(

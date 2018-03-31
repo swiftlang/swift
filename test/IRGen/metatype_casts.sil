@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 // XFAIL: linux
@@ -103,7 +103,8 @@ entry(%0 : $@thick Any.Type):
 // to check.
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_cast_class_to_anyobject_type
-// CHECK:         [[METATYPE:%.*]] = call %swift.type* @"$S14metatype_casts9SomeClassCMa"()
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S14metatype_casts9SomeClassCMa"([[INT]] 0)
+// CHECK:         [[METATYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:         ret %swift.type* [[METATYPE]]
 sil @checked_cast_class_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {
 entry:

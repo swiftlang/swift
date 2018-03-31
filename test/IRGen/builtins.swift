@@ -1,5 +1,5 @@
-// REQUIRES: plus_one_runtime
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+
+// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -173,8 +173,9 @@ func assign_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) 
 
 // CHECK: define hidden {{.*}}void @"$S8builtins16init_object_test{{[_0-9a-zA-Z]*}}F"
 func init_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) {
-  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to %swift.refcounted**
-  // CHECK-NEXT: store [[REFCOUNT]]* {{%.*}}, [[REFCOUNT]]** [[DEST]]
+  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to [[REFCOUNT]]**
+  // CHECK-NEXT: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[SRC:%.*]])
+  // CHECK-NEXT: store [[REFCOUNT]]* [[SRC]], [[REFCOUNT]]** [[DEST]]
   Builtin.initialize(value, ptr)
 }
 

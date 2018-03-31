@@ -179,6 +179,54 @@ static inline Offset measureRelativeOffset(A *referent, B *base) {
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
 template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
+class RelativeIndirectPointer {
+private:
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
+
+  /// The relative offset of the pointer's memory from the `this` pointer.
+  /// This is an indirect reference.
+  Offset RelativeOffset;
+
+  /// RelativePointers should appear in statically-generated metadata. They
+  /// shouldn't be constructed or copied.
+  RelativeIndirectPointer() = delete;
+  RelativeIndirectPointer(RelativeIndirectPointer &&) = delete;
+  RelativeIndirectPointer(const RelativeIndirectPointer &) = delete;
+  RelativeIndirectPointer &operator=(RelativeIndirectPointer &&)
+    = delete;
+  RelativeIndirectPointer &operator=(const RelativeIndirectPointer &)
+    = delete;
+
+public:
+  const ValueTy *get() const & {
+    // Check for null.
+    if (Nullable && RelativeOffset == 0)
+      return nullptr;
+
+    uintptr_t address = detail::applyRelativeOffset(this, RelativeOffset);
+    return *reinterpret_cast<const ValueTy * const *>(address);
+  }
+
+  /// A zero relative offset encodes a null reference.
+  bool isNull() const & {
+    return RelativeOffset == 0;
+  }
+
+  operator const ValueTy* () const & {
+    return get();
+  }
+
+  const ValueTy *operator->() const & {
+    return get();
+  }
+};
+
+/// A relative reference to an object stored in memory. The reference may be
+/// direct or indirect, and uses the low bit of the (assumed at least
+/// 2-byte-aligned) pointer to differentiate.
+template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
 class RelativeIndirectablePointer {
 private:
   static_assert(std::is_integral<Offset>::value &&

@@ -444,7 +444,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
 
   auto paramPL = ParameterList::createWithoutLoc(param);
   
-  DeclName name(C, C.Id_init, paramPL);
+  DeclName name(C, DeclBaseName::createConstructor(), paramPL);
   auto *ctorDecl =
     new (C) ConstructorDecl(name, enumDecl->getLoc(),
                             OTK_Optional, /*FailabilityLoc=*/SourceLoc(),
@@ -1167,7 +1167,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   auto emptyPL = ParameterList::createEmpty(context);
 
   // Create the constructor.
-  DeclName name(context, context.Id_init, emptyPL);
+  DeclName name(context, DeclBaseName::createConstructor(), emptyPL);
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), selfDecl, emptyPL,
@@ -1282,7 +1282,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
       ParameterList::create(context, valueParameters)};
 
   // Create the constructor
-  DeclName name(context, context.Id_init, paramLists[1]);
+  DeclName name(context, DeclBaseName::createConstructor(), paramLists[1]);
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), selfDecl, paramLists[1],
@@ -2264,7 +2264,7 @@ namespace {
 
     bool isFactoryInit(ImportedName &name) {
       return name &&
-             name.getDeclName().getBaseName() == Impl.SwiftContext.Id_init &&
+             name.getDeclName().getBaseName() == DeclBaseName::createConstructor() &&
              (name.getInitKind() == CtorInitializerKind::Factory ||
               name.getInitKind() == CtorInitializerKind::ConvenienceFactory);
     }
@@ -2497,7 +2497,8 @@ namespace {
             // doing so will cause confusion (or even lookup ambiguity) between
             // the name in the imported module and the same name in the
             // standard library.
-            if (auto *NAT = dyn_cast<NameAliasType>(SwiftType.getPointer()))
+            if (auto *NAT =
+                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
@@ -2653,7 +2654,8 @@ namespace {
         break;
       }
 
-      case EnumKind::Enum: {
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum: {
         auto &C = Impl.SwiftContext;
         EnumDecl *nativeDecl;
         bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
@@ -2757,6 +2759,14 @@ namespace {
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
+        // Annotate as 'frozen' if appropriate.
+        assert((DeclAttribute::getOptions(DAK_Frozen) &
+                DeclAttribute::UserInaccessible) &&
+               "Once 'frozen' is supported, the attribute should not be "
+               "implicit (below)");
+        if (enumKind == EnumKind::FrozenEnum)
+          enumDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/true));
+
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
 
@@ -2823,7 +2833,7 @@ namespace {
                          AccessLevel::Public, loc, SourceLoc(),
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
-          alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
+          alias->setUnderlyingType(Impl.getSugaredTypeReference(errorWrapper));
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -2860,7 +2870,8 @@ namespace {
         addEnumeratorsAsMembers = false;
         break;
       case EnumKind::Options:
-      case EnumKind::Enum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
         addEnumeratorsAsMembers = true;
         break;
       }
@@ -2870,7 +2881,8 @@ namespace {
                                        EnumElementDecl *>, 8,
                           APSIntRefDenseMapInfo> canonicalEnumConstants;
 
-      if (enumKind == EnumKind::Enum) {
+      if (enumKind == EnumKind::NonFrozenEnum ||
+          enumKind == EnumKind::FrozenEnum) {
         for (auto constant : decl->enumerators()) {
           if (Impl.isUnavailableInSwift(constant))
             continue;
@@ -2931,7 +2943,8 @@ namespace {
             return true;
           });
           break;
-        case EnumKind::Enum: {
+        case EnumKind::NonFrozenEnum:
+        case EnumKind::FrozenEnum: {
           auto canonicalCaseIter =
             canonicalEnumConstants.find(&constant->getInitVal());
 
@@ -3065,6 +3078,23 @@ namespace {
       decl = decl->getDefinition();
       if (!decl) {
         forwardDeclaration = true;
+        return nullptr;
+      }
+
+      // FIXME: We should actually support strong ARC references and similar in
+      // C structs. That'll require some SIL and IRGen work, though.
+      if (decl->isNonTrivialToPrimitiveCopy() ||
+          decl->isNonTrivialToPrimitiveDestroy()) {
+        // Note that there is a third predicate related to these,
+        // isNonTrivialToPrimitiveDefaultInitialize. That one's not important
+        // for us because Swift never "trivially default-initializes" a struct
+        // (i.e. uses whatever bits were lying around as an initial value).
+
+        // FIXME: It would be nice to instead import the declaration but mark
+        // it as unavailable, but then it might get used as a type for an
+        // imported function and the developer would be able to use it without
+        // referencing the name, which would sidestep our availability
+        // diagnostics.
         return nullptr;
       }
 
@@ -3221,23 +3251,24 @@ namespace {
       if (hasZeroInitializableStorage) {
         // Add constructors for the struct.
         ctors.push_back(createDefaultConstructor(Impl, result));
-        if (hasReferenceableFields && hasMemberwiseInitializer) {
-          // The default zero initializer suppresses the implicit value
-          // constructor that would normally be formed, so we have to add that
-          // explicitly as well.
-          //
-          // If we can completely represent the struct in SIL, leave the body
-          // implicit, otherwise synthesize one to call property setters.
-          bool wantBody = (hasUnreferenceableStorage &&
-                           !Impl.hasFinishedTypeChecking());
-          auto valueCtor = createValueConstructor(Impl, result, members,
-                                                  /*want param names*/true,
-                                                  /*want body*/wantBody);
-          if (!hasUnreferenceableStorage)
-            valueCtor->setIsMemberwiseInitializer();
+      }
 
-          ctors.push_back(valueCtor);
-        }
+      if (hasReferenceableFields && hasMemberwiseInitializer) {
+        // The default zero initializer suppresses the implicit value
+        // constructor that would normally be formed, so we have to add that
+        // explicitly as well.
+        //
+        // If we can completely represent the struct in SIL, leave the body
+        // implicit, otherwise synthesize one to call property setters.
+        bool wantBody = (hasUnreferenceableStorage &&
+                         !Impl.hasFinishedTypeChecking());
+        auto valueCtor = createValueConstructor(Impl, result, members,
+                                                /*want param names*/true,
+                                                /*want body*/wantBody);
+        if (!hasUnreferenceableStorage)
+          valueCtor->setIsMemberwiseInitializer();
+
+        ctors.push_back(valueCtor);
       }
 
       for (auto member : members) {
@@ -3362,7 +3393,8 @@ namespace {
         return result;
       }
 
-      case EnumKind::Enum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
       case EnumKind::Options: {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available
@@ -3504,7 +3536,7 @@ namespace {
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
       if (importedName.importAsMember()) {
         // Handle initializers.
-        if (name.getBaseName() == Impl.SwiftContext.Id_init) {
+        if (name.getBaseName() == DeclBaseName::createConstructor()) {
           assert(!accessorInfo);
           return importGlobalAsInitializer(decl, name, dc,
                                            importedName.getInitKind(),
@@ -3921,12 +3953,14 @@ namespace {
 
       // Normal case applies when we're importing an older name, or when we're
       // not an init
-      if (!isActiveSwiftVersion() || !isFactoryInit(importedName)) {
+      if (!isFactoryInit(importedName)) {
         auto result = importNonInitObjCMethodDecl(decl, dc, importedName,
                                                   selector, forceClassMethod,
                                                   accessorInfo);
+
         if (!isActiveSwiftVersion() && result)
           markAsVariant(result, *correctSwiftName);
+
         return result;
       }
 
@@ -3945,6 +3979,9 @@ namespace {
                             /*required=*/false, selector, importedName,
                             {decl->param_begin(), decl->param_size()},
                             decl->isVariadic(), redundant);
+
+      if (!isActiveSwiftVersion() && result)
+        markAsVariant(result, *correctSwiftName);
 
       return result;
     }
@@ -4632,7 +4669,6 @@ namespace {
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
-      result->setAddedImplicitInitializers();
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
@@ -4932,7 +4968,7 @@ namespace {
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
 
-      typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
+      typealias->setUnderlyingType(Impl.getSugaredTypeReference(typeDecl));
       return typealias;
     }
 
@@ -5155,7 +5191,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     if (underlyingAlias->isGeneric())
       underlyingType = underlyingAlias->getUnboundGenericType();
     else
-      underlyingType = underlyingAlias->getDeclaredInterfaceType();
+      underlyingType = Impl.getSugaredTypeReference(underlyingAlias);
   } else {
     underlyingType = cast<NominalTypeDecl>(typeDecl)->getDeclaredType();
   }
@@ -5336,8 +5372,37 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // implementation in the standard library.
   transferKnown(KnownProtocolKind::Equatable);
   transferKnown(KnownProtocolKind::Hashable);
-  bool transferredObjCBridgeable =
-    transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
+  bool hasObjCBridgeable =
+      transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
+  bool wantsObjCBridgeableTypealias = hasObjCBridgeable && isBridged;
+
+  // Wrappers around ObjC classes and protocols are also bridgeable.
+  if (!hasObjCBridgeable) {
+    if (isBridged) {
+      if (auto *proto = dyn_cast_or_null<ProtocolDecl>(computedNominal))
+        if (proto->getKnownProtocolKind() == KnownProtocolKind::Error)
+          hasObjCBridgeable = true;
+    } else {
+      if (auto *objcClass = dyn_cast_or_null<ClassDecl>(computedNominal)) {
+        switch (objcClass->getForeignClassKind()) {
+        case ClassDecl::ForeignKind::Normal:
+        case ClassDecl::ForeignKind::RuntimeOnly:
+          if (objcClass->hasClangNode())
+            hasObjCBridgeable = true;
+          break;
+        case ClassDecl::ForeignKind::CFType:
+          break;
+        }
+      } else if (storedUnderlyingType->isObjCExistentialType()) {
+        hasObjCBridgeable = true;
+      }
+    }
+
+    if (hasObjCBridgeable) {
+      addKnown(KnownProtocolKind::ObjectiveCBridgeable);
+      wantsObjCBridgeableTypealias = true;
+    }
+  }
 
   if (!isBridged) {
     // Simple, our stored type is equivalent to our computed
@@ -5355,10 +5420,11 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                   computedPropertyUnderlyingType,
                                   synthesizedProtocols,
                                   /*makeUnlabeledValueInit=*/unlabeledCtor);
+  }
 
-    if (transferredObjCBridgeable)
-      addSynthesizedTypealias(structDecl, ctx.Id_ObjectiveCType,
-                              storedUnderlyingType);
+  if (wantsObjCBridgeableTypealias) {
+    addSynthesizedTypealias(structDecl, ctx.Id_ObjectiveCType,
+                            storedUnderlyingType);
   }
 
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
@@ -5415,7 +5481,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     rawValueExpr->setNegative(SourceLoc());
 
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
-      decl, AccessLevel::Public, SourceLoc(), name, TypeLoc(), false,
+      decl, AccessLevel::Public, SourceLoc(), name, nullptr,
       SourceLoc(), rawValueExpr, theEnum);
 
   // Give the enum element the appropriate type.
@@ -6111,8 +6177,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Determine the failability of this initializer.
   auto oldFnType = type->castTo<AnyFunctionType>();
-  bool resultIsOptional;
-  (void)oldFnType->getResult()->getOptionalObjectType(resultIsOptional);
+  bool resultIsOptional = (bool) oldFnType->getResult()->getOptionalObjectType();
 
   // Update the failability appropriately based on the imported method type.
   assert(resultIsOptional || !importedType.isImplicitlyUnwrapped());
@@ -7182,7 +7247,7 @@ void SwiftDeclConverter::importInheritedConstructors(
   // If we have a superclass, import from it.
   if (auto superclassClangDecl = superclass->getClangDecl()) {
     if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
-      inheritConstructors(superclass->lookupDirect(Impl.SwiftContext.Id_init),
+      inheritConstructors(superclass->lookupDirect(DeclBaseName::createConstructor()),
                           kind);
     }
   }
@@ -7777,6 +7842,12 @@ static void finishInheritedConformances(
   }
 }
 
+/// A stripped-down version of Type::subst that only works on non-generic
+/// associated types.
+///
+/// This is used to finish a conformance for a concrete imported type that may
+/// rely on default associated types defined in protocol extensions...without
+/// having to do all the work of gathering conformances from scratch.
 static Type
 recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
                               DependentMemberType *depMemTy) {

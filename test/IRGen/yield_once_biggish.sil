@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 // i386 uses a scalar result count of 3 instead of 4, so this test would need
 // to be substantially different to test the functionality there.  It's easier
@@ -105,7 +105,8 @@ entry(%flag : $Builtin.Int1):
   // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds {{\[}}[[BUFFER_SIZE]] x i8], {{\[}}[[BUFFER_SIZE]] x i8]* [[T0]], i32 0, i32 0
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 [[BUFFER_SIZE]], i8* [[BUFFER]])
 
-  // CHECK-NEXT:    [[SUBCLASS:%.*]] = call %swift.type* @"$S18yield_once_biggish12SomeSubclassCMa"()
+  // CHECK-NEXT:    [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S18yield_once_biggish12SomeSubclassCMa"([[INT]] 0)
+  // CHECK-NEXT:    [[SUBCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 
   //   Prepare the continuation function pointer to block analysis.
   // CHECK-NEXT:    [[T0:%.*]] = call i8* @llvm.coro.prepare.retcon(i8* bitcast ([[ORIG_CORO_T:.*]] @test_simple to i8*))

@@ -1354,7 +1354,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
       .highlight(AttrRange);
-    diagnose(DuplicateAttribute->getLocation(), diag::previous_attribute, DeclAttribute::isDeclModifier(DK))
+    diagnose(DuplicateAttribute->getLocation(),
+             diag::previous_attribute,
+             DeclAttribute::isDeclModifier(DK))
       .highlight(DuplicateAttribute->getRange());
   }
 
@@ -1464,14 +1466,35 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
 
-  if (DK == DAK_Count && Tok.getText() == "availability") {
-    // We renamed @availability to @available, so if we see the former,
-    // treat it as the latter and emit a Fix-It.
-    DK = DAK_Available;
-    diagnose(Tok, diag::attr_availability_renamed)
-        .fixItReplace(Tok.getLoc(), "available");
-  }
+  auto checkRenamedAttr = [&](StringRef oldName, StringRef newName,
+                              DeclAttrKind kind, bool warning) {
+    if (DK == DAK_Count && Tok.getText() == oldName) {
+      // We renamed @availability to @available, so if we see the former,
+      // treat it as the latter and emit a Fix-It.
+      DK = kind;
+      if (warning) {
+        diagnose(Tok, diag::attr_renamed_warning, oldName, newName)
+            .fixItReplace(Tok.getLoc(), newName);
+      } else {
+        diagnose(Tok, diag::attr_renamed, oldName, newName)
+            .fixItReplace(Tok.getLoc(), newName);
+      }
+    }
+  };
 
+  // FIXME: This renaming happened before Swift 3, we can probably remove
+  // the specific fallback path at some point.
+  checkRenamedAttr("availability", "available", DAK_Available, false);
+
+  // In Swift 5 and above, these become hard errors. Otherwise, emit a
+  // warning for compatibility.
+  if (!Context.isSwiftVersionAtLeast(5)) {
+    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, true);
+    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, true);
+  } else {
+    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, false);
+    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, false);
+  }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
@@ -1861,6 +1884,9 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
   FoundCCToken = false;
   if (Tok.isNot(tok::at_sign))
     return false;
+
+  bool error = false;
+
   SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   do {
     if (peekToken().is(tok::code_complete)) {
@@ -1871,10 +1897,12 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
     }
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     SourceLoc AtLoc = consumeToken();
-    if (parseDeclAttribute(Attributes, AtLoc))
-      return true;
+    if (parseDeclAttribute(Attributes, AtLoc)) {
+      // Consume any remaining attributes for better error recovery.
+      error = true;
+    }
   } while (Tok.is(tok::at_sign));
-  return false;
+  return error;
 }
 
 /// \brief This is the internal implementation of \c parseTypeAttributeList,
@@ -5178,7 +5206,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (SignatureHasCodeCompletion)
       CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD);
+    DefaultArgs.setFunctionContext(FD, FD->getParameterLists());
     for (auto PL : FD->getParameterLists())
       addParametersToScope(PL);
     setLocalDiscriminator(FD);
@@ -5428,17 +5456,13 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     }
 
     // See if there's a following argument type.
-    ParserResult<TypeRepr> ArgType;
+    ParserResult<ParameterList> ArgParams;
+    SmallVector<Identifier, 4> argumentNames;
     if (Tok.isFollowingLParen()) {
-      ArgType = parseTypeTupleBody();
-      if (ArgType.hasCodeCompletion()) {
-        Status.setHasCodeCompletion();
-        return Status;
-      }
-      if (ArgType.isNull()) {
-        Status.setIsParseError();
-        return Status;
-      }
+      ArgParams = parseSingleParameterClause(ParameterContextKind::EnumElement,
+                                             &argumentNames);
+      if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
+        return ParserStatus(ArgParams);
     }
     
     // See if there's a raw value expression.
@@ -5490,14 +5514,20 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       return Status;
     }
     
+    
     // Create the element.
-    TypeRepr *ArgTR = ArgType.getPtrOrNull();
-    auto *result = new (Context) EnumElementDecl(NameLoc, Name,
-                                                 ArgTR,
-                                                 ArgTR != nullptr,
+    DeclName FullName;
+    if (ArgParams.isNull()) {
+      FullName = Name;
+    } else {
+      FullName = DeclName(Context, Name, argumentNames);
+    }
+    auto *result = new (Context) EnumElementDecl(NameLoc, FullName,
+                                                 ArgParams.getPtrOrNull(),
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error
     }
@@ -6011,7 +6041,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
   auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
-  DeclName FullName(Context, Context.Id_init, namePieces);
+  DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
 
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
@@ -6041,7 +6071,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // No need to setLocalDiscriminator.
 
-  DefaultArgs.setFunctionContext(CD);
+  DefaultArgs.setFunctionContext(CD, CD->getParameterLists());
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)

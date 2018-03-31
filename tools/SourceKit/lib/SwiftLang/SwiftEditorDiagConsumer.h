@@ -62,6 +62,8 @@ public:
     return Diags;
   }
 
+  void getAllDiagnostics(SmallVectorImpl<DiagnosticEntryInfo> &Result);
+
   bool hadErrorWithInvalidLoc() const { return HadInvalidLocError; }
 
   bool hadAnyError() const { return HadAnyError; }

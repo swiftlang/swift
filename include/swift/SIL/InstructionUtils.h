@@ -48,6 +48,11 @@ SILValue stripUpCasts(SILValue V);
 /// upcasts and downcasts.
 SILValue stripClassCasts(SILValue V);
 
+/// Return the underlying SILValue after stripping off non-projection address
+/// casts. The result will still be an address--this does not look through
+/// pointer-to-address.
+SILValue stripAddressAccess(SILValue V);
+
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
 SILValue stripAddressProjections(SILValue V);
@@ -86,6 +91,10 @@ SILValue stripBorrow(SILValue V);
 /// instructions that the use-visitor can recurse into. Note that the value's
 /// type may be changed by a cast.
 SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
+
+/// Return true if this instruction terminates a SIL-level scope. Scope end
+/// instructions do not produce a result.
+bool isEndOfScopeMarker(SILInstruction *user);
 
 /// Return true if the given instruction has no effect on it's operand values
 /// and produces no result. These are typically end-of scope markers.

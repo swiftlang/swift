@@ -785,9 +785,8 @@ static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
                                             FunctionRefKind functionRefKind) {
   unsigned numParameterLists = 0;
 
-  // Enum element with associated value has to be treated
-  // as regular function value and all of the labels have to be
-  // stripped from its parameters.
+  // Enum elements with associated values have to be treated
+  // as regular function values.
   //
   // enum E {
   //   case foo(a: Int)
@@ -942,8 +941,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         return { found->second, found->second };
 
       auto typeVar = createTypeVariable(getConstraintLocator(locator),
-                                     TVO_CanBindToLValue |
-                                     TVO_CanBindToInOut);
+                                        TVO_CanBindToLValue);
       addConstraint(ConstraintKind::BindParam, valueType, typeVar,
                     getConstraintLocator(locator));
       OpenedParameterTypes.insert(std::make_pair(param, typeVar));
@@ -954,11 +952,13 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
-static NominalTypeDecl *getInnermostConformingDC(TypeChecker &TC,
-                                                 DeclContext *DC,
-                                                 ProtocolDecl *protocol) {
+static Type getInnermostConformingType(TypeChecker &TC, DeclContext *DC,
+                                       ProtocolDecl *protocol) {
   do {
     if (DC->isTypeContext()) {
+      if (protocol == DC->getAsProtocolOrProtocolExtensionContext())
+        return DC->mapTypeIntoContext(DC->getProtocolSelfType());
+
       auto *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
       auto type = NTD->getDeclaredType();
 
@@ -971,7 +971,7 @@ static NominalTypeDecl *getInnermostConformingDC(TypeChecker &TC,
           TC.conformsToProtocol(type, protocol, NTD->getDeclContext(), options);
 
       if (result)
-        return NTD;
+        return DC->getDeclaredTypeInContext();
     }
   } while ((DC = DC->getParent()));
 
@@ -1044,10 +1044,10 @@ static void bindArchetypesFromContext(
           contextTy = genericEnv->mapTypeIntoContext(paramTy);
         } else {
           auto *protocol = parentDC->getAsProtocolOrProtocolExtensionContext();
-          auto conformingDC = getInnermostConformingDC(cs.TC, cs.DC, protocol);
-          assert(conformingDC);
-          contextTy = conformingDC->getDeclaredTypeInContext();
+          contextTy = getInnermostConformingType(cs.TC, cs.DC, protocol);
         }
+
+        assert(contextTy);
 
         auto typeVar = found->second;
         cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
@@ -1467,10 +1467,10 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // be expressed in the type system currently.
     auto input = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-      TVO_CanBindToInOut);
+      /*options*/0);
     auto output = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
-      TVO_CanBindToInOut);
+      /*options*/0);
     
     auto inputArg = TupleTypeElt(input, CS.getASTContext().getIdentifier("of"));
     auto inputTuple = TupleType::get(inputArg, CS.getASTContext());
@@ -1487,16 +1487,16 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // @escaping.
     auto noescapeClosure = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-      TVO_CanBindToInOut);
+      /*options*/0);
     auto escapeClosure = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-      TVO_CanBindToInOut);
+      /*options*/0);
     CS.addConstraint(ConstraintKind::EscapableFunctionOf,
          escapeClosure, noescapeClosure,
          CS.getConstraintLocator(locator, ConstraintLocator::RvalueAdjustment));
     auto result = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
-      TVO_CanBindToInOut);
+      /*options*/0);
     auto bodyClosure = FunctionType::get(
       ParenType::get(CS.getASTContext(), escapeClosure), result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1522,16 +1522,16 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     // existential type as its input.
     auto openedTy = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-      TVO_CanBindToInOut);
+      /*options*/0);
     auto existentialTy = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-      TVO_CanBindToInOut);
+      /*options*/0);
     CS.addConstraint(ConstraintKind::OpenedExistentialOf,
          openedTy, existentialTy,
          CS.getConstraintLocator(locator, ConstraintLocator::RvalueAdjustment));
     auto result = CS.createTypeVariable(
       CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
-      TVO_CanBindToInOut);
+      /*options*/0);
     auto bodyClosure = FunctionType::get(
       ParenType::get(CS.getASTContext(), openedTy), result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
@@ -1629,7 +1629,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
         // Build the disjunction to attempt binding both T? and T (or
         // function returning T? and function returning T).
-        Type ty = createTypeVariable(locator, TVO_CanBindToInOut);
+        Type ty = createTypeVariable(locator, /*options*/0);
         buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType,
                                                        locator);
         addConstraint(ConstraintKind::Bind, boundType,
@@ -1659,7 +1659,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
           // For our original type T -> U?? we will generate:
           // A disjunction V = { U?, U }
           // and a disjunction boundType = { T -> V?, T -> V }
-          Type ty = createTypeVariable(locator, TVO_CanBindToInOut);
+          Type ty = createTypeVariable(locator, /*options*/0);
 
           buildDisjunctionForImplicitlyUnwrappedOptional(ty, optTy, locator);
 
@@ -1770,14 +1770,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // the mutability of the base.
     auto keyPathIndexTy = createTypeVariable(
       getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-      TVO_CanBindToInOut);
+      /*options*/0);
     auto elementTy = createTypeVariable(
             getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-            TVO_CanBindToLValue |
-            TVO_CanBindToInOut);
+            TVO_CanBindToLValue);
     auto elementObjTy = createTypeVariable(
         getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
-        TVO_CanBindToInOut);
+        /*options*/0);
     addConstraint(ConstraintKind::Equal, elementTy, elementObjTy, locator);
     
     // The element result is an lvalue or rvalue based on the key path class.

@@ -1149,21 +1149,25 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 }
 
 DeclName ParsedDeclName::formDeclName(ASTContext &ctx) const {
-  return swift::formDeclName(ctx, BaseName, ArgumentLabels, IsFunctionName);
+  return swift::formDeclName(ctx, BaseName, ArgumentLabels, IsFunctionName,
+                             /*IsInitializer=*/true);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
                              StringRef baseName,
                              ArrayRef<StringRef> argumentLabels,
-                             bool isFunctionName) {
+                             bool isFunctionName,
+                             bool isInitializer) {
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
     return DeclName();
   if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName))
     return DeclName();
 
-  // Get the identifier for the base name.
-  Identifier baseNameId = ctx.getIdentifier(baseName);
+  // Get the identifier for the base name. Special-case `init`.
+  DeclBaseName baseNameId = ((isInitializer && baseName == "init")
+                             ? DeclBaseName::createConstructor()
+                             : ctx.getIdentifier(baseName));
 
   // For non-functions, just use the base name.
   if (!isFunctionName) return baseNameId;

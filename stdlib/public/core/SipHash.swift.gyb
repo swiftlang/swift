@@ -24,16 +24,16 @@
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 }%
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@_versioned
+@_frozen // FIXME(sil-serialize-all)
+@usableFromInline
 internal enum _SipHashDetail {
-  @_versioned
+  @usableFromInline
   @inline(__always)
   internal static func _rotate(_ x: UInt64, leftBy amount: UInt64) -> UInt64 {
     return (x &<< amount) | (x &>> (64 - amount))
   }
 
-  @_versioned
+  @usableFromInline
   @inline(__always)
   internal static func _sipRound(
     v0: inout UInt64,
@@ -65,23 +65,23 @@ internal enum _SipHashDetail {
 public // @testable
 struct ${Self} {
   // "somepseudorandomlygeneratedbytes"
-  @_versioned
+  @usableFromInline
   internal var v0: UInt64 = 0x736f6d6570736575
 
-  @_versioned
+  @usableFromInline
   internal var v1: UInt64 = 0x646f72616e646f6d
 
-  @_versioned
+  @usableFromInline
   internal var v2: UInt64 = 0x6c7967656e657261
 
-  @_versioned
+  @usableFromInline
   internal var v3: UInt64 = 0x7465646279746573
 
   /// This value holds the byte count and the pending bytes that haven't been
   /// compressed yet, in the format that the finalization step needs. (The least
   /// significant 56 bits hold the trailing bytes, while the most significant 8
   /// bits hold the count of bytes appended so far, mod 256.)
-  @_versioned
+  @usableFromInline
   internal var tailAndByteCount: UInt64 = 0
 
   @inline(__always)
@@ -92,7 +92,7 @@ struct ${Self} {
     v0 ^= key.0
   }
 
-  @_versioned
+  @usableFromInline
   internal var byteCount: UInt64 {
     @inline(__always)
     get {
@@ -100,7 +100,7 @@ struct ${Self} {
     }
   }
 
-  @_versioned
+  @usableFromInline
   internal var tail: UInt64 {
     @inline(__always)
     get {
@@ -109,7 +109,7 @@ struct ${Self} {
   }
 
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal mutating func _compress(_ m: UInt64) {
     v3 ^= m
     for _ in 0..<${c_rounds} {

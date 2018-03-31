@@ -92,22 +92,6 @@ class Lexer {
   /// Pointer to the next not consumed character.
   const char *CurPtr;
 
-  /// @{
-  /// Members that are *not* permanent lexer state.  The values only make sense
-  /// during the lexImpl() invocation.  These variables are declared as members
-  /// rather than locals so that we don't have to thread them through to all
-  /// lexing helpers.
-
-  /// Points to the point in the source buffer where we started scanning for
-  /// the current token.  Thus, the range [LastCommentBlockStart, CurPtr)
-  /// covers all comments and whitespace that we skipped, and the token itself.
-  const char *LastCommentBlockStart = nullptr;
-
-  /// True if we have seen a comment while scanning for the current token.
-  bool SeenComment = false;
-
-  /// @}
-
   Token NextToken;
   
   /// \brief This is true if we're lexing a .sil file instead of a .swift
@@ -457,14 +441,6 @@ private:
   /// pointer.
   const char *getBufferPtrForSourceLoc(SourceLoc Loc) const {
     return BufferStart + SourceMgr.getLocOffsetInBuffer(Loc, BufferID);
-  }
-
-  StringRef getSubstring(const char *Start, unsigned Length) const {
-    assert(Start >= BufferStart && Start <= BufferEnd);
-    unsigned BytesUntilBufferEnd = BufferEnd - Start;
-    if (Length > BytesUntilBufferEnd)
-      Length = BytesUntilBufferEnd;
-    return StringRef(Start, Length);
   }
 
   void lexImpl();

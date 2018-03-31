@@ -14,7 +14,7 @@
 
 import Foundation
 
-@available(OSX 10.10, *)
+@available(macOS 10.10, *)
 extension TKSmartCard {
   public func send(ins: UInt8, p1: UInt8, p2: UInt8, data: Data? = nil,
     le: Int? = nil, reply: @escaping (Data?, UInt16, Error?) -> Void) {
@@ -23,7 +23,7 @@ extension TKSmartCard {
       le: le.map { NSNumber(value: $0) }, reply: reply)
   }
 
-  @available(OSX 10.12, *)
+  @available(macOS 10.12, *)
   public func send(ins: UInt8, p1: UInt8, p2: UInt8, data: Data? = nil,
     le: Int? = nil) throws -> (sw: UInt16, response: Data) {
 
@@ -33,7 +33,7 @@ extension TKSmartCard {
     return (sw: sw, response: response)
   }
 
-  @available(OSX 10.12, *)
+  @available(macOS 10.12, *)
   public func withSession<T>(_ body: @escaping () throws -> T) throws -> T {
     var result: T?
     try self.__inSession(executeBlock: {

@@ -154,6 +154,7 @@ UID_KEYS = [
     KEY('RetrieveRefactorActions', 'key.retrieve_refactor_actions'),
     KEY('ActionUID', 'key.actionuid'),
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
+    KEY('CompileID', 'key.compileid'),
 ]
 
 
@@ -204,6 +205,8 @@ UID_REQUESTS = [
     REQUEST('FindLocalRenameRanges',
             'source.request.find-local-rename-ranges'),
     REQUEST('SemanticRefactoring', 'source.request.semantic.refactoring'),
+    REQUEST('EnableCompileNotifications',
+            'source.request.enable-compile-notifications'),
 ]
 
 

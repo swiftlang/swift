@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -I %S/Inputs | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 import Builtin
 
@@ -420,19 +420,29 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK: define{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
 
-// CHECK: define{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMr"
+// CHECK: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S26enum_dynamic_multi_payload8EitherOrOMr"
 // CHECK-SAME: (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 
 // CHECK:      [[BUF:%.*]] = alloca [2 x i8**]
 // CHECK:      [[BUF0:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 0
-// CHECK:      [[T0:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK:      [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 319, %swift.type* %T)
+// CHECK-NEXT: [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[T_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[T_OK:%.*]] = icmp ule [[INT]] [[T_STATUS]], 63
+// CHECK-NEXT: br i1 [[T_OK]],
+// CHECK:      [[T0:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
 // CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 9
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF0]]
 
 // CHECK:      [[BUF1:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 1
-// CHECK:      [[T0:%.*]] = bitcast %swift.type* %U to i8***
+// CHECK:      [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 319, %swift.type* %U)
+// CHECK-NEXT: [[U_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[U_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[U_OK:%.*]] = icmp ule [[INT]] [[U_STATUS]], 63
+// CHECK-NEXT: br i1 [[U_OK]],
+// CHECK:      [[T0:%.*]] = bitcast %swift.type* [[U_CHECKED]] to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
 // CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 9

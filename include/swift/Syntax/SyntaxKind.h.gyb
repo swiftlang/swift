@@ -13,7 +13,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,6 +26,7 @@
 
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "llvm/Support/YAMLTraits.h"
 
 namespace swift {
 namespace syntax {
@@ -90,4 +91,21 @@ struct ScalarEnumerationTraits<syntax::SyntaxKind> {
 } // end namespace json
 } // end namespace swift
 
+namespace llvm {
+namespace yaml {
+
+/// Deserialization traits for SyntaxKind.
+template <>
+struct ScalarEnumerationTraits<swift::syntax::SyntaxKind> {
+  static void enumeration(IO &in, swift::syntax::SyntaxKind &value) {
+    in.enumCase(value, "Token", swift::syntax::SyntaxKind::Token);
+    in.enumCase(value, "Unknown", swift::syntax::SyntaxKind::Unknown);
+% for node in SYNTAX_NODES:
+    in.enumCase(value, "${node.syntax_kind}", swift::syntax::SyntaxKind::${node.syntax_kind});
+% end
+  }
+};
+
+} // end namespace yaml
+} // end namespace llvm
 #endif // SWIFT_SYNTAX_KIND_H

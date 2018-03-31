@@ -1435,7 +1435,8 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
+          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
@@ -2152,6 +2153,17 @@ public:
       }
       
       *this << " : $" << component.getComponentType();
+      
+      if (!component.getSubscriptIndices().empty()) {
+        *this << ", indices_equals ";
+        component.getSubscriptIndexEquals()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexEquals()->getLoweredType();
+        *this << ", indices_hash ";
+        component.getSubscriptIndexHash()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexHash()->getLoweredType();
+      }
     }
     }
   }
@@ -2614,6 +2626,11 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   OS << ")\n";
 }
 
+void SILProperty::dump() const {
+  SILPrintContext context(llvm::errs());
+  print(context);
+}
+
 static void printSILProperties(SILPrintContext &Ctx,
                                const SILModule::PropertyListType &Properties) {
   for (const SILProperty &P : Properties) {
@@ -2638,7 +2655,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
+  OS << "\n\nimport " << BUILTIN_NAME
+     << "\nimport " << STDLIB_NAME
      << "\nimport " << SWIFT_SHIMS_NAME << "\n\n";
 
   // Print the declarations and types from the associated context (origin module or
@@ -2838,13 +2856,6 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "base_protocol "
          << baseProtoWitness.Requirement->getName() << ": ";
       baseProtoWitness.Witness->printName(OS, Options);
-      break;
-    }
-    case MissingOptional: {
-      // optional requirement 'declref': <<not present>>
-      OS << "optional requirement '"
-         << witness.getMissingOptionalWitness().Witness->getBaseName()
-         << "': <<not present>>";
       break;
     }
     }

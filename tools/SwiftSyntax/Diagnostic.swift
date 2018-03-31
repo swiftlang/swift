@@ -29,6 +29,12 @@ public struct SourceLocation: Codable {
   /// The file in which this location resides.
   public let file: String
 
+  public init(file: String, position: AbsolutePosition) {
+    assert(position is UTF8Position, "must be utf8 position")
+    self.init(line: position.line, column: position.column,
+              offset: position.byteOffset, file: file)
+  }
+
   public init(line: Int, column: Int, offset: Int, file: String) {
     self.line = line
     self.column = column

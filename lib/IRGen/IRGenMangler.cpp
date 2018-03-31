@@ -15,7 +15,9 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Runtime/Metadata.h"
+#include "swift/ABI/MetadataValues.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace irgen;

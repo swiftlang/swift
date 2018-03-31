@@ -59,8 +59,8 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
-    TrackingDIRefMap;
+using TrackingDIRefMap =
+    llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>;
 
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
@@ -71,7 +71,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   IRGenModule &IGM;
 
   /// Used for caching SILDebugScopes without inline information.
-  typedef std::pair<const void *, const void *> LocalScopeHash;
+  using LocalScopeHash = std::pair<const void *, const void *>;
   struct LocalScope : public LocalScopeHash {
     LocalScope(const SILDebugScope *DS)
         : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
@@ -1251,14 +1251,15 @@ private:
     case TypeKind::BuiltinVector: {
       (void)MangledName; // FIXME emit the name somewhere.
       auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-      DebugTypeInfo ElemDbgTy(DbgTy.getDeclContext(),
-                              DbgTy.getGenericEnvironment(),
-                              BuiltinVectorTy->getElementType(),
-                              DbgTy.StorageType, DbgTy.size, DbgTy.align, true);
-      auto Subscripts = nullptr;
-      return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
+      auto ElemTy = BuiltinVectorTy->getElementType();
+      auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
+          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), ElemTy,
+          IGM.getTypeInfoForUnlowered(ElemTy));
+      unsigned Count = BuiltinVectorTy->getNumElements();
+      auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
+      return DBuilder.createVectorType(SizeInBits,
                                        AlignInBits, getOrCreateType(ElemDbgTy),
-                                       Subscripts);
+                                       DBuilder.getOrCreateArray(Subscript));
     }
 
     // Reference storage types.
@@ -1276,7 +1277,6 @@ private:
     // Sugared types.
 
     case TypeKind::NameAlias: {
-
       auto *NameAliasTy = cast<NameAliasType>(BaseTy);
       auto *Decl = NameAliasTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
@@ -1285,8 +1285,8 @@ private:
       // For NameAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
-          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
-          DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
+         DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
+         DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     File, L.Line, File);
     }

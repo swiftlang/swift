@@ -284,7 +284,6 @@ public:
         return BuiltType();
       return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
-      return readNominalTypeFromMetadata(Meta);
     case MetadataKind::Enum:
     case MetadataKind::Optional:
       return readNominalTypeFromMetadata(Meta);
@@ -419,16 +418,20 @@ public:
       return BuiltExist;
     }
     case MetadataKind::ForeignClass: {
-      auto Foreign = cast<TargetForeignClassMetadata<Runtime>>(Meta);
+      auto descriptorAddr = readAddressOfNominalTypeDescriptor(Meta);
+      if (!descriptorAddr)
+        return BuiltType();
+      auto descriptor = readContextDescriptor(descriptorAddr);
+      if (!descriptor)
+        return BuiltType();
 
-      StoredPointer namePtr =
-        resolveRelativeField(Meta,
-                             asFullMetadata(Foreign)->Name);
-      if (namePtr == 0)
+      // Build the demangling tree from the context tree.
+      Demangle::NodeFactory nodeFactory;
+      auto node = buildNominalTypeMangling(descriptor, nodeFactory);
+      if (!node)
         return BuiltType();
-      std::string name;
-      if (!Reader->readString(RemoteAddress(namePtr), name))
-        return BuiltType();
+
+      auto name = Demangle::mangleNode(node);
       auto BuiltForeign = Builder.createForeignClassType(std::move(name));
       TypeCache[MetadataAddress] = BuiltForeign;
       return BuiltForeign;
@@ -1005,6 +1008,11 @@ private:
     case MetadataKind::Enum: {
       auto valueMeta = cast<TargetValueMetadata<Runtime>>(metadata);
       return valueMeta->getDescription();
+    }
+        
+    case MetadataKind::ForeignClass: {
+      auto foreignMeta = cast<TargetForeignClassMetadata<Runtime>>(metadata);
+      return foreignMeta->Description;
     }
 
     default:

@@ -597,6 +597,11 @@ public:
   /// you perform such optimizations like e.g. jump-threading.
   bool isTriviallyDuplicatable() const;
 
+  /// Returns true if the instruction is a meta instruction which is
+  /// relevant for debug information and does not get lowered to a real
+  /// instruction.
+  bool isMetaInstruction() const;
+
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
   void verifyOperandOwnership() const;
@@ -2276,17 +2281,15 @@ public:
       return Value.DeclRef;
     }
   };
-
+  
   enum class Kind: unsigned {
     StoredProperty,
     GettableProperty,
     SettableProperty,
-    Last_Packed = SettableProperty, // Last enum value that can be packed in
-                                    // a PointerIntPair
+    External,
     OptionalChain,
     OptionalForce,
     OptionalWrap,
-    External,
   };
   
   // Description of a captured index value and its Hashable conformance for a
@@ -2299,72 +2302,92 @@ public:
   };
   
 private:
-  static constexpr const unsigned KindPackingBits = 2;
-  static constexpr const unsigned UnpackedKind = (1u << KindPackingBits) - 1;
-  static_assert((unsigned)Kind::Last_Packed < UnpackedKind,
-                "too many kinds to pack");
-                
+  enum PackedKind: unsigned {
+    PackedStored,
+    PackedComputed,
+    PackedExternal,
+    Unpacked,
+  };
+  
+  static const unsigned KindPackingBits = 2;
+  
+  static unsigned getPackedKind(Kind k) {
+    switch (k) {
+    case Kind::StoredProperty:
+      return PackedStored;
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return PackedComputed;
+    case Kind::External:
+      return PackedExternal;
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+      return Unpacked;
+    }
+  }
+  
   // Value is the VarDecl* for StoredProperty, the SILFunction* of the
   // Getter for computed properties, or the Kind for other kinds
   llvm::PointerIntPair<void *, KindPackingBits, unsigned> ValueAndKind;
-  llvm::PointerIntPair<SILFunction *, 2,
-                       ComputedPropertyId::KindType> SetterAndIdKind;
-  ComputedPropertyId::ValueType IdValue;
-  ArrayRef<Index> Indices;
   union {
-    // Valid if Kind == GettableProperty || Value == SettableProperty
+    // Valid if Kind == GettableProperty || Kind == SettableProperty
     struct {
-      SILFunction *Equal;
-      SILFunction *Hash;
-    } IndexEquality;
+      llvm::PointerIntPair<SILFunction *, 2,
+                           ComputedPropertyId::KindType> SetterAndIdKind;
+      ComputedPropertyId::ValueType IdValue;
+    } Computed;
     // Valid if Kind == External
     ArrayRef<Substitution> ExternalSubstitutions;
   };
+  ArrayRef<Index> Indices;
+  struct {
+    SILFunction *Equal;
+    SILFunction *Hash;
+  } IndexEquality;
   CanType ComponentType;
   
-  unsigned kindForPacking(Kind k) {
-    auto value = (unsigned)k;
-    assert(value <= (unsigned)Kind::Last_Packed);
-    return value;
-  }
-  
-  KeyPathPatternComponent(Kind kind, CanType ComponentType)
-    : ValueAndKind((void*)((uintptr_t)kind << KindPackingBits), UnpackedKind),
-      ComponentType(ComponentType)
-  {
-    assert(kind > Kind::Last_Packed && "wrong initializer");
-  }
-  
-  KeyPathPatternComponent(VarDecl *storedProp, Kind kind,
+  /// Constructor for stored components
+  KeyPathPatternComponent(VarDecl *storedProp,
                           CanType ComponentType)
-    : ValueAndKind(storedProp, kindForPacking(kind)),
+    : ValueAndKind(storedProp, PackedStored),
       ComponentType(ComponentType) {}
 
-  KeyPathPatternComponent(ComputedPropertyId id, Kind kind,
+  /// Constructor for computed components
+  KeyPathPatternComponent(ComputedPropertyId id,
                           SILFunction *getter,
                           SILFunction *setter,
                           ArrayRef<Index> indices,
                           SILFunction *indicesEqual,
                           SILFunction *indicesHash,
                           CanType ComponentType)
-    : ValueAndKind(getter, kindForPacking(kind)),
-      SetterAndIdKind(setter, id.Kind),
-      IdValue(id.Value),
+    : ValueAndKind(getter, PackedComputed),
+      Computed{{setter, id.Kind}, {id.Value}},
       Indices(indices),
       IndexEquality{indicesEqual, indicesHash},
       ComponentType(ComponentType) {
   }
   
+  /// Constructor for external components
   KeyPathPatternComponent(AbstractStorageDecl *externalStorage,
                           ArrayRef<Substitution> substitutions,
                           ArrayRef<Index> indices,
+                          SILFunction *indicesEqual,
+                          SILFunction *indicesHash,
                           CanType componentType)
-    : ValueAndKind((void*)((uintptr_t)Kind::External << KindPackingBits),
-                   UnpackedKind),
-      IdValue(externalStorage),
-      Indices(indices),
+    : ValueAndKind(externalStorage, PackedExternal),
       ExternalSubstitutions(substitutions),
+      Indices(indices),
+      IndexEquality{indicesEqual, indicesHash},
       ComponentType(componentType) {
+  }
+  
+  /// Constructor for optional components.
+  KeyPathPatternComponent(Kind kind, CanType componentType)
+    : ValueAndKind((void*)((uintptr_t)kind << KindPackingBits), Unpacked),
+      ComponentType(componentType) {
+    assert((unsigned)kind >= (unsigned)Kind::OptionalChain
+           && "not an optional component");
   }
 
 public:
@@ -2376,9 +2399,17 @@ public:
 
   Kind getKind() const {
     auto packedKind = ValueAndKind.getInt();
-    if (packedKind != UnpackedKind)
-      return (Kind)packedKind;
-    return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
+    switch ((PackedKind)packedKind) {
+    case PackedStored:
+      return Kind::StoredProperty;
+    case PackedComputed:
+      return Computed.SetterAndIdKind.getPointer()
+        ? Kind::SettableProperty : Kind::GettableProperty;
+    case PackedExternal:
+      return Kind::External;
+    case Unpacked:
+      return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
+    }
   }
   
   CanType getComponentType() const {
@@ -2410,7 +2441,8 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-      return ComputedPropertyId(IdValue, SetterAndIdKind.getInt());
+      return ComputedPropertyId(Computed.IdValue,
+                                Computed.SetterAndIdKind.getInt());
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2440,7 +2472,7 @@ public:
     case Kind::External:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
-      return SetterAndIdKind.getPointer();
+      return Computed.SetterAndIdKind.getPointer();
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2451,7 +2483,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-      llvm_unreachable("not a computed property");
+      return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
     case Kind::External:
@@ -2465,8 +2497,8 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a computed property");
+    case Kind::External:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return IndexEquality.Equal;
@@ -2478,8 +2510,8 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a computed property");
+    case Kind::External:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return IndexEquality.Hash;
@@ -2490,13 +2522,13 @@ public:
   
   static KeyPathPatternComponent forStoredProperty(VarDecl *property,
                                                    CanType ty) {
-    return KeyPathPatternComponent(property, Kind::StoredProperty, ty);
+    return KeyPathPatternComponent(property, ty);
   }
   
   AbstractStorageDecl *getExternalDecl() const {
     assert(getKind() == Kind::External
            && "not an external property");
-    return IdValue.Property;
+    return (AbstractStorageDecl*)ValueAndKind.getPointer();
   }
   
   ArrayRef<Substitution> getExternalSubstitutions() const {
@@ -2512,7 +2544,7 @@ public:
                               SILFunction *indicesEquals,
                               SILFunction *indicesHash,
                               CanType ty) {
-    return KeyPathPatternComponent(identifier, Kind::GettableProperty,
+    return KeyPathPatternComponent(identifier,
                                    getter, nullptr, indices,
                                    indicesEquals, indicesHash, ty);
   }
@@ -2525,7 +2557,7 @@ public:
                               SILFunction *indicesEquals,
                               SILFunction *indicesHash,
                               CanType ty) {
-    return KeyPathPatternComponent(identifier, Kind::SettableProperty,
+    return KeyPathPatternComponent(identifier,
                                    getter, setter, indices,
                                    indicesEquals, indicesHash, ty);
   }
@@ -2553,8 +2585,11 @@ public:
   forExternal(AbstractStorageDecl *externalDecl,
               ArrayRef<Substitution> substitutions,
               ArrayRef<Index> indices,
+              SILFunction *indicesEquals,
+              SILFunction *indicesHash,
               CanType ty) {
-    return KeyPathPatternComponent(externalDecl, substitutions, indices, ty);
+    return KeyPathPatternComponent(externalDecl, substitutions,
+                                   indices, indicesEquals, indicesHash, ty);
   }
   
   void incrementRefCounts() const;
@@ -3916,18 +3951,26 @@ class ConvertEscapeToNoEscapeInst final
           ConvertEscapeToNoEscapeInst, ConversionInst> {
   friend SILBuilder;
 
+  bool lifetimeGuaranteed;
+
   ConvertEscapeToNoEscapeInst(SILDebugLocation DebugLoc, SILValue Operand,
-                               ArrayRef<SILValue> TypeDependentOperands,
-                               SILType Ty)
+                              ArrayRef<SILValue> TypeDependentOperands,
+                              SILType Ty, bool isLifetimeGuaranteed)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty) {
+            DebugLoc, Operand, TypeDependentOperands, Ty),
+        lifetimeGuaranteed(isLifetimeGuaranteed) {
     assert(!Operand->getType().castTo<SILFunctionType>()->isNoEscape());
     assert(Ty.castTo<SILFunctionType>()->isNoEscape());
   }
 
   static ConvertEscapeToNoEscapeInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         bool lifetimeGuaranteed);
+public:
+  bool isLifetimeGuaranteed() const {
+    return lifetimeGuaranteed;
+  }
 };
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a
