@@ -816,9 +816,9 @@ public enum NonExhaustive {
   case never
 }
 
-// Inlineable code is considered "outside" the module and must include a default
+// Inlinable code is considered "outside" the module and must include a default
 // case.
-@_inlineable
+@inlinable
 public func testNonExhaustive(_ value: NonExhaustive, for interval: TemporalProxy, flag: Bool) {
   switch value { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{do you want to add a default clause?}} {{3-3=default:\n<#code#>\n}}
   case .a: break

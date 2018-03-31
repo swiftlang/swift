@@ -13,12 +13,12 @@ func printDSOHandle(dso: UnsafeRawPointer = #dsohandle) -> UnsafeRawPointer {
   return dso
 }
 
-@_inlineable public func printDSOHandleInlineable(dso: UnsafeRawPointer = #dsohandle) -> UnsafeRawPointer {
+@inlinable public func printDSOHandleInlinable(dso: UnsafeRawPointer = #dsohandle) -> UnsafeRawPointer {
   return dso
 }
 
-@_inlineable public func callsPrintDSOHandleInlineable() {
-  printDSOHandleInlineable()
+@inlinable public func callsPrintDSOHandleInlinable() {
+  printDSOHandleInlinable()
 }
 
 _ = printDSOHandle()

@@ -74,7 +74,7 @@ public protocol RangeExpression {
 }
 
 extension RangeExpression {
-  @_inlineable
+  @inlinable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
   }  
@@ -146,7 +146,7 @@ public struct Range<Bound : Comparable> {
   /// (`..<`) to form `Range` instances is preferred.
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
-  @_inlineable
+  @inlinable
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -162,7 +162,7 @@ public struct Range<Bound : Comparable> {
   /// - Parameter element: The element to check for containment.
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
-  @_inlineable
+  @inlinable
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element && element < upperBound
   }
@@ -174,7 +174,7 @@ public struct Range<Bound : Comparable> {
   ///     let empty: Range = 10..<10
   ///     print(empty.isEmpty)
   ///     // Prints "true"
-  @_inlineable
+  @inlinable
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
@@ -195,20 +195,20 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   public typealias Indices = Range<Bound>
   public typealias SubSequence = Range<Bound>
 
-  @_inlineable
+  @inlinable
   public var startIndex: Index { return lowerBound }
 
-  @_inlineable
+  @inlinable
   public var endIndex: Index { return upperBound }
 
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
     return i.advanced(by: 1)
   }
 
-  @_inlineable
+  @inlinable
   public func index(before i: Index) -> Index {
     _precondition(i > lowerBound)
     _precondition(i <= upperBound)
@@ -216,7 +216,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return i.advanced(by: -1)
   }
 
-  @_inlineable
+  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     let r = i.advanced(by: numericCast(n))
     _precondition(r >= lowerBound)
@@ -224,7 +224,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return r
   }
 
-  @_inlineable
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     return numericCast(start.distance(to: end))
   }
@@ -233,24 +233,24 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   ///
   /// - Parameter bounds: A range of the range's indices. The upper and lower
   ///   bounds of the `bounds` range must be valid indices of the collection.
-  @_inlineable
+  @inlinable
   public subscript(bounds: Range<Index>) -> Range<Bound> {
     return bounds
   }
 
   /// The indices that are valid for subscripting the range, in ascending
   /// order.
-  @_inlineable
+  @inlinable
   public var indices: Indices {
     return self
   }
 
-  @_inlineable
+  @inlinable
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     return lowerBound <= element && element < upperBound
   }
 
-  @_inlineable
+  @inlinable
   public func _customIndexOfEquatableElement(_ element: Bound) -> Index?? {
     return lowerBound <= element && element < upperBound ? element : nil
   }
@@ -265,7 +265,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the range, and must not equal the range's end
   ///   index.
-  @_inlineable
+  @inlinable
   public subscript(position: Index) -> Element {
     // FIXME: swift-3-indexing-model: tests for the range check.
     _debugPrecondition(self.contains(position), "Index out of range")
@@ -307,7 +307,7 @@ extension Range: RangeExpression {
   ///   is *not* guaranteed to be inside the bounds of `collection`. Callers
   ///   should apply the same preconditions to the return value as they would
   ///   to a range provided directly by the user.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return Range(uncheckedBounds: (lower: lowerBound, upper: upperBound))
@@ -333,7 +333,7 @@ extension Range {
   ///
   /// - Parameter limits: The range to clamp the bounds of this range.
   /// - Returns: A new range clamped to the bounds of `limits`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func clamped(to limits: Range) -> Range {
     let lower =         
@@ -350,7 +350,7 @@ extension Range {
 
 extension Range : CustomStringConvertible {
   /// A textual representation of the range.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return "\(lowerBound)..<\(upperBound)"
   }
@@ -358,7 +358,7 @@ extension Range : CustomStringConvertible {
 
 extension Range : CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "Range(\(String(reflecting: lowerBound))"
     + "..<\(String(reflecting: upperBound)))"
@@ -366,7 +366,7 @@ extension Range : CustomDebugStringConvertible {
 }
 
 extension Range : CustomReflectable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -390,7 +390,7 @@ extension Range: Equatable {
   /// - Parameters:
   ///   - lhs: A range to compare.
   ///   - rhs: Another range to compare.
-  @_inlineable
+  @inlinable
   public static func == (lhs: Range<Bound>, rhs: Range<Bound>) -> Bool {
     return
       lhs.lowerBound == rhs.lowerBound &&
@@ -399,12 +399,12 @@ extension Range: Equatable {
 }
 
 extension Range: Hashable where Bound: Hashable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashValue(for: self)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
     hasher.append(lowerBound)
     hasher.append(upperBound)
@@ -436,19 +436,19 @@ extension Range: Hashable where Bound: Hashable {
 public struct PartialRangeUpTo<Bound: Comparable> {
   public let upperBound: Bound
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
 
 extension PartialRangeUpTo: RangeExpression {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return collection.startIndex..<self.upperBound
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element < upperBound
@@ -480,18 +480,18 @@ extension PartialRangeUpTo: RangeExpression {
 public struct PartialRangeThrough<Bound: Comparable> {  
   public let upperBound: Bound
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
 
 extension PartialRangeThrough: RangeExpression {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return collection.startIndex..<collection.index(after: self.upperBound)
   }
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element <= upperBound
@@ -583,19 +583,19 @@ extension PartialRangeThrough: RangeExpression {
 public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ lowerBound: Bound) { self.lowerBound = lowerBound }
 }
 
 extension PartialRangeFrom: RangeExpression {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func relative<C: Collection>(
     to collection: C
   ) -> Range<Bound> where C.Index == Bound {
     return self.lowerBound..<collection.endIndex
   }
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element
   }
@@ -608,17 +608,17 @@ extension PartialRangeFrom: Sequence
 
   @_fixed_layout
   public struct Iterator: IteratorProtocol {
-    @_versioned
+    @usableFromInline
     internal var _current: Bound
-    @_inlineable
+    @inlinable
     public init(_current: Bound) { self._current = _current }
-    @_inlineable
+    @inlinable
     public mutating func next() -> Bound? {
       defer { _current = _current.advanced(by: 1) }
       return _current
     }
   }
-  @_inlineable
+  @inlinable
   public func makeIterator() -> Iterator { 
     return Iterator(_current: lowerBound) 
   }
@@ -639,7 +639,7 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
@@ -669,7 +669,7 @@ extension Comparable {
   ///     // Prints "[10, 20, 30]"
   ///
   /// - Parameter maximum: The upper bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static prefix func ..< (maximum: Self) -> PartialRangeUpTo<Self> {
     return PartialRangeUpTo(maximum)
@@ -697,7 +697,7 @@ extension Comparable {
   ///     // Prints "[10, 20, 30, 40]"
   ///
   /// - Parameter maximum: The upper bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static prefix func ... (maximum: Self) -> PartialRangeThrough<Self> {
     return PartialRangeThrough(maximum)
@@ -725,7 +725,7 @@ extension Comparable {
   ///     // Prints "[40, 50, 60, 70]"
   ///
   /// - Parameter minimum: The lower bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static postfix func ... (minimum: Self) -> PartialRangeFrom<Self> {
     return PartialRangeFrom(minimum)
@@ -772,7 +772,7 @@ public enum UnboundedRange_ {
   ///
   /// The unbounded range operator (`...`) is valid only within a collection's
   /// subscript.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static postfix func ... (_: UnboundedRange_) -> () {
     fatalError("uncallable")
   }
@@ -821,19 +821,19 @@ extension Collection {
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public subscript<R: RangeExpression>(r: R)
   -> SubSequence where R.Bound == Index {
     return self[r.relative(to: self)]
   }
   
-  @_inlineable
+  @inlinable
   public subscript(x: UnboundedRange) -> SubSequence {
     return self[startIndex...]
   }
 }
 extension MutableCollection {
-  @_inlineable
+  @inlinable
   public subscript<R: RangeExpression>(r: R) -> SubSequence
   where R.Bound == Index {
     get {
@@ -844,7 +844,7 @@ extension MutableCollection {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(x: UnboundedRange) -> SubSequence {
     get {
       return self[startIndex...]
@@ -877,13 +877,13 @@ extension Range {
   /// - Parameter other: A range to check for elements in common.
   /// - Returns: `true` if this range and `other` have at least one element in
   ///   common; otherwise, `false`.
-  @_inlineable
+  @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
     return (!other.isEmpty && self.contains(other.lowerBound))
         || (!self.isEmpty && other.contains(self.lowerBound))
   }
 
-  @_inlineable
+  @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
     return self.contains(other.lowerBound)
         || (!self.isEmpty && other.contains(self.lowerBound))

@@ -280,7 +280,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     interfaceType = FunctionType::get({selfParam}, interfaceType,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->copyFormalAccessAndVersionedAttrFrom(property);
+  getterDecl->copyFormalAccessFrom(property);
   getterDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
@@ -307,7 +307,7 @@ DerivedConformance::declareDerivedProperty(TypeChecker &tc, Decl *parentDecl,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       propertyContextType, parentDC);
   propDecl->setImplicit();
-  propDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  propDecl->copyFormalAccessFrom(typeDecl);
   propDecl->setInterfaceType(propertyInterfaceType);
   propDecl->setValidationStarted();
 

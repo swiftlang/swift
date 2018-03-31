@@ -13,7 +13,7 @@
 import SwiftShims
 
 extension _StringVariant {
-  @_versioned
+  @usableFromInline
   func _repeated(_ count: Int) -> _SwiftStringStorage<CodeUnit> {
     _sanityCheck(count > 0)
     let c = self.count
@@ -46,7 +46,7 @@ extension String {
   ///   - repeatedValue: The string to repeat.
   ///   - count: The number of times to repeat `repeatedValue` in the resulting
   ///     string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
     precondition(count >= 0, "Negative count not allowed")
     guard count > 1 else {
@@ -57,7 +57,7 @@ extension String {
   }
 
   /// A Boolean value indicating whether a string has no characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var isEmpty: Bool {
     return _guts.count == 0
   }
@@ -65,8 +65,8 @@ extension String {
 
 // TODO: since this is generally useful, make public via evolution proposal.
 extension BidirectionalCollection {
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal func _ends<Suffix: BidirectionalCollection>(
     with suffix: Suffix, by areEquivalent: (Element,Element) -> Bool
   ) -> Bool where Suffix.Element == Element {
@@ -81,8 +81,8 @@ extension BidirectionalCollection {
 }
 
 extension BidirectionalCollection where Element: Equatable {
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal func _ends<Suffix: BidirectionalCollection>(
     with suffix: Suffix
   ) -> Bool where Suffix.Element == Element {
@@ -121,7 +121,7 @@ extension StringProtocol {
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
-  @_inlineable
+  @inlinable
   public func hasPrefix<Prefix: StringProtocol>(_ prefix: Prefix) -> Bool {
     return self.starts(with: prefix)
   }
@@ -155,14 +155,14 @@ extension StringProtocol {
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
-  @_inlineable
+  @inlinable
   public func hasSuffix<Suffix: StringProtocol>(_ suffix: Suffix) -> Bool {
     return self._ends(with: suffix)
   }
 }
 
 extension String {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func hasPrefix(_ prefix: String) -> Bool {
     let prefixCount = prefix._guts.count
     if prefixCount == 0 { return true }
@@ -210,7 +210,7 @@ extension String {
     return self.starts(with: prefix)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
     let suffixCount = suffix._guts.count
     if suffixCount == 0 { return true }
@@ -287,7 +287,7 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<T : BinaryInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
@@ -296,8 +296,8 @@ extension String {
 }
 
 extension _StringGuts {
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   func _repeated(_ n: Int) -> _StringGuts {
     _sanityCheck(n > 1)
     if self._isSmall {

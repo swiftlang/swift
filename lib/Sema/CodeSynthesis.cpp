@@ -2105,15 +2105,15 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   access = std::min(access, superclassCtor->getFormalAccess());
   ctor->setAccess(access);
 
-  // Inherit the @_versioned attribute.
-  if (superclassCtor->getAttrs().hasAttribute<VersionedAttr>()) {
-    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
+  // Inherit the @usableFromInline attribute.
+  if (superclassCtor->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     ctor->getAttrs().add(clonedAttr);
   }
 
-  // Inherit the @_inlineable attribute.
-  if (superclassCtor->getAttrs().hasAttribute<InlineableAttr>()) {
-    auto *clonedAttr = new (ctx) InlineableAttr(/*implicit=*/true);
+  // Inherit the @inlinable attribute.
+  if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
+    auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
     ctor->getAttrs().add(clonedAttr);
   }
 

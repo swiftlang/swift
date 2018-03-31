@@ -4332,7 +4332,7 @@ public:
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
-    TC.diagnoseInlineableLocalType(NTD);
+    TC.diagnoseInlinableLocalType(NTD);
 
     // We don't support protocols outside the top level of a file.
     if (isa<ProtocolDecl>(NTD) &&
@@ -5762,7 +5762,7 @@ public:
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
-    UNINTERESTING_ATTR(Inlineable)
+    UNINTERESTING_ATTR(Inlinable)
     UNINTERESTING_ATTR(Effects)
     UNINTERESTING_ATTR(FixedLayout)
     UNINTERESTING_ATTR(Lazy)
@@ -5783,7 +5783,7 @@ public:
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccess)
     UNINTERESTING_ATTR(UIApplicationMain)
-    UNINTERESTING_ATTR(Versioned)
+    UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
@@ -7708,7 +7708,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
            && "Decl parsing must prevent destructors outside of types!");
 
     checkDeclAttributesEarly(DD);
-    DD->copyFormalAccessAndVersionedAttrFrom(enclosingClass);
+    DD->copyFormalAccessFrom(enclosingClass);
 
     configureImplicitSelf(*this, DD);
 

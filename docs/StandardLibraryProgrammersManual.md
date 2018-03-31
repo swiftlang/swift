@@ -24,7 +24,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
         1. Customization hooks
     1. Use of classes, COW implementation, buffers, etc
     1. Compatibility, `@available`, etc.
-    1. Resilience, ABI stability, `@_inlineable`, `@_versioned`, etc
+    1. Resilience, ABI stability, `@inlinable`, `@usableFromInline`, etc
     1. Strings and ICU
     1. Lifetimes
         1. withExtendedLifetime, withUnsafe...,

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements diagnostics for @inlineable.
+// This file implements diagnostics for @inlinable.
 //
 //===----------------------------------------------------------------------===//
 
@@ -42,40 +42,40 @@ FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
       if (AFD->isTransparent())
         return FragileFunctionKind::Transparent;
 
-      if (AFD->getAttrs().hasAttribute<InlineableAttr>())
-        return FragileFunctionKind::Inlineable;
+      if (AFD->getAttrs().hasAttribute<InlinableAttr>())
+        return FragileFunctionKind::Inlinable;
 
       if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
         if (attr->getKind() == InlineKind::Always)
           return FragileFunctionKind::InlineAlways;
 
-      // If a property or subscript is @_inlineable, the accessors are
-      // @_inlineable also.
+      // If a property or subscript is @inlinable, the accessors are
+      // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
-        if (accessor->getStorage()->getAttrs().getAttribute<InlineableAttr>())
-          return FragileFunctionKind::Inlineable;
+        if (accessor->getStorage()->getAttrs().getAttribute<InlinableAttr>())
+          return FragileFunctionKind::Inlinable;
     }
   }
 
   llvm_unreachable("Context is not nested inside a fragile function");
 }
 
-void TypeChecker::diagnoseInlineableLocalType(const NominalTypeDecl *NTD) {
+void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
   auto *DC = NTD->getDeclContext();
   auto expansion = DC->getResilienceExpansion();
   if (expansion == ResilienceExpansion::Minimal) {
-    diagnose(NTD, diag::local_type_in_inlineable_function,
+    diagnose(NTD, diag::local_type_in_inlinable_function,
              NTD->getFullName(),
              static_cast<unsigned>(getFragileFunctionKind(DC)));
   }
 }
 
-bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
-                                            const ValueDecl *D,
-                                            const DeclContext *DC) {
+bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
+                                           const ValueDecl *D,
+                                           const DeclContext *DC) {
   auto expansion = DC->getResilienceExpansion();
 
-  // Internal declarations referenced from non-inlineable contexts are OK.
+  // Internal declarations referenced from non-inlinable contexts are OK.
   if (expansion == ResilienceExpansion::Maximal)
     return false;
 
