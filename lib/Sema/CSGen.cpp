@@ -2006,7 +2006,7 @@ namespace {
           if (ty)
             return ty;
           return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                       TVO_CanBindToInOut);
+                                       /*options*/0);
         case ReferenceOwnership::Weak:
           // For weak variables, use Optional<T>.
           if (ty && ty->getOptionalObjectType())
@@ -2014,7 +2014,7 @@ namespace {
           // Create a fresh type variable to handle overloaded expressions.
           if (!ty || ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                       TVO_CanBindToInOut);
+                                       /*options*/0);
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
         }
 
@@ -2055,7 +2055,7 @@ namespace {
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     TVO_CanBindToInOut);
+                                     /*options*/0);
       }
 
       llvm_unreachable("Unhandled pattern kind");
@@ -2329,7 +2329,7 @@ namespace {
       //
       // where T is a fresh type variable.
       auto lvalue = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                          TVO_CanBindToInOut);
+                                          /*options*/0);
       auto bound = LValueType::get(lvalue);
       auto result = InOutType::get(lvalue);
       CS.addConstraint(ConstraintKind::Conversion,
@@ -2492,8 +2492,7 @@ namespace {
 
       // The branches must be convertible to a common type.
       auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                            TVO_PrefersSubtypeBinding |
-                                            TVO_CanBindToInOut);
+                                            TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::Conversion,
                        CS.getType(expr->getThenExpr()), resultTy,
                        CS.getConstraintLocator(expr->getThenExpr()));
