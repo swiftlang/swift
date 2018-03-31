@@ -24,6 +24,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
@@ -658,6 +659,9 @@ llvm::Module *IRGenModule::releaseModule() {
 }
 
 bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
+  if (LazilyEmittedWitnessTables.count(wt))
+    return true;
+
   if (Opts.UseJIT)
     return false;
 
@@ -684,6 +688,21 @@ void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
       LazyWitnessTables.push_back(wt);
+    }
+  // Shared-linkage protocol conformances may not have been deserialized yet
+  // if they were used by inlined code. See if we can deserialize it now.
+  } else {
+    auto linkage =
+      getLinkageForProtocolConformance(Conf->getRootNormalConformance(),
+                                       ForDefinition);
+    if (hasSharedVisibility(linkage)) {
+      SIL.createWitnessTableDeclaration(const_cast<ProtocolConformance*>(Conf),
+                                        linkage);
+      SILWitnessTable *wt = SIL.lookUpWitnessTable(Conf);
+      if (wt && wt->isDefinition()
+          && LazilyEmittedWitnessTables.insert(wt).second) {
+        LazyWitnessTables.push_back(wt);
+      }
     }
   }
 }
