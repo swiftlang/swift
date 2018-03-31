@@ -2428,23 +2428,21 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   assert(assocDC && "cannot serialize SIL without an associated DeclContext");
   for (const SILVTable &vt : SILMod->getVTables()) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
-        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt.getClass()))
+        vt.getClass()->isChildContextOf(assocDC))
       writeSILVTable(vt);
   }
   
   // Write out property descriptors.
   for (const SILProperty &prop : SILMod->getPropertyList()) {
     if ((ShouldSerializeAll || prop.isSerialized()) &&
-        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
-                                     prop.getDecl()->getInnermostDeclContext()))
+        prop.getDecl()->getInnermostDeclContext()->isChildContextOf(assocDC))
       writeSILProperty(prop);
   }
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
     if ((ShouldSerializeAll || wt.isSerialized()) &&
-        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
-                                         wt.getConformance()->getDeclContext()))
+        wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
   }
 
@@ -2452,8 +2450,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   for (const SILDefaultWitnessTable &wt : SILMod->getDefaultWitnessTables()) {
     // FIXME: Don't need to serialize private and internal default witness
     // tables.
-    if (SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
-                                                              wt.getProtocol()))
+    if (wt.getProtocol()->getDeclContext()->isChildContextOf(assocDC))
       writeSILDefaultWitnessTable(wt);
   }
 
