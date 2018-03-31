@@ -1453,8 +1453,8 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
-  for (auto paramList : AFD->getParameterLists())
-    requestRequiredNominalTypeLayoutForParameters(paramList);
+  /*for (auto paramList : AFD->getParameterLists())
+    requestRequiredNominalTypeLayoutForParameters(paramList);*/
 
   if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
     return true;
