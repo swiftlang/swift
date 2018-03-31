@@ -776,3 +776,21 @@ bb0(%0 : $*T, %1 : $*T):
   %r1 = tuple ()
   return %r1 : $()
 }
+
+// Suppress NRVO when a guaranteed argument is stored into a local without
+// making a copy first. By eliminating the copy into the outgoing argument, NRVO
+// would be propagating an unowned (+0) local value into an owned (+1) result.
+// CHECK-LABEL: sil @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @out Builtin.NativeObject {
+// CHECK: bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
+// CHECK: [[LOCAL:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK: copy_addr [[LOCAL]] to [initialization] %0 : $*Builtin.NativeObject
+// CHECK-LABEL: } // end sil function 'foo'
+sil @foo : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @out Builtin.NativeObject {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %2 = alloc_stack $Builtin.NativeObject
+  store %1 to %2 : $*Builtin.NativeObject
+  copy_addr %2 to [initialization] %0 : $*Builtin.NativeObject
+  dealloc_stack %2 : $*Builtin.NativeObject
+  %6 = tuple ()
+  return %6 : $()
+}
