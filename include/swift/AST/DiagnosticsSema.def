@@ -3157,6 +3157,9 @@ ERROR(tuple_ellipsis,none,
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
 
+WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,none,
+        "using '!' here is deprecated and will be removed in a future release", ())
+
 ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
         "using '!' is not allowed here; perhaps '?' was intended?", ())
 

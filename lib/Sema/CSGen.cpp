@@ -2526,6 +2526,9 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
+      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
+      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
+        options |= TypeResolutionFlags::AllowIUODeprecated;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2555,6 +2558,9 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
+      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
+      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
+        options |= TypeResolutionFlags::AllowIUODeprecated;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
@@ -2589,6 +2595,9 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options = TypeResolutionFlags::AllowUnboundGenerics;
       options |= TypeResolutionFlags::InExpression;
+      // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
+      if (!CS.getASTContext().isSwiftVersionAtLeast(5))
+        options |= TypeResolutionFlags::AllowIUODeprecated;
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC, options))
         return nullptr;
 
