@@ -251,7 +251,8 @@ namespace {
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
 
-    void writeConversionLikeInstruction(const SingleValueInstruction *I);
+    void writeConversionLikeInstruction(const SingleValueInstruction *I,
+                                        bool guaranteed);
     void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
@@ -599,9 +600,10 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
 
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
-void SILSerializer::writeConversionLikeInstruction(const SingleValueInstruction *I) {
+void SILSerializer::writeConversionLikeInstruction(
+    const SingleValueInstruction *I, bool guaranteed) {
   assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
-  writeOneTypeOneOperandLayout(I->getKind(), 0, I->getType(),
+  writeOneTypeOneOperandLayout(I->getKind(), guaranteed ? 1 : 0, I->getType(),
                                I->getOperand(0));
 }
 
@@ -1470,7 +1472,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ProjectBlockStorageInst: {
-    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI));
+    bool guaranteed = false;
+    if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst)
+      guaranteed = cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed();
+    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI),
+                                   guaranteed);
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {
@@ -2448,21 +2454,23 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   assert(assocDC && "cannot serialize SIL without an associated DeclContext");
   for (const SILVTable &vt : SILMod->getVTables()) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
-        vt.getClass()->isChildContextOf(assocDC))
+        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt.getClass()))
       writeSILVTable(vt);
   }
   
   // Write out property descriptors.
   for (const SILProperty &prop : SILMod->getPropertyList()) {
     if ((ShouldSerializeAll || prop.isSerialized()) &&
-        prop.getDecl()->getInnermostDeclContext()->isChildContextOf(assocDC))
+        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+                                     prop.getDecl()->getInnermostDeclContext()))
       writeSILProperty(prop);
   }
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
     if ((ShouldSerializeAll || wt.isSerialized()) &&
-        wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
+        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+                                         wt.getConformance()->getDeclContext()))
       writeSILWitnessTable(wt);
   }
 
@@ -2470,7 +2478,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   for (const SILDefaultWitnessTable &wt : SILMod->getDefaultWitnessTables()) {
     // FIXME: Don't need to serialize private and internal default witness
     // tables.
-    if (wt.getProtocol()->getDeclContext()->isChildContextOf(assocDC))
+    if (SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+                                                              wt.getProtocol()))
       writeSILDefaultWitnessTable(wt);
   }
 

@@ -1054,7 +1054,8 @@ void IRGenerator::emitGlobalTopLevel() {
   unsigned nextOrderNumber = 0;
   for (auto &silFn : PrimaryIGM->getSILModule().getFunctions()) {
     // Don't bother adding external declarations to the function order.
-    if (!silFn.isDefinition()) continue;
+    if (!silFn.isDefinition())
+      continue;
     FunctionOrder.insert(std::make_pair(&silFn, nextOrderNumber++));
   }
 
@@ -1201,6 +1202,33 @@ void IRGenerator::emitLazyDefinitions() {
       IGM->emitSILFunction(f);
     }
   }
+}
+
+void IRGenerator::addLazyFunction(SILFunction *f) {
+  // If the function is a shared declaration, it may have a body to
+  // deserialize.
+  if (!f->isDefinition() && hasSharedVisibility(f->getLinkage())) {
+    SIL.linkFunction(f, SILOptions::LinkingMode::LinkThisFunctionOnly);
+    if (!f->isDefinition())
+      return;
+    FunctionOrder.insert({f, FunctionOrder.size()});
+  }
+
+  // Add it to the queue if it hasn't already been put there.
+  if (!LazilyEmittedFunctions.insert(f).second)
+    return;
+
+  LazyFunctionDefinitions.push_back(f);
+
+  if (auto *dc = f->getDeclContext())
+    if (dc->getParentSourceFile())
+      return;
+
+  if (CurrentIGM == nullptr)
+    return;
+
+  // Don't update the map if we already have an entry.
+  DefaultIGMForFunction.insert(std::make_pair(f, CurrentIGM));
 }
 
 void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
@@ -1568,6 +1596,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getLinkageAsConformance();
 
   case Kind::ProtocolWitnessTablePattern:
+  case Kind::ResilientProtocolWitnessTable:
     if (getLinkageAsConformance() == SILLinkage::Shared)
       return SILLinkage::Shared;
     return SILLinkage::Private;
@@ -1678,6 +1707,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
     return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
 
   case Kind::ProtocolWitnessTablePattern:
+  case Kind::ResilientProtocolWitnessTable:
   case Kind::ProtocolRequirementArray:
   case Kind::ObjCClassRef:
   case Kind::ModuleDescriptor:
@@ -2221,8 +2251,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
   }
 
-  bool isDefinition = f->isDefinition();
-  bool hasOrderNumber = isDefinition;
+  bool isDefinition = f->isDefinition() || hasSharedVisibility(f->getLinkage());
+  bool hasOrderNumber = f->isDefinition();
   unsigned orderNumber = ~0U;
   llvm::Function *insertBefore = nullptr;
 
@@ -2253,8 +2283,9 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     }
 
   // Otherwise, if we have a lazy definition for it, be sure to queue that up.
-  } else if (isDefinition && !forDefinition && !f->isPossiblyUsedExternally() &&
-             !hasCodeCoverageInstrumentation(*f, getSILModule())) {
+  } else if (isDefinition
+             && !forDefinition && !f->isPossiblyUsedExternally()
+             && !hasCodeCoverageInstrumentation(*f, getSILModule())) {
     IRGen.addLazyFunction(f);
   }
 
@@ -2549,6 +2580,28 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   return {gotEquivalent, ConstantReference::Indirect};
 }
 
+/// Get or create a "GOT equivalent" llvm::GlobalVariable, if applicable.
+///
+/// Creates a private, unnamed constant containing the address of another
+/// function. LLVM can replace relative references to this variable with
+/// relative references to the GOT entry for the function in the object file.
+ConstantReference
+IRGenModule::getFunctionGOTEquivalent(LinkEntity entity,
+                                      llvm::Function *func) {
+  auto &gotEntry = GlobalGOTEquivalents[entity];
+  if (gotEntry) {
+    return {gotEntry, ConstantReference::Indirect};
+  }
+
+  // Use it as the initializer for an anonymous constant. LLVM can treat this as
+  // equivalent to the global's GOT entry.
+  llvm::SmallString<64> name;
+  entity.mangle(name);
+  auto gotEquivalent = createGOTEquivalent(*this, func, name);
+  gotEntry = gotEquivalent;
+  return {gotEquivalent, ConstantReference::Indirect};
+}
+
 TypeEntityReference
 IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
   TypeMetadataRecordKind kind;
@@ -2741,8 +2794,7 @@ namespace {
       llvm::Constant *witnessTableVar;
 
       if (Conformance->getConditionalRequirements().empty()) {
-        if (!isDependentConformance(IGM, Conformance,
-                                    ResilienceExpansion::Maximal)) {
+        if (!isDependentConformance(Conformance)) {
           Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
           witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
         } else {
@@ -4018,6 +4070,14 @@ getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *conf,
                                expectedTy, DebugTypeInfo());
 }
 
+llvm::Constant *IRGenModule::
+getAddrOfResilientWitnessTable(const NormalProtocolConformance *conf,
+                               ConstantInit definition) {
+  auto entity = LinkEntity::forResilientProtocolWitnessTable(conf);
+  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
+                               definition.getType(), DebugTypeInfo());
+}
+
 llvm::Function *
 IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                       const NormalProtocolConformance *conf) {
@@ -4053,6 +4113,8 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
       RelativeAddressTy,
       // Pattern
       RelativeAddressTy,
+      // ResilientWitnesses
+      RelativeAddressTy,
       // Instantiator
       RelativeAddressTy,
       // PrivateData
@@ -4065,7 +4127,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
 llvm::Function *
 IRGenModule::getAddrOfWitnessTableAccessFunction(
                                       const NormalProtocolConformance *conf,
-                                              ForDefinition_t forDefinition) {
+                                      ForDefinition_t forDefinition) {
   IRGen.addLazyWitnessTable(conf);
 
   LinkEntity entity = LinkEntity::forProtocolWitnessTableAccessFunction(conf);

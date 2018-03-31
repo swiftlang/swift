@@ -197,7 +197,8 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
     ExtDecls.pop_back();
   }
 
-  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<ImportDecl>(D))
+  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<ImportDecl>(D) &&
+      !isa<IfConfigDecl>(D))
     return true;
 
   bool Continue = SEWalker.walkToDeclPost(D);

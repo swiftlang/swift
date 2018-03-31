@@ -24,6 +24,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
@@ -205,8 +206,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy,              // objc properties
     Int32Ty,                // size
     Int32Ty,                // flags
-    Int16Ty,                // mandatory requirement count
-    Int16Ty,                // total requirement count
+    Int32Ty,                // total requirement count
     Int32Ty,                // requirements array
     RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names
@@ -659,6 +659,9 @@ llvm::Module *IRGenModule::releaseModule() {
 }
 
 bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
+  if (LazilyEmittedWitnessTables.count(wt))
+    return true;
+
   if (Opts.UseJIT)
     return false;
 
@@ -685,6 +688,21 @@ void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
     if (canEmitWitnessTableLazily(wt) &&
         LazilyEmittedWitnessTables.insert(wt).second) {
       LazyWitnessTables.push_back(wt);
+    }
+  // Shared-linkage protocol conformances may not have been deserialized yet
+  // if they were used by inlined code. See if we can deserialize it now.
+  } else {
+    auto linkage =
+      getLinkageForProtocolConformance(Conf->getRootNormalConformance(),
+                                       ForDefinition);
+    if (hasSharedVisibility(linkage)) {
+      SIL.createWitnessTableDeclaration(const_cast<ProtocolConformance*>(Conf),
+                                        linkage);
+      SILWitnessTable *wt = SIL.lookUpWitnessTable(Conf);
+      if (wt && wt->isDefinition()
+          && LazilyEmittedWitnessTables.insert(wt).second) {
+        LazyWitnessTables.push_back(wt);
+      }
     }
   }
 }
@@ -1118,17 +1136,12 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
     return getPrimaryIGM();
   }
 
-  if (DeclContext *ctxt = f->getDeclContext()) {
-    if (SourceFile *SF = ctxt->getParentSourceFile()) {
-      IRGenModule *IGM = GenModules[SF];
-      assert(IGM);
-      return IGM;
-    }
-  }
-  // We have no source file for the function.
-  // Let's use the IGM from which the function is referenced the first time.
-  if (IRGenModule *IGM = DefaultIGMForFunction[f])
-    return IGM;
+  auto found = DefaultIGMForFunction.find(f);
+  if (found != DefaultIGMForFunction.end())
+    return found->second;
+
+  if (auto *dc = f->getDeclContext())
+    return getGenModule(dc);
 
   return getPrimaryIGM();
 }

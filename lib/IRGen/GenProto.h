@@ -255,9 +255,7 @@ namespace irgen {
     CanSILFunctionType fnType,
     GenericParamFulfillmentCallback callback);
 
-  bool isDependentConformance(IRGenModule &IGM,
-                        const NormalProtocolConformance *conformance,
-                              ResilienceExpansion expansion);
+  bool isDependentConformance(const NormalProtocolConformance *conformance);
 
 } // end namespace irgen
 } // end namespace swift

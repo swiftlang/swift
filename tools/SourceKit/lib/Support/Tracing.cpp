@@ -54,11 +54,12 @@ uint64_t trace::startOperation(trace::OperationKind OpKind,
 }
 
 // Operation previously started with startXXX has finished
-void trace::operationFinished(uint64_t OpId, trace::OperationKind OpKind) {
+void trace::operationFinished(uint64_t OpId, trace::OperationKind OpKind,
+                              ArrayRef<DiagnosticEntryInfo> Diagnostics) {
   if (trace::anyEnabled()) {
     llvm::sys::ScopedLock L(consumersLock);
     for (auto *consumer : consumers) {
-      consumer->operationFinished(OpId, OpKind);
+      consumer->operationFinished(OpId, OpKind, Diagnostics);
     }
   }
 }

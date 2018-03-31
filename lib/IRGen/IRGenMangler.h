@@ -175,6 +175,11 @@ public:
     return mangleConformanceSymbol(Type(), C, "WI");
   }
 
+  std::string mangleResilientProtocolWitnessTable(
+                                                const ProtocolConformance *C) {
+    return mangleConformanceSymbol(Type(), C, "Wr");
+  }
+
   std::string mangleProtocolWitnessTableAccessFunction(
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "Wa");

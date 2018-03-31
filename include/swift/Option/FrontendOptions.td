@@ -357,6 +357,10 @@ def import_module : Separate<["-"], "import-module">,
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
+def debugger_testing_transform : Flag<["-"], "debugger-testing-transform">,
+  HelpText<"Instrument the code with calls to an intrinsic that record the expected values of "
+           "local variables so they can be compared against the results from the debugger.">;
+
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 

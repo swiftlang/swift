@@ -798,9 +798,11 @@ public:
   }
 
   ConvertEscapeToNoEscapeInst *
-  createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty) {
+  createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty,
+                                bool lifetimeGuaranteed) {
     return insert(ConvertEscapeToNoEscapeInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes,
+        lifetimeGuaranteed));
   }
 
   ThinFunctionToPointerInst *
