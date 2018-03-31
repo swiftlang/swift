@@ -143,6 +143,9 @@ public:
   /// debugger to use.
   bool AlwaysSerializeDebuggingOptions = false;
 
+  /// If set, inserts instrumentation useful for testing the debugger.
+  bool DebuggerTestingTransform = false;
+
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
