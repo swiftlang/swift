@@ -1308,6 +1308,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_WATCHOS
 #   Swift modules this library depends on when built for watchOS.
 #
+# SWIFT_MODULE_DEPENDS_DARWIN
+#   Swift modules this library depends on when built for macOS, iOS, tvOS, or watchOS
+#
 # SWIFT_MODULE_DEPENDS_FREEBSD
 #   Swift modules this library depends on when built for FreeBSD.
 #
@@ -1430,6 +1433,7 @@ function(add_swift_library name)
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
         SWIFT_MODULE_DEPENDS_HAIKU
+        SWIFT_MODULE_DEPENDS_DARWIN
         SWIFT_MODULE_DEPENDS_IOS
         SWIFT_MODULE_DEPENDS_LINUX
         SWIFT_MODULE_DEPENDS_OSX
@@ -1562,28 +1566,32 @@ function(add_swift_library name)
         set(swiftlib_module_depends_flattened ${SWIFTLIB_SWIFT_MODULE_DEPENDS})
         if("${sdk}" STREQUAL "OSX")
           list(APPEND swiftlib_module_depends_flattened
-              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OSX})
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_DARWIN}
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OSX})
         elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
-              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_IOS})
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_DARWIN}
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_IOS})
         elseif("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
-              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_TVOS})
+                ${SWIFTLIB_SWIFT_MODULE_DEPENDS_DARWIN}
+                ${SWIFTLIB_SWIFT_MODULE_DEPENDS_TVOS})
         elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
           list(APPEND swiftlib_module_depends_flattened
-              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_DARWIN}
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WATCHOS})
         elseif("${sdk}" STREQUAL "FREEBSD")
           list(APPEND swiftlib_module_depends_flattened
-               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREEBSD})
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FREEBSD})
         elseif("${sdk}" STREQUAL "LINUX" OR "${sdk}" STREQUAL "ANDROID")
           list(APPEND swiftlib_module_depends_flattened
-              ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
         elseif("${sdk}" STREQUAL "CYGWIN")
           list(APPEND swiftlib_module_depends_flattened
-               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_CYGWIN})
         elseif("${sdk}" STREQUAL "HAIKU")
           list(APPEND swiftlib_module_depends_flattened
-               ${SWIFTLIB_SWIFT_MODULE_DEPENDS_HAIKU})
+                 ${SWIFTLIB_SWIFT_MODULE_DEPENDS_HAIKU})
         endif()
 
         # Swift compiles depend on swift modules, while links depend on
