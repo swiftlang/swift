@@ -1710,6 +1710,7 @@ function set_swiftpm_bootstrap_command() {
     if [[ "${VERBOSE_BUILD}" ]] ; then
         swiftpm_bootstrap_command+=(-v)
     fi
+    swiftpm_bootstrap_command+=(--swift-lib-dir=${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH})
     # FIXME CROSSCOMPILING:
     # SwiftPM needs to be told about the target, sysroot and linker to use
     # when cross-compiling
