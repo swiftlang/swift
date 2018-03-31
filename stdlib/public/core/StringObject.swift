@@ -328,10 +328,13 @@ extension _StringObject {
 //
 
 #if arch(i386) || arch(arm)
-@_versioned // FIXME(sil-serialize-all)
 internal var _emptyStringStorage: UInt32 = 0
 
-@_inlineable // FIXME(sil-serialize-all)
+// NB: This function *cannot* be @inlinable because it expects to project
+// and escape the physical storage of `_emptyStringStorage`.
+// Marking it inlinable will cause it to resiliently use accessors to
+// project `_emptyStringStorage` as a computed
+// property.
 @_versioned // FIXME(sil-serialize-all)
 internal var _emptyStringAddressBits: UInt {
   let p = UnsafeRawPointer(Builtin.addressof(&_emptyStringStorage))
