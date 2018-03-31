@@ -50,18 +50,6 @@ public:
   /// Process F, recursively deserializing any thing F may reference.
   bool processFunction(SILFunction *F);
 
-  /// Process Name, recursively deserializing any thing function with name Name
-  /// may reference.
-  bool processFunction(StringRef Name);
-
-  /// Process Name, try to deserialize a declaration of a function with
-  /// this Name.
-  SILFunction *lookupFunction(StringRef Name, SILLinkage Linkage);
-
-  /// Process Name, try to check if there is a declaration of a function
-  /// with this Name.
-  bool hasFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
-
   /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
   /// transitively references.
   ///
