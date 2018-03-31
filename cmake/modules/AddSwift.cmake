@@ -257,11 +257,18 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
 
     # msvcprt's std::function requires RTTI, but we do not want RTTI data.
-    # Emulate /GR-
+    # Emulate /GR-.
+    # TODO(compnerd) when moving up to VS 2017 15.3 and newer, we can disable
+    # RTTI again
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -frtti)
       list(APPEND result -Xclang;-fno-rtti-data)
     endif()
+
+    # NOTE: VS 2017 15.3 introduced this to disable the static components of
+    # RTTI as well.  This requires a newer SDK though and we do not have
+    # guarantees on the SDK version currently.
+    list(APPEND result "-D_HAS_STATIC_RTTI=0")
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
