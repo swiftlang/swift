@@ -715,7 +715,7 @@ public:
   };
 
   /// Options that control the parsing of declarations.
-  typedef OptionSet<ParseDeclFlags> ParseDeclOptions;
+  using ParseDeclOptions = OptionSet<ParseDeclFlags>;
 
   void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                      ParseDeclOptions Flags);

@@ -104,14 +104,14 @@ public:
   bool PerformConditionEvaluation = true;
 private:
   ScopeInfo ScopeInfo;
-  typedef llvm::DenseMap<AbstractFunctionDecl *,
-                         std::unique_ptr<FunctionBodyState>>
-      DelayedFunctionBodiesTy;
+  using DelayedFunctionBodiesTy =
+      llvm::DenseMap<AbstractFunctionDecl *,
+                     std::unique_ptr<FunctionBodyState>>;
   DelayedFunctionBodiesTy DelayedFunctionBodies;
 
-  typedef llvm::DenseMap<AbstractFunctionDecl *,
-                         std::unique_ptr<AccessorBodyState>>
-      DelayedAccessorBodiesTy;
+  using DelayedAccessorBodiesTy =
+      llvm::DenseMap<AbstractFunctionDecl *,
+                     std::unique_ptr<AccessorBodyState>>;
   DelayedAccessorBodiesTy DelayedAccessorBodies;
 
   /// \brief Parser sets this if it stopped parsing before the buffer ended.
