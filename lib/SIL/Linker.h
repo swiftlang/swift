@@ -53,13 +53,6 @@ public:
   /// Process F, recursively deserializing any thing F may reference.
   bool processFunction(SILFunction *F);
 
-  /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
-  /// transitively references.
-  ///
-  /// This method assumes that the caller made sure that no vtable existed in
-  /// Mod.
-  SILVTable *processClassDecl(const ClassDecl *C);
-
   /// We do not want to visit callee functions if we just have a value base.
   bool visitSILInstruction(SILInstruction *I) { return false; }
 
