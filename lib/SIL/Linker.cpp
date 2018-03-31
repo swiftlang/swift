@@ -47,6 +47,9 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 
   ++NumFuncLinked;
 
+  if (Mode == LinkingMode::LinkThisFunctionOnly)
+    return true;
+  
   // Try to transitively deserialize everything referenced by this
   // function.
   Worklist.push_back(F);
@@ -68,6 +71,9 @@ bool SILLinkerVisitor::processFunction(StringRef Name) {
     return false;
 
   ++NumFuncLinked;
+  
+  if (Mode == LinkingMode::LinkThisFunctionOnly)
+    return true;
 
   // Try to transitively deserialize everything referenced by NewFn.
   Worklist.push_back(NewFn);
