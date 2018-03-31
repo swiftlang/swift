@@ -929,12 +929,17 @@ public:
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
   Modify           = 0x1,
-  // Leave space for other actions.
-  // Don't rely on ActionMask in stable ABI.
+  // ActionMask can grow without breaking the ABI because the runtime controls
+  // how these flags are encoded in the "value buffer". However, any additional
+  // actions must be compatible with the original behavior for the old, smaller
+  // ActionMask (older runtimes will continue to treat them as either a simple
+  // Read or Modify).
   ActionMask       = 0x1,
 
   // Downgrade exclusivity failures to a warning.
-  WarningOnly      = 0x10
+  WarningOnly      = 0x10,
+  // The runtime should track this access to check against subsequent accesses.
+  Tracking         = 0x20
 };
 static inline ExclusivityFlags operator|(ExclusivityFlags lhs,
                                          ExclusivityFlags rhs) {
@@ -950,6 +955,9 @@ static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
 }
 static inline bool isWarningOnly(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
+}
+static inline bool isTracking(ExclusivityFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::Tracking);
 }
 
 /// Flags for struct layout.

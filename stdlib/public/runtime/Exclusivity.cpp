@@ -147,6 +147,29 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
 namespace {
 
 /// A single access that we're tracking.
+///
+/// The following inputs are accepted by the begin_access runtime entry
+/// point. This table show the action performed by the current runtime to
+/// convert those inputs into stored fields in the Access scratch buffer.
+///
+/// Pointer | Runtime     | Access | PC    | Reported| Access
+/// Argument| Behavior    | Pointer| Arg   | PC      | PC
+/// -------- ------------- -------- ------- --------- ----------
+/// null    | [trap or missing enforcement]
+/// nonnull | [nontracked]| null   | null  | caller  | [discard]
+/// nonnull | [nontracked]| null   | valid | <same>  | [discard]
+/// nonnull | [tracked]   | <same> | null  | caller  | caller
+/// nonnull | [tracked]   | <same> | valid | <same>  | <same>
+///
+/// [nontracked] means that the Access scratch buffer will not be added to the
+/// runtime's list of tracked accesses. However, it may be passed to a
+/// subsequent call to end_unpaired_access. The null Pointer field then
+/// identifies the Access record as nontracked.
+///
+/// The runtime owns the contents of the scratch buffer, which is allocated by
+/// the compiler but otherwise opaque. The runtime may later reuse the Pointer
+/// or PC fields or any spare bits for additional flags, and/or a pointer to
+/// out-of-line storage.
 struct Access {
   void *Pointer;
   void *PC;
@@ -188,7 +211,7 @@ class AccessSet {
 public:
   constexpr AccessSet() {}
 
-  void insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
+  bool insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
     auto action = getAccessAction(flags);
 
     for (Access *cur = Head; cur != nullptr; cur = cur->getNext()) {
@@ -208,10 +231,13 @@ public:
       // If we're only warning, don't report multiple conflicts.
       break;
     }
+    if (!isTracking(flags))
+      return false;
 
     // Insert to the front of the array so that remove tends to find it faster.
     access->initialize(pc, pointer, Head, action);
     Head = access;
+    return true;
   }
 
   void remove(Access *access) {
@@ -293,16 +319,20 @@ void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
 
   Access *access = reinterpret_cast<Access*>(buffer);
 
-  // If exclusivity checking is disabled, record in the access
-  // buffer that we didn't track anything.
+  // If exclusivity checking is disabled, record in the access buffer that we
+  // didn't track anything. pc is currently undefined in this case.
   if (_swift_disableExclusivityChecking) {
     access->Pointer = nullptr;
     return;
   }
 
-  if (!pc) pc = get_return_address();
+  // If the provided `pc` is null, then the runtime may override it for
+  // diagnostics.
+  if (!pc)
+    pc = get_return_address();
 
-  getAccessSet().insert(access, pc, pointer, flags);
+  if (!getAccessSet().insert(access, pc, pointer, flags))
+    access->Pointer = nullptr;
 }
 
 /// End tracking a dynamic access.

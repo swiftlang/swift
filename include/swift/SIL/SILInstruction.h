@@ -3237,10 +3237,13 @@ class BeginAccessInst
   friend class SILBuilder;
 
   BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
-                  SILAccessKind accessKind, SILAccessEnforcement enforcement)
+                  SILAccessKind accessKind, SILAccessEnforcement enforcement,
+                  bool noNestedConflict)
       : UnaryInstructionBase(loc, lvalue, lvalue->getType()) {
     SILInstruction::Bits.BeginAccessInst.AccessKind = unsigned(accessKind);
     SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
+    SILInstruction::Bits.BeginAccessInst.NoNestedConflict =
+      unsigned(noNestedConflict);
 
     static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
                   "reserve sufficient bits for serialized SIL");
@@ -3269,6 +3272,19 @@ public:
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
     SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
+  }
+
+  /// If hasNoNestedConflict is true, then it is a static guarantee against
+  /// inner conflicts. No subsequent access between this point and the
+  /// corresponding end_access could cause an enforcement failure. Consequently,
+  /// the access will not need to be tracked by the runtime for the duration of
+  /// its scope. This access may still conflict with an outer access scope;
+  /// therefore may still require dynamic enforcement at a single point.
+  bool hasNoNestedConflict() const {
+    return SILInstruction::Bits.BeginAccessInst.NoNestedConflict;
+  }
+  void setNoNestedConflict(bool noNestedConflict) {
+    SILInstruction::Bits.BeginAccessInst.NoNestedConflict = noNestedConflict;
   }
 
   SILValue getSource() const {
@@ -3348,30 +3364,49 @@ class BeginUnpairedAccessInst
 
   FixedOperandList<2> Operands;
 
-  SILAccessKind AccessKind;
-  SILAccessEnforcement Enforcement;
-
   BeginUnpairedAccessInst(SILDebugLocation loc, SILValue addr, SILValue buffer,
                           SILAccessKind accessKind,
-                          SILAccessEnforcement enforcement)
-    : InstructionBase(loc),
-      Operands(this, addr, buffer),
-      AccessKind(accessKind), Enforcement(enforcement) {
+                          SILAccessEnforcement enforcement,
+                          bool noNestedConflict)
+      : InstructionBase(loc), Operands(this, addr, buffer) {
+    SILInstruction::Bits.BeginUnpairedAccessInst.AccessKind =
+      unsigned(accessKind);
+    SILInstruction::Bits.BeginUnpairedAccessInst.Enforcement =
+      unsigned(enforcement);
+    SILInstruction::Bits.BeginUnpairedAccessInst.NoNestedConflict =
+      unsigned(noNestedConflict);
   }
 
 public:
   SILAccessKind getAccessKind() const {
-    return AccessKind;
+    return SILAccessKind(
+      SILInstruction::Bits.BeginUnpairedAccessInst.AccessKind);
   }
   void setAccessKind(SILAccessKind kind) {
-    AccessKind = kind;
+    SILInstruction::Bits.BeginUnpairedAccessInst.AccessKind = unsigned(kind);
   }
 
   SILAccessEnforcement getEnforcement() const {
-    return Enforcement;
+    return SILAccessEnforcement(
+        SILInstruction::Bits.BeginUnpairedAccessInst.Enforcement);
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
-    Enforcement = enforcement;
+    SILInstruction::Bits.BeginUnpairedAccessInst.Enforcement
+      = unsigned(enforcement);
+  }
+
+  /// If hasNoNestedConflict is true, then it is a static guarantee against
+  /// inner conflicts. No subsequent access between this point and the
+  /// corresponding end_access could cause an enforcement failure. Consequently,
+  /// the access will not need to be tracked by the runtime for the duration of
+  /// its scope. This access may still conflict with an outer access scope;
+  /// therefore may still require dynamic enforcement at a single point.
+  bool hasNoNestedConflict() const {
+    return SILInstruction::Bits.BeginUnpairedAccessInst.NoNestedConflict;
+  }
+  void setNoNestedConflict(bool noNestedConflict) {
+    SILInstruction::Bits.BeginUnpairedAccessInst.NoNestedConflict =
+      noNestedConflict;
   }
 
   SILValue getSource() const {
@@ -3400,15 +3435,13 @@ class EndUnpairedAccessInst
                                   NonValueInstruction> {
   friend class SILBuilder;
 
-  SILAccessEnforcement Enforcement;
-  bool Aborting;
-
 private:
   EndUnpairedAccessInst(SILDebugLocation loc, SILValue buffer,
-                        SILAccessEnforcement enforcement,
-                        bool aborting = false)
-    : UnaryInstructionBase(loc, buffer), Enforcement(enforcement),
-      Aborting(aborting) {
+                        SILAccessEnforcement enforcement, bool aborting = false)
+      : UnaryInstructionBase(loc, buffer) {
+    SILInstruction::Bits.EndUnpairedAccessInst.Enforcement
+      = unsigned(enforcement);
+    SILInstruction::Bits.EndUnpairedAccessInst.Aborting = aborting;
   }
 
 public:
@@ -3419,17 +3452,19 @@ public:
   /// Only AccessKind::Init and AccessKind::Deinit accesses can be
   /// aborted.
   bool isAborting() const {
-    return Aborting;
+    return SILInstruction::Bits.EndUnpairedAccessInst.Aborting;
   }
   void setAborting(bool aborting) {
-    Aborting = aborting;
+    SILInstruction::Bits.EndUnpairedAccessInst.Aborting = aborting;
   }
 
   SILAccessEnforcement getEnforcement() const {
-    return Enforcement;
+    return SILAccessEnforcement(
+        SILInstruction::Bits.EndUnpairedAccessInst.Enforcement);
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
-    Enforcement = enforcement;
+    SILInstruction::Bits.EndUnpairedAccessInst.Enforcement =
+        unsigned(enforcement);
   }
 
   SILValue getBuffer() const {

@@ -2010,9 +2010,9 @@ static void rewriteFunction(StructLoweringState &pass,
     }
     case SILInstructionKind::BeginAccessInst: {
       auto *convInstr = cast<BeginAccessInst>(instr);
-      newInstr = resultTyBuilder.createBeginAccess(Loc, convInstr->getOperand(),
-                                                   convInstr->getAccessKind(),
-                                                   convInstr->getEnforcement());
+      newInstr = resultTyBuilder.createBeginAccess(
+          Loc, convInstr->getOperand(), convInstr->getAccessKind(),
+          convInstr->getEnforcement(), convInstr->hasNoNestedConflict());
       break;
     }
     case SILInstructionKind::EnumInst: {

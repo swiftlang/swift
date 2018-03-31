@@ -1833,8 +1833,9 @@ public:
   }
   void visitBeginAccessInst(BeginAccessInst *BAI) {
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
-          << getSILAccessEnforcementName(BAI->getEnforcement())
-          << "] " << getIDAndType(BAI->getOperand());
+          << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
+          << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
     *this << (EAI->isAborting() ? "[abort] " : "")
@@ -1842,8 +1843,9 @@ public:
   }
   void visitBeginUnpairedAccessInst(BeginUnpairedAccessInst *BAI) {
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
-          << getSILAccessEnforcementName(BAI->getEnforcement())
-          << "] " << getIDAndType(BAI->getSource()) << ", "
+          << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
+          << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << getIDAndType(BAI->getSource()) << ", " 
           << getIDAndType(BAI->getBuffer());
   }
   void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
