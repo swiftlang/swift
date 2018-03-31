@@ -653,15 +653,6 @@ class MandatoryInlining : public SILModuleTransform {
                                SetFactory, SetFactory.getEmptySet(), CHA);
     }
 
-    // Make sure that we de-serialize all transparent functions,
-    // even if we didn't inline them for some reason.
-    // Transparent functions are not available externally, so we
-    // have to generate code for them.
-    for (auto &F : *M) {
-      if (F.isTransparent())
-        M->linkFunction(&F, Mode);
-    }
-    
     if (!ShouldCleanup)
       return;
 
