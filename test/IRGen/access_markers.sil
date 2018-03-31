@@ -155,6 +155,7 @@ bb0(%0 : $A):
   // CHECK: call void @swift_beginAccess(i8* %{{.*}}, [[BUFFER]]* %{{.*}}, [[SIZE]] 0, i8* null)
   %3 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Int
   copy_addr %3 to [initialization] %1 : $*Int
+  // CHECK-NOT: end_access
   end_access %3 : $*Int
   %9 = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: call void @swift_beginAccess(i8* %{{.*}}, [[BUFFER]]* %{{.*}}, [[SIZE]] 0, i8* null)
