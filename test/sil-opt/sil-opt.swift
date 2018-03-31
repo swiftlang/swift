@@ -7,8 +7,8 @@
 // CHECK: func unknown()
 
 // CHECK: struct X {
-// CHECK-NEXT:  @_inlineable func test()
-// CHECK-NEXT:  @_inlineable init
+// CHECK-NEXT:  @inlinable func test()
+// CHECK-NEXT:  @inlinable init
 // CHECK-NEXT: }
 
 // CHECK: sil{{.*}} @unknown : $@convention(thin) () -> ()
@@ -57,11 +57,11 @@ public func unknown() -> ()
 
 @_fixed_layout
 public struct X {
-  @_inlineable
+  @inlinable
   public func test() {
     unknown()
   }
 
-  @_inlineable
+  @inlinable
   public init() {}
 }

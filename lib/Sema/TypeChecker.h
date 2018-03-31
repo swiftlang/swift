@@ -2293,16 +2293,16 @@ public:
 
   /// \name Resilience diagnostics
 
-  void diagnoseInlineableLocalType(const NominalTypeDecl *NTD);
+  void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
 
-  bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
-                                 const DeclContext *DC);
+  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+                                const DeclContext *DC);
 
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
     InlineAlways,
-    Inlineable,
+    Inlinable,
     DefaultArgument,
     PropertyInitializer
   };

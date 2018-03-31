@@ -658,7 +658,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
                                     FunctionType::ExtInfo());
   }
   eqDecl->setInterfaceType(interfaceTy);
-  eqDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  eqDecl->copyFormalAccessFrom(typeDecl);
   eqDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
@@ -1052,7 +1052,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
 
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setValidationStarted();
-  getterDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  getterDecl->copyFormalAccessFrom(typeDecl);
 
   // If the enum was not imported, the derived conformance is either from the
   // enum itself or an extension, in which case we will emit the declaration
@@ -1066,7 +1066,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   hashValueDecl->setValidationStarted();
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
-  hashValueDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  hashValueDecl->copyFormalAccessFrom(typeDecl);
 
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
   hashValuePat->setType(intType);

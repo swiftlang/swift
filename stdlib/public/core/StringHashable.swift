@@ -49,7 +49,7 @@ internal struct ASCIIHasher {
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  // NOT @_versioned
+  // NOT @usableFromInline
   @effects(releasenone)
   internal func hashASCII(into hasher: inout _Hasher) {
     var asciiHasher = ASCIIHasher()
@@ -66,7 +66,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
-  // NOT @_versioned
+  // NOT @usableFromInline
   internal func hashUTF16(into hasher: inout _Hasher) {
     var asciiHasher = ASCIIHasher()
 
@@ -102,7 +102,7 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   @effects(releasenone)
-  @_versioned
+  @usableFromInline
   internal func computeHashValue(into hasher: inout _Hasher) {
     self.hashASCII(into: &hasher)
   }
@@ -110,22 +110,22 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 
 extension _UnmanagedString where CodeUnit == UInt16 {
   @effects(releasenone)
-  @_versioned
+  @usableFromInline
   internal func computeHashValue(into hasher: inout _Hasher) {
     self.hashUTF16(into: &hasher)
   }
 }
 
 extension _UnmanagedOpaqueString {
-  @_versioned
+  @usableFromInline
   internal func computeHashValue(into hasher: inout _Hasher) {
     self.hashUTF16(into: &hasher)
   }
 }
 
 extension _SmallUTF8String {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   internal func computeHashValue(into hasher: inout _Hasher) {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
@@ -139,7 +139,7 @@ extension _SmallUTF8String {
 }
 
 extension _StringGuts {
-  @_versioned
+  @usableFromInline
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(into hasher: inout _Hasher) {
     if _isSmall {
@@ -158,7 +158,7 @@ extension _StringGuts {
     _unmanagedUTF16View.computeHashValue(into: &hasher)
   }
 
-  @_versioned
+  @usableFromInline
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
     if _isSmall {
@@ -183,24 +183,24 @@ extension String : Hashable {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
-  @_inlineable
+  @inlinable
   public var hashValue: Int {
     return _hashValue(for: self)
   }
 
-  @_inlineable
+  @inlinable
   public func _hash(into hasher: inout _Hasher) {
     _guts._hash(into: &hasher)
   }
 }
 
 extension StringProtocol {
-  @_inlineable
+  @inlinable
   public var hashValue : Int {
     return _hashValue(for: self)
   }
 
-  @_inlineable
+  @inlinable
   public func _hash(into hasher: inout _Hasher) {
     _wholeString._guts._hash(_encodedOffsetRange, into: &hasher)
   }

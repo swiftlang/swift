@@ -22,8 +22,8 @@ enum _GutsClassification: UInt {
 }
 
 extension _StringGuts {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   var classification: _GutsClassification {
     if _isSmall { return .smallUTF8 }
     if _isContiguous { return isASCII ? .regularASCII : .regularUTF16 }
@@ -35,7 +35,7 @@ extension _StringGuts {
 // memcmp fast path for comparing ascii strings. rdar://problem/37473470
 @inline(never) // @outlined
 @effects(readonly)
-@_versioned // @opaque
+@usableFromInline // @opaque
 internal
 func _compareUnicode(
   _ lhs: _StringGuts._RawBitPattern, _ rhs: _StringGuts._RawBitPattern
@@ -72,7 +72,7 @@ func _compareUnicode(
 
 @inline(never) // @outlined
 @effects(readonly)
-@_versioned // @opaque
+@usableFromInline // @opaque
 internal
 func _compareUnicode(
   _ lhs: _StringGuts._RawBitPattern, _ leftRange: Range<Int>,
@@ -353,13 +353,13 @@ extension _FixedArray16 where T == UInt16 {
 }
 
 @_frozen
-@_versioned internal
+@usableFromInline internal
 enum _Ordering: Int, Equatable {
   case less = -1
   case equal = 0
   case greater = 1
 
-  @_versioned internal
+  @usableFromInline internal
   var flipped: _Ordering {
     switch self {
       case .less: return .greater
@@ -369,7 +369,7 @@ enum _Ordering: Int, Equatable {
   }
 
   @inline(__always)
-  @_versioned internal
+  @usableFromInline internal
   init(signedNotation int: Int) {
     self = int < 0 ? .less : int == 0 ? .equal : .greater
   }
@@ -683,8 +683,8 @@ internal func _tryNormalize(
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func compareASCII(to other: _UnmanagedString<UInt8>) -> Int {
     // FIXME Results should be the same across all platforms.
     if self.start == other.start {
@@ -703,14 +703,14 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 
 extension _UnmanagedOpaqueString {
   @inline(never) // @outlined
-  @_versioned
+  @usableFromInline
   internal
   func _compareOpaque(_ other: _StringGuts) -> _Ordering {
     return self._compareOpaque(other, 0..<other.count)
   }
 
   @inline(never) // @outlined
-  @_versioned
+  @usableFromInline
   internal
   func _compareOpaque(
     _ other: _StringGuts, _ otherRange: Range<Int>
@@ -916,7 +916,7 @@ extension UnicodeScalar {
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  @_versioned
+  @usableFromInline
   internal func _compareStringsPreLoop(
     _ other: _UnmanagedString<UInt16>
   ) -> _Ordering {
@@ -1130,7 +1130,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     return nextCU < 0x300 || _hasNormalizationBoundary(before: nextCU)
   }
 
-  @_versioned
+  @usableFromInline
   internal
   func _compareStringsPreLoop(
     _ other: _UnmanagedString<UInt16>

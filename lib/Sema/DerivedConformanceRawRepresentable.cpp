@@ -343,7 +343,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  initDecl->copyFormalAccessAndVersionedAttrFrom(enumDecl);
+  initDecl->copyFormalAccessFrom(enumDecl);
   initDecl->setValidationStarted();
 
   // If the enum was not imported, the derived conformance is either from the
