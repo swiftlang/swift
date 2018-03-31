@@ -14,6 +14,7 @@ protocol X {
   func foo()
 }
 extension X {
+  @_optimize(none)
   func foo() {}
 }
 public class Base: X {}
