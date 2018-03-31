@@ -878,6 +878,12 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   // TypeResolver is set before.
   ASTRef->Impl.TypeResolver = createLazyResolver(CompIns.getASTContext());
 
+  if (TracedOp.enabled()) {
+    SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
+    Consumer.getAllDiagnostics(Diagnostics);
+    TracedOp.finish(Diagnostics);
+  }
+
   return ASTRef;
 }
 
