@@ -1278,6 +1278,46 @@ bb0(%0 : $WeakUnownedTest, %1 : $AnyObject):
   return %r : $()
 }
 
+
+class A {
+  @sil_stored var property: Any { get set }
+  deinit
+  init()
+}
+
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_access : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: begin_access [read] [dynamic]
+// CHECK: end_access
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK: end_access
+// CHECK: begin_unpaired_access [read] [dynamic]
+// CHECK: end_unpaired_access [dynamic]
+// CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'test_access'
+sil [serialized] @test_access : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.property
+  %3 = begin_access [dynamic] [read] %2 : $*Any
+  copy_addr %3 to [initialization] %1 : $*Any
+  end_access %3 : $*Any
+  %6 = begin_access [dynamic] [read] [no_nested_conflict] %2 : $*Any
+  copy_addr %6 to %1 : $*Any
+  end_access %6 : $*Any
+  destroy_addr %1 : $*Any
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  end_unpaired_access [dynamic] %9 : $*Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [no_nested_conflict] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
+}
+
 public class Foo {
   subscript (x: Int, y: Int) -> Int32 { get set }
   var x: Int
@@ -1493,6 +1533,7 @@ bb0:
   %151 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
   %152 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
   %153 = function_ref @weak_unowned: $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
+  %154 = function_ref @test_access : $@convention(thin) (@guaranteed A) -> ()
 
   %r = tuple ()
   return %r : $()
