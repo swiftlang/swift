@@ -1,0 +1,171 @@
+//===--- CompatibilityOverrides.def - Compatibility Overrides Database -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines x-macros used for metaprogramming with the set of
+// compatibility override functions.
+//
+//===----------------------------------------------------------------------===//
+
+/// #define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs)
+///   Provides information about an overridable function.
+///   - name is the name of the function, without any leading swift_ or namespace.
+///   - ret is the return type of the function.
+///   - attrs is the attributes, if any, applied to the function definition.
+///   - namespace is the namespace, if any, the function is in, including a trailing ::
+///   - typedArgs is the argument list, including types, surrounded by parentheses
+///   - namedArgs is the list of argument names, with no types, surrounded by parentheses
+///
+/// The entries are organized by group. A user may define OVERRIDE to get all entries,
+/// or define one or more of OVERRIDE_METADATALOOKUP, OVERRIDE_CASTING, OVERRIDE_OBJC,
+/// OVERRIDE_FOREIGN, or OVERRIDE_PROTOCOLCONFORMANCE to get only those entries.
+
+// NOTE: this file is used to build the definition of OverrideSection in
+// CompatibilityOverride.cpp, which is part of the ABI. Do not move or remove entries
+// in this file after ABI stability. Additional entries can be added to the end.
+
+#ifdef OVERRIDE
+#  define OVERRIDE_METADATALOOKUP OVERRIDE
+#  define OVERRIDE_CASTING OVERRIDE
+#  define OVERRIDE_OBJC OVERRIDE
+#  define OVERRIDE_FOREIGN OVERRIDE
+#  define OVERRIDE_PROTOCOLCONFORMANCE OVERRIDE
+#else
+#  ifndef OVERRIDE_METADATALOOKUP
+#    define OVERRIDE_METADATALOOKUP(...)
+#  endif
+#  ifndef OVERRIDE_CASTING
+#    define OVERRIDE_CASTING(...)
+#  endif
+#  ifndef OVERRIDE_OBJC
+#    define OVERRIDE_OBJC(...)
+#  endif
+#  ifndef OVERRIDE_FOREIGN
+#    define OVERRIDE_FOREIGN(...)
+#  endif
+#  ifndef OVERRIDE_PROTOCOLCONFORMANCE
+#    define OVERRIDE_PROTOCOLCONFORMANCE(...)
+#  endif
+#endif
+
+OVERRIDE_METADATALOOKUP(getTypeByMangledName, const Metadata *,
+                        SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL, ,
+                        (const char *typeNameStart, size_t typeNameLength,
+                         size_t numberOfLevels,
+                         size_t *parametersPerLevel,
+                         const Metadata * const *flatSubstitutions),
+                        (typeNameStart, typeNameLength, numberOfLevels,
+                         parametersPerLevel, flatSubstitutions))
+
+
+OVERRIDE_CASTING(dynamicCast, bool, , swift::,
+                 (OpaqueValue *dest, OpaqueValue *src,
+                  const Metadata *srcType,
+                  const Metadata *targetType,
+                  DynamicCastFlags flags),
+                 (dest, src, srcType, targetType, flags))
+
+
+OVERRIDE_CASTING(dynamicCastClass, const void *, , swift::,
+                 (const void *object,
+                  const ClassMetadata *targetType),
+                 (object, targetType))
+
+
+OVERRIDE_CASTING(dynamicCastClassUnconditional, const void *, , swift::,
+                 (const void *object,
+                  const ClassMetadata *targetType),
+                 (object, targetType))
+
+
+
+OVERRIDE_CASTING(dynamicCastUnknownClass, const void *, , swift::,
+                 (const void *object, const Metadata *targetType),
+                 (object, targetType))
+
+
+OVERRIDE_CASTING(dynamicCastUnknownClassUnconditional, const void *, , swift::,
+                 (const void *object, const Metadata *targetType),
+                 (object, targetType))
+
+
+OVERRIDE_CASTING(dynamicCastMetatype, const Metadata *, , swift::,
+                 (const Metadata *sourceType,
+                  const Metadata *targetType),
+                 (sourceType, targetType))
+
+
+OVERRIDE_CASTING(dynamicCastMetatypeUnconditional, const Metadata *, , swift::,
+                 (const Metadata *sourceType,
+                  const Metadata *targetType),
+                 (sourceType, targetType))
+
+
+OVERRIDE_FOREIGN(dynamicCastForeignClassMetatype, const ClassMetadata *, , swift::,
+                 (const ClassMetadata *sourceType,
+                  const ClassMetadata *targetType),
+                 (sourceType, targetType))
+
+
+OVERRIDE_FOREIGN(dynamicCastForeignClassMetatypeUnconditional,
+                 const ClassMetadata *, , swift::,
+                 (const ClassMetadata *sourceType,
+                  const ClassMetadata *targetType),
+                 (sourceType, targetType))
+
+
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol, const WitnessTable *, , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol),
+                             (type, protocol))
+
+#if SWIFT_OBJC_INTEROP
+
+OVERRIDE_OBJC(dynamicCastObjCClass, const void *, , swift::,
+              (const void *object,
+               const ClassMetadata *targetType),
+              (object, targetType))
+
+
+OVERRIDE_OBJC(dynamicCastObjCClassUnconditional, const void *, , swift::,
+              (const void *object,
+               const ClassMetadata *targetType),
+              (object, targetType))
+
+OVERRIDE_OBJC(dynamicCastObjCClassMetatype, const ClassMetadata *, , swift::,
+              (const ClassMetadata *sourceType,
+               const ClassMetadata *targetType),
+              (sourceType, targetType))
+
+
+OVERRIDE_OBJC(dynamicCastObjCClassMetatypeUnconditional, const ClassMetadata *, , swift::,
+              (const ClassMetadata *sourceType, const ClassMetadata *targetType),
+              (sourceType, targetType))
+
+
+OVERRIDE_FOREIGN(dynamicCastForeignClass, const void *, , swift::,
+                 (const void *object,
+                  const ForeignClassMetadata *targetType),
+                 (object, targetType))
+
+
+OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , swift::,
+                 (const void *object, const ForeignClassMetadata *targetType),
+                 (object, targetType))
+
+#endif
+
+#undef OVERRIDE
+#undef OVERRIDE_METADATALOOKUP
+#undef OVERRIDE_CASTING
+#undef OVERRIDE_OBJC
+#undef OVERRIDE_FOREIGN
+#undef OVERRIDE_PROTOCOLCONFORMANCE
