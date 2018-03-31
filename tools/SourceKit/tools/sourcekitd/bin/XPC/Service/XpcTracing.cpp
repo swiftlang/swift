@@ -98,7 +98,9 @@ public:
                         const StringPairs &OpArgs) override;
 
   // Operation previously started with startXXX has finished
-  void operationFinished(uint64_t OpId, OperationKind OpKind) override;
+  void operationFinished(
+      uint64_t OpId, OperationKind OpKind,
+      ArrayRef<SourceKit::DiagnosticEntryInfo> Diagnostics) override;
 };
 
 // Trace start of SourceKit operation
@@ -117,7 +119,9 @@ void XpcTraceConsumer::operationStarted(uint64_t OpId,
 }
 
 // Operation previously started with startXXX has finished
-void XpcTraceConsumer::operationFinished(uint64_t OpId, OperationKind OpKind) {
+void XpcTraceConsumer::operationFinished(
+    uint64_t OpId, OperationKind OpKind,
+    ArrayRef<SourceKit::DiagnosticEntryInfo> Diagnostics) {
   xpc_object_t Contents = xpc_array_create(nullptr, 0);
   append(Contents, trace::ActionKind::OperationFinished);
   append(Contents, OpId);

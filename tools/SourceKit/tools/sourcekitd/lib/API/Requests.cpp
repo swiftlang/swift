@@ -232,7 +232,7 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
 static bool isSemanticEditorDisabled();
 
 static void fillDictionaryForDiagnosticInfo(
-    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info);
 
 static void enableCompileNotifications(bool value);
 
@@ -1466,30 +1466,7 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
     Arr = TopDict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
@@ -2335,7 +2312,38 @@ bool SKEditorConsumer::recordFormattedText(StringRef Text) {
   return true;
 }
 
+static void fillDictionaryForDiagnosticInfoBase(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+
 static void fillDictionaryForDiagnosticInfo(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info) {
+
+  UIdent SeverityUID;
+  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
+  static UIdent UIDKindDiagError(KindDiagError.str());
+  switch (Info.Severity) {
+  case DiagnosticSeverityKind::Warning:
+    SeverityUID = UIDKindDiagWarning;
+    break;
+  case DiagnosticSeverityKind::Error:
+    SeverityUID = UIDKindDiagError;
+    break;
+  }
+
+  Elem.set(KeySeverity, SeverityUID);
+  fillDictionaryForDiagnosticInfoBase(Elem, Info);
+
+  if (!Info.Notes.empty()) {
+    auto NotesArr = Elem.setArray(KeyDiagnostics);
+    for (auto &NoteDiag : Info.Notes) {
+      auto NoteElem = NotesArr.appendDictionary();
+      NoteElem.set(KeySeverity, KindDiagNote);
+      fillDictionaryForDiagnosticInfoBase(NoteElem, NoteDiag);
+    }
+  }
+}
+
+static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
   Elem.set(KeyDescription, Info.Description);
@@ -2383,31 +2391,8 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
     Arr = Dict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   Elem.set(KeyDiagnosticStage, DiagStage);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
@@ -2710,7 +2695,8 @@ public:
   void operationStarted(uint64_t OpId, trace::OperationKind OpKind,
                         const trace::SwiftInvocation &Inv,
                         const trace::StringPairs &OpArgs) override;
-  void operationFinished(uint64_t OpId, trace::OperationKind OpKind) override;
+  void operationFinished(uint64_t OpId, trace::OperationKind OpKind,
+                         ArrayRef<DiagnosticEntryInfo> Diagnostics) override;
   swift::OptionSet<trace::OperationKind> desiredOperations() override {
     return swift::OptionSet<trace::OperationKind>() |
            trace::OperationKind::PerformSema |
@@ -2736,8 +2722,9 @@ void CompileTrackingConsumer::operationStarted(
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 
-void CompileTrackingConsumer::operationFinished(uint64_t OpId,
-                                                trace::OperationKind OpKind) {
+void CompileTrackingConsumer::operationFinished(
+    uint64_t OpId, trace::OperationKind OpKind,
+    ArrayRef<DiagnosticEntryInfo> Diagnostics) {
   if (!desiredOperations().contains(OpKind))
     return;
 
@@ -2746,7 +2733,11 @@ void CompileTrackingConsumer::operationFinished(uint64_t OpId,
   auto Dict = RespBuilder.getDictionary();
   Dict.set(KeyNotification, CompileDidFinishUID);
   Dict.set(KeyCompileID, std::to_string(OpId));
-  // Diagnostics
+  auto DiagArray = Dict.setArray(KeyDiagnostics);
+  for (const auto &DiagInfo : Diagnostics) {
+    fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
+  }
+
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 
