@@ -23,7 +23,6 @@ Double(foo.bar())
 func objCUser(_ obj: ObjCClass) {}
 #endif
 
-// CHECK: Loaded module ASTSection from
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: Importing ASTSection... ok!
 
