@@ -231,9 +231,12 @@ Algorithm.test("sort3/simple")
 }
 
 func isSorted<T>(_ a: [T], by areInIncreasingOrder: (T, T) -> Bool) -> Bool {
-  return !a.dropFirst().enumerated().contains(where: { (offset, element) in
-    areInIncreasingOrder(element, a[offset])
-  })
+  for (x, y) in zip(a, a.dropFirst()) {
+    if areInIncreasingOrder(y, x) {
+      return false
+    }
+  }
+  return true
 }
 
 Algorithm.test("sort3/stable")
@@ -243,6 +246,25 @@ Algorithm.test("sort3/stable")
     // decorate with offset, but sort by value
     var input = Array($0.enumerated())
     _sort3(&input, 0, 1, 2) { $0.element < $1.element }
+    // offsets should still be ordered for equal values
+    expectTrue(isSorted(input) {
+      if $0.element == $1.element {
+        return $0.offset < $1.offset
+      }
+      return $0.element < $1.element
+    })
+}
+
+Algorithm.test("sort/stable")
+  .forEach(in: [
+    Array<Int>(repeatElement(1...100, count: 100).joined()),
+    Array<Int>(repeatElement((1...100).reversed(), count: 100).joined()),
+    Array<Int>((1...100).map({ repeatElement($0, count: 100) }).joined()),
+    Array<Int>((1...100).reversed().map({ repeatElement($0, count: 100) }).joined()),
+  ] as [[Int]]) {
+    // decorate with offset, but sort by value
+    var input = Array($0.enumerated())
+    input.sort { $0.element < $1.element }
     // offsets should still be ordered for equal values
     expectTrue(isSorted(input) {
       if $0.element == $1.element {

@@ -33,6 +33,71 @@ else:
   try_ = ""
 }%
 
+/// Sorts `elements[range]` according to `areInIncreasingOrder`, starting
+/// with `sortedEnd`. Stable.
+///
+/// - Precondition: `elements[range.lowerBound..<sortedEnd]` are already sorted
+///   according to `areInIncreasingOrder`
+@_inlineable
+@_versioned
+internal func _insertionSort<C>(
+  _ elements: inout C,
+  subRange range: Range<C.Index>,
+  sortedEnd: C.Index
+  ${", by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool" if p else ""}
+) ${rethrows_}
+  where
+  C : MutableCollection & BidirectionalCollection
+  ${"" if p else ", C.Element : Comparable"} {
+
+  if range.isEmpty {
+    return
+  }
+
+  var sortedEnd = sortedEnd
+
+  while sortedEnd != range.upperBound {
+    // get the first unsorted element
+    let x: C.Element = elements[sortedEnd]
+
+    // Look backwards for x's position in the sorted sequence,
+    // moving elements forward to make room.
+    var i = sortedEnd
+    repeat {
+      let predecessor: C.Element = elements[elements.index(before: i)]
+
+      % if p:
+      // If clouser throws the error, We catch the error put the element at right
+      // place and rethrow the error.
+      do {
+        // if x doesn't belong before y, we've found its position
+        if !${cmp("x", "predecessor", p)} {
+          break
+        }
+      } catch {
+        elements[i] = x
+        throw error
+      }
+      % else:
+      if !${cmp("x", "predecessor", p)} {
+        break
+      }
+      % end
+
+      // Move y forward
+      elements[i] = predecessor
+      elements.formIndex(before: &i)
+    } while i != range.lowerBound
+
+    if i != sortedEnd {
+      // Plop x into position
+      elements[i] = x
+    }
+    elements.formIndex(after: &sortedEnd)
+  }
+}
+
+/// Sorts `elements[range]` according to `areInIncreasingOrder`. Stable.
 @_inlineable
 @_versioned
 internal func _insertionSort<C>(
@@ -44,56 +109,13 @@ internal func _insertionSort<C>(
   C : MutableCollection & BidirectionalCollection
   ${"" if p else ", C.Element : Comparable"} {
 
-  if !range.isEmpty {
-    let start = range.lowerBound
-
-    // Keep track of the end of the initial sequence of sorted
-    // elements.
-    var sortedEnd = start
-
-    // One element is trivially already-sorted, thus pre-increment
-    // Continue until the sorted elements cover the whole sequence
-    elements.formIndex(after: &sortedEnd)
-    while sortedEnd != range.upperBound {
-      // get the first unsorted element
-      let x: C.Element = elements[sortedEnd]
-
-      // Look backwards for x's position in the sorted sequence,
-      // moving elements forward to make room.
-      var i = sortedEnd
-      repeat {
-        let predecessor: C.Element = elements[elements.index(before: i)]
-
-        % if p:
-        // If clouser throws the error, We catch the error put the element at right
-        // place and rethrow the error.
-        do {
-          // if x doesn't belong before y, we've found its position
-          if !${cmp("x", "predecessor", p)} {
-            break
-          }
-        } catch {
-          elements[i] = x
-          throw error
-        }
-        % else:
-        if !${cmp("x", "predecessor", p)} {
-          break
-        }
-        % end
-
-        // Move y forward
-        elements[i] = predecessor
-        elements.formIndex(before: &i)
-      } while i != start
-
-      if i != sortedEnd {
-        // Plop x into position
-        elements[i] = x
-      }
-      elements.formIndex(after: &sortedEnd)
-    }
+  if range.isEmpty {
+    return
   }
+
+  let sortedEnd = elements.index(after: range.lowerBound)
+  ${try_} _insertionSort(&elements, subRange: range, sortedEnd: sortedEnd
+    ${", by: areInIncreasingOrder" if p else ""})
 }
 
 /// Sorts the elements at `elements[a]`, `elements[b]`, and `elements[c]`.
@@ -400,6 +422,293 @@ internal func _heapSort<C>(
       subRange: lo..<hi
       ${", by: areInIncreasingOrder" if p else ""})
     elements.formIndex(before: &hi)
+  }
+}
+
+/// Merges the elements in the ranges `lo..<mid` and `mid..<hi` using `buffer`
+/// as out-of-place storage. Stable.
+///
+/// - Precondition: `lo..<mid` and `mid..<hi` must already be sorted according
+///   to `areInIncreasingOrder`.
+/// - Precondition: `buffer` must point to a region of memory at least as large
+///   as `min(mid - lo, hi - mid)`.
+/// - Postcondition: `lo..<hi` is sorted according to `areInIncreasingOrder`.
+@_inlineable
+@_versioned
+func _merge<Element>(lo: UnsafeMutablePointer<Element>,
+    mid: UnsafeMutablePointer<Element>,
+    hi: UnsafeMutablePointer<Element>,
+    buffer: UnsafeMutablePointer<Element>
+    ${", by areInIncreasingOrder: (Element, Element) throws -> Bool" if p else ""}
+) ${rethrows_}
+  ${"" if p else "where Element : Comparable"} {
+
+  let lowCount = mid - lo
+  let highCount = hi - mid
+
+  var destLow = lo          // Lower bound of uninitialized storage
+  var bufferLow = buffer    // Lower bound of the initialized buffer
+  var bufferHigh = buffer   // Upper bound of the initialized buffer
+
+  // Guarantee that even if `areInIncreasingOrder` throws, the
+  // buffered elements are moved back into the original storage.
+  defer {
+    destLow.moveInitialize(from: bufferLow, count: bufferHigh - bufferLow)
+  }
+
+  if lowCount < highCount {
+    // Move the lower group of elements into the buffer, then traverse from
+    // low to high in both the buffer and the higher group of elements.
+    //
+    // After moving elements, the storage and buffer look like this, where
+    // `x` is uninitialized memory:
+    //
+    // Storage: [x, x, x, x, x, 6, 8, 8, 10, 12, 15]
+    //           ^              ^
+    //        destLow        srcLow
+    //
+    // Buffer:  [4, 4, 7, 8, 9, x, ...]
+    //           ^              ^
+    //        bufferLow     bufferHigh
+    //
+    // Each iteration moves the element that compares lower into `destLow`,
+    // preferring the buffer when equal to maintain stability. Elements are
+    // moved from either `bufferLow` or `srcLow`, with those pointers
+    // incrementing as elements are moved.
+    buffer.moveInitialize(from: lo, count: lowCount)
+    bufferHigh = bufferLow + lowCount
+
+    var srcLow = mid
+
+    while bufferLow < bufferHigh && srcLow < hi {
+      if ${cmp("srcLow.pointee", "bufferLow.pointee", p)} {
+        destLow.moveInitialize(from: srcLow, count: 1)
+        srcLow += 1
+      } else {
+        destLow.moveInitialize(from: bufferLow, count: 1)
+        bufferLow += 1
+      }
+      destLow += 1
+    }
+  } else {
+    // Move the higher group of elements into the buffer, then traverse from
+    // high to low in both the buffer and the lower group of elements.
+    //
+    // After moving elements, the storage and buffer look like this, where
+    // `x` is uninitialized memory:
+    //
+    // Storage: [4, 4, 7, 8, 9, 6, x, x,  x,  x,  x]
+    //                          ^  ^                 ^
+    //                    srcHigh  destLow        destHigh (past the end)
+    //
+    // Buffer:                    [8, 8, 10, 12, 15, x, ...]
+    //                             ^                 ^
+    //                          bufferLow        bufferHigh
+    //
+    // Each iteration moves the element that compares higher into `destHigh`,
+    // preferring the buffer when equal to maintain stability. Elements are
+    // moved from either `bufferHigh - 1` or `srcHigh - 1`, with those
+    // pointers decrementing as elements are moved. At the start of each
+    // iteration, each pointer points one past the element they're referring
+    // to.
+    buffer.moveInitialize(from: mid, count: highCount)
+    bufferHigh = bufferLow + highCount
+
+    destLow = mid
+    var destHigh = hi
+    var srcHigh = mid
+
+    while bufferHigh > bufferLow && srcHigh > lo {
+      destHigh -= 1
+      if ${cmp("(bufferHigh - 1).pointee", "(srcHigh - 1).pointee", p)} {
+        srcHigh -= 1
+        destHigh.moveInitialize(from: srcHigh, count: 1)
+
+        // Moved an element from the lower initialized portion to the upper,
+        // sorted, initialized portion, so move `destLow` down one.
+        destLow -= 1
+      } else {
+        bufferHigh -= 1
+        destHigh.moveInitialize(from: bufferHigh, count: 1)
+      }
+    }
+  }
+}
+
+extension UnsafeMutableBufferPointer
+${"" if p else "where Element : Comparable"} {
+
+  /// Merges the elements at `runs[i]` and `runs[i - 1]`, using `buffer` as
+  /// out-of-place storage.
+  ///
+  /// - Precondition: `runs.count > 1` and `i > 0`
+  /// - Precondition: `buffer` must have at least
+  ///   `min(runs[i].count, runs[i - 1].count)` uninitialized elements.
+  @_inlineable
+  @_versioned
+  mutating func _mergeRuns(
+    _ runs: inout [Range<Int>],
+    at i: Int,
+    buffer: UnsafeMutablePointer<Element>
+    ${", by areInIncreasingOrder: (Element, Element) throws -> Bool" if p else ""}
+  ) ${rethrows_} {
+    precondition(i > 0)
+    let low = runs[i - 1].lowerBound
+    let middle = runs[i].lowerBound
+    let high = runs[i].upperBound
+    let betterLow = ${try_} self[low..<middle]._partitionPoint(
+      where: { ${cmp("self[middle]", "$0", p)} })
+    let betterHigh = ${try_} self[middle..<high]._partitionPoint(
+      where: { ${cmp("self[middle - 1]", "$0", p)} })
+
+    ${try_} _merge(
+      lo: baseAddress! + betterLow,
+      mid: baseAddress! + middle,
+      hi: baseAddress! + betterHigh,
+      buffer: buffer
+      ${", by: areInIncreasingOrder" if p else ""})
+    runs[i - 1] = low..<high
+    runs.remove(at: i)
+  }
+
+  /// Merges upper elements of `runs` until the required invariants are
+  /// satisfied:
+  ///
+  /// - for all c in 2..<runs.count:
+  ///   - runs[c - 2].count > runs[c - 1].count + runs[c].count
+  /// - where c == runs.count - 1:
+  ///   - runs[c - 1].count > runs[c].count
+  @_inlineable
+  @_versioned
+  mutating func _mergeTopRuns(
+    _ runs: inout [Range<Int>],
+    buffer: UnsafeMutablePointer<Element>
+    ${", by areInIncreasingOrder: (Element, Element) throws -> Bool" if p else ""}
+  ) ${rethrows_} {
+    var i = runs.count - 1
+    while i > 0 {
+      if i >= 2 && runs[i - 2].count <= runs[i - 1].count + runs[i].count ||
+         i >= 3 && runs[i - 3].count <= runs[i - 1].count + runs[i - 2].count
+      {
+        if i > 1 && runs[i - 2].count < runs[i].count {
+          i -= 1
+        }
+      } else if runs[i - 1].count > runs[i].count {
+        // "runs" invariant met here
+        break
+      }
+
+      ${try_} _mergeRuns(&runs, at: i, buffer: buffer
+        ${", by: areInIncreasingOrder" if p else ""})
+      i -= 1
+    }
+  }
+
+  /// Merges elements of `runs` until only one run remains.
+  @_inlineable
+  @_versioned
+  mutating func _finalizeRuns(
+    _ runs: inout [Range<Int>],
+    buffer: UnsafeMutablePointer<Element>
+    ${", by areInIncreasingOrder: (Element, Element) throws -> Bool" if p else ""}
+  ) ${rethrows_} {
+    for i in stride(from: runs.count - 1, to: 0, by: -1) {
+      ${try_} _mergeRuns(&runs, at: i, buffer: buffer
+        ${", by: areInIncreasingOrder" if p else ""})
+    }
+  }
+
+  /// Returns the end of the next in-order run along with a Boolean value
+  /// indicating whether the elements in `start..<end` are in increasing order.
+  @_inlineable
+  @_versioned
+  func _findNextRun(
+    from start: Int
+    ${", by areInIncreasingOrder: (Element, Element) throws -> Bool" if p else ""}
+  ) ${rethrows_} -> (end: Int, ascending: Bool) {
+    var next = start
+    if next < endIndex {
+      next += 1
+      if ${try_} next < endIndex && ${ cmp("self[next]", "self[next - 1]", p).replace('try', '') } {
+        // The elements of this run are in descending order. Equal elements
+        // cannot be included in the run, since the run will be reversed, which
+        // would break stability.
+        repeat {
+          next += 1
+        } while ${try_} next < endIndex && ${ cmp("self[next]", "self[next - 1]", p).replace('try', '') }
+        return(next, false)
+      } else if next < endIndex {
+        // The elements in this run are in ascending order. Equal elements can
+        // be included in the run.
+        repeat {
+          next += 1
+        } while ${try_} next < endIndex && !${ cmp("self[next]", "self[next - 1]", p).replace('try', '') }
+      }
+    }
+    return (next, true)
+  }
+
+  /// Calculates an optimal minimum run length for sorting this collection.
+  ///
+  /// - Returns: If `self.count <= 32`, returns `self.count`. Otherwise,
+  ///   returns a value in `32..<64`.
+  @_inlineable
+  @_versioned
+  func _minimumMergeRunLength() -> Int {
+    var c = count
+    var shiftedOff = 0
+    while c > 32 {
+      shiftedOff |= c & 1
+      c &>>= 1
+    }
+    return c &+ shiftedOff
+  }
+
+  /// Sorts the elements of this buffer according to `areInIncreasingOrder`,
+  /// using a stable, out-of-place merge sort.
+  @_inlineable
+  @_versioned
+  mutating func _mergeSortImpl(
+    ${"by areInIncreasingOrder: (Element, Element) throws -> Bool" if p else ""}
+  ) ${rethrows_} {
+    let minimumRunLength = _minimumMergeRunLength()
+
+    if count <= minimumRunLength {
+      ${try_} _insertionSort(&self, subRange: 0..<count
+        ${", by: areInIncreasingOrder" if p else ""})
+      return
+    }
+
+    let buffer = UnsafeMutableBufferPointer<Element>.allocate(capacity: count / 2)
+    defer { buffer.deallocate() }
+
+    var runs: [Range<Int>] = []
+    
+    var start = startIndex
+    while start < endIndex {
+      // Find the next consecutive run, reversing it
+      var (end, ascending) = ${try_} _findNextRun(from: start
+        ${", by: areInIncreasingOrder" if p else ""})
+      if !ascending {
+        self[start..<end].reverse()
+      }
+
+      if end < endIndex && end - start < minimumRunLength {
+        let newEnd = Swift.min(endIndex, start + minimumRunLength)
+        ${try_} _insertionSort(&self, subRange: start..<newEnd, sortedEnd: end
+          ${", by: areInIncreasingOrder" if p else ""})
+        end = newEnd
+      }
+
+      runs.append(start..<end)
+      ${try_} _mergeTopRuns(&runs, buffer: buffer.baseAddress!
+         ${", by: areInIncreasingOrder" if p else ""})
+     start = end
+    }
+
+    ${try_} _finalizeRuns(&runs, buffer: buffer.baseAddress!
+      ${", by: areInIncreasingOrder" if p else ""})
+    assert(runs.count == 1, "Didn't complete final merge")
   }
 }
 
