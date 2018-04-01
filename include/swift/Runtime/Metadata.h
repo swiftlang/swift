@@ -195,25 +195,45 @@ using Metadata = TargetMetadata<InProcess>;
 /// For performance, functions returning this type should use SWIFT_CC so
 /// that the components are returned as separate values.
 struct MetadataResponse {
-  /// For metadata access functions, this is the requested metadata.
-  ///
-  /// For metadata initialization functions, this is either null,
-  /// indicating that initialization was successful, or a metadata on
-  /// which initialization depends for further progress.
+  /// The requested metadata.
   const Metadata *Value;
 
-  /// For metadata access functions, this is the current state of the
-  /// metadata returned.  Always use this instead of trying to inspect
-  /// the metadata directly; an incomplete metadata may be getting
-  /// initialized concurrently.  This can generally be ignored if the
-  /// metadata request was for abstract metadata or if the request is
-  /// blocking.
-  ///
-  /// For metadata initialization functions, this is the state that the
-  /// given metadata needs to be in before initialization can continue.
+  /// The current state of the metadata returned.  Always use this
+  /// instead of trying to inspect the metadata directly to see if it
+  /// satisfies the request.  An incomplete metadata may be getting
+  /// initialized concurrently.  But this can generally be ignored if
+  /// the metadata request was for abstract metadata or if the request
+  /// is blocking.
   MetadataState State;
 };
-using MetadataDependency = MetadataResponse;
+
+/// A dependency on the metadata progress of other type, indicating that
+/// initialization of a metadata cannot progress until another metadata
+/// reaches a particular state.
+///
+/// For performance, functions returning this type should use SWIFT_CC so
+/// that the components are returned as separate values.
+struct MetadataDependency {
+  /// Either null, indicating that initialization was successful, or
+  /// a metadata on which initialization depends for further progress.
+  const Metadata *Value;
+
+  /// The state that Metadata needs to be in before initialization
+  /// can continue.
+  MetadataState Requirement;
+
+  MetadataDependency() : Value(nullptr) {}
+  MetadataDependency(const Metadata *metadata, MetadataState requirement)
+    : Value(metadata), Requirement(requirement) {}
+
+  explicit operator bool() const { return Value != nullptr; }
+
+  bool operator==(MetadataDependency other) const {
+    assert(Value && other.Value);
+    return Value == other.Value &&
+           Requirement == other.Requirement;
+  }
+};
 
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 

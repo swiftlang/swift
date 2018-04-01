@@ -116,7 +116,12 @@ struct ConcurrencyControl {
 ///
 ///   /// Perform an enqueue operation.
 ///   /// This only needs to be implemented if enqueue is called on the map.
-///   bool enqueueWithLock(ConcurrencyControl &concurrency, ArgTys...);
+///   bool enqueue(ConcurrencyControl &concurrency, ArgTys...);
+///
+///   /// Perform a checkDependency operation.  This only needs to be
+///   /// implemented if checkDependency is called on the map.
+///   MetadataDependency checkDependency(ConcurrencyControl &concurrency,
+///                                      ArgTys...);
 template <class EntryType, bool ProvideDestructor = true>
 class LockingConcurrentMap {
   ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
@@ -184,6 +189,16 @@ public:
     assert(entry && "entry doesn't already exist!");
 
     return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+  }
+
+  /// Given that an entry already exists, check whether it has an active
+  /// dependency.
+  template <class KeyType, class... ArgTys>
+  MetadataDependency checkDependency(KeyType key, ArgTys &&...args) {
+    auto entry = Map.find(key);
+    assert(entry && "entry doesn't already exist!");
+
+    return entry->checkDependency(*Concurrency, std::forward<ArgTys>(args)...);
   }
 };
 
@@ -557,8 +572,7 @@ struct MetadataCompletionQueueEntry {
   /// on another metadata's completion queue.  This latter condition is
   /// important because it allows these fields to be read outside of the
   /// lock by the initializing thread of the dependent metadata.
-  const Metadata *Dependency = nullptr;
-  MetadataState DependencyRequirement = MetadataState::Abstract;
+  MetadataDependency Dependency;
 
   MetadataCompletionQueueEntry(Metadata *value,
                                const PrivateMetadataCompletionContext &context)
@@ -570,12 +584,16 @@ struct MetadataCompletionQueueEntry {
 /// \return false if the entry was not added because the dependency
 ///   has already reached the desired requirement
 bool addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
-                        const Metadata *dependency,
-                        MetadataState dependencyRequirement);
+                        MetadataDependency dependency);
 
 /// Resume completion of the given queue entry, given that it has been
 /// removed from its dependency's metadata queue.
 void resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry);
+
+/// Check for an unbreakable metadata-dependency cycle.
+void checkMetadataDependencyCycle(const Metadata *start,
+                                  MetadataDependency firstLink,
+                                  MetadataDependency secondLink);
 
 /// A base class offerring a reasonable default implementation for entries
 /// in a generic metadata cache.  Supports variably-sized keys.
@@ -791,8 +809,7 @@ protected:
   /// The expected return type of tryInitialize.
   struct TryInitializeResult {
     PrivateMetadataState NewState;
-    MetadataState DependencyRequirement;
-    const Metadata *Dependency;
+    MetadataDependency Dependency;
   };
 
 private:
@@ -882,8 +899,7 @@ private:
       // the lock to protect against other threads checking for dependency
       // cycles.
       concurrency.Lock.withLock([&] {
-        prepareToEnqueueWithLock(queueEntry, tryInitializeResult.Dependency,
-                                 tryInitializeResult.DependencyRequirement);
+        prepareToEnqueueWithLock(queueEntry, tryInitializeResult.Dependency);
         assert(LockedStorageKind == LSK::QueueEntry);
 
         // Grab any satisfied queue entries while we have the lock.
@@ -898,9 +914,7 @@ private:
       // thread anymore.  The small amount of notification we do at the
       // end of this function is okay to race with another thread
       // potentially taking over initialization.
-      if (addToMetadataQueue(queueEntry,
-                             tryInitializeResult.Dependency,
-                             tryInitializeResult.DependencyRequirement))
+      if (addToMetadataQueue(queueEntry, tryInitializeResult.Dependency))
         break;
 
       // If that failed, we should still have ownership of the entry.
@@ -925,10 +939,9 @@ private:
   /// Prepare to enqueue this metadata on another metadata's completion
   /// queue, given that we're holding the lock.
   void prepareToEnqueueWithLock(MetadataCompletionQueueEntry *queueEntry,
-                                const Metadata *dependency,
-                                MetadataState dependencyRequirement) {
+                                MetadataDependency dependency) {
+    assert(dependency);
     queueEntry->Dependency = dependency;
-    queueEntry->DependencyRequirement = dependencyRequirement;
 
     switch (LockedStorageKind) {
     case LSK::QueueEntry:
@@ -999,7 +1012,7 @@ private:
     while (auto waiter = *nextWaiter) {
       // If the new state of this entry doesn't satisfy the waiter's
       // requirements, skip over it.
-      if (!newInfo.satisfies(waiter->DependencyRequirement)) {
+      if (!newInfo.satisfies(waiter->Dependency.Requirement)) {
         nextWaiter = &waiter->Next;
         continue;
       }
@@ -1078,19 +1091,28 @@ private:
   }
 
 public:
-  /// Block a metadata initialization on the completion of this
-  /// initialization.
+  /// Block a metadata initialization on progress in the initialization
+  /// of this metadata.
+  ///
+  /// That is, this cache entry is for metadata Y, and we have been
+  /// handed a queue entry showing a dependency for a metadata X on Y
+  /// reaching state S_Y.  Add the queue entry to the completion queue
+  /// for Y (which is to say, on this cache entry) unless Y has already
+  /// reached state S.  If it has reached that state, return false.
   ///
   /// This is always called from the initializing thread.  The lock is not held.
   bool enqueue(ConcurrencyControl &concurrency,
-               MetadataCompletionQueueEntry *queueEntry) {
+               MetadataCompletionQueueEntry *queueEntry,
+               MetadataDependency dependency) {
     assert(queueEntry);
     assert(!queueEntry->Next);
+    assert(dependency == queueEntry->Dependency);
 
-    return concurrency.Lock.withLock([&] {
+    MetadataDependency otherDependency;
+    bool success = concurrency.Lock.withLock([&] {
       auto curInfo = PrivateMetadataTrackingInfo(
                                   TrackingInfo.load(std::memory_order_acquire));
-      if (curInfo.satisfies(queueEntry->DependencyRequirement))
+      if (curInfo.satisfies(dependency.Requirement))
         return false;
 
       // Note that we don't set the waiters bit because we're not actually
@@ -1114,6 +1136,7 @@ public:
         break;
 
       case LSK::QueueEntry:
+        otherDependency = LockedStorage.QueueEntry->Dependency;
         completionQueue = &LockedStorage.QueueEntry->CompletionQueue;
         break;
       }
@@ -1121,6 +1144,46 @@ public:
       queueEntry->Next = *completionQueue;
       *completionQueue = queueEntry;
       return true;
+    });
+
+    // Diagnose unbreakable dependency cycles.
+    //
+    // Note that we only do this if we find a second dependency link ---
+    // that is, if metadata Y is itself dependent on metadata Z reaching
+    // state S_Z --- but that this will fire even only a cycle of length 1
+    // (i.e. if X == Y) because of course Y will already be showing the
+    // dependency on Y in this case.
+    if (otherDependency) {
+      checkMetadataDependencyCycle(queueEntry->Value, dependency,
+                                   otherDependency);
+    }
+
+    return success;
+  }
+
+  MetadataDependency checkDependency(ConcurrencyControl &concurrency,
+                                     MetadataState requirement) {
+    return concurrency.Lock.withLock([&] {
+      // Load the current state.
+      auto curInfo = PrivateMetadataTrackingInfo(
+                                  TrackingInfo.load(std::memory_order_acquire));
+
+      // If the requirement is satisfied, there no further dependency for now.
+      if (curInfo.satisfies(requirement))
+        return MetadataDependency();
+
+      // Check for an existing dependency.
+      switch (LockedStorageKind) {
+      case LSK::Complete:
+        swift_runtime_unreachable("dependency on complete cache entry?");
+
+      case LSK::AllocatingThread:
+      case LSK::CompletionQueue:
+        return MetadataDependency();
+
+      case LSK::QueueEntry:
+        return LockedStorage.QueueEntry->Dependency;
+      }
     });
   }
 };
