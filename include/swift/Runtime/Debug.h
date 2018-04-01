@@ -167,7 +167,7 @@ struct RuntimeErrorDetails {
   uintptr_t framesToSkip;
 
   // Address of some associated object (if there's any).
-  void *memoryAddress;
+  const void *memoryAddress;
 
   // A structure describing an extra thread (and its stack) that is related.
   struct Thread {

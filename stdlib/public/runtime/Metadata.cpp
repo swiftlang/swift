@@ -243,23 +243,18 @@ namespace {
 
         // If this failed with a dependency, infer the current metadata state
         // and return.
-        if (dependency.Value) {
-          return { inferStateForMetadata(metadata),
-                   dependency.State, dependency.Value };
+        if (dependency) {
+          return { inferStateForMetadata(metadata), dependency };
         }
       }
 
       // Check for transitive completeness.
-      auto dependency =
-        checkTransitiveCompleteness(metadata, description);
-      if (dependency.Value) {
-        return { PrivateMetadataState::NonTransitiveComplete,
-                 dependency.State, dependency.Value };
+      if (auto dependency = checkTransitiveCompleteness(metadata, description)){
+        return { PrivateMetadataState::NonTransitiveComplete, dependency };
       }
 
       // We're done.
-      return { PrivateMetadataState::Complete,
-               MetadataState::Complete, nullptr };
+      return { PrivateMetadataState::Complete, MetadataDependency() };
     }
   };
 } // end anonymous namespace
@@ -3333,24 +3328,24 @@ static Result performOnMetadataCache(const Metadata *metadata,
 }
 
 bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
-                               const Metadata *dependency,
-                               MetadataState dependencyRequirement) {
+                               MetadataDependency dependency) {
   struct EnqueueCallbacks {
     MetadataCompletionQueueEntry *QueueEntry;
+    MetadataDependency Dependency;
 
     bool forGenericMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description,
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
-      return cache.enqueue(key, QueueEntry);
+      return cache.enqueue(key, QueueEntry, Dependency);
     }
 
     bool forOtherMetadata(const Metadata *metadata) && {
       swift_runtime_unreachable("metadata should always be complete");
     }
-  } callbacks = { queueEntry };
+  } callbacks = { queueEntry, dependency };
 
-  return performOnMetadataCache<bool>(dependency, std::move(callbacks));
+  return performOnMetadataCache<bool>(dependency.Value, std::move(callbacks));
 }
 
 void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
@@ -3551,6 +3546,114 @@ checkTransitiveCompleteness(const Metadata *initialType,
 
   // Otherwise, we're transitively complete.
   return { nullptr, MetadataState::Complete };
+}
+
+/// Diagnose a metadata dependency cycle.
+LLVM_ATTRIBUTE_NORETURN
+static void diagnoseMetadataDependencyCycle(const Metadata *start,
+                                            ArrayRef<MetadataDependency> links){
+  assert(start == links.back().Value);
+
+  std::string diagnostic =
+    "runtime error: unresolvable type metadata dependency cycle detected\n  ";
+  diagnostic += nameForMetadata(start);
+
+  for (auto &link : links) {
+    // If the diagnostic gets too large, just cut it short.
+    if (diagnostic.size() >= 128 * 1024) {
+      diagnostic += "\n  (limiting diagnostic text at 128KB)";
+      break;
+    }
+
+    diagnostic += "\n  depends on ";
+
+    switch (link.Requirement) {
+    case MetadataState::Complete:
+      diagnostic += "transitive completion of ";
+      break;
+    case MetadataState::NonTransitiveComplete:
+      diagnostic += "completion of ";
+      break;
+    case MetadataState::LayoutComplete:
+      diagnostic += "layout of ";
+      break;
+    case MetadataState::Abstract:
+      diagnostic += "<corruption> of ";
+      break;
+    }
+
+    diagnostic += nameForMetadata(link.Value);
+  }
+
+  diagnostic += "\nAborting!\n";
+
+  if (_swift_shouldReportFatalErrorsToDebugger()) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc99-extensions"
+    RuntimeErrorDetails details = {
+      .version = RuntimeErrorDetails::currentVersion,
+      .errorType = "type-metadata-cycle",
+      .currentStackDescription = "fetching metadata", // TODO?
+      .framesToSkip = 1, // skip out to the check function
+      .memoryAddress = start
+      // TODO: describe the cycle using notes instead of one huge message?
+    };
+#pragma GCC diagnostic pop
+
+    _swift_reportToDebugger(RuntimeErrorFlagFatal, diagnostic.c_str(),
+                            &details);
+  }
+
+  fatalError(0, diagnostic.c_str());
+}
+
+/// Check whether the given metadata dependency is satisfied, and if not,
+/// return its current dependency, if one exists.
+static MetadataDependency
+checkMetadataDependency(MetadataDependency dependency) {
+  struct IsIncompleteCallbacks {
+    MetadataState Requirement;
+    MetadataDependency forGenericMetadata(const Metadata *type,
+                                          const TypeContextDescriptor *desc,
+                                          GenericMetadataCache &cache,
+                                          MetadataCacheKey key) && {
+      return cache.checkDependency(key, Requirement);
+    }
+
+    MetadataDependency forOtherMetadata(const Metadata *type) && {
+      return MetadataDependency();
+    }
+  } callbacks = { dependency.Requirement };
+
+  return performOnMetadataCache<MetadataDependency>(dependency.Value,
+                                                    std::move(callbacks));
+}
+
+/// Check for an unbreakable metadata-dependency cycle.
+void swift::checkMetadataDependencyCycle(const Metadata *startMetadata,
+                                         MetadataDependency firstLink,
+                                         MetadataDependency secondLink) {
+  std::vector<MetadataDependency> links;
+  auto checkNewLink = [&](MetadataDependency newLink) {
+    links.push_back(newLink);
+    if (newLink.Value == startMetadata)
+      diagnoseMetadataDependencyCycle(startMetadata, links);
+    for (auto i = links.begin(), e = links.end() - 1; i != e; ++i) {
+      if (i->Value == newLink.Value) {
+        auto next = i + 1;
+        diagnoseMetadataDependencyCycle(i->Value,
+                                llvm::makeArrayRef(&*next, links.end() - next));
+      }
+    }
+  };
+
+  checkNewLink(firstLink);
+  checkNewLink(secondLink);
+  while (true) {
+    auto newLink = checkMetadataDependency(links.back());
+    if (!newLink) return;
+    checkNewLink(newLink);
+  }
 }
 
 /***************************************************************************/
