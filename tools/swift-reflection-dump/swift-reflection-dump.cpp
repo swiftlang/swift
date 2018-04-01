@@ -37,6 +37,7 @@
 #endif
 
 #include <algorithm>
+#include <iostream>
 #include <csignal>
 
 using llvm::dyn_cast;
