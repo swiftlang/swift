@@ -432,7 +432,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
          currentExternalDef != n;
          ++currentExternalDef) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-      
+      FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-external", decl);
+
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
         // HACK: don't type-check the same function body twice.  This is
         // supposed to be handled by just not enqueuing things twice,
