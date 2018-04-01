@@ -586,28 +586,6 @@ public extension PyValue {
                                          argArray: args.map { $0.pythonValue },
                                          kwargs: kwargs)
   }
-
-  // NOTE: These are ad-hoc functions added for the demo, in absence of
-  // @dynamicCallable. Remove before project release.
-  @discardableResult
-  func open(
-    _ args: PythonConvertible...,
-    kwargs: [(String, PythonConvertible)] = []
-  ) -> PyValue {
-    return try! self.throwing.callMember("open",
-                                         argArray: args.map { $0.pythonValue },
-                                         kwargs: kwargs)
-  }
-
-  @discardableResult
-  func load(
-    _ args: PythonConvertible...,
-    kwargs: [(String, PythonConvertible)] = []
-  ) -> PyValue {
-    return try! self.throwing.callMember("load",
-                                         argArray: args.map { $0.pythonValue },
-                                         kwargs: kwargs)
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -656,19 +634,6 @@ public struct PythonInterface {
 
   public subscript(dynamicMember name: String) -> PyValue {
     return builtins[name]
-  }
-
-  // NOTE: This is an ad-hoc function added for the demo, in absence of
-  // @dynamicCallable. Remove before project release.
-  @discardableResult
-  public func open(
-    _ args: PythonConvertible...,
-    kwargs: [(String, PythonConvertible)] = []
-  ) -> PyValue {
-    return try! builtins["open"].throwing.call(
-      argArray: args.map { $0.pythonValue },
-      kwargs: kwargs
-    )
   }
 }
 
