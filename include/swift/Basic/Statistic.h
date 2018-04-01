@@ -59,7 +59,11 @@ class ProtocolConformance;
 class Expr;
 class SILFunction;
 class FrontendStatsTracer;
+class Pattern;
+class SourceFile;
 class SourceManager;
+class Stmt;
+class TypeRepr;
 
 class UnifiedStatsReporter {
 
@@ -216,6 +220,14 @@ public:
                       const Expr *E);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
                       const SILFunction *F);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
+                      const SourceFile *F);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
+                      const Stmt *S);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
+                      const Pattern *P);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
+                      const TypeRepr *TR);
 };
 
 // In particular cases, we do know how to format traced entities: we declare
@@ -244,6 +256,18 @@ FrontendStatsTracer::getTraceFormatter<const Expr *>();
 template <>
 const UnifiedStatsReporter::TraceFormatter *
 FrontendStatsTracer::getTraceFormatter<const SILFunction *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const SourceFile *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Stmt *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const Pattern *>();
+
+template<> const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const TypeRepr *>();
 
 // Provide inline definitions for the delegating constructors.  These avoid
 // introducing a circular dependency between libParse and libSIL.  They are
@@ -280,6 +304,26 @@ inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
                                                 const SILFunction *F)
     : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const SourceFile *SF)
+    : FrontendStatsTracer(R, S, SF, getTraceFormatter<const SourceFile *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const Stmt *ST)
+    : FrontendStatsTracer(R, S, ST, getTraceFormatter<const Stmt *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const Pattern *P)
+    : FrontendStatsTracer(R, S, P, getTraceFormatter<const Pattern *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const TypeRepr *TR)
+    : FrontendStatsTracer(R, S, TR, getTraceFormatter<const TypeRepr *>()) {}
 
 } // namespace swift
 #endif // SWIFT_BASIC_STATISTIC_H
