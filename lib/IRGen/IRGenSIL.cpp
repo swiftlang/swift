@@ -4260,8 +4260,8 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
   return enforcement;
 }
 
-template <class Inst>
-static ExclusivityFlags getExclusivityFlags(Inst *i) {
+template <class BeginAccessInst>
+static ExclusivityFlags getExclusivityFlags(BeginAccessInst *i) {
   return getExclusivityFlags(i->getModule(), i->getAccessKind(),
                              i->hasNoNestedConflict());
 }
@@ -4363,6 +4363,9 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
     return;
 
   case SILAccessEnforcement::Dynamic: {
+    if (access->hasNoNestedConflict())
+      return;
+
     auto scratch = getLoweredDynamicEnforcementScratchBuffer(access);
 
     auto call = Builder.CreateCall(IGM.getEndAccessFn(), { scratch });
