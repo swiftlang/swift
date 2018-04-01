@@ -1283,6 +1283,7 @@ protected:
     // FIXME: Figure out why AssociatedTypeDecls don't always have an access
     // level here.
     if (!VD->hasAccess()) {
+      return true;
       if (isa<AssociatedTypeDecl>(VD))
         return true;
     }
@@ -6879,6 +6880,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
 
+    // Hack?
+    if (assocType->hasValidationStarted())
+      return;
+
     assocType->setIsBeingValidated();
     SWIFT_DEFER { assocType->setIsBeingValidated(false); };
 
@@ -6917,6 +6922,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
+    // Hack?
+    if (typeAlias->hasValidationStarted())
+      return;
     // Check generic parameters, if needed.
     typeAlias->setIsBeingValidated();
     SWIFT_DEFER { typeAlias->setIsBeingValidated(false); };

@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ClangImporter/ClangModule.h"
+
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
@@ -421,6 +423,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       // but that gets tricky with synthesized function bodies.
       if (AFD->isBodyTypeChecked()) continue;
 
+      if (isa<ClangModuleUnit>(AFD->getDeclContext()->getModuleScopeContext()))
+        assert(false);
       FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-fn", AFD);
       PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
@@ -469,6 +473,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
     while (!TC.DeclsToFinalize.empty()) {
       auto decl = TC.DeclsToFinalize.pop_back_val();
+      FrontendStatsTracer StatsTracer(TC.Context.Stats, "finalize-decl", decl);
+
       if (decl->isInvalid() || TC.Context.hadError())
         continue;
 
@@ -486,6 +492,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     // Complete any conformances that we used.
     for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
       auto conformance = TC.UsedConformances[i];
+      FrontendStatsTracer StatsTracer(TC.Context.Stats, "complete-conformance",
+                                      conformance);
       if (conformance->isIncomplete())
         TC.checkConformance(conformance);
     }
@@ -613,8 +621,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
           continue;
 
         for (auto D : SF->Decls) {
-          if (auto ED = dyn_cast<ExtensionDecl>(D))
+          if (auto ED = dyn_cast<ExtensionDecl>(D)) {
             bindExtensionDecl(ED, TC);
+          }
         }
       }
     });

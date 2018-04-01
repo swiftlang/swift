@@ -1767,6 +1767,11 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
+      if (options & NL_OnlyTypes) {
+        decls.push_back(decl);
+        continue;
+      }
+      
       // Resolve the declaration signature when we find the
       // declaration.
       if (typeResolver)
@@ -1871,8 +1876,10 @@ bool DeclContext::lookupQualified(Type type,
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
   ModuleDecl *M = getParentModule();
+  if (!(options & NL_OnlyTypes)) {
   if (options & NL_RemoveNonVisible)
     removeShadowedDecls(decls, M, typeResolver);
+  }
 
   if (auto *debugClient = M->getDebugClient())
     filterForDiscriminator(decls, debugClient);
