@@ -122,13 +122,22 @@ struct ConcurrencyControl {
 ///   /// implemented if checkDependency is called on the map.
 ///   MetadataDependency checkDependency(ConcurrencyControl &concurrency,
 ///                                      ArgTys...);
-template <class EntryType, bool ProvideDestructor = true>
+template <class EntryType, bool ProvideDestructor = true,
+          class OptImpl = void>
 class LockingConcurrentMap {
   ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
 
+  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
+
+protected:
+  using Impl =
+    typename std::conditional<std::is_same<OptImpl, void>::value,
+                              LockingConcurrentMap,
+                              OptImpl>::type;
+  Impl &asImpl() { return static_cast<Impl&>(*this); }
+
   using Status = typename EntryType::Status;
 
-  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
 public:
   LockingConcurrentMap() : Concurrency(new ConcurrencyControl()) {}
 
@@ -163,12 +172,15 @@ public:
     return { entry, status };
   }
 
+  template <class KeyType>
+  EntryType *find(KeyType key) {
+    return Map.find(key);
+  }
+
   template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
   resumeInitialization(KeyType key, ArgTys &&...args) {
-    auto entry = Map.find(key);
-    assert(entry && "entry doesn't already exist!");
-
+    EntryType *entry = asImpl().resolveExistingEntry(key);
     auto status =
       entry->resumeInitialization(*Concurrency, std::forward<ArgTys>(args)...);
     return { entry, status };
@@ -176,18 +188,22 @@ public:
 
   template <class KeyType, class... ArgTys>
   bool enqueue(KeyType key, ArgTys &&...args) {
-    auto entry = Map.find(key);
-    assert(entry && "entry doesn't already exist!");
-
+    EntryType *entry = asImpl().resolveExistingEntry(key);
     return entry->enqueue(*Concurrency, std::forward<ArgTys>(args)...);
   }
 
   /// Given that an entry already exists, await it.
   template <class KeyType, class... ArgTys>
   Status await(KeyType key, ArgTys &&...args) {
-    auto entry = Map.find(key);
-    assert(entry && "entry doesn't already exist!");
+    EntryType *entry = asImpl().resolveExistingEntry(key);
+    return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+  }
 
+  /// If an entry already exists, await it; otherwise report failure.
+  template <class KeyType, class... ArgTys>
+  Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
+    EntryType *entry = Map.find(key);
+    if (!entry) return None;
     return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
   }
 
@@ -195,10 +211,17 @@ public:
   /// dependency.
   template <class KeyType, class... ArgTys>
   MetadataDependency checkDependency(KeyType key, ArgTys &&...args) {
+    EntryType *entry = asImpl().resolveExistingEntry(key);
+    return entry->checkDependency(*Concurrency, std::forward<ArgTys>(args)...);
+  }
+
+  /// A default implementation for resolveEntry that assumes that the
+  /// key type is a lookup key for the map.
+  template <class KeyType>
+  EntryType *resolveExistingEntry(KeyType key) {
     auto entry = Map.find(key);
     assert(entry && "entry doesn't already exist!");
-
-    return entry->checkDependency(*Concurrency, std::forward<ArgTys>(args)...);
+    return entry;
   }
 };
 
@@ -398,8 +421,8 @@ protected:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
-  template <class... Args>
-  static size_t getExtraAllocationSize(const MetadataCacheKey &key,
+  template <class KeyType, class... Args>
+  static size_t getExtraAllocationSize(const KeyType &key,
                                        Args &&...args) {
     return TrailingObjects::template additionalSizeToAlloc<Objects...>(
         Impl::numTrailingObjects(OverloadToken<Objects>(), key, args...)...);
@@ -595,14 +618,18 @@ void checkMetadataDependencyCycle(const Metadata *start,
                                   MetadataDependency firstLink,
                                   MetadataDependency secondLink);
 
-/// A base class offerring a reasonable default implementation for entries
-/// in a generic metadata cache.  Supports variably-sized keys.
+/// A cache entry class which provides the basic mechanisms for two-phase
+/// metadata initialization.  Suitable for more heavyweight metadata kinds
+/// such as generic types and tuples.  Does not provide the lookup-related
+/// members.
 ///
 /// The value type may be an arbitrary type, but it must be contextually
 /// convertible to bool, and it must be default-constructible in a false
 /// state.
 ///
-/// Concrete implementations should provide:
+/// In addition to the lookup members required by ConcurrentMap, concrete
+/// implementations should provide:
+///
 ///   /// A name describing the map; used in debugging diagnostics.
 ///   static const char *getName();
 ///
@@ -619,42 +646,34 @@ void checkMetadataDependencyCycle(const Metadata *start,
 ///   /// Try to initialize the metadata.
 ///   TryInitializeResult tryInitialize(Metadata *metadata,
 ///                                     PrivateMetadataState state,
-///                              PrivateMetadataCompletionContext *context,
-///                                     ExtraArgTys...);
+///                                     PrivateMetadataCompletionContext *ctxt);
 template <class Impl, class... Objects>
 class MetadataCacheEntryBase
-    : public ConcurrentMapTrailingObjectsEntry<Impl, const void *, Objects...> {
-  using super =
-             ConcurrentMapTrailingObjectsEntry<Impl, const void *, Objects...>;
-  friend super;
-  using TrailingObjects = typename super::TrailingObjects;
-  friend TrailingObjects;
-
+       : public ConcurrentMapTrailingObjectsEntry<Impl, Objects...> {
+  using super = ConcurrentMapTrailingObjectsEntry<Impl, Objects...>;
 public:
   using ValueType = Metadata *;
   using Status = MetadataResponse;
 
 protected:
-  template<typename T>
-  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
-
-  size_t numTrailingObjects(OverloadToken<const void *>) const {
-    return KeyLength;
-  }
-
-  template <class... Args>
-  static size_t numTrailingObjects(OverloadToken<const void *>,
-                                   const MetadataCacheKey &key,
-                                   Args &&...extraArgs) {
-    return key.size();
-  }
-
+  using TrailingObjectsEntry = super;
   using super::asImpl;
 
 private:
-  /// These are set during construction and never changed.
-  const uint32_t Hash;
-  const uint16_t KeyLength;
+  /// Additional storage that is only ever accessed under the lock.
+  union LockedStorage_t {
+    /// The thread that is allocating the entry.
+    std::thread::id AllocatingThread;
+
+    /// The completion queue.
+    MetadataCompletionQueueEntry *CompletionQueue;
+
+    /// The metadata's own queue entry.
+    MetadataCompletionQueueEntry *QueueEntry;
+
+    LockedStorage_t() {}
+    ~LockedStorage_t() {}
+  } LockedStorage;
 
   /// What kind of data is stored in the LockedStorage field below?
   ///
@@ -696,34 +715,19 @@ private:
   /// targets don't support interesting structs as atomic types.
   std::atomic<PrivateMetadataTrackingInfo::RawType> TrackingInfo;
 
-  /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.
-  ValueType Value;
-
-  /// Additional storage that is only ever accessed under the lock.
-  union LockedStorage_t {
-    /// The thread that is allocating the entry.
-    std::thread::id AllocatingThread;
-
-    /// The completion queue.
-    MetadataCompletionQueueEntry *CompletionQueue;
-
-    /// The metadata's own queue entry.
-    MetadataCompletionQueueEntry *QueueEntry;
-
-    LockedStorage_t() {}
-    ~LockedStorage_t() {}
-  } LockedStorage;
+  // Note that GenericMetadataCacheEntryBase is set up to place fields
+  // into the tail padding of this class.
 
 public:
-  MetadataCacheEntryBase(const MetadataCacheKey &key)
-      : Hash(key.hash()), KeyLength(key.size()),
+  MetadataCacheEntryBase()
+      : LockedStorageKind(LSK::AllocatingThread),
         TrackingInfo(PrivateMetadataTrackingInfo::initial().getRawValue()) {
-    LockedStorageKind = LSK::AllocatingThread;
     LockedStorage.AllocatingThread = std::this_thread::get_id();
-    memcpy(this->template getTrailingObjects<const void *>(),
-           key.begin(), key.size() * sizeof(const void *));
   }
 
+  // Note that having an explicit destructor here is important to make this
+  // a non-POD class and allow subclass fields to be allocated in our
+  // tail-padding.
   ~MetadataCacheEntryBase() {
     if (LockedStorageKind == LSK::QueueEntry)
       delete LockedStorage.QueueEntry;
@@ -732,19 +736,6 @@ public:
   bool isBeingAllocatedByCurrentThread() const {
     return LockedStorageKind == LSK::AllocatingThread &&
            LockedStorage.AllocatingThread == std::this_thread::get_id();
-  }
-
-  MetadataCacheKey getKey() const {
-    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
-                            KeyLength, Hash);
-  }
-
-  intptr_t getKeyIntValueForDump() const {
-    return Hash;
-  }
-
-  int compareWithKey(const MetadataCacheKey &key) const {
-    return key.compare(getKey());
   }
 
   /// Given that this thread doesn't own the right to initialize the
@@ -760,7 +751,7 @@ public:
     }
 
     assert(trackingInfo.hasAllocatedMetadata());
-    return { Value, trackingInfo.getAccomplishedRequestState() };
+    return { asImpl().getValue(), trackingInfo.getAccomplishedRequestState() };
   }
 
   /// The expected return type of allocate.
@@ -772,13 +763,14 @@ public:
   /// Perform the allocation operation.
   template <class... Args>
   Optional<Status>
-  beginAllocation(ConcurrencyControl &concurrency, Args &&...args) {
+  beginAllocation(ConcurrencyControl &concurrency, MetadataRequest request,
+                  Args &&...args) {
     // Allocate the metadata.
     AllocationResult allocationResult =
       asImpl().allocate(std::forward<Args>(args)...);
 
     // Publish the value.
-    Value = const_cast<ValueType>(allocationResult.Value);
+    asImpl().setValue(const_cast<ValueType>(allocationResult.Value));
     PrivateMetadataState newState = allocationResult.State;
     publishPrivateMetadataState(concurrency, newState);
 
@@ -792,17 +784,20 @@ public:
 
   /// Begin initialization immediately after allocation.
   template <class... Args>
-  Status beginInitialization(ConcurrencyControl &concurrency, Args &&...args) {
-    return doInitialization(concurrency, nullptr, std::forward<Args>(args)...);
+  Status beginInitialization(ConcurrencyControl &concurrency,
+                             MetadataRequest request, Args &&...args) {
+    // Note that we ignore the extra arguments; those are just for the
+    // constructor and allocation.
+    return doInitialization(concurrency, nullptr, request);
   }
 
   /// Resume initialization after a previous failure resulted in the
   /// metadata being enqueued on another metadata cache.
-  ///
-  /// We expect the first argument here to be a MetadataCompletionQueueEntry*.
-  template <class... Args>
-  Status resumeInitialization(ConcurrencyControl &concurrency, Args &&...args) {
-    return doInitialization(concurrency, std::forward<Args>(args)...);
+  Status resumeInitialization(ConcurrencyControl &concurrency,
+                              MetadataCompletionQueueEntry *queueEntry) {
+    return doInitialization(concurrency, queueEntry,
+                            MetadataRequest(MetadataState::Complete,
+                                            /*non-blocking*/ true));
   }
 
 protected:
@@ -816,11 +811,9 @@ private:
   /// Try to complete the metadata.
   ///
   /// This is the initializing thread.  The lock is not held.
-  template <class... Args>
   Status doInitialization(ConcurrencyControl &concurrency,
                           MetadataCompletionQueueEntry *queueEntry,
-                          MetadataRequest request,
-                          Args &&...args) {
+                          MetadataRequest request) {
     // We should always have fully synchronized with any previous threads
     // that were processing the initialization, so a relaxed load is fine
     // here.  (This ordering is achieved by the locking which occurs as part
@@ -830,7 +823,7 @@ private:
     assert(curTrackingInfo.hasAllocatedMetadata());
     assert(!curTrackingInfo.isComplete());
 
-    auto value = Value;
+    auto value = asImpl().getValue();
 
     // Figure out the completion context.
     PrivateMetadataCompletionContext scratchContext;
@@ -850,8 +843,7 @@ private:
     // add ourselves to its queue.
     while (true) {
       TryInitializeResult tryInitializeResult =
-        asImpl().tryInitialize(value, curTrackingInfo.getState(), context,
-                               args...);
+        asImpl().tryInitialize(value, curTrackingInfo.getState(), context);
       auto newState = tryInitializeResult.NewState;
 
       assert(curTrackingInfo.getState() <= newState &&
@@ -1188,9 +1180,80 @@ public:
   }
 };
 
-template <class EntryType, bool ProvideDestructor = true>
+/// An convenient subclass of MetadataCacheEntryBase which provides
+/// metadata lookup using a variadic key.
+template <class Impl, class... Objects>
+class VariadicMetadataCacheEntryBase :
+         public MetadataCacheEntryBase<Impl, const void *, Objects...> {
+  using super = MetadataCacheEntryBase<Impl, const void *, Objects...>;
+
+protected:
+  using super::asImpl;
+
+  using ValueType = typename super::ValueType;
+
+  using TrailingObjectsEntry = typename super::TrailingObjectsEntry;
+  friend TrailingObjectsEntry;
+
+  using TrailingObjects = typename super::TrailingObjects;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(OverloadToken<const void *>) const {
+    return KeyLength;
+  }
+
+  template <class... Args>
+  static size_t numTrailingObjects(OverloadToken<const void *>,
+                                   const MetadataCacheKey &key,
+                                   Args &&...extraArgs) {
+    return key.size();
+  }
+
+private:
+  // These are arranged to fit into the tail-padding of the superclass.
+
+  /// These are set during construction and never changed.
+  const uint16_t KeyLength;
+  const uint32_t Hash;
+
+  /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.
+  ValueType Value;
+
+  friend super;
+  ValueType getValue() {
+    return Value;
+  }
+  void setValue(ValueType value) {
+    Value = value;
+  }
+
+public:
+  VariadicMetadataCacheEntryBase(const MetadataCacheKey &key)
+      : KeyLength(key.size()), Hash(key.hash()) {
+    memcpy(this->template getTrailingObjects<const void *>(),
+           key.begin(), key.size() * sizeof(const void *));
+  }
+
+  MetadataCacheKey getKey() const {
+    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
+                            KeyLength, Hash);
+  }
+
+  intptr_t getKeyIntValueForDump() const {
+    return Hash;
+  }
+
+  int compareWithKey(const MetadataCacheKey &key) const {
+    return key.compare(getKey());
+  }
+};
+
+template <class EntryType, bool ProvideDestructor = true, class OptImpl = void>
 class MetadataCache :
-    public LockingConcurrentMap<EntryType, ProvideDestructor> {
+    public LockingConcurrentMap<EntryType, ProvideDestructor, OptImpl> {
 };
 
 } // namespace swift
