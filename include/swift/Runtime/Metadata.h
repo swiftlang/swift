@@ -1868,6 +1868,10 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     OpaqueValue *findIn(OpaqueValue *tuple) const {
       return (OpaqueValue*) (((char*) tuple) + Offset);
     }
+
+    const TypeLayout *getTypeLayout() const {
+      return Type->getTypeLayout();
+    }
   };
 
   Element *getElements() {
@@ -4133,21 +4137,24 @@ swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 /// \param proposedWitnesses - an optional proposed set of value witnesses.
 ///   This is useful when working with a non-dependent tuple type
 ///   where the entrypoint is just being used to unique the metadata.
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata(TupleTypeFlags flags,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata(MetadataRequest request,
+                           TupleTypeFlags flags,
                            const Metadata * const *elements,
                            const char *labels,
                            const ValueWitnessTable *proposedWitnesses);
 
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata2(MetadataRequest request,
+                            const Metadata *elt0, const Metadata *elt1,
                             const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata3(MetadataRequest request,
+                            const Metadata *elt0, const Metadata *elt1,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
 

@@ -111,7 +111,7 @@ func makeGenericMetatypes() {
 }
 
 // CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVyAA3FooVGMa"([[INT]]) [[NOUNWIND_READNONE_OPT:#[0-9]+]]
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVMa"([[INT]] 0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVMa"([[INT]] %0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVMa"
 // CHECK-SAME:    ([[INT]], %swift.type*)
@@ -128,7 +128,7 @@ func makeGenericMetatypes() {
 // CHECK-SAME:    ([[INT]]) [[NOUNWIND_READNONE_OPT]]
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 255)
 // CHECK:   [[BAR:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes7TwoArgsVMa"([[INT]] 0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]])
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes7TwoArgsVMa"([[INT]] %0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]])
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes7TwoArgsVMa"
 // CHECK-SAME:    ([[INT]], %swift.type*, %swift.type*)
@@ -147,7 +147,7 @@ func makeGenericMetatypes() {
 // CHECK-SAME:    ([[INT]]) [[NOUNWIND_READNONE_OPT]]
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 255)
 // CHECK:   [[BAR:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes9ThreeArgsVMa"([[INT]] 0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE]]
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes9ThreeArgsVMa"([[INT]] %0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE]]
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes9ThreeArgsVMa"
 // CHECK-SAME:    ({{i[0-9]+}}, %swift.type*, %swift.type*, %swift.type*)
@@ -181,14 +181,14 @@ func makeGenericMetatypes() {
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* [[BAR]] to i8*
 // CHECK-NEXT: store i8* [[T0]], i8** [[SLOT_3]]
 // CHECK-NEXT: [[BUFFER_PTR:%.*]] = bitcast [4 x i8*]* [[BUFFER]] to i8**
-// CHECK-NEXT: call swiftcc %swift.metadata_response @"$S17generic_metatypes8FourArgsVMa"([[INT]] 0, i8** [[BUFFER_PTR]]) [[NOUNWIND_ARGMEM:#[0-9]+]]
+// CHECK-NEXT: call swiftcc %swift.metadata_response @"$S17generic_metatypes8FourArgsVMa"([[INT]] %0, i8** [[BUFFER_PTR]]) [[NOUNWIND_ARGMEM:#[0-9]+]]
 // CHECK: call void @llvm.lifetime.end.p0i8
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMa"
 // CHECK-SAME:    ([[INT]]) [[NOUNWIND_READNONE_OPT]]
 // CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 255)
 // CHECK:   [[BAR:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVMa"([[INT]] 0, i8**
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVMa"([[INT]] %0, i8**
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVMa"
 // CHECK-SAME:    ([[INT]], i8**) [[NOUNWIND_OPT:#[0-9]+]]
