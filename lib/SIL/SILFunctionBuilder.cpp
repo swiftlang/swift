@@ -129,7 +129,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
   else if (constant.isAlwaysInline())
     inlineStrategy = AlwaysInline;
 
-  StringRef name = allocateCopy(nameTmp);
+  StringRef name = mod.allocateCopy(nameTmp);
   auto *F =
       SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                           IsNotBare, IsTrans, IsSer, entryCount, IsNotThunk,

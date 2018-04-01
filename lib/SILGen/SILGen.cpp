@@ -715,7 +715,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (hasSILBody(fd)) {
-    FrontendStatsTracer Tracer(getASTContext().Stats, "emit-SIL", fd);
+    FrontendStatsTracer Tracer(getASTContext().Stats, "SILGen-funcdecl", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
@@ -1551,11 +1551,16 @@ public:
 
 void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
   SourceFileScope scope(*this, sf);
-  for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
+  FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
+  for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem)) {
+    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
     visit(D);
+  }
 
-  for (Decl *D : sf->LocalTypeDecls)
+  for (Decl *D : sf->LocalTypeDecls) {
+    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", D);
     visit(D);
+  }
 
   // Mark any conformances as "used".
   for (auto conformance : sf->getUsedConformances())
