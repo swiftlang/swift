@@ -18,6 +18,10 @@
 #define KNOWN_TYPE(NAME)
 #endif
 
+#ifndef KNOWN_PROTOCOL
+#define KNOWN_PROTOCOL(NAME)
+#endif
+
 #ifndef DIFF_ITEM_KIND
 #define DIFF_ITEM_KIND(NAME)
 #endif
@@ -70,6 +74,7 @@ NODE_ANNOTATION(NowThrowing)
 NODE_ANNOTATION(NowMutating)
 NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
+NODE_ANNOTATION(DictionaryKeyUpdate)
 
 DECL_ATTR(deprecated)
 DECL_ATTR(fixedLayout)
@@ -100,6 +105,10 @@ KNOWN_TYPE(ImplicitlyUnwrappedOptional)
 KNOWN_TYPE(Void)
 KNOWN_TYPE(Unmanaged)
 KNOWN_TYPE(Function)
+KNOWN_TYPE(Dictionary)
+KNOWN_TYPE(String)
+
+KNOWN_PROTOCOL(RawRepresentable)
 
 DIFF_ITEM_KIND(CommonDiffItem)
 DIFF_ITEM_KIND(TypeMemberDiffItem)
@@ -149,6 +158,7 @@ SPECIAL_CASE_ID(ToUIntMax)
 #undef DIFF_ITEM_KEY_KIND
 #undef DIFF_ITEM_KIND
 #undef KNOWN_TYPE
+#undef KNOWN_PROTOCOL
 #undef KEY
 #undef DECL_ATTR
 #undef NODE_ANNOTATION
