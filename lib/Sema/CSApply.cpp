@@ -3678,24 +3678,11 @@ namespace {
 
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
-      // If we need to insert a force-unwrap for coercions of the form
-      // 'as! T!', do so now.
-      if (hasForcedOptionalResult(expr)) {
-        auto *coerced = handleForcedCheckedCastExpr(expr);
-        if (!coerced)
-          return nullptr;
-
-        return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
-      }
-
-      return handleForcedCheckedCastExpr(expr);
-    }
-
-    // Most of the logic for dealing with ForcedCheckedCastExpr.
-    Expr *handleForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
+      if (hasForcedOptionalResult(expr))
+        toType = toType->getOptionalObjectType();
+
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       checkForImportedUsedConformances(toType);
 

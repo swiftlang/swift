@@ -204,7 +204,7 @@ let x: Int? = 1
 let y0: Int = x as Int! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
 let y1: Int = (x as Int!)! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
 let z0: Int = x as! Int! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-// expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
+// expected-warning@-1 {{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
 let z1: Int = (x as! Int!)! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
 // expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
 let w0: Int = (x as? Int!)! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
