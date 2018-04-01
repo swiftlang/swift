@@ -1694,6 +1694,7 @@ namespace {
 
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
+  FrontendStatsTracer StatsTracer(getASTContext().Stats, "resolve-type", TyR);
   PrettyStackTraceTypeRepr stackTrace(getASTContext(), "resolving", TyR);
 
   TypeResolver typeResolver(*this);
