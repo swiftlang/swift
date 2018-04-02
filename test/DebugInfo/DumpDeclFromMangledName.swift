@@ -7,7 +7,7 @@
 // RUN: sed -ne '/--->/s/^.*---> *//p' < %S/Inputs/decl-reconstr-names.txt > %t.check
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/DeclReconstr -emit-module
-// RUN: %lldb-moduleimport-test %t/DeclReconstr -target-triple %target-triple \
+// RUN: %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   -decl-from-mangled=%t.input > %t.output 2>&1
 // RUN: diff %t.check %t.output
 
