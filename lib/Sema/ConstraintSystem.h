@@ -3369,6 +3369,12 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 
+
+// Erases any opened existentials from the given expression.
+// Note: this may update the provided expr pointer.
+void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
+
+
 /// ExprCleaner - This class is used by shrink to ensure that in
 /// no situation will an expr node be left with a dangling type variable stuck
 /// to it.  Often type checking will create new AST nodes and replace old ones

@@ -3065,14 +3065,50 @@ namespace {
   /// \brief AST walker that "sanitizes" an expression for the
   /// constraint-based type checker.
   ///
-  /// This is only necessary because Sema fills in too much type information
-  /// before the type-checker runs, causing redundant work.
+  /// This is necessary because Sema fills in too much type information before
+  /// the type-checker runs, causing redundant work, and for expression that
+  /// have already been typechecked and may contain unhandled AST nodes.
   class SanitizeExpr : public ASTWalker {
+    ConstraintSystem &CS;
     TypeChecker &TC;
+    bool eraseOpenExistentialsOnly;
+    llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
+
   public:
-    SanitizeExpr(TypeChecker &tc) : TC(tc) { }
+    SanitizeExpr(ConstraintSystem &cs, bool eraseOEsOnly = false)
+        : CS(cs), TC(cs.getTypeChecker()),
+          eraseOpenExistentialsOnly(eraseOEsOnly) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      bool walkIntoChildren = true;
+      if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
+        auto archetypeVal = OOE->getOpaqueValue();
+        auto base = OOE->getExistentialValue();
+
+        // Walk the base expression to erase any existentials within it
+        base = base->walk(*this);
+
+        bool inserted = OpenExistentials.insert({archetypeVal, base}).second;
+        assert(inserted && "OpaqueValue appears multiple times?");
+        (void)inserted;
+        expr = OOE->getSubExpr();
+      } else if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
+        auto value = OpenExistentials.find(OVE);
+        assert(value != OpenExistentials.end() &&
+               "didn't see this OVE in a containing OpenExistentialExpr?");
+        expr = value->second;
+      } else if (auto CDE = dyn_cast<CollectionUpcastConversionExpr>(expr)) {
+        // Handle collection upcasts specially so that we don't blow up on
+        // their embedded OVEs.
+        if (auto result = CDE->getSubExpr()->walk(*this)) {
+          CDE->setSubExpr(result);
+          walkIntoChildren = false;
+        }
+      }
+
+      if (eraseOpenExistentialsOnly)
+        return {true, expr};
+
       // Let's check if condition of the IfExpr looks properly
       // type-checked, and roll it back to the original state,
       // because otherwise, since condition is implicitly Int1,
@@ -3099,6 +3135,25 @@ namespace {
     }
 
     Expr *walkToExprPost(Expr *expr) override {
+      if (CS.hasType(expr)) {
+        Type type = CS.getType(expr);
+        if (type->hasOpenedExistential()) {
+          type = type.transform([&](Type type) -> Type {
+            if (auto archetype = type->getAs<ArchetypeType>())
+              if (auto existentialType = archetype->getOpenedExistentialType())
+                return existentialType;
+
+            return type;
+          });
+          CS.setType(expr, type);
+          // Set new type to the expression directly.
+          expr->setType(type);
+        }
+      }
+
+      if (eraseOpenExistentialsOnly)
+        return expr;
+
       if (auto implicit = dyn_cast<ImplicitConversionExpr>(expr)) {
         // Skip implicit conversions completely.
         return implicit->getSubExpr();
@@ -3143,6 +3198,12 @@ namespace {
 
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
+
+    // Don't walk into statements.  This handles the BraceStmt in
+    // non-single-expr closures, so we don't walk into their body.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
   };
 
   class ConstraintWalker : public ASTWalker {
@@ -3342,7 +3403,7 @@ namespace {
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   // Remove implicit conversions from the expression.
-  expr = expr->walk(SanitizeExpr(getTypeChecker()));
+  expr = expr->walk(SanitizeExpr(*this));
 
   // Walk the expression to associate labeled arguments.
   expr->walk(ArgumentLabelWalker(*this, expr));
@@ -3361,7 +3422,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
 
 Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
   // Sanitize the expression.
-  expr = SanitizeExpr(getTypeChecker()).walkToExprPost(expr);
+  expr = SanitizeExpr(*this).walkToExprPost(expr);
 
   cacheSubExprTypes(expr);
 
@@ -3474,8 +3535,8 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
 
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
-  Parent = Parent->walk(SanitizeExpr(*TC));
   ConstraintSystem CS(*TC, &DC, Options);
+  Parent = Parent->walk(SanitizeExpr(CS));
   CleanupIllFormedExpressionRAII cleanup(TC->Context, Parent);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
@@ -3575,6 +3636,10 @@ bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
 
 bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {
   return canSatisfy(T1, T2, false, ConstraintKind::Conversion, &DC);
+}
+
+void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
+  expr = expr->walk(SanitizeExpr(CS, /*eraseOEsOnly=*/true));
 }
 
 struct ResolvedMemberResult::Implementation {
