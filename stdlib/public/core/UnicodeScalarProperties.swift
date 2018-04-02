@@ -1071,10 +1071,11 @@ extension Unicode.Scalar.Properties {
 
   /// The lowercase mapping of the scalar.
   ///
-  /// This property is a `String` because some mappings may transform a single
-  /// scalar into multiple scalars. For example, the character "İ" (U+0130
-  /// LATIN CAPITAL LETTER I WITH DOT ABOVE) becomes two scalars (U+0069 LATIN
-  /// SMALL LETTER I, U+0307 COMBINING DOT ABOVE) when converted to lowercase.
+  /// This property is a `String`, not a `Unicode.Scalar` or `Character`,
+  /// because some mappings may transform a scalar into multiple scalars or
+  /// graphemes. For example, the character "İ" (U+0130 LATIN CAPITAL LETTER I
+  /// WITH DOT ABOVE) becomes two scalars (U+0069 LATIN SMALL LETTER I, U+0307
+  /// COMBINING DOT ABOVE) when converted to lowercase.
   ///
   /// This property corresponds to the `Lowercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -1105,10 +1106,11 @@ extension Unicode.Scalar.Properties {
 
   /// The titlecase mapping of the scalar.
   ///
-  /// This property is a `String` because some mappings may transform a single
-  /// scalar into multiple scalars. For example, the ligature "ﬁ" (U+FB01 LATIN
-  /// SMALL LIGATURE FI) becomes "Fi" (U+0046 LATIN CAPITAL LETTER F, U+0069
-  /// LATIN SMALL LETTER I) when converted to titlecase.
+  /// This property is a `String`, not a `Unicode.Scalar` or `Character`,
+  /// because some mappings may transform a scalar into multiple scalars or
+  /// graphemes. For example, the ligature "ﬁ" (U+FB01 LATIN SMALL LIGATURE FI)
+  /// becomes "Fi" (U+0046 LATIN CAPITAL LETTER F, U+0069 LATIN SMALL LETTER I)
+  /// when converted to titlecase.
   ///
   /// This property corresponds to the `Titlecase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
@@ -1139,10 +1141,11 @@ extension Unicode.Scalar.Properties {
 
   /// The uppercase mapping of the scalar.
   ///
-  /// This property is a `String` because some mappings may transform a single
-  /// scalar into multiple scalars. For example, the German letter "ß" (U+00DF
-  /// LATIN SMALL LETTER SHARP S) becomes "SS" (U+0053 LATIN CAPITAL LETTER S,
-  /// U+0053 LATIN CAPITAL LETTER S) when converted to uppercase.
+  /// This property is a `String`, not a `Unicode.Scalar` or `Character`,
+  /// because some mappings may transform a scalar into multiple scalars or
+  /// graphemes. For example, the German letter "ß" (U+00DF LATIN SMALL LETTER
+  /// SHARP S) becomes "SS" (U+0053 LATIN CAPITAL LETTER S, U+0053 LATIN CAPITAL
+  /// LETTER S) when converted to uppercase.
   ///
   /// This property corresponds to the `Uppercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
