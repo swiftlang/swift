@@ -195,25 +195,45 @@ using Metadata = TargetMetadata<InProcess>;
 /// For performance, functions returning this type should use SWIFT_CC so
 /// that the components are returned as separate values.
 struct MetadataResponse {
-  /// For metadata access functions, this is the requested metadata.
-  ///
-  /// For metadata initialization functions, this is either null,
-  /// indicating that initialization was successful, or a metadata on
-  /// which initialization depends for further progress.
+  /// The requested metadata.
   const Metadata *Value;
 
-  /// For metadata access functions, this is the current state of the
-  /// metadata returned.  Always use this instead of trying to inspect
-  /// the metadata directly; an incomplete metadata may be getting
-  /// initialized concurrently.  This can generally be ignored if the
-  /// metadata request was for abstract metadata or if the request is
-  /// blocking.
-  ///
-  /// For metadata initialization functions, this is the state that the
-  /// given metadata needs to be in before initialization can continue.
+  /// The current state of the metadata returned.  Always use this
+  /// instead of trying to inspect the metadata directly to see if it
+  /// satisfies the request.  An incomplete metadata may be getting
+  /// initialized concurrently.  But this can generally be ignored if
+  /// the metadata request was for abstract metadata or if the request
+  /// is blocking.
   MetadataState State;
 };
-using MetadataDependency = MetadataResponse;
+
+/// A dependency on the metadata progress of other type, indicating that
+/// initialization of a metadata cannot progress until another metadata
+/// reaches a particular state.
+///
+/// For performance, functions returning this type should use SWIFT_CC so
+/// that the components are returned as separate values.
+struct MetadataDependency {
+  /// Either null, indicating that initialization was successful, or
+  /// a metadata on which initialization depends for further progress.
+  const Metadata *Value;
+
+  /// The state that Metadata needs to be in before initialization
+  /// can continue.
+  MetadataState Requirement;
+
+  MetadataDependency() : Value(nullptr) {}
+  MetadataDependency(const Metadata *metadata, MetadataState requirement)
+    : Value(metadata), Requirement(requirement) {}
+
+  explicit operator bool() const { return Value != nullptr; }
+
+  bool operator==(MetadataDependency other) const {
+    assert(Value && other.Value);
+    return Value == other.Value &&
+           Requirement == other.Requirement;
+  }
+};
 
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
@@ -1847,6 +1867,10 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
 
     OpaqueValue *findIn(OpaqueValue *tuple) const {
       return (OpaqueValue*) (((char*) tuple) + Offset);
+    }
+
+    const TypeLayout *getTypeLayout() const {
+      return Type->getTypeLayout();
     }
   };
 
@@ -4160,21 +4184,24 @@ swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 /// \param proposedWitnesses - an optional proposed set of value witnesses.
 ///   This is useful when working with a non-dependent tuple type
 ///   where the entrypoint is just being used to unique the metadata.
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata(TupleTypeFlags flags,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata(MetadataRequest request,
+                           TupleTypeFlags flags,
                            const Metadata * const *elements,
                            const char *labels,
                            const ValueWitnessTable *proposedWitnesses);
 
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata2(MetadataRequest request,
+                            const Metadata *elt0, const Metadata *elt1,
                             const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata3(MetadataRequest request,
+                            const Metadata *elt0, const Metadata *elt1,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
 

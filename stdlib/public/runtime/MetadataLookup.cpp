@@ -927,9 +927,10 @@ public:
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
-    return swift_getTupleTypeMetadata(flags, elements.data(),
+    return swift_getTupleTypeMetadata(MetadataState::Complete,
+                                      flags, elements.data(),
                                       labels.empty() ? nullptr : labels.c_str(),
-                                      /*proposedWitnesses=*/nullptr);
+                                      /*proposedWitnesses=*/nullptr).Value;
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,

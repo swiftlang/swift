@@ -688,21 +688,22 @@ static llvm::Constant *emitEmptyTupleTypeMetadataRef(IRGenModule &IGM) {
         /*Ty=*/nullptr, fullMetadata, indices);
 }
 
-/// Note that the element request will always be of a
-/// canResponseStatusBeIgnored() kind.
 using GetElementMetadataFn =
-  llvm::function_ref<llvm::Value *(CanType eltType,
-                                   DynamicMetadataRequest eltRequest)>;
+  llvm::function_ref<MetadataResponse(CanType eltType,
+                                      DynamicMetadataRequest eltRequest)>;
 
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                                  CanTupleType type,
                                                  DynamicMetadataRequest request,
                                                  bool useLabels,
-                                      GetElementMetadataFn getElementMetadata) {
-
-  // FIXME: at least propagate dependency failure here.
-  // FIXME: allow abstract creation when the runtime supports that.
-  DynamicMetadataRequest eltRequest = MetadataState::Complete;
+                                    GetElementMetadataFn getMetadataRecursive) {
+  auto getElementMetadata = [&](CanType type) {
+    // Just request the elements to be abstract so that we can always build
+    // the metadata.
+    // TODO: if we have a collector, or if this is a blocking request, maybe
+    // we should build a stronger request?
+    return getMetadataRecursive(type, MetadataState::Abstract).getMetadata();
+  };
 
   switch (type->getNumElements()) {
   case 0:
@@ -712,14 +713,14 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
   case 1:
     // For metadata purposes, we consider a singleton tuple to be
     // isomorphic to its element type. ???
-    return MetadataResponse::forComplete(
-             getElementMetadata(type.getElementType(0), eltRequest));
+    return getMetadataRecursive(type.getElementType(0), request);
 
   case 2: {
-    auto elt0Metadata = getElementMetadata(type.getElementType(0), eltRequest);
-    auto elt1Metadata = getElementMetadata(type.getElementType(1), eltRequest);
+    auto elt0Metadata = getElementMetadata(type.getElementType(0));
+    auto elt1Metadata = getElementMetadata(type.getElementType(1));
 
     llvm::Value *args[] = {
+      request.get(IGF),
       elt0Metadata, elt1Metadata,
       getTupleLabelsString(IGF.IGM, type, useLabels),
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
@@ -727,17 +728,19 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
 
     auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata2Fn(),
                                        args);
+    call->setCallingConv(IGF.IGM.SwiftCC);
     call->setDoesNotThrow();
 
-    return MetadataResponse::forComplete(call);
+    return MetadataResponse::handle(IGF, request, call);
   }
 
   case 3: {
-    auto elt0Metadata = getElementMetadata(type.getElementType(0), eltRequest);
-    auto elt1Metadata = getElementMetadata(type.getElementType(1), eltRequest);
-    auto elt2Metadata = getElementMetadata(type.getElementType(2), eltRequest);
+    auto elt0Metadata = getElementMetadata(type.getElementType(0));
+    auto elt1Metadata = getElementMetadata(type.getElementType(1));
+    auto elt2Metadata = getElementMetadata(type.getElementType(2));
 
     llvm::Value *args[] = {
+      request.get(IGF),
       elt0Metadata, elt1Metadata, elt2Metadata,
       getTupleLabelsString(IGF.IGM, type, useLabels),
       llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy) // proposed
@@ -745,9 +748,10 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
 
     auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadata3Fn(),
                                        args);
+    call->setCallingConv(IGF.IGM.SwiftCC);
     call->setDoesNotThrow();
 
-    return MetadataResponse::forComplete(call);
+    return MetadataResponse::handle(IGF, request, call);
   }
   default:
     // TODO: use a caching entrypoint (with all information
@@ -764,7 +768,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
                                 IGF.IGM.getPointerSize() * elements.size());
     for (auto i : indices(elements)) {
       // Find the metadata pointer for this element.
-      llvm::Value *eltMetadata = getElementMetadata(elements[i], eltRequest);
+      llvm::Value *eltMetadata = getElementMetadata(elements[i]);
 
       // GEP to the appropriate element and store.
       Address eltPtr = IGF.Builder.CreateStructGEP(buffer, i,
@@ -778,6 +782,7 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
     TupleTypeFlags flags =
       TupleTypeFlags().withNumElements(elements.size());
     llvm::Value *args[] = {
+      request.get(IGF),
       llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()),
       pointerToFirst,
       getTupleLabelsString(IGF.IGM, type, useLabels),
@@ -786,12 +791,13 @@ static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
 
     auto call = IGF.Builder.CreateCall(IGF.IGM.getGetTupleMetadataFn(),
                                        args);
+    call->setCallingConv(IGF.IGM.SwiftCC);
     call->setDoesNotThrow();
 
     IGF.Builder.CreateLifetimeEnd(buffer,
                                 IGF.IGM.getPointerSize() * elements.size());
 
-    return MetadataResponse::forComplete(call);
+    return MetadataResponse::handle(IGF, request, call);
   }
 }
 
@@ -882,8 +888,7 @@ namespace {
       auto response = emitTupleTypeMetadataRef(IGF, type, request,
                                                /*labels*/ true,
           [&](CanType eltType, DynamicMetadataRequest eltRequest) {
-        assert(eltRequest.canResponseStatusBeIgnored());
-        return IGF.emitTypeMetadataRef(eltType, eltRequest).getMetadata();
+        return IGF.emitTypeMetadataRef(eltType, eltRequest);
       });
 
       return setLocal(type, response);
@@ -1651,8 +1656,9 @@ irgen::emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
 /// construction of the metadata value just involves calling idempotent
 /// metadata-construction functions.  It is not used for the in-place
 /// initialization of non-generic nominal type metadata.
-static llvm::Value *
+static MetadataResponse
 emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
+                                   DynamicMetadataRequest request,
                                    CanType type) {
   assert(!type->hasArchetype() &&
          "cannot emit metadata accessor for context-dependent type");
@@ -1660,15 +1666,13 @@ emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // We only take this path for non-generic nominal types.
   auto typeDecl = type->getAnyNominal();
   if (!typeDecl)
-    return emitDirectTypeMetadataRef(IGF, type, MetadataState::Complete)
-             .getMetadata();
+    return emitDirectTypeMetadataRef(IGF, type, request);
 
   if (typeDecl->isGenericContext() &&
       !(isa<ClassDecl>(typeDecl) &&
         isa<ClangModuleUnit>(typeDecl->getModuleScopeContext()))) {
     // This is a metadata accessor for a fully substituted generic type.
-    return emitDirectTypeMetadataRef(IGF, type, MetadataState::Complete)
-             .getMetadata();
+    return emitDirectTypeMetadataRef(IGF, type, request);
   }
 
   // We should never be emitting a metadata accessor for resilient nominal
@@ -1687,18 +1691,19 @@ emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   if (auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
     // We emit a completely different pattern for foreign classes.
     if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-      return emitForeignTypeMetadataRef(IGF, type);
+      return MetadataResponse::forComplete(
+                                         emitForeignTypeMetadataRef(IGF, type));
     }
 
     // Classes that might not have Swift metadata use a different
     // symbol name.
     if (!hasKnownSwiftMetadata(IGF.IGM, classDecl)) {
-      return emitObjCMetadataRef(IGF, classDecl);
+      return MetadataResponse::forComplete(emitObjCMetadataRef(IGF, classDecl));
     }
 
   // Imported value types require foreign metadata uniquing.
   } else if (isa<ClangModuleUnit>(typeDecl->getModuleScopeContext())) {
-    return emitForeignTypeMetadataRef(IGF, type);
+    return MetadataResponse::forComplete(emitForeignTypeMetadataRef(IGF, type));
   }
 
   // Okay, everything else is built from a Swift metadata object.
@@ -1707,7 +1712,7 @@ emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
   // We should not be doing more serious work along this path.
   assert(isTypeMetadataAccessTrivial(IGF.IGM, type));
 
-  return metadata;
+  return MetadataResponse::forComplete(metadata);
 }
 
 /// Get or create an accessor function to the given non-dependent type.
@@ -1762,10 +1767,7 @@ llvm::Function *irgen::getTypeMetadataAccessFunction(IRGenModule &IGM,
                                            llvm::Constant *cacheVariable) {
     // We should not be called with ForDefinition for nominal types
     // that require in-place initialization.
-    // We should also not be called for types that require more interesting
-    // initialization that really requires the request/response machinery.
-    return MetadataResponse::forComplete(
-             emitTypeMetadataAccessFunctionBody(IGF, type));
+    return emitTypeMetadataAccessFunctionBody(IGF, request, type);
   });
 }
 
@@ -1959,8 +1961,10 @@ namespace {
       auto response = emitTupleTypeMetadataRef(IGF, type, request,
                                                /*labels*/ false,
           [&](CanType eltType, DynamicMetadataRequest eltRequest) {
-        assert(eltRequest.canResponseStatusBeIgnored());
-        return visit(eltType, eltRequest);
+        // This use of 'forComplete' is technically questionable, but in
+        // this class we're always producing responses we can ignore, so
+        // it's okay.
+        return MetadataResponse::forComplete(visit(eltType, eltRequest));
       });
 
       return setLocal(type, response);
