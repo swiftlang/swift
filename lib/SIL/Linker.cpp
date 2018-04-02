@@ -56,49 +56,6 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
   return true;
 }
 
-/// Process Decl, recursively deserializing any thing Decl may reference.
-bool SILLinkerVisitor::processFunction(StringRef Name) {
-  if (Mode == LinkingMode::LinkNone)
-    return false;
-
-  // If F is a declaration, first deserialize it.
-  auto *NewFn = Loader->lookupSILFunction(Name);
-
-  if (!NewFn || NewFn->isExternalDeclaration())
-    return false;
-
-  ++NumFuncLinked;
-
-  // Try to transitively deserialize everything referenced by NewFn.
-  Worklist.push_back(NewFn);
-  process();
-
-  // Since we successfully processed at least one function, return true.
-  return true;
-}
-
-/// Process Decl, recursively deserializing any thing Decl may reference.
-SILFunction *SILLinkerVisitor::lookupFunction(StringRef Name,
-                                              SILLinkage Linkage) {
-
-  auto *NewFn = Loader->lookupSILFunction(Name, /* declarationOnly */ true,
-                                          Linkage);
-
-  if (!NewFn)
-    return nullptr;
-
-  assert(NewFn->isExternalDeclaration() &&
-         "SIL function lookup should never read function bodies");
-
-  return NewFn;
-}
-
-/// Process Decl, recursively deserializing any thing Decl may reference.
-bool SILLinkerVisitor::hasFunction(StringRef Name,
-                                   Optional<SILLinkage> Linkage) {
-  return Loader->hasSILFunction(Name, Linkage);
-}
-
 /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
 /// transitively references.
 ///
