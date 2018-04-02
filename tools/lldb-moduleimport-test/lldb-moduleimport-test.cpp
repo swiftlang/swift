@@ -42,10 +42,10 @@ void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
 
-static bool validateModule(llvm::StringRef data, bool Verbose) {
-  swift::serialization::ExtendedValidationInfo extendedInfo;
-  swift::serialization::ValidationInfo info =
-      swift::serialization::validateSerializedAST(data, &extendedInfo);
+static bool validateModule(llvm::StringRef data, bool Verbose,
+                           swift::serialization::ValidationInfo &info,
+                           swift::serialization::ExtendedValidationInfo &extendedInfo) {
+  info = swift::serialization::validateSerializedAST(data, &extendedInfo);
   if (info.status != swift::serialization::Status::Valid)
     return false;
 
@@ -175,9 +175,6 @@ int main(int argc, char **argv) {
     llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
     llvm::cl::OneOrMore);
 
-  llvm::cl::opt<std::string> SDK(
-    "sdk", llvm::cl::desc("path to the SDK to build against"));
-
   llvm::cl::opt<bool> DumpModule(
     "dump-module", llvm::cl::desc(
       "Dump the imported module after checking it imports just fine"));
@@ -194,19 +191,13 @@ int main(int argc, char **argv) {
   llvm::cl::opt<std::string> DumpTypeFromMangled(
       "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
 
-  // FIXME: we should infer this from the module.
-  llvm::cl::opt<std::string> TargetTriple(
-      "target-triple", llvm::cl::desc("specify target triple"));
-
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
   ModuleCachePath.removeArgument();
   DumpModule.removeArgument();
   DumpTypeFromMangled.removeArgument();
-  SDK.removeArgument();
   InputNames.removeArgument();
-  TargetTriple.removeArgument();
 
   // Fetch the serialized module bitstreams from the Mach-O files and
   // register them with the module loader.
@@ -214,18 +205,17 @@ int main(int argc, char **argv) {
   if (!collectASTModules(InputNames, Modules))
     return 1;
 
+  if (Modules.empty())
+    return 0;
+
+  swift::serialization::ValidationInfo info;
+  swift::serialization::ExtendedValidationInfo extendedInfo;
   for (auto &Module : Modules) {
-    if (!validateModule(StringRef(Module.first, Module.second), Verbose)) {
+    if (!validateModule(StringRef(Module.first, Module.second), Verbose, info,
+                        extendedInfo)) {
       llvm::errs() << "Malformed module!\n";
       return 1;
     }
-  }
-
-  // If no SDK was specified via -sdk, check environment variable SDKROOT.
-  if (SDK.getNumOccurrences() == 0) {
-    const char *SDKROOT = getenv("SDKROOT");
-    if (SDKROOT)
-      SDK = SDKROOT;
   }
 
   // Create a Swift compiler.
@@ -237,13 +227,9 @@ int main(int argc, char **argv) {
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
-  Invocation.setSDKPath(SDK);
-
-  // FIXME: we should infer this from the module.
-  if (!TargetTriple.empty())
-    Invocation.setTargetTriple(TargetTriple);
-  else
-    Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+  // Infer SDK and Target triple from the module.
+  Invocation.setSDKPath(extendedInfo.getSDKPath());
+  Invocation.setTargetTriple(info.targetTriple);
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
