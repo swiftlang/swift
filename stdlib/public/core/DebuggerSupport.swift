@@ -335,3 +335,13 @@ public enum _DebuggerSupport {
   }
 }
 
+@inline(never)
+public
+func _stringForPrintObject(_ value: Any) -> String {
+  return _DebuggerSupport.stringForPrintObject(value)
+}
+
+@inline(never)
+public
+func _debuggerTestingCheckExpect(_ checked_value: String,
+                                 _ expected_value: String) {}

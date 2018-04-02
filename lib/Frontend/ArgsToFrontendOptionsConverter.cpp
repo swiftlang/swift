@@ -79,6 +79,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
 
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
+
   computePlaygroundOptions();
 
   // This can be enabled independently of the playground transform.
