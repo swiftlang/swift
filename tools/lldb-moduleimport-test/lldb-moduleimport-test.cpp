@@ -188,12 +188,6 @@ int main(int argc, char **argv) {
   llvm::cl::opt<std::string> ModuleCachePath(
     "module-cache-path", llvm::cl::desc("Clang module cache path"));
 
-  llvm::cl::list<std::string> ImportPaths(
-    "I", llvm::cl::desc("add a directory to the import search path"));
-
-  llvm::cl::list<std::string> FrameworkPaths(
-    "F", llvm::cl::desc("add a directory to the framework search path"));
-
   llvm::cl::opt<std::string> DumpDeclFromMangled(
       "decl-from-mangled", llvm::cl::desc("dump decl from mangled names list"));
 
@@ -207,8 +201,6 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
-  FrameworkPaths.removeArgument();
-  ImportPaths.removeArgument();
   ModuleCachePath.removeArgument();
   DumpModule.removeArgument();
   DumpTypeFromMangled.removeArgument();
@@ -255,12 +247,6 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
-  Invocation.setImportSearchPaths(ImportPaths);
-  std::vector<swift::SearchPathOptions::FrameworkSearchPath> FramePaths;
-  for (const auto &path : FrameworkPaths) {
-    FramePaths.push_back({path, /*isSystem=*/false});
-  }
-  Invocation.setFrameworkSearchPaths(FramePaths);
 
   if (CI.setup(Invocation))
     return 1;
