@@ -46,7 +46,7 @@ All metadata records share a common header, with the following fields:
     with Objective-C, the kind field is instead an *isa pointer* to an
     Objective-C metaclass.  Such a pointer can be distinguished from an
     enumerated metadata kind because it is guaranteed to have a value larger
-    than **4096**.  Note that this is a more basic sense of interoperation
+    than **2047**.  Note that this is a more basic sense of interoperation
     than is meant by the ``@objc`` attribute: it is what is required to
     support Objective-C message sends and retain/release.  All classes are
     required to interoperate with Objective-C on this level when building
@@ -90,9 +90,6 @@ contain the following fields:
 
 - If the enum is generic, then the
   `generic argument vector`_ begins at **offset 2**.
-
-- In certain circumstances, there is a `payload size`_ immediately following
-  the `generic argument vector`.
 
 Optional Metadata
 ~~~~~~~~~~~~~~~~~
@@ -612,10 +609,9 @@ Specifically, a type metadata record is required to be complete when:
 - It is passed as a generic argument to a function (other than a metadata
   access function, witness table access function, or metadata initialization
   function).
-- It is stored as a metatype value.
-- It is used to build an existential value.
-- It is passed as the ``Self`` argument to a ``static`` or ``class`` method,
-  including an initializer.
+- It is used as a metatype value, including as the ``Self`` argument to a
+  ``static`` or ``class`` method, including initializers.
+- It is used to build an opaque existential value.
 
 Metadata Requests and Responses
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
