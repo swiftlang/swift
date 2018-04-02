@@ -16,7 +16,7 @@ import <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B.</Acc
 import struct <AccessPathComponent>A.</AccessPathComponent><AccessPathComponent>B</AccessPathComponent></ImportDecl><PoundWarningDecl>
 
 #warning(<StringLiteralExpr>"test warning"</StringLiteralExpr>)</PoundWarningDecl><PoundErrorDecl>
-#error(<StringLiteralExpr>"test error"</StringLiteralExpr>)</PoundErrorDecl><IfConfigDecl>
+#error(<StringLiteralExpr>"test error"</StringLiteralExpr>)</PoundErrorDecl><IfConfigDecl><IfConfigClause>
 
 #if <IdentifierExpr>Blah</IdentifierExpr><ClassDecl>
 class C <MemberDeclBlock>{<FunctionDecl>
@@ -118,16 +118,16 @@ protocol PP <MemberDeclBlock>{<AssociatedtypeDecl>
   associatedtype E<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Sequence </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><TypeInitializerClause>= <ArrayType>[<ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType>] </ArrayType></TypeInitializerClause><GenericWhereClause>where <ConformanceRequirement><MemberTypeIdentifier><SimpleTypeIdentifier>A</SimpleTypeIdentifier>.Element </MemberTypeIdentifier>: <SimpleTypeIdentifier>Sequence</SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause></AssociatedtypeDecl><AssociatedtypeDecl><DeclModifier>
   private </DeclModifier>associatedtype F</AssociatedtypeDecl><AssociatedtypeDecl><Attribute>
   @objc </Attribute>associatedtype G</AssociatedtypeDecl>
-}</MemberDeclBlock></ProtocolDecl>
+}</MemberDeclBlock></ProtocolDecl></IfConfigClause>
 
-#endif</IfConfigDecl><IfConfigDecl>
+#endif</IfConfigDecl><IfConfigDecl><IfConfigClause>
 
 #if <IdentifierExpr>blah</IdentifierExpr><TypealiasDecl>
-typealias A <TypeInitializerClause>= <SimpleTypeIdentifier>Any</SimpleTypeIdentifier></TypeInitializerClause></TypealiasDecl><ElseifDirectiveClause>
+typealias A <TypeInitializerClause>= <SimpleTypeIdentifier>Any</SimpleTypeIdentifier></TypeInitializerClause></TypealiasDecl></IfConfigClause><IfConfigClause>
 #elseif <IdentifierExpr>blahblah</IdentifierExpr><TypealiasDecl>
-typealias B <TypeInitializerClause>= <TupleType>(<TupleTypeElement><MemberTypeIdentifier><SimpleTypeIdentifier>Array<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Array<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Any</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier>.Element</MemberTypeIdentifier>, </TupleTypeElement><TupleTypeElement>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></TypeInitializerClause></TypealiasDecl></ElseifDirectiveClause><ElseDirectiveClause>
+typealias B <TypeInitializerClause>= <TupleType>(<TupleTypeElement><MemberTypeIdentifier><SimpleTypeIdentifier>Array<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Array<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Any</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier>.Element</MemberTypeIdentifier>, </TupleTypeElement><TupleTypeElement>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></TypeInitializerClause></TypealiasDecl></IfConfigClause><IfConfigClause>
 #else<TypealiasDecl>
-typealias C <TypeInitializerClause>= <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType></TypeInitializerClause></TypealiasDecl></ElseDirectiveClause>
+typealias C <TypeInitializerClause>= <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>]</ArrayType></TypeInitializerClause></TypealiasDecl></IfConfigClause>
 #endif</IfConfigDecl><TypealiasDecl>
 typealias D <TypeInitializerClause>= <DictionaryType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier>]</DictionaryType></TypeInitializerClause></TypealiasDecl><TypealiasDecl>
 typealias E <TypeInitializerClause>= <MetatypeType><OptionalType><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>?</OptionalType>.Protocol</MetatypeType></TypeInitializerClause></TypealiasDecl><TypealiasDecl>
@@ -207,7 +207,7 @@ private </DeclModifier>protocol foo <TypeInheritanceClause>: <InheritedType><Sim
 protocol foo <MemberDeclBlock>{ <FunctionDecl>func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature></FunctionDecl>}</MemberDeclBlock></ProtocolDecl><ProtocolDecl><DeclModifier>
 private </DeclModifier>protocol foo<MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><ProtocolDecl><Attribute>
 @objc</Attribute><DeclModifier>
-public </DeclModifier>protocol foo <GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><IfConfigDecl>
+public </DeclModifier>protocol foo <GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>:<SimpleTypeIdentifier>B </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><IfConfigDecl><IfConfigClause>
 
 #if <IdentifierExpr>blah</IdentifierExpr><FunctionDecl>
 func tryfoo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<TryExpr>
@@ -215,7 +215,7 @@ func tryfoo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSi
   try! <FunctionCallExpr><IdentifierExpr>foo</IdentifierExpr>()</FunctionCallExpr></TryExpr><TryExpr>
   try? <FunctionCallExpr><IdentifierExpr>foo</IdentifierExpr>()</FunctionCallExpr></TryExpr><TryExpr>
   try! <FunctionCallExpr><MemberAccessExpr><FunctionCallExpr><MemberAccessExpr><FunctionCallExpr><MemberAccessExpr><FunctionCallExpr><IdentifierExpr>foo</IdentifierExpr>()</FunctionCallExpr>.bar</MemberAccessExpr>()</FunctionCallExpr>.foo</MemberAccessExpr>()</FunctionCallExpr>.bar</MemberAccessExpr>()</FunctionCallExpr></TryExpr>
-}</CodeBlock></FunctionDecl><ElseDirectiveClause>
+}</CodeBlock></FunctionDecl></IfConfigClause><IfConfigClause>
 #else<FunctionDecl>
 func closure<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ClosureExpr>{<ClosureSignature><ClosureCaptureSignature>[<ClosureCaptureItem>weak <IdentifierExpr>a</IdentifierExpr>,</ClosureCaptureItem><ClosureCaptureItem>
@@ -241,7 +241,7 @@ func closure<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ClosureExpr>{}</ClosureExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ClosureExpr>{ <ClosureSignature><ClosureParam>s1, </ClosureParam><ClosureParam>s2 </ClosureParam>in </ClosureSignature><SequenceExpr><IdentifierExpr>s1 </IdentifierExpr><BinaryOperatorExpr>> </BinaryOperatorExpr><IdentifierExpr>s2 </IdentifierExpr></SequenceExpr>}</ClosureExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ClosureExpr>{ <SequenceExpr><IdentifierExpr>$0 </IdentifierExpr><BinaryOperatorExpr>> </BinaryOperatorExpr><IdentifierExpr>$1 </IdentifierExpr></SequenceExpr>}</ClosureExpr></SequenceExpr>
-}</CodeBlock></FunctionDecl></ElseDirectiveClause>
+}</CodeBlock></FunctionDecl></IfConfigClause>
 #endif</IfConfigDecl><FunctionDecl>
 
 func postfix<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<FunctionCallExpr><IdentifierExpr>
@@ -268,10 +268,10 @@ func postfix<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><MemberAccessExpr><IdentifierExpr>x</IdentifierExpr>.foo<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></MemberAccessExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><FunctionCallExpr><IdentifierExpr>foo</IdentifierExpr>(<FunctionCallArgument><InOutExpr>&<IdentifierExpr>d</IdentifierExpr></InOutExpr></FunctionCallArgument>)</FunctionCallExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><EditorPlaceholderExpr><#Placeholder#> </EditorPlaceholderExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><EditorPlaceholderExpr><#T##(Int) -> Int#></EditorPlaceholderExpr></SequenceExpr>
-}</CodeBlock></FunctionDecl><IfConfigDecl>
+}</CodeBlock></FunctionDecl><IfConfigDecl><IfConfigClause>
 
-#if <IdentifierExpr>blah</IdentifierExpr><ElseDirectiveClause>
-#else</ElseDirectiveClause>
+#if <IdentifierExpr>blah</IdentifierExpr></IfConfigClause><IfConfigClause>
+#else</IfConfigClause>
 #endif</IfConfigDecl><ClassDecl>
 
 class C <MemberDeclBlock>{<VariableDecl>
@@ -367,10 +367,16 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
     case <CaseItem><ExpressionPattern><IdentifierExpr>n1</IdentifierExpr></ExpressionPattern></CaseItem>:</SwitchCaseLabel><BreakStmt>
       break</BreakStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
     case <CaseItem><ExpressionPattern><IdentifierExpr>n2</IdentifierExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IdentifierExpr>n3l</IdentifierExpr></ExpressionPattern></CaseItem>:</SwitchCaseLabel><BreakStmt>
-      break</BreakStmt></SwitchCase><IfConfigDecl>
+      break</BreakStmt></SwitchCase><IfConfigDecl><IfConfigClause>
 #if <IdentifierExpr>FOO</IdentifierExpr><SwitchCase><SwitchCaseLabel>
     case <CaseItem><ValueBindingPattern>let <ExpressionPattern><TupleExpr>(<TupleElement><UnresolvedPatternExpr><IdentifierPattern>x</IdentifierPattern></UnresolvedPatternExpr>, </TupleElement><TupleElement><UnresolvedPatternExpr><IdentifierPattern>y</IdentifierPattern></UnresolvedPatternExpr></TupleElement>)  </TupleExpr></ExpressionPattern></ValueBindingPattern><WhereClause>where <PrefixOperatorExpr>!<IdentifierExpr>x</IdentifierExpr></PrefixOperatorExpr></WhereClause>, </CaseItem><CaseItem><ExpressionPattern><IdentifierExpr>n3l </IdentifierExpr></ExpressionPattern><WhereClause>where <BooleanLiteralExpr>false</BooleanLiteralExpr></WhereClause></CaseItem>:</SwitchCaseLabel><BreakStmt>
-      break</BreakStmt></SwitchCase>
+      break</BreakStmt></SwitchCase></IfConfigClause><IfConfigClause>
+#elseif <IdentifierExpr>BAR</IdentifierExpr><SwitchCase><SwitchCaseLabel>
+    case <CaseItem><ValueBindingPattern>let <IdentifierPattern>y</IdentifierPattern></ValueBindingPattern></CaseItem>:</SwitchCaseLabel><BreakStmt>
+      break</BreakStmt></SwitchCase></IfConfigClause><IfConfigClause>
+#else<SwitchCase><SwitchCaseLabel>
+    case <CaseItem><ExpressionPattern><FunctionCallExpr><ImplicitMemberExpr>.foo</ImplicitMemberExpr>(<FunctionCallArgument><UnresolvedPatternExpr><ValueBindingPattern>let <IdentifierPattern>x</IdentifierPattern></ValueBindingPattern></UnresolvedPatternExpr></FunctionCallArgument>)</FunctionCallExpr></ExpressionPattern></CaseItem>:</SwitchCaseLabel><BreakStmt>
+      break</BreakStmt></SwitchCase></IfConfigClause>
 #endif</IfConfigDecl><SwitchCase><SwitchDefaultLabel>
     default:</SwitchDefaultLabel><BreakStmt>
       break</BreakStmt></SwitchCase>
