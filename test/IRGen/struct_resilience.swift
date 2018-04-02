@@ -8,6 +8,9 @@
 import resilient_struct
 import resilient_enum
 
+// rdar://39116363
+// REQUIRES: OS=macosx
+
 // CHECK: %TSi = type <{ [[INT:i32|i64]] }>
 
 // CHECK-LABEL: @"$S17struct_resilience26StructWithResilientStorageVMf" = internal global
