@@ -2010,7 +2010,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
   return true;
 }
 
-static Expr *lookThroughExprsToImmediateDeallocation(Expr *E) {
+static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
   // Look through various expressions that don't affect the fact that the user
   // will be assigning a class instance that will be immediately deallocated.
   while (true) {
@@ -2072,20 +2072,23 @@ static Expr *lookThroughExprsToImmediateDeallocation(Expr *E) {
   }
 }
 
-static void diagnoseUnownedImmediateDeallocationImpl(VarDecl *varDecl,
-                                                     Expr *initExpr,
-                                                     TypeChecker &TC) {
-  auto *ownershipAttr = varDecl->getAttrs().getAttribute<OwnershipAttr>();
+static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
+                                                     const VarDecl *varDecl,
+                                                     const Expr *initExpr,
+                                                     SourceLoc diagLoc,
+                                                     SourceRange diagRange) {
+  auto *ownershipAttr =
+      varDecl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
   if (!ownershipAttr || ownershipAttr->isInvalid())
     return;
 
   // Only diagnose for non-owning ownerships such as 'weak' and 'unowned'.
   switch (ownershipAttr->get()) {
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     return;
-  case Ownership::Weak:
-  case Ownership::Unowned:
-  case Ownership::Unmanaged:
+  case ReferenceOwnership::Weak:
+  case ReferenceOwnership::Unowned:
+  case ReferenceOwnership::Unmanaged:
     break;
   }
 
@@ -2124,28 +2127,24 @@ static void diagnoseUnownedImmediateDeallocationImpl(VarDecl *varDecl,
   if (varDecl->getDeclContext()->isTypeContext())
     storageKind = SK_Property;
 
-  TC.diagnose(initExpr->getStartLoc(),
-              diag::unowned_assignment_immediate_deallocation,
+  TC.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
               varDecl->getName(),
               (unsigned) ownershipAttr->get(), (unsigned) storageKind)
-    .highlight(initExpr->getSourceRange());
+    .highlight(diagRange);
 
-  TC.diagnose(initExpr->getStartLoc(),
-              diag::unowned_assignment_requires_strong)
-    .highlight(initExpr->getSourceRange());
+  TC.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
+    .highlight(diagRange);
 
-  TC.diagnose(varDecl->getStartLoc(), diag::decl_declared_here,
-              varDecl->getFullName())
-    .highlight(varDecl->getSourceRange());
+  TC.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
 }
 
-void swift::diagnoseUnownedImmediateDeallocation(Expr *destExpr,
-                                                 Expr *initExpr,
-                                                 TypeChecker &TC) {
-  destExpr = destExpr->getValueProvidingExpr();
+void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                                 const AssignExpr *assignExpr) {
+  auto *destExpr = assignExpr->getDest()->getValueProvidingExpr();
+  auto *initExpr = assignExpr->getSrc();
 
   // Try to find a referenced VarDecl.
-  VarDecl *VD = nullptr;
+  const VarDecl *VD = nullptr;
   if (auto *DRE = dyn_cast<DeclRefExpr>(destExpr)) {
     VD = dyn_cast<VarDecl>(DRE->getDecl());
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(destExpr)) {
@@ -2153,12 +2152,14 @@ void swift::diagnoseUnownedImmediateDeallocation(Expr *destExpr,
   }
 
   if (VD)
-    diagnoseUnownedImmediateDeallocationImpl(VD, initExpr, TC);
+    diagnoseUnownedImmediateDeallocationImpl(TC, VD, initExpr,
+                                             assignExpr->getLoc(),
+                                             initExpr->getSourceRange());
 }
 
-void swift::diagnoseUnownedImmediateDeallocation(Pattern *pattern,
-                                                 Expr *initExpr,
-                                                 TypeChecker &TC) {
+void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                                 const Pattern *pattern,
+                                                 const Expr *initExpr) {
   pattern = pattern->getSemanticsProvidingPattern();
 
   if (auto *TP = dyn_cast<TuplePattern>(pattern)) {
@@ -2169,15 +2170,20 @@ void swift::diagnoseUnownedImmediateDeallocation(Pattern *pattern,
     auto TE = dyn_cast<TupleExpr>(initExpr);
     if (TE && TE->getNumElements() == TP->getNumElements()) {
       for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
-        TuplePatternElt &elt = TP->getElement(i);
-        Pattern *subPattern = elt.getPattern();
+        const TuplePatternElt &elt = TP->getElement(i);
+        const Pattern *subPattern = elt.getPattern();
         Expr *subInitExpr = TE->getElement(i);
 
-        diagnoseUnownedImmediateDeallocation(subPattern, subInitExpr, TC);
+        diagnoseUnownedImmediateDeallocation(TC, subPattern, subInitExpr);
       }
     }
   } else if (auto *NP = dyn_cast<NamedPattern>(pattern)) {
-    diagnoseUnownedImmediateDeallocationImpl(NP->getDecl(), initExpr, TC);
+    // FIXME: Ideally the diagnostic location should be on the equals '=' token
+    // of the pattern binding rather than at the start of the initializer
+    // expression (matching the above diagnostic logic for an assignment).
+    diagnoseUnownedImmediateDeallocationImpl(TC, NP->getDecl(), initExpr,
+                                             initExpr->getStartLoc(),
+                                             initExpr->getSourceRange());
   }
 }
 

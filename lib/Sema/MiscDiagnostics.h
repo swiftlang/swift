@@ -15,6 +15,7 @@
 
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -65,17 +66,19 @@ bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
 
-/// If \c destExpr refers to a declaration with a non-owning attribute, such as
-/// 'weak' or 'unowned' and \c initializer refers to a class constructor,
-/// emit a warning that the assigned instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(Expr *destExpr, Expr *initializer,
-                                          TypeChecker &TC);
+/// If \p assignExpr has a destination expression that refers to a declaration
+/// with a non-owning attribute, such as 'weak' or 'unowned' and the initializer
+/// expression refers to a class constructor, emit a warning that the assigned
+/// instance will be immediately deallocated.
+void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                          const AssignExpr *assignExpr);
 
-/// If \c pattern binds to a declaration with a non-owning attribute, such as
-/// 'weak' or 'unowned' and \c initializer refers to a class constructor,
+/// If \p pattern binds to a declaration with a non-owning attribute, such as
+/// 'weak' or 'unowned' and \p initializer refers to a class constructor,
 /// emit a warning that the bound instance will be immediately deallocated.
-void diagnoseUnownedImmediateDeallocation(Pattern *pattern, Expr *initializer,
-                                          TypeChecker &TC);
+void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                          const Pattern *pattern,
+                                          const Expr *initializer);
 
 /// Attempt to fix the type of \p decl so that it's a valid override for
 /// \p base...but only if we're highly confident that we know what the user

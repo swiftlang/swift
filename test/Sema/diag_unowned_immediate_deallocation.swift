@@ -436,6 +436,17 @@ func testInitializationThroughTupleElementDiag() {
   _ = c1; _ = c2; _ = c3
 }
 
+class E<T> {}
+
+func testGenericWeakClassDiag() {
+  weak var e = E<String>()
+  // expected-warning@-1 {{instance will be immediately deallocated as 'e' is a 'weak' variable}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'e' declared here}}
+
+  _ = e
+}
+
 // The diagnostic doesn't currently support tuple shuffles.
 func testDontDiagnoseThroughTupleShuffles() {
   unowned let (c1, (c2, c3)): (c: C, (b: C, a: C)) = ((a: D(), b: C()), c: D())
@@ -456,14 +467,14 @@ func testDontDiagnoseOnUnrelatedInitializer() {
   _ = c; _ = c1
 }
 
-class E {
+class F {
   var c: C?
   func makeC() -> C { return C() }
 }
 
 func testDontDiagnoseThroughMembers() {
-  weak var c1 = E().c
-  weak var c2 = E().makeC()
+  weak var c1 = F().c
+  weak var c2 = F().makeC()
   _ = c1; _ = c2
 }
 

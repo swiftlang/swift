@@ -3851,14 +3851,14 @@ namespace {
       if (!src)
         return nullptr;
 
+      expr->setSrc(src);
+
       if (!SuppressDiagnostics) {
         // If we're performing an assignment to a weak or unowned variable from
         // a constructor call, emit a warning that the instance will be
         // immediately deallocated.
-        auto &tc = cs.getTypeChecker();
-        diagnoseUnownedImmediateDeallocation(expr->getDest(), src, tc);
+        diagnoseUnownedImmediateDeallocation(cs.getTypeChecker(), expr);
       }
-      expr->setSrc(src);
       return expr;
     }
     

@@ -2232,7 +2232,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // If we're performing an binding to a weak or unowned variable from a
     // constructor call, emit a warning that the instance will be immediately
     // deallocated.
-    diagnoseUnownedImmediateDeallocation(pattern, initializer, *this);
+    diagnoseUnownedImmediateDeallocation(*this, pattern, initializer);
   }
 
   if (!resultTy && !initializer->getType())
