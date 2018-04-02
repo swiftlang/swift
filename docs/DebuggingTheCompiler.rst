@@ -417,6 +417,13 @@ debugging the swift compiler. These commands live in
 ``SWIFT_BINARY_DIR/bin/lldb-with-tools`` which launches lldb with those
 commands loaded.
 
+A command named ``sequence`` is included in lldbToolBox. ``sequence`` runs
+multiple semicolon separated commands together as one command. This can be used
+to define custom commands using just other lldb commands. For example,
+``custom_step()`` function defined above could be defined as::
+
+    (lldb) command alias cs sequence p/x $rax; stepi
+
 Reducing SIL test cases using bug_reducer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
