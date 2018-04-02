@@ -59,7 +59,7 @@ using SILParameterInfoList = llvm::SmallVector<SILParameterInfo, 8>;
 using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 
 //===----------------------------------------------------------------------===//
-//                           Utilities
+//                                 Utilities
 //===----------------------------------------------------------------------===//
 
 /// Return the single return value of the function.
@@ -87,7 +87,7 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 }
 
 //===----------------------------------------------------------------------===//
-//                     Function Signature Transformation 
+//                        Function Signature Transform
 //===----------------------------------------------------------------------===//
 
 struct FunctionSignatureTransformDescriptor {
@@ -790,9 +790,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
 }
 
-/// ----------------------------------------------------------///
-/// Dead argument transformation.                             ///
-/// ----------------------------------------------------------///
+//===----------------------------------------------------------------------===//
+//                         Dead Argument Elimination
+//===----------------------------------------------------------------------===//
+
 bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   SILFunction *F = TransformDescriptor.OriginalFunction;
