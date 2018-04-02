@@ -270,7 +270,7 @@ extension Sequence {
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the sequence.
   /// - Returns: A shuffled array of this sequence's elements.
-  @_inlineable
+  @inlinable
   public func shuffled<T: RandomNumberGenerator>(
     using generator: T
   ) -> [Element] {
@@ -286,7 +286,7 @@ extension Sequence {
   /// - Returns: A shuffled array of this sequence's elements.
   ///
   /// This uses the standard library's default random number generator.
-  @_inlineable
+  @inlinable
   public func shuffled() -> [Element] {
     return shuffled(using: Random.default)
   }
@@ -297,7 +297,7 @@ extension MutableCollection {
   ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the collection.
-  @_inlineable
+  @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: T
   ) {
@@ -321,7 +321,7 @@ extension MutableCollection {
   ///   the collection.
   ///
   /// This uses the standard library's default random number generator.
-  @_inlineable
+  @inlinable
   public mutating func shuffle() {
     shuffle(using: Random.default)
   }

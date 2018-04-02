@@ -2388,7 +2388,7 @@ where Self.RawSignificand : FixedWidthInteger,
   /// - Parameter generator: The random number generator to use when getting
   ///   the random floating point.
   /// - Returns: A random representation of this floating point.
-  @_inlineable
+  @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: ${Range}<Self>,
     using generator: T
@@ -2400,7 +2400,7 @@ where Self.RawSignificand : FixedWidthInteger,
     )
 %   end
     let delta = range.upperBound - range.lowerBound
-    let maxSignificand: Self.RawSignificand = 1 << Self.significandBitCount
+    let maxSignificand = Self.RawSignificand(1 << (Self.significandBitCount + 1))
 %   if 'Closed' not in Range:
     let rand: Self.RawSignificand = generator.next(upperBound: maxSignificand)
 %   else:
@@ -2409,11 +2409,7 @@ where Self.RawSignificand : FixedWidthInteger,
       return range.upperBound
     }
 %   end
-    let unitRandom = Self.init(
-      sign: .plus,
-      exponentBitPattern: (1 as Self).exponentBitPattern,
-      significandBitPattern: rand
-    ) - 1
+    let unitRandom = Self.init(rand) * Self.ulpOfOne / 2
     return delta * unitRandom + range.lowerBound
   }
 
@@ -2426,7 +2422,7 @@ where Self.RawSignificand : FixedWidthInteger,
   /// - Returns: A random representation of this floating point.
   ///
   /// This uses the standard library's default random number generator.
-  @_inlineable
+  @inlinable
   public static func random(in range: ${Range}<Self>) -> Self {
     return Self.random(in: range, using: Random.default)
   }

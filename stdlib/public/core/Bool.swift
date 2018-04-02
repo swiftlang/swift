@@ -93,7 +93,7 @@ public struct Bool {
   /// - Parameter generator: The random number generator to use when getting a
   ///   random Boolean.
   /// - Returns: A random Boolean.
-  @_inlineable
+  @inlinable
   public static func random<T: RandomNumberGenerator>(
     using generator: T
   ) -> Bool {
@@ -107,7 +107,7 @@ public struct Bool {
   /// - Returns: A random Boolean.
   ///
   /// This uses the standard library's default random number generator.
-  @_inlineable
+  @inlinable
   public static func random() -> Bool {
     return Bool.random(using: Random.default)
   }

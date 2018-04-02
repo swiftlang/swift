@@ -46,10 +46,10 @@ extension RandomNumberGenerator {
   ///
   /// This differs from next() as this function has the ability to transform the
   /// generated number to any unsigned integer.
-  @_inlineable
+  @inlinable
   public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
-    if T.bitWidth == UInt64.bitWidth {
-      return T(self.next())
+    if T.bitWidth <= UInt64.bitWidth {
+      return T(truncatingIfNeeded: self.next())
     }
 
     let (quotient, remainder) = T.bitWidth.quotientAndRemainder(
@@ -76,11 +76,12 @@ extension RandomNumberGenerator {
   /// - Parameter upperBound: The max number this can generate up to.
   /// - Returns: A number that was randomly generated from 0 to upperBound
   ///
-  /// This uses the uniform distribution to form a random number within the
-  /// upperBound.
-  @_inlineable
+  /// By default, this uses the uniform distribution to form a random number
+  /// that is less than the upperBound.
+  @inlinable
   public func next<T: FixedWidthInteger & UnsignedInteger>(upperBound: T) -> T {
-    let range = T.max % upperBound
+    let tmp = (T.max % upperBound) + 1
+    let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
 
     repeat {

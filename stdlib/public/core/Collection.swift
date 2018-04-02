@@ -1041,7 +1041,7 @@ extension Collection {
   ///         print(randomNumber)
   ///     }
   ///     // Could print "20", perhaps
-  @_inlineable
+  @inlinable
   public func random<T: RandomNumberGenerator>(
     using generator: T
   ) -> Element? {
@@ -1074,7 +1074,7 @@ extension Collection {
   ///     // Could print "20", perhaps
   ///
   /// This uses the standard library's default random number generator.
-  @_inlineable
+  @inlinable
   public func random() -> Element? {
     return random(using: Random.default)
   }
