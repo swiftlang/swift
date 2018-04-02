@@ -2659,6 +2659,9 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   if (isa<DestructorDecl>(decl))
     return;
 
+  auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
+  assert(attr && "should only be called on decls already marked @objc");
+
   // If this declaration overrides an @objc declaration, use its name.
   if (auto overridden = decl->getOverriddenDecl()) {
     if (overridden->isObjC()) {
@@ -2666,17 +2669,6 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
       if (auto overriddenFunc = dyn_cast<AbstractFunctionDecl>(overridden)) {
         // Determine the selector of the overridden method.
         ObjCSelector overriddenSelector = overriddenFunc->getObjCSelector();
-
-        // Dig out the @objc attribute on the method, if it exists.
-        auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
-        if (!attr) {
-          // There was no @objc attribute; add one with the
-          // appropriate name.
-          decl->getAttrs().add(ObjCAttr::create(tc.Context,
-                                                overriddenSelector,
-                                                true));
-          return;
-        }
 
         // Determine whether there is a name conflict.
         bool shouldFixName = !attr->hasName();
@@ -2711,18 +2703,6 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
         Identifier overriddenName = overriddenProp->getObjCPropertyName();
         ObjCSelector overriddenNameAsSel(tc.Context, 0, overriddenName);
 
-        // Dig out the @objc attribute, if specified.
-        auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
-        if (!attr) {
-          // There was no @objc attribute; add one with the
-          // appropriate name.
-          decl->getAttrs().add(
-            ObjCAttr::createNullary(tc.Context,
-                                    overriddenName,
-                                    /*isNameImplicit=*/true));
-          return;
-        }
-
         // Determine whether there is a name conflict.
         bool shouldFixName = !attr->hasName();
         if (attr->hasName() && *attr->getName() != overriddenNameAsSel) {
@@ -2751,11 +2731,9 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
     }
   }
 
-  // Dig out the @objc attribute. If it already has a name, do
-  // nothing; the protocol conformance checker will handle any
-  // mismatches.
-  auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
-  if (attr && attr->hasName()) return;
+  // If the decl already has a name, do nothing; the protocol conformance
+  // checker will handle any mismatches.
+  if (attr->hasName()) return;
 
   // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
@@ -2799,13 +2777,8 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 
   // If we have a name, install it via an @objc attribute.
   if (requirementObjCName) {
-    if (attr)
-      const_cast<ObjCAttr *>(attr)->setName(*requirementObjCName,
-                                            /*implicit=*/true);
-    else
-      decl->getAttrs().add(
-        ObjCAttr::create(tc.Context, *requirementObjCName,
-                         /*implicitName=*/true));
+    const_cast<ObjCAttr *>(attr)->setName(*requirementObjCName,
+                                          /*implicit=*/true);
   }
 }
 
@@ -3942,6 +3915,16 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   // of a storage declaration and need to be validated immediately.
   storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
   storage->setIsSetterMutating(computeIsSetterMutating(TC, storage));
+
+  // We can't delay validation of getters and setters on @objc properties,
+  // because if they never get validated at all then conformance checkers
+  // will complain about selector mismatches.
+  if (storage->isObjC()) {
+    if (auto *getter = storage->getGetter())
+      TC.validateDecl(getter);
+    if (auto *setter = storage->getSetter())
+      TC.validateDecl(setter);
+  }
 
   // Create a materializeForSet function if necessary.  This needs to
   // happen immediately so that subclass materializeForSet functions
