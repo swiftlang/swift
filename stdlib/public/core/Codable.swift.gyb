@@ -1968,7 +1968,7 @@ extension Set : Decodable where Element : Decodable {
   }
 }
 
-/// A wrapper for dictionary keys which are Strings or Ints.
+/// A wrapper for dictionary keys which conform to LosslessStringConvertible.
 @usableFromInline // FIXME(sil-serialize-all)
 @_fixed_layout // FIXME(sil-serialize-all)
 internal struct _DictionaryCodingKey : CodingKey {
@@ -1994,7 +1994,7 @@ internal struct _DictionaryCodingKey : CodingKey {
 extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
   /// Encodes the contents of this dictionary into the given encoder.
   ///
-  /// If the dictionary uses `String` or `Int` keys, the contents are encoded
+  /// If the dictionary uses LosslessStringConvertible keys, the contents are encoded
   /// in a keyed container. Otherwise, the contents are encoded as alternating
   /// key-value pairs in an unkeyed container.
   ///
@@ -2013,7 +2013,7 @@ extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
         try container.encode(value, forKey: codingKey)
       }
     } else {
-      // Keys are Encodable but not Strings or Ints, so we cannot arbitrarily
+      // Keys are Encodable but not LosslessStringConvertible, so we cannot arbitrarily
       // convert to keys. We can encode as an array of alternating key-value
       // pairs, though.
       var container = encoder.unkeyedContainer()
@@ -2036,7 +2036,6 @@ extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
   public init(from decoder: Decoder) throws {
     self.init()
 
-    // this handles String as well as Int, but also Int8, UInt8, Double, Float and all custom types conforming to LosslessStringConvertible
     if Key.self is LosslessStringConvertible.Type {
         let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
         for codingKey in container.allKeys {
