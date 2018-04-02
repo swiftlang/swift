@@ -3468,14 +3468,14 @@ public:
 } // end anonymous namespace
 
 void swift::verify(SourceFile &SF) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+#if !defined(SWIFT_DISABLE_AST_VERIFIER)
   Verifier verifier(SF, &SF);
   SF.walk(verifier);
 #endif
 }
 
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+#if !defined(SWIFT_DISABLE_AST_VERIFIER)
   if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
     return shouldVerify(ED->getExtendedType()->getAnyNominal(), Context);
   }
@@ -3493,9 +3493,8 @@ bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
 }
 
 void swift::verify(Decl *D) {
-#if !(defined(NDEBUG) || defined(SWIFT_DISABLE_AST_VERIFIER))
+#if !defined(SWIFT_DISABLE_AST_VERIFIER)
   Verifier V = Verifier::forDecl(D);
   D->walk(V);
 #endif
 }
-
