@@ -869,31 +869,35 @@ FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// Metadata *swift_getTupleTypeMetadata(TupleTypeFlags flags,
-//                                      Metadata * const *elts,
-//                                      const char *labels,
-//                                      value_witness_table_t *proposed);
-FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
+// MetadataResponse swift_getTupleTypeMetadata(MetadataRequest request,
+//                                             TupleTypeFlags flags,
+//                                             Metadata * const *elts,
+//                                             const char *labels,
+//                                             value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, SizeTy, TypeMetadataPtrTy->getPointerTo(0),
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_getTupleTypeMetadata2(Metadata *elt0, Metadata *elt1,
-//                                       const char *labels,
-//                                       value_witness_table_t *proposed);
-FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy,
+// MetadataResponse swift_getTupleTypeMetadata2(MetadataRequest request,
+//                                              Metadata *elt0, Metadata *elt1,
+//                                              const char *labels,
+//                                              value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_getTupleTypeMetadata3(Metadata *elt0, Metadata *elt1,
-//                                       Metadata *elt2, const char *labels,
-//                                       value_witness_table_t *proposed);
-FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+// MetadataResponse swift_getTupleTypeMetadata3(MetadataRequest request,
+//                                              Metadata *elt0, Metadata *elt1,
+//                                              Metadata *elt2,
+//                                              const char *labels,
+//                                              value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 

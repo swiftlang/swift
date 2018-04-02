@@ -325,6 +325,7 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
 static StringRef getStateName(MetadataState state) {
   switch (state) {
   case MetadataState::Complete: return "complete";
+  case MetadataState::NonTransitiveComplete: return "non-transitive-complete";
   case MetadataState::LayoutComplete: return "layout-complete";
   case MetadataState::Abstract: return "abstract";
   }
