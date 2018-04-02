@@ -19,37 +19,15 @@
 // the compiler supports infeed in a more generic way, we will redesign this.
 // This API should not be used for anything other than the Swift for TensorFlow
 // demo.
+@_versioned
 @_fixed_layout
-public struct Dataset<InputScalar : AccelerableByTensorFlow,
-                      OutputScalar : AccelerableByTensorFlow> {
-  @_versioned let dataSource: String = "mnist"
-  public let filePath: String
-  public let batchSize: Int32
-  public let inputShape: TensorShape
-  public let outputShape: TensorShape
+struct Dataset<InputScalar : AccelerableByTensorFlow,
+               OutputScalar : AccelerableByTensorFlow> {
+  public typealias Element = (Tensor<InputScalar>, Tensor<OutputScalar>)
 
   @_inlineable @inline(__always)
   public init(filePath: String, batchSize: Int32,
               inputShape: TensorShape, outputShape: TensorShape) {
-    self.filePath = filePath
-    self.batchSize = batchSize
-    self.inputShape = inputShape
-    self.outputShape = outputShape
-  }
-
-  public typealias Element = (Tensor<InputScalar>, Tensor<OutputScalar>)
-
-  @_inlineable @inline(__always)
-  public mutating func next() -> Element {
-    typealias ElementHandle = (TensorHandle<InputScalar>,
-                               TensorHandle<OutputScalar>)
-    let (xHandle, yHandle): ElementHandle = #tfop(
-      "tfc.makeIteratorGetNextWithDatasets",
-      dataSource: dataSource,
-      filePath: filePath,
-      batchSize: batchSize,
-      output_shapes: [inputShape, outputShape]
-    )
-    return (#tfop("Identity", xHandle), #tfop("Identity", yHandle))
+    fatalError("Unimplemented")
   }
 }
