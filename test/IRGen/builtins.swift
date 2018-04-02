@@ -191,7 +191,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
   // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
-  // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
+  // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 255
   // CHECK-NEXT: [[ALIGN:%.*]] = add i64 [[T3]], 1
   // CHECK-NEXT: store i64 [[ALIGN]], i64* [[A:%.*]]
   var a = Builtin.alignof(T.self)
