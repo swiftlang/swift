@@ -105,17 +105,17 @@ func tuple_existentials() {
   // 2 element tuple
   var t2 = (1,2.0)
   a = t2
-  // CHECK: call %swift.type* @swift_getTupleTypeMetadata2({{.*}}@"$SSiN{{.*}}",{{.*}}@"$SSdN{{.*}}", i8* null, i8** null)
+  // CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2(i64 %0, {{.*}}@"$SSiN{{.*}}",{{.*}}@"$SSdN{{.*}}", i8* null, i8** null)
 
 
   // 3 element tuple
   var t3 = ((),(),())
   a = t3
-  // CHECK: call %swift.type* @swift_getTupleTypeMetadata3({{.*}}@"$SytN{{.*}},{{.*}}@"$SytN{{.*}},{{.*}}@"$SytN{{.*}}, i8* null, i8** null)
+  // CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata3(i64 %0, {{.*}}@"$SytN{{.*}},{{.*}}@"$SytN{{.*}},{{.*}}@"$SytN{{.*}}, i8* null, i8** null)
 
   // 4 element tuple
   var t4 = (1,2,3,4)
   a = t4
-  // CHECK: call %swift.type* @swift_getTupleTypeMetadata(i64 4, {{.*}}, i8* null, i8** null)
+  // CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata(i64 %0, i64 4, {{.*}}, i8* null, i8** null)
 }
 
