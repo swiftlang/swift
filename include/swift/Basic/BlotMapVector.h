@@ -51,6 +51,9 @@ class BlotMapVector {
     iterator_range<iterator> getItems() {
       return swift::make_range(begin(), end());
     }
+    iterator_range<const_iterator> getItems() const {
+      return swift::make_range(begin(), end());
+    }
 
     ValueT &operator[](const KeyT &Arg) {
       auto Pair = Map.insert(std::make_pair(Arg, size_t(0)));
@@ -85,27 +88,34 @@ class BlotMapVector {
     }
 
     const_iterator find(const KeyT &Key) const {
-      return const_cast<BlotMapVector &>(*this)->find(Key);
+      return const_cast<BlotMapVector &>(*this).find(Key);
     }
 
-    /// This is similar to erase, but instead of removing the element from the
-    /// vector, it just zeros out the key in the vector. This leaves iterators
+    /// Eliminate the element at `Key`. Instead of removing the element from the
+    /// vector, just zero out the key in the vector. This leaves iterators
     /// intact, but clients must be prepared for zeroed-out keys when iterating.
-    void erase(const KeyT &Key) { blot(Key); }
+    ///
+    /// Return true if the element was erased.
+    bool erase(const KeyT &Key) { return blot(Key); }
 
-    /// This is similar to erase, but instead of removing the element from the
-    /// vector, it just zeros out the key in the vector. This leaves iterators
-    /// intact, but clients must be prepared for zeroed-out keys when iterating.
+    /// Eliminate the element at the given iterator. Instead of removing the
+    /// element from the vector, just zero out the key in the vector. This
+    /// leaves iterators intact, but clients must be prepared for zeroed-out
+    /// keys when iterating.
     void erase(iterator I) { erase((*I)->first); }
 
-    /// This is similar to erase, but instead of removing the element from the
+    /// Eliminate the element at `Key`. Instead of removing the element from the
     /// vector, it just zeros out the key in the vector. This leaves iterators
     /// intact, but clients must be prepared for zeroed-out keys when iterating.
-    void blot(const KeyT &Key) {
+    ///
+    /// Return true if the element was found and erased.
+    bool blot(const KeyT &Key) {
       typename MapT::iterator It = Map.find(Key);
-      if (It == Map.end()) return;
+      if (It == Map.end())
+        return false;
       Vector[It->second] = None;
       Map.erase(It);
+      return true;
     }
 
     void clear() {

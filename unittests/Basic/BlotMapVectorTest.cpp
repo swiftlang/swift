@@ -446,7 +446,7 @@ TYPED_TEST(BlotMapVectorTest, EraseTest) {
 // Test erase(value) method
 TYPED_TEST(BlotMapVectorTest, EraseTest2) {
   this->Map[this->getKey()] = this->getValue();
-  this->Map.erase(this->getKey());
+  EXPECT_TRUE(this->Map.erase(this->getKey()));
 
   EXPECT_EQ(0u, this->Map.size());
   EXPECT_TRUE(this->Map.empty());
@@ -639,9 +639,11 @@ TEST(BlotMapVectorCustomTest, SmallBlotMapVectorGrowTest) {
   for (unsigned i = 0; i < 20; ++i)
     map[i] = i + 1;
   for (unsigned i = 0; i < 10; ++i)
-    map.erase(i);
+    EXPECT_TRUE(map.erase(i));
   for (unsigned i = 20; i < 32; ++i)
     map[i] = i + 1;
+  for (unsigned i = 0; i < 10; ++i)
+    EXPECT_FALSE(map.erase(i));
 
   // Size tests
   EXPECT_EQ(22u, map.size());
