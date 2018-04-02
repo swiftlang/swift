@@ -448,7 +448,7 @@ public extension Tensor where Scalar : Numeric {
 public extension Float {
   static func randomUniform(state: RandomState? = nil) -> Float {
     let state = state ?? RandomState.global
-    return Float(state.generate()) / 0xFFFFFFFF
+    return Float(state.generate()) / Float(RAND_MAX)
   }
 
   private static var boxMullerHelper: Float = randomUniform()
@@ -466,7 +466,7 @@ public extension Float {
 public extension Double {
   static func randomUniform(state: RandomState? = nil) -> Double {
     let state = state ?? RandomState.global
-    return Double(state.generate()) / 0xFFFFFFFF
+    return Double(state.generate()) / Double(RAND_MAX)
   }
 
   private static var boxMullerHelper: Double = randomUniform()
@@ -515,7 +515,7 @@ public extension Tensor where Scalar : FloatingPoint {
   init(randomUniform shape: TensorShape, state: RandomState? = nil) {
     self = Tensor(
       Tensor<Int32>(randomStandardUniform: shape, state: state)
-    ) / 0xFFFFFFFF
+    ) / Scalar(RAND_MAX)
   }
 
   /// Creates a tensor with the specified shape, randomly sampling scalar values
