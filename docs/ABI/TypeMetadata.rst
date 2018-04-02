@@ -509,3 +509,236 @@ contains:
     3. Reserved for future use.
 
 - A 32-bit value reserved for future use.
+
+Recursive Type Metadata Dependencies
+------------------------------------
+
+The Swift type system is built up inductively by the application of
+higher-kinded type constructors (such as "tuple" or "function", as well
+as user-defined generic types) to other, existing types.  Crucially, it
+is the "least fixed point" of that inductive system, meaning that it
+does not include **infinite types** (µ-types) whose basic identity can
+only be defined in terms of themselves.
+
+That is, it is possible to write the type::
+
+  typealias IntDict = Dictionary<String, Int>
+
+but it is not possible to directly express the type::
+
+  typealias RecursiveDict = Dictionary<String, RecursiveDict>
+
+However, Swift does permit the expression of types that have recursive
+dependencies upon themselves in ways other than their basic identity.
+For example, class ``A`` may inherit from a superclass ``Base<A>``,
+or it may contain a field of type ``(A, A)``.  In order to support
+the dynamic reification of such types into type metadata, as well as
+to support the dynamic layout of such types, Swift's metadata runtime
+supports a system of metadata dependency and iterative initialization.
+
+Metadata States
+~~~~~~~~~~~~~~~
+
+A type metadata may be in one of several different dynamic states:
+
+- An **abstract** metadata stores just enough information to allow the
+  identity of the type to be recovered: namely, the metadata's kind
+  (e.g. **struct**) and any kind-specific identity information it
+  entails (e.g. the `nominal type descriptor`_ and any generic arguments).
+
+- A **layout-complete** metadata additionally stores the components of
+  the type's "external layout", necessary to compute the layout of any
+  type that directly stores a value of the type.  In particular, a
+  metadata in this state has a meaningful value witness table.
+
+- A **non-transitively complete** metadata has undergone any additional
+  initialization that is required in order to support basic operations
+  on the type.  For example, a metadata in this state will have undergone
+  any necessary "internal layout" that might be required in order to
+  create values of the type but not to allocate storage to hold them.
+  For example, a class metadata will have an instance layout, which is
+  not required in order to compute the external layout, but is required
+  in order to allocate instances or create a subclass.
+
+- A **complete** metadata additionally makes certain guarantees of
+  transitive completeness of the metadata referenced from the metadata.
+  For example, a complete metadata for ``Array<T>`` guarantees that
+  the metadata for ``T`` stored in the generic arguments vector is also
+  complete.
+
+Metadata never backtrack in their state.  In particular, once metadata
+is complete, it remains complete forever.
+
+Transitive Completeness Guarantees
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A complete class metadata makes the following guarantees:
+
+- Its superclass metadata (if it has a superclass) is complete.
+- Its generic arguments (if it has any) are complete.
+- By implication, the generic arguments of its superclasses are complete.
+
+A complete struct, enum, or optional metadata makes the following guarantees:
+
+- Its generic arguments (if it has any) are complete.
+
+A complete tuple metadata makes the following guarantees:
+
+- Its element types are complete.
+
+Other kinds of type metadata do not make any completeness guarantees.
+The metadata kinds with transitive guarantees are the metadata kinds that
+potentially require two-phase initialization anyway.  Other kinds of
+metadata could otherwise declare themselves complete immediately on
+allocation, so the transitive completeness guarantee would add significant
+complexity to both the runtime interface and its implementation, as well
+as adding probably-unrecoverable memory overhead to the allocation process.
+
+It is also true that it is far more important to be able to efficiently
+recover complete metadata from the stored arguments of a generic type
+than it is to be able to recover such metadata from a function metadata.
+
+Completeness Requirements
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Type metadata are required to be transitively complete when they are
+presented to most code.  This allows that code to work with the metadata
+without explicitly checking for its completeness.  Metadata in the other
+states are typically encountered only when initializing or building up
+metadata.
+
+Specifically, a type metadata record is required to be complete when:
+
+- It is passed as a generic argument to a function (other than a metadata
+  access function, witness table access function, or metadata initialization
+  function).
+- It is stored as a metatype value.
+- It is used to build an existential value.
+- It is passed as the ``Self`` argument to a ``static`` or ``class`` method,
+  including an initializer.
+
+Metadata Requests and Responses
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When calling a metadata access function, code must provide the following
+information:
+
+- the required state of the metadata, and
+- whether the callee should block until the metadata is available
+  in that state.
+
+The access function will then return:
+
+- the metadata and
+- the current dynamic state of the metadata.
+
+Access functions will always return the correct metadata record; they
+will never return a null pointer.  If the metadata has not been allocated
+at the time of the request, it will at least be allocated before the
+access function returns.  The runtime will block the current thread until
+the allocation completes if necessary, and there is currently no way to
+avoid this.
+
+Since access functions always return metadata that is at least in the
+abstract state, it is not meaningful to make a non-blocking request
+for abstract metadata.
+
+The returned dynamic state of the metadata may be less than the requested
+state if the request was non-blocking.  It is not otherwise affected by
+the request; it is the known dynamic state of the metadata at the time of
+the call.  Note that of course this dynamic state is just a lower bound
+on the actual dynamic state of the metadata, since the actual dynamic
+state may be getting concurrently advanced by another thread.
+
+In general, most code should request metadata in the **complete**
+state (as discussed above) and should block until the metadata is
+available in that state.  However:
+
+- When requesting metadata solely to serve as a generic argument of
+  another metadata, code should request **abstract** metadata.  This
+  can potentially unblock cycles involving the two metadata.
+
+- Metadata initialization code should generally make non-blocking
+  requests; see the next section.
+
+Metadata access functions that cache their results should only cache
+if the dynamic state is complete; this substantially simplifies the caching
+logic, and in practice most metadata will be dynamically complete.
+Note that this rule can be applied without considering the request.
+
+Code outside of the runtime should never attempt to ascertain a
+metadata's current state by inspecting it, e.g. to see if it has a value
+witness table.  Metadata initialization is not required to use
+synchronization when initializing the metadata record; the necessary
+synchronization is done at a higher level in the structures which record
+the metadata's dynamic state.  Because of this, code inspecting aspects
+of the metadata that have not been guaranteed by the returned dynamic
+state may observe partially-initialized state, such as a value witness
+table with a meaningless size value.  Instead, that code should call
+the ``swift_checkMetadataState`` function.
+
+Metadata Allocation and Initialization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In order to support recursive dependencies between type metadata,
+the creation of type metadata is divided into two phases:
+
+- allocation, which creates an abstract metadata, and
+- initialization, which advances the metadata through the progression
+  of states.
+
+Allocation cannot fail.  It should return relatively quickly and
+should not make any metadata requests.
+
+The initialization phase will be repeatedly executed until it reaches
+completion.  It is only executed by one thread at a time.
+Compiler-emitted initialization functions are given a certain amount
+of scratch space that is passed to all executions; this can be used
+to skip expensive or unrepeatable steps in later re-executions.
+
+Any particular execution of the initialization phase can fail due
+to an unsatisfied dependency.  It does so by returning a **metadata
+dependency**, which is a pair of a metadata and a required state for
+that metadata.  The initialization phase is expected to make only
+non-blocking requests for metadata.  If a response does not satisfy
+the requirement, the returned metadata and the requirement should
+be presented to the caller as a dependency.  The runtime does two
+things with this dependency:
+
+- It attempts to add the initialization to the **completion queue**
+  of the dependent metadata.  If this succeeds, the initialization
+  is considered blocked; it will be unblocked as soon as the
+  dependent metadata reaches the required state.  But it can also
+  fail if the dependency is already resolved due to concurrent
+  initialization; if so, the initialization is immediately resumed.
+
+- If it succeeds in blocking the initialization on the dependency,
+  it will check for an unresolvable dependency cycle.  If a cycle exists,
+  it will be reported on stderr and the runtime will abort the process.
+  This depends on the proper use of non-blocking requests; the runtime
+  does not make any effort to detect deadlock due to cycles of blocking
+  requests.
+
+Initialization must not repeatedly report failure based on stale
+information about the dynamic state of a metadata.  (For example,
+it must not cache metadata states from previous executions in the
+initialization scratch space.)  If this happens, the runtime may spin,
+repeatedly executing the initialization phase only to have it fail
+in the same place due to the same stale dependency.
+
+Compiler-emitted initialization functions are only responsible for
+ensuring that the metadata is **non-transitively complete**.
+They signal this by returning a null dependency to the runtime.
+The runtime will then ensure transitive completion.  The initialization
+function should not try to "help out" by requesting complete metadata
+instead of non-transitively-complete metadata; it is impossible to
+resolve certain recursive transitive-closure problems without the
+more holistic information available to the runtime.  In general, if
+an initialization function seems to require transitively-complete
+metadata for something, try to make it not.
+
+If a compiler-emitted initialization function returns a dependency,
+the current state of the metadata (**abstract** vs. **layout-complete**)
+will be determined by inspecting the **incomplete** bit in the flags
+of the value witness table.  Compiler-emitted initialization functions
+are therefore responsible for ensuring that this bit is set correctly.
