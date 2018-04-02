@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ClangImporter/ClangModule.h"
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
@@ -1446,15 +1447,16 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (!AFD->getBody())
     return false;
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
+  if (!isa<ClangModuleUnit>(AFD->getDeclContext()->getModuleScopeContext()))
+    if (Context.Stats)
+      Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
-  for (auto paramList : AFD->getParameterLists())
-    requestRequiredNominalTypeLayoutForParameters(paramList);
+  /*for (auto paramList : AFD->getParameterLists())
+    requestRequiredNominalTypeLayoutForParameters(paramList);*/
 
   if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
     return true;

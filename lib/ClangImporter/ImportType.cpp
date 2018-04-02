@@ -2330,11 +2330,12 @@ Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
 
   assert(!decl->hasClangNode() && "picked up the original type?");
 
+  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
+    return nominalDecl->getDeclaredType();
+
   if (auto *typeResolver = getTypeResolver())
     typeResolver->resolveDeclSignature(decl);
 
-  if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
-    return nominalDecl->getDeclaredType();
   return decl->getDeclaredInterfaceType();
 }
 

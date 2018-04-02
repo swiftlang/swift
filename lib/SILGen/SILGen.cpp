@@ -1574,11 +1574,15 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
       M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
   }
 
-  // Emit external definitions used by this module.
-  for (size_t i = 0, e = mod->getASTContext().LastCheckedExternalDefinition;
-       i != e; ++i) {
-    auto def = mod->getASTContext().ExternalDefinitions[i];
-    SGM.emitExternalDefinition(def);
+  {
+    // Emit external definitions used by this module.
+    for (size_t i = 0, e = mod->getASTContext().LastCheckedExternalDefinition;
+         i != e; ++i) {
+      
+      auto def = mod->getASTContext().ExternalDefinitions[i];
+      FrontendStatsTracer StatsTracer(mod->getASTContext().Stats, "SILGen-external", def);
+      SGM.emitExternalDefinition(def);
+    }
   }
 
   // Emit any delayed definitions that were forced.

@@ -3434,6 +3434,8 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     return EffectiveClangContext();
   }
 
+  return EffectiveClangContext();
+
   // Resolve the type.
   if (auto typeResolver = getTypeResolver())
     typeResolver->resolveDeclSignature(const_cast<NominalTypeDecl *>(nominal));

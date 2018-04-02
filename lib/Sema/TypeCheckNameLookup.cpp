@@ -367,9 +367,11 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     auto *typeDecl = cast<TypeDecl>(decl);
 
     // FIXME: This should happen before we attempt shadowing checks.
+    if (!isa<NominalTypeDecl>(typeDecl)) {
     validateDecl(typeDecl);
     if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
       continue;
+    }
 
     auto memberType = typeDecl->getDeclaredInterfaceType();
 

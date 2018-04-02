@@ -56,84 +56,10 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
   return true;
 }
 
-/// Process Decl, recursively deserializing any thing Decl may reference.
-bool SILLinkerVisitor::processFunction(StringRef Name) {
-  if (Mode == LinkingMode::LinkNone)
-    return false;
-
-  // If F is a declaration, first deserialize it.
-  auto *NewFn = Loader->lookupSILFunction(Name);
-
-  if (!NewFn || NewFn->isExternalDeclaration())
-    return false;
-
-  ++NumFuncLinked;
-
-  // Try to transitively deserialize everything referenced by NewFn.
-  Worklist.push_back(NewFn);
-  process();
-
-  // Since we successfully processed at least one function, return true.
-  return true;
-}
-
-/// Process Decl, recursively deserializing any thing Decl may reference.
-SILFunction *SILLinkerVisitor::lookupFunction(StringRef Name,
-                                              SILLinkage Linkage) {
-
-  auto *NewFn = Loader->lookupSILFunction(Name, /* declarationOnly */ true,
-                                          Linkage);
-
-  if (!NewFn)
-    return nullptr;
-
-  assert(NewFn->isExternalDeclaration() &&
-         "SIL function lookup should never read function bodies");
-
-  return NewFn;
-}
-
-/// Process Decl, recursively deserializing any thing Decl may reference.
-bool SILLinkerVisitor::hasFunction(StringRef Name,
-                                   Optional<SILLinkage> Linkage) {
-  return Loader->hasSILFunction(Name, Linkage);
-}
-
-/// Deserialize the VTable mapped to C if it exists and all SIL the VTable
-/// transitively references.
-///
-/// This method assumes that the caller made sure that no vtable existed in
-/// Mod.
-SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
-  // If we are not linking anything, bail.
-  if (Mode == LinkingMode::LinkNone)
-    return nullptr;
-
-  // Attempt to load the VTable from the SerializedSILLoader. If we
-  // fail... bail...
-  SILVTable *Vtbl = Loader->lookupVTable(C);
-  if (!Vtbl)
-    return nullptr;
-
-  // Otherwise, add all the vtable functions in Vtbl to the function
-  // processing list...
-  for (auto &E : Vtbl->getEntries())
-    Worklist.push_back(E.Implementation);
-
-  // And then transitively deserialize all SIL referenced by those functions.
-  process();
-
-  // Return the deserialized Vtbl.
-  return Vtbl;
-}
-
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
-
-  // If the SILModule does not have the VTable, attempt to deserialize the
-  // VTable. If we fail to do that as well, bail.
-  if (!Vtbl || !(Vtbl = Loader->lookupVTable(D->getName())))
+  if(!Vtbl)
     return false;
 
   // Ok we found our VTable. Visit each function referenced by the VTable. If
