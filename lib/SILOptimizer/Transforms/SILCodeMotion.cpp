@@ -506,10 +506,10 @@ void BBEnumTagDataflowState::mergePredecessorStates() {
   } while (PI != PE);
 
   for (unsigned ID : CurBBValuesToBlot) {
-    ValueToCaseMap.blot(ID);
+    ValueToCaseMap.erase(ID);
   }
   for (unsigned ID : PredBBValuesToBlot) {
-    EnumToEnumBBCaseListMap.blot(ID);
+    EnumToEnumBBCaseListMap.erase(ID);
   }
 }
 

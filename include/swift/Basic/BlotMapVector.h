@@ -95,21 +95,8 @@ class BlotMapVector {
     /// vector, just zero out the key in the vector. This leaves iterators
     /// intact, but clients must be prepared for zeroed-out keys when iterating.
     ///
-    /// Return true if the element was erased.
-    bool erase(const KeyT &Key) { return blot(Key); }
-
-    /// Eliminate the element at the given iterator. Instead of removing the
-    /// element from the vector, just zero out the key in the vector. This
-    /// leaves iterators intact, but clients must be prepared for zeroed-out
-    /// keys when iterating.
-    void erase(iterator I) { erase((*I)->first); }
-
-    /// Eliminate the element at `Key`. Instead of removing the element from the
-    /// vector, it just zeros out the key in the vector. This leaves iterators
-    /// intact, but clients must be prepared for zeroed-out keys when iterating.
-    ///
     /// Return true if the element was found and erased.
-    bool blot(const KeyT &Key) {
+    bool erase(const KeyT &Key) {
       typename MapT::iterator It = Map.find(Key);
       if (It == Map.end())
         return false;
@@ -117,6 +104,12 @@ class BlotMapVector {
       Map.erase(It);
       return true;
     }
+
+    /// Eliminate the element at the given iterator. Instead of removing the
+    /// element from the vector, just zero out the key in the vector. This
+    /// leaves iterators intact, but clients must be prepared for zeroed-out
+    /// keys when iterating.
+    void erase(iterator I) { erase((*I)->first); }
 
     void clear() {
       Map.clear();
