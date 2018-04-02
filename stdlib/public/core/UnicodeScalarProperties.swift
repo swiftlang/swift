@@ -1004,28 +1004,40 @@ extension Unicode.Scalar.Properties {
   internal func _scalarName(
     _ choice: __swift_stdlib_UCharNameChoice
   ) -> String? {
-    let initialCapacity = 256
-
-    var storage = _SwiftStringStorage<UTF8.CodeUnit>.create(
-      capacity: initialCapacity,
-      count: 0)
+    // Attempt to fit it into a small UTF-8 string first. Code points names are
+    // guaranteed by the standard to be ASCII only.
+    var smallString = _SmallUTF8String()
     var err = __swift_stdlib_U_ZERO_ERROR
-
-    let correctSize = _expandingStorageIfNeeded(&storage) { storage in
-      return storage.start.withMemoryRebound(
-        to: Int8.self,
-        capacity: storage.capacity
-      ) { storagePtr in
-        err = __swift_stdlib_U_ZERO_ERROR
-        return __swift_stdlib_u_charName(
-          _value, choice, storagePtr, Int32(storage.capacity), &err)
-      }
+    let correctSizeRaw = smallString._withMutableExcessCapacityBytes { ptr in
+      return __swift_stdlib_u_charName(
+        _value,
+        choice,
+        ptr.baseAddress._unsafelyUnwrappedUnchecked.assumingMemoryBound(
+          to: Int8.self),
+        Int32(ptr.count),
+        &err)
     }
 
-    guard err.isSuccess && correctSize > 0 else {
-      return nil
+    let correctSize = Int(correctSizeRaw)
+    if err.isSuccess {
+      if correctSize == 0 { return nil }
+      smallString.count = correctSize
+      return String(_StringGuts(smallString))
     }
-    return String(_storage: storage)
+    // If the call wasn't successful, the only error we expect to see is buffer
+    // overflow; anything else is a severe error.
+    guard err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+      fatalError("u_charName: Unexpected error retrieving scalar name.")
+    }
+
+    // If it didn't fit, we need to allocate the necessary amount of memory and
+    // make a regular ASCII string.
+    var (asciiArray, ptr) = [UInt8]._allocateUninitialized(correctSize)
+    _ = ptr.withMemoryRebound(to: Int8.self, capacity: correctSize) { int8Ptr in
+      err = __swift_stdlib_U_ZERO_ERROR
+      __swift_stdlib_u_charName(_value, choice, int8Ptr, correctSizeRaw, &err)
+    }
+    return String._fromASCII(asciiArray)
   }
 
   /// The published name of the scalar.
