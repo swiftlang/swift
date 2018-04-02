@@ -134,7 +134,7 @@ InfeedTests.testTPU("ElementIndexing") {
   /// Test scalars
   expectEqual(Array(stride(from: 40.0, to: 60, by: 1)), array2D.scalars)
   expectEqual(Array(stride(from: 35.0, to: 40, by: 1)), array1D.scalars)
-  expectEqual([43], array0D.scalars)  
+  expectEqual([43], array0D.scalars)
 }
 #endif
 

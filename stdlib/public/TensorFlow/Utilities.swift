@@ -25,7 +25,7 @@ import CTensorFlow
 // Standard library extensions
 //===----------------------------------------------------------------------===//
 
-public extension Sequence {
+extension Sequence {
   /// Returns true if all elements satisfy the predicate
   func forAll(_ predicate: (Element) throws -> Bool) rethrows -> Bool {
     return try first(where: { try !predicate($0) }) == nil

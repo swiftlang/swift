@@ -1173,8 +1173,8 @@ public extension Tensor {
   ///
   @_inlineable @inline(__always)
   func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> Tensor {
-    /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
-    /// preferably in graph.
+    // TODO: Precondition `lowerBounds.count == upperBounds.count`,
+    // preferably in graph.
     let lowerBoundsTensor = Tensor<Int32>(lowerBounds) 
     return #tfop("Slice", self, lowerBoundsTensor,
                  Tensor<Int32>(upperBounds) - lowerBoundsTensor)
