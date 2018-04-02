@@ -220,7 +220,10 @@ public:
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
+              std::string CompilationRecordPath,
+              bool OutputCompilationRecordForModuleOnlyBuild,
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+              llvm::sys::TimePoint<> LastBuildTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
@@ -303,19 +306,6 @@ public:
 
   void setShowJobLifecycle(bool value = true) {
     ShowJobLifecycle = value;
-  }
-
-  void setCompilationRecordPath(StringRef path) {
-    assert(CompilationRecordPath.empty() && "already set");
-    CompilationRecordPath = path;
-  }
-
-  void setOutputCompilationRecordForModuleOnlyBuild(bool value = true) {
-    OutputCompilationRecordForModuleOnlyBuild = value;
-  }
-
-  void setLastBuildTime(llvm::sys::TimePoint<> time) {
-    LastBuildTime = time;
   }
 
   /// Requests the path to a file containing all input source files. This can

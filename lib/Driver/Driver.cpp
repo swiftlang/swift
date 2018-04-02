@@ -268,6 +268,47 @@ class Driver::InputInfoMap
 };
 using InputInfoMap = Driver::InputInfoMap;
 
+/// Get the filename for build record. Returns true if failed.
+/// Additionally, set 'outputBuildRecordForModuleOnlyBuild' to true if this is
+/// full compilation with swiftmodule.
+static bool getCompilationRecordPath(std::string &buildRecordPath,
+                                     bool &outputBuildRecordForModuleOnlyBuild,
+                                     const OutputInfo &OI,
+                                     const Optional<OutputFileMap> &OFM,
+                                     DiagnosticEngine *Diags) {
+  if (!OFM) {
+    // FIXME: This should work without an output file map. We should have
+    // another way to specify a build record and where to put intermediates.
+    if (Diags)
+      Diags->diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
+    return true;
+  }
+
+  if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
+    buildRecordPath = masterOutputMap->lookup(file_types::TY_SwiftDeps);
+
+  if (buildRecordPath.empty()) {
+    if (Diags)
+      Diags->diagnose(SourceLoc(),
+                      diag::incremental_requires_build_record_entry,
+                      file_types::getTypeName(file_types::TY_SwiftDeps));
+    return true;
+  }
+
+  // In 'emit-module' only mode, use build-record filename suffixed with
+  // '~moduleonly'. So that module-only mode doesn't mess up build-record
+  // file for full compilation.
+  if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile) {
+    buildRecordPath = buildRecordPath.append("~moduleonly");
+  } else if (OI.ShouldTreatModuleAsTopLevelOutput) {
+    // If we emit module along with full compilation, emit build record
+    // file for '-emit-module' only mode as well.
+    outputBuildRecordForModuleOnlyBuild = true;
+  }
+
+  return false;
+}
+
 static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
                                      StringRef buildRecordPath,
                                      StringRef reason = "") {
@@ -282,7 +323,9 @@ static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
   return true;
 }
 
-static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
+static bool populateOutOfDateMap(InputInfoMap &map,
+                                 llvm::sys::TimePoint<> &LastBuildTime,
+                                 StringRef argsHashStr,
                                  const InputFileList &inputs,
                                  StringRef buildRecordPath,
                                  bool ShowIncrementalBuildDecisions) {
@@ -392,7 +435,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       llvm::sys::TimePoint<> timeVal;
       if (readTimeValue(i->getValue(), timeVal))
         return true;
-      map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
+      LastBuildTime = timeVal;
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
       auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
@@ -637,42 +680,22 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
+  std::string buildRecordPath;
+  bool outputBuildRecordForModuleOnlyBuild = false;
+  getCompilationRecordPath(buildRecordPath, outputBuildRecordForModuleOnlyBuild,
+                           OI, OFM, Incremental ? &Diags : nullptr);
+
   SmallString<32> ArgsHash;
   computeArgsHash(ArgsHash, *TranslatedArgList);
-
+  llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
   bool rebuildEverything = true;
-  if (Incremental) {
-    if (!OFM) {
-      // FIXME: This should work without an output file map. We should have
-      // another way to specify a build record and where to put intermediates.
-      Diags.diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
-
+  if (Incremental && !buildRecordPath.empty()) {
+    if (populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash, Inputs,
+                             buildRecordPath, ShowIncrementalBuildDecisions)) {
+      // FIXME: Distinguish errors from "file removed", which is benign.
     } else {
-      std::string buildRecordPath;
-      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
-        buildRecordPath = masterOutputMap->lookup(file_types::TY_SwiftDeps);
-
-      if (buildRecordPath.empty()) {
-        Diags.diagnose(SourceLoc(),
-                       diag::incremental_requires_build_record_entry,
-                       file_types::getTypeName(file_types::TY_SwiftDeps));
-        rebuildEverything = true;
-
-      } else {
-        // In 'emit-module' only mode, use '~moduleonly' suffixed build record
-        // file.
-        if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile)
-          buildRecordPath = buildRecordPath.append("~moduleonly");
-
-        if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
-                                 buildRecordPath,
-                                 ShowIncrementalBuildDecisions)) {
-          // FIXME: Distinguish errors from "file removed", which is benign.
-        } else {
-          rebuildEverything = false;
-        }
-      }
+      rebuildEverything = false;
     }
   }
 
@@ -699,20 +722,26 @@ Driver::buildCompilation(const ToolChain &TC,
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, OI, Level,
-                                                 std::move(ArgList),
-                                                 std::move(TranslatedArgList),
-                                                 std::move(Inputs),
-                                                 ArgsHash, StartTime,
-                                                 NumberOfParallelCommands,
-                                                 Incremental,
-                                                 BatchMode,
-                                                 DriverBatchSeed,
-                                                 DriverForceOneBatchRepartition,
-                                                 DriverSkipExecution,
-                                                 SaveTemps,
-                                                 ShowDriverTimeCompilation,
-                                                 std::move(StatsReporter)));
+  std::unique_ptr<Compilation> C(
+      new Compilation(Diags, TC, OI, Level,
+                      std::move(ArgList),
+                      std::move(TranslatedArgList),
+                      std::move(Inputs),
+                      buildRecordPath,
+                      outputBuildRecordForModuleOnlyBuild,
+                      ArgsHash,
+                      StartTime,
+                      LastBuildTime,
+                      NumberOfParallelCommands,
+                      Incremental,
+                      BatchMode,
+                      DriverBatchSeed,
+                      DriverForceOneBatchRepartition,
+                      DriverSkipExecution,
+                      SaveTemps,
+                      ShowDriverTimeCompilation,
+                      std::move(StatsReporter)));
+
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
@@ -749,30 +778,6 @@ Driver::buildCompilation(const ToolChain &TC,
   // emit .swiftdeps files for the next build.
   if (rebuildEverything)
     C->disableIncrementalBuild();
-
-  if (OFM) {
-    if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-      auto buildRecordFilename = masterOutputMap->lookup(file_types::TY_SwiftDeps);
-
-      // In 'emit-module' only mode, suffix build-record filename with
-      // '~moduleonly'. So that module-only mode doesn't mess up build-record
-      // file for full compilation.
-      if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile) {
-        C->setCompilationRecordPath(buildRecordFilename + "~moduleonly");
-      } else {
-        C->setCompilationRecordPath(buildRecordFilename);
-
-        // If we emit module along with full compilation, emit build record
-        // file for '-emit-module' only mode as well.
-        if (OI.ShouldTreatModuleAsTopLevelOutput)
-          C->setOutputCompilationRecordForModuleOnlyBuild();
-      }
-
-      auto buildEntry = outOfDateMap.find(nullptr);
-      if (buildEntry != outOfDateMap.end())
-        C->setLastBuildTime(buildEntry->second.previousModTime);
-    }
-  }
 
   if (Diags.hadAnyError())
     return nullptr;
