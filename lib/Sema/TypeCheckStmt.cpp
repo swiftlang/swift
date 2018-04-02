@@ -1145,6 +1145,9 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   if (E->getType()->is<AnyFunctionType>()) {
     bool isDiscardable = false;
     if (auto *Fn = dyn_cast<ApplyExpr>(E)) {
+      while (isa<ApplyExpr>(Fn->getFn())) {
+        Fn = cast<ApplyExpr>(Fn->getFn());
+      }
       if (auto *declRef = dyn_cast<DeclRefExpr>(Fn->getFn())) {
         if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(declRef->getDecl())) {
           if (funcDecl->getAttrs().hasAttribute<DiscardableResultAttr>()) {
