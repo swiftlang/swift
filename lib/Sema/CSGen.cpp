@@ -2797,6 +2797,10 @@ namespace {
       return E->getType();
     }
 
+    Type visitLOLCodeExpr(LOLCodeExpr *E) {
+      return CS.getType(E->getSubExpr());
+    }
+
     Type visitObjCSelectorExpr(ObjCSelectorExpr *E) {
       // #selector only makes sense when we have the Objective-C
       // runtime.

@@ -2478,6 +2478,14 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitLOLCodeExpr(LOLCodeExpr *E) {
+    printCommon(E, "lol_code_expr");
+    OS << " expr=";
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitKeyPathExpr(KeyPathExpr *E) {
     printCommon(E, "keypath_expr");
     if (E->isObjC())

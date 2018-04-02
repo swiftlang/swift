@@ -3991,6 +3991,11 @@ namespace {
       return E;
     }
 
+    Expr *visitLOLCodeExpr(LOLCodeExpr *E) {
+      cs.setType(E, cs.getType(E->getSubExpr()));
+      return E;
+    }
+
     Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
       // Dig out the reference to a declaration.
       Expr *subExpr = E->getSubExpr();

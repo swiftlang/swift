@@ -174,6 +174,7 @@ set(SWIFTLIB_SOURCES
   Availability.swift
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
+  LOLCode.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift

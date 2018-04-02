@@ -4593,6 +4593,33 @@ public:
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
 };
 
+  
+class LOLCodeExpr : public Expr {
+  SourceLoc KeywordLoc;
+  SourceLoc LParenLoc;
+  Expr *SubExpr;
+  SourceLoc RParenLoc;
+
+public:
+  LOLCodeExpr(SourceLoc keywordLoc, SourceLoc lParenLoc, Expr *subExpr,
+              SourceLoc rParenLoc)
+  : Expr(ExprKind::LOLCode, /*Implicit=*/false),
+    KeywordLoc(keywordLoc), LParenLoc(lParenLoc),
+    SubExpr(subExpr), RParenLoc(rParenLoc) {}
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *expr) { SubExpr = expr; }
+
+  SourceLoc getLoc() const { return KeywordLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(KeywordLoc, RParenLoc);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LOLCode;
+  }
+};
+
 /// Produces the Objective-C selector of the referenced method.
 ///
 /// \code

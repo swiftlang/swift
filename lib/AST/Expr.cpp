@@ -372,6 +372,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(Assign)
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
+    NON_LVALUE_EXPR(LOLCode)
     NON_LVALUE_EXPR(KeyPath)
     NON_LVALUE_EXPR(EnumIsCase)
 
@@ -479,6 +480,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(Binary);
   NO_REFERENCE(DotSyntaxCall);
   NO_REFERENCE(MakeTemporarilyEscapable);
+  NO_REFERENCE(LOLCode);
 
   PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
@@ -681,6 +683,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
+  case ExprKind::LOLCode:
     return true;
 
   case ExprKind::ObjectLiteral:

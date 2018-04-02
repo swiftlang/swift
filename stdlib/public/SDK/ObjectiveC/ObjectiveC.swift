@@ -178,19 +178,6 @@ public func autoreleasepool<Result>(
 }
 
 //===----------------------------------------------------------------------===//
-// Mark YES and NO unavailable.
-//===----------------------------------------------------------------------===//
-
-@available(*, unavailable, message: "Use 'Bool' value 'true' instead")
-public var YES: ObjCBool {
-  fatalError("can't retrieve unavailable property")
-}
-@available(*, unavailable, message: "Use 'Bool' value 'false' instead")
-public var NO: ObjCBool {
-  fatalError("can't retrieve unavailable property")
-}
-
-//===----------------------------------------------------------------------===//
 // NSObject
 //===----------------------------------------------------------------------===//
 
