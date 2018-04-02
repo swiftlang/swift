@@ -476,10 +476,6 @@ bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Fun);
 }
 
-bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
-}
-
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
           Linkage == SILLinkage::PublicExternal) &&
@@ -502,14 +498,12 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   }
 
   if (!F) {
-    SILLinkerVisitor Visitor(*this, getSILLoader(),
-                             SILModule::LinkingMode::LinkNormal);
     if (CurF) {
       // Perform this lookup only if a function with a given
       // name is present in the current module.
       // This is done to reduce the amount of IO from the
       // swift module file.
-      if (!Visitor.hasFunction(Name, Linkage))
+      if (!getSILLoader()->hasSILFunction(Name, Linkage))
         return nullptr;
       // The function in the current module will be changed.
       F = CurF;
@@ -519,7 +513,8 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
     // or if it is known to exist, perform a lookup.
     if (!F) {
       // Try to load the function from other modules.
-      F = Visitor.lookupFunction(Name, Linkage);
+      F = getSILLoader()->lookupSILFunction(Name, /*declarationOnly*/ true,
+                                            Linkage);
       // Bail if nothing was found and we are not sure if
       // this function exists elsewhere.
       if (!F)
@@ -545,9 +540,7 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
 bool SILModule::hasFunction(StringRef Name) {
   if (lookUpFunction(Name))
     return true;
-  SILLinkerVisitor Visitor(*this, getSILLoader(),
-                           SILModule::LinkingMode::LinkNormal);
-  return Visitor.hasFunction(Name);
+  return getSILLoader()->hasSILFunction(Name);
 }
 
 void SILModule::linkAllFromCurrentModule() {
