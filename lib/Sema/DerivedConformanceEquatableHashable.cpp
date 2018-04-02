@@ -661,11 +661,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
   eqDecl->copyFormalAccessFrom(typeDecl);
   eqDecl->setValidationStarted();
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (typeDecl->hasClangNode())
-    tc.Context.addExternalDecl(eqDecl);
+  tc.Context.addSynthesizedDecl(eqDecl);
 
   // Add the operator to the parent scope.
   cast<IterableDeclContext>(parentDecl)->addMember(eqDecl);
@@ -1054,11 +1050,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   getterDecl->setValidationStarted();
   getterDecl->copyFormalAccessFrom(typeDecl);
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (typeDecl->hasClangNode())
-    tc.Context.addExternalDecl(getterDecl);
+  tc.Context.addSynthesizedDecl(getterDecl);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
