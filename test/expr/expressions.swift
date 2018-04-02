@@ -600,6 +600,11 @@ class C {
   init(other: C?) { x = other }
 
   func method() {}
+
+  func method2() -> () -> String { return { "" } }
+
+  @discardableResult
+  func method3() -> () -> String { return { "" } }
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
@@ -702,6 +707,12 @@ func unusedExpressionResults() {
   let optionalc:C? = nil
   optionalc?.method()  // ok
   optionalc?.method  // expected-error {{expression resolves to an unused function}}
+
+  optionalc?.method2 // expected-error {{expression resolves to an unused function}}
+  optionalc?.method2() // expected-error {{expression resolves to an unused function}}
+
+  optionalc?.method3 // ok
+  optionalc?.method3() // ok
 }
 
 
