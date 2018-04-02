@@ -8,12 +8,13 @@ to the swift checkout.
 """
 
 import argparse
-import lldb
 import os
 import shlex
 import subprocess
 import sys
 import tempfile
+
+import lldb
 
 REPO_BASE = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir,
                                          os.pardir, os.pardir))
@@ -91,7 +92,7 @@ def sequence(debugger, command, exec_ctx, result, internal_dict):
     for subcommand in command.split(';'):
         subcommand = subcommand.strip()
         if not subcommand:
-            continue # skip empty commands
+            continue  # skip empty commands
 
         ret = lldb.SBCommandReturnObject()
         interpreter.HandleCommand(subcommand, exec_ctx, ret)
