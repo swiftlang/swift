@@ -41,8 +41,19 @@ All metadata records share a common header, with the following fields:
 
   The current kind values are as follows:
 
+  * `Class metadata`_ has of kind of **0** unless the class is required to
+    interoperate with Objective-C.  If the class is required to interoperate
+    with Objective-C, the kind field is instead an *isa pointer* to an
+    Objective-C metaclass.  Such a pointer can be distinguished from an
+    enumerated metadata kind because it is guaranteed to have a value larger
+    than **4096**.  Note that this is a more basic sense of interoperation
+    than is meant by the ``@objc`` attribute: it is what is required to
+    support Objective-C message sends and retain/release.  All classes are
+    required to interoperate with Objective-C on this level when building
+    for an Apple platform.
   * `Struct metadata`_ has a kind of **1**.
   * `Enum metadata`_ has a kind of **2**.
+  * `Optional metadata`_ has a kind of **3**.
   * **Opaque metadata** has a kind of **8**. This is used for compiler
     ``Builtin`` primitives that have no additional runtime information.
   * `Tuple metadata`_ has a kind of **9**.
@@ -50,10 +61,8 @@ All metadata records share a common header, with the following fields:
   * `Protocol metadata`_ has a kind of **12**. This is used for
     protocol types, for protocol compositions, and for the ``Any`` type.
   * `Metatype metadata`_ has a kind of **13**.
-  * `Class metadata`_, instead of a kind, has an *isa pointer* in its kind slot,
-    pointing to the class's metaclass record. This isa pointer is guaranteed
-    to have an integer value larger than **4096** and so can be discriminated
-    from non-class kind values.
+  * `Objective C class wrapper metadata`_ has a kind of **14**.
+  * `Existential metatype metadata`_ has a kind of **15**.
 
 Struct Metadata
 ~~~~~~~~~~~~~~~
@@ -63,19 +72,13 @@ contain the following fields:
 
 - The `nominal type descriptor`_ is referenced at **offset 1**.
 
-- A reference to the **parent** metadata record is stored at **offset 2**. For
-  structs that are members of an enclosing nominal type, this is a reference
-  to the enclosing type's metadata. For top-level structs, this is null.
-
-  TODO: The parent pointer is currently always null.
-
-- A vector of **field offsets** begins at **offset 3**. For each field of the
-  struct, in ``var`` declaration order, the field's offset in bytes from the
-  beginning of the struct is stored as a pointer-sized integer.
-
 - If the struct is generic, then the
-  `generic parameter vector`_ begins at **offset 3+n**, where **n** is the
-  number of fields in the struct.
+  `generic argument vector`_ begins at **offset 2**.
+
+- A vector of **field offsets** begins immediately after the generic
+  argument vector.  For each field of the struct, in ``var`` declaration
+  order, the field's offset in bytes from the beginning of the struct is
+  stored as a pointer-sized integer.
 
 Enum Metadata
 ~~~~~~~~~~~~~
@@ -85,14 +88,18 @@ contain the following fields:
 
 - The `nominal type descriptor`_ is referenced at **offset 1**.
 
-- A reference to the **parent** metadata record is stored at **offset 2**. For
-  enums that are members of an enclosing nominal type, this is a reference to
-  the enclosing type's metadata. For top-level enums, this is null.
-
-  TODO: The parent pointer is currently always null.
-
 - If the enum is generic, then the
-  `generic parameter vector`_ begins at **offset 3**.
+  `generic argument vector`_ begins at **offset 2**.
+
+- In certain circumstances, there is a `payload size`_ immediately following
+  the `generic argument vector`.
+
+Optional Metadata
+~~~~~~~~~~~~~~~~~
+
+Optional metadata share the same basic layout as enum metadata.  They are
+distinguished from enum metadata because of the importance of the
+``Optional`` type for various reflection and dynamic-casting purposes.
 
 Tuple Metadata
 ~~~~~~~~~~~~~~
@@ -102,15 +109,16 @@ contain the following fields:
 
 - The **number of elements** in the tuple is a pointer-sized integer at
   **offset 1**.
-- The **labels string** is a pointer to a list of consecutive null-terminated
-  label names for the tuple at **offset 2**. Each label name is given as a
-  null-terminated, UTF-8-encoded string in sequence. If the tuple has no
-  labels, this is a null pointer.
+- The **labels string** is a pointer to the labels for the tuple elements
+  at **offset 2**. Labels are encoded in UTF-8 and separated by spaces, and
+  the entire string is terminated with a null character.  For example, the
+  labels in the tuple type ``(x: Int, Int, z: Int)`` would be encoded as the
+  character array ``"x  z \0"``. A label (possibly zero-length) is provided
+  for each element of the tuple, meaning that the label string for a tuple
+  of **n** elements always contains exactly **n** spaces. If the tuple has
+  no labels at all, the label string is a null pointer.
 
-  TODO: The labels string pointer is currently always null, and labels are
-  not factored into tuple metadata uniquing.
-
-- The **element vector** begins at **offset 3** and consists of a vector of
+- The **element vector** begins at **offset 3** and consists of an array of
   type-offset pairs. The metadata for the *n*\ th element's type is a pointer
   at **offset 3+2*n**. The offset in bytes from the beginning of the tuple to
   the beginning of the *n*\ th element is at **offset 3+2*n+1**.
@@ -121,22 +129,20 @@ Function Metadata
 In addition to the `common metadata layout`_ fields, function metadata records
 contain the following fields:
 
-- The function flags are stored at **offset 1**, information contained by function
-  flags includes flags (8 bits) which _currently_ consists of 'throws' bit and
-  'parameter flags' bit, function convention (8 bits), and number of parameters (16 bits).
-- A reference to the **result type** metadata record is stored after function
-  flags. If the function has multiple returns, this references a `tuple metadata`_
+- The function flags are stored at **offset 1**.  This includes information
+  such as the semantic convention of the function, whether the function
+  throws, and how many parameters the function has.
+- A reference to the **result type** metadata record is stored at *offset 2**.
+  If the function has multiple returns, this references a `tuple metadata`_
   record.
 - The **parameter type vector** follows the result type and consists of
-  NumParameters type metadata pointers corresponding to the types of the parameters.
-- The optional **parameter flags vector** begins after the end of **parameter type vector**
-  and consists of NumParameters unsigned 32-bit integer values representing flags
-  for each parameter such as inout, __shared, variadic and possibly others. This
-  vector is present only if the hasParameterFlags() function flag is set; otherwise
-  all of the parameter flags are assumed to be zero.
-
-  If the function takes no arguments, **parameter type vector** as well as
-  **parameter flags vector** are going to be empty.
+  **NumParameters** type metadata pointers corresponding to the types of the parameters.
+- The optional **parameter flags vector** begins after the end of
+  **parameter type vector** and consists of **NumParameters** 32-bit flags.
+  This includes information such as whether the parameter is ``inout`` or
+  whether it is variadic.  The presence of this vector is signalled by a flag
+  in the function flags; if no parameter has any non-default flags, the flag
+  is not set.
 
 Currently we have specialized ABI endpoints to retrieve metadata for functions
 with 0/1/2/3 parameters - `swift_getFunctionTypeMetadata{0|1|2|3}` and the general
@@ -186,6 +192,18 @@ contain the following fields:
 
 - A reference to the metadata record for the **instance type** that the metatype
   represents is stored at **offset 1**.
+
+Existential Metatype Metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In addition to the `common metadata layout`_ fields, existential metatype
+metadata records contain the following fields:
+
+- A reference to the metadata record for the **instance type** of the metatype
+  is stored at **offset 1**.  This is always either an existential type
+  metadata or another existential metatype.
+
+- A word of flags summarizing the existential type are stored at **offset 2**.
 
 Class Metadata
 ~~~~~~~~~~~~~~
@@ -240,7 +258,7 @@ classes.
 
     TODO: The parent pointer is currently always null.
 
-  * If the class is generic, its `generic parameter vector`_ is stored inline.
+  * If the class is generic, its `generic argument vector`_ is stored inline.
   * The **vtable** is stored inline and contains a function pointer to the
     implementation of every method of the class in declaration order.
   * If the layout of a class instance is dependent on its generic parameters,
@@ -252,11 +270,23 @@ classes.
   Note that none of these fields are present for Objective-C base classes in
   the inheritance hierarchy.
 
-Generic Parameter Vector
-~~~~~~~~~~~~~~~~~~~~~~~~
+Objective C class wrapper metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Objective-C class wrapper metadata are used when an Objective-C ``Class``
+object is not a valid Swift type metadata.
+
+In addition to the `common metadata layout`_ fields, Objective-C class
+wrapper metadata records have the following fields:
+
+- A ``Class`` value at **offset 1** which is known to not be a Swift type
+  metadata.
+
+Generic Argument Vector
+~~~~~~~~~~~~~~~~~~~~~~~
 
 Metadata records for instances of generic types contain information about their
-generic parameters. For each parameter of the type, a reference to the metadata
+generic arguments. For each parameter of the type, a reference to the metadata
 record for the type argument is stored.  After all of the type argument
 metadata references, for each type parameter, if there are protocol
 requirements on that type parameter, a reference to the witness table for each
@@ -296,6 +326,8 @@ reference counting but are otherwise opaque to the Swift runtime.
 
 Nominal Type Descriptor
 ~~~~~~~~~~~~~~~~~~~~~~~
+
+**Warning: this is all out of date!**
 
 The metadata records for class, struct, and enum types contain a pointer to a
 **nominal type descriptor**, which contains basic information about the nominal
