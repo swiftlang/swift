@@ -210,7 +210,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
 
         // Verify noescape parameter uses.
-        checkNoEscapeParameterUse(DRE, nullptr, OperandKind::None);
+        checkNoEscapeParameterUse(DRE, Parent.getAsExpr(), OperandKind::None);
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
@@ -371,15 +371,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             .highlight(IOE->getSubExpr()->getSourceRange());
       }
 
-      // Diagnose 'self.init' or 'super.init' nested in another expression.
+      // Diagnose 'self.init' or 'super.init' nested in another expression
+      // or closure.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        bool inDefer = false;
-        auto *innerDecl = DC->getInnermostDeclarationDeclContext();
-        if (auto *FD = dyn_cast_or_null<FuncDecl>(innerDecl)) {
-          inDefer = FD->isDeferBody();
-        }
-
-        if (!Parent.isNull() || !IsExprStmt || inDefer) {
+        if (!Parent.isNull() || !IsExprStmt || DC->getParent()->isLocalContext()) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -708,7 +703,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
       // validates that the noescape bit didn't get stripped off), or as
-      // a special case, in the binding of a withoutActuallyEscaping block.
+      // a special case, e.g. in the binding of a withoutActuallyEscaping block
+      // or the argument of a type(of: ...).
       if (parent) {
         if (auto apply = dyn_cast<ApplyExpr>(parent)) {
           if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
@@ -718,6 +714,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                    && useKind == OperandKind::Argument) {
           return;
         } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
+          return;
+        } else if (isa<DynamicTypeExpr>(parent)) {
           return;
         }
       }
@@ -1428,27 +1426,42 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     }
     
-    /// Return true if this is 'nil' type checked as an Optional.  This looks
-    /// like this:
-    ///   (call_expr implicit type='Int?'
-    ///     (constructor_ref_call_expr implicit
-    ///       (declref_expr implicit decl=Optional.init(nilLiteral:)
-    static bool isTypeCheckedOptionalNil(Expr *E) {
-      auto CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr());
+    /// Return true if this is a 'nil' literal.  This looks
+    /// like this if the type is Optional<T>:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    /// Or like this if it is any other ExpressibleByNilLiteral type:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    bool isTypeCheckedOptionalNil(Expr *E) {
+      auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
       if (!CE || !CE->isImplicit())
         return false;
-      
+
+      // First case -- Optional.none
+      if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
+        return DRE->getDecl() == TC.Context.getOptionalNoneDecl();
+
+      // Second case -- init(nilLiteral:)
       auto CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getSemanticFn());
       if (!CRCE || !CRCE->isImplicit()) return false;
-      
-      auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn());
-      
-      SmallString<32> NameBuffer;
-      auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
-      return name == "init(nilLiteral:)";
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn())) {
+        SmallString<32> NameBuffer;
+        auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
+        return name == "init(nilLiteral:)";
+      }
+
+      return false;
     }
-    
-    
+
+
     /// Warn about surprising implicit optional promotions involving operands to
     /// calls.  Specifically, we warn about these expressions when the 'x'
     /// operand is implicitly promoted to optional:
@@ -2587,7 +2600,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
     auto isWrittenLet = false;
-    if (var->isLet() || var->isShared()) {
+    if (var->isImmutable()) {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
@@ -2726,7 +2739,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a mutable 'var', and it was never written to, suggest
     // upgrading to 'let'.  We do this even for a parameter.
-    if (!(var->isLet() || var->isShared()) && (access & RK_Written) == 0 &&
+    if (!var->isImmutable() && (access & RK_Written) == 0 &&
         // Don't warn if we have something like "let (x,y) = ..." and 'y' was
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
@@ -3506,7 +3519,7 @@ public:
 
         // Only print the parentheses if there are some argument
         // names, because "()" would indicate a call.
-        if (argNames.size() > 0) {
+        if (!argNames.empty()) {
           out << "(";
           for (auto argName : argNames) {
             if (argName.empty()) out << "_";
@@ -4086,7 +4099,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     return None;
 
   // String'ify the arguments.
-  StringRef baseNameStr = name.getBaseIdentifier().str();
+  StringRef baseNameStr = name.getBaseName().userFacingName();
   SmallVector<StringRef, 4> argNameStrs;
   for (auto arg : name.getArgumentNames()) {
     if (arg.empty())
@@ -4134,23 +4147,24 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
-                                      Identifier old) -> Identifier{
+                                      DeclBaseName old) -> DeclBaseName{
     if (name.empty())
       return Identifier();
 
-    if (!old.empty() && name == old.str())
+    if (!old.empty() && name == old.userFacingName())
       return old;
 
     return Context.getIdentifier(name);
   };
 
-  Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseIdentifier());
+  auto newBaseName = getReplacementIdentifier(
+      baseNameStr, name.getBaseName());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
-    newArgNames.push_back(getReplacementIdentifier(argNameStrs[i],
-                                                   oldArgNames[i]));
+    auto argBaseName = getReplacementIdentifier(argNameStrs[i],
+                                                oldArgNames[i]);
+    newArgNames.push_back(argBaseName.getIdentifier());
   }
 
   return DeclName(Context, newBaseName, newArgNames);

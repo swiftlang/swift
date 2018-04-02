@@ -855,6 +855,12 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 
   configureInterfaceType(func, sig);
+
+  // Make sure that there are no unresolved
+  // dependent types in the generic signature.
+  assert(func->getInterfaceType()->hasError() ||
+         !func->getInterfaceType()->findUnresolvedDependentMemberType());
+
   return sig;
 }
 
@@ -1141,13 +1147,14 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                       bool allowConcreteGenericParams,
                       ExtensionDecl *ext,
                       llvm::function_ref<void(GenericSignatureBuilder &)>
-                        inferRequirements) {
+                        inferRequirements,
+                      bool mustInferRequirements) {
   assert(genericParams && "Missing generic parameters?");
   bool recursivelyVisitGenericParams =
     genericParams->getOuterParameters() && !parentSig;
 
   GenericSignature *sig;
-  if (!ext || ext->getTrailingWhereClause() ||
+  if (!ext || mustInferRequirements || ext->getTrailingWhereClause() ||
       getExtendedTypeGenericDepth(ext) != genericParams->getDepth()) {
     // Collect the generic parameters.
     SmallVector<GenericTypeParamType *, 4> allGenericParams;

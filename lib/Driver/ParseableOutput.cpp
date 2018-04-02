@@ -15,7 +15,7 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
-#include "swift/Driver/Types.h"
+#include "swift/Frontend/FileTypes.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -30,7 +30,7 @@ namespace {
     CommandInput(StringRef Path) : Path(Path) {}
   };
 
-  typedef std::pair<types::ID, std::string> OutputPair;
+  using OutputPair = std::pair<file_types::ID, std::string>;
 } // end anonymous namespace
 
 namespace swift {
@@ -43,19 +43,18 @@ namespace json {
     static bool mustQuote(StringRef) { return true; }
   };
 
-  template<>
-  struct ScalarEnumerationTraits<types::ID> {
-    static void enumeration(Output &out, types::ID &value) {
-      types::forAllTypes([&](types::ID ty) {
-        std::string typeName = types::getTypeName(ty);
+  template <> struct ScalarEnumerationTraits<file_types::ID> {
+    static void enumeration(Output &out, file_types::ID &value) {
+      file_types::forAllTypes([&](file_types::ID ty) {
+        std::string typeName = file_types::getTypeName(ty);
         out.enumCase(value, typeName.c_str(), ty);
       });
     }
   };
 
-  template<>
-  struct ObjectTraits<std::pair<types::ID, std::string>> {
-    static void mapping(Output &out, std::pair<types::ID, std::string> &value) {
+  template <> struct ObjectTraits<std::pair<file_types::ID, std::string>> {
+    static void mapping(Output &out,
+                        std::pair<file_types::ID, std::string> &value) {
       out.mapRequired("type", value.first);
       out.mapRequired("path", value.second);
     }
@@ -98,12 +97,18 @@ public:
 };
 
 class DetailedCommandBasedMessage : public CommandBasedMessage {
+  std::string Executable;
+  SmallVector<std::string, 16> Arguments;
   std::string CommandLine;
   SmallVector<CommandInput, 4> Inputs;
   SmallVector<OutputPair, 8> Outputs;
 public:
   DetailedCommandBasedMessage(StringRef Kind, const Job &Cmd) :
       CommandBasedMessage(Kind, Cmd) {
+    Executable = Cmd.getExecutable();
+    for (const auto &A : Cmd.getArguments()) {
+      Arguments.push_back(A);
+    }
     llvm::raw_string_ostream wrapper(CommandLine);
     Cmd.printCommandLine(wrapper, "");
     wrapper.flush();
@@ -125,23 +130,25 @@ public:
     }
 
     // TODO: set up Outputs appropriately.
-    types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
-    if (PrimaryOutputType != types::TY_Nothing) {
+    file_types::ID PrimaryOutputType = Cmd.getOutput().getPrimaryOutputType();
+    if (PrimaryOutputType != file_types::TY_Nothing) {
       for (const std::string &OutputFileName : Cmd.getOutput().
                                                  getPrimaryOutputFilenames()) {
         Outputs.push_back(OutputPair(PrimaryOutputType, OutputFileName));
       }
     }
-    types::forAllTypes([&](types::ID Ty) {
-      auto Output = Cmd.getOutput().getAdditionalOutputForType(Ty);
-      if (!Output.empty())
+    file_types::forAllTypes([&](file_types::ID Ty) {
+      for (auto Output : Cmd.getOutput().getAdditionalOutputsForType(Ty)) {
         Outputs.push_back(OutputPair(Ty, Output));
+      }
     });
   }
 
   void provideMapping(swift::json::Output &out) override {
     Message::provideMapping(out);
-    out.mapRequired("command", CommandLine);
+    out.mapRequired("command", CommandLine); // Deprecated, do not document
+    out.mapRequired("command_executable", Executable);
+    out.mapRequired("command_arguments", Arguments);
     out.mapOptional("inputs", Inputs);
     out.mapOptional("outputs", Outputs);
   }

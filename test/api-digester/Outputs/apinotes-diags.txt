@@ -11,5 +11,6 @@ APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.getPropertyA() has be
 APINotesTest(APINotesTest.h): Protocol SwiftTypeWithMethodLeft has been renamed to Protocol SwiftTypeWithMethodRight
 
 /* Type Changes */
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [String : Any] to [AnimalAttributeName : Any]
 
 /* Decl Attribute changes */

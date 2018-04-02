@@ -189,7 +189,7 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
   SILInstruction::Bits.AllocRefInstBase.NumTailTypes = ElementTypes.size();
   assert(SILInstruction::Bits.AllocRefInstBase.NumTailTypes ==
          ElementTypes.size() && "Truncation");
-  assert(!objc || ElementTypes.size() == 0);
+  assert(!objc || ElementTypes.empty());
 }
 
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
@@ -199,7 +199,7 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                    ArrayRef<SILValue> ElementCountOperands,
                                    SILOpenedArchetypesState &OpenedArchetypes) {
   assert(ElementTypes.size() == ElementCountOperands.size());
-  assert(!objc || ElementTypes.size() == 0);
+  assert(!objc || ElementTypes.empty());
   SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
                                        ElementCountOperands.end());
   for (SILType ElemType : ElementTypes) {
@@ -1762,6 +1762,8 @@ OpenExistentialAddrInst::OpenExistentialAddrInst(
 OpenExistentialRefInst::OpenExistentialRefInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+  assert(Operand->getType().isObject() && "Operand must be an object.");
+  assert(Ty.isObject() && "Result type must be an object type.");
 }
 
 OpenExistentialMetatypeInst::OpenExistentialMetatypeInst(
@@ -1996,7 +1998,7 @@ ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 
 ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
-    SILOpenedArchetypesState &OpenedArchetypes) {
+    SILOpenedArchetypesState &OpenedArchetypes, bool isLifetimeGuaranteed) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2005,7 +2007,7 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertEscapeToNoEscapeInst));
   auto *CFI = ::new (Buffer) ConvertEscapeToNoEscapeInst(
-      DebugLoc, Operand, TypeDependentOperands, Ty);
+      DebugLoc, Operand, TypeDependentOperands, Ty, isLifetimeGuaranteed);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //

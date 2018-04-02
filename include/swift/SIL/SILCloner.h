@@ -984,10 +984,10 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createConvertEscapeToNoEscape(
-                          getOpLocation(Inst->getLoc()),
-                          getOpValue(Inst->getOperand()),
-                          getOpType(Inst->getType())));
+  doPostProcess(
+      Inst, getBuilder().createConvertEscapeToNoEscape(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()), Inst->isLifetimeGuaranteed()));
 }
 
 template<typename ImplClass>
@@ -2012,6 +2012,14 @@ visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createIsUniqueOrPinned(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand())));
+}
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitIsEscapingClosureInst(
+    IsEscapingClosureInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createIsEscapingClosure(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

@@ -1,6 +1,6 @@
+
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: optimized_stdlib
-// UNSUPPORTED: resilient_stdlib
 
 public struct BigStruct {
   var i0 : Int32 = 0
@@ -44,9 +44,9 @@ let bigStructGlobalArray : [BigStruct] = [
   BigStruct()
 ]
 
-// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @"$S22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcx_Sg* nocapture dereferenceable({{.*}})
-// CHECK: call void @"$SSqWy
-// CHECK: call void @"$SSqWe
+// CHECK-LABEL: define{{( protected)?}} internal swiftcc void @"$S22big_types_corner_cases21OptionalInoutFuncTypeC7executeyys5Error_pSgFyyXEfU_"(%T22big_types_corner_cases9BigStructVSg* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases21OptionalInoutFuncTypeC*, %T22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_Sg* nocapture dereferenceable({{.*}})
+// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOe
+// CHECK: call void @"$S22big_types_corner_cases9BigStructVSgs5Error_pSgIegcg_SgWOy
 // CHECK: ret void
 
 public func f1_returns_BigType(_ x: BigStruct) -> BigStruct {
@@ -150,7 +150,6 @@ public func enumCallee(_ x: LargeEnum) {
 // CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK-64: call swiftcc void @"$S22big_types_corner_cases9SuperBaseC4boomAA9BigStructVyF"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %T22big_types_corner_cases9SuperBaseC* swiftself {{.*}})
 // CHECK: ret void
 class SuperBase {
@@ -206,13 +205,15 @@ public func testGetFunc() {
 }
 
 // CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself)
-// CHECK: [[CALL1:%.*]] = call %swift.type* @"$SSayy22big_types_corner_cases9BigStructVcSgGMa"
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$SSayy22big_types_corner_cases9BigStructVcSgGMa"
+// CHECK: [[CALL1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[CALL2:%.*]] = call i8** @"$SSayy22big_types_corner_cases9BigStructVcSgGSayxGs10CollectionsWl
-// CHECK: call swiftcc void @"$Ss10CollectionPsE5index5where5IndexQzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegir_Sg*, %swift.refcounted*, %swift.error**)* @"$S22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIgxdzo_ACytIegir_SgSbsAE_pIegidzo_TRTA" to i8*), %swift.opaque* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
+// CHECK: call swiftcc void @"$Ss10CollectionPsE5index5where5IndexQzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegnr_Sg*, %swift.refcounted*, %swift.error**)* @"$S22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIggdzo_ACytIegnr_SgSbsAE_pIegndzo_TRTA" to i8*), %swift.opaque* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
 // CHECK: ret void
 
 // CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases7TestBigC5test2yyF"(%T22big_types_corner_cases7TestBigC* swiftself)
-// CHECK: [[CALL1:%.*]] = call %swift.type* @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGMa"
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGMa"
+// CHECK: [[CALL1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[CALL2:%.*]] = call i8** @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGSayxGs10CollectionsWl"
 // CHECK: call swiftcc void @"$Ss10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF"(%Ts16IndexingIteratorV* noalias nocapture sret {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself {{.*}})
 // CHECK: ret void

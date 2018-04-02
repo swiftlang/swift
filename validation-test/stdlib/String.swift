@@ -912,22 +912,34 @@ StringTests.test("stringGutsReserve")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
-  for k in 0...5 {
+  for k in 0...7 {
     var base: String
     var startedNative: Bool
     let shared: String = "X"
+
+    // Managed native, unmanaged native, or small
+    func isSwiftNative(_ s: String) -> Bool {
+      return s._guts._isNative || s._guts._isSmall || s._guts._isUnmanaged
+    }
 
     switch k {
     case 0: (base, startedNative) = (String(), true)
     case 1: (base, startedNative) = (asciiString("x"), true)
     case 2: (base, startedNative) = ("Ξ", true)
+#if arch(i386) || arch(arm)
     case 3: (base, startedNative) = ("x" as NSString as String, false)
     case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
+#else
+    case 3: (base, startedNative) = ("x" as NSString as String, true)
+    case 4: (base, startedNative) = ("x" as NSMutableString as String, true)
+#endif
     case 5: (base, startedNative) = (shared, true)
+    case 6: (base, startedNative) = ("xá" as NSString as String, false)
+    case 7: (base, startedNative) = ("xá" as NSMutableString as String, false)
     default:
       fatalError("case unhandled!")
     }
-    expectEqual(base._guts._isNative || base._guts._isUnmanaged, startedNative)
+    expectEqual(isSwiftNative(base), startedNative)
     
     let originalBuffer = base.bufferID
     let isUnique = base._guts.isUniqueNative()
@@ -964,6 +976,7 @@ StringTests.test("stringGutsReserve")
     case 1,3,4: expected = "x"
     case 2: expected = "Ξ"
     case 5: expected = shared
+    case 6,7: expected = "xá"
     default:
       fatalError("case unhandled!")
     }
@@ -1089,7 +1102,7 @@ StringTests.test("toInt") {
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(&chars)
-    let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
+    let str = String._fromWellFormedUTF8CodeUnitSequence(chars)
     expectNil(Int(str))
   }
 
@@ -1155,10 +1168,15 @@ StringTests.test("Construction") {
 }
 
 StringTests.test("Conversions") {
+  // Whether we are natively ASCII or small ASCII
+  func isKnownASCII(_ s: String) -> Bool {
+    return s._guts.isASCII ||
+      (s._guts._isSmall && s._guts._smallUTF8String.isASCII)
+  }
   do {
     let c: Character = "a"
     let x = String(c)
-    expectTrue(x._guts.isASCII)
+    expectTrue(isKnownASCII(x))
 
     let s: String = "a"
     expectEqual(s, x)
@@ -1167,7 +1185,7 @@ StringTests.test("Conversions") {
   do {
     let c: Character = "\u{B977}"
     let x = String(c)
-    expectFalse(x._guts.isASCII)
+    expectFalse(isKnownASCII(x))
 
     let s: String = "\u{B977}"
     expectEqual(s, x)
@@ -1728,7 +1746,7 @@ StringTests.test("String.removeSubrange()/closedRange") {
 
 public let testSuffix = "z"
 StringTests.test("COW.Smoke") {
-  var s1 = "Cypseloides" + testSuffix
+  var s1 = "COW Smoke Cypseloides" + testSuffix
   let identity1 = s1._rawIdentifier()
   
   var s2 = s1
@@ -1750,7 +1768,7 @@ struct COWStringTest {
 }
 
 var testCases: [COWStringTest] {
-  return [ COWStringTest(test: "abcdefg", name: "ASCII"),
+  return [ COWStringTest(test: "abcdefghijklmnopqrxtuvwxyz", name: "ASCII"),
            COWStringTest(test: "🐮🐄🤠", name: "Unicode") 
          ]
 }

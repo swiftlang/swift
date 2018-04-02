@@ -303,7 +303,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
   RValue rvalue(SGF, loc, getSubstFormalType(), temporary);
 
   // Don't consume cleanups on the base if this isn't final.
-  if (!isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
+  if (base && !isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
 
   // Clone the component if this isn't final.
   std::unique_ptr<LogicalPathComponent> clonedComponent =
@@ -597,7 +597,9 @@ namespace {
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
 
-      if (!IsNonAccessing) {
+      // Avoid emitting access markers completely for non-accesses or immutable
+      // declarations. Access marker verification is aware of these cases.
+      if (!IsNonAccessing && !Field->isLet()) {
         if (auto enforcement = SGF.getDynamicEnforcement(Field)) {
           result = enterAccessScope(SGF, loc, result, getTypeData(),
                                     accessKind, *enforcement);
@@ -883,7 +885,7 @@ static bool isReadNoneFunction(const Expr *e) {
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     DeclName name = dre->getDecl()->getFullName();
     return (name.getArgumentNames().size() == 1 &&
-            name.getBaseName() == "init" &&
+            name.getBaseName() == DeclBaseName::createConstructor() &&
             !name.getArgumentNames()[0].empty() &&
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
@@ -2684,7 +2686,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
 
   // Bind the value, branching to the destination address if there's no
   // value there.
-  SGF.emitBindOptional(e, optAddr, e->getDepth());
+  SGF.emitBindOptionalAddress(e, optAddr, e->getDepth());
 
   // Project out the payload on the success branch.  We can just use a
   // naked ValueComponent here; this is effectively a separate l-value.
@@ -2926,12 +2928,12 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     // Weak storage types are handled with their underlying type.
     llvm_unreachable("weak pointers are always the right optional types");
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned(safe) types, we need to generate a strong retain and
     // strip the unowned box.
     auto unownedType = storageType.castTo<UnownedStorageType>();
@@ -2940,7 +2942,7 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
 
     return B.createCopyUnownedValue(loc, src);
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unowned(unsafe) types, we need to strip the unmanaged box
     // and then do an (unsafe) retain.
     auto unmanagedType = storageType.castTo<UnmanagedStorageType>();
@@ -2957,16 +2959,16 @@ ManagedValue SILGenFunction::emitConversionToSemanticRValue(
   auto swiftStorageType = src.getType().castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     // Weak storage types are handled with their underlying type.
     llvm_unreachable("weak pointers are always the right optional types");
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case Ownership::Unowned:
+  case ReferenceOwnership::Unowned:
     // For @unowned(safe) types, we need to generate a strong retain and
     // strip the unowned box.
     return B.createCopyUnownedValue(loc, src);
-  case Ownership::Unmanaged:
+  case ReferenceOwnership::Unmanaged:
     // For @unowned(unsafe) types, we need to strip the unmanaged box
     // and then do an (unsafe) retain.
     return B.createUnsafeCopyUnownedValue(loc, src);
@@ -2985,12 +2987,12 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak: {
+  case ReferenceOwnership::Weak: {
     // For @weak types, we need to create an Optional<T>.
     // Optional<T> is currently loadable, but it probably won't be forever.
     return SGF.B.createLoadWeak(loc, src, isTake);
   }
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned(safe) types, we need to strip the unowned box.
     auto unownedType = storageType.castTo<UnownedStorageType>();
     if (!unownedType->isLoadable(ResilienceExpansion::Maximal)) {
@@ -3012,7 +3014,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.createDestroyValue(loc, unownedValue);
     return strongValue;
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unowned(unsafe) types, we need to strip the unmanaged box.
     auto unmanagedType = storageType.castTo<UnmanagedStorageType>();
     auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial);
@@ -3021,7 +3023,7 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     // SEMANTIC ARC TODO: Does this need a cleanup?
     return SGF.B.createCopyValue(loc, result);
   }
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
   }
 }
@@ -3039,7 +3041,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak: {
+  case ReferenceOwnership::Weak: {
     // For @weak types, we need to break down an Optional<T> and then
     // emit the storeWeak ourselves.
     SGF.B.createStoreWeak(loc, value, dest, isInit);
@@ -3048,7 +3050,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.emitDestroyValueOperation(loc, value);
     return;
   }
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned(safe) types, we need to enter the unowned box by
     // turning the strong retain into an unowned retain.
     auto unownedType = storageType.castTo<UnownedStorageType>();
@@ -3068,7 +3070,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.emitDestroyValueOperation(loc, value);
     return;
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unowned(unsafe) types, we need to enter the unmanaged box and
     // release the strong retain.
     auto unmanagedValue =
@@ -3077,7 +3079,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
     SGF.B.emitDestroyValueOperation(loc, value);
     return;
   }
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
   }
 }
@@ -3159,11 +3161,11 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
   switch (swiftStorageType->getOwnership()) {
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     llvm_unreachable("weak types are never loadable");
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case Ownership::Unowned: {
+  case ReferenceOwnership::Unowned: {
     // For @unowned types, place into an unowned box.
     auto unownedType = storageType.castTo<UnownedStorageType>();
     assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
@@ -3174,7 +3176,7 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     B.emitDestroyValueOperation(loc, semanticValue);
     return unowned;
   }
-  case Ownership::Unmanaged: {
+  case ReferenceOwnership::Unmanaged: {
     // For @unmanaged types, place into an unmanaged box.
     SILValue unmanaged =
       B.createRefToUnmanaged(loc, semanticValue, storageType);

@@ -798,8 +798,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     }
     
     indices = MF->getContext().AllocateCopy(indicesBuf);
-    if (!indices.empty() &&
-        kind != KeyPathComponentKindEncoding::External) {
+    if (!indices.empty()) {
       auto indicesEqualsName = MF->getIdentifier(ListOfValues[nextValue++]);
       auto indicesHashName = MF->getIdentifier(ListOfValues[nextValue++]);
       indicesEquals = getFuncForReference(indicesEqualsName.str());
@@ -851,7 +850,8 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     }
     handleComputedIndices();
     return KeyPathPatternComponent::forExternal(decl,
-        MF->getContext().AllocateCopy(subs), indices, type);
+        MF->getContext().AllocateCopy(subs),
+        indices, indicesEquals, indicesHash, type);
   }
   }
 }
@@ -1066,7 +1066,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
-  ONEOPERAND_ONETYPE_INST(ConvertEscapeToNoEscape)
   ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
@@ -1080,6 +1079,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2)),
                   TyID);
+    break;
+  }
+  case  SILInstructionKind::ConvertEscapeToNoEscapeInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    bool isLifetimeGuaranteed = Attr & 0x01;
+    ResultVal = Builder.createConvertEscapeToNoEscape(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+        isLifetimeGuaranteed);
     break;
   }
 
@@ -1574,6 +1585,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
+  UNARY_INSTRUCTION(IsEscapingClosure)
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(EndApply)
 #undef UNARY_INSTRUCTION
@@ -2607,7 +2619,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_FUNCTION) {
+         kind != SIL_FUNCTION &&
+         kind != SIL_PROPERTY) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;

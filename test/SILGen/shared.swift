@@ -1,4 +1,7 @@
+
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+
+// REQUIRES: owned_parameters
 
 class RefAggregate {}
 struct ValueAggregate { let x = RefAggregate() }
@@ -124,3 +127,58 @@ func owned_to_shared_conversion(_ f : (Int, ValueAggregate, RefAggregate) -> Voi
 
 // CHECK-LABEL: sil hidden @$S6shared0A17_closure_loweringyyySi_AA14ValueAggregateVAA03RefE0CtchF : $@convention(thin) (@guaranteed @callee_guaranteed (Int, @owned ValueAggregate, @owned RefAggregate) -> ()) -> ()
 func shared_closure_lowering(_ f : __shared (Int, ValueAggregate, RefAggregate) -> Void) {}
+
+struct Foo {
+    var x: ValueAggregate
+
+    // CHECK-LABEL: sil hidden @$S6shared3FooV21methodSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtF : $@convention(method) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @guaranteed Foo) -> () {
+    func methodSharedArguments(trivial : __shared Int, value : __shared ValueAggregate, ref : __shared RefAggregate) {
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[SELF:%[0-9]+]] : @guaranteed $Foo):
+        // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
+        // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
+        // CHECK: [[OWNED_FUNC:%[0-9]+]] = function_ref @$S6shared3FooV20methodOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtF
+        // CHECK: {{%.*}} = apply [[OWNED_FUNC]]([[TRIVIAL_VAL]], [[COPY_VALUE_VAL]], [[COPY_REF_VAL]], [[SELF]]) : $@convention(method) (Int, @owned ValueAggregate, @owned RefAggregate, @guaranteed Foo) -> ()
+        // CHECK: } // end sil function '$S6shared3FooV21methodSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtF'
+        return methodOwnedArguments(trivial: trivial, value: value, ref: ref)
+    }
+
+    // CHECK-LABEL: sil hidden @$S6shared3FooV20methodOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtF : $@convention(method) (Int, @owned ValueAggregate, @owned RefAggregate, @guaranteed Foo) -> () {
+    func methodOwnedArguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) {
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[SELF:%[0-9]+]] : @guaranteed $Foo):
+        // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
+        // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
+        // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$S6shared3FooV21methodSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtF
+        // CHECK: {{%.*}} = apply [[SHARED_FUNC]]([[TRIVIAL_VAL]], [[BORROW_VALUE_VAL]], [[BORROW_REF_VAL]], [[SELF]])
+        // CHECK: end_borrow [[BORROW_REF_VAL]] from [[REF_VAL]] : $RefAggregate, $RefAggregate
+        // CHECK: end_borrow [[BORROW_VALUE_VAL]] from [[VALUE_VAL]] : $ValueAggregate, $ValueAggregate
+        // CHECK: destroy_value [[REF_VAL]] : $RefAggregate
+        // CHECK: destroy_value [[VALUE_VAL]] : $ValueAggregate
+        // CHECK: } // end sil function '$S6shared3FooV20methodOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtF'
+        return methodSharedArguments(trivial: trivial, value: value, ref: ref)
+    }
+
+    // CHECK-LABEL: sil hidden @$S6shared3FooV21staticSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtFZ : $@convention(method) (Int, @guaranteed ValueAggregate, @guaranteed RefAggregate, @thin Foo.Type) -> () {
+    static func staticSharedArguments(trivial : __shared Int, value : __shared ValueAggregate, ref : __shared RefAggregate) {
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @guaranteed $ValueAggregate, [[REF_VAL:%[0-9]+]] : @guaranteed $RefAggregate, [[SELF_METATYPE:%[0-9]+]] : @trivial $@thin Foo.Type):
+        // CHECK: [[COPY_VALUE_VAL:%[0-9]+]] = copy_value [[VALUE_VAL]] : $ValueAggregate
+        // CHECK: [[COPY_REF_VAL:%[0-9]+]] = copy_value [[REF_VAL]] : $RefAggregate
+        // CHECK: [[OWNED_FUNC:%[0-9]+]] = function_ref @$S6shared3FooV20staticOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtFZ
+        // CHECK: {{%.*}} = apply [[OWNED_FUNC]]([[TRIVIAL_VAL]], [[COPY_VALUE_VAL]], [[COPY_REF_VAL]], [[SELF_METATYPE]]) : $@convention(method) (Int, @owned ValueAggregate, @owned RefAggregate, @thin Foo.Type) -> ()
+        // CHECK: } // end sil function '$S6shared3FooV21staticSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtFZ'
+        return staticOwnedArguments(trivial: trivial, value: value, ref: ref)
+    }
+    // CHECK-LABEL: sil hidden @$S6shared3FooV20staticOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtFZ : $@convention(method) (Int, @owned ValueAggregate, @owned RefAggregate, @thin Foo.Type) -> () {
+    static func staticOwnedArguments(trivial : Int, value : ValueAggregate, ref : RefAggregate) {
+        // CHECK: bb0([[TRIVIAL_VAL:%[0-9]+]] : @trivial $Int, [[VALUE_VAL:%[0-9]+]] : @owned $ValueAggregate, [[REF_VAL:%[0-9]+]] : @owned $RefAggregate, [[SELF_METATYPE:%[0-9]+]] : @trivial $@thin Foo.Type):
+        // CHECK: [[BORROW_VALUE_VAL:%[0-9]+]] = begin_borrow [[VALUE_VAL]] : $ValueAggregate
+        // CHECK: [[BORROW_REF_VAL:%[0-9]+]] = begin_borrow [[REF_VAL]] : $RefAggregate
+        // CHECK: [[SHARED_FUNC:%[0-9]+]] = function_ref @$S6shared3FooV21staticSharedArguments7trivial5value3refySih_AA14ValueAggregateVhAA03RefJ0ChtFZ
+        // CHECK: {{%.*}} = apply [[SHARED_FUNC]]([[TRIVIAL_VAL]], [[BORROW_VALUE_VAL]], [[BORROW_REF_VAL]], [[SELF_METATYPE]])
+        // CHECK: end_borrow [[BORROW_REF_VAL]] from [[REF_VAL]] : $RefAggregate, $RefAggregate
+        // CHECK: end_borrow [[BORROW_VALUE_VAL]] from [[VALUE_VAL]] : $ValueAggregate, $ValueAggregate
+        // CHECK: destroy_value [[REF_VAL]] : $RefAggregate
+        // CHECK: destroy_value [[VALUE_VAL]] : $ValueAggregate
+        // CHECK: } // end sil function '$S6shared3FooV20staticOwnedArguments7trivial5value3refySi_AA14ValueAggregateVAA03RefJ0CtFZ'
+        return staticSharedArguments(trivial: trivial, value: value, ref: ref)
+    }
+}

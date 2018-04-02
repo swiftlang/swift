@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name if_while_binding -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func foo() -> String? { return "" }
 func bar() -> String? { return "" }
@@ -23,9 +24,8 @@ func if_no_else() {
   if let x = foo() {
   // CHECK: [[YES]]([[VAL:%[0-9]+]] : @owned $String):
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   [[A:%.*]] = function_ref @$S16if_while_binding1a
-  // CHECK:   apply [[A]]([[VAL_COPY]])
+  // CHECK:   apply [[A]]([[BORROWED_VAL]])
   // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
@@ -48,9 +48,8 @@ func if_else_chain() {
   // CHECK: [[YESX]]([[VAL:%[0-9]+]] : @owned $String):
   // CHECK:   debug_value [[VAL]] : $String, let, name "x"
   // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   [[A:%.*]] = function_ref @$S16if_while_binding1a
-  // CHECK:   apply [[A]]([[VAL_COPY]])
+  // CHECK:   apply [[A]]([[BORROWED_VAL]])
   // CHECK:   end_borrow [[BORROWED_VAL]] from [[VAL]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT_X:bb[0-9]+]]
@@ -131,8 +130,8 @@ func while_loop() {
 // CHECK:         dealloc_stack [[X]]
 // CHECK:         br [[COND]]
 // CHECK:       [[DONE]]:
-// CHECK-NOT:         destroy_value %0
 // CHECK:         return
+// CHECK: } // end sil function '$S16if_while_binding0B13_loop_generic{{[_0-9a-zA-Z]*}}F'
 func while_loop_generic<T>(_ source: () -> T?) {
   while let x = source() {
   }
@@ -321,14 +320,12 @@ class DerivedClass : BaseClass {}
 
 // CHECK-LABEL: sil hidden @$S16if_while_binding20testAsPatternInIfLetyyAA9BaseClassCSgF
 func testAsPatternInIfLet(_ a : BaseClass?) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $Optional<BaseClass>):
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<BaseClass>):
   // CHECK:   debug_value [[ARG]] : $Optional<BaseClass>, let, name "a"
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]] : $Optional<BaseClass>
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Optional<BaseClass>
   // CHECK:   switch_enum [[ARG_COPY]] : $Optional<BaseClass>, case #Optional.some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
 
   // CHECK: [[NILBB]]:
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   br [[EXITBB:bb[0-9]+]]
 
   // CHECK: [[OPTPRESENTBB]]([[CLS:%.*]] : @owned $BaseClass):
@@ -349,12 +346,10 @@ func testAsPatternInIfLet(_ a : BaseClass?) {
   // CHECK: [[ISDERIVEDBB]]([[DERIVEDVAL:%[0-9]+]] : @owned $DerivedClass):
   // CHECK:   debug_value [[DERIVEDVAL]] : $DerivedClass
   // => SEMANTIC SIL TODO: This is benign, but scoping wise, this end borrow should be after derived val.
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   destroy_value [[DERIVEDVAL]] : $DerivedClass
   // CHECK:   br [[EXITBB]]
   
   // CHECK: [[EXITBB]]:
-  // CHECK:   destroy_value [[ARG]] : $Optional<BaseClass>
   // CHECK:   tuple ()
   // CHECK:   return
   if case let b as DerivedClass = a {

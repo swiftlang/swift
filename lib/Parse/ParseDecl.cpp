@@ -29,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -583,6 +584,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       kind = EffectsKind::ReadNone;
     else if (Tok.getText() == "readwrite")
       kind = EffectsKind::ReadWrite;
+    else if (Tok.getText() == "releasenone")
+      kind = EffectsKind::ReleaseNone;
     else {
       diagnose(Loc, diag::effects_attribute_unknown_option,
                Tok.getText(), AttrName);
@@ -680,19 +683,20 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_Ownership: {
+  case DAK_ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
-    Ownership Kind = AttrName == "weak" ? Ownership::Weak : Ownership::Unowned;
+    auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak
+                                   : ReferenceOwnership::Unowned;
     SourceLoc EndLoc = Loc;
 
-    if (Kind == Ownership::Unowned && Tok.is(tok::l_paren)) {
+    if (Kind == ReferenceOwnership::Unowned && Tok.is(tok::l_paren)) {
       // Parse an optional specifier after unowned.
       SourceLoc lp = consumeToken(tok::l_paren);
       if (Tok.is(tok::identifier) && Tok.getText() == "safe") {
         consumeToken();
       } else if (Tok.is(tok::identifier) && Tok.getText() == "unsafe") {
         consumeToken();
-        Kind = Ownership::Unmanaged;
+        Kind = ReferenceOwnership::Unmanaged;
       } else {
         diagnose(Tok, diag::attr_unowned_invalid_specifier);
         consumeIf(tok::identifier);
@@ -705,8 +709,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) OwnershipAttr(SourceRange(Loc, EndLoc),
-                                                 Kind));
+      Attributes.add(
+          new (Context) ReferenceOwnershipAttr(SourceRange(Loc, EndLoc), Kind));
     break;
   }
 
@@ -1350,7 +1354,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
       .highlight(AttrRange);
-    diagnose(DuplicateAttribute->getLocation(), diag::previous_attribute, DeclAttribute::isDeclModifier(DK))
+    diagnose(DuplicateAttribute->getLocation(),
+             diag::previous_attribute,
+             DeclAttribute::isDeclModifier(DK))
       .highlight(DuplicateAttribute->getRange());
   }
 
@@ -1460,14 +1466,35 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
 
-  if (DK == DAK_Count && Tok.getText() == "availability") {
-    // We renamed @availability to @available, so if we see the former,
-    // treat it as the latter and emit a Fix-It.
-    DK = DAK_Available;
-    diagnose(Tok, diag::attr_availability_renamed)
-        .fixItReplace(Tok.getLoc(), "available");
-  }
+  auto checkRenamedAttr = [&](StringRef oldName, StringRef newName,
+                              DeclAttrKind kind, bool warning) {
+    if (DK == DAK_Count && Tok.getText() == oldName) {
+      // We renamed @availability to @available, so if we see the former,
+      // treat it as the latter and emit a Fix-It.
+      DK = kind;
+      if (warning) {
+        diagnose(Tok, diag::attr_renamed_warning, oldName, newName)
+            .fixItReplace(Tok.getLoc(), newName);
+      } else {
+        diagnose(Tok, diag::attr_renamed, oldName, newName)
+            .fixItReplace(Tok.getLoc(), newName);
+      }
+    }
+  };
 
+  // FIXME: This renaming happened before Swift 3, we can probably remove
+  // the specific fallback path at some point.
+  checkRenamedAttr("availability", "available", DAK_Available, false);
+
+  // In Swift 5 and above, these become hard errors. Otherwise, emit a
+  // warning for compatibility.
+  if (!Context.isSwiftVersionAtLeast(5)) {
+    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, true);
+    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, true);
+  } else {
+    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, false);
+    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, false);
+  }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
@@ -1857,6 +1884,9 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
   FoundCCToken = false;
   if (Tok.isNot(tok::at_sign))
     return false;
+
+  bool error = false;
+
   SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   do {
     if (peekToken().is(tok::code_complete)) {
@@ -1867,10 +1897,12 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
     }
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     SourceLoc AtLoc = consumeToken();
-    if (parseDeclAttribute(Attributes, AtLoc))
-      return true;
+    if (parseDeclAttribute(Attributes, AtLoc)) {
+      // Consume any remaining attributes for better error recovery.
+      error = true;
+    }
   } while (Tok.is(tok::at_sign));
-  return false;
+  return error;
 }
 
 /// \brief This is the internal implementation of \c parseTypeAttributeList,
@@ -1891,7 +1923,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
                                            SourceLoc &SpecifierLoc,
                                            TypeAttributes &Attributes) {
-  Specifier = VarDecl::Specifier::Owned;
+  Specifier = VarDecl::Specifier::Default;
   while (Tok.is(tok::kw_inout) ||
          (Tok.is(tok::identifier) &&
           (Tok.getRawText().equals("__shared") ||
@@ -2350,7 +2382,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         Kind = DAK_AccessControl;
       } else if (Tok.isContextualKeyword("weak") ||
                  Tok.isContextualKeyword("unowned")) {
-        Kind = DAK_Ownership;
+        Kind = DAK_ReferenceOwnership;
       } else if (Tok.isContextualKeyword("optional")) {
         Kind = DAK_Optional;
       } else if (Tok.isContextualKeyword("required")) {
@@ -3672,10 +3704,9 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
     name = P.Context.getIdentifier(implName);
   }
 
-  auto result = new (P.Context) ParamDecl(VarDecl::Specifier::Owned,
-                                          SourceLoc(),SourceLoc(),
-                                          Identifier(), nameLoc, name,
-                                          Type(), P.CurDeclContext);
+  auto result = new (P.Context)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                Identifier(), nameLoc, name, Type(), P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();
 
@@ -4143,10 +4174,14 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       SmallVector<ASTNode, 16> Entries;
       {
         llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-        if (!isDelayedParsingEnabled())
+        if (!isDelayedParsingEnabled()) {
+          if (Context.Stats)
+            Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
           parseBraceItems(Entries);
-        else
+        } else {
           consumeGetSetBody(TheDecl, LBLoc);
+        }
       }
 
       SourceLoc RBLoc;
@@ -5171,7 +5206,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (SignatureHasCodeCompletion)
       CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD);
+    DefaultArgs.setFunctionContext(FD, FD->getParameterLists());
     for (auto PL : FD->getParameterLists())
       addParametersToScope(PL);
     setLocalDiscriminator(FD);
@@ -5190,6 +5225,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
         diagnose(Tok, diag::protocol_method_with_body);
         skipUntilDeclRBrace();
       } else if (!isDelayedParsingEnabled()) {
+        if (Context.Stats)
+          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
         ParserResult<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {
@@ -5418,17 +5456,13 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     }
 
     // See if there's a following argument type.
-    ParserResult<TypeRepr> ArgType;
+    ParserResult<ParameterList> ArgParams;
+    SmallVector<Identifier, 4> argumentNames;
     if (Tok.isFollowingLParen()) {
-      ArgType = parseTypeTupleBody();
-      if (ArgType.hasCodeCompletion()) {
-        Status.setHasCodeCompletion();
-        return Status;
-      }
-      if (ArgType.isNull()) {
-        Status.setIsParseError();
-        return Status;
-      }
+      ArgParams = parseSingleParameterClause(ParameterContextKind::EnumElement,
+                                             &argumentNames);
+      if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
+        return ParserStatus(ArgParams);
     }
     
     // See if there's a raw value expression.
@@ -5480,14 +5514,20 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       return Status;
     }
     
+    
     // Create the element.
-    TypeRepr *ArgTR = ArgType.getPtrOrNull();
-    auto *result = new (Context) EnumElementDecl(NameLoc, Name,
-                                                 ArgTR,
-                                                 ArgTR != nullptr,
+    DeclName FullName;
+    if (ArgParams.isNull()) {
+      FullName = Name;
+    } else {
+      FullName = DeclName(Context, Name, argumentNames);
+    }
+    auto *result = new (Context) EnumElementDecl(NameLoc, FullName,
+                                                 ArgParams.getPtrOrNull(),
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error
     }
@@ -6001,7 +6041,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
   auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
-  DeclName FullName(Context, Context.Id_init, namePieces);
+  DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
 
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
@@ -6031,7 +6071,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // No need to setLocalDiscriminator.
 
-  DefaultArgs.setFunctionContext(CD);
+  DefaultArgs.setFunctionContext(CD, CD->getParameterLists());
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion)
@@ -6060,6 +6100,9 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ParseFunctionBody CC(*this, CD);
 
       if (!isDelayedParsingEnabled()) {
+        if (Context.Stats)
+          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
         ParserResult<BraceStmt> Body =
           parseBraceItemList(diag::invalid_diagnostic);
 
@@ -6128,7 +6171,11 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
     ParseFunctionBody CC(*this, DD);
     if (!isDelayedParsingEnabled()) {
-      ParserResult<BraceStmt> Body=parseBraceItemList(diag::invalid_diagnostic);
+      if (Context.Stats)
+          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+      ParserResult<BraceStmt> Body =
+        parseBraceItemList(diag::invalid_diagnostic);
 
       if (!Body.isNull())
         DD->setBody(Body.get());

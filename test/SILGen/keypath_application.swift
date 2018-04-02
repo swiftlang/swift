@@ -1,3 +1,4 @@
+
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class A {}
@@ -12,14 +13,13 @@ func loadable(readonly: A, writable: inout A,
               wkp: WritableKeyPath<A, B>,
               rkp: ReferenceWritableKeyPath<A, B>) {
   // CHECK: [[ROOT_TMP:%.*]] = alloc_stack $A
-  // CHECK: [[ROOT_BORROW:%.*]] = begin_borrow %0
-  // CHECK: [[ROOT_COPY:%.*]] = copy_value [[ROOT_BORROW]]
+  // CHECK: [[ROOT_COPY:%.*]] = copy_value %0
   // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
-  // CHECK: [[KP_BORROW:%.*]] = begin_borrow %3
-  // CHECK: [[KP_COPY:%.*]] = copy_value [[KP_BORROW]]
+  // CHECK: [[KP_COPY:%.*]] = copy_value %3
   // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}_projectKeyPathReadOnly
+  // CHECK: [[BORROWED_KP_COPY:%.*]] = begin_borrow [[KP_COPY]]
   // CHECK: [[RESULT_TMP:%.*]] = alloc_stack $B
-  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[KP_COPY]])
+  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[BORROWED_KP_COPY]])
   // CHECK: [[RESULT:%.*]] = load [take] [[RESULT_TMP]]
   // CHECK: destroy_value [[RESULT]]
   _ = readonly[keyPath: kp]

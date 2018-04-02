@@ -277,6 +277,11 @@ enum class KnownTypeKind: uint8_t {
   Unknown,
 };
 
+enum class KnownProtocolKind: uint8_t {
+#define KNOWN_PROTOCOL(NAME) NAME,
+#include "swift/IDE/DigesterEnums.def"
+};
+
 enum class SDKDeclAttrKind: uint8_t {
 #define DECL_ATTR(Name) DAK_##Name,
 #include "swift/IDE/DigesterEnums.def"
@@ -328,11 +333,12 @@ struct SDKNodeInitInfo {
   bool IsMutating = false;
   bool IsStatic = false;
   Optional<uint8_t> SelfIndex;
-  Ownership Ownership = Ownership::Strong;
+  ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<SDKDeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
   std::vector<StringRef> ConformingProtocols;
   StringRef SuperclassUsr;
+  StringRef EnumRawTypeName;
   ParentExtensionInfo *ExtInfo = nullptr;
   TypeInitInfo TypeInfo;
 
@@ -377,11 +383,11 @@ public:
   void removeChild(ChildIt CI) { Children.erase(CI); }
   ChildIt getChildBegin() { return Children.begin(); }
   void annotate(NodeAnnotation Anno) { Annotations.insert(Anno); }
+  void annotate(NodeAnnotation Anno, StringRef Comment);
   NodePtr getParent() const { return Parent; };
   unsigned getChildrenCount() const { return Children.size(); }
   NodePtr childAt(unsigned I) const;
   void removeChild(NodePtr C);
-  void addAnnotateComment(NodeAnnotation Anno, StringRef Comment);
   StringRef getAnnotateComment(NodeAnnotation Anno) const;
   bool isAnnotatedAs(NodeAnnotation Anno) const;
   void addChild(SDKNode *Child);
@@ -402,17 +408,18 @@ class SDKNodeDecl : public SDKNode {
   StringRef ModuleName;
   std::vector<SDKDeclAttrKind> DeclAttributes;
   bool IsStatic;
-  uint8_t Ownership;
+  uint8_t ReferenceOwnership;
   bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
   // Non-null ExtInfo implies this decl is defined in an type extension.
   ParentExtensionInfo *ExtInfo;
 
 protected:
-  SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
-    DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
-    ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
-    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)),
-    ExtInfo(Info.ExtInfo) {}
+  SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
+      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.USR),
+        Location(Info.Location), ModuleName(Info.ModuleName),
+        DeclAttributes(Info.DeclAttrs), IsStatic(Info.IsStatic),
+        ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
+        ExtInfo(Info.ExtInfo) {}
 
 public:
   StringRef getUsr() const { return Usr; }
@@ -421,7 +428,9 @@ public:
   StringRef getHeaderName() const;
   void addDeclAttribute(SDKDeclAttrKind DAKind);
   ArrayRef<SDKDeclAttrKind> getDeclAttributes() const;
-  swift::Ownership getOwnership() const { return swift::Ownership(Ownership); }
+  swift::ReferenceOwnership getReferenceOwnership() const {
+    return swift::ReferenceOwnership(ReferenceOwnership);
+  }
   bool isObjc() const { return Usr.startswith("c:"); }
   static bool classof(const SDKNode *N);
   DeclKind getDeclKind() const { return DKind; }
@@ -429,6 +438,7 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isSDKPrivate() const;
   bool isDeprecated() const;
+  bool hasFixedLayout() const;
   bool isStatic() const { return IsStatic; };
   bool isFromExtension() const { return ExtInfo; }
   const ParentExtensionInfo& getExtensionInfo() const {
@@ -506,9 +516,12 @@ bool SDKNodeType::classof(const SDKNode *N) {
 }
 
 class SDKNodeTypeNominal : public SDKNodeType {
+  StringRef USR;
 public:
   SDKNodeTypeNominal(SDKNodeInitInfo Info) : SDKNodeType(Info,
-    SDKNodeKind::TypeNominal) {}
+    SDKNodeKind::TypeNominal), USR(Info.USR) {}
+  // Get the usr of the correspoding nominal type decl.
+  StringRef getUsr() const { return USR; }
   static bool classof(const SDKNode *N);
 };
 
@@ -590,8 +603,9 @@ void SDKNode::removeChild(NodePtr C) {
   Children.erase(std::find(Children.begin(), Children.end(), C));
 }
 
-void SDKNode::addAnnotateComment(NodeAnnotation Anno, StringRef Comment) {
-  assert(isAnnotatedAs(Anno) && "Cannot find annotation");
+void SDKNode::annotate(NodeAnnotation Anno, StringRef Comment) {
+  assert(!isAnnotatedAs(Anno) && "already annotated");
+  annotate(Anno);
   AnnotateComments[Anno] = Comment;
 }
 
@@ -710,6 +724,10 @@ bool SDKNodeDecl::isDeprecated() const {
   return hasDeclAttribute(SDKDeclAttrKind::DAK_deprecated);
 }
 
+bool SDKNodeDecl::hasFixedLayout() const {
+  return hasDeclAttribute(SDKDeclAttrKind::DAK_fixedLayout);
+}
+
 bool SDKNodeDecl::isSDKPrivate() const {
   if (getName().startswith("__"))
     return true;
@@ -776,13 +794,26 @@ SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
 class SDKNodeTypeDecl : public SDKNodeDecl {
   StringRef SuperclassUsr;
   std::vector<StringRef> ConformingProtocols;
+  StringRef EnumRawTypeName;
 public:
   SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::TypeDecl),
                                           SuperclassUsr(Info.SuperclassUsr),
-                                ConformingProtocols(Info.ConformingProtocols){}
+                                ConformingProtocols(Info.ConformingProtocols),
+                                        EnumRawTypeName(Info.EnumRawTypeName) {}
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
   ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
+
+#define NOMINAL_TYPE_DECL(ID, PARENT) \
+  bool is##ID() const { return getDeclKind() == DeclKind::ID; }
+#define DECL(ID, PARENT)
+#include "swift/AST/DeclNodes.def"
+
+  StringRef getEnumRawTypeName() const {
+    assert(isEnum());
+    return EnumRawTypeName;
+  }
+
   Optional<SDKNodeTypeDecl*> getSuperclass() const {
     if (SuperclassUsr.empty())
       return None;
@@ -805,6 +836,18 @@ public:
       return (*Super)->lookupChildByPrintedName(Name);
     }
     return None;
+  }
+
+  bool isConformingTo(KnownProtocolKind Kind) const {
+    StringRef Usr;
+    switch (Kind) {
+#define KNOWN_PROTOCOL(NAME)                                                  \
+      case KnownProtocolKind::NAME:                                           \
+        return std::find(ConformingProtocols.begin(),                         \
+                         ConformingProtocols.end(),                           \
+                         #NAME) != ConformingProtocols.end();
+#include "swift/IDE/DigesterEnums.def"
+    }
   }
 };
 
@@ -917,7 +960,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
 
-  for (auto Pair : *Node) {
+  for (auto &Pair : *Node) {
     switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
     case KeyKind::KK_kind:
       Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
@@ -956,6 +999,11 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       }
       break;
     }
+    case KeyKind::KK_enumRawTypeName: {
+      assert(Info.DKind == DeclKind::Enum);
+      Info.EnumRawTypeName = GetScalarString(Pair.getValue());
+      break;
+    }
     case KeyKind::KK_printedName:
       Info.PrintedName = GetScalarString(Pair.getValue());
       break;
@@ -978,8 +1026,9 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
       Info.IsStatic = true;
       break;
     case KeyKind::KK_ownership:
-      Info.Ownership = swift::Ownership(getAsInt(Pair.getValue()));
-      assert(Info.Ownership != swift::Ownership::Strong &&
+      Info.ReferenceOwnership =
+          swift::ReferenceOwnership(getAsInt(Pair.getValue()));
+      assert(Info.ReferenceOwnership != swift::ReferenceOwnership::Strong &&
              "Strong is implied.");
       break;
 
@@ -1077,7 +1126,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       auto Right = (&Other)->getAs<SDKNodeDecl>();
       if (Left->isStatic() ^ Right->isStatic())
         return false;
-      if (Left->getOwnership() != Right->getOwnership())
+      if (Left->getReferenceOwnership() != Right->getReferenceOwnership())
         return false;
       LLVM_FALLTHROUGH;
     }
@@ -1182,11 +1231,14 @@ static StringRef getEscapedName(DeclBaseName name) {
   switch (name.getKind()) {
   case DeclBaseName::Kind::Subscript:
     return "subscript";
+  case DeclBaseName::Kind::Constructor:
+    return "init";
   case DeclBaseName::Kind::Destructor:
     return "deinit";
   case DeclBaseName::Kind::Normal:
     return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
         .Case("subscript", "`subscript`")
+        .Case("init", "`init`")
         .Case("deinit", "`deinit`")
         .Default(name.getIdentifier().str());
   }
@@ -1238,11 +1290,11 @@ static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   return None;
 }
 
-static Ownership getOwnership(ValueDecl *VD) {
-  if (auto OA = VD->getAttrs().getAttribute<OwnershipAttr>()) {
+static ReferenceOwnership getReferenceOwnership(ValueDecl *VD) {
+  if (auto OA = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
     return OA->get();
   }
-  return Ownership::Strong;
+  return ReferenceOwnership::Strong;
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
@@ -1252,16 +1304,21 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
     TypeInfo(TypeInfo) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
+  // If this is a nominal type, get its Usr.
+  if (auto *ND = Ty->getAnyNominal()) {
+    USR = calculateUsr(Ctx, ND);
+  }
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
-    Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
-    PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
-    USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
-    ModuleName(VD->getModuleContext()->getName().str()),
-    IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
-    Ownership(getOwnership(VD)), ExtInfo(nullptr) {
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
+    : Ctx(Ctx),
+      Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
+      PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
+      USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
+      ModuleName(VD->getModuleContext()->getName().str()),
+      IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
+      IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
+      ReferenceOwnership(getReferenceOwnership(VD)), ExtInfo(nullptr) {
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
@@ -1270,6 +1327,11 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
   }
   if (VD->getAttrs().getDeprecated(VD->getASTContext()))
     DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
+
+  // If this is fixed_layout struct.
+  if (VD->getAttrs().hasAttribute<FixedLayoutAttr>()) {
+    DeclAttrs.push_back(SDKDeclAttrKind::DAK_fixedLayout);
+  }
 
   // If the decl is declared in an extension, calculate the extension info.
   if (auto *Ext = dyn_cast_or_null<ExtensionDecl>(VD->getDeclContext())) {
@@ -1287,6 +1349,15 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
   if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
     for (auto *P: NTD->getAllProtocols()) {
       ConformingProtocols.push_back(P->getName().str());
+    }
+  }
+
+  // Get enum raw type name if this is an enum.
+  if (auto *ED = dyn_cast<EnumDecl>(VD)) {
+    if (auto RT = ED->getRawType()) {
+      if (auto *D = RT->getNominalOrBoundGenericNominal()) {
+        EnumRawTypeName = D->getName().str();
+      }
     }
   }
 }
@@ -1670,6 +1741,14 @@ namespace swift {
                                         KeyKind::KK_conformingProtocols).data(),
                               Pros);
             }
+
+            auto RawTypeName = TD->isEnum() ? TD->getEnumRawTypeName() : StringRef();
+            if (!RawTypeName.empty()) {
+              out.mapRequired(getKeyContent(Ctx,
+                                            KeyKind::KK_enumRawTypeName).data(),
+                              RawTypeName);
+            }
+
           }
           if (D->isFromExtension()) {
             // Even if we don't have any requirements on this parent extension,
@@ -1685,8 +1764,8 @@ namespace swift {
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(),
                             Attributes);
           // Strong reference is implied, no need for serialization.
-          if (D->getOwnership() != Ownership::Strong) {
-            uint8_t Raw = uint8_t(D->getOwnership());
+          if (D->getReferenceOwnership() != ReferenceOwnership::Strong) {
+            uint8_t Raw = uint8_t(D->getReferenceOwnership());
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
           }
         } else if (auto T = dyn_cast<SDKNodeType>(value)) {
@@ -1697,6 +1776,12 @@ namespace swift {
           if (bool HasDefault = T->hasDefaultArgument()) {
             out.mapRequired(getKeyContent(Ctx, KeyKind::KK_hasDefaultArg).data(),
                             HasDefault);
+          }
+          // Serialize nominal type's USR.
+          if (auto NT = dyn_cast<SDKNodeTypeNominal>(value)) {
+            auto Usr = NT->getUsr();
+            if (!Usr.empty())
+              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_usr).data(), Usr);
           }
         }
         if (!value->isLeaf()) {
@@ -1890,8 +1975,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
         } else {
           return false;
         }
-        R->annotate(NodeAnnotation::PropertyName);
-        R->addAnnotateComment(NodeAnnotation::PropertyName, A->getPrintedName());
+        R->annotate(NodeAnnotation::PropertyName, A->getPrintedName());
         foundMatch(R, A);
         return true;
       }
@@ -1928,11 +2012,10 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       if (auto VC = dyn_cast<SDKNodeVar>(Child)) {
       auto LastPartOfA = getLastPartOfUsr(VC);
         if (LastPartOfA && LastPartOfR.getValue() == LastPartOfA.getValue()) {
-          R->annotate(NodeAnnotation::ModernizeEnum);
           std::string FullName = (llvm::Twine(A->getName()) + "." +
             Child->getName()).str();
-          R->addAnnotateComment(NodeAnnotation::ModernizeEnum,
-                                R->getSDKContext().buffer(FullName));
+          R->annotate(NodeAnnotation::ModernizeEnum,
+                      R->getSDKContext().buffer(FullName));
           foundMatch(R, A);
           return true;
         }
@@ -2237,10 +2320,8 @@ static void detectRename(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (isa<SDKNodeDecl>(L) && L->getPrintedName() != R->getPrintedName()) {
     L->annotate(NodeAnnotation::Rename);
-    L->annotate(NodeAnnotation::RenameOldName);
-    L->addAnnotateComment(NodeAnnotation::RenameOldName, L->getPrintedName());
-    L->annotate(NodeAnnotation::RenameNewName);
-    L->addAnnotateComment(NodeAnnotation::RenameNewName, R->getPrintedName());
+    L->annotate(NodeAnnotation::RenameOldName, L->getPrintedName());
+    L->annotate(NodeAnnotation::RenameNewName, R->getPrintedName());
   }
 }
 
@@ -2250,7 +2331,7 @@ static void detectDeclChange(NodePtr L, NodePtr R) {
     auto *RD = R->getAs<SDKNodeDecl>();
     if (LD->isStatic() ^ RD->isStatic())
       L->annotate(NodeAnnotation::StaticChange);
-    if (LD->getOwnership() != RD->getOwnership())
+    if (LD->getReferenceOwnership() != RD->getReferenceOwnership())
       L->annotate(NodeAnnotation::OwnershipChange);
     detectRename(L, R);
   }
@@ -2410,12 +2491,10 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
              diffNode->getKind() == SDKNodeKind::Function &&
              node->isNameValid()) {
       diffNode->annotate(NodeAnnotation::Rename);
-      diffNode->annotate(NodeAnnotation::RenameOldName);
-      diffNode->addAnnotateComment(NodeAnnotation::RenameOldName,
-                                   diffNode->getPrintedName());
-      diffNode->annotate(NodeAnnotation::RenameNewName);
-      diffNode->addAnnotateComment(NodeAnnotation::RenameNewName,
-                                   node->getParent()->getPrintedName());
+      diffNode->annotate(NodeAnnotation::RenameOldName,
+                         diffNode->getPrintedName());
+      diffNode->annotate(NodeAnnotation::RenameNewName,
+                         node->getParent()->getPrintedName());
     }
   }
 
@@ -2520,13 +2599,41 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
         (Node->getName() != Counter->getName()||
         Node->getChildrenCount() != Counter->getChildrenCount())) {
       Node->annotate(NodeAnnotation::TypeRewritten);
-      Node->annotate(NodeAnnotation::TypeRewrittenLeft);
-      Node->annotate(NodeAnnotation::TypeRewrittenRight);
-      Node->addAnnotateComment(NodeAnnotation::TypeRewrittenLeft,
-                               Node->getPrintedName());
-      Node->addAnnotateComment(NodeAnnotation::TypeRewrittenRight,
-                               Counter->getPrintedName());
+      Node->annotate(NodeAnnotation::TypeRewrittenLeft, Node->getPrintedName());
+      Node->annotate(NodeAnnotation::TypeRewrittenRight, 
+                     Counter->getPrintedName());
       return true;
+    }
+    return false;
+  }
+
+  bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
+    if (!IsVisitingLeft)
+      return false;
+    if (L->getTypeKind() != KnownTypeKind::Dictionary ||
+        R->getTypeKind() != KnownTypeKind::Dictionary)
+      return false;
+    auto *Left = dyn_cast<SDKNodeTypeNominal>(L);
+    auto *Right = dyn_cast<SDKNodeTypeNominal>(R);
+    assert(Left && Right);
+    assert(Left->getChildrenCount() == 2);
+    assert(Right->getChildrenCount() == 2);
+    auto* LKey = dyn_cast<SDKNodeTypeNominal>(*Left->getChildBegin());
+    auto* RKey = dyn_cast<SDKNodeTypeNominal>(*Right->getChildBegin());
+    if (!LKey || !RKey)
+      return false;
+    if (LKey->getTypeKind() != KnownTypeKind::String)
+      return false;
+    auto Results = RKey->getRootNode()->getDescendantsByUsr(RKey->getUsr());
+    if (Results.empty())
+      return false;
+    if (auto DT = dyn_cast<SDKNodeTypeDecl>(Results.front())) {
+      if (DT->isConformingTo(KnownProtocolKind::RawRepresentable)) {
+        L->annotate(NodeAnnotation::DictionaryKeyUpdate);
+        L->annotate(NodeAnnotation::TypeRewrittenRight,
+                    DT->getFullyQualifiedName());
+        return true;
+      }
     }
     return false;
   }
@@ -2561,6 +2668,7 @@ public:
                   detectOptionalUpdate(Node, Counter)||
                   detectWrapImplicitOptional(Node, Counter)||
                   detectUnmanagedUpdate(Node, Counter)||
+                  detectDictionaryKeyChange(Node, Counter) ||
                   detectTypeRewritten(Node, Counter);
     (void) Result;
     return;
@@ -2672,6 +2780,7 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
   static StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
     switch (Anno) {
+      case NodeAnnotation::DictionaryKeyUpdate:
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
       case NodeAnnotation::ModernizeEnum:
@@ -2728,7 +2837,8 @@ class DiffItemEmitter : public SDKNodeVisitor {
                         NodeAnnotation::GetterToProperty,
                         NodeAnnotation::ModernizeEnum,
                         NodeAnnotation::Rename,
-                        NodeAnnotation::NowThrowing
+                        NodeAnnotation::NowThrowing,
+                        NodeAnnotation::DictionaryKeyUpdate,
                       });
   }
 
@@ -3093,22 +3203,25 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::OwnershipChange: {
-    auto getOwnershipDescription = [&](swift::Ownership O) {
+    auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
       switch (O) {
-      case Ownership::Strong:    return Ctx.buffer("strong");
-      case Ownership::Weak:      return Ctx.buffer("weak");
-      case Ownership::Unowned:   return Ctx.buffer("unowned");
-      case Ownership::Unmanaged: return Ctx.buffer("unowned(unsafe)");
+      case ReferenceOwnership::Strong:
+        return Ctx.buffer("strong");
+      case ReferenceOwnership::Weak:
+        return Ctx.buffer("weak");
+      case ReferenceOwnership::Unowned:
+        return Ctx.buffer("unowned");
+      case ReferenceOwnership::Unmanaged:
+        return Ctx.buffer("unowned(unsafe)");
       }
 
       llvm_unreachable("Unhandled Ownership in switch.");
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    AttrChangedDecls.Diags.emplace_back(ScreenInfo,
-                                        Node->getDeclKind(),
-                                        Node->getFullyQualifiedName(),
-                                  getOwnershipDescription(Node->getOwnership()),
-                                getOwnershipDescription(Count->getOwnership()));
+    AttrChangedDecls.Diags.emplace_back(
+        ScreenInfo, Node->getDeclKind(), Node->getFullyQualifiedName(),
+        getOwnershipDescription(Node->getReferenceOwnership()),
+        getOwnershipDescription(Count->getReferenceOwnership()));
     return;
   }
   default:
@@ -3359,7 +3472,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
 
   llvm::errs() << "Dumping diff to " << DiffPath << '\n';
   std::vector<OverloadedFuncInfo> Overloads;
-  OverloadMemberFunctionEmitter::collectDiffItems(RightModule, Overloads);
+  // OverloadMemberFunctionEmitter::collectDiffItems(RightModule, Overloads);
 
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);

@@ -264,6 +264,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::kw_sil_global) &&
          Tok.isNot(tok::kw_sil_witness_table) &&
          Tok.isNot(tok::kw_sil_default_witness_table) &&
+         Tok.isNot(tok::kw_sil_property) &&
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
@@ -1599,6 +1600,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
 ///   stmt-while:
 ///     (identifier ':')? 'while' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::WhileStmt);
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
   Scope S(this, ScopeKind::WhileVars);
@@ -1964,6 +1966,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 ///    stmt-switch:
 ///      (identifier ':')? 'switch' expr-basic '{' stmt-case+ '}'
 ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::SwitchStmt);
   SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
 
   ParserStatus Status;
@@ -2018,6 +2021,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
 
 ParserStatus
 Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
+  SyntaxParsingContext CasesContext(SyntaxContext, SyntaxKind::SwitchCaseList);
   ParserStatus Status;
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
@@ -2074,21 +2078,30 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
                                   SmallVectorImpl<CaseLabelItem> &LabelItems,
                                   SmallVectorImpl<VarDecl *> &BoundDecls,
                                   SourceLoc &ColonLoc) {
+  SyntaxParsingContext CaseContext(P.SyntaxContext,
+                                   SyntaxKind::SwitchCaseLabel);
   ParserStatus Status;
   bool isFirst = true;
   
   CaseLoc = P.consumeToken(tok::kw_case);
 
-  do {
-    GuardedPattern PatternResult;
-    parseGuardedPattern(P, PatternResult, Status, BoundDecls,
-                        GuardedPatternContext::Case, isFirst);
-    LabelItems.push_back(CaseLabelItem(/*IsDefault=*/false,
-                                       PatternResult.ThePattern,
-                                       PatternResult.WhereLoc,
-                                       PatternResult.Guard));
-    isFirst = false;
-  } while (P.consumeIf(tok::comma));
+  {
+    SyntaxParsingContext ListContext(P.SyntaxContext, SyntaxKind::CaseItemList);
+
+    while (true) {
+      SyntaxParsingContext ItemContext(P.SyntaxContext, SyntaxKind::CaseItem);
+      GuardedPattern PatternResult;
+      parseGuardedPattern(P, PatternResult, Status, BoundDecls,
+                          GuardedPatternContext::Case, isFirst);
+      LabelItems.push_back(
+          CaseLabelItem(/*IsDefault=*/false, PatternResult.ThePattern,
+                        PatternResult.WhereLoc, PatternResult.Guard));
+      isFirst = false;
+      if (P.consumeIf(tok::comma))
+        continue;
+      break;
+    }
+  }
 
   ColonLoc = P.Tok.getLoc();
   if (!P.Tok.is(tok::colon)) {
@@ -2104,6 +2117,8 @@ static ParserStatus
 parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
                      SmallVectorImpl<CaseLabelItem> &LabelItems,
                      SourceLoc &ColonLoc) {
+  SyntaxParsingContext CaseContext(P.SyntaxContext,
+                                   SyntaxKind::SwitchDefaultLabel);
   ParserStatus Status;
 
   CaseLoc = P.consumeToken(tok::kw_default);
@@ -2135,6 +2150,7 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
 }
 
 ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
+  SyntaxParsingContext CaseContext(SyntaxContext, SyntaxKind::SwitchCase);
   // A case block has its own scope for variables bound out of the pattern.
   Scope S(this, ScopeKind::CaseVars, !IsActive);
 

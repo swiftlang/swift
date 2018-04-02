@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil
+
+// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_speculative_nested %s -parse-as-library -Osize -emit-sil
 //
 // Test speculative devirtualization.
 
@@ -20,7 +21,7 @@ public class Base {
 //
 // But at least, we shouldn't crash.
 
-// CHECK-LABEL: sil [thunk] [always_inline] @$S25devirt_speculative_nested3foo1xyAA4BaseC_tF : $@convention(thin) (@owned Base) -> ()
+// CHECK-LABEL: sil @$S25devirt_speculative_nested3foo1xyAA4BaseC_tF : $@convention(thin) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base
 // CHECK: function_ref @$S25devirt_speculative_nested4BaseC6updateyyF
 // CHECK: class_method %0 : $Base, #Base.update!1

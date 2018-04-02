@@ -517,3 +517,56 @@ bb0:
   %return = tuple ()
   return %return : $()
 }
+
+sil shared [transparent] [thunk] @genericClosure : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil shared @genericThinToThick : $@convention(thin) () -> ()
+// CHECK: [[F:%.*]] = function_ref @genericClosure : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK: apply [[F]]<Builtin.Int64>(%{{.*}}, %{{.*}}) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK-LABEL: } // end sil function 'genericThinToThick'
+sil shared @genericThinToThick : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @genericClosure : $@convention(thin) <T> (@in T) -> @out T
+  %thick = thin_to_thick_function %fn : $@convention(thin) <T> (@in T) -> @out T to $@noescape @callee_guaranteed <T> (@in T) -> @out T
+  %in = alloc_stack $Builtin.Int64
+  %out = alloc_stack $Builtin.Int64
+  %c3 = integer_literal $Builtin.Int64, 3
+  store %c3 to %in : $*Builtin.Int64
+  %call = apply %thick<Builtin.Int64>(%out, %in) : $@noescape @callee_guaranteed <T> (@in T) -> @out T
+  dealloc_stack %out : $*Builtin.Int64
+  dealloc_stack %in : $*Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}
+
+sil shared [transparent] [thunk] @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %val = load %1 : $*Builtin.Int64
+  store %val to %0 : $*Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}
+
+// CHECK-LABEL: sil shared @appliedEscapeToNoEscape : $@convention(thin) () -> () {
+// CHECK: [[F:%.*]] = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64 // user: %5
+// CHECK: apply [[F]](%{{.*}}, %{{.*}}) : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+sil shared @appliedEscapeToNoEscape : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %pa = partial_apply [callee_guaranteed] %fn() : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %cvt = convert_escape_to_noescape %pa : $@callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64 to $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  %out = alloc_stack $Builtin.Int64
+  %in = alloc_stack $Builtin.Int64
+  %c3 = integer_literal $Builtin.Int64, 3
+  store %c3 to %in : $*Builtin.Int64
+  %call = apply %cvt(%out, %in) : $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  dealloc_stack %in : $*Builtin.Int64
+  dealloc_stack %out : $*Builtin.Int64
+  strong_release %pa : $@callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}

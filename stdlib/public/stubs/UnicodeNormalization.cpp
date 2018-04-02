@@ -103,93 +103,6 @@ static const UCollator *GetRootCollator() {
   return SWIFT_LAZY_CONSTANT(MakeRootCollator());
 }
 
-/// This class caches the collation element results for the ASCII subset of
-/// unicode.
-class ASCIICollation {
-public:
-  friend class swift::Lazy<ASCIICollation>;
-
-  static swift::Lazy<ASCIICollation> theTable;
-  static const ASCIICollation *getTable() {
-    return &theTable.get();
-  }
-
-  int32_t CollationTable[128];
-
-  /// Maps an ASCII character to a collation element priority as would be
-  /// returned by a call to ucol_next().
-  int32_t map(unsigned char c) const {
-    return CollationTable[c];
-  }
-
-private:
-  /// Construct the ASCII collation table.
-  ASCIICollation() {
-    const UCollator *Collator = GetRootCollator();
-    for (unsigned char c = 0; c < 128; ++c) {
-      UErrorCode ErrorCode = U_ZERO_ERROR;
-      intptr_t NumCollationElts = 0;
-      UChar Buffer[1];
-      Buffer[0] = c;
-
-      UCollationElements *CollationIterator =
-          ucol_openElements(Collator, Buffer, 1, &ErrorCode);
-
-      while (U_SUCCESS(ErrorCode)) {
-        intptr_t Elem = ucol_next(CollationIterator, &ErrorCode);
-        if (Elem != UCOL_NULLORDER) {
-          CollationTable[c] = Elem;
-          ++NumCollationElts;
-        } else {
-          break;
-        }
-      }
-
-      ucol_closeElements(CollationIterator);
-      if (U_FAILURE(ErrorCode) || NumCollationElts != 1) {
-        swift::crash("Error setting up the ASCII collation table");
-      }
-    }
-  }
-
-  ASCIICollation &operator=(const ASCIICollation &) = delete;
-  ASCIICollation(const ASCIICollation &) = delete;
-};
-
-void *swift::_swift_stdlib_unicodeCollationIterator_create(
-    const __swift_uint16_t *Str, __swift_uint32_t Length) {
-  UErrorCode ErrorCode = U_ZERO_ERROR;
-  UCollationElements *CollationIterator =
-      ucol_openElements(GetRootCollator(), reinterpret_cast<const UChar *>(Str),
-                        Length, &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
-    swift::crash("_swift_stdlib_unicodeCollationIterator_create: ucol_openElements() failed.");
-  }
-  return CollationIterator;
-}
-
-__swift_int32_t swift::_swift_stdlib_unicodeCollationIterator_next(
-    void *CollationIterator, bool *HitEnd) {
-  UErrorCode ErrorCode = U_ZERO_ERROR;
-  auto Result = ucol_next(
-      static_cast<UCollationElements *>(CollationIterator), &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
-    swift::crash(
-        "_swift_stdlib_unicodeCollationIterator_next: ucol_next() failed.");
-  }
-  *HitEnd = (Result == UCOL_NULLORDER);
-  return Result;
-}
-
-void swift::_swift_stdlib_unicodeCollationIterator_delete(
-    void *CollationIterator) {
-  ucol_closeElements(static_cast<UCollationElements *>(CollationIterator));
-}
-
-const __swift_int32_t *swift::_swift_stdlib_unicode_getASCIICollationTable() {
-  return ASCIICollation::getTable()->CollationTable;
-}
-
 /// Convert the unicode string to uppercase. This function will return the
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
@@ -231,8 +144,6 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
   }
   return OutputLength;
 }
-
-swift::Lazy<ASCIICollation> ASCIICollation::theTable;
 #endif
 
 namespace {
@@ -292,8 +203,8 @@ int32_t swift::__swift_stdlib_unorm2_normalize(
     const __swift_stdlib_UNormalizer2 *norm, const __swift_stdlib_UChar *src,
     __swift_int32_t len, __swift_stdlib_UChar *dst, __swift_int32_t capacity,
     __swift_stdlib_UErrorCode *err) {
-  // TODO remove this compatibility when we require ICU >= 60 on Linux
-#if defined(__APPLE__) || U_ICU_VERSION_MAJOR_NUM >= 60
+  // TODO remove this compatibility when we require ICU >= 59 on Linux
+#if defined(__APPLE__) || U_ICU_VERSION_MAJOR_NUM >= 59
   return unorm2_normalize(ptr_cast<UNormalizer2>(norm), src, len, dst, capacity,
                           ptr_cast<UErrorCode>(err));
 #else

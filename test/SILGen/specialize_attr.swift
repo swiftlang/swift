@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name specialize_attr -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: @_specialize(exported: false, kind: full, where T == Int, U == Float)
 // CHECK-NEXT: func specializeThis<T, U>(_ t: T, u: U)
@@ -32,9 +33,9 @@ public class CC<T : PP> {
   }
 }
 
-// CHECK-LABEL: sil hidden [_specialize exported: false, kind: full, where T == Int, U == Float] @$S15specialize_attr0A4This_1uyx_q_tr0_lF : $@convention(thin) <T, U> (@in T, @in U) -> () {
+// CHECK-LABEL: sil hidden [_specialize exported: false, kind: full, where T == Int, U == Float] @$S15specialize_attr0A4This_1uyx_q_tr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
 
-// CHECK-LABEL: sil [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @$S15specialize_attr2CCC3foo_1gqd___AA2GGVyxGtqd___AHtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
+// CHECK-LABEL: sil [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @$S15specialize_attr2CCC3foo_1gqd___AA2GGVyxGtqd___AHtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in_guaranteed U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
 
 // -----------------------------------------------------------------------------
 // Test user-specialized subscript accessors.

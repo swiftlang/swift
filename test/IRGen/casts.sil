@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 // XFAIL: linux
@@ -223,7 +223,8 @@ nay:
 // CHECK-LABEL: define{{( protected)?}} swiftcc %T5casts1AC* @checked_downcast_optional({{(i32|i64)}}) {{.*}} {
 // CHECK:         [[T0:%.*]] = inttoptr {{(i32|i64)}} %0 to %T5casts1AC*
 // CHECK:         [[OBJ_PTR:%.*]] = bitcast %T5casts1AC* [[T0]] to i8*
-// CHECK:         [[METADATA:%.*]] = call %swift.type* @"$S5casts1ACMa"()
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S5casts1ACMa"([[INT]] 0)
+// CHECK:         [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:         [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:         [[RESULT_PTR:%.*]] = call i8* @swift_dynamicCastClass(i8* [[OBJ_PTR]], i8* [[METADATA_PTR]])
 // CHECK:         [[RESULT:%.*]] = bitcast i8* [[RESULT_PTR]] to %T5casts1AC*
@@ -240,7 +241,8 @@ nay:
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_downcast_optional_metatype({{(i32|i64)}}) {{.*}} {
 // CHECK:         [[VALUE:%.*]] = inttoptr {{(i32|i64)}} %0 to %swift.type*
-// CHECK:         [[METADATA:%.*]] = call %swift.type* @"$S5casts1BCMa"()
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S5casts1BCMa"([[INT]] 0)
+// CHECK:         [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:         [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* [[VALUE]], %swift.type* [[METADATA]])
 // CHECK:         [[COND:%.*]] = icmp ne %swift.type* [[RESULT]], null
 // CHECK:         br i1 [[COND]]
@@ -255,7 +257,8 @@ nay:
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @checked_downcast_optional_exmetatype({{(i32, i32|i64, i64)}}) {{.*}} {
 // CHECK:         [[VALUE:%.*]] = inttoptr {{(i32|i64)}} %0 to %swift.type*
-// CHECK:         [[METADATA:%.*]] = call %swift.type* @"$S5casts1BCMa"()
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S5casts1BCMa"([[INT]] 0)
+// CHECK:         [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:         [[RESULT:%.*]] = call %swift.type* @swift_dynamicCastMetatype(%swift.type* [[VALUE]], %swift.type* [[METADATA]])
 // CHECK:         [[COND:%.*]] = icmp ne %swift.type* [[RESULT]], null
 // CHECK:         br i1 [[COND]]

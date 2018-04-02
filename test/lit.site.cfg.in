@@ -36,6 +36,8 @@ config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
 
+# Please remember to handle empty strings and/or unset variables correctly.
+
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
 else:
@@ -65,9 +67,6 @@ if "@SWIFT_AST_VERIFIER@" == "TRUE":
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
-if "@SWIFT_STDLIB_ENABLE_RESILIENCE@" == "TRUE":
-    config.available_features.add("resilient_stdlib")
-
 if "@SWIFT_STDLIB_USE_NONATOMIC_RC@" == "TRUE":
     config.available_features.add("nonatomic_rc")
 
@@ -88,6 +87,11 @@ config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
+
+if "@SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS@" == "TRUE":
+   config.available_features.add('plus_zero_runtime')
+else:
+   config.available_features.add('plus_one_runtime')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

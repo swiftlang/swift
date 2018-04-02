@@ -25,6 +25,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Syntax/Serialization/SyntaxDeserialization.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
@@ -44,6 +45,7 @@ enum class ActionType {
   FullLexRoundTrip,
   FullParseRoundTrip,
   SerializeRawTree,
+  DeserializeRawTree,
   ParseOnly,
   ParserGen,
   EOFPos,
@@ -79,6 +81,10 @@ Action(llvm::cl::desc("Action (required):"),
                    "serialize-raw-tree",
                    "Parse the source file and serialize the raw tree"
                    "to JSON"),
+        clEnumValN(ActionType::DeserializeRawTree,
+                   "deserialize-raw-tree",
+                   "Parse the JSON file from the serialized raw tree"
+                   "to the original"),
         clEnumValN(ActionType::EOFPos,
                    "eof",
                    "Parse the source file, calculate the absolute position"
@@ -88,6 +94,10 @@ Action(llvm::cl::desc("Action (required):"),
 static llvm::cl::opt<std::string>
 InputSourceFilename("input-source-filename",
                     llvm::cl::desc("Path to the input .swift file"));
+
+static llvm::cl::opt<std::string>
+OutputFilename("output-filename",
+               llvm::cl::desc("Path to the output file"));
 
 static llvm::cl::opt<bool>
 PrintNodeKind("print-node-kind",
@@ -102,6 +112,12 @@ PrintTrivialNodeKind("print-trivial-node-kind",
                      llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+VerifySyntaxTree("verify-syntax-tree",
+                 llvm::cl::desc("Emit warnings for unknown nodes"),
+                 llvm::cl::cat(Category),
+                 llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
 Visual("v",
        llvm::cl::desc("Print visually"),
        llvm::cl::cat(Category),
@@ -112,11 +128,13 @@ namespace {
 int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
-                      DiagnosticEngine &Diags,
+                      swift::DiagnosticEngine &Diags,
                       std::vector<std::pair<RC<syntax::RawSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
-  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID,
+                              /*Offset=*/0, /*EndOffset=*/0,
+                              &Diags);
+  return EXIT_SUCCESS;
 }
 
 
@@ -146,7 +164,7 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
                           const char *MainExecutablePath) {
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
-  Invocation.getLangOptions().VerifySyntaxTree = true;
+  Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
@@ -191,7 +209,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
     TokAndPos.first->print(llvm::outs(), {});
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doDumpRawTokenSyntax(const StringRef InputFilename) {
@@ -215,7 +233,7 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
     llvm::outs() << "\n";
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doFullParseRoundTrip(const char *MainExecutablePath,
@@ -236,6 +254,20 @@ int doSerializeRawTree(const char *MainExecutablePath,
   out << *Root;
   llvm::outs() << "\n";
 
+  return EXIT_SUCCESS;
+}
+
+int doDeserializeRawTree(const char *MainExecutablePath,
+                         const StringRef InputFileName,
+                         const StringRef OutputFileName) {
+
+  auto Buffer = llvm::MemoryBuffer::getFile(InputFileName);
+  std::error_code errorCode;
+  auto os = llvm::make_unique<llvm::raw_fd_ostream>(
+              OutputFileName, errorCode, llvm::sys::fs::F_None);
+  swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
+  swift::SyntaxPrintOptions opt;
+  deserializer.getSourceFileSyntax()->print(*os);
   return EXIT_SUCCESS;
 }
 
@@ -309,6 +341,9 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::SerializeRawTree:
     ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
+    break;
+  case ActionType::DeserializeRawTree:
+    ExitCode = doDeserializeRawTree(argv[0], options::InputSourceFilename, options::OutputFilename);
     break;
   case ActionType::ParseOnly:
     ExitCode = doParseOnly(argv[0], options::InputSourceFilename);

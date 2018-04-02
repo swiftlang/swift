@@ -149,7 +149,8 @@ bb0:
 // CHECK-LABEL: define{{( protected)?}} swiftcc %T18static_initializer16TestArrayStorageC* @return_static_array() {{.*}} {
 sil @return_static_array : $@convention(thin) () -> TestArray {
 bb0:
-  // CHECK: [[MD:%[0-9]+]] = call %swift.type* @"$S18static_initializer16TestArrayStorageCMa"()
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S18static_initializer16TestArrayStorageCMa"(i64 0)
+  // CHECK: [[MD:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK: [[O:%[0-9a-z]+]] = call %swift.refcounted* @swift_initStaticObject(%swift.type* [[MD]], %swift.refcounted* getelementptr inbounds (%T18static_initializer16TestArrayStorageC_tailelems0c, %T18static_initializer16TestArrayStorageC_tailelems0c* @static_array, i32 0, i32 1, i32 0))
   // CHECK: [[R:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %T18static_initializer16TestArrayStorageC_tailelems0*
   // CHECK: [[R2:%[0-9]+]] = bitcast %T18static_initializer16TestArrayStorageC_tailelems0* [[R]] to %T18static_initializer16TestArrayStorageC*

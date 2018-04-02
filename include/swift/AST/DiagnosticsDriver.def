@@ -61,7 +61,7 @@ ERROR(error_cannot_specify__o_for_multiple_outputs,none,
       "cannot specify -o when generating multiple output files", ())
 
 ERROR(error_unable_to_load_output_file_map, none,
-      "unable to load output file map", ())
+      "unable to load output file map: %0", (StringRef))
 
 ERROR(error_no_output_file_map_specified,none,
       "no output file map specified", ())
@@ -140,6 +140,9 @@ WARNING(warn_opt_remark_disabled, none,
         "Emission of optimization records has been disabled, because it "
         "requires a single compiler invocation: consider enabling the "
         "-whole-module-optimization flag", ())
+
+WARNING(warn_ignoring_batch_mode,none,
+"ignoring '-enable-batch-mode' because '%0' was also specified", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

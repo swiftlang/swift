@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name protocol_extensions -disable-objc-attr-requires-foundation-module -emit-silgen %s | %FileCheck %s
 
 public protocol P1 {
   func reqP1a()
@@ -95,18 +96,16 @@ struct GenericMetaHolder<T> {
 
 func inout_func(_ n: inout Int) {}
 
-// CHECK-LABEL: sil hidden @$S19protocol_extensions5testD_2dd1dyAA10MetaHolderV_AA1DCmAHtF : $@convention(thin) (MetaHolder, @thick D.Type, @owned D) -> ()
+// CHECK-LABEL: sil hidden @$S19protocol_extensions5testD_2dd1dyAA10MetaHolderV_AA1DCmAHtF : $@convention(thin) (MetaHolder, @thick D.Type, @guaranteed D) -> ()
 // CHECK: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
 func testD(_ m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box ${ var D }
   // CHECK: [[RESULT:%.*]] = project_box [[D2]]
-  // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
   // CHECK: [[MATERIALIZED_BORROWED_D:%[0-9]+]] = alloc_stack $D
-  // CHECK: store_borrow [[BORROWED_D]] to [[MATERIALIZED_BORROWED_D]]
+  // CHECK: store_borrow [[D]] to [[MATERIALIZED_BORROWED_D]]
   // CHECK: [[FN:%[0-9]+]] = function_ref @$S19protocol_extensions2P1PAAE11returnsSelf{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FN]]<D>([[RESULT]], [[MATERIALIZED_BORROWED_D]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK-NEXT: dealloc_stack [[MATERIALIZED_BORROWED_D]]
-  // CHECK-NEXT: end_borrow [[BORROWED_D]] from [[D]]
   var d2: D = d.returnsSelf()
 
   // CHECK: metatype $@thick D.Type
@@ -659,11 +658,9 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
   // CHECK: [[PB:%.*]] = project_box [[IMMEDIATE_BOX]]
 
   // CHECK-NOT: copy_value [[ARG0]]
-  // CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-  // CHECK: [[VALUE:%.*]] = open_existential_ref [[BORROWED_ARG0]]
+  // CHECK: [[VALUE:%.*]] = open_existential_ref [[ARG0]]
   // CHECK: [[METHOD:%.*]] = function_ref
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK-NEXT: end_borrow [[BORROWED_ARG0]] from [[ARG0]]
   // CHECK-NOT: destroy_value [[VALUE]]
   // CHECK-NOT: destroy_value [[ARG0]]
   guaranteed.f1()
@@ -686,6 +683,7 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
   // CHECK-NOT: destroy_value [[PLUS_ONE]]
   plusOneCP1().f1()
 }
+// CHECK: } // end sil function '$S19protocol_extensions37test_open_existential_semantics_class{{[_0-9a-zA-Z]*}}F'
 
 protocol InitRequirement {
   init(c: C)

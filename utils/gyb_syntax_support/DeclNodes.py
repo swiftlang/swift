@@ -96,11 +96,13 @@ DECL_NODES = [
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
     #   else-clause? '#endif'
     Node('IfConfigDecl', kind='Decl',
-         traits=['WithStatements'],
          children=[
              Child('PoundIf', kind='PoundIfToken'),
              Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('Elements', kind='Syntax',
+                   node_choices=[
+                      Child('Statements', kind='CodeBlockItemList'),
+                      Child('SwitchCases', kind='SwitchCaseList')]),
              Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
                    is_optional=True),
              Child('ElseClause', kind='ElseDirectiveClause',
@@ -510,5 +512,99 @@ DECL_NODES = [
                        'LetToken', 'VarToken',
                    ]),
              Child('Bindings', kind='PatternBindingList'),
+         ]),
+
+    Node('EnumCaseElement', kind='Syntax',
+         description='''
+         An element of an enum case, containing the name of the case and, \
+         optionally, either associated values or an assignment to a raw value.
+         ''',
+         traits=['WithTrailingComma'],
+         children=[
+             Child('Identifier', kind='IdentifierToken',
+                   description='The name of this case.'),
+             Child('AssociatedValue', kind='TupleType', is_optional=True,
+                   description='The set of associated values of the case.'),
+             Child('EqualsToken', kind='EqualsToken', is_optional=True,
+                   description='''
+                   The equals token, if this case is assigned to a raw value.
+                   '''),
+             Child('RawValue', kind='Expr', is_optional=True,
+                   description='''
+                   The raw value of this enum element, if present.
+                   '''),
+             Child('TrailingComma', kind='CommaToken', is_optional=True,
+                   description='''
+                   The trailing comma of this element, if the case has \
+                   multiple elements.
+                   '''),
+         ]),
+
+    Node('EnumCaseElementList', kind='SyntaxCollection',
+         description='A collection of 0 or more `EnumCaseElement`s.',
+         element='EnumCaseElement'),
+
+    Node('EnumCaseDecl', kind='Decl',
+         description='''
+         A `case` declaration of a Swift `enum`. It can have 1 or more \
+         `EnumCaseElement`s inside, each declaring a different case of the
+         enum.
+         ''',
+         children=[
+             Child('IndirectKeyword', kind='IndirectToken', is_optional=True,
+                   description='''
+                   The `indirect` keyword, if this case is indirect.
+                   '''),
+             Child('CaseKeyword', kind='CaseToken',
+                   description='The `case` keyword for this case.'),
+             Child('Elements', kind='EnumCaseElementList',
+                   description='The elements this case declares.')
+         ]),
+
+    Node('EnumDecl', kind='Decl', traits=['IdentifiedDecl'],
+         description='A Swift `enum` declaration.',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True,
+                   description='''
+                   The attributes applied to the enum declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the enum declaration.
+                   '''),
+             Child('IndirectKeyword', kind='IndirectToken', is_optional=True,
+                   description='''
+                   The `indirect` keyword that applies to all cases in this \
+                   enum.
+                   '''),
+             Child('EnumKeyword', kind='EnumToken',
+                   description='''
+                   The `enum` keyword for this declaration.
+                   '''),
+             Child('Identifier', kind='IdentifierToken',
+                   description='''
+                   The name of this enum.
+                   '''),
+             Child('GenericParameters', kind='GenericParameterClause',
+                   is_optional=True,
+                   description='''
+                   The generic parameters, if any, for this enum.
+                   '''),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True,
+                   description='''
+                   The inheritance clause describing conformances or raw \
+                   values for this enum.
+                   '''),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                  is_optional=True,
+                  description='''
+                  The `where` clause that applies to the generic parameters of \
+                  this enum.
+                  '''),
+             Child('Members', kind='MemberDeclBlock',
+                  description='''
+                  The cases and other members of this enum.
+                  ''')
          ]),
 ]

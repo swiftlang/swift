@@ -4,8 +4,8 @@
 
 import Swift
 
-@_versioned
-@_inlineable
+@usableFromInline
+@inlinable
 func WhatShouldIDoImBored<T : P>(_ t : T) {
   t.doSomething()
 }

@@ -1,3 +1,4 @@
+
 // rdar://problem/23727705:
 // RUN-DISABLED: %target-swift-frontend -O %s -disable-llvm-optzns -emit-ir -g -o - | %FileCheck %s
 import StdlibUnittest
@@ -35,8 +36,8 @@ demo()
 // Verify that a reabstraction thunk does not have a line number.
 // CHECK-O0-NOT: DW_OP_bit_piece
 // CHECK-O0-NOT: DW_OP_bit_piece
-// CHECK-O0: !DILocalVariable(name: "a", arg: 1{{.*}} line: 17,
+// CHECK-O0: !DILocalVariable(name: "a", arg: 1{{.*}} line: 18,
 // CHECK-O0-NOT: DW_OP_bit_piece
-// CHECK-O0: !DILocalVariable(name: "b", arg: 2{{.*}} line: 17,
+// CHECK-O0: !DILocalVariable(name: "b", arg: 2{{.*}} line: 18,
 // CHECK-O0-NOT: DW_OP_bit_piece
-// CHECK-O0: !DISubprogram(linkageName: "$SS2SSbs5Error_pIgxxdzo_S2SSbsAA_pIegiidzo_TR",
+// CHECK-O0: !DISubprogram(linkageName: "$SS2SSbs5Error_pIgggdzo_S2SSbsAA_pIegnndzo_TR",

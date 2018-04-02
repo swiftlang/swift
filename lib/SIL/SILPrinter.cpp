@@ -1435,7 +1435,8 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
+          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
@@ -1549,7 +1550,7 @@ public:
     interleave(OI->getBaseElements(),
                [&](const SILValue &V) { *this << getIDAndType(V); },
                [&] { *this << ", "; });
-    if (OI->getTailElements().size() > 0) {
+    if (!OI->getTailElements().empty()) {
       *this << ", [tail_elems] ";
       interleave(OI->getTailElements(),
                  [&](const SILValue &V) { *this << getIDAndType(V); },
@@ -1793,6 +1794,9 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
+    *this << getIDAndType(CUI->getOperand());
+  }
+  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
@@ -2149,6 +2153,17 @@ public:
       }
       
       *this << " : $" << component.getComponentType();
+      
+      if (!component.getSubscriptIndices().empty()) {
+        *this << ", indices_equals ";
+        component.getSubscriptIndexEquals()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexEquals()->getLoweredType();
+        *this << ", indices_hash ";
+        component.getSubscriptIndexHash()->printName(PrintState.OS);
+        *this << " : "
+              << component.getSubscriptIndexHash()->getLoweredType();
+      }
     }
     }
   }
@@ -2307,8 +2322,10 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[readonly] ";
   else if (getEffectsKind() == EffectsKind::ReadNone)
       OS << "[readnone] ";
-  if (getEffectsKind() == EffectsKind::ReadWrite)
+  else if (getEffectsKind() == EffectsKind::ReadWrite)
     OS << "[readwrite] ";
+  else if (getEffectsKind() == EffectsKind::ReleaseNone)
+    OS << "[releasenone] ";
 
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";
@@ -2609,6 +2626,11 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   OS << ")\n";
 }
 
+void SILProperty::dump() const {
+  SILPrintContext context(llvm::errs());
+  print(context);
+}
+
 static void printSILProperties(SILPrintContext &Ctx,
                                const SILModule::PropertyListType &Properties) {
   for (const SILProperty &P : Properties) {
@@ -2633,8 +2655,9 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
-     << "\nimport SwiftShims" << "\n\n";
+  OS << "\n\nimport " << BUILTIN_NAME
+     << "\nimport " << STDLIB_NAME
+     << "\nimport " << SWIFT_SHIMS_NAME << "\n\n";
 
   // Print the declarations and types from the associated context (origin module or
   // current file).
@@ -2833,13 +2856,6 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "base_protocol "
          << baseProtoWitness.Requirement->getName() << ": ";
       baseProtoWitness.Witness->printName(OS, Options);
-      break;
-    }
-    case MissingOptional: {
-      // optional requirement 'declref': <<not present>>
-      OS << "optional requirement '"
-         << witness.getMissingOptionalWitness().Witness->getBaseName()
-         << "': <<not present>>";
       break;
     }
     }

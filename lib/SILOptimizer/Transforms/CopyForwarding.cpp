@@ -1223,7 +1223,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   for (auto *BB : PostOrder->get(F)->getPostOrder()) {
     SmallVector<unsigned, 4> DeadInSuccs;
     ArrayRef<SILSuccessor> Succs = BB->getSuccessors();
-    if (Succs.size() == 0)
+    if (Succs.empty())
       continue;
 
     for (unsigned EdgeIdx = 0, End = Succs.size(); EdgeIdx != End; ++EdgeIdx) {
@@ -1301,6 +1301,18 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
 ///   ... // no writes
 ///   return
 static bool canNRVO(CopyAddrInst *CopyInst) {
+  // Don't perform NRVO unless the copy is a [take]. This is the easiest way
+  // to determine that the local variable has ownership of its value and ensures
+  // that removing a copy is a reference count neutral operation. For example,
+  // this copy can't be trivially eliminated without adding a retain.
+  //   sil @f : $@convention(thin) (@guaranteed T) -> @out T
+  //   bb0(%in : $*T, %out : $T):
+  //     %local = alloc_stack $T
+  //     store %in to %local : $*T
+  //     copy_addr %local to [initialization] %out : $*T
+  if (!CopyInst->isTakeOfSrc())
+    return false;
+
   if (!isa<AllocStackInst>(CopyInst->getSrc()))
     return false;
 

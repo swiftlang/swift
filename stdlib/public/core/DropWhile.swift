@@ -18,16 +18,16 @@ public struct LazyDropWhileSequence<Base: Sequence> {
   
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _base: Base
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal let _predicate: (Element) -> Bool
 }
 
@@ -42,24 +42,24 @@ extension LazyDropWhileSequence {
   public struct Iterator {
     public typealias Element = Base.Element
     
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Base.Iterator, predicate: @escaping (Element) -> Bool) {
       self._base = _base
       self._predicate = predicate
     }
 
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var _predicateHasFailed = false
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var _base: Base.Iterator
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal let _predicate: (Element) -> Bool
   }
 }
 
 extension LazyDropWhileSequence.Iterator: IteratorProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {
     // Once the predicate has failed for the first time, the base iterator
     // can be used for the rest of the elements.
@@ -85,7 +85,7 @@ extension LazyDropWhileSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
   }
@@ -103,7 +103,7 @@ extension LazySequenceProtocol {
   ///   its argument and returns `true` if the element should be skipped or
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func drop(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhileSequence<Self.Elements> {
@@ -125,16 +125,16 @@ extension LazySequenceProtocol {
 public struct LazyDropWhileCollection<Base: Collection> {
   public typealias Element = Base.Element
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
   }
 
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _base: Base
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal let _predicate: (Element) -> Bool
 }
 
@@ -144,7 +144,7 @@ extension LazyDropWhileCollection: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
   }
@@ -160,8 +160,8 @@ extension LazyDropWhileCollection {
     /// The position corresponding to `self` in the underlying collection.
     public let base: Base.Index
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Base.Index) {
       self.base = _base
     }
@@ -169,7 +169,7 @@ extension LazyDropWhileCollection {
 }
 
 extension LazyDropWhileCollection.Index: Equatable, Comparable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func == (
     lhs: LazyDropWhileCollection<Base>.Index,
     rhs: LazyDropWhileCollection<Base>.Index
@@ -177,7 +177,7 @@ extension LazyDropWhileCollection.Index: Equatable, Comparable {
     return lhs.base == rhs.base
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func < (
     lhs: LazyDropWhileCollection<Base>.Index,
     rhs: LazyDropWhileCollection<Base>.Index
@@ -187,13 +187,19 @@ extension LazyDropWhileCollection.Index: Equatable, Comparable {
 }
 
 extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
+  @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return base.hashValue
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(base)
   }
 }
 
 extension LazyDropWhileCollection: Collection {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
     var index = _base.startIndex
     while index != _base.endIndex && _predicate(_base[index]) {
@@ -202,19 +208,19 @@ extension LazyDropWhileCollection: Collection {
     return Index(_base: index)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     return Index(_base: _base.endIndex)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     _precondition(i.base < _base.endIndex, "Can't advance past endIndex")
     return Index(_base: _base.index(after: i.base))
   }
 
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Element {
     return _base[position.base]
   }
@@ -224,7 +230,7 @@ extension LazyDropWhileCollection: LazyCollectionProtocol { }
 
 extension LazyDropWhileCollection: BidirectionalCollection 
 where Base: BidirectionalCollection {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     _precondition(i > startIndex, "Can't move before startIndex")
     return Index(_base: _base.index(before: i.base))
@@ -239,7 +245,7 @@ extension LazyCollectionProtocol {
   ///   as its argument and returns `true` if the element should be skipped or
   ///   `false` otherwise. Once `predicate` returns `false` it will not be
   ///   called again.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func drop(
     while predicate: @escaping (Elements.Element) -> Bool
   ) -> LazyDropWhileCollection<Self.Elements> {

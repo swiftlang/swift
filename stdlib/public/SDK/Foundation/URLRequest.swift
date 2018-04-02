@@ -100,7 +100,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
     /// The URLRequest.NetworkServiceType associated with this request.
     /// - discussion: This will return URLRequest.NetworkServiceType.default for requests that have
     /// not explicitly set a networkServiceType
-    @available(OSX 10.7, iOS 4.0, *)
+    @available(macOS 10.7, iOS 4.0, *)
     public var networkServiceType: NetworkServiceType {
         get {
             return _handle.map { $0.networkServiceType }
@@ -112,7 +112,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
     
     /// `true` if the receiver is allowed to use the built in cellular radios to
     /// satisfy the request, `false` otherwise.
-    @available(OSX 10.8, iOS 6.0, *)
+    @available(macOS 10.8, iOS 6.0, *)
     public var allowsCellularAccess: Bool {
         get {
             return _handle.map { $0.allowsCellularAccess }
@@ -219,7 +219,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
     /// `true` if the receiver should transmit before the previous response
     /// is received.  `false` if the receiver should wait for the previous response
     /// before transmitting.
-    @available(OSX 10.7, iOS 4.0, *)
+    @available(macOS 10.7, iOS 4.0, *)
     public var httpShouldUsePipelining: Bool {
         get {
             return _handle.map { $0.httpShouldUsePipelining }

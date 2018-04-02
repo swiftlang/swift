@@ -92,8 +92,6 @@
   * GuardStmt
   * WhileStmt
   * ForInStmt
-
-### Not-started (UnknownStmt):
   * SwitchStmt
 
 ## Pattern

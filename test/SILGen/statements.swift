@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name statements -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
 
 class MyClass { 
   func foo() { }
@@ -240,12 +241,11 @@ func test_break(_ i : Int) {
 
 // <rdar://problem/19150249> Allow labeled "break" from an "if" statement
 
-// CHECK-LABEL: sil hidden @$S10statements13test_if_breakyyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
+// CHECK-LABEL: sil hidden @$S10statements13test_if_breakyyAA1CCSgF : $@convention(thin) (@guaranteed Optional<C>) -> () {
 func test_if_break(_ c : C?) {
-// CHECK: bb0([[ARG:%.*]] : @owned $Optional<C>):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<C>):
 label1:
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
   if let x = c {
 // CHECK: [[TRUE]]({{.*}} : @owned $C):
@@ -263,16 +263,14 @@ label1:
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @$S10statements18test_if_else_breakyyAA1CCSgF : $@convention(thin) (@owned Optional<C>) -> () {
+// CHECK-LABEL: sil hidden @$S10statements18test_if_else_breakyyAA1CCSgF : $@convention(thin) (@guaranteed Optional<C>) -> () {
 func test_if_else_break(_ c : C?) {
-// CHECK: bb0([[ARG:%.*]] : @owned $Optional<C>):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<C>):
 label2:
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
   // CHECK: [[FALSE]]:
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   br [[AFTER_FALSE:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : @owned $C):
@@ -295,13 +293,11 @@ label2:
 // CHECK-LABEL: sil hidden @$S10statements23test_if_else_then_breakyySb_AA1CCSgtF
 func test_if_else_then_break(_ a : Bool, _ c : C?) {
 label3:
-  // CHECK: bb0({{.*}}, [[ARG2:%.*]] : @owned $Optional<C>):
-  // CHECK: [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
-  // CHECK: [[ARG2_COPY:%.*]] = copy_value [[BORROWED_ARG2]]
+  // CHECK: bb0({{.*}}, [[ARG2:%.*]] : @guaranteed $Optional<C>):
+  // CHECK: [[ARG2_COPY:%.*]] = copy_value [[ARG2]]
   // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
   // CHECK: [[FALSE]]:
-  // CHECK:   end_borrow [[BORROWED_ARG2]] from [[ARG2]]
   // CHECK:   br [[COND2:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : @owned $C):
@@ -523,7 +519,7 @@ func defer_in_generic<T>(_ x: T) {
   generic_callee_3(x)
 }
 
-// CHECK-LABEL: sil hidden @$S10statements017defer_in_closure_C8_genericyyxlF : $@convention(thin) <T> (@in T) -> ()
+// CHECK-LABEL: sil hidden @$S10statements017defer_in_closure_C8_genericyyxlF : $@convention(thin) <T> (@in_guaranteed T) -> ()
 func defer_in_closure_in_generic<T>(_ x: T) {
   // CHECK-LABEL: sil private @$S10statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
   _ = {
@@ -611,28 +607,24 @@ func testRequireOptional1(_ a : Int?) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @$S10statements20testRequireOptional2yS2SSgF
-// CHECK: bb0([[ARG:%.*]] : @owned $Optional<String>):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<String>):
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<String>, let, name "a"
-// CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]] : $Optional<String>
+// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]] : $Optional<String>
 // CHECK-NEXT:   switch_enum [[ARG_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK: [[NONE_BB]]:
-  // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK-NEXT: br [[ABORT_BB:bb[0-9]+]]
   
   // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
   // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
   // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
   // CHECK:  [[CONT_BB]]:
-  // CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]] from [[STR]]
   // CHECK-NEXT:   destroy_value [[STR]] : $String
-  // CHECK-NEXT:   destroy_value [[ARG]]
   // CHECK-NEXT:   return [[RETURN]] : $String
 
   // CHECK:        [[ABORT_BB]]:
@@ -664,9 +656,8 @@ func test_is_pattern(_ y : BaseClass) {
 
 // CHECK-LABEL: sil hidden @$S10statements15test_as_patternyAA12DerivedClassCAA04BaseF0CF
 func test_as_pattern(_ y : BaseClass) -> DerivedClass {
-  // CHECK: bb0([[ARG:%.*]] : @owned $BaseClass):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $BaseClass):
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to $DerivedClass
   guard case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : @owned $DerivedClass):
@@ -676,12 +667,10 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
   // CHECK-NEXT: br [[CONT_BB:bb[0-9]+]]
   // CHECK: [[CONT_BB]]:
-  // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
   // CHECK-NEXT: end_borrow [[BORROWED_PTR]] from [[PTR]]
   // CHECK-NEXT: destroy_value [[PTR]] : $DerivedClass
-  // CHECK-NEXT: destroy_value [[ARG]] : $BaseClass
   // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result
 }

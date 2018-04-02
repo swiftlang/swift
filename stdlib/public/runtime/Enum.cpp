@@ -50,14 +50,17 @@ swift::swift_initEnumMetadataSingleCase(EnumMetadata *self,
                                         const TypeLayout *payloadLayout) {
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
 
-  vwtable->size = payloadLayout->size;
-  vwtable->stride = payloadLayout->stride;
-  vwtable->flags = payloadLayout->flags.withEnumWitnesses(true);
+  TypeLayout layout;
+  layout.size = payloadLayout->size;
+  layout.stride = payloadLayout->stride;
+  layout.flags = payloadLayout->flags.withEnumWitnesses(true);
 
   if (payloadLayout->flags.hasExtraInhabitants()) {
     auto ew = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
     ew->extraInhabitantFlags = payloadLayout->getExtraInhabitantFlags();
   }
+
+  vwtable->publishLayout(layout);
 }
 
 void
@@ -86,13 +89,14 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
   
   size_t align = payloadLayout->flags.getAlignment();
-  vwtable->size = size;
-  vwtable->flags = payloadLayout->flags
+  TypeLayout layout;
+  layout.size = size;
+  layout.flags = payloadLayout->flags
     .withExtraInhabitants(unusedExtraInhabitants > 0)
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
   auto rawStride = llvm::alignTo(size, align);
-  vwtable->stride = rawStride == 0 ? 1 : rawStride;
+  layout.stride = rawStride == 0 ? 1 : rawStride;
   
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
@@ -116,7 +120,7 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
 #include "swift/ABI/ValueWitness.def"
   } else {
 #endif
-    installCommonValueWitnesses(vwtable);
+    installCommonValueWitnesses(layout, vwtable);
 #if OPTIONAL_OBJECT_OPTIMIZATION
   }
 #endif
@@ -129,11 +133,13 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
     xiVWTable->extraInhabitantFlags = ExtraInhabitantFlags()
       .withNumExtraInhabitants(unusedExtraInhabitants);
   }
+
+  vwtable->publishLayout(layout);
 }
 
-int swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                          const Metadata *payload,
-                                          unsigned emptyCases) {
+unsigned swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
+                                               const Metadata *payload,
+                                               unsigned emptyCases) {
 
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();
@@ -149,7 +155,8 @@ int swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
 
 void swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                             const Metadata *payload,
-                                            int whichCase, unsigned emptyCases){
+                                            unsigned whichCase,
+                                            unsigned emptyCases) {
 
   auto *payloadWitnesses = payload->getValueWitnesses();
   auto size = payloadWitnesses->getSize();
@@ -190,8 +197,9 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   auto vwtable = getMutableVWTableForInit(enumType, layoutFlags);
 
   // Set up the layout info in the vwtable.
-  vwtable->size = totalSize;
-  vwtable->flags = ValueWitnessFlags()
+  TypeLayout layout;
+  layout.size = totalSize;
+  layout.flags = ValueWitnessFlags()
     .withAlignmentMask(alignMask)
     .withPOD(isPOD)
     .withBitwiseTakable(isBT)
@@ -201,9 +209,11 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
     .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
     ;
   auto rawStride = (totalSize + alignMask) & ~alignMask;
-  vwtable->stride = rawStride == 0 ? 1 : rawStride;
+  layout.stride = rawStride == 0 ? 1 : rawStride;
   
-  installCommonValueWitnesses(vwtable);
+  installCommonValueWitnesses(layout, vwtable);
+
+  vwtable->publishLayout(layout);
 }
 
 namespace {

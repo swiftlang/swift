@@ -1068,6 +1068,7 @@ bool SILInstruction::mayRelease() const {
 bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
     return true;
   default:
@@ -1185,6 +1186,20 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
+}
+
+bool SILInstruction::isMetaInstruction() const {
+  // Every instruction that implements getVarInfo() should be in this list.
+  switch (getKind()) {
+  case SILInstructionKind::AllocBoxInst:
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueAddrInst:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Instruction not handled in isMetaInstruction()!");
 }
 
 //===----------------------------------------------------------------------===//

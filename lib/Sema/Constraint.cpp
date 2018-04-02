@@ -465,8 +465,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[inout-to-pointer]";
   case ConversionRestrictionKind::PointerToPointer:
     return "[pointer-to-pointer]";
-  case ConversionRestrictionKind::ForceUnchecked:
-    return "[force-unchecked]";
   case ConversionRestrictionKind::ArrayUpcast:
     return "[array-upcast]";
   case ConversionRestrictionKind::DictionaryUpcast:
@@ -506,6 +504,9 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: add address-of";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
+  case FixKind::ExplicitlyEscaping:
+  case FixKind::ExplicitlyEscapingToAny:
+    return "fix: add @escaping";
   }
 
   llvm_unreachable("Unhandled FixKind in switch.");

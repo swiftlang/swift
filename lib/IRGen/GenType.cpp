@@ -39,6 +39,7 @@
 #include "GenOpaque.h"
 #include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
+#include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
@@ -162,9 +163,11 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
     loadAsCopy(IGF, srcAddr, copy);
     initialize(IGF, copy, destAddr, true);
   } else {
-    IGF.IGM.generateCallToOutlinedCopyAddr(
-        IGF, *this, destAddr, srcAddr, T,
-        &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+    OutliningMetadataCollector collector(IGF);
+    // No need to collect anything because we assume loadable types can be
+    // loaded without enums.
+    collector.emitCallToOutlinedCopy(
+        destAddr, srcAddr, T, *this, IsInitialization, IsNotTake);
   }
 }
 
@@ -517,7 +520,8 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   result->addIncoming(result0, noExtraTagBitsBB);
   result->addIncoming(result1, extraTagBitsBB);
   result->addIncoming(result2, singleCaseEnumBB);
-  return result;
+
+  return Builder.CreateAdd(result, llvm::ConstantInt::get(IGM.Int32Ty, 1));
 }
 
 /// Emit a speciaize memory operation for a \p size of 0 to 4 bytes.
@@ -636,7 +640,7 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   auto *isExtraTagBitsCaseBB = llvm::BasicBlock::Create(Ctx);
   auto *isPayloadOrInhabitantCaseBB = llvm::BasicBlock::Create(Ctx);
   auto *isPayloadOrExtraInhabitant =
-      Builder.CreateICmpSLT(whichCase, numExtraInhabitants);
+      Builder.CreateICmpULE(whichCase, numExtraInhabitants);
   Builder.CreateCondBr(isPayloadOrExtraInhabitant, isPayloadOrInhabitantCaseBB,
                        isExtraTagBitsCaseBB);
 
@@ -647,20 +651,26 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   isPayloadOrInhabitantCaseBB = Builder.GetInsertBlock();
   auto *storeInhabitantBB = llvm::BasicBlock::Create(Ctx);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
-  auto *isPayload = Builder.CreateICmpEQ(
-      whichCase, llvm::ConstantInt::getSigned(int32Ty, -1));
+  auto *isPayload = Builder.CreateICmpEQ(whichCase, zero);
   Builder.CreateCondBr(isPayload, returnBB, storeInhabitantBB);
 
   Builder.emitBlock(storeInhabitantBB);
-  if (mayHaveExtraInhabitants(IGM))
-    storeExtraInhabitant(IGF, whichCase, enumAddr, T);
+  if (mayHaveExtraInhabitants(IGM)) {
+    // Store an index in the range [0..ElementsWithNoPayload-1].
+    auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
+    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T);
+  }
   Builder.CreateBr(returnBB);
 
   // There are extra tag bits to consider.
   Builder.emitBlock(isExtraTagBitsCaseBB);
 
-  // Write the extra tag bytes.
-  auto *caseIndex = Builder.CreateSub(whichCase, numExtraInhabitants);
+  // Write the extra tag bytes. At this point we know we have an no payload case
+  // and therefore the index we should store is in the range
+  // [0..ElementsWithNoPayload-1].
+  auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
+  auto *caseIndex =
+      Builder.CreateSub(nonPayloadElementIndex, numExtraInhabitants);
   auto *truncSize = Builder.CreateTrunc(size, IGM.Int32Ty);
   auto *isFourBytesPayload = Builder.CreateICmpUGE(truncSize, four);
   auto *payloadGE4BB = Builder.GetInsertBlock();
@@ -1070,6 +1080,10 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   // Push the generic context down to the SIL TypeConverter, so we can share
   // archetypes with SIL.
   IGM.getSILTypes().pushGenericContext(signature);
+
+  // Clear the dependent type info cache since we have a new active signature
+  // now.
+  Types.DependentCache.clear();
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
@@ -2062,20 +2076,6 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   if (w.isPointerWidth())
     return getPointerSize().getValueInBits();
   llvm_unreachable("impossible width value");
-}
-
-llvm::Value *IRGenFunction::getLocalSelfMetadata() {
-  assert(LocalSelf && "no local self metadata");
-  switch (SelfKind) {
-  case SwiftMetatype:
-    return LocalSelf;
-  case ObjCMetatype:
-    return emitObjCMetadataRefForMetadata(*this, LocalSelf);
-  case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
-  }
-
-  llvm_unreachable("Not a valid LocalSelfKind.");
 }
 
 void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,

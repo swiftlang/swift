@@ -48,10 +48,11 @@ public:
     // StructMetadata header.
     asImpl().addNominalTypeDescriptor();
 
-    // If changing this layout, you must update the magic number in
-    // emitParentMetadataRef.
+    // Everything after this is type-specific.
+    asImpl().noteStartOfTypeSpecificMembers();
 
-    // Instantiation-specific.
+    // Generic arguments.
+    // This must always be the first piece of trailing data.
     asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
 
     // Struct field offsets.
@@ -68,7 +69,8 @@ public:
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class StructMetadataScanner : public StructMetadataVisitor<Impl> {
-  typedef StructMetadataVisitor<Impl> super;
+  using super = StructMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 
@@ -84,6 +86,7 @@ public:
   void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
     addPointer();
   }
+  void noteStartOfTypeSpecificMembers() {}
 
 private:
   void addPointer() {

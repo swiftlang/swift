@@ -1,7 +1,6 @@
 // The clang module triggers a warning, make sure that -Fsystem has the effect of importing as system, which will suppress the warning.
 
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -F %S/Inputs/systemframeworks -module-cache-path %t/mcp1 %s 2> %t/stderr-as-user.txt
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -Fsystem %S/Inputs/systemframeworks -module-cache-path %t/mcp2 %s 2> %t/stderr-as-system.txt

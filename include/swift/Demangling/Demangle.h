@@ -75,7 +75,7 @@ struct DemangleOptions {
 };
 
 class Node;
-typedef Node *NodePointer;
+using NodePointer = Node *;
 
 enum class FunctionSigSpecializationParamKind : unsigned {
   // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
@@ -133,7 +133,7 @@ public:
 #include "swift/Demangling/DemangleNodes.def"
   };
 
-  typedef uint64_t IndexType;
+  using IndexType = uint64_t;
 
   friend class NodeFactory;
   
@@ -182,10 +182,10 @@ public:
     assert(hasIndex());
     return IndexPayload;
   }
-  
-  typedef NodePointer *iterator;
-  typedef const NodePointer *const_iterator;
-  typedef size_t size_type;
+
+  using iterator = NodePointer *;
+  using const_iterator = const NodePointer *;
+  using size_type = size_t;
 
   bool hasChildren() const { return NumChildren != 0; }
   size_t getNumChildren() const { return NumChildren; }

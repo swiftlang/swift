@@ -5,7 +5,7 @@
 // RUN: %empty-directory(%t)
 // RUN: echo 'public func a() { }' >%t/a.swift
 // RUN: echo 'public func main() {a()}' >%t/main.swift
-// RUN: %target-swift-frontend -c -enable-batch-mode -bypass-batch-mode-checks -module-name foo -primary-file %t/a.swift -primary-file %t/main.swift -emit-dependencies-path %t/a.d -emit-dependencies-path %t/main.d  -o %t/a.o -o %t/main.o -emit-module-path %t/a.swiftmodule -emit-module-path %t/main.swiftmodule
+// RUN: %target-swift-frontend -c -enable-batch-mode -module-name foo -primary-file %t/a.swift -primary-file %t/main.swift -emit-dependencies-path %t/a.d -emit-dependencies-path %t/main.d  -o %t/a.o -o %t/main.o -emit-module-path %t/a.swiftmodule -emit-module-path %t/main.swiftmodule
 // RUN: %FileCheck -check-prefix=CHECK-MAIN %s <%t/main.d
 // RUN: %FileCheck -check-prefix=NEGATIVE-MAIN %s <%t/main.d
 //

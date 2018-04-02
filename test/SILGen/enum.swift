@@ -1,3 +1,4 @@
+
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership -module-name Swift %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
@@ -107,15 +108,19 @@ func AddressOnly_cases(_ s: S) {
 // CHECK-LABEL: sil shared [transparent] [thunk] @$Ss11AddressOnlyO4mereyABs1P_pcABmF
 // CHECK:       [[FN:%.*]] = function_ref @$Ss11AddressOnlyO4mereyABs1P_pcABmF
 // CHECK-NEXT:  [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
-// CHECK-NEXT:  return [[METHOD]] : $@callee_guaranteed (@in P) -> @out AddressOnly
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[CANONICAL_THUNK_FN:%.*]] = function_ref @$Ss1P_ps11AddressOnlyOIegir_sAA_pACIegnr_TR : $@convention(thin) (@in_guaranteed P, @guaranteed @callee_guaranteed (@in P) -> @out AddressOnly) -> @out AddressOnly
+// CHECK-NEXT:  [[CANONICAL_THUNK:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK_FN]]([[METHOD]])
+// CHECK-NEXT:  return [[CANONICAL_THUNK]] : $@callee_guaranteed (@in_guaranteed P) -> @out AddressOnly
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil shared [transparent] @$Ss11AddressOnlyO4mereyABs1P_pcABmF
-// CHECK:        [[RET_DATA:%.*]] = init_enum_data_addr %0 : $*AddressOnly, #AddressOnly.mere!enumelt.1
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[RET_DATA]] : $*P
-// CHECK-NEXT:   inject_enum_addr %0 : $*AddressOnly, #AddressOnly.mere!enumelt.1
+// CHECK-LABEL: sil shared [transparent] @$Ss11AddressOnlyO4mereyABs1P_pcABmF : $@convention
+// CHECK: bb0([[ARG0:%.*]] : @trivial $*AddressOnly, [[ARG1:%.*]] : @trivial $*P, [[ARG2:%.*]] : @trivial $@thin AddressOnly.Type):
+// CHECK:        [[RET_DATA:%.*]] = init_enum_data_addr [[ARG0]] : $*AddressOnly, #AddressOnly.mere!enumelt.1
+// CHECK-NEXT:   copy_addr [take] [[ARG1]] to [initialization] [[RET_DATA]] : $*P
+// CHECK-NEXT:   inject_enum_addr [[ARG0]] : $*AddressOnly, #AddressOnly.mere!enumelt.1
 // CHECK:        return
-// CHECK-NEXT: }
+// CHECK-NEXT: } // end sil function '$Ss11AddressOnlyO4mereyABs1P_pcABmF'
 
 enum PolyOptionable<T> {
   case nought
@@ -142,7 +147,7 @@ func PolyOptionable_cases<T>(_ t: T) {
 
   _ = PolyOptionable<T>.mere(t)
 
-// CHECK-NEXT:    destroy_addr %0
+// CHECK-NOT:    destroy_addr %0
 // CHECK:         return
 
 }
@@ -171,21 +176,28 @@ struct String { var ptr: Builtin.NativeObject }
 
 enum Foo { case A(P, String) }
 
+// Curry Thunk for Foo.A(_:)
+//
 // CHECK-LABEL: sil shared [transparent] [thunk] @$Ss3FooO1AyABs1P_p_SStcABmF
 // CHECK:         [[FN:%.*]] = function_ref @$Ss3FooO1AyABs1P_p_SStcABmF
 // CHECK-NEXT:    [[METHOD:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
-// CHECK-NEXT:    return [[METHOD]]
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[CANONICAL_THUNK_FN:%.*]] = function_ref @$Ss1P_pSSs3FooOIegixr_sAA_pSSACIegngr_TR : $@convention(thin) (@in_guaranteed P, @guaranteed String, @guaranteed @callee_guaranteed (@in P, @owned String) -> @out Foo) -> @out Foo
+// CHECK-NEXT:    [[CANONICAL_THUNK:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK_FN]]([[METHOD]])
+// CHECK-NEXT:    return [[CANONICAL_THUNK]]
 // CHECK-NEXT:  }
 
+// Foo.A(_:)
 // CHECK-LABEL: sil shared [transparent] @$Ss3FooO1AyABs1P_p_SStcABmF
-// CHECK:         [[PAYLOAD:%.*]] = init_enum_data_addr %0 : $*Foo, #Foo.A!enumelt.1
+// CHECK: bb0([[ARG0:%.*]] : @trivial $*Foo, [[ARG1:%.*]] : @trivial $*P, [[ARG2:%.*]] : @owned $String, [[ARG3:%.*]] : @trivial $@thin Foo.Type):
+// CHECK:         [[PAYLOAD:%.*]] = init_enum_data_addr [[ARG0]] : $*Foo, #Foo.A!enumelt.1
 // CHECK-NEXT:    [[LEFT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 0
 // CHECK-NEXT:    [[RIGHT:%.*]] = tuple_element_addr [[PAYLOAD]] : $*(P, String), 1
-// CHECK-NEXT:    copy_addr [take] %1 to [initialization] [[LEFT]] : $*P
-// CHECK-NEXT:    store %2 to [init] [[RIGHT]]
-// CHECK-NEXT:    inject_enum_addr %0 : $*Foo, #Foo.A!enumelt.1
+// CHECK-NEXT:    copy_addr [take] [[ARG1]] to [initialization] [[LEFT]] : $*P
+// CHECK-NEXT:    store [[ARG2]] to [init] [[RIGHT]]
+// CHECK-NEXT:    inject_enum_addr [[ARG0]] : $*Foo, #Foo.A!enumelt.1
 // CHECK:         return
-// CHECK-NEXT:  }
+// CHECK-NEXT:  } // end sil function '$Ss3FooO1AyABs1P_p_SStcABmF'
 
 func Foo_cases() {
   _ = Foo.A
@@ -195,7 +207,7 @@ enum Indirect<T> {
   indirect case payload((T, other: T))
   case none
 }
-// CHECK-LABEL: sil{{.*}} @{{.*}}makeIndirectEnum{{.*}} : $@convention(thin) <T> (@in T) -> @owned Indirect<T>
+// CHECK-LABEL: sil{{.*}} @{{.*}}makeIndirectEnum{{.*}} : $@convention(thin) <T> (@in_guaranteed T) -> @owned Indirect<T>
 // CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var (τ_0_0, other: τ_0_0) } <T>
 // CHECK: enum $Indirect<T>, #Indirect.payload!enumelt.1, [[BOX]] : $<τ_0_0> { var (τ_0_0, other: τ_0_0) } <T>
 func makeIndirectEnum<T>(_ payload: T) -> Indirect<T> {

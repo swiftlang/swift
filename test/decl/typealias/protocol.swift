@@ -250,8 +250,8 @@ protocol P9 {
   typealias A = Int
 }
 
-func testT9a<T: P9, U>(_: T, _: U) where T.A == U { }
-func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{'T.A' cannot be equal to both 'Float' and 'P9.A' (aka 'Int')}}
+func testT9a<T: P9, U>(_: T, _: U) where T.A == U { } // expected-error {{same-type requirement makes generic parameter 'U' non-generic}}
+func testT9b<T: P9>(_: T) where T.A == Float { } // expected-error{{generic signature requires types 'T.A' (aka 'Int') and 'Float' to be the same}}
 
 
 struct X<T> { }
@@ -268,7 +268,7 @@ extension P10 {
   typealias U = Float
 }
 
-extension P10 where T == Int { } // expected-warning{{neither type in same-type constraint ('P10.T' (aka 'Int') or 'Int') refers to a generic parameter or associated type}}
+extension P10 where T == Int { } // expected-warning{{neither type in same-type constraint ('Self.T' (aka 'Int') or 'Int') refers to a generic parameter or associated type}}
 
 extension P10 where A == X<T> { }
 
@@ -277,7 +277,7 @@ extension P10 where A == X<U> { } // expected-error{{use of undeclared type 'U'}
 extension P10 where A == X<Self.U> { }
 
 extension P10 where V == Int { } // expected-warning 3{{'V' is deprecated: just use Int, silly}}
-// expected-warning@-1{{neither type in same-type constraint ('P10.V' (aka 'Int') or 'Int') refers to a generic parameter or associated type}}
+// expected-warning@-1{{neither type in same-type constraint ('Self.V' (aka 'Int') or 'Int') refers to a generic parameter or associated type}}
 
 // rdar://problem/36003312
 protocol P11 {

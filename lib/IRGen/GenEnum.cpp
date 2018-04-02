@@ -107,6 +107,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -114,6 +115,7 @@
 #include "llvm/Support/Compiler.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
+#include "GenDecl.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -121,7 +123,9 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
+#include "MetadataRequest.h"
 #include "NonFixedTypeInfo.h"
+#include "Outlining.h"
 #include "ResilientTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
@@ -234,9 +238,43 @@ irgen::EnumImplStrategy::getTagIndex(EnumElementDecl *Case) const {
   llvm_unreachable("couldn't find case");
 }
 
-int
-irgen::EnumImplStrategy::getResilientTagIndex(EnumElementDecl *Case) const {
-  return getTagIndex(Case) - ElementsWithPayload.size();
+static void emitResilientTagIndex(IRGenModule &IGM,
+                                  const EnumImplStrategy *strategy,
+                                  EnumElementDecl *Case) {
+  auto resilientIdx = strategy->getTagIndex(Case);
+  auto global = IGM.getAddrOfEnumCase(Case, ForDefinition);
+  cast<llvm::GlobalVariable>(global.getAddress())
+      ->setInitializer(llvm::ConstantInt::get(IGM.Int32Ty, resilientIdx));
+}
+
+void
+irgen::EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
+  for (auto &payload : ElementsWithPayload) {
+    emitResilientTagIndex(IGM, this, payload.decl);
+  }
+  for (auto &noPayload : ElementsWithNoPayload) {
+    emitResilientTagIndex(IGM, this, noPayload.decl);
+  }
+}
+
+void EnumImplStrategy::callOutlinedCopy(IRGenFunction &IGF,
+                                        Address dest, Address src, SILType T,
+                                        IsInitialization_t isInit,
+                                        IsTake_t isTake) const {
+  OutliningMetadataCollector collector(IGF);
+  if (T.hasArchetype()) {
+    collectMetadataForOutlining(collector, T);
+  }
+  collector.emitCallToOutlinedCopy(dest, src, T, *TI, isInit, isTake);
+}
+
+void EnumImplStrategy::callOutlinedDestroy(IRGenFunction &IGF,
+                                           Address addr, SILType T) const {
+  OutliningMetadataCollector collector(IGF);
+  if (T.hasArchetype()) {
+    collectMetadataForOutlining(collector, T);
+  }
+  collector.emitCallToOutlinedDestroy(addr, T, *TI);
 }
 
 namespace {
@@ -292,11 +330,7 @@ namespace {
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, SILType T, Address enumAddr)
     const override {
-      // Convert fragile tag index into resilient tag index.
-      // - -1 -- if we have a payload
-      // -  0 -- if there's no payload
-      return llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-          ElementsWithPayload.size() > 0 ? -1 : 0);
+      return llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
     }
 
     llvm::Value *
@@ -437,14 +471,7 @@ namespace {
         getSingleton()->assignWithCopy(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
       }
     }
 
@@ -457,14 +484,7 @@ namespace {
         getSingleton()->assignWithTake(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
       }
     }
 
@@ -484,14 +504,7 @@ namespace {
         getSingleton()->initializeWithCopy(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
       }
     }
 
@@ -504,25 +517,16 @@ namespace {
         getSingleton()->initializeWithTake(
             IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
       }
     }
 
-    void collectArchetypeMetadata(
-        IRGenFunction &IGF,
-        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-        SILType T) const override {
+    void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                     SILType T) const override {
       if (!getSingleton())
         return;
-      getSingleton()->collectArchetypeMetadata(IGF, typeToMetadataVec,
-                                               getSingletonType(IGF.IGM, T));
+      getSingleton()->collectMetadataForOutlining(collector,
+                                        getSingletonType(collector.IGF.IGM, T));
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
@@ -554,12 +558,7 @@ namespace {
           getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                   getSingletonType(IGF.IGM, T), isOutlined);
         } else {
-          llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-          if (T.hasArchetype()) {
-            collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-          }
-          IGF.IGM.generateCallToOutlinedDestroy(IGF, *TI, addr, T,
-                                                &typeToMetadataVec);
+          callOutlinedDestroy(IGF, addr, T);
         }
       }
     }
@@ -582,7 +581,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // Fixed-size enums don't need dynamic witness table initialization.
       if (TIK >= Fixed) return;
 
@@ -591,7 +591,7 @@ namespace {
 
       auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
                                             IGM.getSILModule());
-      auto payloadLayout = IGF.emitTypeLayoutRef(payloadTy);
+      auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
       IGF.Builder.CreateCall(
                     IGF.IGM.getInitEnumMetadataSingleCaseFn(),
@@ -677,6 +677,14 @@ namespace {
                      cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits(),
                      true);
     }
+
+    bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                   ReferenceCounting *rc) const override {
+      auto singleton = getSingleton();
+      if (!singleton)
+        return false;
+      return singleton->isSingleRetainablePointer(expansion, rc);
+    }
   };
 
   /// Implementation strategy for no-payload enums, in other words, 'C-like'
@@ -727,10 +735,7 @@ namespace {
       Explosion value;
       loadAsTake(IGF, enumAddr, value);
 
-      // Converting fragile tag index into resilient tag index is
-      // not necessary; there are no payload tags.
-      return IGF.Builder.CreateZExtOrTrunc(value.claimNext(),
-                                           IGF.IGM.Int32Ty);
+      return IGF.Builder.CreateZExtOrTrunc(value.claimNext(), IGF.IGM.Int32Ty);
     }
 
     llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
@@ -842,7 +847,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // No-payload enums are always fixed-size so never need dynamic value
       // witness table initialization.
     }
@@ -877,14 +883,8 @@ namespace {
       IGF.Builder.CreateStore(val, dest);
     }
 
-    void collectArchetypeMetadata(
-        IRGenFunction &IGF,
-        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-        SILType T) const override {
-      auto canType = T.getSwiftRValueType();
-      assert(!canType->is<ArchetypeType>() &&
-             "collectArchetypeMetadata: no archetype expected here");
-    }
+    void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                     SILType T) const override {}
 
     static constexpr IsPOD_t IsScalarPOD = IsPOD;
 
@@ -1314,10 +1314,8 @@ namespace {
         IGF.Builder.CreateStore(e.claimNext(), projectExtraTagBits(IGF, addr));
     }
 
-    void collectArchetypeMetadata(
-        IRGenFunction &IGF,
-        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-        SILType T) const override {
+    void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                     SILType T) const override {
       assert(TIK >= Loadable);
     }
 
@@ -1426,12 +1424,13 @@ namespace {
 
   static llvm::Function *createOutlineLLVMFunction(
       IRGenModule &IGM, std::string &name,
-      SmallVector<llvm::Type *, 2> &PayloadTypesAndTagType) {
+      ArrayRef<llvm::Type *> PayloadTypesAndTagType) {
     auto consumeTy = llvm::FunctionType::get(IGM.VoidTy, PayloadTypesAndTagType,
                                              /*isVarArg*/ false);
     auto func =
-        llvm::Function::Create(consumeTy, llvm::GlobalValue::InternalLinkage,
+        llvm::Function::Create(consumeTy, llvm::GlobalValue::LinkOnceODRLinkage,
                                llvm::StringRef(name), IGM.getModule());
+    func->setVisibility(llvm::GlobalValue::HiddenVisibility);
     func->setAttributes(IGM.constructInitialAttributes());
     func->setDoesNotThrow();
     func->setCallingConv(IGM.DefaultCC);
@@ -1490,14 +1489,19 @@ namespace {
 
     unsigned NumExtraInhabitantTagValues = ~0U;
 
-    llvm::Function *copyEnumFunction = nullptr;
-    llvm::Function *consumeEnumFunction = nullptr;
+    SILType loweredType;
+    mutable llvm::Function *copyEnumFunction = nullptr;
+    mutable llvm::Function *consumeEnumFunction = nullptr;
     SmallVector<llvm::Type *, 2> PayloadTypesAndTagType;
 
-    llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, EnumDecl *theEnum) {
+    llvm::Function *
+    emitCopyEnumFunction(IRGenModule &IGM, SILType theEnumType) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedCopyFunction(
-          theEnum->getAsNominalTypeOrNominalTypeExtensionContext());
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
+      std::string name =
+        Mangler.mangleOutlinedCopyFunction(manglingBits.first,
+                                           manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
@@ -1528,9 +1532,13 @@ namespace {
     }
 
     llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
-                                            EnumDecl *theEnum) {
+                                            SILType theEnumType) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedConsumeFunction(theEnum);
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(theEnumType);
+      std::string name =
+        Mangler.mangleOutlinedConsumeFunction(manglingBits.first,
+                                              manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
@@ -1611,8 +1619,7 @@ namespace {
     }
 
     /// Emit a call into the runtime to get the current enum payload tag.
-    /// This returns a tag index in the range
-    /// [-ElementsWithPayload..ElementsWithNoPayload-1].
+    /// This returns a tag index in the range [0..NumElements-1].
     llvm::Value *emitGetEnumTag(IRGenFunction &IGF, SILType T,
                                 Address enumAddr) const override {
       auto numEmptyCases =
@@ -1976,8 +1983,7 @@ namespace {
 
       auto emitCase = [&](Element elt) {
         auto tagVal =
-            llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                   getResilientTagIndex(elt.decl));
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty, getTagIndex(elt.decl));
         auto found = destMap.find(elt.decl);
         if (found != destMap.end())
           swi->addCase(tagVal, found->second);
@@ -2043,7 +2049,8 @@ namespace {
 
       // Non-payload cases use extra inhabitants, if any, or are discriminated
       // by setting the tag bits.
-      unsigned tagIndex = getResilientTagIndex(elt);
+      // Use the index from ElementsWithNoPayload.
+      unsigned tagIndex = getTagIndex(elt) - 1;
       unsigned numExtraInhabitants = getNumExtraInhabitantTagValues();
       APInt payload;
       unsigned extraTagValue;
@@ -2194,9 +2201,9 @@ namespace {
       // Ask the runtime what case we have.
       llvm::Value *which = emitGetEnumTag(IGF, T, addr);
 
-      // If it's -1 then we have the payload.
-      llvm::Value *hasPayload = IGF.Builder.CreateICmpEQ(which,
-                             llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1));
+      // If it's 0 then we have the payload.
+      llvm::Value *hasPayload = IGF.Builder.CreateICmpEQ(
+          which, llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
       IGF.Builder.CreateCondBr(hasPayload, payloadBB, noPayloadBB);
 
       IGF.Builder.emitBlock(payloadBB);
@@ -2274,7 +2281,8 @@ namespace {
         return;
 
       case Normal: {
-        assert(copyEnumFunction && "Did not create copy function for enum");
+        if (!copyEnumFunction)
+          copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -2307,8 +2315,8 @@ namespace {
         return;
 
       case Normal: {
-        assert(consumeEnumFunction &&
-               "Did not create consume function for enum");
+        if (!consumeEnumFunction)
+          consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -2408,12 +2416,11 @@ namespace {
         }
         }
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
+        OutliningMetadataCollector collector(IGF);
         if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+          collectMetadataForOutlining(collector, T);
         }
-        IGF.IGM.generateCallToOutlinedDestroy(IGF, *TI, addr, T,
-                                              &typeToMetadataVec);
+        collector.emitCallToOutlinedDestroy(addr, T, *TI);
       }
     }
 
@@ -2450,7 +2457,7 @@ namespace {
 
       auto PayloadT = getPayloadType(IGF.IGM, T);
       auto Addr = Address(opaqueAddr, dest.getAlignment());
-      auto *whichCase = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
+      auto *whichCase = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
       auto *numEmptyCases =
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size());
       emitStoreEnumTagSinglePayloadCall(IGF, PayloadT, whichCase, numEmptyCases,
@@ -2633,14 +2640,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
       }
     }
 
@@ -2649,14 +2649,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
       }
     }
 
@@ -2665,14 +2658,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
       }
     }
 
@@ -2681,35 +2667,17 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
       }
     }
 
-    void collectArchetypeMetadata(
-        IRGenFunction &IGF,
-        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-        SILType T) const override {
-      auto canType = T.getSwiftRValueType();
-      // get the size before insertions
-      auto SZ = typeToMetadataVec.size();
+    void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                     SILType T) const override {
       if (CopyDestroyKind == Normal) {
-        auto payloadT = getPayloadType(IGF.IGM, T);
-        getPayloadTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
-                                                      payloadT);
+        auto payloadT = getPayloadType(collector.IGF.IGM, T);
+        getPayloadTypeInfo().collectMetadataForOutlining(collector, payloadT);
       }
-      if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-          SZ != typeToMetadataVec.size()) {
-        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-        assert(metadata && "Expected Type Metadata Ref");
-        typeToMetadataVec.insert(std::make_pair(canType, metadata));
-      }
+      collector.collectTypeMetadataForLayout(T);
     }
 
     void storeTag(IRGenFunction &IGF,
@@ -2720,14 +2688,14 @@ namespace {
         // If the enum isn't fixed-layout, get the runtime to do this for us.
         llvm::Value *caseIndex;
         if (Case == getPayloadElement()) {
-          caseIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
+          caseIndex = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
         } else {
           auto found = std::find_if(ElementsWithNoPayload.begin(),
                                     ElementsWithNoPayload.end(),
                                     [&](Element a) { return a.decl == Case; });
           assert(found != ElementsWithNoPayload.end() &&
                  "case not in enum?!");
-          unsigned caseIndexVal = found - ElementsWithNoPayload.begin();
+          unsigned caseIndexVal = found - ElementsWithNoPayload.begin() + 1;
           caseIndex = llvm::ConstantInt::get(IGF.IGM.Int32Ty, caseIndexVal);
         }
 
@@ -2766,7 +2734,7 @@ namespace {
     }
 
     /// Constructs an enum value using a tag index in the range
-    /// [-ElementsWithPayload..ElementsWithNoPayload-1].
+    /// [0..NumElements-1].
     void emitStoreTag(IRGenFunction &IGF, SILType T, Address enumAddr,
                       llvm::Value *tag) const override {
       auto PayloadT = getPayloadType(IGF.IGM, T);
@@ -2784,7 +2752,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // Fixed-size enums don't need dynamic witness table initialization.
       if (TIK >= Fixed) return;
 
@@ -2792,7 +2761,7 @@ namespace {
       // of empty cases.
       auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
                                             IGM.getSILModule());
-      auto payloadLayout = IGF.emitTypeLayoutRef(payloadTy);
+      auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
@@ -2977,13 +2946,18 @@ namespace {
     ReferenceCounting Refcounting;
     bool AllowFixedLayoutOptimizations;
 
-    llvm::Function *copyEnumFunction = nullptr;
-    llvm::Function *consumeEnumFunction = nullptr;
+    SILType loweredType;
+    mutable llvm::Function *copyEnumFunction = nullptr;
+    mutable llvm::Function *consumeEnumFunction = nullptr;
     SmallVector<llvm::Type *, 2> PayloadTypesAndTagType;
 
-    llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, EnumDecl *theEnum) {
+    llvm::Function *emitCopyEnumFunction(IRGenModule &IGM, SILType type) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedCopyFunction(theEnum);
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(type);
+      std::string name =
+        Mangler.mangleOutlinedCopyFunction(manglingBits.first,
+                                           manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
@@ -3007,14 +2981,17 @@ namespace {
     }
 
     llvm::Function *emitConsumeEnumFunction(IRGenModule &IGM,
-                                            EnumDecl *theEnum) {
+                                            SILType type) const {
       IRGenMangler Mangler;
-      std::string name = Mangler.mangleOutlinedConsumeFunction(theEnum);
+      auto manglingBits =
+        getTypeAndGenericSignatureForManglingOutlineFunction(type);
+      std::string name =
+        Mangler.mangleOutlinedConsumeFunction(manglingBits.first,
+                                              manglingBits.second);
       auto func = createOutlineLLVMFunction(IGM, name, PayloadTypesAndTagType);
 
       IRGenFunction IGF(IGM, func);
       Explosion src = IGF.collectParameters();
-
       auto parts = destructureAndTagLoadableEnumFromOutlined(IGF, src);
 
       forNontrivialPayloads(IGF, parts.tag, [&](unsigned tagIndex,
@@ -3344,8 +3321,7 @@ namespace {
 
   public:
 
-    /// Returns a tag index in the range
-    /// [-ElementsWithPayload..ElementsWithNoPayload+1].
+    /// Returns a tag index in the range [0..NumElements-1].
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, SILType T, Address addr)
     const override {
@@ -3355,10 +3331,7 @@ namespace {
 
       if (TIK < Fixed) {
         // Ask the runtime to extract the dynamically-placed tag.
-        llvm::Value *tagValue = loadDynamicTag(IGF, addr, T);
-
-        // Convert fragile tag index into resilient tag index.
-        return IGF.Builder.CreateSub(tagValue, payloadCases);
+        return loadDynamicTag(IGF, addr, T);
       }
 
       // For fixed-size enums, the currently inhabited case is a function of
@@ -3375,15 +3348,6 @@ namespace {
       // Load the payload tag.
       llvm::Value *tagValue = extractPayloadTag(IGF, payload, extraTagBits);
       tagValue = IGF.Builder.CreateZExtOrTrunc(tagValue, IGF.IGM.Int32Ty);
-
-      // Subtract number of payload cases from the payload tag.
-      //
-      // If we have a payload case, this yields a negative value, which is the
-      // final resilient tag index.
-      //
-      // If we have a no-payload case, this yields a non-negative value, which
-      // is the most significant bits of the current case index.
-      tagValue = IGF.Builder.CreateSub(tagValue, payloadCases);
 
       // If we don't have any no-payload cases, we are done -- the payload tag
       // alone is enough to distinguish between all cases.
@@ -3414,10 +3378,14 @@ namespace {
         // The no-payload cases are distributed between multiple payload tags;
         // combine the payload tag with the payload value.
 
+        // First, subtract number of payload cases from the payload tag to get
+        // the most significant bits of the current case.
+        currentCase = IGF.Builder.CreateSub(tagValue, payloadCases);
+
         // Shift the most significant bits of the tag value into place.
         llvm::Constant *numCaseBitsVal =
             llvm::ConstantInt::get(IGF.IGM.Int32Ty, numCaseBits);
-        currentCase = IGF.Builder.CreateShl(tagValue, numCaseBitsVal);
+        currentCase = IGF.Builder.CreateShl(currentCase, numCaseBitsVal);
 
         // Add the payload value to the shifted payload tag.
         //
@@ -3425,10 +3393,12 @@ namespace {
         // so we are done.
         currentCase = IGF.Builder.CreateOr(currentCase, payloadValue);
       }
+      // Now, we have the index of a no-payload case. Add the number of payload
+      // cases back, to get an index of a case.
+      currentCase = IGF.Builder.CreateAdd(currentCase, payloadCases);
 
       // Test if this is a payload or no-payload case.
-      llvm::Value *match = IGF.Builder.CreateICmpSGE(tagValue,
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
+      llvm::Value *match = IGF.Builder.CreateICmpUGE(tagValue, payloadCases);
 
       // Return one of the two values we computed based on the above.
       return IGF.Builder.CreateSelect(match, currentCase, tagValue);
@@ -3502,7 +3472,7 @@ namespace {
       
     found_empty_case:
       llvm::Value *match = IGF.Builder.CreateICmpEQ(parts.tag, tagValue);
-      if (CommonSpareBits.size() > 0) {
+      if (!CommonSpareBits.empty()) {
         auto payloadMatch = parts.payload
           .emitCompare(IGF, APInt::getAllOnesValue(CommonSpareBits.size()),
                        payloadValue);
@@ -3591,7 +3561,7 @@ namespace {
         auto tagVal = llvm::ConstantInt::get(C, APInt(numTagBits, tagIndex));
         
         // If the payload is empty, there's only one case per tag.
-        if (CommonSpareBits.size() == 0) {
+        if (CommonSpareBits.empty()) {
           auto found = destMap.find(elti->decl);
           if (found != destMap.end())
             tagSwitch->addCase(tagVal, found->second);
@@ -3668,8 +3638,7 @@ namespace {
 
       auto emitCase = [&](Element elt) {
         auto tagVal =
-            llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                   getTagIndex(elt.decl));
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty, getTagIndex(elt.decl));
         auto found = destMap.find(elt.decl);
         if (found != destMap.end())
           tagSwitch->addCase(tagVal, found->second);
@@ -3716,7 +3685,7 @@ namespace {
                              const LoadableTypeInfo &payloadTI,
                              Explosion &out) const {
       // If the payload is empty, so is the explosion.
-      if (CommonSpareBits.size() == 0)
+      if (CommonSpareBits.empty())
         return;
       
       // If we have spare bits, we have to mask out any set tag bits packed
@@ -3843,7 +3812,7 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGM, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = APInt(CommonSpareBits.size(), tagIndex);
       }
@@ -3886,7 +3855,7 @@ namespace {
         // If we have spare bits, pack the tag into the spare bits and
         // the tagIndex into the payload.
         payload = getEmptyCasePayload(IGF, tag, tagIndex);
-      } else if (CommonSpareBits.size() > 0) {
+      } else if (!CommonSpareBits.empty()) {
         // Otherwise the payload is just the index.
         payload = EnumPayload::zero(IGM, PayloadSchema);
 #if defined(__BIG_ENDIAN__) && defined(__LP64__)
@@ -4021,7 +3990,8 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
-        assert(copyEnumFunction && "Did not create copy function for enum");
+        if (!copyEnumFunction)
+          copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -4062,8 +4032,8 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
-        assert(consumeEnumFunction &&
-               "Did not create consume function for enum");
+        if (!consumeEnumFunction)
+          consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
         fillExplosionForOutlinedCall(IGF, src, tmp);
         llvm::CallInst *call =
@@ -4309,14 +4279,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
       }
     }
 
@@ -4325,14 +4288,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
       }
     }
 
@@ -4341,14 +4297,7 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
       }
     }
 
@@ -4357,39 +4306,24 @@ namespace {
       if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedCopyAddr(
-            IGF, *TI, dest, src, T,
-            &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
-            &typeToMetadataVec);
+        callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
       }
     }
 
-    void collectArchetypeMetadata(
-        IRGenFunction &IGF,
-        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-        SILType T) const override {
-      auto canType = T.getSwiftRValueType();
-      // get the size before insertions
-      auto SZ = typeToMetadataVec.size();
+    void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                     SILType T) const override {
       if (CopyDestroyKind != Normal) {
         return;
       }
+
       for (auto &payloadCasePair : ElementsWithPayload) {
-        SILType PayloadT =
-            T.getEnumElementType(payloadCasePair.decl, IGF.getSILModule());
+        SILType payloadT =
+          T.getEnumElementType(payloadCasePair.decl,
+                               collector.IGF.getSILModule());
         auto &payloadTI = *payloadCasePair.ti;
-        payloadTI.collectArchetypeMetadata(IGF, typeToMetadataVec, PayloadT);
+        payloadTI.collectMetadataForOutlining(collector, payloadT);
       }
-      if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-          ((typeToMetadataVec.size() != SZ) || (TIK < Fixed))) {
-        auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-        assert(metadata && "Expected Type Metadata Ref");
-        typeToMetadataVec.insert(std::make_pair(canType, metadata));
-      }
+      collector.collectTypeMetadataForLayout(T);
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
@@ -4431,12 +4365,7 @@ namespace {
         }
         }
       } else {
-        llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-        if (T.hasArchetype()) {
-          collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-        }
-        IGF.IGM.generateCallToOutlinedDestroy(IGF, *TI, addr, T,
-                                              &typeToMetadataVec);
+        callOutlinedDestroy(IGF, addr, T);
       }
     }
 
@@ -4599,17 +4528,11 @@ namespace {
 
       // Use the runtime to initialize dynamic cases.
       if (TIK < Fixed) {
-        // Convert resilient tag index into fragile tag index.
-        tag = IGF.Builder.CreateAdd(tag, numPayloadCases);
-
         return storeDynamicTag(IGF, enumAddr, tag, T);
       }
 
       // If there are no empty cases, don't need a conditional.
       if (ElementsWithNoPayload.empty()) {
-        // Convert resilient tag index into fragile tag index.
-        tag = IGF.Builder.CreateAdd(tag, numPayloadCases);
-
         storePayloadTag(IGF, enumAddr, tag, T);
         return;
       }
@@ -4619,23 +4542,20 @@ namespace {
       auto payloadBB = llvm::BasicBlock::Create(C);
       auto endBB = llvm::BasicBlock::Create(C);
 
-      llvm::Value *cond = IGF.Builder.CreateICmpSGE(tag,
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
+      llvm::Value *cond = IGF.Builder.CreateICmpUGE(tag, numPayloadCases);
       IGF.Builder.CreateCondBr(cond, noPayloadBB, payloadBB);
 
       IGF.Builder.emitBlock(noPayloadBB);
       {
         ConditionalDominanceScope condition(IGF);
-        storeNoPayloadTag(IGF, enumAddr, tag, T);
+        storeNoPayloadTag(IGF, enumAddr,
+                          IGF.Builder.CreateSub(tag, numPayloadCases), T);
         IGF.Builder.CreateBr(endBB);
       }
 
       IGF.Builder.emitBlock(payloadBB);
       {
         ConditionalDominanceScope condition(IGF);
-
-        // Convert resilient tag index into fragile tag index.
-        tag = IGF.Builder.CreateAdd(tag, numPayloadCases);
 
         storePayloadTag(IGF, enumAddr, tag, T);
         IGF.Builder.CreateBr(endBB);
@@ -4660,7 +4580,8 @@ namespace {
       }
     }
 
-    llvm::Value *emitPayloadLayoutArray(IRGenFunction &IGF, SILType T) const {
+    llvm::Value *emitPayloadLayoutArray(IRGenFunction &IGF, SILType T,
+                                 MetadataDependencyCollector *collector) const {
       auto numPayloads = ElementsWithPayload.size();
       auto metadataBufferTy = llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
                                                    numPayloads);
@@ -4676,7 +4597,7 @@ namespace {
         
         auto payloadTy = T.getEnumElementType(elt.decl, IGF.getSILModule());
         
-        auto metadata = IGF.emitTypeLayoutRef(payloadTy);
+        auto metadata = emitTypeLayoutRef(IGF, payloadTy, collector);
         
         IGF.Builder.CreateStore(metadata, eltAddr);
       }
@@ -4688,12 +4609,13 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       // Fixed-size enums don't need dynamic metadata initialization.
       if (TIK >= Fixed) return;
       
       // Ask the runtime to set up the metadata record for a dynamic enum.
-      auto payloadLayoutArray = emitPayloadLayoutArray(IGF, T);
+      auto payloadLayoutArray = emitPayloadLayoutArray(IGF, T, collector);
       auto numPayloadsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                                    ElementsWithPayload.size());
 
@@ -4755,8 +4677,8 @@ namespace {
 
       std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(index);
       ClusteredBitVector bits;
-      
-      if (CommonSpareBits.size() > 0)
+
+      if (!CommonSpareBits.empty())
         bits = getBitVectorFromAPInt(payloadPart);
 
       unsigned totalSize
@@ -4816,6 +4738,12 @@ namespace {
                          std::move(WithNoPayload))
     { }
 
+    llvm::Value *loadResilientTagIndex(IRGenFunction &IGF,
+                                       EnumElementDecl *Case) const {
+      auto address = IGF.IGM.getAddrOfEnumCase(Case, NotForDefinition);
+      return IGF.Builder.CreateLoad(address);
+    }
+
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                      SILType Type,
                                      EnumDecl *theEnum,
@@ -4831,8 +4759,7 @@ namespace {
                   SILType T,
                   Address enumAddr,
                   EnumElementDecl *Case) const override {
-      emitDestructiveInjectEnumTagCall(IGF, T,
-                                       getResilientTagIndex(Case),
+      emitDestructiveInjectEnumTagCall(IGF, T, loadResilientTagIndex(IGF, Case),
                                        enumAddr);
     }
 
@@ -4841,9 +4768,7 @@ namespace {
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
       llvm::Value *tag = emitGetEnumTagCall(IGF, T, enumAddr);
-      llvm::Value *expectedTag =
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                 getResilientTagIndex(Case));
+      llvm::Value *expectedTag = loadResilientTagIndex(IGF, Case);
       return IGF.Builder.CreateICmpEQ(tag, expectedTag);
     }
 
@@ -4869,20 +4794,27 @@ namespace {
       if (!defaultDest)
         defaultDest = unreachableBB;
 
-      auto tagSwitch = SwitchBuilder::create(IGF, tag,
-                                             SwitchDefaultDest(defaultDest,
-                                               defaultDest == unreachableBB
-                                                 ? IsUnreachable
-                                                 : IsNotUnreachable),
-                                             dests.size());
+      llvm::BasicBlock *continuationBB = nullptr;
+
+      unsigned numCasesEmitted = 0;
 
       auto emitCase = [&](Element elt) {
-        auto tagVal =
-            llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                   getResilientTagIndex(elt.decl));
         auto found = destMap.find(elt.decl);
-        if (found != destMap.end())
-          tagSwitch->addCase(tagVal, found->second);
+        if (found != destMap.end()) {
+          if (continuationBB)
+            IGF.Builder.emitBlock(continuationBB);
+
+          auto tagVal = loadResilientTagIndex(IGF, elt.decl);
+          auto matchesTag = IGF.Builder.CreateICmpEQ(tag, tagVal);
+
+          // If we are not the last block create a continuation block.
+          if (++numCasesEmitted < dests.size())
+            continuationBB = llvm::BasicBlock::Create(C);
+          // Otherwise, our continuation is the default destination.
+          else
+            continuationBB = defaultDest;
+          IGF.Builder.CreateCondBr(matchesTag, found->second, continuationBB);
+        }
       };
 
       for (auto &elt : ElementsWithPayload)
@@ -4890,6 +4822,11 @@ namespace {
 
       for (auto &elt : ElementsWithNoPayload)
         emitCase(elt);
+
+      // If we have not emitted any cases jump to the default destination.
+      if (numCasesEmitted == 0) {
+        IGF.Builder.CreateBr(defaultDest);
+      }
 
       // Delete the unreachable default block if we didn't use it, or emit it
       // if we did.
@@ -4925,17 +4862,9 @@ namespace {
                                  dest, src);
     }
 
-    void collectArchetypeMetadata(
-        IRGenFunction &IGF,
-        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-        SILType T) const override {
-      auto canType = T.getSwiftRValueType();
-      if (typeToMetadataVec.find(canType) != typeToMetadataVec.end()) {
-        return;
-      }
-      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-      assert(metadata && "Expected Type Metadata Ref");
-      typeToMetadataVec.insert(std::make_pair(canType, metadata));
+    void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                     SILType T) const override {
+      collector.collectTypeMetadataForLayout(T);
     }
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
@@ -5084,7 +5013,8 @@ namespace {
     void initializeMetadata(IRGenFunction &IGF,
                             llvm::Value *metadata,
                             bool isVWTMutable,
-                            SILType T) const override {
+                            SILType T,
+                        MetadataDependencyCollector *collector) const override {
       llvm_unreachable("resilient enums cannot be defined");
     }
 
@@ -5136,9 +5066,8 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
 
   // Resilient enums are manipulated as opaque values, except we still
   // make the following assumptions:
-  // 1) Physical case indices won't change
-  // 2) The indirect-ness of cases won't change
-  // 3) Payload types won't change in a non-resilient way
+  // 1) The indirect-ness of cases won't change
+  // 2) Payload types won't change in a non-resilient way
   bool isResilient = TC.IGM.isResilient(theEnum, ResilienceExpansion::Maximal);
   
   // The most general resilience scope where the enum type is visible.
@@ -5223,12 +5152,6 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     }
   }
 
-
-  // Resilient tag numbering decreases for payload tags, so reverse the
-  // payload tags if this enum is resilient from any context.
-  if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
-    std::reverse(elementsWithPayload.begin(), elementsWithPayload.end());
-
   assert(numElements == elementsWithPayload.size()
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
@@ -5243,7 +5166,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isObjC()) {
-    assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
+    assert(elementsWithPayload.empty() && "C enum with payload?!");
     assert(alwaysFixedSize == IsFixedSize && "C enum with resilient payload?!");
     return std::unique_ptr<EnumImplStrategy>(
            new CCompatibleEnumImplStrategy(TC.IGM, tik, alwaysFixedSize,
@@ -5320,11 +5243,9 @@ namespace {
                             SILType T, bool isOutlined) const override {
       return Strategy.initializeWithTake(IGF, dest, src, T, isOutlined);
     }
-    void collectArchetypeMetadata(
-        IRGenFunction &IGF,
-        llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-        SILType T) const override {
-      return Strategy.collectArchetypeMetadata(IGF, typeToMetadataVec, T);
+    void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                     SILType T) const override {
+      return Strategy.collectMetadataForOutlining(collector, T);
     }
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
@@ -5333,12 +5254,6 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       return Strategy.assignWithTake(IGF, dest, src, T, isOutlined);
-    }
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      return Strategy.initializeMetadata(IGF, metadata, isVWTMutable, T);
     }
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return Strategy.mayHaveExtraInhabitants(IGM);
@@ -5353,6 +5268,10 @@ namespace {
                               Address dest,
                               SILType T) const override {
       return Strategy.storeExtraInhabitant(IGF, index, dest, T);
+    }
+    bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                   ReferenceCounting *rc) const override {
+      return Strategy.isSingleRetainablePointer(expansion, rc);
     }
   };
 
@@ -5725,8 +5644,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
       payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal));
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
-    copyEnumFunction = emitCopyEnumFunction(TC.IGM, theEnum);
-    consumeEnumFunction = emitConsumeEnumFunction(TC.IGM, theEnum);
+    loweredType = Type;
   }
 
   return const_cast<TypeInfo *>(TI);
@@ -5916,8 +5834,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
-    copyEnumFunction = emitCopyEnumFunction(TC.IGM, theEnum);
-    consumeEnumFunction = emitConsumeEnumFunction(TC.IGM, theEnum);
+    loweredType = Type;
   }
 
   return const_cast<TypeInfo *>(TI);
@@ -6058,6 +5975,15 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
   }
 
   emitFieldMetadataRecord(theEnum);
+
+  if (!isResilient(theEnum, ResilienceExpansion::Minimal))
+    return;
+
+  // Emit resilient tag indices.
+  auto &strategy = getEnumImplStrategy(
+      *this,
+      theEnum->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
+  strategy.emitResilientTagIndices(*this);
 }
 
 void irgen::emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,

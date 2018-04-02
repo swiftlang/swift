@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
   typealias JumpBuffer = Int32
 #else

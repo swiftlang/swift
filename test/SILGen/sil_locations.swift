@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name sil_locations -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
 
 // FIXME: Not sure if this an ideal source info for the branch - 
 // it points to if, not the last instruction in the block.
@@ -76,7 +77,7 @@ func templateTest<T>(_ value: T) -> T {
 func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden @$S13sil_locations15useTemplateTestSiyF
-  // CHECK: function_ref @$SSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":77
+  // CHECK: function_ref @$SSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":78
 }
 
 func foo(_ x: Int) -> Int {
@@ -127,9 +128,9 @@ func testSwitch() {
   var x:Int
   x = 0
   switch (switchfoo(), switchbar()) {
-  // CHECK: store {{.*}}, loc "{{.*}}":[[@LINE+1]]
+  // CHECK: store {{.*}}, loc "{{.*}}":[[@LINE-1]]
   case (1,2):
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-1]]:11
+  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-3]]:10
   // FIXME: Location info is missing.
   // CHECK: cond_br
   //
@@ -209,7 +210,7 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   return {x}
   // CHECK-LABEL: sil hidden @$S13sil_locations14captures_tuple{{[_0-9a-zA-Z]*}}F
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-3]]:27
-  // CHECK: copy_addr [take] {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
+  // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
   // CHECK: function_ref {{.*}}, loc "{{.*}}":[[@LINE-4]]:10
 
   // CHECK-LABEL: sil private @$S13sil_locations14captures_tuple{{.*}}fU_

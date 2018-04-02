@@ -264,7 +264,7 @@ protected:
 
     // Others, such as capture descriptors, do not have a name.
     } else {
-      var = B.finishAndCreateGlobal("\x01l__swift5_reflection_descriptor",
+      var = B.finishAndCreateGlobal("\x01l__swift4_reflection_descriptor",
                                     Alignment(4), /*isConstant*/ true,
                                     llvm::GlobalValue::PrivateLinkage);
     }
@@ -788,12 +788,12 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << ".sw5" << FourCC << "$B";
     break;
   case llvm::Triple::ELF:
-    OS << "swift5_" << LongName;
+    OS << "swift4_" << LongName;
     break;
   case llvm::Triple::MachO:
     assert(LongName.size() <= 7 &&
            "Mach-O section name length must be <= 16 characters");
-    OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
+    OS << "__TEXT,__swift4_" << LongName << ", regular, no_dead_strip";
     break;
   case llvm::Triple::Wasm:
     llvm_unreachable("web assembly object format is not supported.");

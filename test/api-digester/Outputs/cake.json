@@ -43,6 +43,7 @@
               "kind": "TypeNominal",
               "name": "C0",
               "printedName": "C0<T1, T2, T3>",
+              "usr": "s:4cake2C0C",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -115,6 +116,9 @@
         "P1",
         "P2"
       ],
+      "declAttributes": [
+        "fixedLayout"
+      ],
       "children": [
         {
           "kind": "Function",
@@ -185,7 +189,8 @@
             {
               "kind": "TypeNominal",
               "name": "S1",
-              "printedName": "S1"
+              "printedName": "S1",
+              "usr": "s:4cake2S1V"
             }
           ]
         }
@@ -246,11 +251,13 @@
                   "kind": "TypeNominal",
                   "name": "Optional",
                   "printedName": "C1?",
+                  "usr": "s:Sq",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "C1",
-                      "printedName": "C1"
+                      "printedName": "C1",
+                      "usr": "s:4cake2C1C"
                     }
                   ]
                 }
@@ -274,11 +281,13 @@
                   "kind": "TypeNominal",
                   "name": "Optional",
                   "printedName": "C1?",
+                  "usr": "s:Sq",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "C1",
-                      "printedName": "C1"
+                      "printedName": "C1",
+                      "usr": "s:4cake2C1C"
                     }
                   ]
                 }
@@ -313,7 +322,8 @@
                 {
                   "kind": "TypeNominal",
                   "name": "C1",
-                  "printedName": "C1"
+                  "printedName": "C1",
+                  "usr": "s:4cake2C1C"
                 }
               ]
             },
@@ -334,7 +344,8 @@
                 {
                   "kind": "TypeNominal",
                   "name": "C1",
-                  "printedName": "C1"
+                  "printedName": "C1",
+                  "usr": "s:4cake2C1C"
                 }
               ]
             }
@@ -352,7 +363,8 @@
             {
               "kind": "TypeNominal",
               "name": "C1",
-              "printedName": "C1"
+              "printedName": "C1",
+              "usr": "s:4cake2C1C"
             }
           ]
         }
@@ -376,12 +388,14 @@
           "kind": "TypeNominal",
           "name": "Int",
           "printedName": "Int",
-          "hasDefaultArg": true
+          "hasDefaultArg": true,
+          "usr": "s:Si"
         },
         {
           "kind": "TypeNominal",
           "name": "S1",
-          "printedName": "S1"
+          "printedName": "S1",
+          "usr": "s:4cake2S1V"
         }
       ]
     },
@@ -403,12 +417,50 @@
           "kind": "TypeNominal",
           "name": "Int",
           "printedName": "Int",
-          "hasDefaultArg": true
+          "hasDefaultArg": true,
+          "usr": "s:Si"
         },
         {
           "kind": "TypeNominal",
           "name": "S1",
-          "printedName": "S1"
+          "printedName": "S1",
+          "usr": "s:4cake2S1V"
+        }
+      ]
+    },
+    {
+      "kind": "Function",
+      "name": "foo3",
+      "printedName": "foo3(_:)",
+      "declKind": "Func",
+      "usr": "s:4cake4foo3yys10DictionaryVySiSSGF",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "Dictionary",
+          "printedName": "[Int : String]",
+          "usr": "s:s10DictionaryV",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            }
+          ]
         }
       ]
     },
@@ -425,6 +477,7 @@
         "Hashable",
         "RawRepresentable"
       ],
+      "enumRawTypeName": "Int",
       "children": [
         {
           "kind": "Var",
@@ -443,7 +496,8 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Number",
-                  "printedName": "Number"
+                  "printedName": "Number",
+                  "usr": "s:4cake6NumberO"
                 },
                 {
                   "kind": "TypeNominal",
@@ -453,7 +507,8 @@
                     {
                       "kind": "TypeNominal",
                       "name": "Number",
-                      "printedName": "Number"
+                      "printedName": "Number",
+                      "usr": "s:4cake6NumberO"
                     }
                   ]
                 }
@@ -473,7 +528,8 @@
             {
               "kind": "TypeNominal",
               "name": "Int",
-              "printedName": "Int"
+              "printedName": "Int",
+              "usr": "s:Si"
             }
           ]
         },
@@ -489,7 +545,8 @@
             {
               "kind": "TypeNominal",
               "name": "Int",
-              "printedName": "Int"
+              "printedName": "Int",
+              "usr": "s:Si"
             },
             {
               "kind": "Getter",
@@ -503,7 +560,8 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Int",
-                  "printedName": "Int"
+                  "printedName": "Int",
+                  "usr": "s:Si"
                 }
               ]
             }
@@ -522,18 +580,21 @@
               "kind": "TypeNominal",
               "name": "Optional",
               "printedName": "Number?",
+              "usr": "s:Sq",
               "children": [
                 {
                   "kind": "TypeNominal",
                   "name": "Number",
-                  "printedName": "Number"
+                  "printedName": "Number",
+                  "usr": "s:4cake6NumberO"
                 }
               ]
             },
             {
               "kind": "TypeNominal",
               "name": "Int",
-              "printedName": "Int"
+              "printedName": "Int",
+              "usr": "s:Si"
             }
           ]
         },
@@ -549,7 +610,8 @@
             {
               "kind": "TypeNominal",
               "name": "Int",
-              "printedName": "Int"
+              "printedName": "Int",
+              "usr": "s:Si"
             },
             {
               "kind": "Getter",
@@ -563,7 +625,8 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Int",
-                  "printedName": "Int"
+                  "printedName": "Int",
+                  "usr": "s:Si"
                 }
               ]
             }

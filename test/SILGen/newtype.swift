@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-RAW
 
-// RUN: %target-swift-frontend -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-frontend -module-name newtype -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-RAW
+
+// RUN: %target-swift-frontend -module-name newtype -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
 
 // REQUIRES: objc_interop
 
@@ -46,7 +47,7 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: return [[STRING_RESULT]]
 
 class ObjCTest {
-  // CHECK-RAW-LABEL: sil hidden @$S7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
+  // CHECK-RAW-LABEL: sil hidden @$S7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF : $@convention(method) (@guaranteed Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
   // CHECK-RAW: sil hidden [thunk] @$S7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
@@ -66,7 +67,7 @@ func bridgeToNewtype() -> MyString {
 // CHECK-RAW: [[TO_NS:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK-RAW: [[BORROW:%.*]] = begin_borrow [[STRING]]
 // CHECK-RAW: [[NS:%.*]] = apply [[TO_NS]]([[BORROW]])
-// CHECK-RAW: [[TO_MY:%.*]] = function_ref @$Ss20_SwiftNewtypeWrapperPss21_ObjectiveCBridgeable8RawValueRpzrlE026_unconditionallyBridgeFromD1CyxAD_01_D5CTypeQZSgFZ : $@convention(method) <τ_0_0 where τ_0_0 : _SwiftNewtypeWrapper, τ_0_0.RawValue : _ObjectiveCBridgeable> (@owned Optional<τ_0_0.RawValue._ObjectiveCType>, @thick τ_0_0.Type)
+// CHECK-RAW: [[TO_MY:%.*]] = function_ref @$Ss20_SwiftNewtypeWrapperPss21_ObjectiveCBridgeable8RawValueRpzrlE026_unconditionallyBridgeFromD1CyxAD_01_D5CTypeQZSgFZ : $@convention(method) <τ_0_0 where τ_0_0 : _SwiftNewtypeWrapper, τ_0_0.RawValue : _ObjectiveCBridgeable> (@guaranteed Optional<τ_0_0.RawValue._ObjectiveCType>, @thick τ_0_0.Type)
 // CHECK-RAW: [[OPTNS:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NS]]
 // CHECK-RAW: [[META:%.*]] = metatype $@thick MyString.Type
 // CHECK-RAW: apply [[TO_MY]]<MyString, String>({{.*}}, [[OPTNS]], [[META]])

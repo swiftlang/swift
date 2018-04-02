@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name let_decls -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -70,14 +71,13 @@ func test3() {
   // CHECK: [[GETFN:%[0-9]+]] = function_ref{{.*}}getAString
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
-  
+
+  // CHECK-NEXT: debug_value
   // CHECK-NOT: destroy_value
 
-  // CHECK: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
-  // CHECK-NEXT: [[STR_COPY:%.*]] = copy_value [[BORROWED_STR]]
+  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [[STR]]
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
-  // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_COPY]])
-  // CHECK-NEXT: end_borrow [[BORROWED_STR]] from [[STR]]
+  // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)
   
   // CHECK: destroy_value [[STR]]
@@ -99,11 +99,8 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: [[ARG:%.*]] = alloc_stack $T
-  // CHECK: copy_addr [[FUNC_ARG]] to [initialization] [[ARG]]
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
-  // CHECK-NEXT: dealloc_stack [[ARG]]
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[FUNC_ARG]])
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
   // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [copy] [[STRADDR]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
@@ -114,12 +111,10 @@ func testAddressOnlyStructString<T>(_ a : T) -> String {
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructElt
 func testAddressOnlyStructElt<T>(_ a : T) -> T {
   return produceAddressOnlyStruct(a).elt
-  
+  // CHECK: bb0([[ARG0:%.*]] : @trivial $*T, [[ARG1:%.*]] : @trivial $*T):
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: [[ARG:%.*]] = alloc_stack $T
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
-  // CHECK-NEXT: dealloc_stack [[ARG]]
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG1]])
   // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
   // CHECK-NEXT: copy_addr [[ELTADDR]] to [initialization] %0 : $*T
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
@@ -265,7 +260,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
 // CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $*T):
 // CHECK-NEXT: debug_value_addr %1 : $*T
 // CHECK-NEXT: copy_addr %1 to [initialization] %0 : $*T
-// CHECK-NEXT: destroy_addr %1
+// CHECK-NOT: destroy_addr %1
 // CHECK: } // end sil function '{{.*}}generic_identity{{.*}}'
 func generic_identity<T>(_ a : T) -> T {
   // Should be a single copy_addr, with no temporary.
@@ -306,7 +301,7 @@ func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: apply
   p.doSomethingGreat()
   
-  // CHECK-NEXT: destroy_addr %0
+  // CHECK-NOT: destroy_addr %0
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
 }
@@ -322,7 +317,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
   // CHECK-NEXT: apply
   p.doSomethingGreat()
 
-  // CHECK-NEXT: destroy_addr %0
+  // CHECK-NOT: destroy_addr %0
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
 }
@@ -339,7 +334,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
   // CHECK: apply
   b.doSomethingGreat()
   
-  // CHECK: destroy_addr
+  // CHECK-NOT: destroy_addr
 
   // CHECK: return %0
   return x
@@ -351,7 +346,7 @@ func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int
 // CHECK:       bb0(%0 : @trivial $*SimpleProtocol, %1 : @trivial $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
-// CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
+// CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
 // CHECK-NEXT:    debug_value_addr %2
