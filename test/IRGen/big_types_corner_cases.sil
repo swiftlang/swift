@@ -282,3 +282,52 @@ sil_vtable SuperBase {
 sil_vtable SuperSub {
 }
 
+class X {
+  @objc func foo() -> BitfieldOne
+}
+sil_vtable X {}
+
+sil @$S22big_types_corner_cases1XC3fooSo11BitfieldOneVyFTo : $@convention(objc_method) (X) -> BitfieldOne {
+bb0(%1 : $X):
+  %4 = function_ref @$getLargeObjCType : $@convention(thin) () -> BitfieldOne
+  %7 = apply %4() : $@convention(thin) () -> BitfieldOne
+  return %7 : $BitfieldOne
+}
+
+sil @$getLargeObjCType : $@convention(thin) () -> BitfieldOne
+
+// CHECK-LABAL: define {{.*}} swiftcc void @"$crash_on_objc_apply"(%objc_object*)
+// CHECK: entry:
+// CHECK:   [[LOADS:%.*]] = load i8*, i8** @"\01L_selector(foo)"
+// CHECK:   [[RESS:%.*]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
+// CHECK:   call i1 bitcast (void ()* @objc_msgSend to i1 (%objc_object*, i8*, i8*)*)(%objc_object* %0, i8* [[RESS]], i8* [[LOADS]])
+sil @$crash_on_objc_apply : $@convention(thin) (@guaranteed AnyObject) -> () {
+// %0                                             // users: %2, %1
+bb0(%0 : $AnyObject):
+  debug_value %0 : $AnyObject, let, name "object", argno 1
+  %2 = open_existential_ref %0 : $AnyObject to $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
+  strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
+  %4 = alloc_stack $Optional<BitfieldOne>
+  dynamic_method_br %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject, #X.foo!1.foreign, bb1, bb2
+
+bb1(%6 : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject) -> BitfieldOne): // Preds: bb0
+  strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
+  %8 = partial_apply [callee_guaranteed] %6(%2) : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject) -> BitfieldOne
+  %9 = apply %8() : $@callee_guaranteed () -> BitfieldOne
+  %10 = init_enum_data_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt.1
+  store %9 to %10 : $*BitfieldOne
+  inject_enum_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt.1
+  strong_release %8 : $@callee_guaranteed () -> BitfieldOne
+  br bb3
+
+bb2:                                              // Preds: bb0
+  inject_enum_addr %4 : $*Optional<BitfieldOne>, #Optional.none!enumelt
+  br bb3
+
+bb3:                                              // Preds: bb2 bb1
+  %17 = load %4 : $*Optional<BitfieldOne>
+  dealloc_stack %4 : $*Optional<BitfieldOne>
+  strong_release %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
+  %20 = tuple ()
+  return %20 : $()
+} // end sil function '$crash_on_objc_apply'
