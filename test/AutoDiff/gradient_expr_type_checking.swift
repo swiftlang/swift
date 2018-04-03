@@ -7,10 +7,10 @@ let someVar: Int = 100
 #gradient(of: someVar) // expected-error {{only functions can be differentiated}}
 #valueAndGradient(of: someVar) // expected-error {{only functions can be differentiated}}
 
-let _ = #gradient(of: foo) // ok
-let _ = #valueAndGradient(of: foo) // ok
-let _: (Float, Float) -> (Float, Float) = #gradient(of: foo) // ok
-let _: (Float, Float) -> (value: Float, gradient: (Float, Float)) = #valueAndGradient(of: foo) // ok
+let _ = gradient(of: foo) // ok
+let _ = valueAndGradient(of: foo) // ok
+let _: (Float, Float) -> (Float, Float) = gradient(of: foo) // ok
+let _: (Float, Float) -> (value: Float, gradient: (Float, Float)) = valueAndGradient(of: foo) // ok
 
 let _: (Float, Float) -> Float = #gradient(of: foo, withRespectTo: .0) // ok
 let _: (Float, Float) -> (value: Float, gradient: Float)
@@ -43,11 +43,11 @@ struct S {
 }
 
 let s = S()
-let _: (Float) -> Float = #gradient(of: s.a)
-let _: (Float) -> (Float, Float) = #valueAndGradient(of: s.a)
-let _: (Double) -> Double = #gradient(of: s.a)
+let _: (Float) -> Float = gradient(of: s.a)
+let _: (Float) -> (Float, Float) = valueAndGradient(of: s.a)
+let _: (Double) -> Double = gradient(of: s.a)
 // expected-error @-1 {{cannot convert value of type '(Float) -> Float' to specified type}}
-let _: (Double) -> (Double, Double) = #valueAndGradient(of: s.a)
+let _: (Double) -> (Double, Double) = valueAndGradient(of: s.a)
 // expected-error @-1 {{cannot convert value of type '(Float) -> (value: Float, gradient: Float)' to specified type}}
 
 // Gradient expressions with generic primal.
