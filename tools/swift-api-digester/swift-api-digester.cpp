@@ -2681,6 +2681,8 @@ typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
 
 } // end anonymous namespace
 
+static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
+                                TypeMemberDiffVector &out);
 
 static void printNode(llvm::raw_ostream &os, NodePtr node) {
   os << "{" << node->getName() << " " << node->getKind() << " "
@@ -3005,7 +3007,10 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   DiagBag<RemovedDeclDiag> RemovedDecls;
 
   UpdatedNodesMap &UpdateMap;
-  DiagnosisEmitter(UpdatedNodesMap &UpdateMap) : UpdateMap(UpdateMap) {}
+  TypeMemberDiffVector &MemberChanges;
+  DiagnosisEmitter(UpdatedNodesMap &UpdateMap,
+                   TypeMemberDiffVector &MemberChanges):
+                     UpdateMap(UpdateMap), MemberChanges(MemberChanges) {}
 public:
   static void diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
                         UpdatedNodesMap &UpdateMap);
@@ -3126,7 +3131,10 @@ void DiagnosisEmitter::DeclAttrDiag::output() const {
 
 void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
                                  UpdatedNodesMap &UpdateMap) {
-  DiagnosisEmitter Emitter(UpdateMap);
+  // Find member hoist changes to help refine diagnostics.
+  TypeMemberDiffVector MemberChanges;
+  findTypeMemberDiffs(LeftRoot, RightRoot, MemberChanges);
+  DiagnosisEmitter Emitter(UpdateMap, MemberChanges);
   collectAddedDecls(RightRoot, Emitter.AddedDecls);
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
@@ -3150,6 +3158,17 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
                                       Added->getFullyQualifiedName());
         return;
       }
+    }
+
+    // If we can find a hoisted member for this removed delcaration, we
+    // emit the diagnostics as rename instead of removal.
+    auto It = std::find_if(MemberChanges.begin(), MemberChanges.end(),
+      [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
+    if (It != MemberChanges.end()) {
+      RenamedDecls.Diags.emplace_back(ScreenInfo, Node->getDeclKind(),
+        Node->getDeclKind(), Node->getFullyQualifiedName(),
+        Ctx.buffer((Twine(It->newTypeName) + "." + It->newPrintedName).str()));
+      return;
     }
 
     // We should exlude those declarations that are pulled up to the super classes.
