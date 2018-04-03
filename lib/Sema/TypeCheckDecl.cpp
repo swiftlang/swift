@@ -7036,6 +7036,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
 
+    if (PatternBindingDecl *PBD = VD->getParentPatternBinding())
+      if (PBD->isBeingValidated())
+        return;
+
     D->setIsBeingValidated();
 
     if (!VD->hasInterfaceType()) {
@@ -7046,25 +7050,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
         recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
       } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        if (PBD->isBeingValidated()) {
-          diagnose(VD, diag::pattern_used_in_type, VD->getName());
-
-        } else {
-          validatePatternBindingEntries(*this, PBD);
-        }
+        validatePatternBindingEntries(*this, PBD);
 
         auto parentPattern = VD->getParentPattern();
         if (PBD->isInvalid() || !parentPattern->hasType()) {
           parentPattern->setType(ErrorType::get(Context));
           setBoundVarsTypeError(parentPattern, Context);
-          
-          // If no type has been set for the initializer, we need to diagnose
-          // the failure.
-          if (VD->getParentInitializer() &&
-              !VD->getParentInitializer()->getType()) {
-            diagnose(parentPattern->getLoc(), diag::identifier_init_failure,
-                     parentPattern->getBoundName());
-          }
         }
       } else {
         // FIXME: This case is hit when code completion occurs in a function
@@ -7172,6 +7163,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto *FD = cast<FuncDecl>(D);
     assert(!FD->hasInterfaceType());
 
+    // Bail out if we're in a recursive validation situation.
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      auto *storage = accessor->getStorage();
+      validateDecl(storage);
+      if (!storage->hasValidSignature())
+        return;
+    }
+
     checkDeclAttributesEarly(FD);
     computeAccessLevel(FD);
 
@@ -7208,7 +7207,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // FIXME: should this include the generic signature?
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       auto storage = accessor->getStorage();
-      validateDecl(storage);
 
       // Note that it's important for correctness that we're filling in
       // empty TypeLocs, because otherwise revertGenericFuncSignature might
