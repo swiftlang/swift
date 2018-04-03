@@ -44,6 +44,11 @@ __attribute__((swift_name("Panda")))
 @interface PKPanda : NSObject
 @end
 
+typedef NSString *IncompleteImportTargetName __attribute__((swift_wrapper(struct)));
+
+@interface IncompleteImportTarget : NSObject
+@end
+
 #pragma clang assume_nonnull end
 
 #endif
