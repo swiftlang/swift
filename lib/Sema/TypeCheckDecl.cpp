@@ -3982,7 +3982,8 @@ public:
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
       auto &Context = TC.Context;
-      if (VD->getDeclContext()->isTypeContext() &&
+      if (IsFirstPass &&
+          VD->getDeclContext()->isTypeContext() &&
           (VD->getFullName().isSimpleName(Context.Id_Type) ||
            VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
           VD->getNameLoc().isValid() &&
