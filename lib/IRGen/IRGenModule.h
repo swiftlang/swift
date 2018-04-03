@@ -338,7 +338,13 @@ public:
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
-  void addLazyFunction(SILFunction *f);
+  void addLazyFunction(SILFunction *f) {
+    // Add it to the queue if it hasn't already been put there.
+    if (LazilyEmittedFunctions.insert(f).second) {
+      LazyFunctionDefinitions.push_back(f);
+      DefaultIGMForFunction[f] = CurrentIGM;
+    }
+  }
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
