@@ -666,10 +666,6 @@ NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
-ERROR(identifier_init_failure,none,
-      "could not infer type for %0", (Identifier))
-ERROR(pattern_used_in_type,none,
-      "%0 used within its own type", (Identifier))
 NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
 

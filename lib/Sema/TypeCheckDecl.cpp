@@ -3976,6 +3976,9 @@ public:
     
     DeclVisitor<DeclChecker>::visit(decl);
 
+    if (IsFirstPass)
+      TC.checkUnsupportedProtocolType(decl);
+
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
       
@@ -3995,17 +3998,6 @@ public:
         TC.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
-      }
-    }
-
-    if (!IsFirstPass) {
-      TC.checkUnsupportedProtocolType(decl);
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        TC.checkDeclCircularity(nominal);
-      }
-      if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
-        if (protocol->isResilient())
-          TC.inferDefaultWitnesses(protocol);
       }
     }
   }
@@ -4145,66 +4137,59 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    // Check all the pattern/init pairs in the PBD.
-    validatePatternBindingEntries(TC, PBD);
+    if (!IsFirstPass)
+      return;
 
     if (PBD->isBeingValidated())
       return;
 
-    // If the initializers in the PBD aren't checked yet, do so now.
-    if (!IsFirstPass) {
-      for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-        if (!PBD->isInitializerChecked(i) && PBD->getInit(i))
-          TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
-      }
-    }
+    // Check all the pattern/init pairs in the PBD.
+    validatePatternBindingEntries(TC, PBD);
 
     TC.checkDeclAttributesEarly(PBD);
 
-    if (IsFirstPass) {
-      for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-        // Type check each VarDecl that this PatternBinding handles.
-        visitBoundVars(PBD->getPattern(i));
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+      // Type check each VarDecl that this PatternBinding handles.
+      visitBoundVars(PBD->getPattern(i));
 
-        // If we have a type but no initializer, check whether the type is
-        // default-initializable. If so, do it.
-        if (PBD->getPattern(i)->hasType() &&
-            !PBD->getInit(i) &&
-            PBD->getPattern(i)->hasStorage() &&
-            !PBD->getPattern(i)->getType()->hasError()) {
+      // If we have a type but no initializer, check whether the type is
+      // default-initializable. If so, do it.
+      if (PBD->getPattern(i)->hasType() &&
+          !PBD->getInit(i) &&
+          PBD->getPattern(i)->hasStorage() &&
+          !PBD->getPattern(i)->getType()->hasError()) {
 
-          // If we have a type-adjusting attribute (like ownership), apply it now.
-          if (auto var = PBD->getSingleVar())
-            TC.checkTypeModifyingDeclAttributes(var);
+        // If we have a type-adjusting attribute (like ownership), apply it now.
+        if (auto var = PBD->getSingleVar())
+          TC.checkTypeModifyingDeclAttributes(var);
 
-          // Decide whether we should suppress default initialization.
-          //
-          // Note: Swift 4 had a bug where properties with a desugared optional
-          // type like Optional<Int> had a half-way behavior where sometimes
-          // they behave like they are default initialized, and sometimes not.
-          //
-          // In Swift 5 mode, use the right condition here, and only default
-          // initialize properties with a sugared Optional type.
-          //
-          // (The restriction to sugared types only comes because we don't have
-          // the iterative declaration checker yet; so in general, we cannot
-          // look at the type of a property at all, and can only look at the
-          // TypeRepr, because we haven't validated the property yet.)
-          if (TC.Context.isSwiftVersionAtLeast(5)) {
-            if (!PBD->isDefaultInitializable(i))
-              continue;
-          } else {
-            if (PBD->getPattern(i)->isNeverDefaultInitializable())
-              continue;
-          }
+        // Decide whether we should suppress default initialization.
+        //
+        // Note: Swift 4 had a bug where properties with a desugared optional
+        // type like Optional<Int> had a half-way behavior where sometimes
+        // they behave like they are default initialized, and sometimes not.
+        //
+        // In Swift 5 mode, use the right condition here, and only default
+        // initialize properties with a sugared Optional type.
+        //
+        // (The restriction to sugared types only comes because we don't have
+        // the iterative declaration checker yet; so in general, we cannot
+        // look at the type of a property at all, and can only look at the
+        // TypeRepr, because we haven't validated the property yet.)
+        if (TC.Context.isSwiftVersionAtLeast(5)) {
+          if (!PBD->isDefaultInitializable(i))
+            continue;
+        } else {
+          if (PBD->getPattern(i)->isNeverDefaultInitializable())
+            continue;
+        }
 
-          auto type = PBD->getPattern(i)->getType();
-          if (auto defaultInit = buildDefaultInitializer(TC, type)) {
-            // If we got a default initializer, install it and re-type-check it
-            // to make sure it is properly coerced to the pattern type.
-            PBD->setInit(i, defaultInit);
-            TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
-          }
+        auto type = PBD->getPattern(i)->getType();
+        if (auto defaultInit = buildDefaultInitializer(TC, type)) {
+          // If we got a default initializer, install it and re-type-check it
+          // to make sure it is properly coerced to the pattern type.
+          PBD->setInit(i, defaultInit);
+          TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
         }
       }
     }
@@ -4271,9 +4256,13 @@ public:
     }
 
     TC.checkDeclAttributes(PBD);
+    checkAccessControl(TC, PBD);
 
-    if (IsFirstPass)
-      checkAccessControl(TC, PBD);
+    // If the initializers in the PBD aren't checked yet, do so now.
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
+      if (!PBD->isInitializerChecked(i) && PBD->getInit(i))
+        TC.typeCheckPatternBinding(PBD, i, /*skipApplyingSolution*/false);
+    }
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -4398,6 +4387,8 @@ public:
       // enums haven't.
       checkEnumRawValues(TC, ED);
     }
+
+    TC.checkDeclCircularity(ED);
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -4424,6 +4415,8 @@ public:
 
     TC.checkDeclAttributes(SD);
     checkAccessControl(TC, SD);
+
+    TC.checkDeclCircularity(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -4656,6 +4649,8 @@ public:
 
     TC.checkDeclAttributes(CD);
     checkAccessControl(TC, CD);
+
+    TC.checkDeclCircularity(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -4711,6 +4706,10 @@ public:
 
     GenericTypeToArchetypeResolver resolver(PD);
     TC.validateWhereClauses(PD, &resolver);
+
+    TC.checkDeclCircularity(PD);
+    if (PD->isResilient())
+      TC.inferDefaultWitnesses(PD);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
       auto requirementsSig =
@@ -7041,6 +7040,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Param: {
     auto VD = cast<VarDecl>(D);
 
+    if (PatternBindingDecl *PBD = VD->getParentPatternBinding())
+      if (PBD->isBeingValidated())
+        return;
+
     D->setIsBeingValidated();
 
     if (!VD->hasInterfaceType()) {
@@ -7051,25 +7054,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
         recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
       } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        if (PBD->isBeingValidated()) {
-          diagnose(VD, diag::pattern_used_in_type, VD->getName());
-
-        } else {
-          validatePatternBindingEntries(*this, PBD);
-        }
+        validatePatternBindingEntries(*this, PBD);
 
         auto parentPattern = VD->getParentPattern();
         if (PBD->isInvalid() || !parentPattern->hasType()) {
           parentPattern->setType(ErrorType::get(Context));
           setBoundVarsTypeError(parentPattern, Context);
-          
-          // If no type has been set for the initializer, we need to diagnose
-          // the failure.
-          if (VD->getParentInitializer() &&
-              !VD->getParentInitializer()->getType()) {
-            diagnose(parentPattern->getLoc(), diag::identifier_init_failure,
-                     parentPattern->getBoundName());
-          }
         }
       } else {
         // FIXME: This case is hit when code completion occurs in a function
@@ -7177,6 +7167,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto *FD = cast<FuncDecl>(D);
     assert(!FD->hasInterfaceType());
 
+    // Bail out if we're in a recursive validation situation.
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      auto *storage = accessor->getStorage();
+      validateDecl(storage);
+      if (!storage->hasValidSignature())
+        return;
+    }
+
     checkDeclAttributesEarly(FD);
     computeAccessLevel(FD);
 
@@ -7213,7 +7211,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // FIXME: should this include the generic signature?
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       auto storage = accessor->getStorage();
-      validateDecl(storage);
 
       // Note that it's important for correctness that we're filling in
       // empty TypeLocs, because otherwise revertGenericFuncSignature might
