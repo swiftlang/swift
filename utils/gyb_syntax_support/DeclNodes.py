@@ -19,8 +19,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('TypealiasKeyword', kind='TypealiasToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -40,8 +39,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('AssociatedtypeKeyword', kind='AssociatedtypeToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -173,8 +171,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ClassKeyword', kind='ClassToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -198,8 +195,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('StructKeyword', kind='StructToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -216,8 +212,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ProtocolKeyword', kind='ProtocolToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -237,8 +232,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ExtensionKeyword', kind='ExtensionToken'),
              Child('ExtendedType', kind='Type'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -436,6 +430,8 @@ DECL_NODES = [
     Node('ImportDecl', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
              Child('ImportTok', kind='ImportToken'),
              Child('ImportKind', kind='Token', is_optional=True,
                    token_choices=[
