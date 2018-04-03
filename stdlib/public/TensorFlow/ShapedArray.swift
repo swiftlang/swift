@@ -555,18 +555,9 @@ extension ShapedArray : CustomStringConvertible {
 }
 
 // Xcode Playground display conversion.
-// NOTE: The new "CustomPlaygroundDisplayConvertible" API causes Xcode
-// Playgrounds to crash on Mac.
-#if false
 extension ShapedArray : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
-  }
-}
-#endif
-extension ShapedArray : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
   }
 }
 
@@ -865,18 +856,9 @@ extension ShapedArraySlice : CustomStringConvertible {
 }
 
 // Xcode Playground display conversion
-// NOTE: The new "CustomPlaygroundDisplayConvertible" API causes Xcode
-// Playgrounds to crash on Mac.
-#if false
 extension ShapedArraySlice : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
-  }
-}
-#endif
-extension ShapedArraySlice : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
   }
 }
 
