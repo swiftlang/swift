@@ -159,17 +159,10 @@ private:
   void OwnedToGuaranteedTransformFunctionParameters();
 
   /// Find any owned to guaranteed opportunities.
-  bool OwnedToGuaranteedAnalyze() {
-    bool Result = OwnedToGuaranteedAnalyzeResults();
-    bool Params = OwnedToGuaranteedAnalyzeParameters();
-    return Params || Result;
-  }
+  bool OwnedToGuaranteedAnalyze();
 
   /// Do the actual owned to guaranteed transformations.
-  void OwnedToGuaranteedTransform() {
-    OwnedToGuaranteedTransformFunctionResults();
-    OwnedToGuaranteedTransformFunctionParameters();
-  }
+  void OwnedToGuaranteedTransform();
 
   /// Set up epilogue work for the thunk result based in the given argument.
   void OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD,
@@ -197,25 +190,8 @@ private:
   /// Every transformation must defines this interface. Default implementation
   /// simply passes it through.
   void addThunkArgument(ArgumentDescriptor &AD, SILBuilder &Builder,
-                        SILBasicBlock *BB, 
-                        llvm::SmallVectorImpl<SILValue> &NewArgs) {
-    // Dead argument.
-    if (AD.IsEntirelyDead) {
-      return;
-    }
-
-    // Explode the argument.
-    if (AD.Explode) {
-      llvm::SmallVector<SILValue, 4> LeafValues;
-      AD.ProjTree.createTreeFromValue(Builder, BB->getParent()->getLocation(),
-                                      BB->getArgument(AD.Index), LeafValues);
-      NewArgs.append(LeafValues.begin(), LeafValues.end());
-      return;
-    }
-
-    // All other arguments get pushed as what they are.
-    NewArgs.push_back(BB->getArgument(AD.Index));
-  } 
+                        SILBasicBlock *BB,
+                        llvm::SmallVectorImpl<SILValue> &NewArgs);
 
   /// Take ArgumentDescList and ResultDescList and create an optimized function
   /// based on the current function we are analyzing. This also has the side effect
@@ -241,105 +217,35 @@ public:
   }
 
   /// Run the optimization.
-  bool run(bool hasCaller) {
-    bool Changed = false;
-    SILFunction *F = TransformDescriptor.OriginalFunction;
-
-    if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
-      DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
-      return false;
-    }
-
-    // Run OwnedToGuaranteed optimization.
-    if (OwnedToGuaranteedAnalyze()) {
-      Changed = true;
-      DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
-      OwnedToGuaranteedTransform();
-    }
-
-    // Run DeadArgument elimination transformation. We only specialize
-    // if this function has a caller inside the current module or we have
-    // already created a thunk.
-    if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
-      Changed = true;
-      DEBUG(llvm::dbgs() << "  remove dead arguments\n");
-      DeadArgumentTransformFunction();
-    }
-
-    // Run ArgumentExplosion transformation. We only specialize
-    // if this function has a caller inside the current module or we have
-    // already created a thunk.
-    //
-    // NOTE: we run argument explosion last because we've already initialized
-    // the ArgumentDescList to have unexploded number of arguments. Exploding
-    // it without changing the argument count is not going to help with
-    // owned-to-guaranteed transformation. 
-    // 
-    // In order to not miss any opportunity, we send the optimized function
-    // to the passmanager to optimize any opportunities exposed by argument
-    // explosion.
-    if ((hasCaller || Changed) && ArgumentExplosionAnalyzeParameters()) {
-      Changed = true;
-    }
-
-    // Check if generic signature of the function could be changed by
-    // removed some unused generic arguments.
-    if (F->getLoweredFunctionType()->isPolymorphic() &&
-        createOptimizedSILFunctionType() != F->getLoweredFunctionType()) {
-      Changed = true;
-    }
-
-    // Create the specialized function and invalidate the old function.
-    if (Changed) {
-      createFunctionSignatureOptimizedFunction();
-    }
-    return Changed;
-  }
+  bool run(bool hasCaller);
 
   /// Run dead argument elimination of partially applied functions.
+  ///
   /// After this optimization CapturePropagation can replace the partial_apply
   /// by a direct reference to the specialized function.
-  bool removeDeadArgs(int minPartialAppliedArgs) {
-    if (minPartialAppliedArgs < 1)
-      return false;
-
-    if (!DeadArgumentAnalyzeParameters())
-      return false;
-
-    SILFunction *F = TransformDescriptor.OriginalFunction;
-    auto ArgumentDescList = TransformDescriptor.ArgumentDescList;
-
-    // Check if at least the minimum number of partially applied arguments
-    // are dead. Otherwise no partial_apply can be removed anyway.
-    unsigned Size = ArgumentDescList.size();
-    for (unsigned Idx : range(Size)) {
-      if (Idx < Size - minPartialAppliedArgs) {
-        // Don't remove arguments other than the partial applied ones, even if
-        // they are dead.
-        ArgumentDescList[Idx].IsEntirelyDead = false;
-        continue;
-      }
-
-      // Is the partially applied argument dead?
-      if (!ArgumentDescList[Idx].IsEntirelyDead)
-        return false;
-
-      // Currently we require that all dead parameters have trivial types.  The
-      // reason is that it's very hard to find places where we can release those
-      // parameters (as a replacement for the removed partial_apply).
-      //
-      // TODO: Maybe we can skip this restriction when we have semantic ARC.
-      if (ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
-        continue;
-      return false;
-    }
-
-    DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
-    DeadArgumentTransformFunction();
-    createFunctionSignatureOptimizedFunction();
-    return true;
-  }
+  bool removeDeadArgs(int minPartialAppliedArgs);
 };
+
+void FunctionSignatureTransform::addThunkArgument(
+    ArgumentDescriptor &AD, SILBuilder &Builder, SILBasicBlock *BB,
+    llvm::SmallVectorImpl<SILValue> &NewArgs) {
+  // Dead argument.
+  if (AD.IsEntirelyDead) {
+    return;
+  }
+
+  // Explode the argument.
+  if (AD.Explode) {
+    llvm::SmallVector<SILValue, 4> LeafValues;
+    AD.ProjTree.createTreeFromValue(Builder, BB->getParent()->getLocation(),
+                                    BB->getArgument(AD.Index), LeafValues);
+    NewArgs.append(LeafValues.begin(), LeafValues.end());
+    return;
+  }
+
+  // All other arguments get pushed as what they are.
+  NewArgs.push_back(BB->getArgument(AD.Index));
+}
 
 std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
@@ -790,6 +696,107 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
 }
 
+// Run the optimization.
+bool FunctionSignatureTransform::run(bool hasCaller) {
+  bool Changed = false;
+  SILFunction *F = TransformDescriptor.OriginalFunction;
+
+  if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
+    DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
+    return false;
+  }
+
+  // Run OwnedToGuaranteed optimization.
+  if (OwnedToGuaranteedAnalyze()) {
+    Changed = true;
+    DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
+    OwnedToGuaranteedTransform();
+  }
+
+  // Run DeadArgument elimination transformation. We only specialize
+  // if this function has a caller inside the current module or we have
+  // already created a thunk.
+  if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
+    Changed = true;
+    DEBUG(llvm::dbgs() << "  remove dead arguments\n");
+    DeadArgumentTransformFunction();
+  }
+
+  // Run ArgumentExplosion transformation. We only specialize
+  // if this function has a caller inside the current module or we have
+  // already created a thunk.
+  //
+  // NOTE: we run argument explosion last because we've already initialized
+  // the ArgumentDescList to have unexploded number of arguments. Exploding
+  // it without changing the argument count is not going to help with
+  // owned-to-guaranteed transformation.
+  //
+  // In order to not miss any opportunity, we send the optimized function
+  // to the passmanager to optimize any opportunities exposed by argument
+  // explosion.
+  if ((hasCaller || Changed) && ArgumentExplosionAnalyzeParameters()) {
+    Changed = true;
+  }
+
+  // Check if generic signature of the function could be changed by
+  // removed some unused generic arguments.
+  if (F->getLoweredFunctionType()->isPolymorphic() &&
+      createOptimizedSILFunctionType() != F->getLoweredFunctionType()) {
+    Changed = true;
+  }
+
+  // Create the specialized function and invalidate the old function.
+  if (Changed) {
+    createFunctionSignatureOptimizedFunction();
+  }
+  return Changed;
+}
+
+// Run dead argument elimination of partially applied functions.
+//
+// After this optimization CapturePropagation can replace the partial_apply by a
+// direct reference to the specialized function.
+bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
+  if (minPartialAppliedArgs < 1)
+    return false;
+
+  if (!DeadArgumentAnalyzeParameters())
+    return false;
+
+  SILFunction *F = TransformDescriptor.OriginalFunction;
+  auto ArgumentDescList = TransformDescriptor.ArgumentDescList;
+
+  // Check if at least the minimum number of partially applied arguments
+  // are dead. Otherwise no partial_apply can be removed anyway.
+  unsigned Size = ArgumentDescList.size();
+  for (unsigned Idx : range(Size)) {
+    if (Idx < Size - minPartialAppliedArgs) {
+      // Don't remove arguments other than the partial applied ones, even if
+      // they are dead.
+      ArgumentDescList[Idx].IsEntirelyDead = false;
+      continue;
+    }
+
+    // Is the partially applied argument dead?
+    if (!ArgumentDescList[Idx].IsEntirelyDead)
+      return false;
+
+    // Currently we require that all dead parameters have trivial types.  The
+    // reason is that it's very hard to find places where we can release those
+    // parameters (as a replacement for the removed partial_apply).
+    //
+    // TODO: Maybe we can skip this restriction when we have semantic ARC.
+    if (ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
+      continue;
+    return false;
+  }
+
+  DEBUG(llvm::dbgs() << "  remove dead arguments for partial_apply\n");
+  DeadArgumentTransformFunction();
+  createFunctionSignatureOptimizedFunction();
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                         Dead Argument Elimination
 //===----------------------------------------------------------------------===//
@@ -1074,6 +1081,17 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
                               NormalBB->getArgument(0),
                               Builder.getDefaultAtomicity());
   }
+}
+
+bool FunctionSignatureTransform::OwnedToGuaranteedAnalyze() {
+  bool Result = OwnedToGuaranteedAnalyzeResults();
+  bool Params = OwnedToGuaranteedAnalyzeParameters();
+  return Params || Result;
+}
+
+void FunctionSignatureTransform::OwnedToGuaranteedTransform() {
+  OwnedToGuaranteedTransformFunctionResults();
+  OwnedToGuaranteedTransformFunctionParameters();
 }
 
 //===----------------------------------------------------------------------===//
