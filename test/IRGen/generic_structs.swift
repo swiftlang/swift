@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize -DINT_32=i32
 
 struct A<T1, T2>
 {
@@ -41,10 +41,10 @@ public struct GenericStruct<T : Proto> {
 // CHECK-LABEL: define{{.*}} swiftcc void @"$S15generic_structs13GenericStructVACyxGycfC"
 // CHECK:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15generic_structs13GenericStructVMa"([[INT]] 0, %swift.type* %T, i8** %T.Proto)
 // CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to [[INT]]*
-// CHECK:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[PTR]], [[INT]] 4
-// CHECK:  [[FIELDOFFSET:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELDOFFSETS]], i32 2
-// CHECK:  [[OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELDOFFSET]]
-// CHECK:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, [[INT]] [[OFFSET]]
+// CHECK:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to [[INT_32]]*
+// CHECK:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds [[INT_32]], [[INT_32]]* [[PTR]], [[INT]] [[IDX:4|8]]
+// CHECK:  [[FIELDOFFSET:%.*]] = getelementptr inbounds [[INT_32]], [[INT_32]]* [[FIELDOFFSETS]], i32 2
+// CHECK:  [[OFFSET:%.*]] = load [[INT_32]], [[INT_32]]* [[FIELDOFFSET]]
+// CHECK:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, [[INT_32]] [[OFFSET]]
 // CHECK:  [[OPTPTR:%.*]] = bitcast i8* [[ADDROFOPT]] to %TSq*
 // CHECK:  call %TSq* @"$SxSg15generic_structs5ProtoRzlWOb"(%TSq* {{.*}}, %TSq* [[OPTPTR]]

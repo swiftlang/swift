@@ -65,12 +65,12 @@ public func functionWithResilientTypesRectangle(_ r: Rectangle) {
 // CHECK: entry:
 // CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct9RectangleVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
-// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 2
-// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
-// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
+// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4]]
+// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
+// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T16resilient_struct9RectangleV* %0 to i8*
-// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], [[INT]] [[FIELD_OFFSET]]
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], i32 [[FIELD_OFFSET]]
 // CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %TSi*
 // CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
@@ -123,12 +123,12 @@ public struct StructWithResilientStorage {
 // CHECK-LABEL: define{{( protected)?}} swiftcc {{i32|i64}} @"$S17struct_resilience26StructWithResilientStorageV1nSivg"(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S17struct_resilience26StructWithResilientStorageVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
-// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 2
-// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
-// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_PTR]]
+// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
+// CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4]]
+// CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
+// CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_PTR]]
 // CHECK-NEXT: [[STRUCT_ADDR:%.*]] = bitcast %T17struct_resilience26StructWithResilientStorageV* %0 to i8*
-// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], [[INT]] [[FIELD_OFFSET]]
+// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[STRUCT_ADDR]], i32 [[FIELD_OFFSET]]
 // CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %TSi*
 // CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
@@ -203,6 +203,6 @@ public func partialApplyOfResilientMethod(s: Size) {
 // CHECK: [[FIELD_4:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 3
 // CHECK: store i8** [[SIZE_AND_ALIGNMENT:%.*]], i8*** [[FIELD_4]]
 
-// CHECK: call void @swift_initStructMetadata(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 4, i8*** [[FIELDS_ADDR]], [[INT]]* {{.*}})
+// CHECK: call void @swift_initStructMetadata(%swift.type* {{.*}}, [[INT]] 256, [[INT]] 4, i8*** [[FIELDS_ADDR]], i32* {{.*}})
 // CHECK: store atomic %swift.type* {{.*}} @"$S17struct_resilience26StructWithResilientStorageVMf{{.*}}, %swift.type** @"$S17struct_resilience26StructWithResilientStorageVML" release,
 // CHECK: ret void

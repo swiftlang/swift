@@ -220,7 +220,7 @@ sil_vtable C {}
 //             -- struct with runtime-resolved offset
 // CHECK-SAME: <i32 0x00fffffe>,
 // CHECK-32-SAME: i32 20 }>
-// CHECK-64-SAME: i32 40 }>
+// CHECK-64-SAME: i32 36 }>
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
