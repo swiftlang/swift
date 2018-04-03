@@ -6356,14 +6356,14 @@ public:
 
   void visitDestructorDecl(DestructorDecl *DD) {
     if (!IsFirstPass) {
-      if (DD->getBody())
-        TC.definedFunctions.push_back(DD);
-
       return;
     }
 
     TC.validateDecl(DD);
     TC.checkDeclAttributes(DD);
+
+    if (DD->hasBody())
+      TC.definedFunctions.push_back(DD);
   }
 };
 } // end anonymous namespace
