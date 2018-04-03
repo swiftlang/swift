@@ -8695,8 +8695,9 @@ static void diagnoseMissingRequiredInitializer(
                                            insertionLoc);
 
   // Find the indentation used on the indentation line.
-  StringRef indentation = Lexer::getIndentationForLine(TC.Context.SourceMgr,
-                                                       indentationLoc);
+  StringRef extraIndentation;
+  StringRef indentation = Lexer::getIndentationForLine(
+      TC.Context.SourceMgr, indentationLoc, &extraIndentation);
 
   // Pretty-print the superclass initializer into a string.
   // FIXME: Form a new initializer by performing the appropriate
@@ -8726,12 +8727,9 @@ static void diagnoseMissingRequiredInitializer(
       superInitializer->print(printer, options);
     }
 
-    // FIXME: Infer body indentation from the source rather than hard-coding
-    // 4 spaces.
-
     // Add a dummy body.
     out << " {\n";
-    out << indentation << "    fatalError(\"";
+    out << indentation << extraIndentation << "fatalError(\"";
     superInitializer->getFullName().printPretty(out);
     out << " has not been implemented\")\n";
     out << indentation << "}\n";

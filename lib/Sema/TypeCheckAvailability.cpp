@@ -1245,8 +1245,9 @@ static void fixAvailabilityByAddingVersionCheck(
     return;
 
   SourceLoc ReplaceLocStart = RangeToWrap.Start;
-  StringRef OriginalIndent =
-      Lexer::getIndentationForLine(TC.Context.SourceMgr, ReplaceLocStart);
+  StringRef ExtraIndent;
+  StringRef OriginalIndent = Lexer::getIndentationForLine(
+      TC.Context.SourceMgr, ReplaceLocStart, &ExtraIndent);
 
   std::string IfText;
   {
@@ -1260,16 +1261,15 @@ static void fixAvailabilityByAddingVersionCheck(
                                                          ReplaceLocStart,
                                                          ReplaceLocEnd)).str();
 
-    // We'll indent with 4 spaces
-    std::string ExtraIndent = "    ";
     std::string NewLine = "\n";
+    std::string NewLineReplacement = (NewLine + ExtraIndent).str();
 
     // Indent the body of the Fix-It if. Because the body may be a compound
     // statement, we may have to indent multiple lines.
     size_t StartAt = 0;
     while ((StartAt = GuardedText.find(NewLine, StartAt)) !=
            std::string::npos) {
-      GuardedText.replace(StartAt, NewLine.length(), NewLine + ExtraIndent);
+      GuardedText.replace(StartAt, NewLine.length(), NewLineReplacement);
       StartAt += NewLine.length();
     }
 

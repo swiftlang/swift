@@ -2058,10 +2058,10 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   // FIXME: Infer body indentation from the source rather than hard-coding
   // 4 spaces.
   ASTContext &Ctx = Requirement->getASTContext();
-  std::string ExtraIndent = "    ";
-  StringRef CurrentIndent = Lexer::getIndentationForLine(Ctx.SourceMgr,
-                                                         TypeLoc);
-  std::string StubIndent = CurrentIndent.str() + ExtraIndent;
+  StringRef ExtraIndent;
+  StringRef CurrentIndent =
+      Lexer::getIndentationForLine(Ctx.SourceMgr, TypeLoc, &ExtraIndent);
+  std::string StubIndent = (CurrentIndent + ExtraIndent).str();
 
   ExtraIndentStreamPrinter Printer(OS, StubIndent);
   Printer.printNewline();
