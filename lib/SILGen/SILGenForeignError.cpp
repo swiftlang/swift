@@ -394,7 +394,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
-  errorBB->createPHIArgument(optionalError->getType().unwrapAnyOptionalType(),
+  errorBB->createPHIArgument(optionalError->getType().unwrapOptionalType(),
                              ValueOwnershipKind::Owned);
   SILBasicBlock *contBB = SGF.createBasicBlock();
   SGF.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,

@@ -303,8 +303,8 @@ bool SILType::canPerformABICompatibleUnsafeCastValue(SILType fromType,
 // TODO: handle casting to a loadable existential by generating
 // init_existential_ref. Until then, only promote to a heap object dest.
 bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
-  auto fromTy = operTy.unwrapAnyOptionalType();
-  auto toTy = resultTy.unwrapAnyOptionalType();
+  auto fromTy = operTy.unwrapOptionalType();
+  auto toTy = resultTy.unwrapOptionalType();
   return (fromTy.isHeapObjectReferenceType() || fromTy.isClassExistentialType())
     && toTy.isHeapObjectReferenceType();
 }
@@ -469,7 +469,7 @@ SILType SILType::getOptionalObjectType() const {
   return SILType();
 }
 
-SILType SILType::unwrapAnyOptionalType() const {
+SILType SILType::unwrapOptionalType() const {
   if (auto objectTy = getOptionalObjectType()) {
     return objectTy;
   }
@@ -639,16 +639,6 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 
 bool SILFunctionType::isNoReturnFunction() {
   return getDirectFormalResultsType().getSwiftRValueType()->isUninhabited();
-}
-
-SILType SILType::wrapAnyOptionalType(SILFunction &F) const {
-  SILModule &M = F.getModule();
-  EnumDecl *OptionalDecl = M.getASTContext().getOptionalDecl();
-  BoundGenericType *BoundEnumDecl =
-      BoundGenericType::get(OptionalDecl, Type(), {getSwiftRValueType()});
-  AbstractionPattern Pattern(F.getLoweredFunctionType()->getGenericSignature(),
-                             BoundEnumDecl->getCanonicalType());
-  return M.Types.getLoweredType(Pattern, BoundEnumDecl);
 }
 
 #ifndef NDEBUG
