@@ -768,6 +768,10 @@ public:
   bool parseDeclAttributeList(DeclAttributes &Attributes,
                               bool &FoundCodeCompletionToken);
 
+  /// Parse the optional modifiers  before a declaration.
+  bool parseDeclModifierList(DeclAttributes &Attributes, SourceLoc &StaticLoc,
+                             StaticSpellingKind &StaticSpelling);
+
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
@@ -828,8 +832,7 @@ public:
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
-  parseDeclClass(SourceLoc ClassLoc,
-                 ParseDeclOptions Flags, DeclAttributes &Attributes);
+  parseDeclClass(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<PatternBindingDecl>
   parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                SmallVectorImpl<Decl *> &Decls,

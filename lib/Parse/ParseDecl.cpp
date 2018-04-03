@@ -1905,6 +1905,153 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
   return error;
 }
 
+/// \verbatim
+///   modifier-list
+///     /* empty */
+//      modifier modifier-list
+//    modifier
+//      'private'
+//      'private' '(' 'set' ')'
+//      'fileprivate'
+//      'fileprivate' '(' 'set' )'
+//      'internal'
+//      'internal' '(' 'set' ')'
+//      'public'
+//      'open'
+//      'weak'
+//      'unowned'
+//      'unowned' '(' 'safe' ')'
+//      'unowned' '(' 'unsafe' ')'
+//      'optional'
+//      'required'
+//      'lazy'
+//      'final'
+//      'dyntamic'
+//      'prefix'
+//      'postfix'
+//      'infix'
+//      'override'
+//      'mutating
+//      'nonmutating'
+//      '__consuming'
+//      'convenience'
+bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
+                                   SourceLoc &StaticLoc,
+                                   StaticSpellingKind &StaticSpelling) {
+  SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::ModifierList);
+  bool isError = false;
+  bool hasModifier = false;
+  while (true) {
+    switch (Tok.getKind()) {
+
+    case tok::kw_private:
+    case tok::kw_fileprivate:
+    case tok::kw_internal:
+    case tok::kw_public: {
+      SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
+      // We still model these specifiers as attributes.
+      isError |=
+          parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
+      hasModifier = true;
+      continue;
+    }
+
+    // Context sensitive keywords.
+    case tok::identifier: {
+      if (Tok.isEscapedIdentifier())
+        break;
+
+      DeclAttrKind Kind = llvm::StringSwitch<DeclAttrKind>(Tok.getText())
+                              .Case("open", DAK_AccessControl)
+                              .Case("weak", DAK_ReferenceOwnership)
+                              .Case("unowned", DAK_ReferenceOwnership)
+                              .Case("optional", DAK_Optional)
+                              .Case("required", DAK_Required)
+                              .Case("lazy", DAK_Lazy)
+                              .Case("final", DAK_Final)
+                              .Case("dynamic", DAK_Dynamic)
+                              .Case("prefix", DAK_Prefix)
+                              .Case("postfix", DAK_Postfix)
+                              .Case("indirect", DAK_Indirect)
+                              .Case("infix", DAK_Infix)
+                              .Case("override", DAK_Override)
+                              .Case("mutating", DAK_Mutating)
+                              .Case("nonmutating", DAK_NonMutating)
+                              .Case("__consuming", DAK_Consuming)
+                              .Case("convenience", DAK_Convenience)
+                              .Default(DAK_Count);
+      if (Kind == DAK_Count)
+        break;
+
+      SyntaxParsingContext ModContext(SyntaxContext,
+                                      SyntaxKind::DeclModifier);
+      isError |= parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, Kind);
+      hasModifier = true;
+      continue;
+    }
+
+    case tok::kw_static: {
+      // 'static' is not handled as an attribute in AST.
+      if (StaticLoc.isValid()) {
+        diagnose(Tok, diag::decl_already_static,
+                 StaticSpellingKind::KeywordStatic)
+            .highlight(StaticLoc)
+            .fixItRemove(Tok.getLoc());
+      } else {
+        StaticLoc = Tok.getLoc();
+        StaticSpelling = StaticSpellingKind::KeywordStatic;
+      }
+      SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
+      consumeToken(tok::kw_static);
+      hasModifier = true;
+      continue;
+    }
+
+    case tok::kw_class: {
+      // If 'class' is a modifier on another decl kind, like var or func,
+      // then treat it as a modifier.
+      {
+        BacktrackingScope Scope(*this);
+        consumeToken(tok::kw_class);
+        if (!isStartOfDecl())
+          // This 'class' is a real ClassDecl introducer.
+          break;
+      }
+      if (StaticLoc.isValid()) {
+        diagnose(Tok, diag::decl_already_static,
+                 StaticSpellingKind::KeywordClass)
+            .highlight(StaticLoc)
+            .fixItRemove(Tok.getLoc());
+      } else {
+        StaticLoc = Tok.getLoc();
+        StaticSpelling = StaticSpellingKind::KeywordClass;
+      }
+      SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
+      consumeToken(tok::kw_class);
+      hasModifier = true;
+      continue;
+    }
+
+    case tok::unknown:
+      // Eat an invalid token in decl modifier context. Error tokens are
+      // diagnosed by the lexer, so we don't need to emit another diagnostic.
+      consumeToken(tok::unknown);
+      hasModifier = true;
+      continue;
+
+    default:
+      break;
+    }
+
+    // If we don't have any modifiers, don't bother to construct an empty list.
+    if (!hasModifier)
+      ListContext.setTransparent();
+
+    // If we 'break' out of the switch, modifier list has ended.
+    return isError;
+  }
+}
+
 /// \brief This is the internal implementation of \c parseTypeAttributeList,
 /// which we expect to be inlined to handle the common case of an absent
 /// attribute list.
@@ -2233,9 +2380,6 @@ void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
 ParserResult<Decl>
 Parser::parseDecl(ParseDeclOptions Flags,
                   llvm::function_ref<void(Decl*)> Handler) {
-  SyntaxParsingContext DeclParsingContext(SyntaxContext,
-                                          SyntaxContextKind::Decl);
-
   if (Tok.is(tok::pound_if)) {
     auto IfConfigResult = parseIfConfig(
       [&](SmallVectorImpl<ASTNode> &Decls, bool IsActive) {
@@ -2276,6 +2420,10 @@ Parser::parseDecl(ParseDeclOptions Flags,
     return IfConfigResult;
   }
 
+
+  SyntaxParsingContext DeclParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Decl);
+
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
@@ -2287,313 +2435,194 @@ Parser::parseDecl(ParseDeclOptions Flags,
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::Declaration);
 
+  // Parse attributes.
   DeclAttributes Attributes;
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   bool FoundCCTokenInAttr;
   parseDeclAttributeList(Attributes, FoundCCTokenInAttr);
 
+  // Parse modifiers.
   // Keep track of where and whether we see a contextual keyword on the decl.
   SourceLoc StaticLoc;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
+  parseDeclModifierList(Attributes, StaticLoc, StaticSpelling);
+
   ParserResult<Decl> DeclResult;
 
-  while (1) {
-    // Save the original token, in case code-completion needs it.
-    auto OrigTok = Tok;
-    bool MayNeedOverrideCompletion = false;
+  // Save the original token, in case code-completion needs it.
+  auto OrigTok = Tok;
+  bool MayNeedOverrideCompletion = false;
 
-    switch (Tok.getKind()) {
-    // Modifiers
-    case tok::kw_static: {
-      if (StaticLoc.isValid()) {
-        diagnose(Tok, diag::decl_already_static,
-                 StaticSpellingKind::KeywordStatic)
-        .highlight(StaticLoc)
-        .fixItRemove(Tok.getLoc());
+  switch (Tok.getKind()) {
+  case tok::kw_import:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::ImportDecl);
+    DeclResult = parseDeclImport(Flags, Attributes);
+    break;
+  case tok::kw_extension:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::ExtensionDecl);
+    DeclResult = parseDeclExtension(Flags, Attributes);
+    break;
+  case tok::kw_let:
+  case tok::kw_var: {
+    // Collect all modifiers into a modifier list.
+    DeclParsingContext.setCreateSyntax(SyntaxKind::VariableDecl);
+    llvm::SmallVector<Decl *, 4> Entries;
+    DeclResult = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
+                              StaticSpelling, tryLoc);
+    StaticLoc = SourceLoc(); // we handled static if present.
+    MayNeedOverrideCompletion = true;
+    std::for_each(Entries.begin(), Entries.end(), Handler);
+    if (auto *D = DeclResult.getPtrOrNull())
+      markWasHandled(D);
+    break;
+  }
+  case tok::kw_typealias:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::TypealiasDecl);
+    DeclResult = parseDeclTypeAlias(Flags, Attributes);
+    MayNeedOverrideCompletion = true;
+    break;
+  case tok::kw_associatedtype:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::AssociatedtypeDecl);
+    DeclResult = parseDeclAssociatedType(Flags, Attributes);
+    break;
+  case tok::kw_enum:
+    DeclResult = parseDeclEnum(Flags, Attributes);
+    break;
+  case tok::kw_case: {
+    llvm::SmallVector<Decl *, 4> Entries;
+    DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
+    std::for_each(Entries.begin(), Entries.end(), Handler);
+    if (auto *D = DeclResult.getPtrOrNull())
+      markWasHandled(D);
+    break;
+  }
+  case tok::kw_class:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
+    DeclResult = parseDeclClass(Flags, Attributes);
+    break;
+  case tok::kw_struct:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::StructDecl);
+    DeclResult = parseDeclStruct(Flags, Attributes);
+    break;
+  case tok::kw_init:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::InitializerDecl);
+    DeclResult = parseDeclInit(Flags, Attributes);
+    break;
+  case tok::kw_deinit:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::DeinitializerDecl);
+    DeclResult = parseDeclDeinit(Flags, Attributes);
+    break;
+  case tok::kw_operator:
+    DeclResult = parseDeclOperator(Flags, Attributes);
+    break;
+  case tok::kw_precedencegroup:
+    DeclResult = parseDeclPrecedenceGroup(Flags, Attributes);
+    break;
+  case tok::kw_protocol:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::ProtocolDecl);
+    DeclResult = parseDeclProtocol(Flags, Attributes);
+    break;
+  case tok::kw_func:
+    // Collect all modifiers into a modifier list.
+    DeclParsingContext.setCreateSyntax(SyntaxKind::FunctionDecl);
+    DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
+    StaticLoc = SourceLoc(); // we handled static if present.
+    MayNeedOverrideCompletion = true;
+    break;
+  case tok::kw_subscript: {
+    DeclParsingContext.setCreateSyntax(SyntaxKind::SubscriptDecl);
+    if (StaticLoc.isValid()) {
+      diagnose(Tok, diag::subscript_static, StaticSpelling)
+          .fixItRemove(SourceRange(StaticLoc));
+      StaticLoc = SourceLoc();
+    }
+    llvm::SmallVector<Decl *, 4> Entries;
+    DeclResult = parseDeclSubscript(Flags, Attributes, Entries);
+    std::for_each(Entries.begin(), Entries.end(), Handler);
+    MayNeedOverrideCompletion = true;
+    if (auto *D = DeclResult.getPtrOrNull())
+      markWasHandled(D);
+    break;
+  }
+
+  case tok::code_complete:
+    MayNeedOverrideCompletion = true;
+    DeclResult = makeParserError();
+    // Handled below.
+    break;
+
+  case tok::pound_warning:
+    // FIXME: This is discarding attributes/modifiers. Should be hoisted.
+    DeclParsingContext.setCreateSyntax(SyntaxKind::PoundWarningDecl);
+    DeclResult = parseDeclPoundDiagnostic();
+    break;
+  case tok::pound_error:
+    // FIXME: This is discarding attributes/modifiers. Should be hoisted.
+    DeclParsingContext.setCreateSyntax(SyntaxKind::PoundErrorDecl);
+    DeclResult = parseDeclPoundDiagnostic();
+    break;
+
+  case tok::pound_if:
+  case tok::pound_sourceLocation:
+  case tok::pound_line:
+    // We see some attributes right before these pounds.
+    // TODO: Emit dedicated errors for them.
+    LLVM_FALLTHROUGH;
+
+  // Obvious nonsense.
+  default:
+    if (FoundCCTokenInAttr) {
+      if (!CodeCompletion) {
+        delayParseFromBeginningToHere(BeginParserPosition, Flags);
       } else {
-        StaticLoc = Tok.getLoc();
-        StaticSpelling = StaticSpellingKind::KeywordStatic;
+        CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), false);
       }
-      SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
-      consumeToken(tok::kw_static);
-      // Static modifier doesn't have more details.
-      SyntaxParsingContext DetailContext(SyntaxContext, SyntaxKind::TokenList);
-      continue;
-    }
-    // 'class' is a modifier on func, but is also a top-level decl.
-    case tok::kw_class: {
-      SourceLoc ClassLoc;
-      bool AsModifier;
-      {
-        BacktrackingScope Scope(*this);
-        ClassLoc = consumeToken(tok::kw_class);
-        AsModifier = isStartOfDecl();
-      }
-      // If 'class' is a modifier on another decl kind, like var or func,
-      // then treat it as a modifier.
-      if (AsModifier) {
-        SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
-        consumeToken(tok::kw_class);
-        SyntaxParsingContext DetailContext(SyntaxContext, SyntaxKind::TokenList);
-        if (StaticLoc.isValid()) {
-          diagnose(Tok, diag::decl_already_static,
-                   StaticSpellingKind::KeywordClass)
-            .highlight(StaticLoc).fixItRemove(ClassLoc);
-        } else {
-          StaticLoc = ClassLoc;
-          StaticSpelling = StaticSpellingKind::KeywordClass;
-        }
-        continue;
-      }
-
-      consumeToken(tok::kw_class);
-      // Otherwise this is the start of a class declaration.
-      DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
-      DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
-      break;
     }
 
-    case tok::kw_private:
-    case tok::kw_fileprivate:
-    case tok::kw_internal:
-    case tok::kw_public: {
-      SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
-      // We still model these specifiers as attributes.
-      parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, DAK_AccessControl);
-      continue;
-    }
+    diagnose(Tok, diag::expected_decl);
 
-    case tok::pound_warning:
-      DeclParsingContext.setCreateSyntax(SyntaxKind::PoundWarningDecl);
-      DeclResult = parseDeclPoundDiagnostic();
-      break;
-    case tok::pound_error:
-      DeclParsingContext.setCreateSyntax(SyntaxKind::PoundErrorDecl);
-      DeclResult = parseDeclPoundDiagnostic();
-      break;
-
-    // Context sensitive keywords.
-    case tok::identifier: {
-      Optional<DeclAttrKind> Kind;
-      // FIXME: This is ridiculous, this all needs to be sucked into the
-      // declparsing goop.
-      if (Tok.isContextualKeyword("open")) {
-        Kind = DAK_AccessControl;
-      } else if (Tok.isContextualKeyword("weak") ||
-                 Tok.isContextualKeyword("unowned")) {
-        Kind = DAK_ReferenceOwnership;
-      } else if (Tok.isContextualKeyword("optional")) {
-        Kind = DAK_Optional;
-      } else if (Tok.isContextualKeyword("required")) {
-        Kind = DAK_Required;
-      } else if (Tok.isContextualKeyword("lazy")) {
-        Kind = DAK_Lazy;
-      } else if (Tok.isContextualKeyword("final")) {
-        Kind = DAK_Final;
-      } else if (Tok.isContextualKeyword("dynamic")) {
-        Kind = DAK_Dynamic;
-      } else if (Tok.isContextualKeyword("prefix")) {
-        Kind = DAK_Prefix;
-      } else if (Tok.isContextualKeyword("postfix")) {
-        Kind = DAK_Postfix;
-      } else if (Tok.isContextualKeyword("indirect")) {
-        Kind = DAK_Indirect;
-      } else if (Tok.isContextualKeyword("infix")) {
-        Kind = DAK_Infix;
-      } else if (Tok.isContextualKeyword("override")) {
-        Kind = DAK_Override;
-      } else if (Tok.isContextualKeyword("mutating")) {
-        Kind = DAK_Mutating;
-      } else if (Tok.isContextualKeyword("nonmutating")) {
-        Kind = DAK_NonMutating;
-      } else if (Tok.isContextualKeyword("__consuming")) {
-        Kind = DAK_Consuming;
-      } else if (Tok.isContextualKeyword("convenience")) {
-        Kind = DAK_Convenience;
-      }
-      if (Kind) {
-        SyntaxParsingContext ModContext(SyntaxContext, SyntaxKind::DeclModifier);
-        parseNewDeclAttribute(Attributes, SourceLoc(), *Kind);
-        continue;
-      }
-
-      // Otherwise this is not a context-sensitive keyword.
-      LLVM_FALLTHROUGH;
-    }
-
-    case tok::pound_if:
-    case tok::pound_sourceLocation:
-    case tok::pound_line:
-      // We see some attributes right before these pounds.
-      // TODO: Emit dedicated errors for them.
-      LLVM_FALLTHROUGH;
-
-    // Obvious nonsense.
-    default:
-      if (FoundCCTokenInAttr) {
-        if (!CodeCompletion) {
-          delayParseFromBeginningToHere(BeginParserPosition, Flags);
-        } else {
-          CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(),
-                                                  false);
-        }
-      }
-
-      diagnose(Tok, diag::expected_decl);
-
-      if (CurDeclContext) {
-        if (auto nominal = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
-          diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
-                   nominal->getName());
-        } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
-          if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
-            if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
-              diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
-                idRepr->getComponentRange().front()->getIdentifier());
-            }
+    if (CurDeclContext) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
+        diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
+                 nominal->getName());
+      } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
+        if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
+          if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
+            diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
+                     idRepr->getComponentRange().front()->getIdentifier());
           }
         }
       }
-      return makeParserErrorResult<Decl>();
+    }
+    return makeParserErrorResult<Decl>();
+  }
 
-    case tok::unknown:
-      consumeToken(tok::unknown);
-      continue;
-
-    // Unambiguous top level decls.
-    case tok::kw_import:
-      DeclParsingContext.setCreateSyntax(SyntaxKind::ImportDecl);
-      DeclResult = parseDeclImport(Flags, Attributes);
-      break;
-    case tok::kw_extension: {
-      DeclParsingContext.setCreateSyntax(SyntaxKind::ExtensionDecl);
-      DeclResult = parseDeclExtension(Flags, Attributes);
-      break;
-    }
-    case tok::kw_let:
-    case tok::kw_var: {
-      // Collect all modifiers into a modifier list.
-      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
-      DeclParsingContext.setCreateSyntax(SyntaxKind::VariableDecl);
-      llvm::SmallVector<Decl *, 4> Entries;
-      DeclResult = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
-                                StaticSpelling, tryLoc);
-      StaticLoc = SourceLoc();   // we handled static if present.
-      MayNeedOverrideCompletion = true;
-      std::for_each(Entries.begin(), Entries.end(), Handler);
-      if (auto *D = DeclResult.getPtrOrNull())
-        markWasHandled(D);
-      break;
-    }
-    case tok::kw_typealias:
-      DeclParsingContext.setCreateSyntax(SyntaxKind::TypealiasDecl);
-      DeclResult = parseDeclTypeAlias(Flags, Attributes);
-      MayNeedOverrideCompletion = true;
-      break;
-    case tok::kw_associatedtype:
-      DeclParsingContext.setCreateSyntax(SyntaxKind::AssociatedtypeDecl);
-      DeclResult = parseDeclAssociatedType(Flags, Attributes);
-      break;
-    case tok::kw_enum:
-      DeclResult = parseDeclEnum(Flags, Attributes);
-      break;
-    case tok::kw_case: {
-      llvm::SmallVector<Decl *, 4> Entries;
-      DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
-      std::for_each(Entries.begin(), Entries.end(), Handler);
-      if (auto *D = DeclResult.getPtrOrNull())
-        markWasHandled(D);
-      break;
-    }
-    case tok::kw_struct: {
-      DeclParsingContext.setCreateSyntax(SyntaxKind::StructDecl);
-      DeclResult = parseDeclStruct(Flags, Attributes);
-      break;
-    }
-    case tok::kw_init:
-      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
-      DeclParsingContext.setCreateSyntax(SyntaxKind::InitializerDecl);
-      DeclResult = parseDeclInit(Flags, Attributes);
-      break;
-    case tok::kw_deinit:
-      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
-      DeclParsingContext.setCreateSyntax(SyntaxKind::DeinitializerDecl);
-      DeclResult = parseDeclDeinit(Flags, Attributes);
-      break;
-    case tok::kw_operator:
-      DeclResult = parseDeclOperator(Flags, Attributes);
-      break;
-    case tok::kw_precedencegroup:
-      DeclResult = parseDeclPrecedenceGroup(Flags, Attributes);
-      break;
-    case tok::kw_protocol: {
-      DeclParsingContext.setCreateSyntax(SyntaxKind::ProtocolDecl);
-      DeclResult = parseDeclProtocol(Flags, Attributes);
-      break;
-    }
-    case tok::kw_func:
-      // Collect all modifiers into a modifier list.
-      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
-      DeclParsingContext.setCreateSyntax(SyntaxKind::FunctionDecl);
-      DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
-      StaticLoc = SourceLoc();   // we handled static if present.
-      MayNeedOverrideCompletion = true;
-      break;
-
-    case tok::kw_subscript: {
-      DeclParsingContext.collectNodesInPlace(SyntaxKind::ModifierList);
-      DeclParsingContext.setCreateSyntax(SyntaxKind::SubscriptDecl);
-      if (StaticLoc.isValid()) {
-        diagnose(Tok, diag::subscript_static, StaticSpelling)
-          .fixItRemove(SourceRange(StaticLoc));
-        StaticLoc = SourceLoc();
+  if (DeclResult.isParseError() && MayNeedOverrideCompletion &&
+      Tok.is(tok::code_complete)) {
+    DeclResult = makeParserCodeCompletionStatus();
+    if (CodeCompletion) {
+      // If we need to complete an override, collect the keywords already
+      // specified so that we do not duplicate them in code completion
+      // strings.
+      SmallVector<StringRef, 3> Keywords;
+      switch (OrigTok.getKind()) {
+      case tok::kw_func:
+      case tok::kw_subscript:
+      case tok::kw_var:
+      case tok::kw_let:
+      case tok::kw_typealias:
+        Keywords.push_back(OrigTok.getText());
+        break;
+      default:
+        // Other tokens are already accounted for.
+        break;
       }
-      llvm::SmallVector<Decl *, 4> Entries;
-      DeclResult = parseDeclSubscript(Flags, Attributes, Entries);
-      std::for_each(Entries.begin(), Entries.end(), Handler);
-      MayNeedOverrideCompletion = true;
-      if (auto *D = DeclResult.getPtrOrNull())
-        markWasHandled(D);
-      break;
-    }
-
-    case tok::code_complete:
-      MayNeedOverrideCompletion = true;
-      DeclResult = makeParserError();
-      // Handled below.
-      break;
-    }
-
-    if (DeclResult.isParseError() && MayNeedOverrideCompletion &&
-        Tok.is(tok::code_complete)) {
-      DeclResult = makeParserCodeCompletionStatus();
-      if (CodeCompletion) {
-        // If we need to complete an override, collect the keywords already
-        // specified so that we do not duplicate them in code completion
-        // strings.
-        SmallVector<StringRef, 3> Keywords;
-        switch (OrigTok.getKind()) {
-        case tok::kw_func:
-        case tok::kw_subscript:
-        case tok::kw_var:
-        case tok::kw_let:
-        case tok::kw_typealias:
-          Keywords.push_back(OrigTok.getText());
-          break;
-        default:
-          // Other tokens are already accounted for.
-          break;
-        }
-        for (auto attr : Attributes) {
-          Keywords.push_back(attr->getAttrName());
-        }
-        CodeCompletion->completeNominalMemberBeginning(Keywords);
+      for (auto attr : Attributes) {
+        Keywords.push_back(attr->getAttrName());
       }
+      CodeCompletion->completeNominalMemberBeginning(Keywords);
     }
-
-    // If we 'break' out of the switch, break out of the loop too.
-    break;
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
@@ -5658,9 +5687,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 ///   decl-class-body:
 ///      decl*
 /// \endverbatim
-ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
-                                               ParseDeclOptions Flags,
+ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes) {
+  SourceLoc ClassLoc = consumeToken(tok::kw_class);
+
   Identifier ClassName;
   SourceLoc ClassNameLoc;
   ParserStatus Status;
