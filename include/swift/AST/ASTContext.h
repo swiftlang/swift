@@ -533,6 +533,11 @@ public:
   /// nested within it.
   void addExternalDecl(Decl *decl);
 
+  /// Add a declaration that was synthesized to a per-source file list if
+  /// if is part of a source file, or the external declarations list if
+  /// it is part of an imported type context.
+  void addSynthesizedDecl(Decl *decl);
+
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
 

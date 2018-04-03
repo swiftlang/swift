@@ -502,7 +502,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   ctorDecl->setBody(body);
   ctorDecl->setBodyTypeCheckedIfPresent();
   
-  C.addExternalDecl(ctorDecl);
+  Impl.registerExternalDecl(ctorDecl);
   
   return ctorDecl;
 }
@@ -580,7 +580,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
-  C.addExternalDecl(getterDecl);
+  Impl.registerExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -663,7 +663,7 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
 
-  C.addExternalDecl(getterDecl);
+  Impl.registerExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -830,7 +830,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     getterDecl->setBody(body);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(getterDecl);
+    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -855,7 +855,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     setterDecl->setBody(body);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(setterDecl);
+    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -916,7 +916,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     getterDecl->setBody(body);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(getterDecl);
+    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -950,7 +950,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     setterDecl->setBody(body);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(setterDecl);
+    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -7742,34 +7742,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 }
 
 void ClangImporter::Implementation::startedImportingEntity() {
-  ++NumCurrentImportingEntities;
   ++NumTotalImportedEntities;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (SwiftContext.Stats)
     SwiftContext.Stats->getFrontendCounters().NumTotalClangImportedEntities++;
-}
-
-void ClangImporter::Implementation::finishedImportingEntity() {
-  assert(NumCurrentImportingEntities &&
-         "finishedImportingEntity not paired with startedImportingEntity");
-  if (NumCurrentImportingEntities == 1) {
-    // We decrease NumCurrentImportingEntities only after pending actions
-    // are finished, to avoid recursively re-calling finishPendingActions().
-    finishPendingActions();
-  }
-  --NumCurrentImportingEntities;
-}
-
-void ClangImporter::Implementation::finishPendingActions() {
-  if (RegisteredExternalDecls.empty())
-    return;
-
-  if (!hasFinishedTypeChecking()) {
-    for (auto *D : RegisteredExternalDecls)
-      SwiftContext.addExternalDecl(D);
-  }
-
-  RegisteredExternalDecls.clear();
 }
 
 /// Look up associated type requirements in the conforming type.
@@ -7982,7 +7958,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   bool TypedefIsSuperfluous = false;
   bool HadForwardDeclaration = false;
 
-  ImportingEntityRAII ImportingEntity(*this);
+  startedImportingEntity();
   Decl *Result = importDeclImpl(ClangDecl, version, TypedefIsSuperfluous,
                                 HadForwardDeclaration);
   if (!Result)
@@ -8479,7 +8455,7 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(
     return;
 
   // Get ready to actually load the members.
-  ImportingEntityRAII Importing(*this);
+  startedImportingEntity();
 
   // Load the members.
   for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
@@ -8579,13 +8555,11 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
     loadMembersOfBaseImportedFromClang(ext);
   }
 
-  ImportingEntityRAII Importing(*this);
+  startedImportingEntity();
 
   SmallVector<Decl *, 16> members;
   collectMembersToAdd(objcContainer, D, DC, members);
 
-  // Add the members now, before ~ImportingEntityRAII does work that might
-  // involve them.
   for (auto member : members) {
     IDC->addMember(member);
   }

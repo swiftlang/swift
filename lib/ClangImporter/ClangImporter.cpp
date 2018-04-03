@@ -1659,7 +1659,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       nameImporter() {}
 
 ClangImporter::Implementation::~Implementation() {
-  assert(NumCurrentImportingEntities == 0);
 #ifndef NDEBUG
   SwiftContext.SourceMgr.verifyAllBuffers();
 #endif

@@ -283,11 +283,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->copyFormalAccessFrom(property);
   getterDecl->setValidationStarted();
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (isa<ClangModuleUnit>(parentDC->getModuleScopeContext()))
-    tc.Context.addExternalDecl(getterDecl);
+  tc.Context.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }
@@ -319,9 +315,11 @@ DerivedConformance::declareDerivedProperty(TypeChecker &tc, Decl *parentDecl,
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
+
   propPat = new (C) TypedPattern(propPat,
                                  TypeLoc::withoutLoc(propertyContextType),
                                  /*implicit*/ true);
+  propPat->setType(propertyContextType);
 
   auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
                                            StaticSpellingKind::None,

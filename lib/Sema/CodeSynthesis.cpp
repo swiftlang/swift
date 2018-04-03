@@ -243,17 +243,6 @@ static bool needsDynamicMaterializeForSet(AbstractStorageDecl *storage) {
   return storage->isDynamic() || storage->hasClangNode();
 }
 
-// True if a generated accessor needs to be registered as an external decl.
-bool needsToBeRegisteredAsExternalDecl(AbstractStorageDecl *storage) {
-  // Either the storage itself was imported from Clang...
-  if (storage->hasClangNode())
-    return true;
-
-  // ...or it was synthesized into an imported context.
-  const DeclContext *dc = storage->getDeclContext();
-  return isa<ClangModuleUnit>(dc->getModuleScopeContext());
-}
-
 /// Mark the accessor as transparent if we can.
 ///
 /// If the storage is inside a fixed-layout nominal type, we can mark the
@@ -396,12 +385,9 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   maybeMarkTransparent(materializeForSet, storage, TC);
 
   AvailabilityInference::applyInferredAvailableAttrs(materializeForSet,
-                                                        asAvailableAs, ctx);
+                                                     asAvailableAs, ctx);
 
-  // If the property came from ObjC, we need to register this as an external
-  // definition to be compiled.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(materializeForSet);
+  TC.Context.addSynthesizedDecl(materializeForSet);
   TC.DeclsToFinalize.insert(materializeForSet);
   
   return materializeForSet;
@@ -734,9 +720,7 @@ static void synthesizeTrivialGetter(AccessorDecl *getter,
   SourceLoc loc = storage->getLoc();
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
 
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(getter);
+  TC.Context.addSynthesizedDecl(getter);
   TC.DeclsToFinalize.insert(getter);
 }
 
@@ -754,9 +738,7 @@ static void synthesizeTrivialSetter(AccessorDecl *setter,
                                             setterBody, TC);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
 
-  // Register the accessor as an external decl if the storage was imported.
-  if (needsToBeRegisteredAsExternalDecl(storage))
-    TC.Context.addExternalDecl(setter);
+  TC.Context.addSynthesizedDecl(setter);
   TC.DeclsToFinalize.insert(setter);
 }
 
