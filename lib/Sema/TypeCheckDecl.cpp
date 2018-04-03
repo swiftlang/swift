@@ -4771,22 +4771,20 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
-    if (!IsFirstPass) {
-      if (FD->hasBody()) {
-        // Record the body.
-        TC.definedFunctions.push_back(FD);
-      } else if (requiresDefinition(FD)) {
-        // Complain if we should have a body.
-        TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
-      }
-
+    if (!IsFirstPass)
       return;
-    }
 
     TC.validateDecl(FD);
     checkAccessControl(TC, FD);
-  }
 
+    if (FD->hasBody()) {
+      // Record the body.
+      TC.definedFunctions.push_back(FD);
+    } else if (requiresDefinition(FD)) {
+      // Complain if we should have a body.
+      TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
+    }
+  }
 
   void visitModuleDecl(ModuleDecl *) { }
 
