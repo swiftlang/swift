@@ -45,9 +45,6 @@ public:
   enum LinkingMode {
     /// Skip SIL linking.
     LinkNone,
-    
-    /// Link only the given function without recursively visiting its uses.
-    LinkThisFunctionOnly,
 
     /// Perform normal SIL linking.
     LinkNormal,
