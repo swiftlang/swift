@@ -3974,6 +3974,9 @@ public:
     
     DeclVisitor<DeclChecker>::visit(decl);
 
+    if (IsFirstPass)
+      TC.checkUnsupportedProtocolType(decl);
+
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
       
@@ -3993,17 +3996,6 @@ public:
         TC.diagnose(VD->getNameLoc(), diag::backticks_to_escape)
             .fixItReplace(VD->getNameLoc(),
                           "`" + VD->getBaseName().userFacingName().str() + "`");
-      }
-    }
-
-    if (!IsFirstPass) {
-      TC.checkUnsupportedProtocolType(decl);
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-        TC.checkDeclCircularity(nominal);
-      }
-      if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
-        if (protocol->isResilient())
-          TC.inferDefaultWitnesses(protocol);
       }
     }
   }
@@ -4393,6 +4385,8 @@ public:
       // enums haven't.
       checkEnumRawValues(TC, ED);
     }
+
+    TC.checkDeclCircularity(ED);
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -4419,6 +4413,8 @@ public:
 
     TC.checkDeclAttributes(SD);
     checkAccessControl(TC, SD);
+
+    TC.checkDeclCircularity(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -4651,6 +4647,8 @@ public:
 
     TC.checkDeclAttributes(CD);
     checkAccessControl(TC, CD);
+
+    TC.checkDeclCircularity(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -4706,6 +4704,10 @@ public:
 
     GenericTypeToArchetypeResolver resolver(PD);
     TC.validateWhereClauses(PD, &resolver);
+
+    TC.checkDeclCircularity(PD);
+    if (PD->isResilient())
+      TC.inferDefaultWitnesses(PD);
 
     if (TC.Context.LangOpts.DebugGenericSignatures) {
       auto requirementsSig =
