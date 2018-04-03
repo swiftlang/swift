@@ -24,15 +24,18 @@ import Glibc
 import CTensorFlow
 
 //===----------------------------------------------------------------------===//
-// Tensor type
+// Tensor
 //===----------------------------------------------------------------------===//
 
+/// `Tensor` is a multi-dimensional array used for computation. It is a wrapper
+/// around a `TensorHandle`.
 @_fixed_layout
 public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
   public typealias BoolTensor = Tensor<Bool>
 
-  /// A tensor just contains a TensorHandle under the covers.  This is public to
-  /// allow user defined ops, but shouldn't normally be used otherwise.
+  /// The underlying `TensorHandle`.
+  /// NOTE: `handle` is public to allow user defined ops, but should not
+  /// normally be used otherwise.
   public let handle: TensorHandle<Scalar>
 
   @_inlineable
@@ -45,13 +48,13 @@ public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
 // Compiler intrinsics
 //===----------------------------------------------------------------------===//
 //
-// By default, when a tensor value is implicitly passed between host and tensor
-// code, the partitioning pass will generate a warning.  Users can indicate that
-// they are doing something intentional by using these methods, which silences
-// the warning.
+// By default, when a `Tensor` value is implicitly passed between host and
+// tensor code, the partitioning pass will generate a warning. Users can
+// indicate that they are doing something intentionally by using these methods,
+// which silences the warning.
 //
-// TODO: These would be nicer if defined as builtins rather than being "well
-// known functions".
+// TODO: These would be nicer defined as builtins rather than "well known
+// functions".
 
 @_versioned @inline(never)
 @_silgen_name("__tf_send")
@@ -62,29 +65,30 @@ func _TFSend<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
 
 @_versioned @inline(never)
 @_silgen_name("__tf_receive")
-func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
+func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>)
+  -> TensorHandle<Scalar> {
   return handle
 }
 
-/// This function converts a TensorHandle that is known to have a 0d value into
-/// the scalar that it produces.  This is intended for use in op definitions
-/// where it is known that the Op always returns a 0d tensor, it is not for use
+/// This function converts a `TensorHandle` that is known to have a 0-d value
+/// into the scalar that it produces. This is intended for use in op definitions
+/// where it is known that the op always returns a 0-d tensor. It is not for use
 /// in general code.
 @_versioned @_inlineable @inline(__always)
 func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
   return Scalar._getScalarOrDie(handle)
 }
 
-/// This function converts a TensorHandle into a scalar if it is 0d, or returns
-/// nil otherwise.
+/// This function converts a `TensorHandle` into a scalar if it is 0-d, or
+/// returns nil otherwise.
 @_versioned @_inlineable @inline(__always)
 func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
   return Scalar._getScalar(handle)
 }
 
 /// This compiler builtin is known by the partitioning pass, which recognizes it
-/// and promotes calls to it to being in graph when it can.  This signature was
-/// designed to align with the requirements of the 'Const' Tensorflow operation.
+/// and promotes calls to it to being in graph when it can. This signature was
+/// designed to align with the requirements of the `Const` TensorFlow operation.
 @_versioned @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
 func _TFTensorFromScalars<Scalar>(_ scalars: [Scalar], shape: [Int32])
@@ -558,7 +562,7 @@ public extension Tensor where Scalar : Numeric {
     return self + zeros
   }
 
-  /// Broadcast to the same shape as the specified Tensor.
+  /// Broadcast to the same shape as the specified `Tensor`.
   /// - Precondition: The specified shape must be compatible for broadcasting.
   // TODO: This is a temporary workaround for supporting broadcast on numeric
   // tensors. Remove this function once a general working broadcast is
@@ -576,7 +580,7 @@ public extension Tensor where Scalar : Numeric {
 }
 
 public extension Tensor {
-  /// Reshape to the shape of the specified Tensor.
+  /// Reshape to the shape of the specified `Tensor`.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   func reshaped<T>(like other: Tensor<T>) -> Tensor {
@@ -590,7 +594,7 @@ public extension Tensor {
     return reshaped(toShape: Tensor<Int32>(newShape.dimensions))
   }
 
-  /// Reshape to the specified Tensor representing a shape.
+  /// Reshape to the specified `Tensor` representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   @differentiable(
@@ -601,20 +605,20 @@ public extension Tensor {
     return #tfop("Reshape", handle, newShape)
   }
 
-  /// Return a copy of the tensor collapsed into a 1-D Tensor, in row-major
+  /// Return a copy of the tensor collapsed into a 1-D `Tensor`, in row-major
   /// order.
   @_inlineable @inline(__always)
   func flattened() -> Tensor {
     return reshaped(to: [-1])
   }
 
-  /// Returns a rank-lifted Tensor with a leading dimension of 1.
+  /// Returns a rank-lifted `Tensor` with a leading dimension of 1.
   @_inlineable @inline(__always)
   func rankLifted() -> Tensor {
     return expandingShape(at: 0)
   }
 
-  /// Returns a shape-expanded Tensor, with a dimension of 1 inserted at the
+  /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
   /// specified shape index.
   @_inlineable @inline(__always)
   @differentiable(
@@ -657,8 +661,8 @@ public extension Tensor {
     }
   }
 
-  /// Returns the underlying scalar from a 0-ranked Tensor.
-  /// - precondition: Tensor is 0-ranked.
+  /// Returns the underlying scalar from a 0-ranked `Tensor`.
+  /// - Precondition: the `Tensor` is 0-ranked.
   @_inlineable
   var scalar: Scalar? {
     @inline(__always)
@@ -732,14 +736,14 @@ extension Tensor : CustomStringConvertible {
   }
 }
 
-// Xcode Playground display conversion.
+/// Xcode Playground display conversion.
 extension Tensor : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-// Mirror representation, used by debugger/REPL.
+/// Mirror representation, used by debugger/REPL.
 extension Tensor : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)

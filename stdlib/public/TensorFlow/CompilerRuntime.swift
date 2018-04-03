@@ -72,7 +72,7 @@ public enum _ExecutionMode : Equatable {
 }
 
 /// The configuration for the compiler runtime.
-/// TODO(hongm): Revisit the longer-term design.
+// TODO(hongm): Revisit the longer-term design.
 @_fixed_layout
 public enum _RuntimeConfig {
   /// When true, run the entire tensor computation in
@@ -625,8 +625,7 @@ extension TFState {
 /// Tensor computation.
 ///
 /// - Note: The call sequence for the APIs below must be one of the two:
-///     init -> terminate()
-///     init -> finish()
+///   `init -> terminate()` or `init -> finish()`.
 ///   The finish/terminate APIs may only be called once.
 @_fixed_layout
 public final class _TensorComputation {
@@ -637,7 +636,7 @@ public final class _TensorComputation {
   let entryFuncName: String
 
   /// The tensor handles returned by the tensor program.
-  /// TODO(hongm): Retire returnValues when eager based runtime is removed.
+  // TODO(hongm): Retire returnValues when eager based runtime is removed.
   var returnValues: [CTensorHandle?]
 
   // NOTE: the following properties are intentionally not implemented as an enum
@@ -813,8 +812,8 @@ public final class _TensorComputation {
 
 private extension _TensorComputation {
   /// Executes the computation using TensorFlow Eager.
-  /// NOTE: This is to be called by the initializer. The computation gets
-  /// executed on initialization, thus this method will not be exposed to users.
+  // NOTE: This is to be called by the initializer. The computation gets
+  // executed on initialization, thus this method will not be exposed to users.
   private func execute() {
     debugLog("Executing TF function \(entryFuncName).")
     if let stateTFE = stateTFE {
