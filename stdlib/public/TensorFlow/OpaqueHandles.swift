@@ -16,9 +16,9 @@
 
 import CTensorFlow
 
-/// ResourceHandle is the type used by "ops" and the `#tfop()` syntax to
+/// ResourceHandle is the type used by ops and the `#tfop()` syntax to
 /// represent TensorFlow 'resource' values.  It exists only to represent edges
-/// in TensorFlow graphs, and has no host-side representation (and thus, no
+/// in TensorFlow graphs, and has no host-side representation (and thus no
 /// methods).
 public final class ResourceHandle {
   private init() {
@@ -26,9 +26,9 @@ public final class ResourceHandle {
   }
 }
 
-/// VariantHandle is the type used by "ops" and the `#tfop()` syntax to
+/// VariantHandle is the type used by ops and the `#tfop()` syntax to
 /// represent TensorFlow 'variant' values.  It exists only to represent edges
-/// in TensorFlow graphs, and has no host-side representation (and thus, no
+/// in TensorFlow graphs, and has no host-side representation (and thus no
 /// methods).
 public final class VariantHandle {
   private init() {
