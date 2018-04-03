@@ -206,8 +206,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (IID == llvm::Intrinsic::instrprof_increment) {
     // If we import profiling intrinsics from a swift module but profiling is
     // not enabled, ignore the increment.
-    if (!IGF.getSILModule().getOptions().GenerateProfile)
+    if (!IGF.getSILModule().getOptions().GenerateProfile) {
+      (void)args.claimAll();
       return;
+    }
 
     // Extract the PGO function name.
     auto *NameGEP = cast<llvm::User>(args.claimNext());
