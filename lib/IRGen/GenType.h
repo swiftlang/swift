@@ -169,10 +169,6 @@ private:
   // Debugging aids.
 #ifndef NDEBUG
   bool isExemplarArchetype(ArchetypeType *arch) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    CanType getTypeThatLoweredTo(llvm::Type *t) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
 #endif
 
   ArchetypeType *getExemplarArchetype(ArchetypeType *t);
@@ -192,7 +188,6 @@ private:
     friend void TypeConverter::popGenericContext(CanGenericSignature signature);
     
 #ifndef NDEBUG
-    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
     friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
 #endif
   };
