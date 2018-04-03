@@ -769,11 +769,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   encodeDecl->setValidationStarted();
   encodeDecl->setAccess(target->getFormalAccess());
 
-  // If the type was not imported, the derived conformance is either from the
-  // type itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (target->hasClangNode())
-    tc.Context.addExternalDecl(encodeDecl);
+  tc.Context.addSynthesizedDecl(encodeDecl);
 
   target->addMember(encodeDecl);
   return encodeDecl;
@@ -1112,11 +1108,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   initDecl->setInitializerInterfaceType(initializerType);
   initDecl->setAccess(target->getFormalAccess());
 
-  // If the type was not imported, the derived conformance is either from the
-  // type itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (target->hasClangNode())
-    tc.Context.addExternalDecl(initDecl);
+  tc.Context.addSynthesizedDecl(initDecl);
 
   target->addMember(initDecl);
   return initDecl;

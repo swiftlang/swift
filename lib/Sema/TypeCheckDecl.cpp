@@ -3982,7 +3982,8 @@ public:
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
       auto &Context = TC.Context;
-      if (VD->getDeclContext()->isTypeContext() &&
+      if (IsFirstPass &&
+          VD->getDeclContext()->isTypeContext() &&
           (VD->getFullName().isSimpleName(Context.Id_Type) ||
            VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
           VD->getNameLoc().isValid() &&
@@ -4360,42 +4361,41 @@ public:
   }
 
   void visitEnumDecl(EnumDecl *ED) {
+    if (!IsFirstPass) {
+      for (Decl *member : ED->getMembers())
+        visit(member);
+
+      TC.checkConformancesInContext(ED, ED);
+      return;
+    }
+
     TC.checkDeclAttributesEarly(ED);
     TC.computeAccessLevel(ED);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(ED);
+    checkUnsupportedNestedType(ED);
 
-      TC.validateDecl(ED);
+    TC.validateDecl(ED);
+    TC.DeclsToFinalize.remove(ED);
 
-      TC.DeclsToFinalize.remove(ED);
-
-      {
-        // Check for circular inheritance of the raw type.
-        SmallVector<EnumDecl *, 8> path;
-        path.push_back(ED);
-        checkCircularity(TC, ED, diag::circular_enum_inheritance,
-                         diag::enum_here, path);
-      }
-    }
-
-    if (!IsFirstPass) {
-      checkAccessControl(TC, ED);
-
-      if (ED->hasRawType() && !ED->isObjC()) {
-        // ObjC enums have already had their raw values checked, but pure Swift
-        // enums haven't.
-        checkEnumRawValues(TC, ED);
-      }
-
-      TC.checkConformancesInContext(ED, ED);
+    {
+      // Check for circular inheritance of the raw type.
+      SmallVector<EnumDecl *, 8> path;
+      path.push_back(ED);
+      checkCircularity(TC, ED, diag::circular_enum_inheritance,
+                       diag::enum_here, path);
     }
 
     for (Decl *member : ED->getMembers())
       visit(member);
-    
 
     TC.checkDeclAttributes(ED);
+    checkAccessControl(TC, ED);
+
+    if (ED->hasRawType() && !ED->isObjC()) {
+      // ObjC enums have already had their raw values checked, but pure Swift
+      // enums haven't.
+      checkEnumRawValues(TC, ED);
+    }
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -4403,6 +4403,7 @@ public:
       for (Decl *Member : SD->getMembers())
         visit(Member);
 
+      TC.checkConformancesInContext(SD, SD);
       return;
     }
 
@@ -4421,9 +4422,6 @@ public:
 
     TC.checkDeclAttributes(SD);
     checkAccessControl(TC, SD);
-
-    if (!SD->isInvalid())
-      TC.checkConformancesInContext(SD, SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -4530,36 +4528,30 @@ public:
 
 
   void visitClassDecl(ClassDecl *CD) {
+    if (!IsFirstPass) {
+      for (Decl *Member : CD->getMembers())
+        visit(Member);
+
+      TC.checkConformancesInContext(CD, CD);
+      return;
+    }
+
     TC.checkDeclAttributesEarly(CD);
     TC.computeAccessLevel(CD);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(CD);
+    checkUnsupportedNestedType(CD);
 
-      TC.validateDecl(CD);
-      if (!CD->hasValidSignature())
-        return;
+    TC.validateDecl(CD);
+    TC.requestSuperclassLayout(CD);
+    TC.DeclsToFinalize.remove(CD);
 
-      TC.requestSuperclassLayout(CD);
-      TC.DeclsToFinalize.remove(CD);
-
-      {
-        // Check for circular inheritance.
-        SmallVector<ClassDecl *, 8> path;
-        path.push_back(CD);
-        checkCircularity(TC, CD, diag::circular_class_inheritance,
-                         diag::class_here, path);
-      }
+    {
+      // Check for circular inheritance.
+      SmallVector<ClassDecl *, 8> path;
+      path.push_back(CD);
+      checkCircularity(TC, CD, diag::circular_class_inheritance,
+                       diag::class_here, path);
     }
-
-    // If this class needs an implicit constructor, add it.
-    if (!IsFirstPass)
-      TC.addImplicitConstructors(CD);
-
-    CD->addImplicitDestructor();
-
-    if (!IsFirstPass && !CD->isInvalid())
-      TC.checkConformancesInContext(CD, CD);
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
@@ -4569,103 +4561,106 @@ public:
     if (CD->requiresStoredPropertyInits())
       checkRequiredInClassInits(CD);
 
-    if (!IsFirstPass) {
-      if (auto superclassTy = CD->getSuperclass()) {
-        ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+    TC.addImplicitConstructors(CD);
+    CD->addImplicitDestructor();
 
-        if (auto *SF = CD->getParentSourceFile()) {
-          if (auto *tracker = SF->getReferencedNameTracker()) {
-            bool isPrivate =
-                CD->getFormalAccess() <= AccessLevel::FilePrivate;
-            tracker->addUsedMember({Super, Identifier()}, !isPrivate);
-          }
+    if (auto superclassTy = CD->getSuperclass()) {
+      ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+
+      if (auto *SF = CD->getParentSourceFile()) {
+        if (auto *tracker = SF->getReferencedNameTracker()) {
+          bool isPrivate =
+              CD->getFormalAccess() <= AccessLevel::FilePrivate;
+          tracker->addUsedMember({Super, Identifier()}, !isPrivate);
         }
+      }
 
-        bool isInvalidSuperclass = false;
+      bool isInvalidSuperclass = false;
 
-        if (Super->isFinal()) {
-          TC.diagnose(CD, diag::inheritance_from_final_class,
-                      Super->getName());
-          // FIXME: should this really be skipping the rest of decl-checking?
-          return;
-        }
+      if (Super->isFinal()) {
+        TC.diagnose(CD, diag::inheritance_from_final_class,
+                    Super->getName());
+        // FIXME: should this really be skipping the rest of decl-checking?
+        return;
+      }
 
-        if (Super->hasClangNode() && Super->getGenericParams()
-            && superclassTy->hasTypeParameter()) {
-          TC.diagnose(CD,
-                      diag::inheritance_from_unspecialized_objc_generic_class,
-                      Super->getName());
-        }
+      if (Super->hasClangNode() && Super->getGenericParams()
+          && superclassTy->hasTypeParameter()) {
+        TC.diagnose(CD,
+                    diag::inheritance_from_unspecialized_objc_generic_class,
+                    Super->getName());
+      }
 
-        switch (Super->getForeignClassKind()) {
-        case ClassDecl::ForeignKind::Normal:
-          break;
-        case ClassDecl::ForeignKind::CFType:
-          TC.diagnose(CD, diag::inheritance_from_cf_class,
-                      Super->getName());
-          isInvalidSuperclass = true;
-          break;
-        case ClassDecl::ForeignKind::RuntimeOnly:
-          TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
-                      Super->getName());
-          isInvalidSuperclass = true;
-          break;
-        }
+      switch (Super->getForeignClassKind()) {
+      case ClassDecl::ForeignKind::Normal:
+        break;
+      case ClassDecl::ForeignKind::CFType:
+        TC.diagnose(CD, diag::inheritance_from_cf_class,
+                    Super->getName());
+        isInvalidSuperclass = true;
+        break;
+      case ClassDecl::ForeignKind::RuntimeOnly:
+        TC.diagnose(CD, diag::inheritance_from_objc_runtime_visible_class,
+                    Super->getName());
+        isInvalidSuperclass = true;
+        break;
+      }
 
-        if (!isInvalidSuperclass && Super->hasMissingVTableEntries()) {
-          auto *superFile = Super->getModuleScopeContext();
-          if (auto *serialized = dyn_cast<SerializedASTFile>(superFile)) {
-            if (serialized->getLanguageVersionBuiltWith() !=
-                TC.getLangOpts().EffectiveLanguageVersion) {
-              TC.diagnose(CD,
-                          diag::inheritance_from_class_with_missing_vtable_entries_versioned,
-                          Super->getName(),
-                          serialized->getLanguageVersionBuiltWith(),
-                          TC.getLangOpts().EffectiveLanguageVersion);
-              isInvalidSuperclass = true;
-            }
-          }
-          if (!isInvalidSuperclass) {
-            TC.diagnose(
-                CD, diag::inheritance_from_class_with_missing_vtable_entries,
-                Super->getName());
+      if (!isInvalidSuperclass && Super->hasMissingVTableEntries()) {
+        auto *superFile = Super->getModuleScopeContext();
+        if (auto *serialized = dyn_cast<SerializedASTFile>(superFile)) {
+          if (serialized->getLanguageVersionBuiltWith() !=
+              TC.getLangOpts().EffectiveLanguageVersion) {
+            TC.diagnose(CD,
+                        diag::inheritance_from_class_with_missing_vtable_entries_versioned,
+                        Super->getName(),
+                        serialized->getLanguageVersionBuiltWith(),
+                        TC.getLangOpts().EffectiveLanguageVersion);
             isInvalidSuperclass = true;
           }
         }
-
-        // Require the superclass to be open if this is outside its
-        // defining module.  But don't emit another diagnostic if we
-        // already complained about the class being inherently
-        // un-subclassable.
-        if (!isInvalidSuperclass &&
-            Super->getFormalAccess(CD->getDeclContext())
-              < AccessLevel::Open &&
-            Super->getModuleContext() != CD->getModuleContext()) {
-          TC.diagnose(CD, diag::superclass_not_open, superclassTy);
+        if (!isInvalidSuperclass) {
+          TC.diagnose(
+              CD, diag::inheritance_from_class_with_missing_vtable_entries,
+              Super->getName());
           isInvalidSuperclass = true;
         }
-
-        // Require superclasses to be open if the subclass is open.
-        // This is a restriction we can consider lifting in the future,
-        // e.g. to enable a "sealed" superclass whose subclasses are all
-        // of one of several alternatives.
-        if (!isInvalidSuperclass &&
-            CD->getFormalAccess() == AccessLevel::Open &&
-            Super->getFormalAccess() != AccessLevel::Open) {
-          TC.diagnose(CD, diag::superclass_of_open_not_open, superclassTy);
-          TC.diagnose(Super, diag::superclass_here);
-        }
-
       }
 
-      checkAccessControl(TC, CD);
+      // Require the superclass to be open if this is outside its
+      // defining module.  But don't emit another diagnostic if we
+      // already complained about the class being inherently
+      // un-subclassable.
+      if (!isInvalidSuperclass &&
+          Super->getFormalAccess(CD->getDeclContext())
+            < AccessLevel::Open &&
+          Super->getModuleContext() != CD->getModuleContext()) {
+        TC.diagnose(CD, diag::superclass_not_open, superclassTy);
+        isInvalidSuperclass = true;
+      }
+
+      // Require superclasses to be open if the subclass is open.
+      // This is a restriction we can consider lifting in the future,
+      // e.g. to enable a "sealed" superclass whose subclasses are all
+      // of one of several alternatives.
+      if (!isInvalidSuperclass &&
+          CD->getFormalAccess() == AccessLevel::Open &&
+          Super->getFormalAccess() != AccessLevel::Open) {
+        TC.diagnose(CD, diag::superclass_of_open_not_open, superclassTy);
+        TC.diagnose(Super, diag::superclass_here);
+      }
+
     }
 
     TC.checkDeclAttributes(CD);
+    checkAccessControl(TC, CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     if (!IsFirstPass) {
+      for (auto Member : PD->getMembers())
+        visit(Member);
+
       return;
     }
 
@@ -4710,9 +4705,6 @@ public:
     TC.checkDeclAttributes(PD);
 
     checkAccessControl(TC, PD);
-    for (auto member : PD->getMembers()) {
-      TC.checkUnsupportedProtocolType(member);
-    }
     TC.checkInheritanceClause(PD);
 
     GenericTypeToArchetypeResolver resolver(PD);
@@ -4755,6 +4747,10 @@ public:
     // Invalid, implicit, and Clang-imported declarations never
     // require a definition.
     if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
+      return false;
+
+    // Protocol requirements do not require definitions.
+    if (isa<ProtocolDecl>(decl->getDeclContext()))
       return false;
 
     // Functions can have _silgen_name, semantics, and NSManaged attributes.
