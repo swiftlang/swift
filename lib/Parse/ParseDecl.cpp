@@ -2419,7 +2419,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     }
     return IfConfigResult;
   }
-
+  if (Tok.isAny(tok::pound_warning, tok::pound_error)) {
+    auto Result = parseDeclPoundDiagnostic();
+    if (Result.isNonNull())
+      Handler(Result.get());
+    return Result;
+  }
 
   SyntaxParsingContext DeclParsingContext(SyntaxContext,
                                           SyntaxContextKind::Decl);
@@ -2487,10 +2492,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     DeclResult = parseDeclAssociatedType(Flags, Attributes);
     break;
   case tok::kw_enum:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::EnumDecl);
     DeclResult = parseDeclEnum(Flags, Attributes);
     break;
   case tok::kw_case: {
     llvm::SmallVector<Decl *, 4> Entries;
+    DeclParsingContext.setCreateSyntax(SyntaxKind::EnumCaseDecl);
     DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
@@ -2552,20 +2559,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
     // Handled below.
     break;
 
-  case tok::pound_warning:
-    // FIXME: This is discarding attributes/modifiers. Should be hoisted.
-    DeclParsingContext.setCreateSyntax(SyntaxKind::PoundWarningDecl);
-    DeclResult = parseDeclPoundDiagnostic();
-    break;
-  case tok::pound_error:
-    // FIXME: This is discarding attributes/modifiers. Should be hoisted.
-    DeclParsingContext.setCreateSyntax(SyntaxKind::PoundErrorDecl);
-    DeclResult = parseDeclPoundDiagnostic();
-    break;
-
   case tok::pound_if:
   case tok::pound_sourceLocation:
   case tok::pound_line:
+  case tok::pound_warning:
+  case tok::pound_error:
     // We see some attributes right before these pounds.
     // TODO: Emit dedicated errors for them.
     LLVM_FALLTHROUGH;
@@ -5391,6 +5389,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   ED->setGenericParams(GenericParams);
 
+  SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
     LBLoc = PreviousLoc;
@@ -5431,6 +5430,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
   
   SourceLoc CommaLoc;
   for (;;) {
+    SyntaxParsingContext ElementContext(SyntaxContext,
+                                        SyntaxKind::EnumCaseElement);
     Identifier Name;
     SourceLoc NameLoc;
 
@@ -5499,6 +5500,9 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     ParserResult<Expr> RawValueExpr;
     LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
+      SyntaxParsingContext InitContext(SyntaxContext,
+                                       SyntaxKind::InitializerClause);
+
       EqualsLoc = consumeToken();
       {
         CodeCompletionCallbacks::InEnumElementRawValueRAII
@@ -5569,6 +5573,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       break;
     CommaLoc = consumeToken(tok::comma);
   }
+  SyntaxContext->collectNodesInPlace(SyntaxKind::EnumCaseElementList);
   
   if (!(Flags & PD_AllowEnumElement)) {
     diagnose(CaseLoc, diag::disallowed_enum_element);

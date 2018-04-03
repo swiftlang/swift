@@ -137,7 +137,7 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating',
+                       'mutating', 'nonmutating', 'indirect',
                    ]),
              Child('Detail', kind='TokenList', is_optional=True),
          ]),
@@ -280,7 +280,8 @@ DECL_NODES = [
                    token_choices=[
                        'IdentifierToken',
                        'WildcardToken',
-                   ]),
+                   ],
+                   is_optional=True),
              # One of these two names needs be optional, we choose the second
              # name to avoid backtracking.
              Child('SecondName', kind='Token',
@@ -289,8 +290,10 @@ DECL_NODES = [
                        'WildcardToken',
                    ],
                    is_optional=True),
-             Child('Colon', kind='ColonToken'),
-             Child('TypeAnnotation', kind='Type'),
+             Child('Colon', kind='ColonToken',
+                   is_optional=True),
+             Child('Type', kind='Type',
+                   is_optional=True),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
              Child('DefaultArgument', kind='InitializerClause',
@@ -509,13 +512,9 @@ DECL_NODES = [
          children=[
              Child('Identifier', kind='IdentifierToken',
                    description='The name of this case.'),
-             Child('AssociatedValue', kind='TupleType', is_optional=True,
+             Child('AssociatedValue', kind='ParameterClause', is_optional=True,
                    description='The set of associated values of the case.'),
-             Child('EqualsToken', kind='EqualsToken', is_optional=True,
-                   description='''
-                   The equals token, if this case is assigned to a raw value.
-                   '''),
-             Child('RawValue', kind='Expr', is_optional=True,
+             Child('RawValue', kind='InitializerClause', is_optional=True,
                    description='''
                    The raw value of this enum element, if present.
                    '''),
@@ -537,9 +536,13 @@ DECL_NODES = [
          enum.
          ''',
          children=[
-             Child('IndirectKeyword', kind='IndirectToken', is_optional=True,
+             Child('Attributes', kind='AttributeList', is_optional=True,
                    description='''
-                   The `indirect` keyword, if this case is indirect.
+                   The attributes applied to the case declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the case declaration.
                    '''),
              Child('CaseKeyword', kind='CaseToken',
                    description='The `case` keyword for this case.'),
@@ -557,11 +560,6 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList', is_optional=True,
                    description='''
                    The declaration modifiers applied to the enum declaration.
-                   '''),
-             Child('IndirectKeyword', kind='IndirectToken', is_optional=True,
-                   description='''
-                   The `indirect` keyword that applies to all cases in this \
-                   enum.
                    '''),
              Child('EnumKeyword', kind='EnumToken',
                    description='''
@@ -583,14 +581,14 @@ DECL_NODES = [
                    values for this enum.
                    '''),
              Child('GenericWhereClause', kind='GenericWhereClause',
-                  is_optional=True,
-                  description='''
-                  The `where` clause that applies to the generic parameters of \
-                  this enum.
-                  '''),
+                   is_optional=True,
+                   description='''
+                   The `where` clause that applies to the generic parameters of \
+                   this enum.
+                   '''),
              Child('Members', kind='MemberDeclBlock',
-                  description='''
-                  The cases and other members of this enum.
-                  ''')
+                   description='''
+                   The cases and other members of this enum.
+                   ''')
          ]),
 ]
