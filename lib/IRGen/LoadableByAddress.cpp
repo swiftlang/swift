@@ -627,6 +627,10 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
   if (applySite.getSubstCalleeType()->getLanguage() == SILFunctionLanguage::C) {
     return false;
   }
+  SILValue callee = applySite.getCallee();
+  if (auto site = ApplySite::isa(callee)) {
+    return modifiableApply(site, Mod);
+  }
   return true;
 }
 
