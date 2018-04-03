@@ -1342,8 +1342,12 @@ void ASTContext::addExternalDecl(Decl *decl) {
 
 void ASTContext::addSynthesizedDecl(Decl *decl) {
   auto *mod = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
-  if (mod->getKind() == FileUnitKind::ClangModule)
+  if (mod->getKind() == FileUnitKind::ClangModule) {
     ExternalDefinitions.insert(decl);
+    return;
+  }
+
+  cast<SourceFile>(mod)->SynthesizedDecls.push_back(decl);
 }
 
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {

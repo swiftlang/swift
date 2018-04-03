@@ -1050,8 +1050,6 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   getterDecl->setValidationStarted();
   getterDecl->copyFormalAccessFrom(typeDecl);
 
-  tc.Context.addSynthesizedDecl(getterDecl);
-
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
@@ -1072,6 +1070,9 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
                                             SourceLoc(), hashValuePat, nullptr,
                                             parentDC);
   patDecl->setImplicit();
+
+  tc.Context.addSynthesizedDecl(hashValueDecl);
+  tc.Context.addSynthesizedDecl(getterDecl);
 
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);

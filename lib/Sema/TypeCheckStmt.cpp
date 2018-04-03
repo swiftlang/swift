@@ -1443,8 +1443,17 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  // HACK: don't type-check the same function body twice.  This is
+  // supposed to be handled by just not enqueuing things twice,
+  // but that gets tricky with synthesized function bodies.
+  if (AFD->isBodyTypeChecked())
+    return false;
+
   if (!AFD->getBody())
     return false;
+
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-fn", AFD);
+  PrettyStackTraceDecl StackEntry("type-checking", AFD);
 
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
@@ -1456,9 +1465,12 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   for (auto paramList : AFD->getParameterLists())
     requestRequiredNominalTypeLayoutForParameters(paramList);
 
-  if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
+  bool error = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  AFD->setBodyTypeCheckedIfPresent();
+
+  if (error)
     return true;
-  
+
   performAbstractFuncDeclDiagnostics(*this, AFD);
   return false;
 }
