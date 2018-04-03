@@ -1033,8 +1033,8 @@ namespace {
       // I -> inout? O, where I and O are fresh type variables. The index
       // expression must be convertible to I and the subscript expression
       // itself has type inout? O, where O may or may not be an lvalue.
-      auto inputTv = CS.createTypeVariable(indexLocator, /*options*/0);
-      
+      auto inputTv = CS.createTypeVariable(indexLocator);
+
       // For an integer subscript expression on an array slice type, instead of
       // introducing a new type variable we can easily obtain the element type.
       if (isa<SubscriptExpr>(anchor)) {
@@ -1419,7 +1419,7 @@ namespace {
 
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
-      auto baseTy = CS.createTypeVariable(baseLocator, /*options*/0);
+      auto baseTy = CS.createTypeVariable(baseLocator);
       auto memberTy = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
 
       // An unresolved member expression '.member' is modeled as a value member
@@ -1440,8 +1440,7 @@ namespace {
         // TODO: we definitely want this to include ImplicitlyUnwrappedOptional; does it
         // need to include everything else in the world?
         auto outputTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
-            /*options*/0);
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
         CS.addConstraint(ConstraintKind::Conversion, outputTy, baseTy,
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
@@ -1495,8 +1494,7 @@ namespace {
                         CS.getConstraintLocator(expr),
                           TVO_CanBindToLValue |
                           TVO_PrefersSubtypeBinding);
-        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                              /*options*/0);
+        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
         auto methodTy = FunctionType::get(argsTy, resultTy);
         CS.addValueMemberConstraint(baseTy, expr->getName(),
           methodTy, CurDC, expr->getFunctionRefKind(),
@@ -1972,8 +1970,7 @@ namespace {
             return CS.getType(boundExpr)->getRValueType();
         }
 
-        return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     /*options*/0);
+        return CS.createTypeVariable(CS.getConstraintLocator(locator));
       }
 
       case PatternKind::Named: {
@@ -2003,16 +2000,14 @@ namespace {
         case ReferenceOwnership::Unmanaged:
           if (ty)
             return ty;
-          return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                       /*options*/0);
+          return CS.createTypeVariable(CS.getConstraintLocator(locator));
         case ReferenceOwnership::Weak:
           // For weak variables, use Optional<T>.
           if (ty && ty->getOptionalObjectType())
             return ty; // Already Optional<T>.
           // Create a fresh type variable to handle overloaded expressions.
           if (!ty || ty->is<TypeVariableType>())
-            ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                       /*options*/0);
+            ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
         }
 
@@ -2052,8 +2047,7 @@ namespace {
 #include "swift/AST/PatternNodes.def"
         // TODO: we could try harder here, e.g. for enum elements to provide the
         // enum type.
-        return CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                     /*options*/0);
+        return CS.createTypeVariable(CS.getConstraintLocator(locator));
       }
 
       llvm_unreachable("Unhandled pattern kind");
@@ -2289,7 +2283,7 @@ namespace {
 
         // If no return type was specified, create a fresh type
         // variable for it.
-        funcTy = CS.createTypeVariable(locator, /*options*/0);
+        funcTy = CS.createTypeVariable(locator);
 
         // Allow it to default to () if there are no return statements.
         if (closureHasNoResult(expr)) {
@@ -2326,8 +2320,7 @@ namespace {
       //     S < lvalue T
       //
       // where T is a fresh type variable.
-      auto lvalue = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                          /*options*/0);
+      auto lvalue = CS.createTypeVariable(CS.getConstraintLocator(expr));
       auto bound = LValueType::get(lvalue);
       auto result = InOutType::get(lvalue);
       CS.addConstraint(ConstraintKind::Conversion,
@@ -2337,8 +2330,7 @@ namespace {
     }
 
     Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                      /*options*/0);
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr));
       CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,
                        CS.getType(expr->getBase()),
            CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
@@ -2415,8 +2407,7 @@ namespace {
       // variables T1 and T2.
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
-            /*options*/0);
+            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
       } else {
         // Since we know what the output type is, we can set it as the favored
         // type of this expression.
@@ -2507,7 +2498,7 @@ namespace {
     Type
     createTypeVariableAndDisjunctionForIUOCoercion(Type toType,
                                                    ConstraintLocator *locator) {
-      auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
+      auto typeVar = CS.createTypeVariable(locator);
       CS.buildDisjunctionForImplicitlyUnwrappedOptional(typeVar, toType,
                                                         locator);
       return typeVar;
@@ -2643,7 +2634,7 @@ namespace {
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
-      auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
+      auto typeVar = CS.createTypeVariable(locator);
       return LValueType::get(typeVar);
     }
     
@@ -2658,8 +2649,7 @@ namespace {
       if (!destTy)
         return Type();
       if (destTy->is<UnresolvedType>()) {
-        return CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                     /*options=*/0);
+        return CS.createTypeVariable(CS.getConstraintLocator(expr));
       }
       
       // The source must be convertible to the destination.
@@ -2774,7 +2764,7 @@ namespace {
         auto &placeholderTy
           = editorPlaceholderVariables[currentEditorPlaceholderVariable];
         if (!placeholderTy) {
-          placeholderTy = CS.createTypeVariable(locator, /*options*/0);
+          placeholderTy = CS.createTypeVariable(locator);
 
           CS.addConstraint(ConstraintKind::Defaultable,
                            placeholderTy,
@@ -2830,8 +2820,8 @@ namespace {
       // For native key paths, traverse the key path components to set up
       // appropriate type relationships at each level.
       auto locator = CS.getConstraintLocator(E);
-      Type root = CS.createTypeVariable(locator, /*options*/0);
-      
+      Type root = CS.createTypeVariable(locator);
+
       // If a root type was explicitly given, then resolve it now.
       if (auto rootRepr = E->getRootType()) {
         auto rootObjectTy = resolveTypeReferenceInExpression(rootRepr);
@@ -2893,7 +2883,7 @@ namespace {
           
           // We can't assign an optional back through an optional chain
           // today. Force the base to an rvalue.
-          auto rvalueTy = CS.createTypeVariable(locator, 0);
+          auto rvalueTy = CS.createTypeVariable(locator);
           CS.addConstraint(ConstraintKind::Equal, base, rvalueTy, locator);
           base = rvalueTy;
           LLVM_FALLTHROUGH;
@@ -2921,14 +2911,14 @@ namespace {
       // If there was an optional chaining component, the end result must be
       // optional.
       if (didOptionalChain) {
-        auto objTy = CS.createTypeVariable(locator, /*options*/0);
+        auto objTy = CS.createTypeVariable(locator);
         auto optTy = OptionalType::get(objTy);
         CS.addConstraint(ConstraintKind::Conversion, base, optTy,
                          locator);
         base = optTy;
       }
-      
-      auto rvalueBase = CS.createTypeVariable(locator, /*options*/0);
+
+      auto rvalueBase = CS.createTypeVariable(locator);
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
       
       // The result is a KeyPath from the root to the end component.
@@ -2939,8 +2929,7 @@ namespace {
       } else {
         // The type of key path depends on the overloads chosen for the key
         // path components.
-        kpTy = CS.createTypeVariable(CS.getConstraintLocator(E),
-                                     /*options*/0);
+        kpTy = CS.createTypeVariable(CS.getConstraintLocator(E));
         CS.addKeyPathConstraint(kpTy, root, rvalueBase,
                                 CS.getConstraintLocator(E));
       }
