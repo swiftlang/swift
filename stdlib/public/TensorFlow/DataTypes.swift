@@ -239,7 +239,7 @@ extension UInt32 : AccelerableByTensorFlow {
   }
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: UInt32)
-  -> TensorHandle<UInt32> {
+    -> TensorHandle<UInt32> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
   @_silgen_name("__tf_hoistable_UInt32") @_optimize(none) @inline(never)
@@ -286,7 +286,7 @@ extension UInt64 : AccelerableByTensorFlow {
   }
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: UInt64)
-  -> TensorHandle<UInt64> {
+    -> TensorHandle<UInt64> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
   @_silgen_name("__tf_hoistable_UInt64") @_optimize(none) @inline(never)
@@ -333,7 +333,7 @@ extension Double : AccelerableByTensorFlow {
   }
   @_inlineable @inline(__always)
   public static func _makeScalarTensor(_ scalar: Double)
-  -> TensorHandle<Double> {
+    -> TensorHandle<Double> {
     return #tfop("tfc.scalarToTensor", scalar)
   }
   @_silgen_name("__tf_hoistable_Double") @_optimize(none) @inline(never)

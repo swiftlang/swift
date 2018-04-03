@@ -28,8 +28,8 @@ public typealias Array1D = Array
 public typealias ArraySlice1D = ArraySlice
 
 fileprivate extension Array1D {
-  /// Creates an Array1D from a ShapedArray.
-  /// - Precondition: The ShapedArray must have rank 1.
+  /// Creates an `Array1D` from a `ShapedArray`.
+  /// - Precondition: The `ShapedArray` must have rank 1.
   /// - Note: This is an internal initializer and should not be exposed to
   ///   users.
   init(base: ShapedArray<Element>) {
@@ -44,8 +44,8 @@ fileprivate extension Array1D {
 }
 
 fileprivate extension ArraySlice1D {
-  /// Creates an ArraySlice1D from a ShapedArraySlice.
-  /// - Precondition: The ShapedArraySlice must have rank 1.
+  /// Creates an `ArraySlice1D` from a `ShapedArraySlice`.
+  /// - Precondition: The `ShapedArraySlice` must have rank 1.
   /// - Note: This is an internal initializer and should not be exposed to
   ///   users.
   init(base: ShapedArraySlice<Element>) {
@@ -85,11 +85,11 @@ fileprivate extension ArraySlice1D {
 /// A ${rankName(rank)}-dimensional array.
 @_fixed_layout
 public struct ${ArrayXD}<Scalar> {
-  /// The underlying ShapedArray of the ${ArrayXD}.
+  /// The underlying `ShapedArray` of the `${ArrayXD}`.
   @_versioned
   internal var base: ShapedArray<Scalar>
 
-  /// The dimensions of the ${ArrayXD}.
+  /// The dimensions of the `${ArrayXD}`.
   public var shape: [Int] {
     return base.shape
   }
@@ -116,12 +116,12 @@ public struct ${ArrayXD}<Scalar> {
     }
   }
 
-  /// Creates an ${ArrayXD} from a TensorBuffer and a shape.
+  /// Creates an `${ArrayXD}` from a `TensorBuffer` and a shape.
   fileprivate init(buffer: TensorBuffer<Scalar>, shape: [Int]) {
     self.init(base: ShapedArray(buffer: buffer, shape: shape))
   }
 
-  /// Creates an ${ArrayXD} from a ShapedArray.
+  /// Creates an `${ArrayXD}` from a `ShapedArray`.
   /// - Note: This is an internal initializer and should not be exposed to
   ///   users.
   @_versioned
@@ -129,15 +129,15 @@ public struct ${ArrayXD}<Scalar> {
     self.base = base
   }
 
-  /// Creates an ${ArrayXD} from a ShapedArray. Returns nil if the ShapedArray
-  /// does not have rank ${rank}.
+  /// Creates an `${ArrayXD}` from a `ShapedArray`. Returns nil if the
+  /// `ShapedArray` does not have rank ${rank}.
   public init?(_ other: ShapedArray<Scalar>) {
     guard other.rank == ${rank} else { return nil }
     self.init(base: other)
   }
 
-  /// Creates an ${ArrayXD} from a ShapedArray.
-  /// - Precondition: The ShapedArray must have rank ${rank}.
+  /// Creates an `${ArrayXD}` from a `ShapedArray`.
+  /// - Precondition: The `ShapedArray` must have rank ${rank}.
   public init(identicallyRanked other: ShapedArray<Scalar>) {
     precondition(other.rank == ${rank}, "Rank is not ${rank}.")
     self.init(base: other)
@@ -145,7 +145,7 @@ public struct ${ArrayXD}<Scalar> {
 }
 
 public extension ${ArrayXD} {
-  /// Returns the number of element arrays in an ${ArrayXD} (equivalent to the
+  /// Returns the number of element arrays in an `${ArrayXD}` (equivalent to the
   /// first dimension).
   /// - Note: `count` is distinct from `scalarCount`, which represents the total
   ///   number of scalars.
@@ -153,7 +153,7 @@ public extension ${ArrayXD} {
     return base.count
   }
 
-  /// Creates an ${ArrayXD} with the specified shape and contiguous scalars in
+  /// Creates an `${ArrayXD}` with the specified shape and contiguous scalars in
   /// row-major order.
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
@@ -165,7 +165,7 @@ public extension ${ArrayXD} {
     self.init(base: ShapedArray(shape: shape, scalars: scalars))
   }
 
-  /// Creates an ${ArrayXD} with the specified shape and a single, repeated
+  /// Creates an `${ArrayXD}` with the specified shape and a single, repeated
   /// value.
   /// - Parameters:
   ///   - shape: The dimensions of the array.
@@ -215,9 +215,9 @@ extension ${ArrayXD} : RandomAccessCollection, MutableCollection {
     return base.endIndex
   }
 
-  /// Access the element ${Element} specified by an index in the leading
+  /// Access the element `${Element}` specified by an index in the leading
   /// dimension.
-  /// - Parameter index: Index of the element ${Element}.
+  /// - Parameter index: Index of the element `${Element}`.
   public subscript(index: Int) -> Element {
     get {
       precondition(index < endIndex, "${ArrayXD} index is out of range")
@@ -249,7 +249,7 @@ extension ${ArrayXD} : RandomAccessCollection, MutableCollection {
     }
   }
 
-  /// Access the ${SliceXD} specified by a contiguous range of indices.
+  /// Access the `${SliceXD}` specified by a contiguous range of indices.
   /// - Parameter bounds: Contiguous range of indices.
   public subscript(bounds: Range<Int>) -> SubSequence {
     get {
@@ -275,7 +275,7 @@ extension ${ArrayXD} : RandomAccessCollection, MutableCollection {
   }
 }
 
-/// ${TensorXD} conversion
+/// `${TensorXD}` conversion
 public extension ${ArrayXD} where Scalar : AccelerableByTensorFlow {
   init(_ tensor: ${TensorXD}<Scalar>) {
     self = tensor.array
@@ -291,20 +291,20 @@ extension ${ArrayXD} : Equatable where Scalar : Equatable {
 
 /// String conversion.
 extension ${ArrayXD} : CustomStringConvertible {
-  /// A textual representation of this ${ArrayXD}.
+  /// A textual representation of this `${ArrayXD}`.
   public var description: String {
     return base.description
   }
 }
 
-// Xcode Playground display conversion.
+/// Xcode Playground display conversion.
 extension ${ArrayXD} : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-// Mirror representation, used by debugger/REPL.
+/// Mirror representation, used by debugger/REPL.
 extension ${ArrayXD} : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)
@@ -313,10 +313,10 @@ extension ${ArrayXD} : CustomReflectable {
 
 @_fixed_layout
 public struct ${SliceXD}<Scalar>  {
-  /// The underlying ShapedArraySlice of the ${SliceXD}.
+  /// The underlying ShapedArraySlice of the `${SliceXD}`.
   fileprivate var base: ShapedArraySlice<Scalar>
 
-  /// Creates an ${SliceXD} from a ShapedArraySlice.
+  /// Creates an `${SliceXD}` from a `ShapedArraySlice`.
   /// - Note: This is an internal initializer and should not be exposed to
   ///   users.
   fileprivate init(base: ShapedArraySlice<Scalar>) {
@@ -350,7 +350,7 @@ public extension ${SliceXD} {
 
 /// Slice initializers
 public extension ${SliceXD} {
-  /// Returns the number of element arrays in an ${SliceXD} (equivalent to the
+  /// Returns the number of element arrays in an `${SliceXD}` (equivalent to the
   /// first dimension).
   /// - Note: `count` is distinct from `scalarCount`, which represents the total
   ///   number of scalars.
@@ -358,7 +358,7 @@ public extension ${SliceXD} {
     return base.count
   }
 
-  /// Creates an ${SliceXD} with the specified shape and contiguous scalars in
+  /// Creates an `${SliceXD}` with the specified shape and contiguous scalars in
   /// row-major order.
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
@@ -366,7 +366,8 @@ public extension ${SliceXD} {
     self.init(base: ShapedArraySlice(shape: shape, scalars: scalars))
   }
 
-  /// Creates an ${SliceXD} with the specified shape and a single, repeated value.
+  /// Creates an `${SliceXD}` with the specified shape and a single, repeated
+  /// value.
   /// - Parameters:
   ///   - shape: The dimensions of the array.
   ///   - repeatedValue: The scalar value to repeat.
@@ -406,9 +407,9 @@ extension ${SliceXD} : RandomAccessCollection, MutableCollection {
     return base.endIndex
   }
 
-  /// Access the element ${Element} specified by an index in the leading
+  /// Access the element `${Element}` specified by an index in the leading
   /// dimension.
-  /// - Parameter index: Index of the element ${Element}.
+  /// - Parameter index: Index of the element `${Element}`.
   public subscript(index: Int) -> Element {
     get {
       precondition(index < endIndex, "${SliceXD} index is out of range")
@@ -441,7 +442,7 @@ extension ${SliceXD} : RandomAccessCollection, MutableCollection {
     }
   }
 
-  /// Access the ${SliceXD} specified by a contiguous range of indices.
+  /// Access the `${SliceXD}` specified by a contiguous range of indices.
   /// - Parameter bounds: Contiguous range of indices.
   public subscript(bounds: Range<Int>) -> SubSequence {
     get {
@@ -467,7 +468,7 @@ extension ${SliceXD} : RandomAccessCollection, MutableCollection {
   }
 }
 
-/// ${TensorXD} conversion
+/// `${TensorXD}` conversion
 public extension ${SliceXD} where Scalar : AccelerableByTensorFlow {
   init(_ tensor: ${TensorXD}<Scalar>) {
     self.init(base: ShapedArraySlice<Scalar>(tensor.base))
@@ -483,20 +484,20 @@ extension ${SliceXD} : Equatable where Scalar : Equatable {
 
 /// String conversion.
 extension ${SliceXD} : CustomStringConvertible {
-  /// A textual representation of this ${SliceXD}.
+  /// A textual representation of this `${SliceXD}`.
   public var description: String {
     return base.description
   }
 }
 
-// Xcode Playground display conversion.
+/// Xcode Playground display conversion.
 extension ${SliceXD} : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-// Mirror representation, used by debugger/REPL.
+/// Mirror representation, used by debugger/REPL.
 extension ${SliceXD} : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)

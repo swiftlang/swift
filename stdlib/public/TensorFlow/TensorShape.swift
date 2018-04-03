@@ -34,7 +34,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
     self.dimensions = dimensions
   }
 
-  /// Initialize with an array literal, representing shape dimensions. The rank
+  /// Initialize with an array literal representing the shape dimensions. The rank
   /// of the tensor is the length of the dimensions.
   /// - Parameter dimensions: the shape dimensions.
   @_inlineable @inline(__always)
@@ -42,7 +42,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
     self.init(elements)
   }
 
-  /// Initialize with variadic elements, representing shape dimensions. The rank
+  /// Initialize with variadic elements representing the shape dimensions. The rank
   /// of the tensor is the length of the elements.
   /// - Parameter dimensions: the shape dimensions.
   @_inlineable @inline(__always)
