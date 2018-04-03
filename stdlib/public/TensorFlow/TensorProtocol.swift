@@ -10,22 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Tensor protocol generalizing unranked tensors (Tensor) and ranked tensors
-// (Tensor1D, Tensor2D, etc). Common tensor properties and operations are
-// defined on TensorProtocol.
-//
-// NOTE: TensorProtocol intentionally does not refine Collection in order for
-// predictable and guaranteed acceleration. Methods for indexing/slicing are
-// defined as standalone subscript methods. Users are encouraged to use
-// aggregate operations rather than loops when working with TensorProtocol
-// instances.
+// This file defines the TensorProtocol type.
 //
 //===----------------------------------------------------------------------===//
 
+/// The protocol generalizing unranked tensors (`Tensor`) and ranked tensors
+/// (`Tensor1D`, `Tensor2D`, etc). Common tensor properties and operations are
+/// defined on `TensorProtocol`.
+///
+/// NOTE: `TensorProtocol` intentionally does not refine `Collection` in order
+/// for predictable and guaranteed acceleration. Methods for indexing/slicing
+/// are defined as standalone subscript methods. Users are encouraged to use
+/// aggregate operations rather than loops when working with `TensorProtocol`
+/// instances.
 public protocol TensorProtocol {
   /// Scalar type.
   associatedtype Scalar : AccelerableByTensorFlow
-  /// Tensor type of the same rank with scalar type Bool.
+  /// Tensor type of the same rank with scalar type `Bool`.
   associatedtype BoolTensor : TensorProtocol where BoolTensor.Scalar == Bool
 
   /// The number of dimensions of the tensor.
@@ -45,7 +46,7 @@ public protocol TensorProtocol {
   /// - Note: Do NOT remove this. This is a compiler requirement.
   var handle: TensorHandle<Scalar> { get }
 
-  /// Initialize from a TensorHandle.
+  /// Initialize from a `TensorHandle`.
   /// - Note: Do NOT remove this. This is a compiler requirement.
   init(handle: TensorHandle<Scalar>)
 }
@@ -54,7 +55,7 @@ public protocol TensorProtocol {
 // Memory transfer markers
 //===----------------------------------------------------------------------===//
 
-/// TODO: Remove when send/receive semantics gets revisited.
+// TODO: Remove when send/receive semantics gets revisited.
 public extension TensorProtocol {
   @_inlineable @inline(__always)
   func toDevice() -> Self {

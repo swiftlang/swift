@@ -51,7 +51,7 @@ infix operator ⊗ : MultiplicationPrecedence
 public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
   public typealias BoolTensor = ${TensorXD}<Bool>
 
-  /// The underlying Tensor of the ${TensorXD}.
+  /// The underlying `Tensor` of the `${TensorXD}`.
   @_versioned
   internal var base: Tensor<Scalar>
 
@@ -103,7 +103,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     }
   }
 
-  /// Creates a ${TensorXD} from a Tensor.
+  /// Creates a `${TensorXD}` from a `Tensor`.
   /// - Note: This is an internal initializer and should not be exposed to
   ///   users.
   @_versioned
@@ -117,15 +117,15 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     self.init(base: Tensor(handle: handle))
   }
 
-  /// Creates a ${TensorXD} from a Tensor. Returns nil if the Tensor does not
-  /// have rank ${rank}.
+  /// Creates a `${TensorXD}` from a `Tensor`. Returns nil if the `Tensor` does
+  /// not have rank ${rank}.
   @_inlineable @inline(__always)
   public init?(_ other: Tensor<Scalar>) {
     guard other.rank == ${rank} else { return nil }
     self.init(base: other)
   }
 
-  /// Creates a ${TensorXD} from a Tensor.
+  /// Creates a `${TensorXD}` from a `Tensor`.
   /// - Precondition: The tensor must have rank ${rank}.
   @_inlineable @inline(__always)
   public init(identicallyRanked other: Tensor<Scalar>) {
@@ -140,7 +140,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     self.init(base: other)
   }
 
-  /// Creates a ${TensorXD} with the specified shape and contiguous scalars in
+  /// Creates a `${TensorXD}` with the specified shape and contiguous scalars in
   /// row-major order.
   /// - Precondition: The shape must have ${rank} dimensions.
   /// - Precondition: The number of scalars must equal the product of the
@@ -158,7 +158,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     self.init(base: Tensor(shape: shape, scalars: scalars))
   }
 
-  /// Creates a ${TensorXD} with the specified shape and contiguous scalars in
+  /// Creates a `${TensorXD}` with the specified shape and contiguous scalars in
   /// row-major order.
   /// - Precondition: The shape must have ${rank} dimensions.
   /// - Precondition: The number of scalars must equal the product of the
@@ -170,7 +170,7 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     self.init(base: Tensor(shape: shape, scalars: scalars))
   }
 
-  /// Creates a ${TensorXD} with the specified shape and contiguous scalars in
+  /// Creates a `${TensorXD}` with the specified shape and contiguous scalars in
   /// row-major order.
   /// - Precondition: The shape must have ${rank} dimensions.
   /// - Precondition: The number of scalars must equal the product of the
@@ -182,11 +182,11 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     self.init(base: Tensor(shape: shape, scalars: scalars))
   }
 
-  /// Creates a ${TensorXD} with the specified shape and a single, repeated
+  /// Creates a `${TensorXD}` with the specified shape and a single, repeated
   /// value.
   /// - Precondition: The shape must have ${rank} dimensions.
   /// - Parameters:
-  ///   - shape: The dimensions of the ${TensorXD}.
+  ///   - shape: The dimensions of the `${TensorXD}`.
   ///   - repeatedValue: The scalar value to repeat.
   @_inlineable @inline(__always)
   public init(shape: TensorShape, repeating repeatedValue: Scalar) {
@@ -217,7 +217,7 @@ extension ${TensorXD} : Equatable where Scalar : Equatable {
 
 /// Array literal support.
 extension ${TensorXD} : ExpressibleByArrayLiteral {
-  /// Creates a ${TensorXD} from with the specified elements.
+  /// Creates a `${TensorXD}` from with the specified elements.
   @_inlineable @inline(__always)
   public init(arrayLiteral elements: ${elementArrayLiteral}...) {
     self.init(elements)
@@ -235,14 +235,14 @@ public extension ${TensorXD} where Scalar : Numeric {
 /// Initializers
 public extension ${TensorXD} {
 % if rank == 1:
-  /// Creates a ${TensorXD} from with the specified elements.
+  /// Creates a `${TensorXD}` from with the specified elements.
   @_inlineable @inline(__always)
   init<C : RandomAccessCollection>(_ elements: C)
     where C.Element == ${elementArrayLiteral} {
     self.init(base: Tensor<Scalar>(elements))
   }
 % else:
-  /// Creates a ${TensorXD} from with the specified elements.
+  /// Creates a `${TensorXD}` from with the specified elements.
   @_inlineable @inline(__always)
   init<C : RandomAccessCollection>(_ elements: C)
     where C.Element == ${elementArrayLiteral} {
@@ -250,41 +250,41 @@ public extension ${TensorXD} {
   }
 % end
 
-  /// Creates a ${TensorXD} from a ShapedArray. Returns nil if the ShapedArray
-  /// does not have rank ${rank}.
+  /// Creates a `${TensorXD}` from a `ShapedArray`. Returns nil if the
+  /// `ShapedArray` does not have rank ${rank}.
   @_inlineable @inline(__always)
   init?(_ array: ShapedArray<Scalar>) {
     self.init(Tensor(array))
   }
 
-  /// Creates a ${TensorXD} from a ShapedArray.
-  /// - Precondition: The ShapedArray must have rank ${rank}.
+  /// Creates a `${TensorXD}` from a `ShapedArray`.
+  /// - Precondition: The `ShapedArray` must have rank ${rank}.
   @_inlineable @inline(__always)
   init(identicallyRanked other: ShapedArray<Scalar>) {
     self.init(identicallyRanked: Tensor(other))
   }
 
 % if rank != 1:
-  /// Creates a ${TensorXD} from an ${ArrayXD}.
+  /// Creates a `${TensorXD}` from an `${ArrayXD}`.
   @_inlineable @inline(__always)
   init(_ array: ${ArrayXD}<Scalar>) {
     self.init(base: Tensor(array.base))
   }
 % end
 
-  /// Creates a ${TensorXD} containing the given element literals.
+  /// Creates a `${TensorXD}` containing the given element literals.
   @_inlineable @inline(__always)
   init(_ elements: [${elementArrayLiteral}]) {
     self.init(base: Tensor<Scalar>(elements))
   }
 
-  /// Creates a ${TensorXD} containing the given element literals.
+  /// Creates a `${TensorXD}` containing the given element literals.
   @_inlineable @inline(__always)
   init(_ elements: ${elementArrayLiteral}...) {
     self.init(elements)
   }
 
-  /// Creates a ${TensorXD} by broadcasting the given scalar to a {rank}-D
+  /// Creates a `${TensorXD}` by broadcasting the given scalar to a {rank}-D
   /// shape with all dimensions being 1.
   @_inlineable @inline(__always)
   init(broadcasting scalar: Scalar) {
@@ -293,7 +293,7 @@ public extension ${TensorXD} {
 }
 
 public extension AccelerableByTensorFlow {
-  /// Converts to a ${TensorXD} with all dimensions equal to 1.
+  /// Converts to a `${TensorXD}` with all dimensions equal to 1.
   @_inlineable @inline(__always)
   func make${TensorXD}() -> ${TensorXD}<Self> {
     return ${TensorXD}(base: self.makeTensor(withRank: ${rank}))
@@ -318,9 +318,9 @@ public extension ${TensorXD} {
 
 /// Factories
 public extension ${TensorXD} where Scalar : Numeric {
-  /// Creates a ${TensorXD} with all scalars set to zero.
+  /// Creates a `${TensorXD}` with all scalars set to zero.
   ///
-  /// - Parameter shape: The dimensions of the ${TensorXD}.
+  /// - Parameter shape: The dimensions of the `${TensorXD}`.
   @_inlineable @inline(__always)
   init(zeros shape: TensorShape) {
     // NOTE: Precondition written using Assert op instead of Swift
@@ -335,9 +335,9 @@ public extension ${TensorXD} where Scalar : Numeric {
     self.init(base: Tensor<Scalar>(zeros: shape))
   }
 
-  /// Creates a ${TensorXD} with all scalars set to one.
+  /// Creates a `${TensorXD}` with all scalars set to one.
   ///
-  /// - Parameter shape: The dimensions of the ${TensorXD}.
+  /// - Parameter shape: The dimensions of the `${TensorXD}`.
   @_inlineable @inline(__always)
   init(ones shape: TensorShape) {
     // NOTE: Precondition written using Assert op instead of Swift
@@ -354,11 +354,11 @@ public extension ${TensorXD} where Scalar : Numeric {
 }
 
 public extension ${TensorXD} where Scalar == Float {
-  /// Creates a ${TensorXD} with the specified shape, randomly sampling
+  /// Creates a `${TensorXD}` with the specified shape, randomly sampling
   /// scalar values from a normal distribution.
   ///
   /// - Parameters:
-  ///   - shape: The dimensions of the ${TensorXD}.
+  ///   - shape: The dimensions of the `${TensorXD}`.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
   ///   - state: The pseudorandom state in which the random numbers are being
@@ -373,11 +373,11 @@ public extension ${TensorXD} where Scalar == Float {
                            state: state))
   }
 
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a uniform distribution.
+  /// Creates a `{TensorXD}` with the specified shape, randomly sampling scalar
+  /// values from a uniform distribution.
   ///
   /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
+  ///   - shape: The dimensions of the `${TensorXD}`.
   ///   - min: The lower bound of the distribution.
   ///   - max: The upper bound of the distribution.
   ///   - state: The pseudorandom state in which the random numbers are being
@@ -392,11 +392,11 @@ public extension ${TensorXD} where Scalar == Float {
 }
 
 public extension ${TensorXD} where Scalar == Double {
-  /// Creates a ${TensorXD} with the specified shape, randomly sampling
+  /// Creates a `${TensorXD}` with the specified shape, randomly sampling
   /// scalar values from a normal distribution.
   ///
   /// - Parameters:
-  ///   - shape: The dimensions of the ${TensorXD}.
+  ///   - shape: The dimensions of the `${TensorXD}`.
   ///   - mean: The mean of the distribution.
   ///   - stddev: The standard deviation of the distribution.
   ///   - state: The pseudorandom state in which the random numbers are being
@@ -411,11 +411,11 @@ public extension ${TensorXD} where Scalar == Double {
                            state: state))
   }
 
-  /// Creates a tensor with the specified shape, randomly sampling scalar values
-  /// from a uniform distribution.
+  /// Creates a `${TensorXD}` with the specified shape, randomly sampling scalar
+  /// values from a uniform distribution.
   ///
   /// - Parameters:
-  ///   - shape: The dimensions of the tensor.
+  ///   - shape: The dimensions of the `${TensorXD}`.
   ///   - min: The lower bound of the distribution.
   ///   - max: The upper bound of the distribution.
   ///   - state: The pseudorandom state in which the random numbers are being
@@ -461,7 +461,7 @@ extension ${TensorXD} : Differentiable where Scalar : FloatingPoint {
 //===----------------------------------------------------------------------===//
 
 public extension ${TensorXD} {
-  /// Returns a transposed ${TensorXD}, with dimensions permuted in reverse
+  /// Returns a transposed `${TensorXD}`, with dimensions permuted in reverse
   /// order.
   @_inlineable @inline(__always)
   func transposed() -> ${TensorXD} {
@@ -471,8 +471,8 @@ public extension ${TensorXD} {
     return transposed(withPermutations: defaultPermutations)
   }
 
-  /// Return a copy of the ${TensorXD} collapsed into a Tensor1D in row-major
-  /// order.
+  /// Return a copy of the `${TensorXD}` collapsed into a `Tensor1D` in
+  /// row-major order.
   @_inlineable @inline(__always)
   func flattened() -> Tensor1D<Scalar> {
     return Tensor1D(base: base.flattened())
@@ -496,9 +496,9 @@ public extension ${TensorXD} {
   }
 % else:
   @_inlineable
-  /// Access the element ${ElementTensor} specified by an index in the leading
+  /// Access the element `${ElementTensor}` specified by an index in the leading
   /// dimension.
-  /// - Parameter index: Index of the element ${ElementTensor}.
+  /// - Parameter index: Index of the element `${ElementTensor}`.
   subscript(index: Int32) -> ${ElementTensor}<Scalar> {
     @inline(__always)
     get {
@@ -517,8 +517,8 @@ public extension ${TensorXD} {
     }
   }
 
-  /// Extracts a slice from a tensor. This operation extracts a slice at the
-  /// ranges specified by `dimensionalBounds`.
+  /// Extracts a slice from a `${TensorXD}`. This operation extracts a slice at
+  /// the ranges specified by `dimensionalBounds`.
   ///
   /// - Parameter dimensionalBounds: Bounds at each dimension.
   ///
@@ -634,14 +634,14 @@ public extension ${TensorXD} where Scalar == Bool {
 
 public extension ${TensorXD} {
 % if rank < ranks[-1]:
-  /// Returns a rank-lifted {LiftedTensor} with a leading dimension of 1.
+  /// Returns a rank-lifted `{LiftedTensor}` with a leading dimension of 1.
   @_inlineable @inline(__always)
   func rankLifted() -> ${LiftedTensor}<Scalar> {
     return ${LiftedTensor}<Scalar>(base: base.rankLifted())
   }
 
-  /// Returns a shape-expanded {LiftedTensor}, inserting a dimension of 1 at the
-  /// specified shape index.
+  /// Returns a shape-expanded `{LiftedTensor}`, inserting a dimension of 1 at
+  /// the specified shape index.
   @_inlineable @inline(__always)
   func expandingShape(at shapeIndex: Int32) -> ${LiftedTensor}<Scalar> {
     return ${LiftedTensor}<Scalar>(base: base.expandingShape(at: shapeIndex))
@@ -653,7 +653,7 @@ public extension ${TensorXD} {
 // Description and visualization
 //===----------------------------------------------------------------------===//
 
-/// Make "print(some${TensorXD})" print a pretty form of the tensor.
+/// String conversion.
 extension ${TensorXD} : CustomStringConvertible {
   @_inlineable
   public var description: String {
@@ -661,14 +661,14 @@ extension ${TensorXD} : CustomStringConvertible {
   }
 }
 
-// Xcode Playground display conversion.
+/// Xcode Playground display conversion.
 extension ${TensorXD} : CustomPlaygroundDisplayConvertible {
   public var playgroundDescription: Any {
     return description
   }
 }
 
-// Mirror representation, used by debugger/REPL.
+/// Mirror representation, used by debugger/REPL.
 extension ${TensorXD} : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)

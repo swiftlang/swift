@@ -16,18 +16,17 @@
 
 import CTensorFlow
 
-/// TensorHandle<Scalar> is the type used by "ops" and the #tfop() syntax
-/// specifically.  It includes an element type, which the tf-compiler internals
-/// depend on to know what the dtype of params are when they are extracted out
+/// `TensorHandle` is the type used by ops and the `#tfop()` syntax
+/// specifically. It includes a `Scalar` type, which compiler internals depend
+/// on to determine the datatypes of parameters when they are extracted
 /// into a tensor program.
 @_fixed_layout // required because the compiler accesses cTensorHandle directly.
 public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
-  /// This is the underlying "TF_TensorHandle*" which this TensorHandle
-  /// represents.
+  /// The underlying `TF_TensorHandle *`.
   ///
-  /// - Note: The compiler knows that TensorHandle has a single stored property,
-  /// and assumes that this is it.  Changing the design of TensorHandle will
-  /// require tweaking the compiler.
+  /// - Note: The compiler knows that `TensorHandle` has a single stored
+  /// property, and assumes that this is it. Changing the design of
+  /// `TensorHandle` will require tweaking the compiler.
   public let cTensorHandle: CTensorHandle
 
   init(copyingFromCTensor cTensor: CTensor) {
@@ -39,7 +38,7 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
     TF_DeleteStatus(status)
   }
 
-  /// Create a tensor handle with a closure that initializes the underlying
+  /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///
   /// - Note: `scalarsInitializer` must initialize all scalars in the underlying
@@ -75,9 +74,9 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
 }
 
 internal extension TensorHandle {
-  /// Create a shaped array with contents of the underlying tensor. If the
-  /// tensor is on the accelerator, it will be copied to the host.
-  /// - Returns: A shaped array.
+  /// Create a `ShapedArray` with contents of the underlying `TensorHandle`. If
+  /// the `TensorHandle` is on the accelerator, it will be copied to the host.
+  /// - Returns: A `ShapedArray`.
   @_versioned
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
@@ -90,7 +89,8 @@ internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
   @inline(never)
   init(cTensorHandle: CTensorHandle) {
     let status = TF_NewStatus()
-    // If the tensor is on the accelerator, we need to copy it to the host.
+    // If the `CTensorHandle` is on the accelerator, it needs to be copied to
+    // host.
     // NOTE: This will not perform a copy if the handle is already on the host.
     let context = _ExecutionContext.global
     let hostHandle: CTensorHandle = context.withMutableCContext { ctx in
@@ -113,21 +113,21 @@ internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
   }
 }
 
-// For "print", REPL, and Playgrounds integeration, we'll eventually want to
-// implement this, probably in terms of fetching a summary.  For now, this is
+// For "print", REPL, and Playgrounds integration, we'll eventually want to
+// implement this, probably in terms of fetching a summary. For now, this is
 // disabled.
-#if false
-/// Make "print(someTensor)" print a pretty form of the tensor.
+/*
+/// String conversion
 extension TensorHandle : CustomStringConvertible {
   public var description: String {
-    fatalError("unimplemented")
+    fatalError("Unimplemented")
   }
 }
 
-// Make Tensors show up nicely in the Xcode Playground results sidebar.
-extension TensorHandle : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
+/// Xcode Playground display conversion.
+extension TensorHandle : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
   }
 }
-#endif
+*/
