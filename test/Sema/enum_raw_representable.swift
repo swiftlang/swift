@@ -77,7 +77,7 @@ class Outer {
   // scenario too.
   let a: Int = E.a // expected-error {{cannot convert value of type 'Outer.E' to specified type 'Int'}}
 
-  enum E : Array<Int> { // expected-error {{'Outer.E' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}} // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
+  enum E : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
     case a
   }
 }

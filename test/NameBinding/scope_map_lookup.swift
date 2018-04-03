@@ -118,6 +118,6 @@ protocol Fooable {
 struct S<T> // expected-error{{expected '{' in struct}}
 extension S // expected-error{{expected '{' in extension}}
 
-let a = b ; let b = a // expected-error{{could not infer type for 'a'}} 
-// expected-error@-1 {{'a' used within its own type}}
-// FIXME: That second error is bogus.
+let a = b ; let b = a
+// expected-note@-1 {{'a' declared here}}
+// expected-error@-2 {{ambiguous use of 'a'}}
