@@ -3642,7 +3642,7 @@ namespace {
 
       // Look up the dispatch thunk if the protocol is resilient.
       llvm::Constant *thunk = nullptr;
-      if (Protocol->isResilient())
+      if (IGM.isResilient(Protocol, ResilienceExpansion::Minimal))
         thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
 
       // Classify the function.
@@ -3707,7 +3707,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   }
 
   SILDefaultWitnessTable *defaultWitnesses = nullptr;
-  if (protocol->isResilient())
+  if (isResilient(protocol, ResilienceExpansion::Minimal))
     defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
 
   ConstantInitBuilder initBuilder(*this);
