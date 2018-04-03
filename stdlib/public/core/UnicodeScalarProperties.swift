@@ -24,18 +24,9 @@ extension Unicode.Scalar {
       // We convert the value to the underlying UChar32 type here and store it
       // in that form to make calling the ICU APIs cleaner below.
       self._value = __swift_stdlib_UChar32(bitPattern: _scalar._value)
-
-      // Likewise, we cache the UTF-16 encoding of the scalar for a few of the
-      // properties that require treating it like a string (e.g., case
-      // mappings).
-      let utf16 = _scalar.utf16
-      self._utf16Length = utf16.count
-      self._utf16 = (utf16[0], _utf16Length > 1 ? utf16[1] : 0)
     }
 
     internal var _value: __swift_stdlib_UChar32
-    internal var _utf16: (UTF16.CodeUnit, UTF16.CodeUnit)
-    internal var _utf16Length: Int
   }
 
   /// A value that provides access to properties of the Unicode scalar that are
@@ -1036,6 +1027,15 @@ extension Unicode.Scalar.Properties {
 
 extension Unicode.Scalar.Properties {
 
+  /// The UTF-16 encoding of the scalar, represented as a tuple of 2 elements.
+  ///
+  /// If the scalar only encodes to one code unit, the second element is zero.
+  @_transparent
+  internal var _utf16CodeUnits: (UTF16.CodeUnit, UTF16.CodeUnit) {
+    let utf16 = UnicodeScalar(UInt32(_value))!.utf16
+    return (utf16[0], utf16.count > 1 ? utf16[1] : 0)
+  }
+
   // The type of ICU case conversion functions.
   internal typealias _U_StrToX = (
     /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
@@ -1053,16 +1053,17 @@ extension Unicode.Scalar.Properties {
   /// all current case mappings. In the event more space is needed, it will be
   /// allocated on the heap.
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
+    let utf16Length = UnicodeScalar(UInt32(_value))!.utf16.count
+    var utf16 = _utf16CodeUnits
     var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
     let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
-      var utf16 = _utf16
       return withUnsafePointer(to: &utf16.0) { utf16Pointer in
         var err = __swift_stdlib_U_ZERO_ERROR
         let correctSize = u_strTo(
           bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
           Int32(bufPtr.count),
           utf16Pointer,
-          Int32(_utf16Length),
+          Int32(utf16Length),
           "",
           &err)
         guard err.isSuccess ||
@@ -1078,14 +1079,13 @@ extension Unicode.Scalar.Properties {
     }
     var array = Array<UInt16>(repeating: 0, count: count)
     array.withUnsafeMutableBufferPointer { bufPtr in
-      var utf16 = _utf16
       withUnsafePointer(to: &utf16.0) { utf16Pointer in
         var err = __swift_stdlib_U_ZERO_ERROR
         let correctSize = u_strTo(
           bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
           Int32(bufPtr.count),
           utf16Pointer,
-          Int32(_utf16Length),
+          Int32(utf16Length),
           "",
           &err)
         guard err.isSuccess else {
