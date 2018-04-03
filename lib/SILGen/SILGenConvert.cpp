@@ -66,7 +66,8 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
         TemporaryInitialization init(objectBuf, CleanupHandle::invalid());
         ManagedValue objectResult = generator(SGFContext(&init));
         if (!objectResult.isInContext()) {
-          objectResult.forwardInto(*this, loc, objectBuf);
+          objectResult.ensurePlusOne(*this, loc)
+              .forwardInto(*this, loc, objectBuf);
         }
 
         // Finalize the outer optional buffer.
@@ -190,8 +191,11 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   bool hadCleanup = optional.hasCleanup();
   bool hadLValue = optional.isLValue();
 
-  auto noneDecl = getASTContext().getOptionalNoneDecl();
   auto someDecl = getASTContext().getOptionalSomeDecl();
+  auto noneDecl = getASTContext().getOptionalNoneDecl();
+
+  // If we have an object, make sure the object is at +1. All switch_enum of
+  // objects is done at +1.
   if (optional.getType().isAddress()) {
     // We forward in the creation routine for
     // unchecked_take_enum_data_addr. switch_enum_addr is a +0 operation.
@@ -199,6 +203,9 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                            /*defaultDest*/ nullptr,
                            {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
+    optional = optional.ensurePlusOne(*this, loc);
+    hadCleanup = true;
+    hadLValue = false;
     B.createSwitchEnum(loc, optional.forward(*this),
                        /*defaultDest*/ nullptr,
                        {{someDecl, contBB}, {noneDecl, failBB}});
@@ -775,7 +782,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                             *this));
           ManagedValue mv = F(SGFContext(init.get()));
           if (!mv.isInContext()) {
-            init->copyOrInitValueInto(*this, loc, mv, /*init*/ true);
+            init->copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
+                                      /*init*/ true);
             init->finishInitialization(*this);
           }
         });

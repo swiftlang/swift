@@ -146,6 +146,7 @@ set(TEST_SUBSETS
     all
     only_validation
     only_long
+    only_stress
 )
 
 if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -159,7 +160,7 @@ foreach(SDK ${SWIFT_SDKS})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
     set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
-    set(VARIANT_SDK "${SWIFT_SDK_${SDK}_PATH}")
+    set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
 
     # A directory where to put the xUnit-style XML test results.
     set(SWIFT_TEST_RESULTS_DIR
@@ -271,12 +272,14 @@ foreach(SDK ${SWIFT_SDKS})
         if((test_subset STREQUAL "primary") OR
            (test_subset STREQUAL "validation") OR
            (test_subset STREQUAL "only_long") OR
+           (test_subset STREQUAL "only_stress") OR
            (test_subset STREQUAL "all"))
           list(APPEND directories "${test_bin_dir}")
         endif()
         if((test_subset STREQUAL "validation") OR
            (test_subset STREQUAL "only_validation") OR
            (test_subset STREQUAL "only_long") OR
+           (test_subset STREQUAL "only_stress") OR
            (test_subset STREQUAL "all"))
           list(APPEND directories "${validation_test_bin_dir}")
           list(APPEND dependencies ${validation_test_dependencies})

@@ -1,0 +1,233 @@
+// FIXME(integers): add tests that perform the same checks in generic code
+
+%{
+import gyb
+}%
+
+import StdlibUnittest
+
+var FixedPointConversionTraps = TestSuite("FixedPointToFixedPointConversionTraps")
+var FixedPointConversionFailure = TestSuite("FixedPointToFixedPointConversionFailures")
+
+var FloatingPointConversionTruncations = TestSuite("FloatingPointToFixedPointConversionTruncations")
+var FloatingPointConversionTraps = TestSuite("FloatingPointConversionTraps")
+var FloatingPointConversionFailures = TestSuite("FloatingPointToFixedPointConversionFailures")
+
+func getInfiniteOrNaNMessage() -> String {
+  if _isDebugAssertConfiguration() {
+    return "either infinite or NaN"
+  }
+  return ""
+}
+
+func getTooSmallMessage() -> String {
+  if _isDebugAssertConfiguration() {
+    return "would be less than"
+  }
+  return ""
+}
+
+func getTooLargeMessage() -> String {
+  if _isDebugAssertConfiguration() {
+    return "would be greater than"
+  }
+  return ""
+}
+
+%{
+
+int_to_int_conversion_template = gyb.parse_template("int_to_int_conversion",
+"""
+%{
+from SwiftIntTypes import all_integer_types, int_max, int_min
+from SwiftFloatingPointTypes import all_floating_point_types
+
+}%
+% for self_ty in all_integer_types(word_bits):
+%   selfBits = self_ty.bits
+%   selfSigned = self_ty.is_signed
+%   selfMin = self_ty.min
+%   selfMax = self_ty.max
+%   Self = self_ty.stdlib_name
+
+%   for other_ty in all_integer_types(word_bits):
+%     otherBits = other_ty.bits
+%     otherSigned = other_ty.is_signed
+%     otherMin = other_ty.min
+%     otherMax = other_ty.max
+%     Other = other_ty.stdlib_name
+
+%     for testValue in [selfMin, selfMax, selfMin - 1, selfMax + 1, otherMin, otherMax]:
+
+%       if testValue < otherMin or testValue > otherMax:
+%          # Can't construct `other` value, do nothing and continue.
+
+%       elif testValue >= selfMin and testValue <= selfMax:
+
+/// Always-safe conversion from ${Other}(${testValue}) to ${Self}.
+FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
+  // Test that nothing interesting happens and we end up with the same result after converting.
+  let input = get${Other}(${testValue})
+  expectEqual(${testValue}, ${Self}(input))
+}
+
+/// Never-nil failable conversion from ${Other}(${testValue}) to ${Self}.
+FixedPointConversionFailure.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
+  // Test that nothing interesting happens and we end up with a non-nil, identical result.
+  let input = get${Other}(${testValue})
+  var result = ${Self}(exactly: input)
+  expectEqual(${testValue}, result)
+}
+
+%       else:
+
+/// Always-failing conversion from ${Other}(${testValue}) to ${Self}.
+FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
+  // Test that we check if we fail and crash when an integer would be truncated in conversion.
+  let input = get${Other}(${testValue})
+  expectCrashLater()
+  var result = ${Self}(input)
+  _blackHole(result)
+}
+
+/// Always-nil failable conversion from ${Other}(${testValue}) to ${Self}.
+FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}") {
+  // Test that we check if we return nil when an integer would be truncated in conversion.
+  let input = get${Other}(${testValue})
+  expectNil(${Self}(exactly: input))
+}
+%       end
+
+%     end # for testValue in ...
+%   end # for in all_integer_types (Other)
+
+%   for other_type in all_floating_point_types():
+%     Other = "Float" + str(other_type.bits)
+%     otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
+%     otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
+
+%     if Other == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     end
+
+%     for testValue in [repr(value) for value in [selfMin, selfMax, selfMin - 0.1, selfMax + 0.1, otherMin, otherMax, 0.0, -0.0, 0.1, -0.1]]:
+
+%       if testValue < otherMin or testValue > otherMax:
+%         # Can't construct `other` value to test from, do nothing and continue.
+
+%       elif testValue >= selfMin and testValue <= selfMax and testValue % 1 == 0 and testValue != -0.0:
+
+FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
+  let input = get${Other}(${testValue})
+  let result = ${Self}(input)
+  var resultConvertedBack = ${Other}(result)
+  expectEqual(${testValue}, resultConvertedBack)
+}
+
+FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
+  let input = get${Other}(${testValue})
+  expectNil(${Self}(exactly: input))
+}
+
+%       else:
+
+%         if testValue > selfMax:
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+.crashOutputMatches(getTooLargeMessage()).code {
+  expectCrashLater()
+%         elif testValue < selfMin:
+FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}")
+.crashOutputMatches(getTooSmallMessage()).code {
+  expectCrashLater()
+%         else:
+FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValue}") {
+%         end
+  let input = get${Other}(${testValue})
+  var result = ${Self}(input)
+  var resultConvertedBack = ${Other}(result)
+  expectNotEqual(input, resultConvertedBack)
+}
+
+FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testValue}") {
+  let input = get${Other}(${testValue})
+  expectNil(${Self}(exactly: input))
+}
+%       end
+%     end # for in testValues
+
+// Test Always-Trapping conversions.
+
+%     if not selfSigned:
+
+FloatingPointConversionTraps.test("${Self}/${Other}/negative")
+  .crashOutputMatches(getTooSmallMessage()).code {
+  expectCrashLater()
+  _blackHole(${Self}(get${Other}(-123.0)))
+}
+
+FloatingPointConversionFailures.test("${Self}/${Other}/negative") {
+  expectNil(${Self}(exactly: get${Other}(-123.0)))
+}
+
+%     end
+
+FloatingPointConversionTraps.test("${Self}/${Other}/+inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage()).code {
+  expectCrashLater()
+  _blackHole(${Self}(get${Other}(${Other}.infinity)))
+}
+
+FloatingPointConversionFailures.test("${Self}/${Other}/+inf") {
+  expectNil(${Self}(exactly: get${Other}(${Other}.infinity)))
+}
+
+FloatingPointConversionTraps.test("${Self}/${Other}/-inf")
+  .crashOutputMatches(getInfiniteOrNaNMessage()).code {
+  expectCrashLater()
+  _blackHole(${Self}(get${Other}(-${Other}.infinity)))
+}
+
+FloatingPointConversionFailures.test("${Self}/${Other}/-inf") {
+  expectNil(${Self}(exactly: get${Other}(-${Other}.infinity)))
+}
+
+FloatingPointConversionTraps.test("${Self}/${Other}/NaN")
+  .crashOutputMatches(getInfiniteOrNaNMessage()).code {
+  expectCrashLater()
+  _blackHole(${Self}(get${Other}(${Other}.nan)))
+}
+
+FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
+  expectNil(${Self}(exactly: get${Other}(${Other}.nan)))
+}
+
+%     if Other == 'Float80':
+#endif
+%     end
+
+%   end # for in all_floating_point_types (Other)
+% end # for in all_integer_types (Self)
+
+""")
+
+}%
+
+#if arch(i386) || arch(arm)
+
+  ${gyb.execute_template(
+      int_to_int_conversion_template,
+      word_bits=32)}
+
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+
+  ${gyb.execute_template(
+      int_to_int_conversion_template,
+      word_bits=64)}
+
+#else
+
+_UnimplementedError()
+
+#endif
+
+runAllTests()

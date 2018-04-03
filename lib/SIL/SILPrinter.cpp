@@ -1435,7 +1435,8 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
+          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
@@ -1832,8 +1833,9 @@ public:
   }
   void visitBeginAccessInst(BeginAccessInst *BAI) {
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
-          << getSILAccessEnforcementName(BAI->getEnforcement())
-          << "] " << getIDAndType(BAI->getOperand());
+          << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
+          << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
     *this << (EAI->isAborting() ? "[abort] " : "")
@@ -1841,8 +1843,9 @@ public:
   }
   void visitBeginUnpairedAccessInst(BeginUnpairedAccessInst *BAI) {
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
-          << getSILAccessEnforcementName(BAI->getEnforcement())
-          << "] " << getIDAndType(BAI->getSource()) << ", "
+          << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
+          << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << getIDAndType(BAI->getSource()) << ", " 
           << getIDAndType(BAI->getBuffer());
   }
   void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
@@ -2654,7 +2657,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
+  OS << "\n\nimport " << BUILTIN_NAME
+     << "\nimport " << STDLIB_NAME
      << "\nimport " << SWIFT_SHIMS_NAME << "\n\n";
 
   // Print the declarations and types from the associated context (origin module or
@@ -2854,13 +2858,6 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "base_protocol "
          << baseProtoWitness.Requirement->getName() << ": ";
       baseProtoWitness.Witness->printName(OS, Options);
-      break;
-    }
-    case MissingOptional: {
-      // optional requirement 'declref': <<not present>>
-      OS << "optional requirement '"
-         << witness.getMissingOptionalWitness().Witness->getBaseName()
-         << "': <<not present>>";
       break;
     }
     }

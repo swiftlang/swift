@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
@@ -89,8 +88,8 @@ func test0(_ arg: id) -> id {
 
 func test1(_ cell: Blammo) {}
 // CHECK:  define hidden swiftcc void @"$S4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
-// CHECK:    ret void
+// CHECK-NEXT:    entry
+// CHECK-NEXT:    ret void
 
 
 // FIXME: These ownership convention tests should become SILGen tests.

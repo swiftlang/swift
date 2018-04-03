@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
 // RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
@@ -584,7 +583,7 @@ func noEscapeBlock() {
 // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> (), invoke [[F2]] : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
 // CHECK: [[ARG:%.*]] = copy_block [[BLOCK]] : $@convention(block) @noescape () -> ()
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@owned @convention(block) @noescape () -> (), @inout Int) -> ()
+// CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> (), @inout Int) -> ()
 // CHECK: end_access [[WRITE]] : $*Int
 // CHECK: dealloc_stack [[STORAGE]] : $*@block_storage @noescape @callee_guaranteed () -> ()
 // CHECK-LABEL: } // end sil function '$S27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_'

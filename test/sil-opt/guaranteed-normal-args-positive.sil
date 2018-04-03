@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/Inputs/guaranteed-normal-args.swift -o %t/TestModule.swiftmodule -emit-module -module-name TestModule -enable-guaranteed-normal-arguments
-// RUN: %target-sil-opt %s -I=%t -enable-guaranteed-normal-arguments
+// RUN: %target-swift-frontend %S/Inputs/guaranteed-normal-args.swift -o %t/TestModule.swiftmodule -emit-module -module-name TestModule
+// RUN: %target-sil-opt %s -I=%t
 
 // This is a positive test
 

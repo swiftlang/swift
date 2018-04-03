@@ -684,12 +684,19 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     if (!substConv.getSILType(PI).isLoadable(M)) {
       continue;
     }
-    if (PI.getConvention() == ParameterConvention::Indirect_In) {
+
+    switch (PI.getConvention()) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
       Conversions.set(IdxToInsert);
-    }
-    if ((PI.getConvention() == ParameterConvention::Indirect_In_Guaranteed) &&
-        substConv.getSILType(PI).isTrivial(M)) {
-      Conversions.set(IdxToInsert);
+      break;
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Guaranteed:
+      break;
     }
   }
 

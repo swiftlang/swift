@@ -153,6 +153,7 @@ KNOWN_SETTINGS=(
     skip-test-android-host      ""               "set to skip testing the host parts of the Android toolchain"
     validation-test             "0"              "set to run the validation test suite"
     long-test                   "0"              "set to run the long test suite"
+    stress-test                 "0"              "set to run the stress test suite"
     test-paths                  ""               "run tests located in specific directories and/or files"
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
@@ -2252,6 +2253,7 @@ for host in "${ALL_HOSTS[@]}"; do
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                             -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                             -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                             -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                             -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2270,6 +2272,7 @@ for host in "${ALL_HOSTS[@]}"; do
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                             -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                             -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                             -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                             -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2288,6 +2291,7 @@ for host in "${ALL_HOSTS[@]}"; do
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                             -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                             -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                             -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                             -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2306,6 +2310,7 @@ for host in "${ALL_HOSTS[@]}"; do
                             "${cmake_options[@]}"
                             -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                             -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                            -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                             -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                             -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                             -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2332,6 +2337,7 @@ for host in "${ALL_HOSTS[@]}"; do
                                 "${cmake_options[@]}"
                                 -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                                 -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                                -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                                 -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                                 -DLLDB_PATH_TO_LLVM_SOURCE:PATH="${LLVM_SOURCE_DIR}"
                                 -DLLDB_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -2744,9 +2750,15 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 lldb_build_dir=$(build_directory ${host} lldb)
 
+		using_xcodebuild="FALSE"
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                    using_xcodebuild="TRUE"
+                fi
+
+
                 # Run the unittests.
                 # FIXME: The xcode build project currently doesn't know how to run the lit style tests.
-                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
                     set_lldb_xcodebuild_options
                     # Run the LLDB unittests (gtests).
                     with_pushd ${LLDB_SOURCE_DIR} \
@@ -2763,7 +2775,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
-                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
                     lldb_executable="${lldb_build_dir}"/${LLDB_BUILD_MODE}/lldb
                 else
                     lldb_executable="${lldb_build_dir}"/bin/lldb
@@ -2792,14 +2804,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
-                # Optionally specify a test subdirectory and category filters.
-                # Watchpoint testing is currently disabled: see rdar://38566150.
+                # Handle test subdirectory clause
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
+                    LLDB_TEST_CATEGORIES="--skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
                 else
                     LLDB_TEST_SUBDIR_CLAUSE=""
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
+                    LLDB_TEST_CATEGORIES=""
                 fi
 
                 # figure out which C/C++ compiler we should use for building test inferiors.
@@ -2839,26 +2850,21 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Prefer to use lldb-dotest, as building it guarantees that we build all
                 # test dependencies. Ultimately we want to delete as much lldb-specific logic
                 # from this file as possible and just have a single call to lldb-dotest.
-                dotest_extra_args=""
-                if [[ ! -z "${DOTEST_EXTRA}" ]] ; then
-                    dotest_extra_args="-E ${DOTEST_EXTRA}"
-                fi
-                if [[ "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "FALSE" ]] ; then
+                if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
                         ${NINJA_BIN} lldb-dotest
 
                     lldb_dotest="${lldb_build_dir}"/bin/lldb-dotest
                     with_pushd ${results_dir} \
-                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                        SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                        ${lldb_dotest} \
+                        call "${lldb_dotest}" \
                         ${LLDB_TEST_SUBDIR_CLAUSE} \
                         ${LLDB_TEST_CATEGORIES} \
                         ${LLDB_FORMATTER_OPTS} \
-                        ${dotest_extra_args}
-		else
+                        --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
+                        -E "${DOTEST_EXTRA}"
+                else
                     with_pushd "${results_dir}" \
-                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
                         SWIFTLIBS="${swift_build_dir}/lib/swift" \
                         "${LLDB_SOURCE_DIR}"/test/dotest.py \
                         --executable "${lldb_executable}" \
@@ -2868,7 +2874,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ${LLDB_DOTEST_CC_OPTS} \
                         ${LLDB_FORMATTER_OPTS} \
                         --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                        ${dotest_extra_args}
+                        -E "${DOTEST_EXTRA}"
                 fi
 
                 continue

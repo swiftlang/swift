@@ -99,7 +99,7 @@ public func single_concrete() {
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$S42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 
-// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa"(%swift.type* [[Single_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @"$S42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa"(%swift.type* [[Single_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]]) [[ATTRS:#[0-9]+]]
 // CHECK-NEXT:    store atomic i8** [[Single_P1]], i8*** @"$S42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 
@@ -304,3 +304,4 @@ protocol P5 {}
 struct SR7101<T> {}
 extension SR7101 : P5 where T == P4Typealias {}
 
+// CHECK: attributes [[ATTRS]] = { nounwind }

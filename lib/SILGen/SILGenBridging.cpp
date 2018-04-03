@@ -306,6 +306,10 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
     return SGF.emitManagedRValueWithCleanup(value, valueTL);
 
   case ParameterConvention::Direct_Guaranteed:
+    // If we have a guaranteed parameter, the object should not need to be
+    // retained or have a cleanup.
+    return ManagedValue::forUnmanaged(value);
+
   case ParameterConvention::Direct_Unowned:
     // We need to independently retain the value.
     return SGF.emitManagedRetain(loc, value, valueTL);
@@ -315,9 +319,9 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
 
   case ParameterConvention::Indirect_In_Guaranteed:
     if (valueTL.isLoadable()) {
-      return SGF.emitLoad(loc, value, valueTL, SGFContext(), IsNotTake);
+      return SGF.B.createLoadBorrow(loc, ManagedValue::forUnmanaged(value));
     } else {
-      return SGF.emitManagedRetain(loc, value, valueTL);
+      return ManagedValue::forUnmanaged(value);
     }
 
   case ParameterConvention::Indirect_In:
@@ -925,23 +929,19 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
-  SingleValueInstruction *thunkedFn = B.createPartialApply(
+  ManagedValue thunkedFn = B.createPartialApply(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs,
-      block.forward(*this),
+      block,
       SILType::getPrimitiveObjectType(loweredFuncTyWithoutNoEscape));
 
   if (!loweredFuncTy->isNoEscape()) {
-    return emitManagedRValueWithCleanup(thunkedFn);
+    return thunkedFn;
   }
 
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
-
-  auto &funcTL = getTypeLowering(loweredFuncTy);
-  SingleValueInstruction *noEscapeThunkFn =
-      B.createConvertEscapeToNoEscape(loc, thunkedFn, funcTL.getLoweredType());
-  enterPostponedCleanup(thunkedFn);
-  return emitManagedRValueWithCleanup(noEscapeThunkFn);
+  return B.createConvertEscapeToNoEscape(loc, thunkedFn,
+                          SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
@@ -1118,12 +1118,20 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
   assert(bridgeFnType->getResults()[0].getConvention()
          == ResultConvention::Owned);
   auto nativeErrorType = bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
-  assert(bridgeFnType->getParameters()[0].getConvention()
-           == ParameterConvention::Direct_Owned);
+
+  SILValue arg;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments) {
+    assert(bridgeFnType->getParameters()[0].getConvention() ==
+           ParameterConvention::Direct_Guaranteed);
+    arg = bridgedError.getValue();
+  } else {
+    assert(bridgeFnType->getParameters()[0].getConvention() ==
+           ParameterConvention::Direct_Owned);
+    arg = bridgedError.forward(*this);
+  }
 
   SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
-                                       nativeErrorType, {},
-                                       bridgedError.forward(*this));
+                                       nativeErrorType, {}, arg);
   return emitManagedRValueWithCleanup(nativeError);
 }
 
@@ -1166,12 +1174,20 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
          == ResultConvention::Owned);
   auto loweredBridgedErrorType =
     bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
-  assert(bridgeFnType->getParameters()[0].getConvention()
-           == ParameterConvention::Direct_Owned);
+
+  SILValue arg;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments) {
+    assert(bridgeFnType->getParameters()[0].getConvention() ==
+           ParameterConvention::Direct_Guaranteed);
+    arg = nativeError.getValue();
+  } else {
+    assert(bridgeFnType->getParameters()[0].getConvention() ==
+           ParameterConvention::Direct_Owned);
+    arg = nativeError.forward(*this);
+  }
 
   SILValue bridgedError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
-                                        loweredBridgedErrorType, {},
-                                        nativeError.forward(*this));
+                                        loweredBridgedErrorType, {}, arg);
   return emitManagedRValueWithCleanup(bridgedError);
 }
 
@@ -1320,12 +1336,16 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
 
   assert(bridgedArgs.size() == nativeInputs.size());
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
+    // Consider the bridged values to be "call results" since they're coming
+    // from potentially nil-unsound ObjC callers.
     ManagedValue native =
       SGF.emitBridgedToNativeValue(loc,
-                                   bridgedArgs[i],
-                                   bridgedFormalTypes[i],
-                                   nativeFormalTypes[i],
-                        swiftFnTy->getParameters()[i].getSILStorageType());
+                        bridgedArgs[i],
+                        bridgedFormalTypes[i],
+                        nativeFormalTypes[i],
+                        swiftFnTy->getParameters()[i].getSILStorageType(),
+                        SGFContext(),
+                        /*isCallResult*/ true);
     SILValue argValue;
 
     if (nativeInputs[i].isConsumed()) {

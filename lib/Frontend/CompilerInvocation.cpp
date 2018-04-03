@@ -12,9 +12,9 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
@@ -308,6 +308,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
                    Opts.EnableNSKeyedArchiverDiagnostics);
+
+  Opts.EnableNonFrozenEnumExhaustivityDiagnostics =
+    Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
+                 OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
+                 Opts.EnableNonFrozenEnumExhaustivityDiagnostics);
 
   if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
     Opts.OptimizationRemarkPassedPattern =
@@ -668,8 +673,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.EnableGuaranteedNormalArguments |=
-      Args.hasArg(OPT_enable_guaranteed_normal_arguments);
+  Opts.EnableGuaranteedNormalArguments &=
+      !Args.hasArg(OPT_disable_guaranteed_normal_arguments);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
@@ -910,9 +915,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
+static std::string getScriptFileName(StringRef name, bool isSwiftVersion3) {
+  StringRef langVer = isSwiftVersion3 ? "3" : "4";
+  return (Twine(name) + langVer + ".json").str();
+}
+
 bool ParseMigratorArgs(MigratorOptions &Opts,
                        const FrontendOptions &FrontendOpts,
                        const llvm::Triple &Triple,
+                       const bool isSwiftVersion3,
                        StringRef ResourcePath, const ArgList &Args,
                        DiagnosticEngine &Diags) {
   using namespace options;
@@ -943,19 +954,24 @@ bool ParseMigratorArgs(MigratorOptions &Opts,
     llvm::SmallString<128> dataPath(ResourcePath);
     llvm::sys::path::append(dataPath, "migrator");
     if (Triple.isMacOSX())
-      llvm::sys::path::append(dataPath, "macos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("macos", isSwiftVersion3));
     else if (Triple.isiOS())
-      llvm::sys::path::append(dataPath, "ios.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("ios", isSwiftVersion3));
     else if (Triple.isTvOS())
-      llvm::sys::path::append(dataPath, "tvos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("tvos", isSwiftVersion3));
     else if (Triple.isWatchOS())
-      llvm::sys::path::append(dataPath, "watchos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("watchos", isSwiftVersion3));
     else
       Supported = false;
     if (Supported) {
       llvm::SmallString<128> authoredDataPath(ResourcePath);
       llvm::sys::path::append(authoredDataPath, "migrator");
-      llvm::sys::path::append(authoredDataPath, "overlay.json");
+      llvm::sys::path::append(authoredDataPath,
+                              getScriptFileName("overlay", isSwiftVersion3));
       // Add authored list first to take higher priority.
       Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
       Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
@@ -1046,6 +1062,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseMigratorArgs(MigratorOpts, FrontendOpts, LangOpts.Target,
+                        LangOpts.isSwiftVersion3(),
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }

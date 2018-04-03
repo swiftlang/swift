@@ -611,12 +611,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   }
   invocationArgStrs.push_back("-iapinotes-modules");
   invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
-
-  // Map the Swift major version into the API notes version for Swift. This
-  // has the effect of allowing API notes to effect changes only on Swift
-  // major versions, not minor versions.
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
-                              llvm::itostr(languageVersion[0]));
+      languageVersion.asAPINotesVersionString());
 }
 
 static void

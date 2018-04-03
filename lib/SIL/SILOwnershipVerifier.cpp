@@ -62,6 +62,12 @@ llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
                    "comment in SILOwnershipVerifier.cpp above option for more "
                    "information."));
 
+/// This is an option to turn off ownership verification on a specific file. We
+/// still emit code as if we are in ownership mode, but we do not verify. This
+/// is useful for temporarily turning off verification on tests.
+static llvm::cl::opt<bool>
+    DisableOwnershipVerification("disable-sil-ownership-verification");
+
 //===----------------------------------------------------------------------===//
 //                              Generalized User
 //===----------------------------------------------------------------------===//
@@ -2206,6 +2212,9 @@ bool SILValueOwnershipChecker::checkDataflow() {
 
 void SILInstruction::verifyOperandOwnership() const {
 #ifndef NDEBUG
+  if (DisableOwnershipVerification)
+    return;
+
   if (isStaticInitializerInst())
     return;
 
@@ -2251,6 +2260,9 @@ void SILInstruction::verifyOperandOwnership() const {
 
 void SILValue::verifyOwnership(SILModule &Mod, DeadEndBlocks *DEBlocks) const {
 #ifndef NDEBUG
+  if (DisableOwnershipVerification)
+    return;
+
   // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
   // the SILUndef will make sure that the matching checks out.
   if (isa<SILUndef>(*this))

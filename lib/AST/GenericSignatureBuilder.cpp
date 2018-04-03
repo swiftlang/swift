@@ -2596,13 +2596,14 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
 // Function for feeding through any other requirements that the conformance
 // requires to be satisfied. These are things we're inferring.
 static void addConditionalRequirements(GenericSignatureBuilder &builder,
-                                       ProtocolConformanceRef conformance) {
+                                       ProtocolConformanceRef conformance,
+                                       ModuleDecl *inferForModule) {
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
     auto source = FloatingRequirementSource::forInferred(nullptr);
     for (auto requirement : conformance.getConditionalRequirements()) {
-      builder.addRequirement(requirement, source, /*inferForModule=*/nullptr);
+      builder.addRequirement(requirement, source, inferForModule);
       ++NumConditionalRequirementsAdded;
     }
   }
@@ -2646,7 +2647,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
-  addConditionalRequirements(*this, *conformance);
+  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
   return concreteSource;
 }
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
@@ -2677,7 +2678,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
-  addConditionalRequirements(*this, *conformance);
+  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
   return superclassSource;
 }
 
@@ -3899,24 +3900,34 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // The protocol concrete type has an underlying type written in terms
   // of the protocol's 'Self' type.
-  auto type = concreteDecl->getDeclaredInterfaceType();
+  auto typealias = dyn_cast<TypeAliasDecl>(concreteDecl);
+  auto type = typealias ? typealias->getUnderlyingTypeLoc().getType()
+                        : concreteDecl->getDeclaredInterfaceType();
 
+  Type parentType;
+  SubstitutionMap subMap;
   if (proto) {
     // Substitute in the type of the current PotentialArchetype in
     // place of 'Self' here.
-    Type parentType = basePA->getDependentType(builder.getGenericParams());
+    parentType = basePA->getDependentType(builder.getGenericParams());
 
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+    subMap = SubstitutionMap::getProtocolSubstitutions(
         proto, parentType, ProtocolConformanceRef(proto));
 
     type = type.subst(subMap, SubstFlags::UseErrorType);
   } else {
     // Substitute in the superclass type.
-    auto superclass = basePA->getEquivalenceClassIfPresent()->superclass;
-    auto superclassDecl = superclass->getClassOrBoundGenericClass();
-    type = superclass->getTypeOfMember(
-        superclassDecl->getParentModule(), concreteDecl,
-        concreteDecl->getDeclaredInterfaceType());
+    parentType = basePA->getEquivalenceClassIfPresent()->superclass;
+    auto superclassDecl = parentType->getClassOrBoundGenericClass();
+
+    subMap = parentType->getMemberSubstitutionMap(
+                           superclassDecl->getParentModule(), concreteDecl);
+    type = type.subst(subMap, SubstFlags::UseErrorType);
+  }
+
+  // If we had a typealias, form a sugared type.
+  if (typealias) {
+    type = NameAliasType::get(typealias, parentType, subMap, type);
   }
 
   return type;
@@ -4106,8 +4117,6 @@ static ConstraintResult visitInherited(
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
 
-  // FIXME: Should this whole thing use getExistentialLayout() instead?
-
   visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr) {
     // Decompose explicitly-written protocol compositions.
     if (auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr)) {
@@ -4173,7 +4182,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
-                               /*inferForModule=*/nullptr);
+                               proto->getModuleContext());
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }
@@ -4189,7 +4198,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
           source, proto, &req, /*inferred=*/false);
       addRequirement(&req, innerSource, &protocolSubMap,
-                     /*inferForModule=*/nullptr);
+                     proto->getModuleContext());
     }
   }
 
@@ -4710,10 +4719,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
-          auto inferredSource = FloatingRequirementSource::forInferred(nullptr);
-          for (auto req : conformance->getConditionalRequirements()) {
-            addRequirement(req, inferredSource, inferForModule);
-          }
+          addConditionalRequirements(*this, *conformance, inferForModule);
         }
       }
     }
@@ -4937,6 +4943,22 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->representativeOrEquivClass = T1;
+
+  // Layout requirements.
+  if (equivClass2 && equivClass2->layout) {
+    if (!equivClass->layout) {
+      equivClass->layout = equivClass2->layout;
+      equivClass->layoutConstraints = std::move(equivClass2->layoutConstraints);
+    } else {
+      const RequirementSource *source2
+        = equivClass2->layoutConstraints.front().source;
+      addLayoutRequirementDirect(T1, equivClass2->layout, source2);
+      equivClass->layoutConstraints.insert(
+                                   equivClass->layoutConstraints.end(),
+                                   equivClass2->layoutConstraints.begin() + 1,
+                                   equivClass2->layoutConstraints.end());
+    }
+  }
 
   // Superclass requirements.
   if (equivClass2 && equivClass2->superclass) {
@@ -5416,9 +5438,25 @@ public:
   }
 
   Action walkToTypePost(Type ty) override {
-    auto decl = ty->getAnyNominal();
-    if (!decl)
+    // Infer from generic typealiases.
+    if (auto NameAlias = dyn_cast<NameAliasType>(ty.getPointer())) {
+      auto decl = NameAlias->getDecl();
+      auto genericSig = decl->getGenericSignature();
+      if (!genericSig)
+        return Action::Continue;
+
+      auto subMap = NameAlias->getSubstitutionMap();
+      for (const auto &rawReq : genericSig->getRequirements()) {
+        if (auto req = rawReq.subst(subMap))
+          Builder.addRequirement(*req, source, nullptr);
+      }
+
       return Action::Continue;
+    }
+
+    // Infer from generic nominal types.
+    auto decl = ty->getAnyNominal();
+    if (!decl) return Action::Continue;
 
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
@@ -6164,19 +6202,19 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
 
 /// Determine whether this is a redundantly inheritable Objective-C protocol.
 ///
-/// If we do have a redundantly inheritable Objective-C protocol, record that
-/// the conformance was restated on the protocol whose requirement signature
-/// we are computing.
+/// A redundantly-inheritable Objective-C protocol is one where we will
+/// silently accept a directly-stated redundant conformance to this protocol,
+/// and emit this protocol in the list of "inherited" protocols. There are
+/// two cases where we allow this:
 ///
-/// At present, there is only one such protocol that we know about:
-/// JavaScriptCore's JSExport.
+//    1) For a protocol defined in Objective-C, so that we will match Clang's
+///      behavior, and
+///   2) For an @objc protocol defined in Swift that directly inherits from
+///      JavaScriptCore's JSExport, which depends on this behavior.
 static bool isRedundantlyInheritableObjCProtocol(
                                              ProtocolDecl *proto,
                                              const RequirementSource *source) {
   if (!proto->isObjC()) return false;
-
-  // Only JSExport protocol behaves this way.
-  if (!proto->getName().is("JSExport")) return false;
 
   // Only do this for the requirement signature computation.
   auto parentSource = source->parent;
@@ -6184,9 +6222,14 @@ static bool isRedundantlyInheritableObjCProtocol(
       parentSource->kind != RequirementSource::RequirementSignatureSelf)
     return false;
 
+  // Check the two conditions in which we will suppress the diagnostic and
+  // emit the redundant inheritance.
+  auto inheritingProto = parentSource->getProtocolDecl();
+  if (!inheritingProto->hasClangNode() && !proto->getName().is("JSExport"))
+    return false;
+
   // If the inheriting protocol already has @_restatedObjCConformance with
   // this protocol, we're done.
-  auto inheritingProto = parentSource->getProtocolDecl();
   for (auto *attr : inheritingProto->getAttrs()
                       .getAttributes<RestatedObjCConformanceAttr>()) {
     if (attr->Proto == proto) return true;

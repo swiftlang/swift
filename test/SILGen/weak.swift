@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %target-swift-frontend -module-name weak -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
@@ -12,10 +11,10 @@ struct A {
   weak var x: C?
 }
 
-// CHECK:    sil hidden @$S4weak5test01cyAA1CC_tF : $@convention(thin) (@owned C) -> () {
+// CHECK:    sil hidden @$S4weak5test01cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 func test0(c c: C) {
   var c = c
-// CHECK:    bb0(%0 : @owned $C):
+// CHECK:    bb0(%0 : @guaranteed $C):
 // CHECK:      [[C:%.*]] = alloc_box ${ var C }
 // CHECK-NEXT: [[PBC:%.*]] = project_box [[C]]
 

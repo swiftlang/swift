@@ -1,12 +1,12 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -enable-key-path-resilience %s | %FileCheck %s
 
 // TODO: globals should get descriptors
 public var a: Int = 0
 
-@_inlineable
+@inlinable
 public var b: Int { return 0 }
 
-@_versioned
+@usableFromInline
 internal var c: Int = 0
 
 // no descriptor
@@ -20,11 +20,11 @@ public struct A {
   public var a: Int = 0
 
   // CHECK-LABEL: sil_property #A.b
-  @_inlineable
+  @inlinable
   public var b: Int { return 0 }
 
   // CHECK-LABEL: sil_property #A.c
-  @_versioned
+  @usableFromInline
   internal var c: Int = 0
 
   // no descriptor
@@ -37,9 +37,9 @@ public struct A {
 
   // TODO: static vars should get descriptors
   public static var a: Int = 0
-  @_inlineable
+  @inlinable
   public static var b: Int { return 0 }
-  @_versioned
+  @usableFromInline
   internal static var c: Int = 0
 
   // no descriptor
@@ -53,10 +53,10 @@ public struct A {
   // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1a
   public subscript(a x: Int) -> Int { return x }
   // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1b
-  @_inlineable
+  @inlinable
   public subscript(b x: Int) -> Int { return x }
   // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1c
-  @_versioned
+  @usableFromInline
   internal subscript(c x: Int) -> Int { return x }
   
   // no descriptor
@@ -68,10 +68,10 @@ public struct A {
   // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1a
   public subscript<T>(a x: T) -> T { return x }
   // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1b
-  @_inlineable
+  @inlinable
   public subscript<T>(b x: T) -> T { return x }
   // CHECK-LABEL: sil_property #A.subscript{{.*}} id @{{.*}}1c
-  @_versioned
+  @usableFromInline
   internal subscript<T>(c x: T) -> T { return x }
   
   // no descriptor

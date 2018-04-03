@@ -229,22 +229,22 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // Swift source.
 
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-      MANGLE_AS_STRING(MANGLE_SYM(So10CFErrorRefas5Error10FoundationWP))));
+      MANGLE_AS_STRING(MANGLE_SYM(So10CFErrorRefas5Error10FoundationWa))));
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
 
-  return reinterpret_cast<const WitnessTable *>(TheWitnessTable);
+  return reinterpret_cast<const SWIFT_CC(swift) WitnessTable *(*)()>(TheWitnessTable)();
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-           MANGLE_AS_STRING(MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWP))));
+           MANGLE_AS_STRING(MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWa))));
   assert(TheWitnessTable &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
 
-  return reinterpret_cast<const HashableWitnessTable *>(TheWitnessTable);
+  return reinterpret_cast<const SWIFT_CC(swift) HashableWitnessTable *(*)()>(TheWitnessTable)();
 }
 
 bool SwiftError::isPureNSError() const {

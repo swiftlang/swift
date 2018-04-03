@@ -37,7 +37,6 @@ class SILModule;
 class ProtocolConformance;
 class NormalProtocolConformance;
 enum IsSerialized_t : unsigned char;
-enum class ResilienceStrategy : unsigned;
 
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.
@@ -84,20 +83,13 @@ public:
     ProtocolConformance *Witness;
   };
                           
-  /// A witness table entry for an optional requirement that is not present.
-  struct MissingOptionalWitness {
-    /// The witness for the optional requirement that wasn't present.
-    ValueDecl *Witness;
-  };
-  
   /// A witness table entry kind.
   enum WitnessKind {
     Invalid,
     Method,
     AssociatedType,
     AssociatedTypeProtocol,
-    BaseProtocol,
-    MissingOptional
+    BaseProtocol
   };
   
   /// A witness table entry.
@@ -108,7 +100,6 @@ public:
       AssociatedTypeWitness AssociatedType;
       AssociatedTypeProtocolWitness AssociatedTypeProtocol;
       BaseProtocolWitness BaseProtocol;
-      MissingOptionalWitness MissingOptional;
     };
     
   public:
@@ -132,10 +123,6 @@ public:
         BaseProtocol(BaseProtocol)
     {}
     
-    Entry(const MissingOptionalWitness &MissingOptional)
-      : Kind(WitnessKind::MissingOptional), MissingOptional(MissingOptional) {
-    }
-    
     WitnessKind getKind() const { return Kind; }
     
     const MethodWitness &getMethodWitness() const {
@@ -156,11 +143,6 @@ public:
       return BaseProtocol;
     }
     
-    const MissingOptionalWitness &getMissingOptionalWitness() const {
-      assert(Kind == WitnessKind::MissingOptional);
-      return MissingOptional;
-    }
-
     void removeWitnessMethod() {
       assert(Kind == WitnessKind::Method);
       if (Method.Witness) {

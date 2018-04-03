@@ -62,7 +62,6 @@ namespace swift {
   class LinkLibrary;
   class LookupCache;
   class ModuleLoader;
-  class NameAliasType;
   class NominalTypeDecl;
   class EnumElementDecl;
   class OperatorDecl;
@@ -108,13 +107,13 @@ enum class SourceFileKind {
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
-  /// Non-inlineable function bodies: resilient
+  /// Non-inlinable function bodies: resilient
   ///
   /// This is the default behavior without any flags.
   Default,
 
   /// Public nominal types: resilient
-  /// Non-inlineable function bodies: resilient
+  /// Non-inlinable function bodies: resilient
   ///
   /// This is the behavior with -enable-resilience.
   Resilient

@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %swift -module-name generic_metatypes -target x86_64-apple-macosx10.9  -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
 // RUN: %swift -module-name generic_metatypes -target i386-apple-ios7.0        -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
@@ -61,7 +60,7 @@ func protocolTypeof(_ x: Bas) -> Bas.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[VALUE_ADDR]], %swift.type* [[METADATA]], i1 true)
   // CHECK: [[WTABLE_ADDR:%.*]] = getelementptr inbounds %T17generic_metatypes3BasP, %T17generic_metatypes3BasP* %0, i32 0, i32 2
   // CHECK: [[WTABLE:%.*]] = load i8**, i8*** [[WTABLE_ADDR]]
-  // CHECK: call void @__swift_destroy_boxed_opaque_existential_1(%T17generic_metatypes3BasP* %0)
+  // CHECK-NOT: call void @__swift_destroy_boxed_opaque_existential_1(%T17generic_metatypes3BasP* %0)
   // CHECK: [[T0:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[METATYPE]], 0
   // CHECK: [[T1:%.*]] = insertvalue { %swift.type*, i8** } [[T0]], i8** [[WTABLE]], 1
   // CHECK: ret { %swift.type*, i8** } [[T1]]
@@ -112,7 +111,7 @@ func makeGenericMetatypes() {
 }
 
 // CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVyAA3FooVGMa"([[INT]]) [[NOUNWIND_READNONE_OPT:#[0-9]+]]
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVMa"([[INT]] 0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVMa"([[INT]] %0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes6OneArgVMa"
 // CHECK-SAME:    ([[INT]], %swift.type*)
@@ -127,9 +126,9 @@ func makeGenericMetatypes() {
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMa"
 // CHECK-SAME:    ([[INT]]) [[NOUNWIND_READNONE_OPT]]
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 0)
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 255)
 // CHECK:   [[BAR:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes7TwoArgsVMa"([[INT]] 0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]])
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes7TwoArgsVMa"([[INT]] %0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]])
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes7TwoArgsVMa"
 // CHECK-SAME:    ([[INT]], %swift.type*, %swift.type*)
@@ -146,9 +145,9 @@ func makeGenericMetatypes() {
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMa"
 // CHECK-SAME:    ([[INT]]) [[NOUNWIND_READNONE_OPT]]
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 0)
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 255)
 // CHECK:   [[BAR:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes9ThreeArgsVMa"([[INT]] 0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE]]
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes9ThreeArgsVMa"([[INT]] %0, %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}, %swift.type* [[BAR]], %swift.type* {{.*}} @"$S17generic_metatypes3FooVMf", {{.*}}) [[NOUNWIND_READNONE]]
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes9ThreeArgsVMa"
 // CHECK-SAME:    ({{i[0-9]+}}, %swift.type*, %swift.type*, %swift.type*)
@@ -168,7 +167,7 @@ func makeGenericMetatypes() {
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMa"
 // CHECK-SAME:    ([[INT]]) [[NOUNWIND_READNONE_OPT]]
 // CHECK:   [[BUFFER:%.*]] = alloca [4 x i8*]
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 0)
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 255)
 // CHECK:   [[BAR:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   call void @llvm.lifetime.start
 // CHECK-NEXT: [[SLOT_0:%.*]] = getelementptr inbounds [4 x i8*], [4 x i8*]* [[BUFFER]], i32 0, i32 0
@@ -182,14 +181,14 @@ func makeGenericMetatypes() {
 // CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* [[BAR]] to i8*
 // CHECK-NEXT: store i8* [[T0]], i8** [[SLOT_3]]
 // CHECK-NEXT: [[BUFFER_PTR:%.*]] = bitcast [4 x i8*]* [[BUFFER]] to i8**
-// CHECK-NEXT: call swiftcc %swift.metadata_response @"$S17generic_metatypes8FourArgsVMa"([[INT]] 0, i8** [[BUFFER_PTR]]) [[NOUNWIND_ARGMEM:#[0-9]+]]
+// CHECK-NEXT: call swiftcc %swift.metadata_response @"$S17generic_metatypes8FourArgsVMa"([[INT]] %0, i8** [[BUFFER_PTR]]) [[NOUNWIND_ARGMEM:#[0-9]+]]
 // CHECK: call void @llvm.lifetime.end.p0i8
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMa"
 // CHECK-SAME:    ([[INT]]) [[NOUNWIND_READNONE_OPT]]
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 0)
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S17generic_metatypes3BarCMa"([[INT]] 255)
 // CHECK:   [[BAR:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVMa"([[INT]] 0, i8**
+// CHECK:   call swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVMa"([[INT]] %0, i8**
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S17generic_metatypes8FiveArgsVMa"
 // CHECK-SAME:    ([[INT]], i8**) [[NOUNWIND_OPT:#[0-9]+]]

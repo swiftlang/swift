@@ -648,46 +648,25 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 ParserResult<IfConfigDecl> Parser::parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
   SyntaxParsingContext IfConfigCtx(SyntaxContext, SyntaxKind::IfConfigDecl);
+
   SmallVector<IfConfigClause, 4> Clauses;
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
   bool foundActive = false;
   bool isVersionCondition = false;
-  enum class ClauseKind {
-    If,
-    ElseIf,
-    Else,
-  };
   while (1) {
-    ClauseKind ClKind;
-    if (Tok.is(tok::pound_if)) {
-      ClKind = ClauseKind::If;
-    } else if (Tok.is(tok::pound_elseif)) {
-      ClKind = ClauseKind::ElseIf;
-    } else {
-      ClKind = ClauseKind::Else;
-    }
-    if (ClKind == ClauseKind::Else) {
-      // Collect all #elseif to a list.
-      SyntaxContext->collectNodesInPlace(SyntaxKind::ElseifDirectiveClauseList);
-    }
     SyntaxParsingContext ClauseContext(SyntaxContext,
-                                       ClKind == ClauseKind::Else ?
-                                        SyntaxKind::ElseDirectiveClause :
-                                        SyntaxKind::ElseifDirectiveClause);
-    SWIFT_DEFER {
-      // Avoid making a clause for if
-      if (ClKind == ClauseKind::If)
-        ClauseContext.setTransparent();
-    };
+                                       SyntaxKind::IfConfigClause);
+
+    bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     bool isActive = false;
 
     // Parse the condition.  Evaluate it to determine the active
     // clause unless we're doing a parse-only pass.
-    if (ClKind == ClauseKind::Else) {
+    if (isElse) {
       isActive = !foundActive && State->PerformConditionEvaluation;
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
@@ -739,9 +718,10 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     if (Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
 
-    if (ClKind == ClauseKind::Else)
+    if (isElse)
       diagnose(Tok, diag::expected_close_after_else_directive);
   }
+  SyntaxContext->collectNodesInPlace(SyntaxKind::IfConfigClauseList);
 
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);

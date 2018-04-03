@@ -46,7 +46,7 @@ void emitStoreEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
 template <class Impl>
 class WitnessSizedTypeInfo : public IndirectTypeInfo<Impl, TypeInfo> {
 private:
-  typedef IndirectTypeInfo<Impl, TypeInfo> super;
+  using super = IndirectTypeInfo<Impl, TypeInfo>;
 
 protected:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }

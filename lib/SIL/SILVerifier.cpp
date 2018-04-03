@@ -22,6 +22,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PostOrder.h"
@@ -59,7 +60,7 @@ static llvm::cl::opt<bool> AbortOnFailure(
 
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(false));
+                              llvm::cl::init(true));
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -209,9 +210,12 @@ void verifyKeyPathComponent(SILModule &M,
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = component.getStoredPropertyDecl();
-    require(property->getDeclContext()
-             == baseTy->getAnyNominal(),
-            "property decl should be a member of the component base type");
+    auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
+                         ->getReferenceStorageReferent()
+                         ->getCanonicalType();
+    require(fieldTy == componentTy,
+            "property decl should be a member of the base with the same type "
+            "as the component");
     switch (property->getStorageKind()) {
     case AbstractStorageDecl::Stored:
     case AbstractStorageDecl::StoredWithObservers:
@@ -4541,16 +4545,14 @@ public:
 
     const SILDebugScope *LastSeenScope = nullptr;
     for (SILInstruction &SI : *BB) {
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
       LastSeenScope = SI.getDebugScope();
       AlreadySeenScopes.insert(LastSeenScope);
       break;
     }
     for (SILInstruction &SI : *BB) {
-      // `alloc_stack` can create false positive, so we skip it
-      // for now.
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
 
       // If we haven't seen this debug scope yet, update the
@@ -4588,6 +4590,9 @@ public:
       }
       if (DS != LastSeenScope) {
         DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
+        DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
+        DEBUG(llvm::dbgs() <<
+          "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");

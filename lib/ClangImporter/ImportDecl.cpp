@@ -2497,7 +2497,8 @@ namespace {
             // doing so will cause confusion (or even lookup ambiguity) between
             // the name in the imported module and the same name in the
             // standard library.
-            if (auto *NAT = dyn_cast<NameAliasType>(SwiftType.getPointer()))
+            if (auto *NAT =
+                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
@@ -2653,7 +2654,8 @@ namespace {
         break;
       }
 
-      case EnumKind::Enum: {
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum: {
         auto &C = Impl.SwiftContext;
         EnumDecl *nativeDecl;
         bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
@@ -2757,6 +2759,14 @@ namespace {
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->computeType();
 
+        // Annotate as 'frozen' if appropriate.
+        assert((DeclAttribute::getOptions(DAK_Frozen) &
+                DeclAttribute::UserInaccessible) &&
+               "Once 'frozen' is supported, the attribute should not be "
+               "implicit (below)");
+        if (enumKind == EnumKind::FrozenEnum)
+          enumDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/true));
+
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
 
@@ -2823,7 +2833,7 @@ namespace {
                          AccessLevel::Public, loc, SourceLoc(),
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
-          alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
+          alias->setUnderlyingType(Impl.getSugaredTypeReference(errorWrapper));
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -2860,7 +2870,8 @@ namespace {
         addEnumeratorsAsMembers = false;
         break;
       case EnumKind::Options:
-      case EnumKind::Enum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
         addEnumeratorsAsMembers = true;
         break;
       }
@@ -2870,7 +2881,8 @@ namespace {
                                        EnumElementDecl *>, 8,
                           APSIntRefDenseMapInfo> canonicalEnumConstants;
 
-      if (enumKind == EnumKind::Enum) {
+      if (enumKind == EnumKind::NonFrozenEnum ||
+          enumKind == EnumKind::FrozenEnum) {
         for (auto constant : decl->enumerators()) {
           if (Impl.isUnavailableInSwift(constant))
             continue;
@@ -2931,7 +2943,8 @@ namespace {
             return true;
           });
           break;
-        case EnumKind::Enum: {
+        case EnumKind::NonFrozenEnum:
+        case EnumKind::FrozenEnum: {
           auto canonicalCaseIter =
             canonicalEnumConstants.find(&constant->getInitVal());
 
@@ -3238,23 +3251,24 @@ namespace {
       if (hasZeroInitializableStorage) {
         // Add constructors for the struct.
         ctors.push_back(createDefaultConstructor(Impl, result));
-        if (hasReferenceableFields && hasMemberwiseInitializer) {
-          // The default zero initializer suppresses the implicit value
-          // constructor that would normally be formed, so we have to add that
-          // explicitly as well.
-          //
-          // If we can completely represent the struct in SIL, leave the body
-          // implicit, otherwise synthesize one to call property setters.
-          bool wantBody = (hasUnreferenceableStorage &&
-                           !Impl.hasFinishedTypeChecking());
-          auto valueCtor = createValueConstructor(Impl, result, members,
-                                                  /*want param names*/true,
-                                                  /*want body*/wantBody);
-          if (!hasUnreferenceableStorage)
-            valueCtor->setIsMemberwiseInitializer();
+      }
 
-          ctors.push_back(valueCtor);
-        }
+      if (hasReferenceableFields && hasMemberwiseInitializer) {
+        // The default zero initializer suppresses the implicit value
+        // constructor that would normally be formed, so we have to add that
+        // explicitly as well.
+        //
+        // If we can completely represent the struct in SIL, leave the body
+        // implicit, otherwise synthesize one to call property setters.
+        bool wantBody = (hasUnreferenceableStorage &&
+                         !Impl.hasFinishedTypeChecking());
+        auto valueCtor = createValueConstructor(Impl, result, members,
+                                                /*want param names*/true,
+                                                /*want body*/wantBody);
+        if (!hasUnreferenceableStorage)
+          valueCtor->setIsMemberwiseInitializer();
+
+        ctors.push_back(valueCtor);
       }
 
       for (auto member : members) {
@@ -3379,7 +3393,8 @@ namespace {
         return result;
       }
 
-      case EnumKind::Enum:
+      case EnumKind::NonFrozenEnum:
+      case EnumKind::FrozenEnum:
       case EnumKind::Options: {
         // The enumeration was mapped to a high-level Swift type, and its
         // elements were created as children of that enum. They aren't available
@@ -4654,7 +4669,6 @@ namespace {
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
-      result->setAddedImplicitInitializers();
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
@@ -4954,7 +4968,7 @@ namespace {
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
 
-      typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
+      typealias->setUnderlyingType(Impl.getSugaredTypeReference(typeDecl));
       return typealias;
     }
 
@@ -5177,7 +5191,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     if (underlyingAlias->isGeneric())
       underlyingType = underlyingAlias->getUnboundGenericType();
     else
-      underlyingType = underlyingAlias->getDeclaredInterfaceType();
+      underlyingType = Impl.getSugaredTypeReference(underlyingAlias);
   } else {
     underlyingType = cast<NominalTypeDecl>(typeDecl)->getDeclaredType();
   }
@@ -5467,7 +5481,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     rawValueExpr->setNegative(SourceLoc());
 
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
-      decl, AccessLevel::Public, SourceLoc(), name, TypeLoc(), false,
+      decl, AccessLevel::Public, SourceLoc(), name, nullptr,
       SourceLoc(), rawValueExpr, theEnum);
 
   // Give the enum element the appropriate type.
@@ -7828,6 +7842,12 @@ static void finishInheritedConformances(
   }
 }
 
+/// A stripped-down version of Type::subst that only works on non-generic
+/// associated types.
+///
+/// This is used to finish a conformance for a concrete imported type that may
+/// rely on default associated types defined in protocol extensions...without
+/// having to do all the work of gathering conformances from scratch.
 static Type
 recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
                               DependentMemberType *depMemTy) {

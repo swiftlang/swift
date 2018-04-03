@@ -209,7 +209,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i64, i64* [[T0]], i64 3
 // CHECK:   [[T2:%.*]] = getelementptr inbounds i8**, i8*** [[TYPES:%.*]], i32 0
 // CHECK:   call void @swift_initStructMetadata(%swift.type* [[METADATA]], i64 0, i64 1, i8*** [[TYPES]], i64* [[T1]])
-// CHECK:   ret %swift.metadata_response zeroinitializer
+// CHECK:   ret %swift.metadata_response
 // CHECK: }
 
 // Check that we directly delegate buffer witnesses to a single dynamic field:
@@ -261,6 +261,11 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 // CHECK:   %T.ParentHasAssociatedType = load i8**, i8*** [[T2]],
 
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
+
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$S15generic_structs26GenericLayoutWithAssocTypeVMr"(
+
+// CHECK: [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, %swift.type* %T)
+// CHECK: [[T_CHECKED:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK: [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 1
 // CHECK: [[T0:%.*]] = load i8*, i8** [[T0_GEP]]

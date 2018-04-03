@@ -1052,6 +1052,7 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   // point.
   for (auto *FinalRelease : Tracker.getFinalReleases()) {
     Builder.setInsertionPoint(FinalRelease);
+    Builder.setCurrentDebugScope(FinalRelease->getDebugScope());
     for (unsigned i : indices(Args)) {
       SILValue Arg = Args[i];
       SILParameterInfo Param = Params[i];
@@ -1330,11 +1331,11 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
 /// True if a type can be expanded
 /// without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
-  if (EnableExpandAll) {
-    return true;
-  }
   if (Ty.isAddressOnly(Module)) {
     return false;
+  }
+  if (EnableExpandAll) {
+    return true;
   }
   unsigned numFields = Module.Types.countNumberOfFields(Ty);
   if (numFields > 6) {
@@ -1364,48 +1365,40 @@ bool swift::isSimpleType(SILType SILTy, SILModule& Module) {
 /// Check if the value of V is computed by means of a simple initialization.
 /// Store the actual SILValue into Val and the reversed list of instructions
 /// initializing it in Insns.
-/// The check is performed by recursively walking the computation of the
-/// SIL value being analyzed.
-/// TODO: Move into utils.
+///
+/// The check is performed by recursively walking the computation of the SIL
+/// value being analyzed.
 bool
 swift::analyzeStaticInitializer(SILValue V,
-                                SmallVectorImpl<SILInstruction *> &Insns) {
+                                SmallVectorImpl<SILInstruction *> &Insts) {
   // Save every instruction we see.
   // TODO: MultiValueInstruction?
-  if (auto I = dyn_cast<SingleValueInstruction>(V))
-    Insns.push_back(I);
+  if (auto *I = dyn_cast<SingleValueInstruction>(V))
+    Insts.push_back(I);
 
   if (auto *SI = dyn_cast<StructInst>(V)) {
     // If it is not a struct which is a simple type, bail.
     if (!isSimpleType(SI->getType(), SI->getModule()))
       return false;
-    for (auto &Op: SI->getAllOperands()) {
-      // If one of the struct instruction operands is not
-      // a simple initializer, bail.
-      if (!analyzeStaticInitializer(Op.get(), Insns))
-        return false;
-    }
-    return true;
+    return llvm::all_of(SI->getAllOperands(), [&](Operand &Op) -> bool {
+      return analyzeStaticInitializer(Op.get(), Insts);
+    });
   }
 
   if (auto *TI = dyn_cast<TupleInst>(V)) {
     // If it is not a tuple which is a simple type, bail.
     if (!isSimpleType(TI->getType(), TI->getModule()))
       return false;
-    for (auto &Op: TI->getAllOperands()) {
-      // If one of the struct instruction operands is not
-      // a simple initializer, bail.
-      if (!analyzeStaticInitializer(Op.get(), Insns))
-        return false;
-    }
-    return true;
+    return llvm::all_of(TI->getAllOperands(), [&](Operand &Op) -> bool {
+      return analyzeStaticInitializer(Op.get(), Insts);
+    });
   }
 
   if (auto *bi = dyn_cast<BuiltinInst>(V)) {
     switch (bi->getBuiltinInfo().ID) {
     case BuiltinValueKind::FPTrunc:
       if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
-        return analyzeStaticInitializer(LI, Insns);
+        return analyzeStaticInitializer(LI, Insts);
       }
       return false;
     default:
@@ -1413,13 +1406,9 @@ swift::analyzeStaticInitializer(SILValue V,
     }
   }
 
-  if (isa<IntegerLiteralInst>(V)
-      || isa<FloatLiteralInst>(V)
-      || isa<StringLiteralInst>(V)) {
-    return true;
-  }
-
-  return false;
+  return isa<IntegerLiteralInst>(V)
+    || isa<FloatLiteralInst>(V)
+    || isa<StringLiteralInst>(V);
 }
 
 /// Replace load sequence which may contain

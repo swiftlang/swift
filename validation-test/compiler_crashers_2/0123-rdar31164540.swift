@@ -150,7 +150,7 @@ public class PartialKeyPath<Root>: AnyKeyPath {
   }
 
   // MARK: Override abstract interfaces
-  @_inlineable
+  @inlinable
   public final override class var rootType: Any.Type {
     return Root.self
   }
@@ -274,7 +274,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
     }
   }
 
-  @_inlineable
+  @inlinable
   public final func appending<AppendedValue>(
     path: ReferenceWritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue> {
@@ -285,7 +285,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
   }
 
   // MARK: Override optional-returning abstract interfaces
-  @_inlineable
+  @inlinable
   public final override func appending<Value2, AppendedValue>(
     path: KeyPath<Value2, AppendedValue>
   ) -> KeyPath<Root, AppendedValue>? {
@@ -296,7 +296,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
     return nil
   }
   
-  @_inlineable
+  @inlinable
   public final override func appending<Value2, AppendedValue>(
     path: ReferenceWritableKeyPath<Value2, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue>? {
@@ -308,7 +308,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
     return nil
   }
 
-  @_inlineable
+  @inlinable
   public final override class var valueType: Any.Type {
     return Value.self
   }
@@ -519,7 +519,7 @@ public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value>
 }
 
 extension _KeyPath where Self: ReferenceWritableKeyPath<_Root, _Value> {
-  @_inlineable
+  @inlinable
   public final func appending<AppendedValue>(
     path: WritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue> {

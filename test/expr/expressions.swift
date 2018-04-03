@@ -533,10 +533,8 @@ func testInOut(_ arg: inout Int) {
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
-  var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
-  var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
-             // expected-error {{variable has type 'inout Int' which includes nested inout parameters}}
+  var y = &x //expected-error {{use of extraneous '&'}}
+  var z = &arg //expected-error {{use of extraneous '&'}}
 
   takesExplicitInt(5) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 }
@@ -688,11 +686,9 @@ func test() {
   var x = Foo()
   let y = Foo()
 
-  // FIXME: Bad diagnostics
-
   // rdar://15708430
-  (&x).method()  // expected-error {{type of expression is ambiguous without more context}}
-  (&x).mutatingMethod() // expected-error {{cannot use mutating member on immutable value of type 'inout Foo'}}
+  (&x).method()  // expected-error {{use of extraneous '&'}}
+  (&x).mutatingMethod() // expected-error {{use of extraneous '&'}}
 }
 
 
@@ -818,15 +814,16 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
-  (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
-  // expected-warning @-1 {{expression of type 'inout Int' is unused}}
-  let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  (true ? &x : &y) // expected-error 2 {{use of extraneous '&'}}
+  let a = (true ? &x : &y) // expected-error 2 {{use of extraneous '&'}}
 
-  inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  inoutTests(true ? &x : &y) // expected-error {{use of extraneous '&'}}
 
-  &_ // expected-error {{expression type 'inout _' is ambiguous without more context}}
+  &_ // expected-error {{use of extraneous '&'}}
 
-  inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
+  inoutTests((&x, 24).0) // expected-error {{use of extraneous '&'}}
+
+  inoutTests((&x)) // expected-error {{use of extraneous '&'}}
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
@@ -845,7 +842,7 @@ func inoutTests(_ arr: inout Int) {
 
 // <rdar://problem/20802757> Compiler crash in default argument & inout expr
 var g20802757 = 2
-func r20802757(_ z: inout Int = &g20802757) { // expected-error {{'&' can only appear immediately in a call argument list}}
+func r20802757(_ z: inout Int = &g20802757) { // expected-error {{use of extraneous '&'}}
   print(z)
 }
 

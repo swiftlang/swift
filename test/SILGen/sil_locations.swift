@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %target-swift-frontend -module-name sil_locations -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
 
@@ -78,7 +77,7 @@ func templateTest<T>(_ value: T) -> T {
 func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden @$S13sil_locations15useTemplateTestSiyF
-  // CHECK: function_ref @$SSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":79
+  // CHECK: function_ref @$SSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":78
 }
 
 func foo(_ x: Int) -> Int {
@@ -211,7 +210,7 @@ func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   return {x}
   // CHECK-LABEL: sil hidden @$S13sil_locations14captures_tuple{{[_0-9a-zA-Z]*}}F
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-3]]:27
-  // CHECK: copy_addr [take] {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
+  // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
   // CHECK: function_ref {{.*}}, loc "{{.*}}":[[@LINE-4]]:10
 
   // CHECK-LABEL: sil private @$S13sil_locations14captures_tuple{{.*}}fU_

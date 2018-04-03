@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendInputsConverter.h"
 
+#include "ArgsToFrontendOutputsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"

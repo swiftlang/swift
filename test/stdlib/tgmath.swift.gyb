@@ -148,8 +148,17 @@ internal extension TGMath {
     expectEqual(2.5, Self._scalbn(0.625, 2))
     expectEqual((0.625, 2), Self._frexp(2.5))
     expectEqual(1, Self._ilogb(2.5))
+#if os(Linux) && arch(x86_64)
+    // double-precision remquo is broken in the glibc in 14.04. Disable this
+    // test for all Linux in the short-term to un-FAIL the build. SR-7234.
+    if Self.significandBitCount != 52 {
+      expectEqual(-0.25, Self._remquo(16, 0.625).0)
+      expectEqual(2, Self._remquo(16, 0.625).1 & 7)
+    }
+#else
     expectEqual(-0.25, Self._remquo(16, 0.625).0)
     expectEqual(2, Self._remquo(16, 0.625).1 & 7)
+#endif
   }
 }
 
@@ -180,8 +189,8 @@ extension ${T}: TGMath {
 
 MathTests.test("${T}") {
   ${T}.allTests()
-% if T == 'Double':
-  //  Functions that are defined only for Double
+% if T in ['Double','CGFloat']:
+  //  Functions that are defined only for Double and CGFloat
   expectEqualWithTolerance(0.99750156206604, j0(0.1), ulps: 16)
   expectEqualWithTolerance(0.049937526036242, j1(0.1), ulps: 16)
   expectEqualWithTolerance(1.2229926610356451e-22, jn(11, 0.1), ulps: 16)

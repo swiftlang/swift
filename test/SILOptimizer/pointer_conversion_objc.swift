@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -module-name pointer_conversion -emit-sil -O %s | %FileCheck %s
+
 // REQUIRES: optimized_stdlib
 // REQUIRES: objc_interop
-// REQUIRES: radar38551973
+// REQUIRES: swift_stdlib_asserts
 
 // Opaque, unoptimizable functions to call.
 @_silgen_name("takesConstRawPointer")

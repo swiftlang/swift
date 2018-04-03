@@ -890,6 +890,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
                                     TyID, TyCategory, ValID);
     break;
+  case SIL_ONE_OPERAND_EXTRA_ATTR:
+    SILOneOperandExtraAttributeLayout::readRecord(scratch, RawOpCode, Attr,
+                                                  TyID, TyCategory, ValID);
+    break;
   case SIL_ONE_TYPE_ONE_OPERAND:
     SILOneTypeOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
                                            TyID, TyCategory,
@@ -918,6 +922,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILTwoOperandsLayout::readRecord(scratch, RawOpCode, Attr,
                                      TyID, TyCategory, ValID,
                                      TyID2, TyCategory2, ValID2);
+    break;
+  case SIL_TWO_OPERANDS_EXTRA_ATTR:
+    SILTwoOperandsExtraAttributeLayout::readRecord(scratch, RawOpCode, Attr,
+                                                   TyID, TyCategory, ValID,
+                                                   TyID2, TyCategory2, ValID2);
     break;
   case SIL_TAIL_ADDR:
     SILTailAddrLayout::readRecord(scratch, RawOpCode,
@@ -1066,7 +1075,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
-  ONEOPERAND_ONETYPE_INST(ConvertEscapeToNoEscape)
   ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
@@ -1080,6 +1088,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2)),
                   TyID);
+    break;
+  }
+  case  SILInstructionKind::ConvertEscapeToNoEscapeInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    bool isLifetimeGuaranteed = Attr & 0x01;
+    ResultVal = Builder.createConvertEscapeToNoEscape(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+        isLifetimeGuaranteed);
     break;
   }
 
@@ -1667,8 +1687,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement(Attr >> 2);
-    ResultVal = Builder.createBeginAccess(Loc, op, accessKind, enforcement);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x3);
+    bool noNestedConflict = Attr >> 4;
+    ResultVal =
+        Builder.createBeginAccess(Loc, op, accessKind, enforcement,
+                                  noNestedConflict);
     break;
   }
   case SILInstructionKind::EndAccessInst: {
@@ -1684,9 +1707,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue buffer = getLocalValue(
         ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement(Attr >> 2);
-    ResultVal = Builder.createBeginUnpairedAccess(Loc, source, buffer,
-                                                  accessKind, enforcement);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x03);
+    bool noNestedConflict = Attr >> 4;
+    ResultVal = Builder.createBeginUnpairedAccess(
+        Loc, source, buffer, accessKind, enforcement, noNestedConflict);
     break;
   }
   case SILInstructionKind::EndUnpairedAccessInst: {

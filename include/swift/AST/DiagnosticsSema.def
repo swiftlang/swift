@@ -610,6 +610,10 @@ ERROR(reserved_member_name,none,
       " 'foo.%1' expression", (DeclName, StringRef))
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
+WARNING(invalid_redecl_swift5_warning,none,
+        "redeclaration of %0 is deprecated and will be illegal in Swift 5",
+        (DeclName))
+
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
@@ -885,6 +889,9 @@ ERROR(missing_explicit_conversion,none,
 ERROR(missing_address_of,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
+ERROR(extraneous_address_of,none,
+      "use of extraneous '&'",
+      ())
 ERROR(extra_address_of,none,
       "'&' used with non-inout argument of type %0",
       (Type))
@@ -1204,11 +1211,15 @@ WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
 
-// Indirect enums
+// Enum annotations
 ERROR(indirect_case_without_payload,none,
       "enum case %0 without associated value cannot be 'indirect'", (Identifier))
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
+WARNING(enum_frozen_nonresilient,none,
+        "%0 has no effect without -enable-resilience", (DeclAttribute))
+WARNING(enum_frozen_nonpublic,none,
+        "%0 has no effect on non-public enums", (DeclAttribute))
 
 // Variables (var and let).
 ERROR(unimplemented_static_var,none,
@@ -1400,6 +1411,9 @@ NOTE(type_does_not_inherit_or_conform_requirement,none,
 ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
+ERROR(types_not_equal_in_call,none,
+      "%0 requires the types %1 and %2 be equivalent to use %3",
+      (Type, Type, Type, DeclName))
 ERROR(type_does_not_conform_owner,none,
       "%0 requires that %1 conform to %2", (Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
@@ -1503,6 +1517,10 @@ ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(type_witness_objc_generic_parameter,none,
+      "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
+      "used for associated type %3 of protocol %4",
+      (Type, Type, bool, DeclName, DeclName))
 
 ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{"
@@ -2155,10 +2173,6 @@ ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
 
-// Duplicate declarations
-ERROR(duplicate_enum_element,none,
-      "duplicate definition of enum element",())
-
 // Property behaviors
 ERROR(property_behavior_not_protocol,none,
       "property behavior name must refer to a protocol", ())
@@ -2801,6 +2815,9 @@ ERROR(assigning_noescape_to_escaping,none,
 ERROR(general_noescape_to_escaping,none,
       "using non-escaping parameter %0 in a context expecting an @escaping closure",
       (Identifier))
+ERROR(converting_noescape_to_type,none,
+      "converting non-escaping value to %0 may allow it to escape",
+      (Type))
 
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
@@ -2913,6 +2930,9 @@ ERROR(fallthrough_into_case_with_var_binding,none,
 ERROR(unnecessary_cast_over_optionset,none,
       "unnecessary cast over raw value of %0", (Type))
 
+ERROR(mutability_mismatch_multiple_pattern_list,none,
+      "'%select{var|let}0' pattern binding must match previous "
+      "'%select{var|let}1' pattern binding", (bool, bool))
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
 ERROR(type_mismatch_fallthrough_pattern_list,none,
@@ -3145,6 +3165,9 @@ ERROR(tuple_ellipsis,none,
 
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
+
+WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,none,
+        "using '!' here is deprecated and will be removed in a future release", ())
 
 ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
         "using '!' is not allowed here; perhaps '?' was intended?", ())
@@ -3689,30 +3712,30 @@ WARNING(discardable_result_on_void_never_function, none,
 //------------------------------------------------------------------------------
 
 ERROR(fixed_layout_attr_on_internal_type,
-      none, "'@_fixed_layout' attribute can only be applied to '@_versioned' "
+      none, "'@_fixed_layout' attribute can only be applied to '@usableFromInline' "
       "or public declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error}1",
       (DeclName, AccessLevel))
 
 ERROR(versioned_attr_with_explicit_access,
-      none, "'@_versioned' attribute can only be applied to internal "
+      none, "'@usableFromInline' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
       (DeclName, AccessLevel))
 
 ERROR(versioned_attr_in_protocol,none,
-      "'@_versioned' attribute cannot be used in protocols", ())
+      "'@usableFromInline' attribute cannot be used in protocols", ())
 
 ERROR(versioned_dynamic_not_supported,none,
-      "'@_versioned' attribute cannot be applied to 'dynamic' declarations", ())
+      "'@usableFromInline' attribute cannot be applied to 'dynamic' declarations", ())
 
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
-  "an '@_inlineable' function|" \
+  "an '@inlinable' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
-ERROR(local_type_in_inlineable_function,
+ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
       (DeclName, unsigned))
 
@@ -3727,21 +3750,21 @@ NOTE(resilience_decl_declared_here,
      none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
 
 NOTE(resilience_decl_declared_here_versioned,
-     none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
+     none, "%0 %1 is not '@usableFromInline' or public", (DescriptiveDeclKind, DeclName))
 
-ERROR(class_designated_init_inlineable_resilient,none,
+ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
+      "'%select{@_transparent|@inline(__always)|@inlinable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
-      none, "'@%0' attribute cannot be applied to stored properties", (StringRef))
+      none, "'%0' attribute cannot be applied to stored properties", (DeclAttribute))
 
-ERROR(inlineable_dynamic_not_supported,
-      none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())
+ERROR(inlinable_dynamic_not_supported,
+      none, "'@inlinable' attribute cannot be applied to 'dynamic' declarations", ())
 
-ERROR(inlineable_decl_not_public,
-      none, "'@_inlineable' attribute can only be applied to public declarations, "
+ERROR(inlinable_decl_not_public,
+      none, "'@inlinable' attribute can only be applied to public declarations, "
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
       (DeclBaseName, AccessLevel))
 

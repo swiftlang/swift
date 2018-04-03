@@ -56,7 +56,7 @@ class SwiftTestCase(unittest.TestCase):
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
             enable_sil_ownership=False,
-            enable_guaranteed_normal_arguments=False,
+            disable_guaranteed_normal_arguments=True,
             force_optimized_typechecker=False)
 
         # Setup shell
@@ -289,7 +289,7 @@ class SwiftTestCase(unittest.TestCase):
              if 'SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP' in x])
 
     def test_swift_guaranteed_normal_arguments_flags(self):
-        self.args.enable_guaranteed_normal_arguments = True
+        self.args.disable_guaranteed_normal_arguments = False
         swift = Swift(
             args=self.args,
             toolchain=self.toolchain,

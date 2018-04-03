@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
@@ -16,17 +15,17 @@ import resilient_enum
 // Resilient structs from outside our resilience domain are manipulated via
 // value witnesses
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.opaque*)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience30functionWithResilientTypesSize_1f010resilient_A00G0VAFn_A2FnXEtF"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i8*, %swift.opaque*)
 
-public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
-
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) -> Size) -> Size {
+// CHECK: entry:
+// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 
-// CHECK: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK: [[WITNESS_FOR_SIZE:%.*]] = ptrtoint i8* [[WITNESS]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
@@ -45,7 +44,9 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_PTR]]
 // CHECK: [[destroy:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*)*
 // CHECK: call void [[destroy]](%swift.opaque* noalias %1, %swift.type* [[METADATA]])
-// CHECK: ret void
+// CHECK-NEXT: bitcast
+// CHECK-NEXT: call
+// CHECK-NEXT: ret void
 
   return f(s)
 }
@@ -59,11 +60,11 @@ public func functionWithResilientTypes(_ s: Size, f: (Size) -> Size) -> Size {
 // Make sure we use a type metadata accessor function, and load indirect
 // field offsets from it.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience26functionWithResilientTypesyy010resilient_A09RectangleVF"(%T16resilient_struct9RectangleV* noalias nocapture)
-public func functionWithResilientTypes(_ r: Rectangle) {
-
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct9RectangleVMa"([[INT]] 0)
-// CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience35functionWithResilientTypesRectangleyy010resilient_A00G0VF"(%T16resilient_struct9RectangleV* noalias nocapture)
+public func functionWithResilientTypesRectangle(_ r: Rectangle) {
+// CHECK: entry:
+// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct9RectangleVMa"([[INT]] 0)
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to [[INT]]*
 // CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] 2
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[FIELD_OFFSET_VECTOR]], i32 2
@@ -76,7 +77,7 @@ public func functionWithResilientTypes(_ r: Rectangle) {
 
   _ = r.color
 
-// CHECK: ret void
+// CHECK-NEXT: ret void
 
 }
 
@@ -89,8 +90,8 @@ public struct MySize {
   public let h: Int
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience28functionWithMyResilientTypes_1fAA0E4SizeVAE_A2EXEtF"(%T17struct_resilience6MySizeV* {{.*}}, %T17struct_resilience6MySizeV* {{.*}}, i8*, %swift.opaque*)
-public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> MySize {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S17struct_resilience32functionWithMyResilientTypesSize_1fAA0eH0VAEn_A2EnXEtF"(%T17struct_resilience6MySizeV* noalias nocapture sret, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable({{8|(16)}}), i8*, %swift.opaque*)
+public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned MySize) -> MySize) -> MySize {
 
 // CHECK: [[TEMP:%.*]] = alloca %T17struct_resilience6MySizeV
 // CHECK: bitcast

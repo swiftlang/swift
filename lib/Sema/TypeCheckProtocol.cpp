@@ -138,6 +138,17 @@ static std::tuple<Type, Type, OptionalAdjustmentKind>
 getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
                   Type witnessType, bool witnessTypeIsIUO,
                   VarianceKind variance) {
+  // If the witness type is noescape but the requirement type is not,
+  // adjust the witness type to be escaping. This permits a limited form of
+  // covariance.
+  bool reqNoescapeToEscaping = false;
+  (void)adjustInferredAssociatedType(reqtType, reqNoescapeToEscaping);
+  bool witnessNoescapeToEscaping = false;
+  Type adjustedWitnessType =
+    adjustInferredAssociatedType(witnessType, witnessNoescapeToEscaping);
+  if (witnessNoescapeToEscaping && !reqNoescapeToEscaping)
+    witnessType = adjustedWitnessType;
+
   // For @objc protocols, deal with differences in the optionality.
   // FIXME: It probably makes sense to extend this to non-@objc
   // protocols as well, but this requires more testing.
@@ -152,8 +163,7 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
     reqtType = reqtValueType;
   }
   bool witnessIsOptional = false;
-  if (Type witnessValueType =
-      witnessType->getOptionalObjectType()) {
+  if (Type witnessValueType = witnessType->getOptionalObjectType()) {
     witnessIsOptional = true;
     witnessType = witnessValueType;
   }
@@ -1839,6 +1849,53 @@ void ConformanceChecker::recordInvalidWitness(ValueDecl *requirement) {
   Conformance->setWitness(requirement, Witness());
 }
 
+bool ConformanceChecker::checkObjCTypeErasedGenerics(
+                                                 AssociatedTypeDecl *assocType,
+                                                 Type type,
+                                                 TypeDecl *typeDecl) {
+  // Objective-C's type-erased generics don't allow the type arguments
+  // to be extracted from an instance (or a metatype), so we cannot refer to
+  // the type parameters from an associated type. Check that here.
+  auto &ctx = assocType->getASTContext();
+  if (!ctx.LangOpts.EnableObjCInterop && type->hasError())
+    return false;
+
+  auto classDecl = Adoptee->getClassOrBoundGenericClass();
+  if (!classDecl) return false;
+
+  if (!classDecl->usesObjCGenericsModel()) return false;
+
+  // Concrete types are okay.
+  if (!type->hasTypeParameter()) return false;
+
+  // Find one of the generic parameters named. It doesn't matter
+  // which one.
+  Type genericParam;
+  (void)type.findIf([&](Type type) {
+    if (auto gp = type->getAs<GenericTypeParamType>()) {
+      genericParam = gp;
+      return true;
+    }
+
+    return false;
+  });
+
+  // Diagnose the problem.
+  auto &diags = assocType->getASTContext().Diags;
+  if (typeDecl) {
+    diags.diagnose(typeDecl, diag::type_witness_objc_generic_parameter,
+                   type, genericParam, !genericParam.isNull(),
+                   assocType->getFullName(), Proto->getFullName());
+  } else {
+    diags.diagnose(Conformance->getLoc(),
+                   diag::type_witness_objc_generic_parameter,
+                   type, genericParam,  !genericParam.isNull(),
+                   assocType->getFullName(), Proto->getFullName());
+  }
+
+  return true;
+}
+
 void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                            Type type,
                                            TypeDecl *typeDecl,
@@ -1852,6 +1909,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   assert(!type->hasArchetype() && "Got a contextual type here?");
+
+  checkObjCTypeErasedGenerics(assocType, type, typeDecl);
 
   if (typeDecl) {
     // Check access.

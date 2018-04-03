@@ -31,6 +31,7 @@ namespace swift {
   class AssociatedType;
   class CanType;
   class FuncDecl;
+  enum class MetadataState : size_t;
   class ProtocolConformanceRef;
   struct SILDeclRef;
   class SILType;
@@ -131,7 +132,8 @@ namespace irgen {
  
   void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
                                           NominalTypeDecl *typeDecl,
-                                          Address array);
+                                          Address array,
+                                          MetadataState metadataState);
 
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
@@ -252,6 +254,8 @@ namespace irgen {
   void enumerateGenericParamFulfillments(IRGenModule &IGM,
     CanSILFunctionType fnType,
     GenericParamFulfillmentCallback callback);
+
+  bool isDependentConformance(const NormalProtocolConformance *conformance);
 
 } // end namespace irgen
 } // end namespace swift

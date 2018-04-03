@@ -98,8 +98,8 @@ public:
 private:
   int_type Data;
 
-  constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
 public:
+  explicit constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
   constexpr TargetValueWitnessFlags() : Data(0) {}
 
   /// The required alignment of the first byte of an object of this
@@ -929,12 +929,17 @@ public:
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
   Modify           = 0x1,
-  // Leave space for other actions.
-  // Don't rely on ActionMask in stable ABI.
+  // ActionMask can grow without breaking the ABI because the runtime controls
+  // how these flags are encoded in the "value buffer". However, any additional
+  // actions must be compatible with the original behavior for the old, smaller
+  // ActionMask (older runtimes will continue to treat them as either a simple
+  // Read or Modify).
   ActionMask       = 0x1,
 
   // Downgrade exclusivity failures to a warning.
-  WarningOnly      = 0x10
+  WarningOnly      = 0x10,
+  // The runtime should track this access to check against subsequent accesses.
+  Tracking         = 0x20
 };
 static inline ExclusivityFlags operator|(ExclusivityFlags lhs,
                                          ExclusivityFlags rhs) {
@@ -950,6 +955,9 @@ static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
 }
 static inline bool isWarningOnly(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
+}
+static inline bool isTracking(ExclusivityFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::Tracking);
 }
 
 /// Flags for struct layout.
@@ -978,6 +986,27 @@ static inline StructLayoutFlags getLayoutAlgorithm(StructLayoutFlags flags) {
 }
 static inline bool isValueWitnessTableMutable(StructLayoutFlags flags) {
   return uintptr_t(flags) & uintptr_t(StructLayoutFlags::IsVWTMutable);
+}
+
+/// Flags for class layout.
+enum class ClassLayoutFlags : uintptr_t {
+  /// Reserve space for 256 layout algorithms.
+  AlgorithmMask     = 0xff,
+
+  /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
+  Swift5Algorithm   = 0x00,
+};
+static inline ClassLayoutFlags operator|(ClassLayoutFlags lhs,
+                                         ClassLayoutFlags rhs) {
+  return ClassLayoutFlags(uintptr_t(lhs) | uintptr_t(rhs));
+}
+static inline ClassLayoutFlags &operator|=(ClassLayoutFlags &lhs,
+                                           ClassLayoutFlags rhs) {
+  return (lhs = (lhs | rhs));
+}
+static inline ClassLayoutFlags getLayoutAlgorithm(ClassLayoutFlags flags) {
+  return ClassLayoutFlags(uintptr_t(flags)
+                             & uintptr_t(ClassLayoutFlags::AlgorithmMask));
 }
 
 /// Flags for enum layout.
@@ -1362,36 +1391,95 @@ public:
                                  value_setMetadataKind)
 };
 
+/// The public state of a metadata.
+enum class MetadataState : size_t {
+  // The values of this enum are set up to give us some future flexibility
+  // in adding states.  The compiler emits unsigned comparisons against
+  // these values, so adding states that aren't totally ordered with at
+  // least the existing values will pose a problem; but we also use a
+  // gradually-shrinking bitset in case it's useful to track states as
+  // separate capabilities.  Specific values have been chosen so that a
+  // MetadataRequest of 0 represents a blocking complete request, which
+  // is the most likely request from ordinary code.  The total size of a
+  // state is kept to 8 bits so that a full request, even with additional
+  // flags, can be materialized as a single immediate on common ISAs, and
+  // so that the state can be extracted with a byte truncation.
+  // The spacing between states reflects guesswork about where new
+  // states/capabilities are most likely to be added.
+
+  /// The metadata is fully complete.  By definition, this is the
+  /// end-state of all metadata.  Generally, metadata is expected to be
+  /// complete before it can be passed to arbitrary code, e.g. as
+  /// a generic argument to a function or as a metatype value.
+  ///
+  /// In addition to the requirements of NonTransitiveComplete, certain
+  /// transitive completeness guarantees must hold.  Most importantly,
+  /// complete nominal type metadata transitively guarantee the completion
+  /// of their stored generic type arguments and superclass metadata.
+  Complete = 0x00,
+
+  /// The metadata is fully complete except for any transitive completeness
+  /// guarantees.
+  ///
+  /// In addition to the requirements of LayoutComplete, metadata in this
+  /// state must be prepared for all basic type operations.  This includes:
+  ///
+  ///   - any sort of internal layout necessary to allocate and work
+  ///     with concrete values of the type, such as the instance layout
+  ///     of a class;
+  ///
+  ///   - any sort of external dynamic registration that might be required
+  ///     for the type, such as the realization of a class by the Objective-C
+  ///     runtime; and
+  ///
+  ///   - the initialization of any other information kept in the metadata
+  ///     object, such as a class's v-table.
+  NonTransitiveComplete = 0x01,
+
+  /// The metadata is ready for the layout of other types that store values
+  /// of this type.
+  ///
+  /// In addition to the requirements of Abstract, metadata in this state
+  /// must have a valid value witness table, meaning that its size,
+  /// alignment, and basic type properties (such as POD-ness) have been
+  /// computed.
+  LayoutComplete = 0x3F,
+
+  /// The metadata has its basic identity established.  It is possible to
+  /// determine what formal type it corresponds to.  Among other things, it
+  /// is possible to use the runtime mangling facilities with the type.
+  ///
+  /// For example, a metadata for a generic struct has a metadata kind,
+  /// a type descriptor, and all of its type arguments.  However, it does not
+  /// necessarily have a meaningful value-witness table.
+  ///
+  /// References to other types that are not part of the type's basic identity
+  /// may not yet have been established.  Most crucially, this includes the
+  /// superclass pointer.
+  Abstract = 0xFF,
+};
+
+/// Something that can be static_asserted in all the places where we do
+/// comparisons on metadata states.
+constexpr const bool MetadataStateIsReverseOrdered = true;
+
+/// Return true if the first metadata state is at least as advanced as the
+/// second.
+inline bool isAtLeast(MetadataState lhs, MetadataState rhs) {
+  static_assert(MetadataStateIsReverseOrdered,
+                "relying on the ordering of MetadataState here");
+  return size_t(lhs) <= size_t(rhs);
+}
+
 /// Kinds of requests for metadata.
-template <class IntType>
-class TargetMetadataRequest : public FlagSet<IntType> {
+class MetadataRequest : public FlagSet<size_t> {
+  using IntType = size_t;
   using super = FlagSet<IntType>;
+
 public:
-  enum BasicKind : IntType {
-    /// A request for fully-completed metadata.  The metadata must be
-    /// prepared for all supported type operations.  This is a superset
-    /// of the requirements of LayoutComplete.
-    ///
-    /// For example, a class must be ready for subclassing and instantiation:
-    /// it must have a completed instance layout and (under ObjCInterop)
-    /// must have been realized by the Objective-C runtime.
-    Complete,
-
-    /// A request for metadata that can be used for type layout; that is,
-    /// the type's value witness table must be completely initialized.
-    LayoutComplete,
-
-    /// A request for a metadata pointer that fully identifies the type.
-    /// Basic type structure, such as the type context descriptor and the
-    /// list of generic arguments, should have been installed, but there is
-    /// no requirement for a valid value witness table.
-    Abstract,
-  };
-
-private:
   enum : IntType {
-    BasicKind_bit = 0,
-    BasicKind_width = 8,
+    State_bit = 0,
+    State_width = 8,
 
     /// A blocking request will not return until the runtime is able to produce
     /// metadata with the given kind.  A non-blocking request will return
@@ -1402,28 +1490,31 @@ private:
     NonBlocking_bit = 8,
   };
 
-public:
-  TargetMetadataRequest(BasicKind kind, bool isNonBlocking = false) {
-    setBasicKind(kind);
+  MetadataRequest(MetadataState state, bool isNonBlocking = false) {
+    setState(state);
     setIsNonBlocking(isNonBlocking);
   }
-  explicit TargetMetadataRequest(IntType bits) : super(bits) {}
-  constexpr TargetMetadataRequest() {}
+  explicit MetadataRequest(IntType bits) : super(bits) {}
+  constexpr MetadataRequest() {}
 
-  FLAGSET_DEFINE_EQUALITY(TargetMetadataRequest)
+  FLAGSET_DEFINE_EQUALITY(MetadataRequest)
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(BasicKind_bit,
-                                 BasicKind_width,
-                                 BasicKind,
-                                 getBasicKind,
-                                 setBasicKind)
+  FLAGSET_DEFINE_FIELD_ACCESSORS(State_bit,
+                                 State_width,
+                                 MetadataState,
+                                 getState,
+                                 setState)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(NonBlocking_bit,
                                 isNonBlocking,
                                 setIsNonBlocking)
+  bool isBlocking() const { return !isNonBlocking(); }
+
+  /// Is this request satisfied by a metadata that's in the given state?
+  bool isSatisfiedBy(MetadataState state) const {
+    return isAtLeast(state, getState());
+  }
 };
-using MetadataRequest =
-  TargetMetadataRequest<size_t>;
 
 } // end namespace swift
 

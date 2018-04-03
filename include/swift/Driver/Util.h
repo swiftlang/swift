@@ -14,7 +14,7 @@
 #define SWIFT_DRIVER_UTIL_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Frontend/Types.h"
+#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
@@ -27,9 +27,9 @@ namespace swift {
 
 namespace driver {
   /// An input argument from the command line and its inferred type.
-  typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
+  using InputPair = std::pair<file_types::ID, const llvm::opt::Arg *>;
   /// Type used for a list of input arguments.
-  typedef SmallVector<InputPair, 16> InputFileList;
+  using InputFileList = SmallVector<InputPair, 16>;
 
   enum class LinkKind {
     None,
@@ -55,7 +55,7 @@ namespace driver {
     };
 
     StringRef path;
-    types::ID type;
+    file_types::ID type;
     WhichFiles whichFiles;
   };
 

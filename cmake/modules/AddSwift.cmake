@@ -123,10 +123,11 @@ function(_add_variant_c_compile_link_flags)
     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}${DEPLOYMENT_VERSION}")
   endif()
 
+  set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
   if(IS_DARWIN)
-    list(APPEND result "-isysroot" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
-  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${SWIFT_SDK_${CFLAGS_SDK}_PATH}" STREQUAL "/")
-    list(APPEND result "--sysroot=${SWIFT_SDK_${CFLAGS_SDK}_PATH}")
+    list(APPEND result "-isysroot" "${_sysroot}")
+  elseif(NOT SWIFT_COMPILER_IS_MSVC_LIKE AND NOT "${_sysroot}" STREQUAL "/")
+    list(APPEND result "--sysroot=${_sysroot}")
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
@@ -256,11 +257,18 @@ function(_add_variant_c_compile_flags)
     list(APPEND result "-D_ENABLE_ATOMIC_ALIGNMENT_FIX")
 
     # msvcprt's std::function requires RTTI, but we do not want RTTI data.
-    # Emulate /GR-
+    # Emulate /GR-.
+    # TODO(compnerd) when moving up to VS 2017 15.3 and newer, we can disable
+    # RTTI again
     if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
       list(APPEND result -frtti)
       list(APPEND result -Xclang;-fno-rtti-data)
     endif()
+
+    # NOTE: VS 2017 15.3 introduced this to disable the static components of
+    # RTTI as well.  This requires a newer SDK though and we do not have
+    # guarantees on the SDK version currently.
+    list(APPEND result "-D_HAS_STATIC_RTTI=0")
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)
@@ -294,9 +302,9 @@ function(_add_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
-  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH, so don't include it.
+  # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
   if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
+    list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
   is_darwin_based_sdk("${sdk}" IS_DARWIN)
@@ -314,7 +322,7 @@ function(_add_variant_swift_compile_flags
 
   if(IS_DARWIN)
     list(APPEND result
-        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
+      "-F" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
   is_build_type_optimized("${build_type}" optimized)
@@ -333,8 +341,8 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
-  if (SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
-    list(APPEND result "-Xfrontend" "-enable-guaranteed-normal-arguments")
+  if (NOT SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS)
+    list(APPEND result "-Xfrontend" "-disable-guaranteed-normal-arguments")
   endif()
   
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
@@ -355,7 +363,7 @@ function(_add_variant_link_flags)
     ${ARGN})
 
   precondition(LFLAGS_SDK MESSAGE "Should specify an SDK")
-  precondition(LFLAGS_SDK MESSAGE "Should specify an architecture")
+  precondition(LFLAGS_ARCH MESSAGE "Should specify an architecture")
 
   set(result ${${LFLAGS_RESULT_VAR_NAME}})
   set(library_search_directories ${${LFLAGS_LIBRARY_SEARCH_DIRECTORIES_VAR_NAME}})
@@ -413,10 +421,12 @@ function(_add_variant_link_flags)
   endif()
 
   if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_UC}" STREQUAL "")
-    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_UC}")
+    get_filename_component(SWIFT_${sdk}_${arch}_ICU_UC_LIBDIR "${SWIFT_${sdk}_${arch}_ICU_UC}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_UC_LIBDIR}")
   endif()
   if(NOT "${SWIFT_${LFLAGS_SDK}_${LFLAGS_ARCH}_ICU_I18N}" STREQUAL "")
-    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_I18N}")
+    get_filename_component(SWIFT_${sdk}_${arch}_ICU_I18N_LIBDIR "${SWIFT_${sdk}_${arch}_IC_I18N}" DIRECTORY)
+    list(APPEND library_search_directories "${SWIFT_${sdk}_${arch}_ICU_I18N_LIBDIR}")
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -1619,7 +1629,7 @@ function(add_swift_library name)
         # Add PrivateFrameworks, rdar://28466433
         set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
         if(SWIFTLIB_IS_SDK_OVERLAY)
-          list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_PATH}/System/Library/PrivateFrameworks/")
+          list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
         endif()
        
        if("${sdk}" STREQUAL "IOS_SIMULATOR")

@@ -2,3 +2,4 @@ $S4blah4mainyyF ---> () -> ()
 $SytD ---> ()
 $Ss5Int32VD ---> Int32
 $S4blah4mainyyF8PatatinoL_VMa ---> Can't resolve type of $S4blah4mainyyF8PatatinoL_VMa
+$Ss10CollectionP7Element ---> Can't resolve type of $Ss10CollectionP7Element

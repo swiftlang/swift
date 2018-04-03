@@ -8,15 +8,15 @@ func unknown() -> ()
 
 @_fixed_layout
 public class Y : P {
-  @_inlineable
+  @inlinable
   public func doAnotherThing() {
     unknown()
   }
 
-  @_inlineable
+  @inlinable
   public func doSomething() {
     doAnotherThing()
   }
-  @_inlineable
+  @inlinable
   public init() {}
 }

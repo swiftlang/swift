@@ -306,6 +306,15 @@ public:
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,
                             SILType type);
 
+  using SILBuilder::tryCreateUncheckedRefCast;
+  ManagedValue tryCreateUncheckedRefCast(SILLocation loc, ManagedValue original,
+                                         SILType type);
+
+  using SILBuilder::createUncheckedTrivialBitCast;
+  ManagedValue createUncheckedTrivialBitCast(SILLocation loc,
+                                             ManagedValue original,
+                                             SILType type);
+
   using SILBuilder::createUncheckedRefCast;
   ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
                                       SILType type);
@@ -350,6 +359,12 @@ public:
   using SILBuilder::createConvertFunction;
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy);
+
+  using SILBuilder::createConvertEscapeToNoEscape;
+  ManagedValue
+  createConvertEscapeToNoEscape(SILLocation loc, ManagedValue fn,
+                                SILType resultTy,
+                                bool postponeToNoEscapeCleanup = true);
 
   using SILBuilder::createStore;
   /// Forward \p value into \p address.

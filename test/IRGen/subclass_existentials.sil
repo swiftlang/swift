@@ -54,8 +54,9 @@ sil @takesMetadata : $@convention(thin) <T> (@thick T.Type) -> ()
 // CHECK:        [[PROTOCOLS:%.*]] = bitcast [1 x %swift.protocol*]* [[PROTOCOL_ARRAY]] to %swift.protocol**
 // CHECK-NEXT:   [[PROTOCOL:%.*]] = getelementptr inbounds %swift.protocol*, %swift.protocol** [[PROTOCOLS]], i32 0
 // CHECK-NEXT:   store %swift.protocol* @"$S21subclass_existentials1PMp", %swift.protocol** [[PROTOCOL]]
-// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S21subclass_existentials1CCMa"([[INT]] 0)
+// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S21subclass_existentials1CCMa"([[INT]] 255)
 // CHECK-NEXT:   [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-NEXT:   extractvalue %swift.metadata_response [[TMP]], 1
 // CHECK-NEXT:   [[METATYPE:%.*]] = call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* [[SUPERCLASS]], {{i32|i64}} 1, %swift.protocol** [[PROTOCOLS]])
 // CHECK:        ret
 

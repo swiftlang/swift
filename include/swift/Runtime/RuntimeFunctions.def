@@ -826,6 +826,13 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
+// MetadataResponse swift_checkMetadataState(MetadataRequest request,
+//                                           cosnt Metadata *type);
+FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // const ProtocolWitnessTable *
 // swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
 //                              const Metadata *type,
@@ -862,31 +869,35 @@ FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
-// Metadata *swift_getTupleTypeMetadata(TupleTypeFlags flags,
-//                                      Metadata * const *elts,
-//                                      const char *labels,
-//                                      value_witness_table_t *proposed);
-FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(0),
+// MetadataResponse swift_getTupleTypeMetadata(MetadataRequest request,
+//                                             TupleTypeFlags flags,
+//                                             Metadata * const *elts,
+//                                             const char *labels,
+//                                             value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata, swift_getTupleTypeMetadata, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, SizeTy, TypeMetadataPtrTy->getPointerTo(0),
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_getTupleTypeMetadata2(Metadata *elt0, Metadata *elt1,
-//                                       const char *labels,
-//                                       value_witness_table_t *proposed);
-FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy,
+// MetadataResponse swift_getTupleTypeMetadata2(MetadataRequest request,
+//                                              Metadata *elt0, Metadata *elt1,
+//                                              const char *labels,
+//                                              value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata2, swift_getTupleTypeMetadata2, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
-// Metadata *swift_getTupleTypeMetadata3(Metadata *elt0, Metadata *elt1,
-//                                       Metadata *elt2, const char *labels,
-//                                       value_witness_table_t *proposed);
-FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, C_CC,
-         RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+// MetadataResponse swift_getTupleTypeMetadata3(MetadataRequest request,
+//                                              Metadata *elt0, Metadata *elt1,
+//                                              Metadata *elt2,
+//                                              const char *labels,
+//                                              value_witness_table_t *proposed);
+FUNCTION(GetTupleMetadata3, swift_getTupleTypeMetadata3, SwiftCC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy, TypeMetadataPtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
               Int8PtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
@@ -914,14 +925,15 @@ FUNCTION(RelocateClassMetadata,
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };
-// void swift_initClassMetadata_UniversalStrategy(Metadata *self,
-//                                                size_t numFields,
-//                                                TypeLayout * const *fieldTypes,
-//                                                size_t *fieldOffsets);
-FUNCTION(InitClassMetadataUniversal,
-         swift_initClassMetadata_UniversalStrategy, C_CC,
+// void swift_initClassMetadata(Metadata *self,
+//                              ClassLayoutFlags flags,
+//                              size_t numFields,
+//                              TypeLayout * const *fieldTypes,
+//                              size_t *fieldOffsets);
+FUNCTION(InitClassMetadata,
+         swift_initClassMetadata, C_CC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, SizeTy,
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
@@ -934,7 +946,8 @@ FUNCTION(InitClassMetadataUniversal,
 FUNCTION(InitStructMetadata,
          swift_initStructMetadata, C_CC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, Int8PtrPtrTy->getPointerTo(0),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
+              Int8PtrPtrTy->getPointerTo(0),
               SizeTy->getPointerTo()),
          ATTRS(NoUnwind))
 
@@ -987,7 +1000,7 @@ FUNCTION(GetEnumCaseMultiPayload,
          ATTRS(NoUnwind, ReadOnly))
 
 // void swift_storeEnumTagSinglePayload(opaque_t *obj, Metadata *payload,
-//                                      int case_index,
+//                                      unsigned case_index,
 //                                      unsigned num_empty_cases);
 FUNCTION(StoreEnumTagSinglePayload,
          swift_storeEnumTagSinglePayload,

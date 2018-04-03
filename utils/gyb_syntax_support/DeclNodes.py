@@ -84,27 +84,32 @@ DECL_NODES = [
              Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
-    # else-if-directive-clause -> '#elseif' expr stmt-list
-    Node('ElseifDirectiveClause', kind='Syntax',
-         traits=['WithStatements'],
+    # if-config-clause ->
+    #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
+    Node('IfConfigClause', kind='Syntax',
          children=[
-             Child('PoundElseif', kind='PoundElseifToken'),
-             Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('PoundKeyword', kind='Token',
+                   token_choices=[
+                       'PoundIfToken',
+                       'PoundElseifToken',
+                       'PoundElseToken',
+                   ]),
+             Child('Condition', kind='Expr',
+                   is_optional=True),
+             Child('Elements', kind='Syntax',
+                   node_choices=[
+                      Child('Statements', kind='CodeBlockItemList'),
+                      Child('SwitchCases', kind='SwitchCaseList')]),
          ]),
+
+    Node('IfConfigClauseList', kind='SyntaxCollection',
+         element='IfConfigClause'),
 
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
     #   else-clause? '#endif'
     Node('IfConfigDecl', kind='Decl',
-         traits=['WithStatements'],
          children=[
-             Child('PoundIf', kind='PoundIfToken'),
-             Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
-             Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
-                   is_optional=True),
-             Child('ElseClause', kind='ElseDirectiveClause',
-                   is_optional=True),
+             Child('Clauses', kind='IfConfigClauseList'),
              Child('PoundEndif', kind='PoundEndifToken'),
          ]),
 
@@ -402,19 +407,6 @@ DECL_NODES = [
                    is_optional=True),
              # the body is not necessary inside a protocol definition
              Child('Accessor', kind='AccessorBlock', is_optional=True),
-         ]),
-
-    # else-if-directive-clause-list -> else-if-directive-clause
-    #   else-if-directive-clause-list?
-    Node('ElseifDirectiveClauseList', kind='SyntaxCollection',
-         element='ElseifDirectiveClause'),
-
-    # else-directive-clause -> '#else' stmt-list
-    Node('ElseDirectiveClause', kind='Syntax',
-         traits=['WithStatements'],
-         children=[
-             Child('PoundElse', kind='PoundElseToken'),
-             Child('Statements', kind='CodeBlockItemList'),
          ]),
 
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'

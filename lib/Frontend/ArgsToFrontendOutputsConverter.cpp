@@ -9,12 +9,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
+#include "ArgsToFrontendOutputsConverter.h"
 
+#include "ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
@@ -467,16 +467,16 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
   SupplementaryOutputPaths paths;
   if (!map)
     return paths;
-  const std::pair<types::ID, std::string &> typesAndStrings[] = {
-      {types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
-      {types::TY_SwiftModuleFile, paths.ModuleOutputPath},
-      {types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
-      {types::TY_Dependencies, paths.DependenciesFilePath},
-      {types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
-      {types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
-      {types::TY_ModuleTrace, paths.LoadedModuleTracePath},
-      {types::TY_TBD, paths.TBDPath}};
-  for (const std::pair<types::ID, std::string &> &typeAndString :
+  const std::pair<file_types::ID, std::string &> typesAndStrings[] = {
+      {file_types::TY_ObjCHeader, paths.ObjCHeaderOutputPath},
+      {file_types::TY_SwiftModuleFile, paths.ModuleOutputPath},
+      {file_types::TY_SwiftModuleDocFile, paths.ModuleDocOutputPath},
+      {file_types::TY_Dependencies, paths.DependenciesFilePath},
+      {file_types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
+      {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
+      {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
+      {file_types::TY_TBD, paths.TBDPath}};
+  for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
     auto const out = map->find(typeAndString.first);
     typeAndString.second = out == map->end() ? "" : out->second;
@@ -518,13 +518,23 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
   }
 
   std::vector<SupplementaryOutputPaths> outputPaths;
+  bool hadError = false;
   InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         const TypeToPathMap *mapForInput =
             OFM->getOutputMapForInput(input.file());
+        if (!mapForInput) {
+          Diags.diagnose(
+              SourceLoc(),
+              diag::error_missing_entry_in_supplementary_output_file_map,
+              supplementaryFileMapPath, input.file());
+          hadError = true;
+        }
         outputPaths.push_back(createFromTypeToPathMap(mapForInput));
         return false;
       });
+  if (hadError)
+    return None;
 
   return outputPaths;
 }

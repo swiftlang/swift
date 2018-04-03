@@ -4574,6 +4574,48 @@ DictionaryTestSuite.test("removeAt") {
   }
 }
 
+DictionaryTestSuite.test("localHashSeeds") {
+  // With global hashing, copying elements in hash order between hash tables
+  // can become quadratic. (See https://bugs.swift.org/browse/SR-3268)
+  //
+  // We defeat this by mixing the local storage capacity into the global hash
+  // seed, thereby breaking the correlation between bucket indices across
+  // hash tables with different sizes.
+  //
+  // Verify this works by copying a small sampling of elements near the
+  // beginning of a large Dictionary into a smaller one. If the elements end up
+  // in the same order in the smaller Dictionary, then that indicates we do not
+  // use size-dependent seeding.
+
+  let count = 100_000
+  // Set a large table size to reduce frequency/length of collision chains.
+  var large = [Int: Int](minimumCapacity: 4 * count)
+  for i in 1 ..< count {
+    large[i] = 2 * i
+  }
+
+  let bunch = count / 100 // 1 percent's worth of elements
+
+  // Copy two bunches of elements into another dictionary that's half the size
+  // of the first. We start after the initial bunch because the hash table may
+  // begin with collided elements wrapped over from the end, and these would be
+  // sorted into irregular slots in the smaller table.
+  let slice = large.prefix(3 * bunch).dropFirst(bunch)
+  var small = [Int: Int](minimumCapacity: large.capacity / 2)
+  expectLT(small.capacity, large.capacity)
+  for (key, value) in slice {
+    small[key] = value
+  }
+
+  // Compare the second halves of the new dictionary and the slice.  Ignore the
+  // first halves; the first few elements may not be in the correct order if we
+  // happened to start copying from the middle of a collision chain.
+  let smallKeys = small.dropFirst(bunch).map { $0.key }
+  let sliceKeys = slice.dropFirst(bunch).map { $0.key }
+  // If this test fails, there is a problem with local hash seeding.
+  expectFalse(smallKeys.elementsEqual(sliceKeys))
+}
+
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
 #if _runtime(_ObjC)

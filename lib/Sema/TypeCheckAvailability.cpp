@@ -2458,7 +2458,7 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
   }
 
   if (R.isValid())
-    if (TC.diagnoseInlineableDeclRef(R.Start, D, DC))
+    if (TC.diagnoseInlinableDeclRef(R.Start, D, DC))
       return true;
 
   if (TC.diagnoseExplicitUnavailability(D, R, DC, call))

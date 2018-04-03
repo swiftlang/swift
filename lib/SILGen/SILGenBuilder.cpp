@@ -207,6 +207,31 @@ ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
   return cloner.clone(result);
 }
 
+ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
+    SILLocation loc, ManagedValue fn, SILType resultTy,
+    bool postponeToNoEscapeCleanup) {
+
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  auto resultFnType = resultTy.castTo<SILFunctionType>();
+
+  // Escaping to noescape conversion.
+  assert(resultFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         fnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         !fnType->isNoEscape() && resultFnType->isNoEscape() &&
+         "Expect a escaping to noescape conversion");
+
+  SILValue fnValue = postponeToNoEscapeCleanup
+                         ? fn.ensurePlusOne(SGF, loc).forward(SGF)
+                         : fn.getValue();
+  SILValue result = createConvertEscapeToNoEscape(loc, fnValue, resultTy,
+                                                  postponeToNoEscapeCleanup);
+  if (postponeToNoEscapeCleanup)
+    getSILGenFunction().enterPostponedCleanup(fnValue);
+  return ManagedValue::forTrivialObjectRValue(result);
+}
+
 ManagedValue SILGenBuilder::createInitExistentialValue(
     SILLocation loc, SILType existentialType, CanType formalConcreteType,
     ManagedValue concrete, ArrayRef<ProtocolConformanceRef> conformances) {
@@ -900,4 +925,23 @@ ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValu
   CleanupCloner cloner(*this, op);
   SILValue cast = createUncheckedAddrCast(loc, op.forward(SGF), resultTy);
   return cloner.clone(cast);
+}
+
+ManagedValue SILGenBuilder::tryCreateUncheckedRefCast(SILLocation loc,
+                                                      ManagedValue original,
+                                                      SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue result = tryCreateUncheckedRefCast(loc, original.getValue(), type);
+  if (!result)
+    return ManagedValue();
+  original.forward(SGF);
+  return cloner.clone(result);
+}
+
+ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
+                                                          ManagedValue original,
+                                                          SILType type) {
+  SILValue result =
+      SGF.B.createUncheckedTrivialBitCast(loc, original.getValue(), type);
+  return ManagedValue::forUnmanaged(result);
 }

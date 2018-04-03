@@ -64,12 +64,12 @@ FilterTests.test("single-count") {
   }
     
   let f0 = (0..<30).makeIterator().lazy.filter(mod7AndCount)
-  let a0 = Array(f0)
+  _ = Array(f0)
   expectEqual(30, count)
 
   count = 0
   let f1 = LazyFilterCollection(_base: 0..<30, mod7AndCount)
-  let a1 = Array(f1)
+  _ = Array(f1)
   expectEqual(30, count)
 }
 

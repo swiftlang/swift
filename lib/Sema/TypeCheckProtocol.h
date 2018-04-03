@@ -552,6 +552,11 @@ class ConformanceChecker : public WitnessChecker {
   /// Record that the given requirement has no valid witness.
   void recordInvalidWitness(ValueDecl *requirement);
 
+  /// Check for ill-formed uses of Objective-C generics in a type witness.
+  bool checkObjCTypeErasedGenerics(AssociatedTypeDecl *assocType,
+                                   Type type,
+                                   TypeDecl *typeDecl);
+
   /// Record a type witness.
   ///
   /// \param assocType The associated type whose witness is being recorded.
@@ -846,6 +851,13 @@ RequirementMatch matchWitness(TypeChecker &tc,
 /// the given protocol, return the referenced associated type.
 AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
                                                      ProtocolDecl *proto);
+
+/// Perform any necessary adjustments to the inferred associated type to
+/// make it suitable for later use.
+///
+/// \param noescapeToEscaping Will be set \c true if this operation performed
+/// the noescape-to-escaping adjustment.
+Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
 
 }
 

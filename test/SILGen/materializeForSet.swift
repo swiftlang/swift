@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s
@@ -445,14 +444,14 @@ struct GenericSubscriptWitness : GenericSubscriptProtocol {
 // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RESULT]] : $()
 
-// CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet23GenericSubscriptWitnessVyxxcluim : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in T, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet23GenericSubscriptWitnessVyxxcluim : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed T, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:      bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*T, %3 : $*GenericSubscriptWitness):
 // CHECK-NEXT:   [[BUFFER:%.*]] = alloc_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:   copy_addr %2 to [initialization] [[BUFFER]] : $*T
 // CHECK-NEXT:   [[VALUE:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
 // CHECK-NEXT:   [[SELF:%.*]] = load [trivial] %3 : $*GenericSubscriptWitness
-// CHECK:        [[GETTER:%.*]] = function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluig : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
-// CHECK-NEXT:   apply [[GETTER]]<T>([[VALUE]], %2, [[SELF]]) : $@convention(method) <τ_0_0> (@in τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
+// CHECK:        [[GETTER:%.*]] = function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluig : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
+// CHECK-NEXT:   apply [[GETTER]]<T>([[VALUE]], %2, [[SELF]]) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
 // CHECK-NEXT:   [[VALUE_PTR:%.*]] = address_to_pointer [[VALUE]] : $*T to $Builtin.RawPointer
 // CHECK:        [[CALLBACK:%.*]] = function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluimytfU_
 // CHECK-NEXT:   [[CALLBACK_PTR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(method) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () to $Builtin.RawPointer
@@ -572,11 +571,11 @@ struct TuxedoPanda : Panda { }
 
   // FIXME: Useless re-abstractions
 
-  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegir_A2CIegyd_TR : $@convention(thin) (TuxedoPanda, @guaranteed @callee_guaranteed (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
+  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegnr_A2CIegyd_TR : $@convention(thin) (TuxedoPanda, @guaranteed @callee_guaranteed (@in_guaranteed TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
 
-  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegyd_A2CIegir_TR : $@convention(thin) (@in TuxedoPanda, @guaranteed @callee_guaranteed (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
+  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegyd_A2CIegnr_TR : $@convention(thin) (@in_guaranteed TuxedoPanda, @guaranteed @callee_guaranteed (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
 
-  // CHECK: function_ref @$S17materializeForSet5PandaPAAE1xyxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
+  // CHECK: function_ref @$S17materializeForSet5PandaPAAE1xyxxcvs : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@owned @callee_guaranteed (@in_guaranteed τ_0_0) -> @out τ_0_0, @inout τ_0_0) -> ()
 
 // CHECK: }
 
@@ -584,18 +583,18 @@ struct TuxedoPanda : Panda { }
 
 // Call the getter:
 
-  // CHECK: function_ref @$S17materializeForSet5PandaPAAE1xyxxcvg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in τ_0_0) -> @out τ_0_0
+  // CHECK: function_ref @$S17materializeForSet5PandaPAAE1xyxxcvg : $@convention(method) <τ_0_0 where τ_0_0 : Panda> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed τ_0_0) -> @out τ_0_0
 
 // Result of calling the getter is re-abstracted to the maximally substituted type
 // by SILGenFunction::emitApply():
 
-  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegir_A2CIegyd_TR : $@convention(thin) (TuxedoPanda, @guaranteed @callee_guaranteed (@in TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
+  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegnr_A2CIegyd_TR : $@convention(thin) (TuxedoPanda, @guaranteed @callee_guaranteed (@in_guaranteed TuxedoPanda) -> @out TuxedoPanda) -> TuxedoPanda
 
 // ... then we re-abstract to the requirement signature:
 // FIXME: Peephole this away with the previous one since there's actually no
 // abstraction change in this case.
 
-  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegyd_A2CIegir_TR : $@convention(thin) (@in TuxedoPanda, @guaranteed @callee_guaranteed (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
+  // CHECK: function_ref @$S17materializeForSet11TuxedoPandaVACIegyd_A2CIegnr_TR : $@convention(thin) (@in_guaranteed TuxedoPanda, @guaranteed @callee_guaranteed (TuxedoPanda) -> TuxedoPanda) -> @out TuxedoPanda
 
 // The callback:
 

@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // REQUIRES: no_asan
 // RUN: %empty-directory(%t)
@@ -87,7 +86,7 @@ bb0:
 // structural sub-terms of the callee's substituted generic parameters that
 // contain the caller's generic parameters.
 
-sil @generic_callee3 : $@convention(thin) <T, U> (@in T) -> () {
+sil @generic_callee3 : $@convention(thin) <T, U> (@in_guaranteed T) -> () {
 bb0(%t: $*T):
   %12 = tuple ()
   return %12 : $()
@@ -95,10 +94,10 @@ bb0(%t: $*T):
 
 sil @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_guaranteed () -> () {
 bb0:
-  %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in T) -> ()
-  %t = alloc_stack $Optional<@callee_guaranteed (@in A) -> @out B>
-  %c = partial_apply [callee_guaranteed] %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in T) -> ()
-  dealloc_stack %t : $*Optional<@callee_guaranteed (@in A) -> @out B>
+  %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
+  %t = alloc_stack $Optional<@callee_guaranteed (@in_guaranteed A) -> @out B>
+  %c = partial_apply [callee_guaranteed] %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
+  dealloc_stack %t : $*Optional<@callee_guaranteed (@in_guaranteed A) -> @out B>
   return %c : $@callee_guaranteed () -> ()
 }
 

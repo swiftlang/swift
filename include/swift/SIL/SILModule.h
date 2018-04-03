@@ -493,13 +493,6 @@ public:
   bool linkFunction(SILFunction *Fun,
                     LinkingMode LinkAll = LinkingMode::LinkNormal);
 
-  /// Attempt to link a function by mangled name. Returns true if linking
-  /// succeeded, false otherwise.
-  ///
-  /// \return false if the linking failed.
-  bool linkFunction(StringRef Name,
-                    LinkingMode LinkAll = LinkingMode::LinkNormal);
-
   /// Check if a given function exists in any of the modules with a
   /// required linkage, i.e. it can be linked by linkFunction.
   ///

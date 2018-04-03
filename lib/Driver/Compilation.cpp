@@ -361,7 +361,7 @@ namespace driver {
                              SmallVector<const Job *, N> &Dependents) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
-        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
+          Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
 
       if (DependenciesFile.empty()) {
         // If this job doesn't track dependencies, it must always be run.
@@ -602,7 +602,8 @@ namespace driver {
         // FIXME: We can probably do better here!
         Job::Condition Condition = Job::Condition::Always;
         StringRef DependenciesFile =
-          Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+            Cmd->getOutput().getAdditionalOutputForType(
+                file_types::TY_SwiftDeps);
         if (!DependenciesFile.empty()) {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
@@ -950,7 +951,8 @@ namespace driver {
         for (const Job *Cmd : Comp.getJobs()) {
           // Skip files that don't use dependency analysis.
           StringRef DependenciesFile =
-            Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+              Cmd->getOutput().getAdditionalOutputForType(
+                  file_types::TY_SwiftDeps);
           if (DependenciesFile.empty())
             continue;
 
@@ -1152,6 +1154,9 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       else {
         // The normal case for non-single-compile jobs.
         for (const Action *A : job->getSource().getInputs()) {
+          // A could be a GeneratePCHJobAction
+          if (!isa<InputAction>(A))
+            continue;
           const auto *IA = cast<InputAction>(A);
           out << IA->getInputArg().getValue() << "\n";
         }
@@ -1258,7 +1263,7 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
   }
 
   for (auto inputPair : inputFiles) {
-    if (!types::isPartOfSwiftCompilation(inputPair.first))
+    if (!file_types::isPartOfSwiftCompilation(inputPair.first))
       continue;
     out << inputPair.second->getValue() << "\n";
   }

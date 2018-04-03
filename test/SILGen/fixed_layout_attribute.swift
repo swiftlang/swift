@@ -64,9 +64,9 @@ public func usesStaticProperty() {
   _ = HasStaticProperty.staticProperty
 }
 
-// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute28usesStaticPropertyInlineableyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute27usesStaticPropertyInlinableyyF : $@convention(thin) () -> ()
 
-@_inlineable
-public func usesStaticPropertyInlineable() {
+@inlinable
+public func usesStaticPropertyInlinable() {
   _ = HasStaticProperty.staticProperty
 }

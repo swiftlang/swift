@@ -1960,13 +1960,9 @@ private:
     // Recurse.
     optValue = emitBindOptionals(SGF, optValue, bind->getSubExpr());
 
-    // Check whether the value is non-nil.
-    SGF.emitBindOptional(bind, optValue, bind->getDepth());
-
-    // Extract the non-optional value.
-    auto &optTL = SGF.getTypeLowering(optValue.getType());
-    auto value = SGF.emitUncheckedGetOptionalValueFrom(bind, optValue, optTL);
-    return value;
+    // Check whether the value is non-nil and if the value is not-nil, return
+    // the unwrapped value.
+    return SGF.emitBindOptional(bind, optValue, bind->getDepth());
   }
 
   std::pair<ManagedValue, ManagedValue>

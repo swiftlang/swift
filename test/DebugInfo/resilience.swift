@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %empty-directory(%t)
 //
@@ -25,7 +24,6 @@ public func f() {
   // CHECK: call void @llvm.dbg.declare(metadata i8** %[[ADDR]],
   // CHECK-SAME:                        metadata ![[V1:[0-9]+]],
   // CHECK-SAME:                        metadata !DIExpression(DW_OP_deref))
-  // CHECK: %[[USE_BUFFER:.*]] = alloca i8,
   // CHECK: %[[S1:.*]] = alloca i8,
   // CHECK: store i8* %[[S1]], i8** %[[ADDR]]
   // CHECK: ![[V1]] = !DILocalVariable(name: "s1", {{.*}}type: ![[TY:[0-9]+]])

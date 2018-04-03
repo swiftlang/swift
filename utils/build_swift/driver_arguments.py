@@ -445,8 +445,8 @@ def create_argument_parser():
     option('--enable-sil-ownership', store_true,
            help='Enable the SIL ownership model')
 
-    option('--enable-guaranteed-normal-arguments', store_true,
-           help='Enable guaranteed normal arguments')
+    option('--disable-guaranteed-normal-arguments', store_true,
+           help='Disable guaranteed normal arguments')
 
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '
@@ -702,6 +702,9 @@ def create_argument_parser():
 
     option('--long-test', toggle_true,
            help='run the long test suite')
+
+    option('--stress-test', toggle_true,
+           help='run the stress test suite')
 
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')

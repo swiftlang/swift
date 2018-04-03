@@ -14,7 +14,7 @@
 #define SWIFT_DRIVER_OUTPUTFILEMAP_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Frontend/Types.h"
+#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
@@ -28,7 +28,7 @@
 
 namespace swift {
 
-typedef llvm::DenseMap<types::ID, std::string> TypeToPathMap;
+using TypeToPathMap = llvm::DenseMap<file_types::ID, std::string>;
 
 class OutputFileMap {
 private:

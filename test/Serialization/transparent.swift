@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_transparent.swift
@@ -41,7 +40,7 @@ func wrap_br() {
   test_br()
 }
 
-// SIL-LABEL: sil public_external [serialized] [canonical] @$S15def_transparent9do_switch1uyAA9MaybePairO_tF : $@convention(thin) (@owned MaybePair) -> () {
+// SIL-LABEL: sil public_external [serialized] [canonical] @$S15def_transparent9do_switch1uyAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> () {
 // SIL: bb0(%0 : $MaybePair):
 // SIL: retain_value %0 : $MaybePair
 // SIL: switch_enum %0 : $MaybePair, case #MaybePair.Neither!enumelt: bb[[CASE1:[0-9]+]], case #MaybePair.Left!enumelt.1: bb[[CASE2:[0-9]+]], case #MaybePair.Right!enumelt.1: bb[[CASE3:[0-9]+]], case #MaybePair.Both!enumelt.1: bb[[CASE4:[0-9]+]]

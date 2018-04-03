@@ -53,4 +53,28 @@ VisitorTests.test("RewritingNodeWithEmptyChild") {
   })
 }
 
+VisitorTests.test("SyntaxRewriter.visitAny") {
+  class VisitAnyRewriter: SyntaxRewriter {
+    let transform: (TokenSyntax) -> TokenSyntax
+    init(transform: @escaping (TokenSyntax) -> TokenSyntax) {
+      self.transform = transform
+    }
+    override func visitAny(_ node: Syntax) -> Syntax? {
+      if let tok = node as? TokenSyntax {
+        return transform(tok)
+      }
+      return nil
+    }
+  }
+  expectDoesNotThrow({
+    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
+      SwiftLang.parse(getInput("near-empty.swift")))
+    let rewriter = VisitAnyRewriter(transform: { _ in
+       return SyntaxFactory.makeIdentifier("")
+    })
+    let rewritten = rewriter.visit(parsed)
+    expectEqual(rewritten.description, "")
+  })
+}
+
 runAllTests()

@@ -62,8 +62,8 @@ func mutablePointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesMutableArrayPointer(&ii)
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutablePointer<Int> = &i // expected-error{{cannot pass immutable value as inout argument: 'i' is immutable}}
-  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' to type 'UnsafeMutablePointer<Int>'}}
+  var x: UnsafeMutablePointer<Int> = &i // expected-error {{use of extraneous '&'}}
+  x = &ii // expected-error {{use of extraneous '&'}}
   _ = x
 }
 
@@ -94,9 +94,9 @@ func mutableVoidPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesMutableVoidPointer(ff) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer${diag_suffix}'}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutableRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutableRawPointer'}}
+  var x: UnsafeMutableRawPointer = &i // expected-error {{use of extraneous '&'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutableRawPointer'}}
-  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' to type 'UnsafeMutableRawPointer'}}
+  x = &ii // expected-error {{use of extraneous '&'}}
   _ = x
 }
 
@@ -129,9 +129,9 @@ func mutableRawPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesMutableRawPointer(ff) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutableRawPointer${diag_suffix}'}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutableRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutableRawPointer'}}
+  var x: UnsafeMutableRawPointer = &i // expected-error {{use of extraneous '&'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutableRawPointer'}}
-  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' to type 'UnsafeMutableRawPointer'}}
+  x = &ii //expected-error {{use of extraneous '&'}}
   _ = x
 }
 
@@ -160,7 +160,7 @@ func constPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{cannot convert value of type '[Double]' to expected argument type 'UnsafePointer<Int>}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafePointer<Int> = &i // expected-error{{cannot pass immutable value as inout argument: 'i' is immutable}}
+  var x: UnsafePointer<Int> = &i // expected-error {{use of extraneous '&'}}
   x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafePointer<Int>'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafePointer<Int>'}}
 }
@@ -194,7 +194,7 @@ func constVoidPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstVoidPointer([0.0, 1.0, 2.0])
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeRawPointer'}}
+  var x: UnsafeRawPointer = &i // expected-error {{use of extraneous '&'}}
   x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafeRawPointer'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeRawPointer'}}
   x = fp // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Float>' to type 'UnsafeRawPointer'}}
@@ -234,7 +234,7 @@ func constRawPointerArguments(_ p: UnsafeMutablePointer<Int>,
   takesConstRawPointer([0.0, 1.0, 2.0])
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeRawPointer = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeRawPointer'}}
+  var x: UnsafeRawPointer = &i // expected-error {{use of extraneous '&'}}
   x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafeRawPointer'}}
   x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeRawPointer'}}
   x = fp // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Float>' to type 'UnsafeRawPointer'}}

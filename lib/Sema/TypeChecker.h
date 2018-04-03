@@ -539,6 +539,9 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Is it okay to resolve an IUO sigil ("!") here?
   AllowIUO = 0x4000000,
+
+  /// Is it okay to resolve an IUO sigil ("!") here with a deprecation warning?
+  AllowIUODeprecated = 0x8000000,
 };
 
 /// Option set describing how type resolution should work.
@@ -1277,19 +1280,6 @@ public:
                               DeclContext *dc,
                               bool *unwrappedIUO = nullptr);
 
-  /// \brief Determine whether one type would be a valid substitution for an
-  /// archetype.
-  ///
-  /// \param type The potential type.
-  ///
-  /// \param archetype The archetype for which type may (or may not) be
-  /// substituted.
-  ///
-  /// \param dc The context of the check.
-  ///
-  /// \returns true if \c t1 is a valid substitution for \c t2.
-  bool isSubstitutableFor(Type type, ArchetypeType *archetype, DeclContext *dc);
-
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
@@ -1322,6 +1312,9 @@ public:
 
   void computeAccessLevel(ValueDecl *D);
   void computeDefaultAccessLevel(ExtensionDecl *D);
+
+  /// Check the default arguments that occur within this value decl.
+  void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
 
   virtual void resolveAccessControl(ValueDecl *VD) override {
     validateAccessControl(VD);
@@ -1419,7 +1412,8 @@ public:
                         bool allowConcreteGenericParams,
                         ExtensionDecl *ext,
                         llvm::function_ref<void(GenericSignatureBuilder &)>
-                          inferRequirements);
+                          inferRequirements,
+                        bool mustInferRequirements);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1439,7 +1433,8 @@ public:
                         ExtensionDecl *ext) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
                                    allowConcreteGenericParams, ext,
-                                   [&](GenericSignatureBuilder &) { });
+                                   [&](GenericSignatureBuilder &) { },
+                                   /*mustInferRequirements=*/false);
   }
 
   /// Validate the signature of a generic type.
@@ -1731,10 +1726,12 @@ public:
   ///
   /// \param stmt The switch statement to be type-checked.  No modification of
   /// the statement occurs.
+  /// \param DC The decl context containing \p stmt.
   /// \param limitChecking The checking process relies on the switch statement
   /// being well-formed.  If it is not, pass true to this flag to run a limited
   /// form of analysis.
-  void checkSwitchExhaustiveness(SwitchStmt *stmt, bool limitChecking);
+  void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
+                                 bool limitChecking);
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
@@ -1819,6 +1816,10 @@ public:
   bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
                               TypeResolutionOptions options,
                               GenericTypeResolver &resolver);
+
+  /// Type check all parameter lists of a function.
+  bool typeCheckParameterLists(AbstractFunctionDecl *fd,
+                               GenericTypeResolver &resolver);
 
   /// Coerce a pattern to the given type.
   ///
@@ -2292,16 +2293,16 @@ public:
 
   /// \name Resilience diagnostics
 
-  void diagnoseInlineableLocalType(const NominalTypeDecl *NTD);
+  void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
 
-  bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
-                                 const DeclContext *DC);
+  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+                                const DeclContext *DC);
 
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
     InlineAlways,
-    Inlineable,
+    Inlinable,
     DefaultArgument,
     PropertyInitializer
   };
@@ -2538,7 +2539,27 @@ public:
 bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                               DeclContext *DC,
                                               TypeChecker &TC);
-  
+
+/// Determine whether this is a "pass-through" typealias, which has the
+/// same type parameters as the nominal type it references and specializes
+/// the underlying nominal type with exactly those type parameters.
+/// For example, the following typealias \c GX is a pass-through typealias:
+///
+/// \code
+/// struct X<T, U> { }
+/// typealias GX<A, B> = X<A, B>
+/// \endcode
+///
+/// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+/// different type parameters and \c GX3 doesn't pass its type parameters
+/// directly through.
+///
+/// \code
+/// typealias GX2<A> = X<A, A>
+/// typealias GX3<A, B> = X<B, A>
+/// \endcode
+bool isPassThroughTypealias(TypeAliasDecl *typealias);
+
 } // end namespace swift
 
 #endif

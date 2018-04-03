@@ -1,4 +1,3 @@
-// REQUIRES: plus_one_runtime
 
 // RUN: %target-swift-frontend -module-name constrained_extensions -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
 // RUN: %target-swift-frontend -module-name constrained_extensions -emit-sil -O -primary-file %s > /dev/null
@@ -89,7 +88,7 @@ extension Dictionary where Key == Int {
     return instanceProperty
   }
 
-  // CHECK-LABEL: sil @$Ss10DictionaryV22constrained_extensionsSiRszrlE14instanceMethod1vq_q__tF : $@convention(method) <Key, Value where Key == Int> (@in Value, @guaranteed Dictionary<Int, Value>) -> @out Value
+  // CHECK-LABEL: sil @$Ss10DictionaryV22constrained_extensionsSiRszrlE14instanceMethod1vq_q__tF : $@convention(method) <Key, Value where Key == Int> (@in_guaranteed Value, @guaranteed Dictionary<Int, Value>) -> @out Value
   public func instanceMethod(v: Value) -> Value {
     return v
   }
@@ -106,7 +105,7 @@ extension Dictionary where Key == Int {
 
   // CHECK-LABEL: sil @$Ss10DictionaryV22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA_ : $@convention(thin) <Key, Value where Key == Int> () -> Optional<Int>
   // CHECK-LABEL: sil @$Ss10DictionaryV22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA0_ : $@convention(thin) <Key, Value where Key == Int> () -> @out Optional<Value>
-  // CHECK-LABEL: sil @$Ss10DictionaryV22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZ : $@convention(method) <Key, Value where Key == Int> (Optional<Int>, @in Optional<Value>, @thin Dictionary<Int, Value>.Type) -> @out Value
+  // CHECK-LABEL: sil @$Ss10DictionaryV22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZ : $@convention(method) <Key, Value where Key == Int> (Optional<Int>, @in_guaranteed Optional<Value>, @thin Dictionary<Int, Value>.Type) -> @out Value
   public static func staticMethod(k: Key? = nil, v: Value? = nil) -> Value {
     return v!
   }
@@ -164,10 +163,10 @@ extension GenericClass where Y == () {
     set {}
   }
 
-  // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcig : $@convention(method) <X, Y where Y == ()> (@in X, @guaranteed GenericClass<X, ()>) -> ()
+  // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcig : $@convention(method) <X, Y where Y == ()> (@in_guaranteed X, @guaranteed GenericClass<X, ()>) -> ()
   // CHECK-LABEL: sil @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcis : $@convention(method) <X, Y where Y == ()> (@in X, @guaranteed GenericClass<X, ()>) -> ()
   // CHECK-LABEL: sil shared [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcimytfU_ : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed GenericClass<X, ()>, @thick GenericClass<X, ()>.Type) -> ()
-  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcim : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in X, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK-LABEL: sil [transparent] [serialized] @$S22constrained_extensions12GenericClassCAAytRs_rlEyyxcim : $@convention(method) <X, Y where Y == ()> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed X, @guaranteed GenericClass<X, ()>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
   public subscript(_: X) -> Y {
     get { while true {} }
     set {}
