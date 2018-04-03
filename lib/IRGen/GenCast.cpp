@@ -98,7 +98,6 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
     toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
   }
   // Emit a reference to the heap metadata for the target type.
-  const bool allowConservative = true;
 
   // If we're allowed to do a conservative check, try to just use the
   // global class symbol.  If the class has been re-allocated, this
@@ -106,17 +105,16 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // test might fail; but it's a much faster check.
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
-  if (allowConservative &&
-      (targetMetadata =
-        tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
-                                       /*allowUninitialized*/ true))) {
+  if ((targetMetadata =
+           tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
+                                          /*allowUninitialized*/ false))) {
     // ok
   } else {
     targetMetadata
       = emitClassHeapMetadataRef(IGF, toType.getSwiftRValueType(),
                                  MetadataValueType::ObjCClass,
                                  MetadataState::Complete,
-                                 /*allowUninitialized*/ allowConservative);
+                                 /*allowUninitialized*/ false);
   }
 
   // Handle checking a metatype object's type by directly comparing the address
