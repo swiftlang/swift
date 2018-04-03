@@ -291,7 +291,7 @@ protocol P {
   var a: Int {}
 }
 
-class C {
+private final class D {
   @objc
   static private var a: Int = 3 { return 3 }, b: Int, c = 4, d : Int { get {} get {}}, (a, b): (Int, Int)
   let (a, b) = (1,2), _ = 4 {}
