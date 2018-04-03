@@ -6296,15 +6296,6 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (!IsFirstPass) {
-      if (CD->getBody()) {
-        TC.definedFunctions.push_back(CD);
-      } else if (requiresDefinition(CD)) {
-        // Complain if we should have a body.
-        TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
-      }
-    }
-
-    if (!IsFirstPass) {
       return;
     }
 
@@ -6352,6 +6343,13 @@ public:
 
     TC.checkDeclAttributes(CD);
     checkAccessControl(TC, CD);
+
+    if (CD->hasBody() && !CD->isMemberwiseInitializer()) {
+      TC.definedFunctions.push_back(CD);
+    } else if (requiresDefinition(CD)) {
+      // Complain if we should have a body.
+      TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
+    }
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -9035,6 +9033,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       // We have a designated initializer. Create an override of it.
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor, kind)) {
+        Context.addSynthesizedDecl(ctor);
         classDecl->addMember(ctor);
       }
     }
@@ -9265,6 +9264,9 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+
+  // Make sure we type check the constructor later.
+  Context.addSynthesizedDecl(ctor);
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {
