@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -3849,7 +3850,15 @@ namespace {
       Expr *src = coerceToType(expr->getSrc(), destTy, locator);
       if (!src)
         return nullptr;
+
       expr->setSrc(src);
+
+      if (!SuppressDiagnostics) {
+        // If we're performing an assignment to a weak or unowned variable from
+        // a constructor call, emit a warning that the instance will be
+        // immediately deallocated.
+        diagnoseUnownedImmediateDeallocation(cs.getTypeChecker(), expr);
+      }
       return expr;
     }
     

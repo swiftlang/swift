@@ -188,7 +188,7 @@ Expr *Expr::getSemanticsProvidingExpr() {
 Expr *Expr::getValueProvidingExpr() {
   Expr *E = getSemanticsProvidingExpr();
 
-  if (auto TE = dyn_cast<ForceTryExpr>(this))
+  if (auto TE = dyn_cast<ForceTryExpr>(E))
     return TE->getSubExpr()->getValueProvidingExpr();
 
   // TODO:
