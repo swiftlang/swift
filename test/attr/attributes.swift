@@ -159,7 +159,15 @@ unowned
 var weak7 : Int // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'Int'}}
 weak
 var weak8 : Class? = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated as 'weak8' is a 'weak' variable}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak8' declared here}}
+
 unowned var weak9 : Class = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated as 'weak9' is an 'unowned' variable}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak9' declared here}}
+
 weak
 var weak10 : NonClass? = Ty0() // expected-error {{'weak' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
