@@ -91,6 +91,14 @@ static bool shouldTransformParameter(GenericEnvironment *env,
   return (param != newParam);
 }
 
+static bool isFuncOrOptionalFuncType(SILType Ty) {
+  SILType nonOptionalType = Ty;
+  if (auto optType = Ty.getOptionalObjectType()) {
+    nonOptionalType = optType;
+  }
+  return nonOptionalType.is<SILFunctionType>();
+}
+
 static bool shouldTransformFunctionType(GenericEnvironment *env,
                                         CanSILFunctionType fnType,
                                         irgen::IRGenModule &IGM) {
@@ -1742,7 +1750,7 @@ static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
   instr->getParent()->erase(instr);
 
   // If the load is of a function type - do not replace it.
-  if (loadArg->getType().is<SILFunctionType>()) {
+  if (isFuncOrOptionalFuncType(loadArg->getType())) {
     return;
   }
 
@@ -1803,7 +1811,7 @@ static void rewriteFunction(StructLoweringState &pass,
           loadArg->setOperand(newArg);
 
           // If the load is of a function type - do not replace it.
-          if (loadArg->getType().is<SILFunctionType>()) {
+          if (isFuncOrOptionalFuncType(loadArg->getType())) {
             continue;
           }
 
@@ -1843,7 +1851,7 @@ static void rewriteFunction(StructLoweringState &pass,
             allocateAndSetForArgumentOperand(pass, currOperand, applyInst);
           } else if (auto *load = dyn_cast<LoadInst>(currOperandInstr)) {
             // If the load is of a function type - do not replace it.
-            if (load->getType().is<SILFunctionType>()) {
+            if (isFuncOrOptionalFuncType(load->getType())) {
               continue;
             }
 
@@ -2215,7 +2223,11 @@ static SILValue
 getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
                                   IRGenModule &Mod, SILBuilder &builder) {
   SILType currSILType = op->getType();
-  if (auto funcType = currSILType.getAs<SILFunctionType>()) {
+  SILType nonOptionalType = currSILType;
+  if (auto optType = currSILType.getOptionalObjectType()) {
+    nonOptionalType = optType;
+  }
+  if (auto funcType = nonOptionalType.getAs<SILFunctionType>()) {
     GenericEnvironment *genEnv =
         containingInstr->getFunction()->getGenericEnvironment();
     if (!genEnv && funcType->isPolymorphic()) {
@@ -2223,8 +2235,16 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
     }
     auto newFnType = getNewSILFunctionType(genEnv, funcType, Mod);
     SILType newSILType = SILType::getPrimitiveObjectType(newFnType);
+    if (nonOptionalType.isAddress()) {
+      newSILType = newSILType.getAddressType();
+    }
+    if (nonOptionalType != currSILType) {
+      newSILType = SILType::getOptionalType(newSILType);
+    }
     if (currSILType.isAddress()) {
-      newSILType = newSILType.getAddressType(); // we need address for loads
+      newSILType = newSILType.getAddressType();
+    }
+    if (currSILType.isAddress()) {
       if (newSILType != currSILType) {
         auto castInstr = builder.createUncheckedAddrCast(
             containingInstr->getLoc(), op, newSILType);
