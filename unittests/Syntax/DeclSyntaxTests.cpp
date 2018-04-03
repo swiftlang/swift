@@ -259,13 +259,13 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
                                                     NoEllipsis, DefaultArg,
                                                     Comma);
 
-  ASSERT_EQ(ExternalName.getRaw(), Param.getFirstName().getRaw());
+  ASSERT_EQ(ExternalName.getRaw(), Param.getFirstName()->getRaw());
   ASSERT_EQ(LocalName.getRaw(), Param.getSecondName()->getRaw());
-  ASSERT_EQ(Colon.getRaw(), Param.getColon().getRaw());
+  ASSERT_EQ(Colon.getRaw(), Param.getColon()->getRaw());
 
-  auto GottenType = Param.getTypeAnnotation();
-  auto GottenType2 = Param.getTypeAnnotation();
-  ASSERT_TRUE(GottenType.hasSameIdentityAs(GottenType2));
+  auto GottenType = Param.getType();
+  auto GottenType2 = Param.getType();
+  ASSERT_TRUE(GottenType->hasSameIdentityAs(*GottenType2));
 
   ASSERT_EQ(DefaultArg.getRaw(), Param.getDefaultArgument()->getRaw());
 
@@ -277,10 +277,10 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
 
   // Test that llvm::None is returned for non-token missing children:
   auto Decimated = Param
-    .withTypeAnnotation(llvm::None)
+    .withType(llvm::None)
     .withDefaultArgument(llvm::None);
 
-  ASSERT_TRUE(Decimated.getTypeAnnotation().isMissing());
+  ASSERT_FALSE(Decimated.getType().hasValue());
   ASSERT_FALSE(Decimated.getDefaultArgument().hasValue());
 }
 
@@ -307,7 +307,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
       .withFirstName(ExternalName)
       .withSecondName(LocalName)
       .withColon(Colon)
-      .withTypeAnnotation(Int)
+      .withType(Int)
       .withDefaultArgument(DefaultArg)
       .withTrailingComma(Comma)
       .print(OS);
@@ -317,7 +317,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     getCannedFunctionParameter()
-      .withTypeAnnotation(llvm::None)
+      .withType(llvm::None)
       .withDefaultArgument(llvm::None)
       .print(OS);
     ASSERT_EQ(OS.str().str(), "with radius: , ");

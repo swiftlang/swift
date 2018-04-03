@@ -2492,10 +2492,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     DeclResult = parseDeclAssociatedType(Flags, Attributes);
     break;
   case tok::kw_enum:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::EnumDecl);
     DeclResult = parseDeclEnum(Flags, Attributes);
     break;
   case tok::kw_case: {
     llvm::SmallVector<Decl *, 4> Entries;
+    DeclParsingContext.setCreateSyntax(SyntaxKind::EnumCaseDecl);
     DeclResult = parseDeclEnumCase(Flags, Attributes, Entries);
     std::for_each(Entries.begin(), Entries.end(), Handler);
     if (auto *D = DeclResult.getPtrOrNull())
@@ -5387,6 +5389,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   ED->setGenericParams(GenericParams);
 
+  SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
     LBLoc = PreviousLoc;
@@ -5427,6 +5430,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
   
   SourceLoc CommaLoc;
   for (;;) {
+    SyntaxParsingContext ElementContext(SyntaxContext,
+                                        SyntaxKind::EnumCaseElement);
     Identifier Name;
     SourceLoc NameLoc;
 
@@ -5495,6 +5500,9 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     ParserResult<Expr> RawValueExpr;
     LiteralExpr *LiteralRawValueExpr = nullptr;
     if (Tok.is(tok::equal)) {
+      SyntaxParsingContext InitContext(SyntaxContext,
+                                       SyntaxKind::InitializerClause);
+
       EqualsLoc = consumeToken();
       {
         CodeCompletionCallbacks::InEnumElementRawValueRAII
@@ -5565,6 +5573,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       break;
     CommaLoc = consumeToken(tok::comma);
   }
+  SyntaxContext->collectNodesInPlace(SyntaxKind::EnumCaseElementList);
   
   if (!(Flags & PD_AllowEnumElement)) {
     diagnose(CaseLoc, diag::disallowed_enum_element);

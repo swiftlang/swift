@@ -238,6 +238,7 @@ func closure() {
     return 2
   }
   _ = { a, b in }
+  _ = { (a, b) in }
   _ = {}
   _ = { s1, s2 in s1 > s2 }
   _ = { $0 > $1 }
@@ -425,4 +426,14 @@ func objectLiterals() {
   #file
   #function
   #dsohandle
+}
+
+enum E1 : String {
+  case foo = 1
+  case bar = "test", baz(x: Int, String) = 12
+  indirect case qux(E1)
+
+  indirect private enum E2<T>: String where T: SomeProtocol {
+    case foo, bar, baz
+  }
 }
