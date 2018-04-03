@@ -4361,42 +4361,41 @@ public:
   }
 
   void visitEnumDecl(EnumDecl *ED) {
+    if (!IsFirstPass) {
+      for (Decl *member : ED->getMembers())
+        visit(member);
+
+      TC.checkConformancesInContext(ED, ED);
+      return;
+    }
+
     TC.checkDeclAttributesEarly(ED);
     TC.computeAccessLevel(ED);
 
-    if (IsFirstPass) {
-      checkUnsupportedNestedType(ED);
+    checkUnsupportedNestedType(ED);
 
-      TC.validateDecl(ED);
+    TC.validateDecl(ED);
+    TC.DeclsToFinalize.remove(ED);
 
-      TC.DeclsToFinalize.remove(ED);
-
-      {
-        // Check for circular inheritance of the raw type.
-        SmallVector<EnumDecl *, 8> path;
-        path.push_back(ED);
-        checkCircularity(TC, ED, diag::circular_enum_inheritance,
-                         diag::enum_here, path);
-      }
-    }
-
-    if (!IsFirstPass) {
-      checkAccessControl(TC, ED);
-
-      if (ED->hasRawType() && !ED->isObjC()) {
-        // ObjC enums have already had their raw values checked, but pure Swift
-        // enums haven't.
-        checkEnumRawValues(TC, ED);
-      }
-
-      TC.checkConformancesInContext(ED, ED);
+    {
+      // Check for circular inheritance of the raw type.
+      SmallVector<EnumDecl *, 8> path;
+      path.push_back(ED);
+      checkCircularity(TC, ED, diag::circular_enum_inheritance,
+                       diag::enum_here, path);
     }
 
     for (Decl *member : ED->getMembers())
       visit(member);
-    
 
     TC.checkDeclAttributes(ED);
+    checkAccessControl(TC, ED);
+
+    if (ED->hasRawType() && !ED->isObjC()) {
+      // ObjC enums have already had their raw values checked, but pure Swift
+      // enums haven't.
+      checkEnumRawValues(TC, ED);
+    }
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -4404,6 +4403,7 @@ public:
       for (Decl *Member : SD->getMembers())
         visit(Member);
 
+      TC.checkConformancesInContext(SD, SD);
       return;
     }
 
@@ -4422,9 +4422,6 @@ public:
 
     TC.checkDeclAttributes(SD);
     checkAccessControl(TC, SD);
-
-    if (!SD->isInvalid())
-      TC.checkConformancesInContext(SD, SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
