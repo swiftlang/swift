@@ -34,7 +34,7 @@ func useFoo(_ x: Foo) -> Int32 {
   }
 
   // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK: call swiftcc void @"$Ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$S{{.+}}3FooON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$Ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]
@@ -68,7 +68,7 @@ func useBar(_ x: Bar) -> Int32 {
   }
 
   // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK: call swiftcc void @"$Ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$S{{.+}}3BarON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$Ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]
