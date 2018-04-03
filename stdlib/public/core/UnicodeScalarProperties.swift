@@ -966,39 +966,6 @@ extension Unicode.Scalar.Properties {
   }
 }
 
-/// Executes a block that will attempt to store text in the memory owned by the
-/// given string storage object, returning the length of the text.
-///
-/// The closure is assumed to return an `Int32` value (the convention of ICU's C
-/// functions) that is equal to the length of the string being stored. If the
-/// storage object is not large enough to hold the string, it is replaced by one
-/// that is exactly the required size and the closure is executed one more time
-/// to populate it.
-@_inlineable
-@_versioned
-internal func _expandingStorageIfNeeded<
-  CodeUnit: UnsignedInteger & FixedWidthInteger
->(
-  _ storage: inout _SwiftStringStorage<CodeUnit>,
-  body: (_SwiftStringStorage<CodeUnit>) throws -> Int32
-) rethrows -> Int {
-  let z = try body(storage)
-  let correctSize = Int(z)
-  if correctSize > storage.capacity {
-    // If the buffer wasn't large enough, replace it with one that is the
-    // correct size and execute the closure again.
-    storage = _SwiftStringStorage<CodeUnit>.create(
-      capacity: correctSize,
-      count: correctSize)
-    return Int(try body(storage))
-  } else {
-    // Otherwise, the buffer has been populated; update its count to the correct
-    // value.
-    storage.count = correctSize
-    return correctSize
-  }
-}
-
 extension Unicode.Scalar.Properties {
 
   internal func _scalarName(
@@ -1069,6 +1036,67 @@ extension Unicode.Scalar.Properties {
 
 extension Unicode.Scalar.Properties {
 
+  // The type of ICU case conversion functions.
+  internal typealias _U_StrToX = (
+    /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
+    /* destCapacity */ Int32,
+    /* src */ UnsafePointer<__swift_stdlib_UChar>,
+    /* srcLength */ Int32,
+    /* locale */ UnsafePointer<Int8>,
+    /* pErrorCode */ UnsafeMutablePointer<__swift_stdlib_UErrorCode>
+  ) -> Int32
+
+  /// Applies the given ICU string mapping to the scalar.
+  ///
+  /// This function attempts first to write the mapping into a stack-based
+  /// UTF-16 buffer capable of holding 16 code units, which should be enough for
+  /// all current case mappings. In the event more space is needed, it will be
+  /// allocated on the heap.
+  internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
+    var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
+    let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
+      var utf16 = _utf16
+      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(bufPtr.count),
+          utf16Pointer,
+          Int32(_utf16Length),
+          "",
+          &err)
+        guard err.isSuccess ||
+              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        return Int(correctSize)
+      }
+    }
+    if _fastPath(count <= scratchBuffer.count) {
+      scratchBuffer.count = count
+      return String._fromWellFormedUTF16CodeUnits(scratchBuffer)
+    }
+    var array = Array<UInt16>(repeating: 0, count: count)
+    array.withUnsafeMutableBufferPointer { bufPtr in
+      var utf16 = _utf16
+      withUnsafePointer(to: &utf16.0) { utf16Pointer in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(bufPtr.count),
+          utf16Pointer,
+          Int32(_utf16Length),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+      }
+    }
+    return String._fromWellFormedUTF16CodeUnits(array[..<count])
+  }
+
   /// The lowercase mapping of the scalar.
   ///
   /// This property is a `String`, not a `Unicode.Scalar` or `Character`,
@@ -1080,28 +1108,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the `Lowercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var lowercaseMapping: String {
-    let initialCapacity = 1
-
-    var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
-      capacity: initialCapacity,
-      count: 0)
-
-    _ = _expandingStorageIfNeeded(&storage) { storage in
-      var utf16 = _utf16
-      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = __swift_stdlib_u_strToLower(
-          storage.start, Int32(storage.capacity),
-          utf16Pointer, Int32(_utf16Length), "", &err)
-        guard err.isSuccess ||
-              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-          fatalError(
-            "u_strToLower: Unexpected error lowercasing Unicode scalar.")
-        }
-        return correctSize
-      }
-    }
-    return String(_storage: storage)
+    return _applyMapping(__swift_stdlib_u_strToLower)
   }
 
   /// The titlecase mapping of the scalar.
@@ -1115,28 +1122,9 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the `Titlecase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var titlecaseMapping: String {
-    let initialCapacity = 1
-
-    var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
-      capacity: initialCapacity,
-      count: 0)
-
-    _ = _expandingStorageIfNeeded(&storage) { storage in
-      var utf16 = _utf16
-      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = __swift_stdlib_u_strToTitle(
-          storage.start, Int32(storage.capacity),
-          utf16Pointer, Int32(_utf16Length), nil, "", &err)
-        guard err.isSuccess ||
-              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-          fatalError(
-            "u_strToTitle: Unexpected error titlecasing Unicode scalar.")
-        }
-        return correctSize
-      }
+    return _applyMapping { ptr, cap, src, len, locale, err in
+      return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
     }
-    return String(_storage: storage)
   }
 
   /// The uppercase mapping of the scalar.
@@ -1150,28 +1138,7 @@ extension Unicode.Scalar.Properties {
   /// This property corresponds to the `Uppercase_Mapping` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var uppercaseMapping: String {
-    let initialCapacity = 1
-
-    var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
-      capacity: initialCapacity,
-      count: 0)
-
-    _ = _expandingStorageIfNeeded(&storage) { storage in
-      var utf16 = _utf16
-      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = __swift_stdlib_u_strToUpper(
-          storage.start, Int32(storage.capacity),
-          utf16Pointer, Int32(_utf16Length), "", &err)
-        guard err.isSuccess ||
-              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-          fatalError(
-            "u_strToUpper: Unexpected error uppercasing Unicode scalar.")
-        }
-        return correctSize
-      }
-    }
-    return String(_storage: storage)
+    return _applyMapping(__swift_stdlib_u_strToUpper)
   }
 }
 
