@@ -50,7 +50,7 @@
 ///              to other: Self) {
 ///             self.init(Array(repeating: value, count: elements.count))
 ///         }
-/// 
+///
 ///         func combiningAsAdjoint(with newAdjoint: Self) -> Self {
 ///             return self + newAdjoint
 ///         }
@@ -97,13 +97,120 @@ public extension FloatingPoint {
 }
 
 //===----------------------------------------------------------------------===//
+// Differentiation Operators
+//===----------------------------------------------------------------------===//
+
+@_transparent @_versioned
+func _gradientBodyUnreachable() {
+  // This implementation is never used, since calls to `Swift.gradient(of:)` are
+  // resolved as a special case by the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'gradient(of:)' operation failed to resolve"
+      as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@_transparent @_versioned
+func _valueAndGradientBodyUnreachable() {
+  // This implementation is never used, since calls to
+  // `Swift.valueAndGradient(of:)` are resolved as a special case by the type
+  // checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: 'valueAndGradient(of:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.gradient(of:)")
+public func gradient<T, Result>(of function: (T) -> Result) -> (T) -> T
+  where T : Differentiable, Result : Differentiable {
+  _gradientBodyUnreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.gradient(of:)")
+public func gradient<T, U, Result>(
+  of function: (T, U) -> Result
+) -> (T, U) -> (T, U)
+  where T : Differentiable, U : Differentiable, Result : Differentiable {
+  _gradientBodyUnreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.gradient(of:)")
+public func gradient<T, U, V, Result>(
+  of function: (T, U, V) -> Result
+) -> (T, U, V) -> (T, U, V)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        Result : Differentiable {
+  _gradientBodyUnreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.gradient(of:)")
+public func gradient<T, U, V, W, Result>(
+  of function: (T, U, V, W) -> Result
+) -> (T, U, V, W) -> (T, U, V, W)
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        W : Differentiable, Result : Differentiable {
+  _gradientBodyUnreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.valueAndGradient(of:)")
+public func valueAndGradient<T, Result>(
+  of function: (T) -> Result
+) -> (T) -> (value: Result, gradient: T)
+  where T : Differentiable, Result : Differentiable {
+  _valueAndGradientBodyUnreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.valueAndGradient(of:)")
+public func valueAndGradient<T, U, Result>(
+  of function: (T, U) -> Result
+) -> (T, U) -> (value: Result, gradient: (T, U))
+  where T : Differentiable, U : Differentiable, Result : Differentiable {
+  _valueAndGradientBodyUnreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.valueAndGradient(of:)")
+public func valueAndGradient<T, U, V, Result>(
+  of function: (T, U, V) -> Result
+) -> (T, U, V) -> (value: Result, gradient: (T, U, V))
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        Result : Differentiable {
+  _valueAndGradientBodyUnreachable()
+}
+
+@_inlineable // FIXME(sil-serialize-all)
+@_transparent
+@_semantics("typechecker.valueAndGradient(of:)")
+public func valueAndGradient<T, U, V, W, Result>(
+  of function: (T, U, V, W) -> Result
+) -> (T, U, V, W) -> (value: Result, gradient: (T, U, V, W))
+  where T : Differentiable, U : Differentiable, V : Differentiable,
+        W : Differentiable, Result : Differentiable {
+  _valueAndGradientBodyUnreachable()
+}
+
+//===----------------------------------------------------------------------===//
 // Runtime
 //===----------------------------------------------------------------------===//
 
 @_versioned
 class _ADTape<Element> {
   @_versioned var elements: [Element] = []
-  
+
   @inline(never)
   @_semantics("autodiff.create_tape")
   @_silgen_name("_swift_autodiff_CreateTape")
@@ -119,14 +226,14 @@ extension _ADTape {
       return elements.count
     }
   }
-  
+
   @inline(never)
   @_semantics("autodiff.push_to_tape")
   @_silgen_name("_swift_autodiff_PushToTape")
   func push(_ value: Element) {
     elements.append(value)
   }
-  
+
   @inline(never)
   @_semantics("autodiff.pop_from_tape")
   @_silgen_name("_swift_autodiff_PopFromTape")
@@ -137,4 +244,3 @@ extension _ADTape {
     return popped
   }
 }
-
