@@ -736,7 +736,7 @@ public:
 
   /// The type of a match predicate, which takes as input a node and its
   /// parent and returns a bool indicating whether the node matches.
-  typedef std::function<bool(ASTNode, ASTWalker::ParentTy)> MatchPredicate;
+  using MatchPredicate = std::function<bool(ASTNode, ASTWalker::ParentTy)>;
 
 private:
   const SourceRange TargetRange;
