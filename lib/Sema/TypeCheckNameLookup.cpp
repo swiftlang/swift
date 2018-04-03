@@ -539,28 +539,6 @@ static bool isLocInVarInit(TypeChecker &TC, VarDecl *var, SourceLoc loc) {
   return TC.Context.SourceMgr.rangeContainsTokenLoc(initRange, loc);
 }
 
-namespace {
-  class TypoCorrectionResolver : public DelegatingLazyResolver {
-    TypeChecker &TC() { return static_cast<TypeChecker&>(Principal); }
-    SourceLoc NameLoc;
-  public:
-    TypoCorrectionResolver(TypeChecker &TC, SourceLoc nameLoc)
-      : DelegatingLazyResolver(TC), NameLoc(nameLoc) {}
-
-    void resolveDeclSignature(ValueDecl *VD) override {
-      if (VD->isInvalid() || VD->hasInterfaceType()) return;
-
-      // Don't process a variable if we're within its initializer.
-      if (auto var = dyn_cast<VarDecl>(VD)) {
-        if (isLocInVarInit(TC(), var, NameLoc))
-          return;
-      }
-
-      DelegatingLazyResolver::resolveDeclSignature(VD);
-    }
-  };
-} // end anonymous namespace
-
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
                                         DeclName targetDeclName,
@@ -608,12 +586,11 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     entries.insert(distance, std::move(decl));
   });
 
-  TypoCorrectionResolver resolver(*this, nameLoc);
   if (baseTypeOrNull) {
-    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, &resolver,
+    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, this,
                              /*include instance members*/ true, gsb);
   } else {
-    lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
+    lookupVisibleDecls(consumer, DC, this, /*top level*/ true, nameLoc);
   }
 
   // Impose a maximum distance from the best score.
