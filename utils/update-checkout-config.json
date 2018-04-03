@@ -199,9 +199,9 @@
                 "llbuild": "master",
                 "swiftpm": "master",
                 "compiler-rt": "swift-4.2-branch",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
+                "swift-corelibs-xctest": "swift-4.2-branch",
+                "swift-corelibs-foundation": "swift-4.2-branch",
+                "swift-corelibs-libdispatch": "swift-4.2-branch",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release"
