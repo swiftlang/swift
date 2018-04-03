@@ -2419,7 +2419,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     }
     return IfConfigResult;
   }
-
+  if (Tok.isAny(tok::pound_warning, tok::pound_error)) {
+    auto Result = parseDeclPoundDiagnostic();
+    if (Result.isNonNull())
+      Handler(Result.get());
+    return Result;
+  }
 
   SyntaxParsingContext DeclParsingContext(SyntaxContext,
                                           SyntaxContextKind::Decl);
@@ -2552,20 +2557,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
     // Handled below.
     break;
 
-  case tok::pound_warning:
-    // FIXME: This is discarding attributes/modifiers. Should be hoisted.
-    DeclParsingContext.setCreateSyntax(SyntaxKind::PoundWarningDecl);
-    DeclResult = parseDeclPoundDiagnostic();
-    break;
-  case tok::pound_error:
-    // FIXME: This is discarding attributes/modifiers. Should be hoisted.
-    DeclParsingContext.setCreateSyntax(SyntaxKind::PoundErrorDecl);
-    DeclResult = parseDeclPoundDiagnostic();
-    break;
-
   case tok::pound_if:
   case tok::pound_sourceLocation:
   case tok::pound_line:
+  case tok::pound_warning:
+  case tok::pound_error:
     // We see some attributes right before these pounds.
     // TODO: Emit dedicated errors for them.
     LLVM_FALLTHROUGH;
