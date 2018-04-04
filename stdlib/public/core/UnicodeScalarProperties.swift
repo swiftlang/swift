@@ -34,6 +34,126 @@ extension Unicode.Scalar {
   public var properties: Properties {
     return Properties(_scalar: self)
   }
+
+  /// Returns the lowercase mapping of the scalar.
+  ///
+  /// This function returns a `String`, not a `Unicode.Scalar` or `Character`,
+  /// because some mappings may transform a scalar into multiple scalars or
+  /// graphemes. For example, the character "İ" (U+0130 LATIN CAPITAL LETTER I
+  /// WITH DOT ABOVE) becomes two scalars (U+0069 LATIN SMALL LETTER I, U+0307
+  /// COMBINING DOT ABOVE) when converted to lowercase.
+  ///
+  /// This function corresponds to the `Lowercase_Mapping` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  ///
+  /// - Returns: The lowercase mapping of the scalar.
+  public func lowercased() -> String {
+    return _applyMapping(__swift_stdlib_u_strToLower)
+  }
+
+  /// Returns the titlecase mapping of the scalar.
+  ///
+  /// This function returns a `String`, not a `Unicode.Scalar` or `Character`,
+  /// because some mappings may transform a scalar into multiple scalars or
+  /// graphemes. For example, the ligature "ﬁ" (U+FB01 LATIN SMALL LIGATURE FI)
+  /// becomes "Fi" (U+0046 LATIN CAPITAL LETTER F, U+0069 LATIN SMALL LETTER I)
+  /// when converted to titlecase.
+  ///
+  /// This function corresponds to the `Titlecase_Mapping` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  ///
+  /// - Returns: The titlecase mapping of the scalar.
+  public func titlecased() -> String {
+    return _applyMapping { ptr, cap, src, len, locale, err in
+      return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
+    }
+  }
+
+  /// Returns the uppercase mapping of the scalar.
+  ///
+  /// This function returns a `String`, not a `Unicode.Scalar` or `Character`,
+  /// because some mappings may transform a scalar into multiple scalars or
+  /// graphemes. For example, the German letter "ß" (U+00DF LATIN SMALL LETTER
+  /// SHARP S) becomes "SS" (U+0053 LATIN CAPITAL LETTER S, U+0053 LATIN CAPITAL
+  /// LETTER S) when converted to uppercase.
+  ///
+  /// This function corresponds to the `Uppercase_Mapping` property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  ///
+  /// - Returns: The titlecase mapping of the scalar.
+  public func uppercased() -> String {
+    return _applyMapping(__swift_stdlib_u_strToUpper)
+  }
+
+  /// The UTF-16 encoding of the scalar, represented as a tuple of 2 elements.
+  ///
+  /// If the scalar only encodes to one code unit, the second element is zero.
+  @_transparent
+  internal var _utf16CodeUnits: (UTF16.CodeUnit, UTF16.CodeUnit) {
+    let utf16 = UnicodeScalar(UInt32(_value))!.utf16
+    return (utf16[0], utf16.count > 1 ? utf16[1] : 0)
+  }
+
+  // The type of ICU case conversion functions.
+  internal typealias _U_StrToX = (
+    /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
+    /* destCapacity */ Int32,
+    /* src */ UnsafePointer<__swift_stdlib_UChar>,
+    /* srcLength */ Int32,
+    /* locale */ UnsafePointer<Int8>,
+    /* pErrorCode */ UnsafeMutablePointer<__swift_stdlib_UErrorCode>
+  ) -> Int32
+
+  /// Applies the given ICU string mapping to the scalar.
+  ///
+  /// This function attempts first to write the mapping into a stack-based
+  /// UTF-16 buffer capable of holding 16 code units, which should be enough for
+  /// all current case mappings. In the event more space is needed, it will be
+  /// allocated on the heap.
+  internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
+    let utf16Length = UnicodeScalar(UInt32(_value))!.utf16.count
+    var utf16 = _utf16CodeUnits
+    var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
+    let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
+      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(bufPtr.count),
+          utf16Pointer,
+          Int32(utf16Length),
+          "",
+          &err)
+        guard err.isSuccess ||
+              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        return Int(correctSize)
+      }
+    }
+    if _fastPath(count <= scratchBuffer.count) {
+      scratchBuffer.count = count
+      return String._fromWellFormedUTF16CodeUnits(scratchBuffer)
+    }
+    var array = Array<UInt16>(repeating: 0, count: count)
+    array.withUnsafeMutableBufferPointer { bufPtr in
+      withUnsafePointer(to: &utf16.0) { utf16Pointer in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(bufPtr.count),
+          utf16Pointer,
+          Int32(utf16Length),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
+        }
+        _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+      }
+    }
+    return String._fromWellFormedUTF16CodeUnits(array[..<count])
+  }
 }
 
 /// Boolean properties that are defined by the Unicode Standard (i.e., not
@@ -1022,123 +1142,6 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var nameAlias: String? {
     return _scalarName(__swift_stdlib_U_CHAR_NAME_ALIAS)
-  }
-}
-
-extension Unicode.Scalar.Properties {
-
-  /// The UTF-16 encoding of the scalar, represented as a tuple of 2 elements.
-  ///
-  /// If the scalar only encodes to one code unit, the second element is zero.
-  @_transparent
-  internal var _utf16CodeUnits: (UTF16.CodeUnit, UTF16.CodeUnit) {
-    let utf16 = UnicodeScalar(UInt32(_value))!.utf16
-    return (utf16[0], utf16.count > 1 ? utf16[1] : 0)
-  }
-
-  // The type of ICU case conversion functions.
-  internal typealias _U_StrToX = (
-    /* dest */ UnsafeMutablePointer<__swift_stdlib_UChar>,
-    /* destCapacity */ Int32,
-    /* src */ UnsafePointer<__swift_stdlib_UChar>,
-    /* srcLength */ Int32,
-    /* locale */ UnsafePointer<Int8>,
-    /* pErrorCode */ UnsafeMutablePointer<__swift_stdlib_UErrorCode>
-  ) -> Int32
-
-  /// Applies the given ICU string mapping to the scalar.
-  ///
-  /// This function attempts first to write the mapping into a stack-based
-  /// UTF-16 buffer capable of holding 16 code units, which should be enough for
-  /// all current case mappings. In the event more space is needed, it will be
-  /// allocated on the heap.
-  internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    let utf16Length = UnicodeScalar(UInt32(_value))!.utf16.count
-    var utf16 = _utf16CodeUnits
-    var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
-    let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
-      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = u_strTo(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(bufPtr.count),
-          utf16Pointer,
-          Int32(utf16Length),
-          "",
-          &err)
-        guard err.isSuccess ||
-              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-          fatalError("Unexpected error case-converting Unicode scalar.")
-        }
-        return Int(correctSize)
-      }
-    }
-    if _fastPath(count <= scratchBuffer.count) {
-      scratchBuffer.count = count
-      return String._fromWellFormedUTF16CodeUnits(scratchBuffer)
-    }
-    var array = Array<UInt16>(repeating: 0, count: count)
-    array.withUnsafeMutableBufferPointer { bufPtr in
-      withUnsafePointer(to: &utf16.0) { utf16Pointer in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = u_strTo(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(bufPtr.count),
-          utf16Pointer,
-          Int32(utf16Length),
-          "",
-          &err)
-        guard err.isSuccess else {
-          fatalError("Unexpected error case-converting Unicode scalar.")
-        }
-        _sanityCheck(count == correctSize, "inconsistent ICU behavior")
-      }
-    }
-    return String._fromWellFormedUTF16CodeUnits(array[..<count])
-  }
-
-  /// The lowercase mapping of the scalar.
-  ///
-  /// This property is a `String`, not a `Unicode.Scalar` or `Character`,
-  /// because some mappings may transform a scalar into multiple scalars or
-  /// graphemes. For example, the character "İ" (U+0130 LATIN CAPITAL LETTER I
-  /// WITH DOT ABOVE) becomes two scalars (U+0069 LATIN SMALL LETTER I, U+0307
-  /// COMBINING DOT ABOVE) when converted to lowercase.
-  ///
-  /// This property corresponds to the `Lowercase_Mapping` property in the
-  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  public var lowercaseMapping: String {
-    return _applyMapping(__swift_stdlib_u_strToLower)
-  }
-
-  /// The titlecase mapping of the scalar.
-  ///
-  /// This property is a `String`, not a `Unicode.Scalar` or `Character`,
-  /// because some mappings may transform a scalar into multiple scalars or
-  /// graphemes. For example, the ligature "ﬁ" (U+FB01 LATIN SMALL LIGATURE FI)
-  /// becomes "Fi" (U+0046 LATIN CAPITAL LETTER F, U+0069 LATIN SMALL LETTER I)
-  /// when converted to titlecase.
-  ///
-  /// This property corresponds to the `Titlecase_Mapping` property in the
-  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  public var titlecaseMapping: String {
-    return _applyMapping { ptr, cap, src, len, locale, err in
-      return __swift_stdlib_u_strToTitle(ptr, cap, src, len, nil, locale, err)
-    }
-  }
-
-  /// The uppercase mapping of the scalar.
-  ///
-  /// This property is a `String`, not a `Unicode.Scalar` or `Character`,
-  /// because some mappings may transform a scalar into multiple scalars or
-  /// graphemes. For example, the German letter "ß" (U+00DF LATIN SMALL LETTER
-  /// SHARP S) becomes "SS" (U+0053 LATIN CAPITAL LETTER S, U+0053 LATIN CAPITAL
-  /// LETTER S) when converted to uppercase.
-  ///
-  /// This property corresponds to the `Uppercase_Mapping` property in the
-  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
-  public var uppercaseMapping: String {
-    return _applyMapping(__swift_stdlib_u_strToUpper)
   }
 }
 
