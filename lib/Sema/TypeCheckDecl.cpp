@@ -4354,7 +4354,6 @@ public:
       for (Decl *member : ED->getMembers())
         visit(member);
 
-      TC.checkConformancesInContext(ED, ED);
       return;
     }
 
@@ -4387,6 +4386,7 @@ public:
     }
 
     TC.checkDeclCircularity(ED);
+    TC.ConformanceContexts.push_back(ED);
   }
 
   void visitStructDecl(StructDecl *SD) {
@@ -4394,7 +4394,6 @@ public:
       for (Decl *Member : SD->getMembers())
         visit(Member);
 
-      TC.checkConformancesInContext(SD, SD);
       return;
     }
 
@@ -4415,6 +4414,7 @@ public:
     checkAccessControl(TC, SD);
 
     TC.checkDeclCircularity(SD);
+    TC.ConformanceContexts.push_back(SD);
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -4525,7 +4525,6 @@ public:
       for (Decl *Member : CD->getMembers())
         visit(Member);
 
-      TC.checkConformancesInContext(CD, CD);
       return;
     }
 
@@ -4649,6 +4648,7 @@ public:
     checkAccessControl(TC, CD);
 
     TC.checkDeclCircularity(CD);
+    TC.ConformanceContexts.push_back(CD);
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
@@ -6241,7 +6241,7 @@ public:
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
-    TC.checkConformancesInContext(ED, ED);
+    TC.ConformanceContexts.push_back(ED);
 
     if (!ED->isInvalid())
       TC.checkDeclAttributes(ED);

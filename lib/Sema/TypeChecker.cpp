@@ -442,6 +442,18 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
+    // Type check conformance contexts.
+    for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
+      auto decl = TC.ConformanceContexts[i];
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+        TC.checkConformancesInContext(ext, ext);
+      else {
+        auto *ntd = cast<NominalTypeDecl>(decl);
+        TC.checkConformancesInContext(ntd, ntd);
+      }
+    }
+    TC.ConformanceContexts.clear();
+
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
@@ -523,6 +535,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            !TC.DeclsToFinalize.empty() ||
+           !TC.ConformanceContexts.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
            !TC.UsedConformances.empty() ||
            !TC.PartiallyCheckedConformances.empty());
