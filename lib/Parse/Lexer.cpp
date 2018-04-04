@@ -2621,7 +2621,17 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   return getSourceLoc(L.CurPtr);
 }
 
-StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
+StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc,
+                                       StringRef *ExtraIndentation) {
+  // FIXME: do something more intelligent here.
+  //
+  // Four spaces is the typical indentation in Swift code, so for now just use
+  // that directly here, but if someone was to do something better, updating
+  // here will update everyone.
+
+  if (ExtraIndentation)
+    *ExtraIndentation = "    ";
+
   // Don't try to do anything with an invalid location.
   if (Loc.isInvalid())
     return "";
