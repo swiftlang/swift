@@ -962,40 +962,40 @@ extension Unicode.Scalar.Properties {
   internal func _scalarName(
     _ choice: __swift_stdlib_UCharNameChoice
   ) -> String? {
-    // Attempt to fit it into a small UTF-8 string first. Code points names are
-    // guaranteed by the standard to be ASCII only.
-    var smallString = _SmallUTF8String()
-    var err = __swift_stdlib_U_ZERO_ERROR
-    let correctSizeRaw = smallString._withMutableExcessCapacityBytes { ptr in
-      return __swift_stdlib_u_charName(
-        _value,
-        choice,
-        ptr.baseAddress._unsafelyUnwrappedUnchecked.assumingMemoryBound(
+    // ICU writes a trailing nul. We allow ICU to store up to and including
+    // `capacity` bytes. If ICU writes `capacity` bytes, then ICU will also
+    // write nul into the count, which we will overwrite after.
+    var smol = _SmallUTF8String()
+    let count = smol._withAllUnsafeMutableBytes { bufPtr -> Int in
+      var err = __swift_stdlib_U_ZERO_ERROR
+      let count32 = __swift_stdlib_u_charName(
+        _value, choice,
+        bufPtr.baseAddress._unsafelyUnwrappedUnchecked.assumingMemoryBound(
           to: Int8.self),
-        Int32(ptr.count),
-        &err)
+        Int32(bufPtr.count), &err)
+      return Int(count32)
+    }
+    guard count > 0 else { return nil }
+    if count <= smol.capacity {
+      smol.count = count
+      return String(_StringGuts(smol))
     }
 
-    let correctSize = Int(correctSizeRaw)
-    if err.isSuccess {
-      if correctSize == 0 { return nil }
-      smallString.count = correctSize
-      return String(_StringGuts(smallString))
+    // Save room for nul
+    var array = Array<UInt8>(repeating: 0, count: 1 + count)
+    array.withUnsafeMutableBufferPointer { bufPtr in
+      var err = __swift_stdlib_U_ZERO_ERROR
+      let correctSize = __swift_stdlib_u_charName(
+        _value, choice,
+        UnsafeMutableRawPointer(bufPtr.baseAddress._unsafelyUnwrappedUnchecked)
+          .assumingMemoryBound(to: Int8.self),
+        Int32(bufPtr.count), &err)
+      guard err.isSuccess else {
+        fatalError("Unexpected error case-converting Unicode scalar.")
+      }
+      _sanityCheck(count == correctSize, "inconsistent ICU behavior")
     }
-    // If the call wasn't successful, the only error we expect to see is buffer
-    // overflow; anything else is a severe error.
-    guard err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-      fatalError("u_charName: Unexpected error retrieving scalar name.")
-    }
-
-    // If it didn't fit, we need to allocate the necessary amount of memory and
-    // make a regular ASCII string.
-    var (asciiArray, ptr) = [UInt8]._allocateUninitialized(correctSize)
-    _ = ptr.withMemoryRebound(to: Int8.self, capacity: correctSize) { int8Ptr in
-      err = __swift_stdlib_U_ZERO_ERROR
-      __swift_stdlib_u_charName(_value, choice, int8Ptr, correctSizeRaw, &err)
-    }
-    return String._fromASCII(asciiArray)
+    return String._fromWellFormedUTF8CodeUnitSequence(array[..<count])
   }
 
   /// The published name of the scalar.
