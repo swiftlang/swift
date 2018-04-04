@@ -176,11 +176,11 @@ namespace swift {
     CalleeCandidateInfo(Type baseType, ArrayRef<OverloadChoice> candidates,
                         bool hasTrailingClosure, ConstraintSystem &CS,
                         bool selfAlreadyApplied = true);
-    
-    typedef std::pair<CandidateCloseness, FailedArgumentInfo> ClosenessResultTy;
-    typedef const std::function<ClosenessResultTy(UncurriedCandidate)>
-    &ClosenessPredicate;
-    
+
+    using ClosenessResultTy = std::pair<CandidateCloseness, FailedArgumentInfo>;
+    using ClosenessPredicate =
+        const std::function<ClosenessResultTy(UncurriedCandidate)> &;
+
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.

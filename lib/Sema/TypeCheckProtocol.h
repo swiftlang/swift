@@ -115,13 +115,12 @@ struct InferredAssociatedTypesByWitness {
 
 /// The set of witnesses that were considered when attempting to
 /// infer associated types.
-typedef SmallVector<InferredAssociatedTypesByWitness, 2>
-  InferredAssociatedTypesByWitnesses;
+using InferredAssociatedTypesByWitnesses =
+    SmallVector<InferredAssociatedTypesByWitness, 2>;
 
 /// A mapping from requirements to the set of matches with witnesses.
-typedef SmallVector<std::pair<ValueDecl *,
-                              InferredAssociatedTypesByWitnesses>, 4>
-  InferredAssociatedTypes;
+using InferredAssociatedTypes =
+    SmallVector<std::pair<ValueDecl *, InferredAssociatedTypesByWitnesses>, 4>;
 
 /// A potential solution to the set of inferred type witnesses.
 struct InferredTypeWitnessesSolution {
@@ -816,8 +815,8 @@ private:
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
-  typedef std::vector<std::pair<AssociatedTypeDecl *, Type>>
-    InferredTypeWitnesses;
+  using InferredTypeWitnesses =
+      std::vector<std::pair<AssociatedTypeDecl *, Type>>;
 
   /// Perform associated type inference.
   ///
