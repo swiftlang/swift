@@ -1632,20 +1632,25 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                     Context.getIdentifier("_"), /*implicit=*/false);
       auto Result = makeParserResult(Expr);
       if (CodeCompletion) {
+
+        // FIXME: Code-completion should be able to find the contextual type
+        // from AST.
         std::vector<StringRef> Identifiers;
-
-        // Move lexer to the start of the current line.
-        L->backtrackToState(L->getStateForBeginningOfTokenLoc(
-          L->getLocForStartOfLine(SourceMgr, Tok.getLoc())));
-
         bool HasReturn = false;
+        {
+          ParserPositionRAII PPR(*this);
+          // Move lexer to the start of the current line.
+          L->backtrackToState(L->getStateForBeginningOfTokenLoc(
+            L->getLocForStartOfLine(SourceMgr, Tok.getLoc())));
 
-        // Until we see the code completion token, collect identifiers.
-        for (L->lex(Tok); !Tok.is(tok::code_complete); consumeToken()) {
-          if (!HasReturn)
-            HasReturn = Tok.is(tok::kw_return);
-          if (Tok.is(tok::identifier)) {
-            Identifiers.push_back(Tok.getText());
+          // Until we see the code completion token, collect identifiers.
+          for (L->lex(Tok); !Tok.isAny(tok::code_complete, tok::eof);
+              consumeTokenWithoutFeedingReceiver()) {
+            if (!HasReturn)
+              HasReturn = Tok.is(tok::kw_return);
+            if (Tok.is(tok::identifier)) {
+              Identifiers.push_back(Tok.getText());
+            }
           }
         }
         CodeCompletion->completeUnresolvedMember(Expr, Identifiers, HasReturn);
