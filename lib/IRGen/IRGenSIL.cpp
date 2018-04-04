@@ -3693,8 +3693,6 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getSwiftRValueType();
-  if (SILTy.isAddress() && !IsLoadablyByAddress)
-    RealType = CanInOutType::get(RealType);
   // Unwrap implicitly indirect types and types that are passed by
   // reference only at the SIL level and below.
   //
@@ -4178,8 +4176,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
            && "box for a local variable should only have one field");
     auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
     auto RealType = SILTy.getSwiftRValueType();
-    if (SILTy.isAddress())
-      RealType = CanInOutType::get(RealType);
     auto DbgTy = DebugTypeInfo::getLocalVariable(
         CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
         RealType, type, /*Unwrap=*/false);

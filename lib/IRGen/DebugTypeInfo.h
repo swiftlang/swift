@@ -96,11 +96,9 @@ public:
   /// LValues, inout args, and Archetypes are implicitly indirect by
   /// virtue of their DWARF type.
   //
-  // FIXME: Should this check if the lowered SILType is address only
-  // instead? Otherwise optionals of archetypes etc will still have
-  // 'isImplicitlyIndirect()' return false.
+  // FIXME: There exists an inverse workaround in LLDB. Both should be removed.
   bool isImplicitlyIndirect() const {
-    return Type->hasLValueType() || isArchetype() || Type->is<InOutType>();
+    return isArchetype();
   }
 
   bool isNull() const { return Type == nullptr; }
