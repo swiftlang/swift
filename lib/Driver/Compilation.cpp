@@ -102,7 +102,11 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
-                         StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+                         std::string CompilationRecordPath,
+                         bool OutputCompilationRecordForModuleOnlyBuild,
+                         StringRef ArgsHash,
+                         llvm::sys::TimePoint<> StartTime,
+                         llvm::sys::TimePoint<> LastBuildTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
@@ -117,11 +121,16 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     Level(Level),
     RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)),
-    InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
+    InputFilesWithTypes(std::move(InputsWithTypes)),
+    CompilationRecordPath(CompilationRecordPath),
+    ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
+    LastBuildTime(LastBuildTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
+    OutputCompilationRecordForModuleOnlyBuild(
+        OutputCompilationRecordForModuleOnlyBuild),
     EnableBatchMode(EnableBatchMode),
     BatchSeed(BatchSeed),
     ForceOneBatchRepartition(ForceOneBatchRepartition),
@@ -1192,6 +1201,12 @@ int Compilation::performJobsImpl(bool &abnormalExit) {
     checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
+
+    if (OutputCompilationRecordForModuleOnlyBuild) {
+      // TODO: Optimize with clonefile(2) ?
+      llvm::sys::fs::copy_file(CompilationRecordPath,
+                               CompilationRecordPath + "~moduleonly");
+    }
   }
 
   abnormalExit = State.hadAnyAbnormalExit();

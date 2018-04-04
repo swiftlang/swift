@@ -160,6 +160,15 @@ private:
   /// of date.
   bool EnableIncrementalBuild;
 
+  /// When true, emit duplicated compilation record file whose filename is
+  /// suffixed with '~moduleonly'.
+  ///
+  /// This compilation record is used by '-emit-module'-only incremental builds
+  /// so that module-only builds do not affect compilation record file for
+  /// normal builds, while module-only incremental builds are able to use
+  /// artifacts of normal builds if they are already up to date.
+  bool OutputCompilationRecordForModuleOnlyBuild = false;
+
   /// Indicates whether groups of parallel frontend jobs should be merged
   /// together and run in composite "batch jobs" when possible, to reduce
   /// redundant work.
@@ -211,7 +220,10 @@ public:
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
+              std::string CompilationRecordPath,
+              bool OutputCompilationRecordForModuleOnlyBuild,
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+              llvm::sys::TimePoint<> LastBuildTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
@@ -294,15 +306,6 @@ public:
 
   void setShowJobLifecycle(bool value = true) {
     ShowJobLifecycle = value;
-  }
-
-  void setCompilationRecordPath(StringRef path) {
-    assert(CompilationRecordPath.empty() && "already set");
-    CompilationRecordPath = path;
-  }
-
-  void setLastBuildTime(llvm::sys::TimePoint<> time) {
-    LastBuildTime = time;
   }
 
   /// Requests the path to a file containing all input source files. This can
