@@ -665,7 +665,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
                                                ManagedValue arg) {
   CleanupCloner cloner(*this, arg);
   auto &argTL = SGF.getTypeLowering(arg.getType());
-  SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
+  SILType optionalType = SILType::getOptionalType(arg.getType());
   if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
         createOptionalSome(loc, arg.forward(SGF), optionalType);
