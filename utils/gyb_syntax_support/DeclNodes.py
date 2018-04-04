@@ -322,7 +322,7 @@ DECL_NODES = [
     #                       | 'weak'
     # mutation-modifier -> 'mutating' | 'nonmutating'
     Node('ModifierList', kind='SyntaxCollection',
-         element='Syntax',
+         element='DeclModifier',
          element_name='Modifier'),
 
     Node('FunctionDecl', kind='Decl', traits=['IdentifiedDecl'],
