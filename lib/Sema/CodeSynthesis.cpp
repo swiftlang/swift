@@ -1413,8 +1413,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                 SourceLoc(), /*implicit*/ true);
   Parameter->setBody(Body);
   
-  typeCheckDecl(Parameter, true);
-  typeCheckDecl(Parameter, false);
+  typeCheckDecl(Parameter);
   addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.

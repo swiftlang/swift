@@ -3959,14 +3959,7 @@ class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
   TypeChecker &TC;
 
-  // For library-style parsing, we need to make two passes over the global
-  // scope.  These booleans indicate whether this is currently the first or
-  // second pass over the global scope (or neither, if we're in a context where
-  // we only visit each decl once).
-  unsigned IsFirstPass : 1;
-
-  DeclChecker(TypeChecker &TC, bool IsFirstPass)
-      : TC(TC), IsFirstPass(IsFirstPass) {}
+  explicit DeclChecker(TypeChecker &TC) : TC(TC) {}
 
   void visit(Decl *decl) {
     FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-decl", decl);
@@ -3974,8 +3967,7 @@ public:
     
     DeclVisitor<DeclChecker>::visit(decl);
 
-    if (IsFirstPass)
-      TC.checkUnsupportedProtocolType(decl);
+    TC.checkUnsupportedProtocolType(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
@@ -3985,8 +3977,7 @@ public:
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
       auto &Context = TC.Context;
-      if (IsFirstPass &&
-          VD->getDeclContext()->isTypeContext() &&
+      if (VD->getDeclContext()->isTypeContext() &&
           (VD->getFullName().isSimpleName(Context.Id_Type) ||
            VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
           VD->getNameLoc().isValid() &&
@@ -4115,14 +4106,12 @@ public:
     // (that were previously only validated at point of synthesis)
     if (auto getter = VD->getGetter()) {
       if (getter->hasBody()) {
-        TC.typeCheckDecl(getter, true);
-        TC.typeCheckDecl(getter, false);
+        TC.typeCheckDecl(getter);
       }
     }
     if (auto setter = VD->getSetter()) {
       if (setter->hasBody()) {
-        TC.typeCheckDecl(setter, true);
-        TC.typeCheckDecl(setter, false);
+        TC.typeCheckDecl(setter);
       }
     }
 
@@ -4135,9 +4124,6 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    if (!IsFirstPass)
-      return;
-
     if (PBD->isBeingValidated())
       return;
 
@@ -4264,20 +4250,12 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    if (!IsFirstPass) {
-      return;
-    }
-
     TC.validateDecl(SD);
     TC.checkDeclAttributes(SD);
     checkAccessControl(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (!IsFirstPass) {
-      return;
-    }
-
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessLevel(TAD);
 
@@ -4287,10 +4265,6 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    if (!IsFirstPass) {
-      return;
-    }
-
     TC.validateDecl(AT);
 
     auto *proto = AT->getProtocol();
@@ -4350,13 +4324,6 @@ public:
   }
 
   void visitEnumDecl(EnumDecl *ED) {
-    if (!IsFirstPass) {
-      for (Decl *member : ED->getMembers())
-        visit(member);
-
-      return;
-    }
-
     TC.checkDeclAttributesEarly(ED);
     TC.computeAccessLevel(ED);
 
@@ -4390,13 +4357,6 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    if (!IsFirstPass) {
-      for (Decl *Member : SD->getMembers())
-        visit(Member);
-
-      return;
-    }
-
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessLevel(SD);
 
@@ -4521,13 +4481,6 @@ public:
 
 
   void visitClassDecl(ClassDecl *CD) {
-    if (!IsFirstPass) {
-      for (Decl *Member : CD->getMembers())
-        visit(Member);
-
-      return;
-    }
-
     TC.checkDeclAttributesEarly(CD);
     TC.computeAccessLevel(CD);
 
@@ -4652,13 +4605,6 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    if (!IsFirstPass) {
-      for (auto Member : PD->getMembers())
-        visit(Member);
-
-      return;
-    }
-
     TC.checkDeclAttributesEarly(PD);
     TC.computeAccessLevel(PD);
 
@@ -4771,9 +4717,6 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
-    if (!IsFirstPass)
-      return;
-
     TC.validateDecl(FD);
     checkAccessControl(TC, FD);
 
@@ -6185,22 +6128,12 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
-    if (!IsFirstPass) {
-      return;
-    }
-
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
     checkAccessControl(TC, EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
-    if (!IsFirstPass) {
-      for (Decl *Member : ED->getMembers())
-        visit(Member);
-      return;
-    }
-
     TC.validateExtension(ED);
 
     TC.checkDeclAttributesEarly(ED);
@@ -6295,10 +6228,6 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    if (!IsFirstPass) {
-      return;
-    }
-
     TC.validateDecl(CD);
 
     // If this initializer overrides a 'required' initializer, it must itself
@@ -6353,10 +6282,6 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    if (!IsFirstPass) {
-      return;
-    }
-
     TC.validateDecl(DD);
     TC.checkDeclAttributes(DD);
 
@@ -6426,9 +6351,9 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   return requirementInfo.isContainedIn(witnessInfo);
 }
 
-void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
+void TypeChecker::typeCheckDecl(Decl *D) {
   checkForForbiddenPrefix(D);
-  DeclChecker(*this, isFirstPass).visit(D);
+  DeclChecker(*this).visit(D);
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has

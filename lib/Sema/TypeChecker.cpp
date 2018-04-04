@@ -511,8 +511,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
          currentSynthesizedDecl != n;
          ++currentSynthesizedDecl) {
       auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
-      TC.typeCheckDecl(decl, /*isFirstPass*/true);
-      TC.typeCheckDecl(decl, /*isFirstPass*/false);
+      TC.typeCheckDecl(decl);
     }
 
     // Ensure that the requirements of the given conformance are
@@ -663,22 +662,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       }
     });
 
-    // FIXME: Check for cycles in class inheritance here?
-    
     // Type check the top-level elements of the source file.
-    for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-      if (isa<TopLevelCodeDecl>(D))
-        continue;
-
-      TC.typeCheckDecl(D, /*isFirstPass*/true);
-    }
-
-    // At this point, we can perform general name lookup into any type.
-
-    // We don't know the types of all the global declarations in the first
-    // pass, which means we can't completely analyze everything. Perform the
-    // second pass now.
-
     bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -686,7 +670,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
       } else {
-        TC.typeCheckDecl(D, /*isFirstPass*/false);
+        TC.typeCheckDecl(D);
       }
     }
 
@@ -820,7 +804,7 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   if (auto ext = dyn_cast<ExtensionDecl>(D))
     TC.validateExtension(ext);
   else
-    TC.typeCheckDecl(D, true);
+    TC.typeCheckDecl(D);
   return true;
 }
 
