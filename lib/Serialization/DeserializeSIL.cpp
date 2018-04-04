@@ -2801,6 +2801,14 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
   }
+  
+  // We may see multiple shared-linkage definitions of the same witness table
+  // for the same conformance.
+  if (wT->isDefinition() && hasSharedVisibility(*Linkage)
+      && hasSharedVisibility(wT->getLinkage())) {
+    wTableOrOffset.set(wT, /*fully deserialized*/ true);
+    return wT;
+  }
 
   assert(wT->isDeclaration() && "Our witness table at this point must be a "
                                 "declaration.");
