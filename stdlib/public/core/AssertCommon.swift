@@ -142,7 +142,7 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@_versioned // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 @inline(never)
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
@@ -271,7 +271,7 @@ func _undefined<T>(
 /// bloats code. It doesn't take a source location because it's most important
 /// in release builds anyway (old apps that are run on new OSs).
 @inline(never)
-@_versioned // COMPILER_INTRINSIC
+@usableFromInline // COMPILER_INTRINSIC
 internal func _diagnoseUnexpectedEnumCaseValue<SwitchedValue, RawValue>(
   type: SwitchedValue.Type,
   rawValue: RawValue
@@ -288,7 +288,7 @@ internal func _diagnoseUnexpectedEnumCaseValue<SwitchedValue, RawValue>(
 /// bloats code. It doesn't take a source location because it's most important
 /// in release builds anyway (old apps that are run on new OSs).
 @inline(never)
-@_versioned // COMPILER_INTRINSIC
+@usableFromInline // COMPILER_INTRINSIC
 internal func _diagnoseUnexpectedEnumCase<SwitchedValue>(
   type: SwitchedValue.Type
 ) -> Never {
