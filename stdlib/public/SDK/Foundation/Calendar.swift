@@ -917,25 +917,25 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         
         switch matchingPolicy {
         case .nextTime:
-            let _ = result.insert(.matchNextTime)
+            result.insert(.matchNextTime)
         case .nextTimePreservingSmallerComponents:
-            let _ = result.insert(.matchNextTimePreservingSmallerUnits)
+            result.insert(.matchNextTimePreservingSmallerUnits)
         case .previousTimePreservingSmallerComponents:
-            let _ = result.insert(.matchPreviousTimePreservingSmallerUnits)
+            result.insert(.matchPreviousTimePreservingSmallerUnits)
         case .strict:
-            let _ = result.insert(.matchStrictly)
+            result.insert(.matchStrictly)
         }
         
         switch repeatedTimePolicy {
         case .first:
-            let _ = result.insert(.matchFirst)
+            result.insert(.matchFirst)
         case .last:
-            let _ = result.insert(.matchLast)
+            result.insert(.matchLast)
         }
         
         switch direction {
         case .backward:
-            let _ = result.insert(.searchBackwards)
+            result.insert(.searchBackwards)
         case .forward:
             break
         }
@@ -964,7 +964,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
         
         var result = NSCalendar.Unit()
         for u in units {
-            let _ = result.insert(unitMap[u]!)
+            result.insert(unitMap[u]!)
         }
         return result
     }
