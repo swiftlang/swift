@@ -2629,8 +2629,12 @@ namespace {
         B.add(offset);
       } else {
         asImpl().flagUnfilledFieldOffset();
-        B.addInt(IGM.IntPtrTy, 0);
+        B.addInt(IGM.Int32Ty, 0);
       }
+    }
+
+    void noteEndOfFieldOffsets() {
+      B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
 
     void addGenericArgument(CanType type) {
@@ -2727,7 +2731,7 @@ namespace {
     /// Fill in a constant field offset vector if possible.
     PartialPattern buildExtraDataPattern() {
       ConstantInitBuilder builder(IGM);
-      auto init = builder.beginArray(IGM.SizeTy);
+      auto init = builder.beginArray(IGM.Int32Ty);
 
       struct Scanner : StructMetadataScanner<Scanner> {
         SILType Type;
@@ -2744,7 +2748,11 @@ namespace {
           }
           assert(IGM.isKnownEmpty(Type.getFieldType(field, IGM.getSILModule()),
                                   ResilienceExpansion::Maximal));
-          B.addInt(IGM.SizeTy, 0);
+          B.addInt32(0);
+        }
+
+        void noteEndOfFieldOffsets() {
+          B.addAlignmentPadding(IGM.getPointerAlignment());
         }
       };
       Scanner(IGM, Target, getLoweredType(), init).layout();

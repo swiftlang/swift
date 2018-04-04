@@ -942,13 +942,13 @@ FUNCTION(InitClassMetadata,
 //                               StructLayoutFlags flags,
 //                               size_t numFields,
 //                               TypeLayout * const *fieldTypes,
-//                               size_t *fieldOffsets);
+//                               uint32_t *fieldOffsets);
 FUNCTION(InitStructMetadata,
          swift_initStructMetadata, C_CC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(0),
-              SizeTy->getPointerTo()),
+              Int32Ty->getPointerTo()),
          ATTRS(NoUnwind))
 
 // void swift_initEnumMetadataSingleCase(Metadata *enumType,
