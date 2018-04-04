@@ -1640,8 +1640,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = try body(&bufferPointer)
-      return r
+      return try body(&bufferPointer)
     }
   }
 
