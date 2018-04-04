@@ -220,3 +220,23 @@ class TestBig {
         let d = arr.index(where: { _ in true })
     }
 }
+
+struct BigStructWithFunc {
+    var incSize : BigStruct
+    var foo: ((BigStruct) -> Void)?
+}
+
+// CHECK-LABEL: define{{( protected)?}} hidden swiftcc void @_T022big_types_corner_cases20UseBigStructWithFuncC5crashyyF(%T22big_types_corner_cases20UseBigStructWithFuncC* swiftself)
+// CHECK: call swiftcc void @_T022big_types_corner_cases20UseBigStructWithFuncC10callMethod
+// CHECK: ret void
+class UseBigStructWithFunc {
+    var optBigStructWithFunc: BigStructWithFunc?
+
+    func crash() {
+        guard let bigStr = optBigStructWithFunc else { return }
+        callMethod(ptr: bigStr.foo)
+    }
+
+    private func callMethod(ptr: ((BigStruct) -> Void)?) -> () {
+    }
+}
