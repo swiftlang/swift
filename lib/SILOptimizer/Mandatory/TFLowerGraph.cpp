@@ -299,7 +299,7 @@ private:  // Helpers to create TensorFlow graph nodes.
           infeedInputDtypes(dTypes) {
       assert(numDims.size() == dTypes.size());
       auto dimPtr = this->dims.data();
-      for (int shape = 0; shape != numDims.size(); ++shape) {
+      for (unsigned shape = 0; shape != numDims.size(); ++shape) {
         dimPtrs.push_back(dimPtr);
         dimPtr += numDims[shape];
       }
@@ -728,7 +728,7 @@ static void decodeShapeArray(SILInstruction *inst,
   auto numShapes = cast<IntegerLiteralInst>(inst->getOperand(operandIdx))
                        ->getValue()
                        .getLimitedValue();
-  for (int shape = 0; shape != numShapes; ++shape) {
+  for (unsigned shape = 0; shape != numShapes; ++shape) {
     auto prevNumDims = dims.size();
     ++operandIdx;  // We consumed an operand.
     auto nextOperand = inst->getOperand(operandIdx);
@@ -745,7 +745,7 @@ static void decodeShapeArray(SILInstruction *inst,
   // of pointers that TensorFlow needs.  This is safe now that the vector
   // has finished its resizing.
   auto dimPtr = dims.data();
-  for (int shape = 0; shape != numShapes; ++shape) {
+  for (unsigned shape = 0; shape != numShapes; ++shape) {
     dimPtrs.push_back(dimPtr);
     dimPtr += numDims[shape];
   }
