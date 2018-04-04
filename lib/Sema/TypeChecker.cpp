@@ -460,6 +460,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
         TC.typeCheckAbstractFunctionBody(AFD);
+        TC.checkFunctionErrorHandling(AFD);
         continue;
       }
       if (isa<NominalTypeDecl>(decl)) {
@@ -558,11 +559,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   // bodies having been type-checked.
   for (AbstractFunctionDecl *FD : TC.definedFunctions) {
     TC.checkFunctionErrorHandling(FD);
-  }
-  for (auto decl : TC.Context.ExternalDefinitions) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-      TC.checkFunctionErrorHandling(fn);
-    }
   }
 }
 
