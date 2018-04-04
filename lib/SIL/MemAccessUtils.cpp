@@ -104,8 +104,53 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   }
 }
 
-// An address base is a block argument. Verify that it is actually a box
-// projected from a switch_enum.
+const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
+  switch (k) {
+  case Box:
+    return "Box";
+  case Stack:
+    return "Stack";
+  case Nested:
+    return "Nested";
+  case Unidentified:
+    return "Unidentified";
+  case Argument:
+    return "Argument";
+  case Global:
+    return "Global";
+  case Class:
+    return "Class";
+  }
+}
+
+void AccessedStorage::print(raw_ostream &os) const {
+  os << getKindName(kind) << " ";
+  switch (kind) {
+  case Box:
+  case Stack:
+  case Nested:
+  case Unidentified:
+    os << value;
+    break;
+  case Argument:
+    os << "index: " << paramIndex << "\n";
+    break;
+  case Global:
+    os << *global;
+    break;
+  case Class:
+    os << objProj.getObject() << "  ";
+    objProj.getProjection().print(os, objProj.getObject()->getType());
+    os << "\n";
+  }
+}
+
+void AccessedStorage::dump() const { print(llvm::dbgs()); }
+
+// Given an address base is a block argument, verify that it is actually a box
+// projected from a switch_enum. This is a valid pattern at any SIL stage
+// resulting in a block-type phi. In later SIL stages, the optimizer may form
+// address-type phis, causing this assert if called on those cases.
 static void checkSwitchEnumBlockArg(SILPHIArgument *arg) {
   assert(!arg->getType().isAddress());
   SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
@@ -135,6 +180,9 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     // A block argument may be a box value projected out of
     // switch_enum. Address-type block arguments are not allowed.
     case ValueKind::SILPHIArgument:
+      if (address->getType().isAddress())
+        return AccessedStorage();
+
       checkSwitchEnumBlockArg(cast<SILPHIArgument>(address));
       return AccessedStorage(address, AccessedStorage::Unidentified);
 
@@ -279,7 +327,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     if (isScratchBuffer(storage.getValue()))
       return false;
   }
-  // Additional checks that apply to anything that may fal through.
+  // Additional checks that apply to anything that may fall through.
 
   // Immutable values are only accessed for initialization.
   if (isLetAccess(storage, F))

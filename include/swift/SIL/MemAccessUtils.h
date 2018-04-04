@@ -24,6 +24,10 @@ namespace swift {
 
 // stripAddressAccess() is declared in InstructionUtils.h.
 
+inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
+  return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
+}
+
 /// Represents the identity of a stored class property as a combination
 /// of a base and a single projection. Eventually the goal is to make this
 /// more precise and consider, casts, etc.
@@ -88,6 +92,7 @@ public:
   enum Kind {
     Box, Stack, Global, Class, Argument, Nested, Unidentified
   };
+  static const char *getKindName(Kind k);
 
   /// If the given address source is an identified access base, return the kind
   /// of access base. Otherwise, return Unidentified.
@@ -107,6 +112,9 @@ public:
   AccessedStorage(): kind(Unidentified), value() {}
 
   AccessedStorage(SILValue base, Kind kind);
+
+  AccessedStorage(SILValue object, Projection projection)
+      : kind(Class), objProj(object, projection) {}
 
   // Return true if this is a valid storage location.
   operator bool() const {
@@ -186,6 +194,9 @@ public:
   /// determined. Otherwise returns null. For diagnostics and checking via the
   /// ValueDecl if we are processing a `let` variable.
   const ValueDecl *getDecl(SILFunction *F) const;
+
+  void print(raw_ostream &os) const;
+  void dump() const;
 };
 } // end namespace swift
 
@@ -283,6 +294,10 @@ AccessedStorage findAccessedStorageOrigin(SILValue sourceAddr);
 /// a begin_access marker. To determine whether to emit begin_access:
 ///   storage = findAccessedStorage(address)
 ///   needsAccessMarker = storage && isPossibleFormalAccessBase(storage)
+///
+/// Warning: This is only valid for SIL with well-formed accessed. For example,
+/// it will not handle address-type phis. Optimization passes after
+/// DiagnoseStaticExclusivity may violate these assumptions.
 bool isPossibleFormalAccessBase(const AccessedStorage &storage, SILFunction *F);
 
 /// Visit each address accessed by the given memory operation.

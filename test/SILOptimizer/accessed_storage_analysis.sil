@@ -1,0 +1,388 @@
+// RUN: %target-sil-opt %s -accessed-storage-dump -enable-sil-verify-all -o /dev/null -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: @readIdentifiedArg
+// CHECK: [read] Argument index: 0
+sil @readIdentifiedArg : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %5 = begin_access [read] [dynamic] %0 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: @writeIdentifiedArg
+// CHECK: [modify] Argument index: 0
+sil @writeIdentifiedArg : $@convention(thin) (Int) -> (@out Int) {
+bb0(%0 : $*Int, %1 : $Int):
+  %3 = begin_access [modify] [dynamic] %0 : $*Int
+  store %1 to %3 : $*Int
+  end_access %3 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: @readWriteIdentifiedArg
+// CHECK: [modify] Argument index: 0
+sil @readWriteIdentifiedArg : $@convention(thin) (Int) -> (@out Int, Int) {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = function_ref @writeIdentifiedArg : $@convention(thin) (Int) -> (@out Int)
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int) -> (@out Int)
+  %5 = begin_access [modify] [dynamic] %0 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: @writeIdentifiedStack
+// CHECK: [modify] Stack   %1 = alloc_stack $Int
+sil @writeIdentifiedStack : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  %3 = begin_access [modify] [dynamic] %1 : $*Int
+  store %0 to %3 : $*Int
+  end_access %3 : $*Int
+  dealloc_stack %1 : $*Int
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @readWriteIdentifiedStack
+// CHECK: [modify] Stack   %1 = alloc_stack $Int
+sil @readWriteIdentifiedStack : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  %2 = function_ref @writeIdentifiedArg : $@convention(thin) (Int) -> (@out Int)
+  %3 = apply %2(%1, %0) : $@convention(thin) (Int) -> (@out Int)
+  %5 = begin_access [modify] [dynamic] %1 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  dealloc_stack %1 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: @readIdentifiedBoxArg
+// CHECK: [read] Argument index: 0
+sil @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }) -> Int {
+bb0(%0 : ${ var Int }):
+  %1 = project_box %0 : ${ var Int }, 0
+  %5 = begin_access [read] [dynamic] %1 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: @writeIdentifiedBoxArg
+// CHECK: [modify] Argument index: 0
+sil @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> () {
+bb0(%0 : ${ var Int }, %1 : $Int):
+  %2 = project_box %0 : ${ var Int }, 0
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
+  store %1 to %3 : $*Int
+  end_access %3 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: @readWriteIdentifiedBoxArg
+// CHECK: [modify] Argument index: 0
+sil @readWriteIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> Int {
+bb0(%0 : ${ var Int }, %1 : $Int):
+  %2 = function_ref @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed { var Int }, Int) -> ()
+  %4 = project_box %0 : ${ var Int }, 0
+  %5 = begin_access [modify] [dynamic] %4 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: @writeIdentifiedBox
+// CHECK: [read] Box   %1 = alloc_box ${ var Int }
+sil @writeIdentifiedBox : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = project_box %1 : ${ var Int }, 0
+  %3 = begin_access [read] [dynamic] %2 : $*Int
+  store %0 to %3 : $*Int
+  end_access %3 : $*Int
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @readWriteIdentifiedBox
+// CHECK: [modify] Box   %1 = alloc_box ${ var Int }
+sil @readWriteIdentifiedBox : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = function_ref @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> ()
+  %3 = apply %2(%1, %0) : $@convention(thin) (@guaranteed { var Int }, Int) -> ()
+  %4 = project_box %1 : ${ var Int }, 0
+  %5 = begin_access [modify] [dynamic] %4 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+sil_global @int_global : $Int
+
+// CHECK-LABEL: @readIdentifiedGlobal
+// CHECK: [read] Global // int_global
+// CHECK: sil_global @int_global : $Int
+sil @readIdentifiedGlobal : $@convention(thin) () -> Int {
+bb0:
+  %1 = global_addr @int_global : $*Int
+  %2 = begin_access [read] [dynamic] %1 : $*Int
+  %3 = load %2 : $*Int
+  end_access %2 : $*Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: @writeIdentifiedGlobal
+// CHECK: [modify] Global // int_global
+// CHECK: sil_global @int_global : $Int
+sil @writeIdentifiedGlobal : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = global_addr @int_global : $*Int
+  %2 = begin_access [modify] [dynamic] %1 : $*Int
+  store %0 to %2 : $*Int
+  end_access %2 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: @readWriteIdentifiedGlobal
+// CHECK: [modify] Global // int_global
+// CHECK: sil_global @int_global : $Int
+sil @readWriteIdentifiedGlobal : $@convention(thin) (Int) -> (Int) {
+bb0(%0 : $Int):
+  %1 = function_ref @writeIdentifiedGlobal : $@convention(thin) (Int) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (Int) -> ()
+  %3 = global_addr @int_global : $*Int
+  %4 = begin_access [read] [dynamic] %3 : $*Int
+  %5 = load %4 : $*Int
+  end_access %4 : $*Int
+  return %5 : $Int
+}
+
+class C {
+  @sil_stored var property: Int
+  deinit
+  init()
+}
+
+// CHECK-LABEL: @readIdentifiedClass
+// CHECK: [read] Class %0 = argument of bb0 : $C
+// CHECK: Field: @sil_stored var property: Int
+sil @readIdentifiedClass : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : $C):
+  %1 = ref_element_addr %0 : $C, #C.property
+  %2 = begin_access [read] [dynamic] %1 : $*Int
+  %3 = load %2 : $*Int
+  end_access %2 : $*Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: @writeIdentifiedClass
+// CHECK: [modify] Class %0 = argument of bb0 : $C
+// CHECK: Field: @sil_stored var property: Int
+sil @writeIdentifiedClass : $@convention(thin) (@guaranteed C, Int) -> () {
+bb0(%0 : $C, %1 : $Int):
+  %2 = ref_element_addr %0 : $C, #C.property
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
+  store %1 to %3 : $*Int
+  end_access %3 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: @readWriteIdentifiedClass
+// CHECK: [modify] Class   %1 = alloc_ref $C
+// CHECK: Field: @sil_stored var property: Int
+sil @readWriteIdentifiedClass : $@convention(thin) (Int) -> (Int) {
+bb0(%0 : $Int):
+  %1 = alloc_ref $C
+  %2 = function_ref @writeIdentifiedClass : $@convention(thin) (@guaranteed C, Int) -> ()
+  %3 = apply %2(%1, %0) : $@convention(thin) (@guaranteed C, Int) -> ()
+  %4 = ref_element_addr %1 : $C, #C.property
+  %5 = begin_access [read] [dynamic] %4 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+// CHECK-LABEL: @readIdentifiedNestedClass
+// CHECK: [read] Class %0 = argument of bb0 : $C
+// CHECK: Field: @sil_stored var property: Int
+sil @readIdentifiedNestedClass : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : $C):
+  %1 = ref_element_addr %0 : $C, #C.property
+  %2 = begin_access [read] [dynamic] %1 : $*Int
+  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %4 = load %3 : $*Int
+  end_access %2 : $*Int
+  end_access %3 : $*Int
+  return %4 : $Int
+}
+
+// CHECK-LABEL: @writeIdentifiedNestedClass
+// CHECK: [modify] Class %0 = argument of bb0 : $C
+// CHECK: Field: @sil_stored var property: Int
+sil @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> () {
+bb0(%0 : $C, %1 : $Int):
+  %2 = ref_element_addr %0 : $C, #C.property
+  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  store %1 to %4 : $*Int
+  end_access %4 : $*Int
+  end_access %3 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: @readWriteIdentifiedNestedClass
+// CHECK: [modify] Class   %1 = alloc_ref $C
+// CHECK: Field: @sil_stored var property: Int
+sil @readWriteIdentifiedNestedClass : $@convention(thin) (Int) -> (Int) {
+bb0(%0 : $Int):
+  %1 = alloc_ref $C
+  %2 = function_ref @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> ()
+  %3 = apply %2(%1, %0) : $@convention(thin) (@guaranteed C, Int) -> ()
+  %4 = ref_element_addr %1 : $C, #C.property
+  %5 = begin_access [read] [dynamic] %4 : $*Int
+  %6 = begin_access [read] [dynamic] %5 : $*Int
+  %7 = load %6 : $*Int
+  end_access %5 : $*Int
+  end_access %6 : $*Int
+  return %7 : $Int
+}
+
+// CHECK-LABEL: @readUnidentified
+// CHECK: unidentified accesses: read
+sil @readUnidentified : $@convention(thin) (Builtin.RawPointer) -> Int {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %2 = begin_access [read] [dynamic] %1 : $*Int
+  %4 = load %2 : $*Int
+  end_access %2 : $*Int
+  return %4 : $Int
+}
+
+// CHECK-LABEL: @writeUnidentified
+// CHECK: unidentified accesses: modify
+sil @writeUnidentified : $@convention(thin) (Builtin.RawPointer, Int) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Int):
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
+  store %1 to %3 : $*Int
+  end_access %3 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK-LABEL: @readWriteUnidentified
+// CHECK: unidentified accesses: modify
+sil @readWriteUnidentified : $@convention(thin) (Builtin.RawPointer, Int) -> Int {
+bb0(%0 : $Builtin.RawPointer, %1 : $Int):
+  %2 = function_ref @writeUnidentified : $@convention(thin) (Builtin.RawPointer, Int) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (Builtin.RawPointer, Int) -> ()
+  %4 = pointer_to_address %0 : $Builtin.RawPointer to $*Int
+  %5 = begin_access [read] [dynamic] %4 : $*Int
+  %6 = load %5 : $*Int
+  end_access %5 : $*Int
+  return %6 : $Int
+}
+
+enum TreeB<T> {
+  case Nil
+  case Leaf(T)
+  indirect case Branch(left: TreeB<T>, right: TreeB<T>)
+}
+
+// CHECK-LABEL: @readIndirectEnum
+// CHECK: [read] Argument index: 1
+sil @readIndirectEnum : $@convention(thin) <T> (@in TreeB<T>) -> (@out TreeB<T>) {
+bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
+  %enumAddr = unchecked_take_enum_data_addr %1 : $*TreeB<T>, #TreeB.Branch!enumelt.1
+  %box = load %enumAddr : $*<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>
+  %boxAddr = project_box %box : $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>, 0
+  %boxAccess = begin_access [read] [dynamic] %boxAddr : $*(left: TreeB<T>, right: TreeB<T>)
+  %leftAddr = tuple_element_addr %boxAccess : $*(left: TreeB<T>, right: TreeB<T>), 0
+  copy_addr %leftAddr to [initialization] %0 : $*TreeB<T>
+  end_access %boxAccess : $*(left: TreeB<T>, right: TreeB<T>)
+  %v = tuple ()
+  return %v : $()
+}
+
+struct SomeError: Error {}
+
+// CHECK-LABEL: @writeIdentifiedArgReadUnidentifiedVarious
+// CHECK: [modify] Argument index: 0
+// CHECK: unidentified accesses: read
+sil @writeIdentifiedArgReadUnidentifiedVarious : $@convention(thin) (Int, Error) -> (@out Int) {
+bb0(%out : $*Int, %i : $Int, %e : $Error):
+  %argAccess = begin_access [modify] [dynamic] %out : $*Int
+  store %i to %argAccess : $*Int
+  end_access %argAccess : $*Int
+
+  %peb = project_existential_box $SomeError in %e : $Error
+  %pebAccess = begin_access [read] [dynamic] %peb : $*SomeError
+  %eload = load %pebAccess : $*SomeError
+  end_access %pebAccess : $*SomeError
+
+  %oeb = open_existential_box %e : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %oebAccess = begin_access [read] [dynamic] %oeb : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  end_access %oebAccess : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+
+  %v = tuple ()
+  return %v : $()
+}
+
+protocol P {}
+
+class CP : P {
+  var property: Int
+  init()
+  deinit
+}
+
+// None of these address producers are normally used for formal
+// access. i.e. They should not feed into a begin_access
+// operand. Eventually, we may want to verify that SIL passes never
+// result in such patterns. Until then we gracefully treat them as
+// unidentified access.
+// CHECK-LABEL: @readUnexpected
+// CHECK: unidentified accesses: read
+sil @readUnexpected : $@convention(thin) (@inout Int, @inout Int?, @inout Builtin.UnsafeValueBuffer) -> () {
+bb0(%inout : $*Int, %oi : $*Optional<Int>, %b : $*Builtin.UnsafeValueBuffer):
+  br bb1(%inout : $*Int)
+
+bb1(%phi : $*Int):
+  %phiAccess = begin_access [read] [dynamic] %phi : $*Int
+  %ld = load %phiAccess : $*Int
+  end_access %phiAccess : $*Int
+
+  %ea = init_enum_data_addr %oi : $*Optional<Int>, #Optional.some!enumelt.1
+  %eaAccess = begin_access [read] [dynamic] %ea : $*Int
+  %eaload = load %eaAccess : $*Int
+  end_access %eaAccess : $*Int
+
+  %pvb = project_value_buffer $Int in %b : $*Builtin.UnsafeValueBuffer
+  %pvbAccess = begin_access [read] [dynamic] %pvb : $*Int
+  %bload = load %pvbAccess : $*Int
+  end_access %pvbAccess : $*Int
+
+  %p = alloc_stack $P
+  %iea = init_existential_addr %p : $*P, $CP
+  %propAccess = begin_access [read] [dynamic] %iea : $*CP
+  end_access %propAccess : $*CP
+  dealloc_stack %p : $*P
+
+  %v = tuple ()
+  return %v : $()
+}
