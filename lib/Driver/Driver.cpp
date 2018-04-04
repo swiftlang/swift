@@ -1403,19 +1403,18 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
                               options::OPT_disable_batch_mode,
                               false);
 
-  if (ArgRequiringSingleCompile) {
-    // Override batch mode if given -wmo or -index-file.
-    if (BatchModeOut) {
-      BatchModeOut = false;
-      // Emit a warning about such overriding (FIXME: we might conditionalize
-      // this based on the user or xcode passing -disable-batch-mode).
-      Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
-                     ArgRequiringSingleCompile->getOption().getPrefixedName());
-    }
-    return OutputInfo::Mode::SingleCompile;
-  }
+  if (!ArgRequiringSingleCompile)
+    return OutputInfo::Mode::StandardCompile;
 
-  return OutputInfo::Mode::StandardCompile;
+  // Override batch mode if given -wmo or -index-file.
+  if (BatchModeOut) {
+    BatchModeOut = false;
+    // Emit a warning about such overriding (FIXME: we might conditionalize
+    // this based on the user or xcode passing -disable-batch-mode).
+    Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
+                   ArgRequiringSingleCompile->getOption().getPrefixedName());
+  }
+  return OutputInfo::Mode::SingleCompile;
 }
 
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
