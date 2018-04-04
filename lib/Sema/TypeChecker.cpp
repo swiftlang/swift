@@ -430,7 +430,8 @@ void TypeChecker::resolveExtensionForConformanceConstruction(
       type = resolveType(inherited.getTypeRepr(), ext, options, &resolver);
 
     if (type && type->isExistentialType()) {
-      for (auto proto : type->getExistentialLayout().getProtocols())
+      auto layout = type->getExistentialLayout();
+      for (auto proto : layout.getProtocols())
         protocols.push_back({inherited.getLoc(), proto->getDecl()});
     }
   }
