@@ -2157,98 +2157,6 @@ namespace {
   };
 } // end anonymous namespace
 
-/// Erase an expression tree's open existentials after a re-typecheck operation.
-///
-/// This is done in the case of a typecheck failure, after we re-typecheck
-/// partially-typechecked subexpressions in a context-free manner.
-///
-static void eraseOpenedExistentials(Expr *&expr, ConstraintSystem &CS) {
-
-  class ExistentialEraser : public ASTWalker {
-    ConstraintSystem &CS;
-    llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
-
-  public:
-    ExistentialEraser(ConstraintSystem &CS) : CS(CS) {}
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
-        auto archetypeVal = OOE->getOpaqueValue();
-        auto base = OOE->getExistentialValue();
-        
-        // Walk the base expression to ensure we erase any existentials within
-        // it.
-        base = base->walk(*this);
-
-        registerOpaqueValue(archetypeVal, base);
-        return { true, OOE->getSubExpr() };
-      }
-
-      if (auto *MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
-        registerOpaqueValue(MTEE->getOpaqueValue(),
-                            MTEE->getNonescapingClosureValue());
-        return {true, MTEE->getSubExpr()};
-      }
-
-      if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
-        auto value = OpenExistentials.find(OVE);
-        assert(value != OpenExistentials.end() &&
-               "didn't see this OVE in a containing OpenExistentialExpr?");
-        return { true, value->second };
-      }
-
-      // Handle collection upcasts specially so that we don't blow up on
-      // their embedded OVEs.
-      if (auto CDE = dyn_cast<CollectionUpcastConversionExpr>(expr)) {
-        if (auto result = CDE->getSubExpr()->walk(*this)) {
-          CDE->setSubExpr(result);
-          return { false, CDE };
-        } else {
-          return { true, CDE };
-        }
-      }
-      
-      return { true, expr };
-    }
-
-    Expr *walkToExprPost(Expr *expr) override {
-      if (!CS.hasType(expr))
-        return expr;
-
-      Type type = CS.getType(expr);
-      if (!type->hasOpenedExistential())
-        return expr;
-
-      type = type.transform([&](Type type) -> Type {
-        if (auto archetype = type->getAs<ArchetypeType>())
-          if (auto existentialType = archetype->getOpenedExistentialType())
-            return existentialType;
-
-        return type;
-      });
-      CS.setType(expr, type);
-      // Set new type to the expression directly.
-      expr->setType(type);
-
-      return expr;
-    }
-    
-    // Don't walk into statements.  This handles the BraceStmt in
-    // non-single-expr closures, so we don't walk into their body.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-
-    void registerOpaqueValue(OpaqueValueExpr *opaque, Expr *base) {
-      bool inserted = OpenExistentials.insert({opaque, base}).second;
-      assert(inserted && "OpaqueValue appears multiple times?");
-      (void)inserted;
-    }
-  };
-
-  expr = expr->walk(ExistentialEraser(CS));
-}
-
 /// Unless we've already done this, retypecheck the specified subexpression on
 /// its own, without including any contextual constraints or parent expr
 /// nodes.  This is more likely to succeed than type checking the original
@@ -2338,12 +2246,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
       TCEOptions |= TypeCheckExprFlags::PreferForceUnwrapToOptional;
   }
 
-  // Ensure that the expression we're about to type-check doesn't have
-  // anything that the type-checker doesn't expect to see.  This can happen
-  // because of repeated type-checking; the removal below, while independently
-  // important, isn't itself sufficient because of AST mutation.
-  eraseOpenedExistentials(subExpr, CS);
-
   auto resultTy = CS.TC.typeCheckExpression(
       subExpr, CS.DC, TypeLoc::withoutLoc(convertType), convertTypePurpose,
       TCEOptions, listener, &CS);
@@ -2356,7 +2258,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // holding on to an expression containing open existential types but
   // no OpenExistentialExpr, which breaks invariants enforced by the
   // ASTChecker.
-  eraseOpenedExistentials(subExpr, CS);
+  if (isa<OpenExistentialExpr>(subExpr))
+    eraseOpenedExistentials(CS, subExpr);
   
   // If recursive type checking failed, then an error was emitted.  Return
   // null to indicate this to the caller.

@@ -208,3 +208,21 @@ S_RDAR_28991372(x: #^RDAR_28991372^#, y: <#T##Int#>)
 
 protocol P where #^RDAR_31981486^#
 // RDAR_31981486: Begin completions
+
+
+// rdar://problem/38149042
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_38149042 | %FileCheck %s -check-prefix=RDAR_38149042
+class Baz_38149042 {
+  let x: Int = 0
+}
+protocol Bar_38149042 {
+  var foo: Baz_38149042? {get}
+}
+func foo_38149042(bar: Bar_38149042) {
+  _ = bar.foo? #^RDAR_38149042^# .x
+}
+// RDAR_38149042: Begin completions, 3 items
+// RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
+// RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
+// RDAR_38149042: End completions
