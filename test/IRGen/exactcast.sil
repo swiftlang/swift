@@ -60,7 +60,7 @@ final class DerivedInt : Base<Int> {
 sil @test_exact_checked_cast_branch_dynamic_init : $@convention(thin) (@guaranteed BaseBase) -> Int {
 bb0(%0 : $BaseBase):
 //CHECK-LABEL: define{{.*}}@test_exact_checked_cast_branch_dynamic_init
-//CHECK: call swiftcc {{.*}}@"$S9exactcast10DerivedIntCMa"({{.*}})
+//CHECK: call {{.*}}@"$S9exactcast10DerivedIntCMa"({{.*}})
 //CHECK: load
 //CHECK: bitcast
 //CHECK: icmp eq %swift.type
