@@ -823,21 +823,10 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
                                       FunctionType::ExtInfo());
   }
   hashDecl->setInterfaceType(interfaceType);
-  hashDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  hashDecl->copyFormalAccessFrom(typeDecl);
+  hashDecl->setValidationStarted();
 
-  // If we aren't synthesizing into an imported/derived type, the derived conformance is
-  // either from the type itself or an extension, in which case we will emit the
-  // declaration normally.
-  //
-  // We're checking for a source file here rather than the presence of a Clang
-  // node because otherwise we wouldn't catch synthesized Hashable structs, like
-  // SE-0112's imported Error types.
-  if (!isa<SourceFile>(parentDC->getModuleScopeContext())) {
-    C.addExternalDecl(hashDecl);
-    // Assume the new function is already typechecked; TypeChecker::validateDecl
-    // would otherwise reject it.
-    hashDecl->setValidationStarted();
-  }
+  C.addSynthesizedDecl(hashDecl);
  
   cast<IterableDeclContext>(parentDecl)->addMember(hashDecl);
   return hashDecl;
