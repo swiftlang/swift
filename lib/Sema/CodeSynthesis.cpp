@@ -2085,18 +2085,29 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   AccessLevel access = classDecl->getFormalAccess();
   access = std::max(access, AccessLevel::Internal);
   access = std::min(access, superclassCtor->getFormalAccess());
+
   ctor->setAccess(access);
 
-  // Inherit the @usableFromInline attribute.
-  if (superclassCtor->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    ctor->getAttrs().add(clonedAttr);
+  // This is really painful. We need better abstractions for dealing with
+  // @usableFromInline.
+  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
+                                      /*isUsableFromInline=*/true)
+        >= AccessLevel::Public) {
+    if (access == AccessLevel::Internal &&
+        !superclassCtor->isDynamic()) {
+      auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
+      ctor->getAttrs().add(clonedAttr);
+    }
   }
 
   // Inherit the @inlinable attribute.
-  if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
-    auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
-    ctor->getAttrs().add(clonedAttr);
+  if (ctor->getFormalAccess(/*useDC=*/nullptr,
+                            /*isUsableFromInline=*/true)
+        >= AccessLevel::Public) {
+    if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
+      auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
+      ctor->getAttrs().add(clonedAttr);
+    }
   }
 
   // Make sure the constructor is only as available as its superclass's

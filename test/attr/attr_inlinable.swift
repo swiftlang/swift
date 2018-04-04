@@ -206,6 +206,27 @@ class Derived : Middle {
   }
 }
 
+// More inherited initializers
+@_fixed_layout
+public class Base2 {
+  @inlinable
+  public init(x: Int) {}
+}
+
+@_fixed_layout
+@usableFromInline
+class Middle2 : Base2 {}
+
+@_fixed_layout
+@usableFromInline
+class Derived2 : Middle2 {
+  @usableFromInline
+  @inlinable
+  init(y: Int) {
+    super.init(x: y)
+  }
+}
+
 // Stored property initializer expressions.
 //
 // Note the behavior here does not depend on the state of the -enable-resilience
