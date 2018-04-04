@@ -103,6 +103,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
                          StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+                         size_t FilelistThreshold,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
@@ -127,7 +128,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
-    Stats(std::move(StatsReporter)) {
+    Stats(std::move(StatsReporter)),
+    FilelistThreshold(FilelistThreshold) {
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,

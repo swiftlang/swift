@@ -502,6 +502,31 @@ static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
   }
 }
 
+/// Gets the filelist threshold to use. Diagnoses and returns true on error.
+static bool getFilelistThreshold(DerivedArgList &Args, size_t &FilelistThreshold,
+                                   DiagnosticEngine &Diags) {
+  FilelistThreshold = 128;
+
+  // claim and diagnose deprecated -driver-use-filelists
+  bool HasUseFilelists = Args.hasArg(options::OPT_driver_use_filelists);
+  if (HasUseFilelists)
+    Diags.diagnose(SourceLoc(), diag::warn_use_filelists_deprecated);
+
+  if (const Arg *A = Args.getLastArg(options::OPT_driver_filelist_threshold)) {
+    // Use the supplied threshold
+    if (StringRef(A->getValue()).getAsInteger(10, FilelistThreshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  } else if (HasUseFilelists) {
+    // Treat -driver-use-filelists as -driver-filelist-threshold=0
+    FilelistThreshold = 0;
+  } // else stick with the default
+
+  return false;
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -681,6 +706,10 @@ Driver::buildCompilation(const ToolChain &TC,
     }
   }
 
+  size_t DriverFilelistThreshold;
+  if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
+    return nullptr;
+
   OutputLevel Level = OutputLevel::Normal;
   if (const Arg *A =
           ArgList->getLastArg(options::OPT_driver_print_jobs, options::OPT_v,
@@ -700,6 +729,7 @@ Driver::buildCompilation(const ToolChain &TC,
                                                  std::move(TranslatedArgList),
                                                  std::move(Inputs),
                                                  ArgsHash, StartTime,
+                                                 DriverFilelistThreshold,
                                                  NumberOfParallelCommands,
                                                  Incremental,
                                                  BatchMode,
