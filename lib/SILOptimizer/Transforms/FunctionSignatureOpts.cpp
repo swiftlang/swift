@@ -90,6 +90,8 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 //                        Function Signature Transform
 //===----------------------------------------------------------------------===//
 
+namespace {
+
 struct FunctionSignatureTransformDescriptor {
   /// The original function that we are analyzing/transforming.
   SILFunction *OriginalFunction;
@@ -113,6 +115,10 @@ struct FunctionSignatureTransformDescriptor {
   /// will use during our optimization.
   MutableArrayRef<ResultDescriptor> ResultDescList;
 };
+
+} // end anonymous namespace
+
+namespace {
 
 class FunctionSignatureTransform {
   /// A struct that contains all data that we use during our
@@ -340,6 +346,8 @@ public:
     return true;
   }
 };
+
+} // end anonymous namespace
 
 std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
