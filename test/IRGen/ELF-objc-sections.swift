@@ -21,7 +21,7 @@ class D {
 // CHECK-ELF-NOT: @"$S4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
 // CHECK-ELF: @"\01l_OBJC_LABEL_PROTOCOL_$_P" = {{.*}}, section "objc_protolist"
 // CHECK-ELF: @"\01l_OBJC_PROTOCOL_REFERENCE_$_P" = {{.*}}, section "objc_protorefs", align 8
-// CHECK-ELF: @"OBJC_CLASS_REF_$_I" = {{.*}}, section "objc_classrefs", align 8
+// CHECK-ELF: @"\01l_OBJC_CLASS_REF_$_I" = {{.*}}, section "objc_classrefs", align 8
 // CHECK-ELF: @"\01L_selector(init)" = {{.*}}, section "objc_selrefs"
 // CHECK-ELF: @objc_classes = {{.*}}, section "objc_classlist"
 // CHECK-ELF: @objc_categories = {{.*}}, section "objc_catlist"

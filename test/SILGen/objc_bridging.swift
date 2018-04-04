@@ -1,7 +1,8 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %S/../Inputs/ObjCBridging -Xllvm -sil-full-demangle -emit-silgen %s -enable-sil-ownership | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_bridging -I %S/../Inputs/ObjCBridging -Xllvm -sil-full-demangle -emit-silgen %s -enable-sil-ownership | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
 
 // REQUIRES: objc_interop
 
@@ -13,10 +14,9 @@ func getDescription(_ o: NSObject) -> String {
   return o.description
 }
 // CHECK-LABEL: sil hidden @$S13objc_bridging14getDescription{{.*}}F
-// CHECK: bb0([[ARG:%.*]] : @owned $NSObject):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[DESCRIPTION:%.*]] = objc_method [[BORROWED_ARG]] : $NSObject, #NSObject.description!getter.1.foreign
-// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[DESCRIPTION]]([[BORROWED_ARG]])
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $NSObject):
+// CHECK:   [[DESCRIPTION:%.*]] = objc_method [[ARG]] : $NSObject, #NSObject.description!getter.1.foreign
+// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[DESCRIPTION]]([[ARG]])
 // CHECK:   switch_enum [[OPT_BRIDGED]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]([[BRIDGED:%.*]] : @owned $NSString):
@@ -38,8 +38,7 @@ func getDescription(_ o: NSObject) -> String {
 // CHECK:   unreachable
 //
 // CHECK: [[SOME_BB]]([[NATIVE:%.*]] : @owned $String):
-// CHECK:    end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK:    destroy_value [[ARG]]
+// CHECK-NOT:    destroy_value [[ARG]]
 // CHECK:    return [[NATIVE]] 
 // CHECK:}
 
@@ -47,13 +46,12 @@ func getUppercaseString(_ s: NSString) -> String {
   return s.uppercase()
 }
 // CHECK-LABEL: sil hidden @$S13objc_bridging18getUppercaseString{{.*}}F
-// CHECK: bb0([[ARG:%.*]] : @owned $NSString):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $NSString):
 // -- The 'self' argument of NSString methods doesn't bridge.
 // CHECK-NOT: function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 // CHECK-NOT: function_ref @swift_StringToNSString
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[UPPERCASE_STRING:%.*]] = objc_method [[BORROWED_ARG]] : $NSString, #NSString.uppercase!1.foreign
-// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]([[BORROWED_ARG]]) : $@convention(objc_method) (NSString) -> @autoreleased Optional<NSString>
+// CHECK:   [[UPPERCASE_STRING:%.*]] = objc_method [[ARG]] : $NSString, #NSString.uppercase!1.foreign
+// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]([[ARG]]) : $@convention(objc_method) (NSString) -> @autoreleased Optional<NSString>
 // CHECK:   switch_enum [[OPT_BRIDGED]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 //
@@ -85,18 +83,16 @@ func setFoo(_ f: Foo, s: String) {
   f.setFoo(s)
 }
 // CHECK-LABEL: sil hidden @$S13objc_bridging6setFoo{{.*}}F
-// CHECK: bb0([[ARG0:%.*]] : @owned $Foo, {{%.*}} : @owned $String):
-// CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Foo, {{%.*}} : @guaranteed $String):
 // CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
 // CHECK:   [[OPT_BRIDGED:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
-// CHECK:   [[SET_FOO:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setFoo!1.foreign
-// CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Optional<NSString>, Foo) -> ()
+// CHECK:   [[SET_FOO:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setFoo!1.foreign
+// CHECK:   apply [[SET_FOO]]([[OPT_BRIDGED]], [[ARG0]]) : $@convention(objc_method) (Optional<NSString>, Foo) -> ()
 // CHECK:   destroy_value [[OPT_BRIDGED]]
-// CHECK:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK:   destroy_value [[ARG0]]
+// CHECK-NOT:   destroy_value [[ARG0]]
 // CHECK: }
 
 // @interface Foo -(BOOL) zim; @end
@@ -105,51 +101,41 @@ func getZim(_ f: Foo) -> Bool {
 }
 
 // CHECK-ios-i386-LABEL: sil hidden @$S13objc_bridging6getZim{{.*}}F
-// CHECK-ios-i386: bb0([[SELF:%.*]] : @owned $Foo):
-// CHECK-ios-i386:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-// CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
-// CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
-// CHECK-ios-i386:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK-ios-i386: bb0([[SELF:%.*]] : @guaranteed $Foo):
+// CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
+// CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
 // CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-ios-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-ios-i386:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-ios-i386: }
 
 // CHECK-watchos-i386-LABEL: sil hidden @$S13objc_bridging6getZim{{.*}}F
-// CHECK-watchos-i386: bb0([[SELF:%.*]] : @owned $Foo):
-// CHECK-watchos-i386:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-// CHECK-watchos-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
-// CHECK-watchos-i386:   [[BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]]) : $@convention(objc_method) (Foo) -> Bool
-// CHECK-watchos-i386:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK-watchos-i386: bb0([[SELF:%.*]] : @guaranteed $Foo):
+// CHECK-watchos-i386:   [[METHOD:%.*]] = objc_method [[SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
+// CHECK-watchos-i386:   [[BOOL:%.*]] = apply [[METHOD]]([[SELF]]) : $@convention(objc_method) (Foo) -> Bool
 // CHECK-watchos-i386:   return [[BOOL]] : $Bool
 // CHECK-watchos-i386: }
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @$S13objc_bridging6getZim{{.*}}F
-// CHECK-macosx-x86_64: bb0([[SELF:%.*]] : @owned $Foo):
-// CHECK-macosx-x86_64:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-// CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
-// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
-// CHECK-macosx-x86_64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK-macosx-x86_64: bb0([[SELF:%.*]] : @guaranteed $Foo):
+// CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Bool
+// CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[METHOD]]([[SELF]])  : $@convention(objc_method) (Foo) -> ObjCBool
 // CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-macosx-x86_64:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
 // CHECK-macosx-x86_64:   return [[SWIFT_BOOL]] : $Bool
 // CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @$S13objc_bridging6getZim{{.*}}F
-// CHECK-ios-x86_64: bb0([[SELF:%.*]] : @owned $Foo):
-// CHECK-ios-x86_64:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-// CHECK-ios-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
-// CHECK-ios-x86_64:   [[BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]]) : $@convention(objc_method) (Foo) -> Bool
-// CHECK-ios-x86_64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK-ios-x86_64: bb0([[SELF:%.*]] : @guaranteed $Foo):
+// CHECK-ios-x86_64:   [[METHOD:%.*]] = objc_method [[SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
+// CHECK-ios-x86_64:   [[BOOL:%.*]] = apply [[METHOD]]([[SELF]]) : $@convention(objc_method) (Foo) -> Bool
 // CHECK-ios-x86_64:   return [[BOOL]] : $Bool
 // CHECK-ios-x86_64: }
 
 // CHECK-arm64-LABEL: sil hidden @$S13objc_bridging6getZim{{.*}}F
-// CHECK-arm64: bb0([[SELF:%.*]] : @owned $Foo):
-// CHECK-arm64:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-// CHECK-arm64:   [[METHOD:%.*]] = objc_method [[BORROWED_SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
-// CHECK-arm64:   [[BOOL:%.*]] = apply [[METHOD]]([[BORROWED_SELF]]) : $@convention(objc_method) (Foo) -> Bool
-// CHECK-arm64:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+// CHECK-arm64: bb0([[SELF:%.*]] : @guaranteed $Foo):
+// CHECK-arm64:   [[METHOD:%.*]] = objc_method [[SELF]] : $Foo, #Foo.zim!1.foreign : (Foo) -> () -> Boo
+// CHECK-arm64:   [[BOOL:%.*]] = apply [[METHOD]]([[SELF]]) : $@convention(objc_method) (Foo) -> Bool
 // CHECK-arm64:   return [[BOOL]] : $Bool
 // CHECK-arm64: }
 
@@ -158,52 +144,42 @@ func setZim(_ f: Foo, b: Bool) {
   f.setZim(b)
 }
 // CHECK-ios-i386-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
-// CHECK-ios-i386: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
-// CHECK-ios-i386:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+// CHECK-ios-i386: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
-// CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
-// CHECK-ios-i386:   apply [[METHOD]]([[OBJC_BOOL]], [[BORROWED_ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()
-// CHECK-ios-i386:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK-ios-i386:   destroy_value [[ARG0]]
+// CHECK-ios-i386:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
+// CHECK-ios-i386:   apply [[METHOD]]([[OBJC_BOOL]], [[ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()
+// CHECK-ios-i386-NOT:   destroy_value [[ARG0]]
 // CHECK-ios-i386: }
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
-// CHECK-macosx-x86_64: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
-// CHECK-macosx-x86_64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+// CHECK-macosx-x86_64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
 // CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]([[ARG1]]) : $@convention(thin) (Bool) -> ObjCBool
-// CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
-// CHECK-macosx-x86_64:   apply [[METHOD]]([[OBJC_BOOL]], [[BORROWED_ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()
-// CHECK-macosx-x86_64:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK-macosx-x86_64:   destroy_value [[ARG0]]
+// CHECK-macosx-x86_64:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
+// CHECK-macosx-x86_64:   apply [[METHOD]]([[OBJC_BOOL]], [[ARG0]]) : $@convention(objc_method) (ObjCBool, Foo) -> ()
+// CHECK-macosx-x86_64-NOT:   destroy_value [[ARG0]]
 // CHECK-macosx-x86_64: }
 
 // CHECK-ios-x86_64-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
-// CHECK-ios-x86_64: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
-// CHECK-ios-x86_64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-ios-x86_64:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
-// CHECK-ios-x86_64:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
-// CHECK-ios-x86_64:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK-ios-x86_64:   destroy_value [[ARG0]]
+// CHECK-ios-x86_64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-ios-x86_64:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
+// CHECK-ios-x86_64:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
+// CHECK-ios-x86_64-NOT:   destroy_value [[ARG0]]
 // CHECK-ios-x86_64: }
 
 // CHECK-arm64-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
-// CHECK-arm64: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
-// CHECK-arm64:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-arm64:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
-// CHECK-arm64:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
-// CHECK-arm64:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK-arm64:   destroy_value [[ARG0]]
+// CHECK-arm64: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-arm64:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
+// CHECK-arm64:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
+// CHECK-arm64-NOT:   destroy_value [[ARG0]]
 // CHECK-arm64: }
 
 // CHECK-watchos-i386-LABEL: sil hidden @$S13objc_bridging6setZim{{.*}}F
-// CHECK-watchos-i386: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
-// CHECK-watchos-i386:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK-watchos-i386:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZim!1.foreign
-// CHECK-watchos-i386:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
-// CHECK-watchos-i386:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK-watchos-i386:   destroy_value [[ARG0]]
+// CHECK-watchos-i386: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK-watchos-i386:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZim!1.foreign
+// CHECK-watchos-i386:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
+// CHECK-watchos-i386-NOT:   destroy_value [[ARG0]]
 // CHECK-watchos-i386: }
 
 // @interface Foo -(_Bool) zang; @end
@@ -211,12 +187,10 @@ func getZang(_ f: Foo) -> Bool {
   return f.zang()
 }
 // CHECK-LABEL: sil hidden @$S13objc_bridging7getZangySbSo3FooCF
-// CHECK: bb0([[ARG:%.*]] : @owned $Foo)
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG]] : $Foo, #Foo.zang!1.foreign
-// CHECK:   [[BOOL:%.*]] = apply [[METHOD]]([[BORROWED_ARG]]) : $@convention(objc_method) (Foo) -> Bool
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK:   destroy_value [[ARG]]
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo)
+// CHECK:   [[METHOD:%.*]] = objc_method [[ARG]] : $Foo, #Foo.zang!1.foreign
+// CHECK:   [[BOOL:%.*]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Foo) -> Bool
+// CHECK-NOT:   destroy_value [[ARG]]
 // CHECK:   return [[BOOL]]
 
 // @interface Foo -(void) setZang: (_Bool)b; @end
@@ -224,12 +198,10 @@ func setZang(_ f: Foo, _ b: Bool) {
   f.setZang(b)
 }
 // CHECK-LABEL: sil hidden @$S13objc_bridging7setZangyySo3FooC_SbtF
-// CHECK: bb0([[ARG0:%.*]] : @owned $Foo, [[ARG1:%.*]] : @trivial $Bool):
-// CHECK:   [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
-// CHECK:   [[METHOD:%.*]] = objc_method [[BORROWED_ARG0]] : $Foo, #Foo.setZang!1.foreign
-// CHECK:   apply [[METHOD]]([[ARG1]], [[BORROWED_ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
-// CHECK:   end_borrow [[BORROWED_ARG0]] from [[ARG0]]
-// CHECK:   destroy_value [[ARG0]]
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @trivial $Bool):
+// CHECK:   [[METHOD:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.setZang!1.foreign
+// CHECK:   apply [[METHOD]]([[ARG1]], [[ARG0]]) : $@convention(objc_method) (Bool, Foo) -> ()
+// CHECK-NOT:   destroy_value [[ARG0]]
 // CHECK: } // end sil function '$S13objc_bridging7setZangyySo3FooC_SbtF'
 
 // NSString *bar(void);
@@ -257,7 +229,7 @@ func callSetBar(_ s: String) {
   setBar(s)
 }
 // CHECK-LABEL: sil hidden @$S13objc_bridging10callSetBar{{.*}}F
-// CHECK: bb0({{%.*}} : @owned $String):
+// CHECK: bb0({{%.*}} : @guaranteed $String):
 // CHECK:   [[NATIVE:%.*]] = load
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
@@ -425,9 +397,10 @@ class Bas : NSObject {
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[NSSTR_COPY]]
   // CHECK:   [[STR:%.*]] = apply [[NSSTRING_TO_STRING]]([[NSSTR_BOX]]
+  // CHECK:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK:   [[METHOD:%.*]] = function_ref @$S13objc_bridging3BasC6strArgyySSF
-  // CHECK:   apply [[METHOD]]([[STR]], [[BORROWED_THIS_COPY]])
+  // CHECK:   apply [[METHOD]]([[BORROWED_STR]], [[BORROWED_THIS_COPY]])
   // CHECK:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK:   destroy_value [[THIS_COPY]]
   // CHECK: } // end sil function '$S13objc_bridging3BasC6strArgyySSFTo'
@@ -457,9 +430,10 @@ class Bas : NSObject {
   // CHECK:   [[OPT_NSARRAY:%[0-9]+]] = enum $Optional<NSArray>, #Optional.some!enumelt.1, [[NSARRAY_COPY]] : $NSArray
   // CHECK:   [[ARRAY_META:%[0-9]+]] = metatype $@thin Array<AnyObject>.Type
   // CHECK:   [[ARRAY:%[0-9]+]] = apply [[CONV_FN]]<AnyObject>([[OPT_NSARRAY]], [[ARRAY_META]])
+  // CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @$S13objc_bridging3BasC8arrayArgyySayyXlGF : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
-  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[ARRAY]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @$S13objc_bridging3BasC8arrayArgyySayyXlGF : $@convention(method) (@guaranteed Array<AnyObject>, @guaranteed Bas) -> ()
+  // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[BORROWED_ARRAY]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Array<AnyObject>, @guaranteed Bas) -> ()
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]] : $Bas
   // CHECK:   return [[RESULT]] : $()
@@ -488,12 +462,11 @@ class Bas : NSObject {
 
 // CHECK-LABEL: sil hidden @$S13objc_bridging16applyStringBlock_1xS3SXB_SStF
 func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> String {
-  // CHECK: bb0([[BLOCK:%.*]] : @owned $@convention(block) @noescape (NSString) -> @autoreleased NSString, [[STRING:%.*]] : @owned $String):
+  // CHECK: bb0([[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (NSString) -> @autoreleased NSString, [[STRING:%.*]] : @guaranteed $String):
   // CHECK:   [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
   // CHECK:   [[BORROWED_BLOCK_COPY:%.*]] = begin_borrow [[BLOCK_COPY]]
   // CHECK:   [[BLOCK_COPY_COPY:%.*]] = copy_value [[BORROWED_BLOCK_COPY]]
-  // CHECK:   [[BORROWED_STRING:%.*]] = begin_borrow [[STRING]]
-  // CHECK:   [[STRING_COPY:%.*]] = copy_value [[BORROWED_STRING]]
+  // CHECK:   [[STRING_COPY:%.*]] = copy_value [[STRING]]
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // CHECK:   [[BORROWED_STRING_COPY:%.*]] = begin_borrow [[STRING_COPY]]
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_STRING_COPY]]) : $@convention(method) (@guaranteed String)
@@ -503,11 +476,11 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
   // CHECK:   destroy_value [[NSSTR]]
   // CHECK:   [[FINAL_BRIDGE:%.*]] = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK:   [[OPTIONAL_NSSTR:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[RESULT_NSSTR]]
-  // CHECK:   [[RESULT:%.*]] = apply [[FINAL_BRIDGE]]([[OPTIONAL_NSSTR]], {{.*}}) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK:   [[RESULT:%.*]] = apply [[FINAL_BRIDGE]]([[OPTIONAL_NSSTR]], {{.*}}) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
   // CHECK:   destroy_value [[BLOCK_COPY_COPY]]
-  // CHECK:   destroy_value [[STRING]]
+  // CHECK-NOT:   destroy_value [[STRING]]
   // CHECK:   destroy_value [[BLOCK_COPY]]
-  // CHECK:   destroy_value [[BLOCK]]
+  // CHECK-NOT:   destroy_value [[BLOCK]]
   // CHECK:   return [[RESULT]] : $String
   return f(x)
 }
@@ -515,7 +488,7 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
 
 // CHECK-LABEL: sil hidden @$S13objc_bridging15bridgeCFunction{{.*}}F
 func bridgeCFunction() -> (String?) -> (String?) {
-  // CHECK: [[THUNK:%.*]] = function_ref @$SSo18NSStringFromStringySSSgABFTO : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String>
+  // CHECK: [[THUNK:%.*]] = function_ref @$SSo18NSStringFromStringySSSgABFTO : $@convention(thin) (@guaranteed Optional<String>) -> @owned Optional<String>
   // CHECK: [[THICK:%.*]] = thin_to_thick_function [[THUNK]]
   // CHECK: return [[THICK]]
   return NSStringFromString
@@ -581,16 +554,14 @@ func bools(_ x: Bool) -> (Bool, Bool) {
 }
 
 // CHECK-LABEL: sil hidden @$S13objc_bridging9getFridge{{.*}}F
-// CHECK: bb0([[HOME:%[0-9]+]] : @owned $APPHouse):
+// CHECK: bb0([[HOME:%[0-9]+]] : @guaranteed $APPHouse):
 func getFridge(_ home: APPHouse) -> Refrigerator {
-  // CHECK: [[BORROWED_HOME:%.*]] = begin_borrow [[HOME]]
-  // CHECK: [[GETTER:%[0-9]+]] = objc_method [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
-  // CHECK: [[OBJC_RESULT:%[0-9]+]] = apply [[GETTER]]([[BORROWED_HOME]])
+  // CHECK: [[GETTER:%[0-9]+]] = objc_method [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK: [[OBJC_RESULT:%[0-9]+]] = apply [[GETTER]]([[HOME]])
   // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @$S10Appliances12RefrigeratorV36_unconditionallyBridgeFromObjectiveCyACSo15APPRefrigeratorCSgFZ
   // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[BRIDGE_FN]]([[OBJC_RESULT]], [[REFRIGERATOR_META]])
-  // CHECK: end_borrow [[BORROWED_HOME]] from [[HOME]]
-  // CHECK: destroy_value [[HOME]] : $APPHouse
+  // CHECK-NOT: destroy_value [[HOME]] : $APPHouse
   // CHECK: return [[RESULT]] : $Refrigerator
   return home.fridge
 }
@@ -603,15 +574,12 @@ func updateFridgeTemp(_ home: APPHouse, delta: Double) {
   // +=
   // XCHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @$Ss2peoiyySdz_SdtF
 
-  // Borrowed home
-  // CHECK: [[BORROWED_HOME:%.*]] = begin_borrow [[HOME]]
-
   // Temporary fridge
   // XCHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
 
   // Get operation
-  // CHECK: [[GETTER:%[0-9]+]] = objc_method [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
-  // CHECK: [[OBJC_FRIDGE:%[0-9]+]] = apply [[GETTER]]([[BORROWED_HOME]])
+  // CHECK: [[GETTER:%[0-9]+]] = objc_method [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK: [[OBJC_FRIDGE:%[0-9]+]] = apply [[GETTER]]([[HOME]])
   // CHECK: [[BRIDGE_FROM_FN:%[0-9]+]] = function_ref @$S10Appliances12RefrigeratorV36_unconditionallyBridgeFromObjectiveCyACSo15APPRefrigeratorCSgFZ
   // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
   // CHECK: [[FRIDGE:%[0-9]+]] = apply [[BRIDGE_FROM_FN]]([[OBJC_FRIDGE]], [[REFRIGERATOR_META]])
@@ -643,13 +611,13 @@ func takeTwoAnys(_ lhs: Any, _ rhs: Any) -> Any { return lhs }
 // CHECK-LABEL: sil hidden @$S13objc_bridging22defineNonStandardBlock1xyyp_tF
 func defineNonStandardBlock(x: Any) {
   // CHECK: function_ref @$S13objc_bridging22defineNonStandardBlock1xyyp_tFypypcfU_
-  // CHECK: function_ref @$SypypIegir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+  // CHECK: function_ref @$SypypIegnr_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
 
   let fn : @convention(block) (Any) -> Any = { y in takeTwoAnys(x, y) }
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SypypIegir_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
-// CHECK: bb0(%0 : @trivial $*@block_storage @callee_guaranteed (@in Any) -> @out Any, %1 : @unowned $AnyObject):
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SypypIegnr_yXlyXlIeyBya_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, AnyObject) -> @autoreleased AnyObject
+// CHECK: bb0(%0 : @trivial $*@block_storage @callee_guaranteed (@in_guaranteed Any) -> @out Any, %1 : @unowned $AnyObject):
 // CHECK:   [[T0:%.*]] = copy_value %1 : $AnyObject
 // CHECK:   [[T1:%.*]] = open_existential_ref [[T0]] : $AnyObject
 // CHECK:   [[ARG:%.*]] = alloc_stack $Any
@@ -665,7 +633,7 @@ func castToCFunction(ptr: UnsafeRawPointer) {
   // CHECK: store %0 to [trivial] [[IN]] : $*UnsafeRawPointer
   // CHECK: [[META:%.*]] = metatype $@thick (@convention(c) (Optional<AnyObject>) -> ()).Type
   // CHECK: [[CASTFN:%.*]] = function_ref @$Ss13unsafeBitCast_2toq_x_q_mtr0_lF
-  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (AnyObject?) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
+  // CHECK: apply [[CASTFN]]<UnsafeRawPointer, @convention(c) (AnyObject?) -> ()>([[OUT]], [[IN]], [[META]]) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @thick τ_0_1.Type) -> @out τ_0_1
   // CHECK: [[RESULT:%.*]] = load [trivial] [[OUT]] : $*@convention(c) (Optional<AnyObject>) -> ()
   typealias Fn = @convention(c) (AnyObject?) -> Void
   unsafeBitCast(ptr, to: Fn.self)(nil)

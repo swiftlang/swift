@@ -199,6 +199,13 @@ ProtocolConformanceState ProtocolConformance::getState() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getState, ())
 }
 
+ConformanceEntryKind ProtocolConformance::getSourceKind() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getSourceKind, ())
+}
+NormalProtocolConformance *ProtocolConformance::getImplyingConformance() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getImplyingConformance, ())
+}
+
 bool
 ProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                     LazyResolver *resolver) const {
@@ -375,7 +382,7 @@ ProtocolConformanceRef::getConditionalRequirements() const {
 }
 
 void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
-  assert(ConditionalRequirements.size() == 0 &&
+  assert(ConditionalRequirements.empty() &&
          "should not recompute conditional requirements");
   auto &ctxt = getProtocol()->getASTContext();
   auto DC = getDeclContext();

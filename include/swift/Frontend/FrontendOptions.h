@@ -55,9 +55,6 @@ public:
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
-  /// The path to which we should output fixits as source edits.
-  std::string FixitsOutputPath;
-
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 
@@ -145,6 +142,9 @@ public:
   /// If set, emitted module files will always contain options for the
   /// debugger to use.
   bool AlwaysSerializeDebuggingOptions = false;
+
+  /// If set, inserts instrumentation useful for testing the debugger.
+  bool DebuggerTestingTransform = false;
 
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;

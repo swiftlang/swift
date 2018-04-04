@@ -262,14 +262,25 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
-                        NumSILAccessKindBits+NumSILAccessEnforcementBits,
+                        NumSILAccessKindBits+NumSILAccessEnforcementBits
+                        + 1,
     AccessKind : NumSILAccessKindBits,
-    Enforcement : NumSILAccessEnforcementBits
+    Enforcement : NumSILAccessEnforcementBits,
+    NoNestedConflict : 1
   );
+  SWIFT_INLINE_BITFIELD(BeginUnpairedAccessInst, NonValueInstruction,
+                        NumSILAccessKindBits + NumSILAccessEnforcementBits + 1,
+                        AccessKind : NumSILAccessKindBits,
+                        Enforcement : NumSILAccessEnforcementBits,
+                        NoNestedConflict : 1);
 
   SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
     Aborting : 1
   );
+  SWIFT_INLINE_BITFIELD(EndUnpairedAccessInst, NonValueInstruction,
+                        NumSILAccessEnforcementBits + 1,
+                        Enforcement : NumSILAccessEnforcementBits,
+                        Aborting : 1);
 
   SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
                         NumStoreOwnershipQualifierBits,
@@ -544,7 +555,7 @@ struct cast_convert_val<To, const swift::SILNode, From>;
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
-class PointerLikeTypeTraits<swift::SILNode *> {
+struct PointerLikeTypeTraits<swift::SILNode *> {
 public:
   static inline void *getAsVoidPointer(swift::SILNode *I) {
     return (void*)I;

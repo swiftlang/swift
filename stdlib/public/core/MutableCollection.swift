@@ -189,7 +189,7 @@ where SubSequence: MutableCollection
 
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
-  @_inlineable
+  @inlinable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -218,7 +218,7 @@ extension MutableCollection {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
-  @_inlineable
+  @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
@@ -238,7 +238,7 @@ extension MutableCollection {
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
-  @_inlineable
+  @inlinable
   public mutating func swapAt(_ i: Index, _ j: Index) {
     guard i != j else { return }
     let tmp = self[i]

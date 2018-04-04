@@ -91,6 +91,14 @@ static bool shouldTransformParameter(GenericEnvironment *env,
   return (param != newParam);
 }
 
+static bool isFuncOrOptionalFuncType(SILType Ty) {
+  SILType nonOptionalType = Ty;
+  if (auto optType = Ty.getOptionalObjectType()) {
+    nonOptionalType = optType;
+  }
+  return nonOptionalType.is<SILFunctionType>();
+}
+
 static bool shouldTransformFunctionType(GenericEnvironment *env,
                                         CanSILFunctionType fnType,
                                         irgen::IRGenModule &IGM) {
@@ -123,7 +131,7 @@ static bool containsFunctionSignature(GenericEnvironment *genEnv,
       if (auto optionalObject = objectType.getOptionalObjectType()) {
         objectType = optionalObject;
       }
-      if (auto fnType = objectType.getAs<SILFunctionType>()) {
+      if (objectType.is<SILFunctionType>()) {
         return true;
       }
     }
@@ -627,6 +635,10 @@ static bool modifiableApply(ApplySite applySite, irgen::IRGenModule &Mod) {
   if (applySite.getSubstCalleeType()->getLanguage() == SILFunctionLanguage::C) {
     return false;
   }
+  SILValue callee = applySite.getCallee();
+  if (auto site = ApplySite::isa(callee)) {
+    return modifiableApply(site, Mod);
+  }
   return true;
 }
 
@@ -946,7 +958,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
     LoadInst *optimizableLoad) {
   SILValue value = optimizableLoad->getOperand();
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1069,7 +1081,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
   }
   SILValue value = unoptimizableLoad->getOperand();
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1411,7 +1423,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   assert(!ApplySite::isa(value) && "Unexpected instruction");
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1438,7 +1450,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 AllocStackInst *
 LoadableStorageAllocation::allocateForApply(SILInstruction *apply,
                                             SILType type) {
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   auto *allocInstr = allocBuilder.createAllocStack(apply->getLoc(), type);
 
   pass.largeLoadableArgs.push_back(allocInstr);
@@ -1524,7 +1536,7 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
 static void allocateAndSetForInstrOperand(StructLoweringState &pass,
                                           SingleValueInstruction *instrOperand){
   assert(instrOperand->getType().isObject());
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr = allocBuilder.createAllocStack(
       instrOperand->getLoc(), instrOperand->getType());
 
@@ -1558,7 +1570,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
   auto *arg = dyn_cast<SILArgument>(value);
   assert(arg && "non-instr operand must be an argument");
 
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(applyInst->getLoc(), value->getType());
 
@@ -1677,7 +1689,8 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
   auto value = orig->getOperand();
   auto type = value->getType();
   if (type.isObject()) {
-    SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+    SILBuilderWithScope allocBuilder(&*pass.F->begin());
+
     // support for non-address operands / enums
     auto *allocInstr = allocBuilder.createAllocStack(orig->getLoc(), type);
     SILBuilderWithScope storeBuilder(orig);
@@ -1696,7 +1709,7 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
     }
     value = allocInstr;
   }
-  SILBuilderWithScope allocBuilder(pass.F->begin()->begin());
+  SILBuilderWithScope allocBuilder(&*pass.F->begin());
   auto *allocInstr = allocBuilder.createAllocStack(value.getLoc(), type);
 
   SILBuilderWithScope copyBuilder(orig);
@@ -1737,7 +1750,7 @@ static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
   instr->getParent()->erase(instr);
 
   // If the load is of a function type - do not replace it.
-  if (loadArg->getType().is<SILFunctionType>()) {
+  if (isFuncOrOptionalFuncType(loadArg->getType())) {
     return;
   }
 
@@ -1798,7 +1811,7 @@ static void rewriteFunction(StructLoweringState &pass,
           loadArg->setOperand(newArg);
 
           // If the load is of a function type - do not replace it.
-          if (loadArg->getType().is<SILFunctionType>()) {
+          if (isFuncOrOptionalFuncType(loadArg->getType())) {
             continue;
           }
 
@@ -1838,7 +1851,7 @@ static void rewriteFunction(StructLoweringState &pass,
             allocateAndSetForArgumentOperand(pass, currOperand, applyInst);
           } else if (auto *load = dyn_cast<LoadInst>(currOperandInstr)) {
             // If the load is of a function type - do not replace it.
-            if (load->getType().is<SILFunctionType>()) {
+            if (isFuncOrOptionalFuncType(load->getType())) {
               continue;
             }
 
@@ -2009,9 +2022,9 @@ static void rewriteFunction(StructLoweringState &pass,
     }
     case SILInstructionKind::BeginAccessInst: {
       auto *convInstr = cast<BeginAccessInst>(instr);
-      newInstr = resultTyBuilder.createBeginAccess(Loc, convInstr->getOperand(),
-                                                   convInstr->getAccessKind(),
-                                                   convInstr->getEnforcement());
+      newInstr = resultTyBuilder.createBeginAccess(
+          Loc, convInstr->getOperand(), convInstr->getAccessKind(),
+          convInstr->getEnforcement(), convInstr->hasNoNestedConflict());
       break;
     }
     case SILInstructionKind::EnumInst: {
@@ -2210,7 +2223,11 @@ static SILValue
 getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
                                   IRGenModule &Mod, SILBuilder &builder) {
   SILType currSILType = op->getType();
-  if (auto funcType = currSILType.getAs<SILFunctionType>()) {
+  SILType nonOptionalType = currSILType;
+  if (auto optType = currSILType.getOptionalObjectType()) {
+    nonOptionalType = optType;
+  }
+  if (auto funcType = nonOptionalType.getAs<SILFunctionType>()) {
     GenericEnvironment *genEnv =
         containingInstr->getFunction()->getGenericEnvironment();
     if (!genEnv && funcType->isPolymorphic()) {
@@ -2218,8 +2235,16 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
     }
     auto newFnType = getNewSILFunctionType(genEnv, funcType, Mod);
     SILType newSILType = SILType::getPrimitiveObjectType(newFnType);
+    if (nonOptionalType.isAddress()) {
+      newSILType = newSILType.getAddressType();
+    }
+    if (nonOptionalType != currSILType) {
+      newSILType = SILType::getOptionalType(newSILType);
+    }
     if (currSILType.isAddress()) {
-      newSILType = newSILType.getAddressType(); // we need address for loads
+      newSILType = newSILType.getAddressType();
+    }
+    if (currSILType.isAddress()) {
       if (newSILType != currSILType) {
         auto castInstr = builder.createUncheckedAddrCast(
             containingInstr->getLoc(), op, newSILType);
@@ -2494,7 +2519,8 @@ void LoadableByAddress::recreateConvInstrs() {
     case SILInstructionKind::ConvertEscapeToNoEscapeInst: {
       auto instr = cast<ConvertEscapeToNoEscapeInst>(convInstr);
       newInstr = convBuilder.createConvertEscapeToNoEscape(
-          instr->getLoc(), instr->getOperand(), newType);
+          instr->getLoc(), instr->getOperand(), newType,
+          instr->isLifetimeGuaranteed());
       break;
     }
     case SILInstructionKind::MarkDependenceInst: {

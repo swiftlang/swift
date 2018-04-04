@@ -1147,11 +1147,6 @@ public:
                         RValue &&optionalSubscripts,
                         SILType addressType);
 
-  RValue emitApplyConversionFunction(SILLocation loc,
-                                     Expr *funcExpr,
-                                     Type resultType,
-                                     RValue &&operand);
-
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);
@@ -1515,10 +1510,18 @@ public:
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
   ///
-  /// NOTE: This operation does *not* consume the managed value.
+  /// NOTE: This operation does consume the managed value.
+  ManagedValue emitBindOptional(SILLocation loc,
+                                ManagedValue optionalAddrOrValue,
+                                unsigned depth);
+
+  /// Emit the control flow for an optional 'bind' operation, branching to the
+  /// active failure destination if the optional value addressed by optionalAddr
+  /// is nil, and leaving the insertion point on the success branch.
   ///
-  void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
-                        unsigned depth);
+  /// NOTE: This operation does not consume the managed address.
+  void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
+                               unsigned depth);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,
@@ -1614,7 +1617,8 @@ public:
   ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
                                     CanType inputType,
                                     CanType outputType,
-                                    SGFContext ctx = SGFContext());
+                                    SGFContext ctx = SGFContext(),
+                                    bool postponeToNoEscapeCleanup = true);
 
   /// Most general form of the above.
   ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
@@ -1622,7 +1626,8 @@ public:
                                     CanType inputSubstType,
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
-                                    SGFContext ctx = SGFContext());
+                                    SGFContext ctx = SGFContext(),
+                                    bool postponeToNoEscapeCleanup = true);
   RValue emitTransformedValue(SILLocation loc, RValue &&input,
                               AbstractionPattern inputOrigType,
                               CanType inputSubstType,
@@ -1642,7 +1647,9 @@ public:
                                     CanType &inputSubstType,
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
-                                    SubstitutionMap &interfaceSubs);
+                                    SubstitutionMap &interfaceSubs,
+                                    bool withoutActuallyEscaping=false);
+
   //===--------------------------------------------------------------------===//
   // NoEscaping to Escaping closure thunk
   //===--------------------------------------------------------------------===//
@@ -1679,6 +1686,10 @@ public:
     // No lowering support needed.
   }
   void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
+    // No lowering support needed.
+  }
+
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
     // No lowering support needed.
   }
 

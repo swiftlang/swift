@@ -1,5 +1,7 @@
 public protocol P1 {}
 public protocol P2 {}
+
+@_fixed_layout
 public struct S1: P1 {
   public static func foo1() {}
   mutating public func foo2() {}
@@ -33,3 +35,5 @@ public func foo2(_ a: Int = #line, b: S1) {}
 public enum Number: Int {
   case one
 }
+
+public func foo3(_ a: [Int: String]) {}

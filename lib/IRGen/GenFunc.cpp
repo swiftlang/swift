@@ -721,7 +721,7 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
     getArgumentLoweringType(argType.getSwiftRValueType(), param);
   auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
   // Empty values don't matter.
-  return ti.getSchema().size() == 0 && !param.isFormalIndirect();
+  return ti.getSchema().empty() && !param.isFormalIndirect();
 }
 
 /// Find the parameter index for the one (assuming there was only one) partially
@@ -933,7 +933,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
-      layout->getBindings().restore(subIGF, bindingsAddr);
+      layout->getBindings().restore(subIGF, bindingsAddr,
+                                    MetadataState::Complete);
     }
 
   // There's still a placeholder to claim if the target type is thick
@@ -1345,7 +1346,7 @@ void irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
-  bool isNoEscapeFunction = outType->isNoEscape();
+  assert(!outType->isNoEscape());
 
   // Reserve space for polymorphic bindings.
   SubstitutionMap subMap;
@@ -1374,7 +1375,7 @@ void irgen::emitFunctionPartialApplication(
 
     // Empty values don't matter.
     auto schema = ti.getSchema();
-    if (schema.size() == 0 && !param.isFormalIndirect())
+    if (schema.empty() && !param.isFormalIndirect())
       continue;
 
     argValTypes.push_back(argType);
@@ -1475,10 +1476,7 @@ void irgen::emitFunctionPartialApplication(
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
-    if (isNoEscapeFunction)
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.OpaquePtrTy);
-    else
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
     return;
   }
@@ -1519,10 +1517,7 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     if (isIndirectFormalParameter(*singleRefcountedConvention))
       ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
-    if (isNoEscapeFunction)
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.OpaquePtrTy);
-    else
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
     return;
   }
@@ -1613,8 +1608,6 @@ void irgen::emitFunctionPartialApplication(
                                                               argConventions);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
-  if (isNoEscapeFunction)
-    data = IGF.Builder.CreateBitCast(data, IGF.IGM.OpaquePtrTy);
   out.add(data);
 }
 

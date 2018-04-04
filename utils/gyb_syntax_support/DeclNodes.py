@@ -19,8 +19,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('TypealiasKeyword', kind='TypealiasToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -40,8 +39,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('AssociatedtypeKeyword', kind='AssociatedtypeToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -84,27 +82,32 @@ DECL_NODES = [
              Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
-    # else-if-directive-clause -> '#elseif' expr stmt-list
-    Node('ElseifDirectiveClause', kind='Syntax',
-         traits=['WithStatements'],
+    # if-config-clause ->
+    #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
+    Node('IfConfigClause', kind='Syntax',
          children=[
-             Child('PoundElseif', kind='PoundElseifToken'),
-             Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('PoundKeyword', kind='Token',
+                   token_choices=[
+                       'PoundIfToken',
+                       'PoundElseifToken',
+                       'PoundElseToken',
+                   ]),
+             Child('Condition', kind='Expr',
+                   is_optional=True),
+             Child('Elements', kind='Syntax',
+                   node_choices=[
+                      Child('Statements', kind='CodeBlockItemList'),
+                      Child('SwitchCases', kind='SwitchCaseList')]),
          ]),
+
+    Node('IfConfigClauseList', kind='SyntaxCollection',
+         element='IfConfigClause'),
 
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
     #   else-clause? '#endif'
     Node('IfConfigDecl', kind='Decl',
-         traits=['WithStatements'],
          children=[
-             Child('PoundIf', kind='PoundIfToken'),
-             Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
-             Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
-                   is_optional=True),
-             Child('ElseClause', kind='ElseDirectiveClause',
-                   is_optional=True),
+             Child('Clauses', kind='IfConfigClauseList'),
              Child('PoundEndif', kind='PoundEndifToken'),
          ]),
 
@@ -134,7 +137,7 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating',
+                       'mutating', 'nonmutating', 'indirect',
                    ]),
              Child('Detail', kind='TokenList', is_optional=True),
          ]),
@@ -168,8 +171,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ClassKeyword', kind='ClassToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -193,8 +195,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('StructKeyword', kind='StructToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -211,8 +212,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ProtocolKeyword', kind='ProtocolToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -232,8 +232,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ExtensionKeyword', kind='ExtensionToken'),
              Child('ExtendedType', kind='Type'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -281,7 +280,8 @@ DECL_NODES = [
                    token_choices=[
                        'IdentifierToken',
                        'WildcardToken',
-                   ]),
+                   ],
+                   is_optional=True),
              # One of these two names needs be optional, we choose the second
              # name to avoid backtracking.
              Child('SecondName', kind='Token',
@@ -290,8 +290,10 @@ DECL_NODES = [
                        'WildcardToken',
                    ],
                    is_optional=True),
-             Child('Colon', kind='ColonToken'),
-             Child('TypeAnnotation', kind='Type'),
+             Child('Colon', kind='ColonToken',
+                   is_optional=True),
+             Child('Type', kind='Type',
+                   is_optional=True),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
              Child('DefaultArgument', kind='InitializerClause',
@@ -320,7 +322,7 @@ DECL_NODES = [
     #                       | 'weak'
     # mutation-modifier -> 'mutating' | 'nonmutating'
     Node('ModifierList', kind='SyntaxCollection',
-         element='Syntax',
+         element='DeclModifier',
          element_name='Modifier'),
 
     Node('FunctionDecl', kind='Decl', traits=['IdentifiedDecl'],
@@ -404,19 +406,6 @@ DECL_NODES = [
              Child('Accessor', kind='AccessorBlock', is_optional=True),
          ]),
 
-    # else-if-directive-clause-list -> else-if-directive-clause
-    #   else-if-directive-clause-list?
-    Node('ElseifDirectiveClauseList', kind='SyntaxCollection',
-         element='ElseifDirectiveClause'),
-
-    # else-directive-clause -> '#else' stmt-list
-    Node('ElseDirectiveClause', kind='Syntax',
-         traits=['WithStatements'],
-         children=[
-             Child('PoundElse', kind='PoundElseToken'),
-             Child('Statements', kind='CodeBlockItemList'),
-         ]),
-
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'
     #                        | 'fileprivate' | 'fileprivate' '(' 'set' ')'
     #                        | 'internal' | 'internal' '(' 'set' ')'
@@ -444,6 +433,8 @@ DECL_NODES = [
     Node('ImportDecl', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
              Child('ImportTok', kind='ImportToken'),
              Child('ImportKind', kind='Token', is_optional=True,
                    token_choices=[
@@ -510,5 +501,94 @@ DECL_NODES = [
                        'LetToken', 'VarToken',
                    ]),
              Child('Bindings', kind='PatternBindingList'),
+         ]),
+
+    Node('EnumCaseElement', kind='Syntax',
+         description='''
+         An element of an enum case, containing the name of the case and, \
+         optionally, either associated values or an assignment to a raw value.
+         ''',
+         traits=['WithTrailingComma'],
+         children=[
+             Child('Identifier', kind='IdentifierToken',
+                   description='The name of this case.'),
+             Child('AssociatedValue', kind='ParameterClause', is_optional=True,
+                   description='The set of associated values of the case.'),
+             Child('RawValue', kind='InitializerClause', is_optional=True,
+                   description='''
+                   The raw value of this enum element, if present.
+                   '''),
+             Child('TrailingComma', kind='CommaToken', is_optional=True,
+                   description='''
+                   The trailing comma of this element, if the case has \
+                   multiple elements.
+                   '''),
+         ]),
+
+    Node('EnumCaseElementList', kind='SyntaxCollection',
+         description='A collection of 0 or more `EnumCaseElement`s.',
+         element='EnumCaseElement'),
+
+    Node('EnumCaseDecl', kind='Decl',
+         description='''
+         A `case` declaration of a Swift `enum`. It can have 1 or more \
+         `EnumCaseElement`s inside, each declaring a different case of the
+         enum.
+         ''',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True,
+                   description='''
+                   The attributes applied to the case declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the case declaration.
+                   '''),
+             Child('CaseKeyword', kind='CaseToken',
+                   description='The `case` keyword for this case.'),
+             Child('Elements', kind='EnumCaseElementList',
+                   description='The elements this case declares.')
+         ]),
+
+    Node('EnumDecl', kind='Decl', traits=['IdentifiedDecl'],
+         description='A Swift `enum` declaration.',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True,
+                   description='''
+                   The attributes applied to the enum declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the enum declaration.
+                   '''),
+             Child('EnumKeyword', kind='EnumToken',
+                   description='''
+                   The `enum` keyword for this declaration.
+                   '''),
+             Child('Identifier', kind='IdentifierToken',
+                   description='''
+                   The name of this enum.
+                   '''),
+             Child('GenericParameters', kind='GenericParameterClause',
+                   is_optional=True,
+                   description='''
+                   The generic parameters, if any, for this enum.
+                   '''),
+             Child('InheritanceClause', kind='TypeInheritanceClause',
+                   is_optional=True,
+                   description='''
+                   The inheritance clause describing conformances or raw \
+                   values for this enum.
+                   '''),
+             Child('GenericWhereClause', kind='GenericWhereClause',
+                   is_optional=True,
+                   description='''
+                   The `where` clause that applies to the generic parameters of \
+                   this enum.
+                   '''),
+             Child('Members', kind='MemberDeclBlock',
+                   description='''
+                   The cases and other members of this enum.
+                   ''')
          ]),
 ]

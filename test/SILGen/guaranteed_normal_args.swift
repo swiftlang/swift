@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -parse-as-library -module-name Swift -parse-stdlib -emit-silgen -enable-sil-ownership -enable-guaranteed-normal-arguments %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -parse-as-library -module-name Swift -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // This test checks specific codegen related to normal arguments being passed at
 // +0. Eventually, it should be merged into normal SILGen tests.
@@ -221,4 +222,12 @@ public func forwardIntoMemory(fromNative x: AnyObject, y: Builtin.Word) -> Built
   // conformance.
   let object = Builtin.castToBridgeObject(x, y)
   return object
+}
+
+public struct StructWithOptionalAddressOnlyField<T> {
+  public let newValue: T?
+}
+
+func useStructWithOptionalAddressOnlyField<T>(t: T) -> StructWithOptionalAddressOnlyField<T> {
+  return StructWithOptionalAddressOnlyField<T>(newValue: t)
 }

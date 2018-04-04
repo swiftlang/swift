@@ -437,6 +437,9 @@ public:
       subPattern = getSubExprPattern(arg);
     }
     
+    if (ume->getName().getBaseName().isSpecial())
+      return nullptr;
+
     // FIXME: Compound names.
     return new (TC.Context) EnumElementPattern(
                               ume->getDotLoc(),
@@ -787,10 +790,8 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     // If the param is not a 'let' and it is not an 'inout'.
     // It must be a 'var'. Provide helpful diagnostics like a shadow copy
     // in the function body to fix the 'var' attribute.
-    if (!decl->isLet() &&
-        !decl->isImplicit() &&
-        (Ty.isNull() || !Ty->is<InOutType>()) &&
-        !hadError) {
+    if (!decl->isImmutable() && !decl->isImplicit() &&
+        (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
       decl->setInvalid();
       hadError = true;
     }
@@ -866,6 +867,8 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
         param->setSpecifier(VarDecl::Specifier::InOut);
       } else if (isa<SharedTypeRepr>(typeRepr)) {
         param->setSpecifier(VarDecl::Specifier::Shared);
+      } else if (isa<OwnedTypeRepr>(typeRepr)) {
+        param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }
   }
@@ -873,6 +876,17 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   return hadError;
 }
 
+bool TypeChecker::typeCheckParameterLists(AbstractFunctionDecl *fd,
+                                          GenericTypeResolver &resolver) {
+  bool hadError = false;
+  for (auto paramList : fd->getParameterLists()) {
+    hadError |= typeCheckParameterList(paramList, fd,
+                                       TypeResolutionOptions(),
+                                       resolver);
+  }
+
+  return hadError;
+}
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {
@@ -1616,7 +1630,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        assert(!param->isLet() || !ty->is<InOutType>());
+        assert(!param->isImmutable() || !ty->is<InOutType>());
         param->setType(ty->getInOutObjectType());
         param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
       }
@@ -1636,7 +1650,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      assert(!param->isLet() || !ty->is<InOutType>());
+      assert(!param->isImmutable() || !ty->is<InOutType>());
       param->setType(ty->getInOutObjectType());
       param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
     }

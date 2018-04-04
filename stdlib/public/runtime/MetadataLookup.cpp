@@ -31,6 +31,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
+#include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include <functional>
 #include <vector>
@@ -103,22 +104,22 @@ namespace {
   };
 } // end anonymous namespace
 
-struct TypeMetadataState {
+struct TypeMetadataPrivateState {
   ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
   std::vector<TypeMetadataSection> SectionsToScan;
   Mutex SectionsToScanLock;
 
-  TypeMetadataState() {
+  TypeMetadataPrivateState() {
     SectionsToScan.reserve(16);
     initializeTypeMetadataRecordLookup();
   }
 
 };
 
-static Lazy<TypeMetadataState> TypeMetadataRecords;
+static Lazy<TypeMetadataPrivateState> TypeMetadataRecords;
 
 static void
-_registerTypeMetadataRecords(TypeMetadataState &T,
+_registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
   ScopedLock guard(T.SectionsToScanLock);
@@ -243,7 +244,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
 // returns the nominal type descriptor for the type named by typeName
 static const TypeContextDescriptor *
-_searchTypeMetadataRecords(const TypeMetadataState &T,
+_searchTypeMetadataRecords(const TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = T.SectionsToScan.size();
@@ -333,22 +334,22 @@ namespace {
     }
   };
 
-  struct ProtocolMetadataState {
+  struct ProtocolMetadataPrivateState {
     ConcurrentMap<ProtocolDescriptorCacheEntry> ProtocolCache;
     std::vector<ProtocolSection> SectionsToScan;
     Mutex SectionsToScanLock;
 
-    ProtocolMetadataState() {
+    ProtocolMetadataPrivateState() {
       SectionsToScan.reserve(16);
       initializeProtocolLookup();
     }
   };
 
-  static Lazy<ProtocolMetadataState> Protocols;
+  static Lazy<ProtocolMetadataPrivateState> Protocols;
 }
 
 static void
-_registerProtocols(ProtocolMetadataState &C,
+_registerProtocols(ProtocolMetadataPrivateState &C,
                    const ProtocolRecord *begin,
                    const ProtocolRecord *end) {
   ScopedLock guard(C.SectionsToScanLock);
@@ -379,7 +380,7 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 }
 
 static const ProtocolDescriptor *
-_searchProtocolRecords(const ProtocolMetadataState &C,
+_searchProtocolRecords(const ProtocolMetadataPrivateState &C,
                        const llvm::StringRef protocolName){
   unsigned sectionIdx = 0;
   unsigned endSectionIdx = C.SectionsToScan.size();
@@ -847,7 +848,7 @@ public:
     auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
-    return accessFunction(allGenericArgs);
+    return accessFunction(MetadataState::Complete, allGenericArgs).Value;
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
@@ -926,9 +927,10 @@ public:
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
-    return swift_getTupleTypeMetadata(flags, elements.data(),
+    return swift_getTupleTypeMetadata(MetadataState::Complete,
+                                      flags, elements.data(),
                                       labels.empty() ? nullptr : labels.c_str(),
-                                      /*proposedWitnesses=*/nullptr);
+                                      /*proposedWitnesses=*/nullptr).Value;
   }
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
@@ -1015,19 +1017,18 @@ swift::_getTypeByMangledName(StringRef typeName,
       if (!assocTypeReqIndex) return nullptr;
 
       // Call the associated type access function.
-      using AssociatedTypeAccessFn =
-        const Metadata *(*)(const Metadata *base, const WitnessTable *);
-      return ((const AssociatedTypeAccessFn *)witnessTable)[*assocTypeReqIndex]
-                (base, witnessTable);
+      // TODO: can we just request abstract metadata?  If so, do we have
+      //   a responsibility to try to finish it later?
+      return ((const AssociatedTypeAccessFunction * const *)witnessTable)[*assocTypeReqIndex]
+                (MetadataState::Complete, base, witnessTable).Value;
     });
 
   auto type = Demangle::decodeMangledType(builder, node);
   return {type, builder.getReferenceOwnership()};
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
+static const Metadata * _Nullable
+swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
                            size_t numberOfLevels,
                            size_t *parametersPerLevel,
                            const Metadata * const *flatSubstitutions) {
@@ -1148,3 +1149,6 @@ void swift::swift_getFieldAt(
     }
   }
 }
+
+#define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

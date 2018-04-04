@@ -40,6 +40,7 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     Casting.cpp
+    CompatibilityOverride.cpp
     CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
@@ -64,6 +65,7 @@ set(swift_runtime_sources
     ProtocolConformance.cpp
     RefCount.cpp
     RuntimeInvocationsTracking.cpp
+    SwiftDtoa.cpp
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"

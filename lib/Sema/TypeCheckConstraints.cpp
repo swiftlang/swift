@@ -553,7 +553,7 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
       diagnose(Loc, diag::use_nonmatching_operator,
-               Name.getBaseName().getIdentifier(),
+               Name,
                UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
                UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
       return new (Context) ErrorExpr(UDRE->getSourceRange());
@@ -651,7 +651,7 @@ VarDecl *
 TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                    UnresolvedDotExpr *ctorRef) {
   // If the reference isn't to a constructor, we're done.
-  if (ctorRef->getName().getBaseName() != Context.Id_init)
+  if (ctorRef->getName().getBaseName() != DeclBaseName::createConstructor())
     return nullptr;
 
   if (auto ctorContext
@@ -824,7 +824,12 @@ namespace {
           TC.typeCheckDecl(capture.Var, true);
           TC.typeCheckDecl(capture.Var, false);
         }
-        return finish(true, expr);
+
+        // Since closure expression is contained by capture list
+        // let's handle it directly to avoid walking into capture
+        // list itself.
+        captureList->getClosureBody()->walk(*this);
+        return finish(false, expr);
       }
 
       // For closures, type-check the patterns and result type as written,
@@ -1049,7 +1054,8 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 }
 
 TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
-  if (!UDE->getName().isSimpleName())
+  if (!UDE->getName().isSimpleName() ||
+      UDE->getName().isSpecial())
     return nullptr;
 
   auto Name = UDE->getName().getBaseIdentifier();
@@ -1989,9 +1995,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Add type variable for the code-completion expression.
   auto tvRHS =
-      CS.createTypeVariable(CS.getConstraintLocator(CCE),
-                            TVO_CanBindToLValue |
-                            TVO_CanBindToInOut);
+      CS.createTypeVariable(CS.getConstraintLocator(CCE), TVO_CanBindToLValue);
   CCE->setType(tvRHS);
 
   if (auto generated = CS.generateConstraints(expr)) {
@@ -2130,7 +2134,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
     Expr *foundSolution(Solution &solution, Expr *expr) override {
       // Figure out what type the constraints decided on.
-      InitTypeAndInOut.setPointer(solution.simplifyType(InitTypeAndInOut.getPointer()));
+      auto ty = solution.simplifyType(InitTypeAndInOut.getPointer());
+      InitTypeAndInOut.setPointer(
+          ty->getRValueType()->reconstituteSugar(/*recursive =*/false));
       InitTypeAndInOut.setInt(expr->isSemanticallyInOutExpr());
 
       // Just keep going.
@@ -2222,6 +2228,11 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                             nullptr, TypeLoc())) {
       return true;
     }
+
+    // If we're performing an binding to a weak or unowned variable from a
+    // constructor call, emit a warning that the instance will be immediately
+    // deallocated.
+    diagnoseUnownedImmediateDeallocation(*this, pattern, initializer);
   }
 
   if (!resultTy && !initializer->getType())
@@ -2320,8 +2331,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      SequenceType =
-        cs.createTypeVariable(Locator, /*options=*/0);
+      SequenceType = cs.createTypeVariable(Locator);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
@@ -2394,7 +2404,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator, /*options=*/0);
+        elementType = cs.createTypeVariable(elementLocator);
       }
 
       // Add a conversion constraint between the element type of the sequence
@@ -2478,8 +2488,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
     // Newly allocated type should be explicitly materializable,
     // it's invalid to use non-materializable types as assignment destination.
-    auto objectTv = createTypeVariable(getConstraintLocator(dest),
-                                       /*options=*/0);
+    auto objectTv = createTypeVariable(getConstraintLocator(dest));
     auto refTv = LValueType::get(objectTv);
     addConstraint(ConstraintKind::Bind, typeVar, refTv,
                   getConstraintLocator(dest));
@@ -2703,8 +2712,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
           return Type();
 
         auto locator = cs.getConstraintLocator(nullptr);
-        auto replacement = cs.createTypeVariable(locator,
-                                                 TVO_CanBindToInOut);
+        auto replacement = cs.createTypeVariable(locator);
 
         if (auto superclass = archetypeType->getSuperclass()) {
           cs.addConstraint(ConstraintKind::Subtype, replacement,
@@ -2721,8 +2729,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       // FIXME: Remove this case
       assert(cast<GenericTypeParamType>(origType));
       auto locator = cs.getConstraintLocator(nullptr);
-      auto replacement = cs.createTypeVariable(locator,
-                                               TVO_CanBindToInOut);
+      auto replacement = cs.createTypeVariable(locator);
       types[origType] = replacement;
       return replacement;
     },
@@ -2813,25 +2820,6 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   auto kind = typeCheckCheckedCast(t1, t2, CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange());
   return (kind != CheckedCastKind::Unresolved);
-}
-
-bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
-                                     DeclContext *dc) {
-  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
-    return false;
-
-  if (auto superclass = archetype->getSuperclass()) {
-    if (!superclass->isExactSuperclassOf(type))
-      return false;
-  }
-
-  for (auto proto : archetype->getConformsTo()) {
-    if (!dc->getParentModule()->lookupConformance(
-          type, proto))
-      return false;
-  }
-
-  return true;
 }
 
 Expr *TypeChecker::coerceToRValue(Expr *expr,

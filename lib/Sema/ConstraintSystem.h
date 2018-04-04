@@ -84,7 +84,7 @@ public:
 };
 
 /// \brief A set of saved type variable bindings.
-typedef SmallVector<SavedTypeVariableBinding, 16> SavedTypeVariableBindings;
+using SavedTypeVariableBindings = SmallVector<SavedTypeVariableBinding, 16>;
 
 class ConstraintLocator;
 
@@ -547,9 +547,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
 /// Describes a dependent type that has been opened to a particular type
 /// variable.
-typedef std::pair<GenericTypeParamType *, TypeVariableType *> OpenedType;
+using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
-typedef llvm::DenseMap<GenericTypeParamType *, TypeVariableType *> OpenedTypeMap;
+using OpenedTypeMap =
+    llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
 
 /// \brief A complete solution to a constraint system.
 ///
@@ -789,7 +790,7 @@ struct SpecificConstraint {
 };
 
 /// An intrusive, doubly-linked list of constraints.
-typedef llvm::ilist<Constraint> ConstraintList;
+using ConstraintList = llvm::ilist<Constraint>;
 
 enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
@@ -805,7 +806,7 @@ enum class ConstraintSystemFlags {
 };
 
 /// Options that affect the constraint system as a whole.
-typedef OptionSet<ConstraintSystemFlags> ConstraintSystemOptions;
+using ConstraintSystemOptions = OptionSet<ConstraintSystemFlags>;
 
 /// This struct represents the results of a member lookup of
 struct MemberLookupResult {
@@ -1566,7 +1567,7 @@ public:
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options);
+                                       unsigned options = 0);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -1942,7 +1943,7 @@ public:
   };
 
   /// Options that govern how type matching should proceed.
-  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
+  using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
@@ -2031,8 +2032,7 @@ public:
   /// Call Expr::propagateLValueAccessKind on the given expression,
   /// using a custom accessor for the type on the expression that
   /// reads the type from the ConstraintSystem expression type map.
-  void propagateLValueAccessKind(Expr *E,
-                                 AccessKind accessKind,
+  void propagateLValueAccessKind(Expr *E, AccessKind accessKind, bool isShallow,
                                  bool allowOverwrite = false);
 
   /// Call Expr::isTypeReference on the given expression, using a
@@ -2198,7 +2198,7 @@ public:
   template <typename It>
   ArrayRef<typename std::iterator_traits<It>::value_type>
   allocateCopy(It start, It end) {
-    typedef typename std::iterator_traits<It>::value_type T;
+    using T = typename std::iterator_traits<It>::value_type;
     T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start), alignof(T));
     unsigned i;
     for (i = 0; start != end; ++start, ++i)
@@ -2666,7 +2666,7 @@ public:
 
 private:
   /// The kind of bindings that are permitted.
-  enum class AllowedBindingKind : unsigned char {
+  enum class AllowedBindingKind : uint8_t {
     /// Only the exact type.
     Exact,
     /// Supertypes of the specified type.
@@ -2676,7 +2676,7 @@ private:
   };
 
   /// The kind of literal binding found.
-  enum class LiteralBindingKind : unsigned char {
+  enum class LiteralBindingKind : uint8_t {
     None,
     Collection,
     Float,
@@ -2697,7 +2697,7 @@ private:
     ConstraintKind BindingSource;
 
     /// The defaulted protocol associated with this binding.
-    Optional<ProtocolDecl *> DefaultedProtocol;
+    ProtocolDecl *DefaultedProtocol;
 
     /// If this is a binding that comes from a \c Defaultable constraint,
     /// the locator of that constraint.
@@ -2705,7 +2705,7 @@ private:
 
     PotentialBinding(Type type, AllowedBindingKind kind,
                      ConstraintKind bindingSource,
-                     Optional<ProtocolDecl *> defaultedProtocol = None,
+                     ProtocolDecl *defaultedProtocol = nullptr,
                      ConstraintLocator *defaultableBinding = nullptr)
         : BindingType(type), Kind(kind), BindingSource(bindingSource),
           DefaultedProtocol(defaultedProtocol),
@@ -2715,8 +2715,8 @@ private:
   };
 
   struct PotentialBindings {
-    typedef std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>
-        BindingScore;
+    using BindingScore =
+        std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>;
 
     TypeVariableType *TypeVar;
 
@@ -2775,22 +2775,6 @@ private:
 
       if (x.FullyBound || x.SubtypeOfExistentialType)
         return false;
-
-      llvm::SmallPtrSet<Constraint *, 8> intersection(x.Sources);
-      llvm::set_intersect(intersection, y.Sources);
-
-      // Some relational constraints dictate certain
-      // ordering when it comes to attempting binding
-      // of type variables, where left-hand side is
-      // always more preferrable than right-hand side.
-      for (const auto *constraint : intersection) {
-        if (constraint->getKind() != ConstraintKind::Subtype)
-          continue;
-
-        auto lhs = constraint->getFirstType();
-        if (auto *typeVar = lhs->getAs<TypeVariableType>())
-          return x.TypeVar == typeVar;
-      }
 
       // If the only difference is default types,
       // prioritize bindings with fewer of them.
@@ -2856,7 +2840,7 @@ private:
                    }
                    if (binding.DefaultedProtocol)
                      out << "(default from "
-                         << (*binding.DefaultedProtocol)->getName() << ") ";
+                         << binding.DefaultedProtocol->getName() << ") ";
                    out << type.getString();
                  },
                  [&]() { out << "; "; });
@@ -2882,6 +2866,12 @@ private:
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
                                     bool *isNilLiteral = nullptr);
   Optional<PotentialBindings> determineBestBindings();
+  Optional<ConstraintSystem::PotentialBinding>
+  getPotentialBindingForRelationalConstraint(
+      PotentialBindings &result, Constraint *constraint,
+      bool &hasDependentMemberRelationalConstraints,
+      bool &hasNonDependentMemberRelationalConstraints,
+      bool &addOptionalSupertypeBindings);
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar);
 
   bool
@@ -3147,7 +3137,7 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a
 /// TinyPtrVector for unsigned values.
-typedef SmallVector<unsigned, 1> ParamBinding;
+using ParamBinding = SmallVector<unsigned, 1>;
 
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
@@ -3257,30 +3247,42 @@ public:
                     Constraint *choice)
       : CS(cs), Disjunction(disjunction), Choice(choice) {}
 
-  Constraint *operator&() const { return Choice; }
-
-  Constraint *getConstraint() const { return Choice; }
-
   Constraint *operator->() const { return Choice; }
 
   bool isDisabled() const { return Choice->isDisabled(); }
 
+  bool isUnavailable() const {
+    if (auto *decl = getDecl(Choice))
+      return decl->getAttrs().isUnavailable(decl->getASTContext());
+    return false;
+  }
+
   // FIXME: Both of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
 
-  bool isGenericOperatorOrUnavailable() const;
+  bool isGenericOperator() const;
   bool isSymmetricOperator() const;
 
   /// \brief Apply given choice to the system and try to solve it.
   Optional<Score> solve(SmallVectorImpl<Solution> &solutions,
                         FreeTypeVariableBinding allowFreeTypeVariables);
 
+  operator Constraint *() { return Choice; }
+
 private:
   /// \brief If associated disjunction is an explicit conversion,
   /// let's try to propagate its type early to prune search space.
   void propagateConversionInfo() const;
 
-  static ValueDecl *getOperatorDecl(Constraint *constraint) {
+  ValueDecl *getOperatorDecl() const {
+    auto *decl = getDecl(Choice);
+    if (!decl)
+      return nullptr;
+
+    return decl->isOperator() ? decl : nullptr;
+  }
+
+  static ValueDecl *getDecl(Constraint *constraint) {
     if (constraint->getKind() != ConstraintKind::BindOverload)
       return nullptr;
 
@@ -3288,8 +3290,7 @@ private:
     if (choice.getKind() != OverloadChoiceKind::Decl)
       return nullptr;
 
-    auto *decl = choice.getDecl();
-    return decl->isOperator() ? decl : nullptr;
+    return choice.getDecl();
   }
 };
 
@@ -3368,6 +3369,12 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 /// If the expression has the effect of a forced downcast, find the
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
+
+
+// Erases any opened existentials from the given expression.
+// Note: this may update the provided expr pointer.
+void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
+
 
 /// ExprCleaner - This class is used by shrink to ensure that in
 /// no situation will an expr node be left with a dangling type variable stuck

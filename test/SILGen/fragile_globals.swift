@@ -13,7 +13,7 @@ var mygg = 29
 
 // CHECK: sil_global private{{.*}} @globalinit_[[T3:.*]]_token0
 
-//@_inlineable
+//@inlinable
 public func sum() -> Int {
   return mygg + get_gg_a() + get_gg_b()
 }

@@ -19,7 +19,7 @@ extension UndoManager {
     fatalError("This API has been renamed")
   }
 
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func registerUndo<TargetType : AnyObject>(withTarget target: TargetType, handler: @escaping (TargetType) -> Void) {
     __NSUndoManagerRegisterWithTargetHandler( self, target) { internalTarget in
       handler(internalTarget as! TargetType)

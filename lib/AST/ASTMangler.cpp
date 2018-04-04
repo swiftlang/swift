@@ -503,6 +503,7 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   } else if (isa<AssociatedTypeDecl>(Decl)) {
     appendContextOf(Decl);
     appendDeclName(Decl);
+    appendOperator("Qa");
   } else {
     appendEntity(Decl);
   }
@@ -735,11 +736,14 @@ void ASTMangler::appendType(Type type) {
                             cast<BuiltinVectorType>(tybase)->getNumElements());
     case TypeKind::NameAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
-      auto NameAliasTy = cast<NameAliasType>(tybase);
-      TypeAliasDecl *decl = NameAliasTy->getDecl();
+      auto aliasTy = cast<NameAliasType>(tybase);
+
+      // It's not possible to mangle the context of the builtin module.
+      // FIXME: We also cannot yet mangle references to typealiases that
+      // involve generics.
+      TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-        // It's not possible to mangle the context of the builtin module.
-        return appendType(NameAliasTy->getSinglyDesugaredType());
+        return appendType(aliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,
@@ -1609,7 +1613,7 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
       else
         appendOperator("_");
     }
-  } else if (parameters.size() > 0) {
+  } else if (!parameters.empty()) {
     appendOperator("y");
   }
 
@@ -1724,10 +1728,20 @@ void ASTMangler::appendTypeList(Type listTy) {
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
                                        ParameterTypeFlags flags) {
   appendType(elementType->getInOutObjectType());
-  if (flags.isInOut())
+  switch (flags.getValueOwnership()) {
+  case ValueOwnership::Default:
+    /* nothing */
+    break;
+  case ValueOwnership::InOut:
     appendOperator("z");
-  if (flags.isShared())
+    break;
+  case ValueOwnership::Shared:
     appendOperator("h");
+    break;
+  case ValueOwnership::Owned:
+    appendOperator("n");
+    break;
+  }
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())

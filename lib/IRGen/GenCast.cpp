@@ -19,11 +19,12 @@
 #include "Explosion.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
-#include "GenMeta.h"
+#include "GenHeap.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "TypeInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -97,7 +98,6 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
     toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
   }
   // Emit a reference to the heap metadata for the target type.
-  const bool allowConservative = true;
 
   // If we're allowed to do a conservative check, try to just use the
   // global class symbol.  If the class has been re-allocated, this
@@ -105,16 +105,16 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // test might fail; but it's a much faster check.
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
-  if (allowConservative &&
-      (targetMetadata =
-        tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
-                                       /*allowUninitialized*/ true))) {
+  if ((targetMetadata =
+           tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
+                                          /*allowUninitialized*/ false))) {
     // ok
   } else {
     targetMetadata
       = emitClassHeapMetadataRef(IGF, toType.getSwiftRValueType(),
                                  MetadataValueType::ObjCClass,
-                                 /*allowUninitialized*/ allowConservative);
+                                 MetadataState::Complete,
+                                 /*allowUninitialized*/ false);
   }
 
   // Handle checking a metatype object's type by directly comparing the address
@@ -247,7 +247,8 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
 
     // Get the ObjC metadata for the type we're checking.
     toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType(),
-                                          MetadataValueType::ObjCClass);
+                                          MetadataValueType::ObjCClass,
+                                          MetadataState::Complete);
     switch (mode) {
     case CheckedCastMode::Unconditional:
       castFn = IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFn();

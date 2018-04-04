@@ -63,32 +63,40 @@ class C<T> : B {}
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMa"
 //   Superclass.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1BCMn"
+//   Negative size in words.
+// CHECK-SAME: i32 2,
+//   Positive size in words.
+// CHECK-32-SAME: i32 15,
+// CHECK-64-SAME: i32 12,
+//   Num immediate members.
+// CHECK-32-SAME: i32 1,
 //   Field count.
 // CHECK-SAME: i32 0,
 //   Field offset vector offset.
 // CHECK-32-SAME: i32 15,
 // CHECK-64-SAME: i32 12,
-//   Argument offset.
-// CHECK-32-SAME: i32 14,
-// CHECK-64-SAME: i32 11,
-//   Instantiation function.
-// CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMi"
 //   Instantiation cache.
 // CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMI"
+//   Instantiation pattern.
+// CHECK-SAME: i32 {{.*}} @"$S14class_metadata1CCMP"
 //   Generic parameter count.
-// CHECK-SAME: i32 1,
+// CHECK-SAME: i16 1,
 //   Generic requirement count.
-// CHECK-SAME: i32 0,
+// CHECK-SAME: i16 0,
 //   Key generic arguments count.
-// CHECK-SAME: i32 1,
+// CHECK-SAME: i16 1,
 //   Extra generic arguments count.
-// CHECK-SAME: i32 0,
+// CHECK-SAME: i16 0,
 //   Generic parameter descriptor #1: flags. -128 == 0x80 == Key
 // CHECK-SAME: i8 -128,
 ///  Padding.
 // CHECK-SAME: i8 0,
 // CHECK-SAME: i8 0,
 // CHECK-SAME: i8 0 }>, section
+
+// CHECK-LABEL: @"$S14class_metadata1CCMP" =
+//   Instantiation function.
+// CHECK-SAME:  i32 {{.*}} @"$S14class_metadata1CCMi"
 
 // For stupid reasons, when we declare the superclass after the subclass,
 // we end up using an indirect reference to the nominal type descriptor.

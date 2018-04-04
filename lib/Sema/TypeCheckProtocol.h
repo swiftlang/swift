@@ -115,13 +115,12 @@ struct InferredAssociatedTypesByWitness {
 
 /// The set of witnesses that were considered when attempting to
 /// infer associated types.
-typedef SmallVector<InferredAssociatedTypesByWitness, 2>
-  InferredAssociatedTypesByWitnesses;
+using InferredAssociatedTypesByWitnesses =
+    SmallVector<InferredAssociatedTypesByWitness, 2>;
 
 /// A mapping from requirements to the set of matches with witnesses.
-typedef SmallVector<std::pair<ValueDecl *,
-                              InferredAssociatedTypesByWitnesses>, 4>
-  InferredAssociatedTypes;
+using InferredAssociatedTypes =
+    SmallVector<std::pair<ValueDecl *, InferredAssociatedTypesByWitnesses>, 4>;
 
 /// A potential solution to the set of inferred type witnesses.
 struct InferredTypeWitnessesSolution {
@@ -148,7 +147,7 @@ class RequirementEnvironment;
 
 /// \brief The result of matching a particular declaration to a given
 /// requirement.
-enum class MatchKind : unsigned char {
+enum class MatchKind : uint8_t {
   /// \brief The witness matched the requirement exactly.
   ExactMatch,
 
@@ -552,6 +551,11 @@ class ConformanceChecker : public WitnessChecker {
   /// Record that the given requirement has no valid witness.
   void recordInvalidWitness(ValueDecl *requirement);
 
+  /// Check for ill-formed uses of Objective-C generics in a type witness.
+  bool checkObjCTypeErasedGenerics(AssociatedTypeDecl *assocType,
+                                   Type type,
+                                   TypeDecl *typeDecl);
+
   /// Record a type witness.
   ///
   /// \param assocType The associated type whose witness is being recorded.
@@ -811,8 +815,8 @@ private:
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
-  typedef std::vector<std::pair<AssociatedTypeDecl *, Type>>
-    InferredTypeWitnesses;
+  using InferredTypeWitnesses =
+      std::vector<std::pair<AssociatedTypeDecl *, Type>>;
 
   /// Perform associated type inference.
   ///
@@ -846,6 +850,13 @@ RequirementMatch matchWitness(TypeChecker &tc,
 /// the given protocol, return the referenced associated type.
 AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
                                                      ProtocolDecl *proto);
+
+/// Perform any necessary adjustments to the inferred associated type to
+/// make it suitable for later use.
+///
+/// \param noescapeToEscaping Will be set \c true if this operation performed
+/// the noescape-to-escaping adjustment.
+Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
 
 }
 

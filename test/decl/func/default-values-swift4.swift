@@ -7,7 +7,7 @@ fileprivate func fileprivateFunction() {}
 // expected-note@-1 4{{global function 'fileprivateFunction()' is not public}}
 func internalFunction() {}
 // expected-note@-1 4{{global function 'internalFunction()' is not public}}
-@_versioned func versionedFunction() {}
+@usableFromInline func versionedFunction() {}
 public func publicFunction() {}
 
 func internalIntFunction() -> Int {}
@@ -33,7 +33,7 @@ func internalFunctionWithDefaultValue(
     }(),
     y: Int = internalIntFunction()) {}
 
-@_versioned func versionedFunctionWithDefaultValue(
+@usableFromInline func versionedFunctionWithDefaultValue(
     x: Int = {
       struct Nested {}
       // expected-error@-1 {{type 'Nested' cannot be nested inside a default argument value}}

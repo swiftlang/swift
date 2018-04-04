@@ -18,6 +18,10 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <mach-o/getsect.h>
+#endif
+
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -30,6 +34,32 @@
 #include <set>
 #include <vector>
 #include <unordered_map>
+#include <utility>
+
+#if defined(__APPLE__) && defined(__MACH__)
+#ifndef __LP64__
+using MachHeader = const struct mach_header;
+#else
+using MachHeader = const struct mach_header_64;
+#endif
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+template <typename Section>
+static std::pair<Section, bool> findSection(MachHeader *Header,
+                                            const char *Name) {
+  unsigned long Size;
+  auto Address = getsectiondata(Header, "__TEXT", Name, &Size);
+  if (!Address)
+    return {{nullptr, nullptr}, false};
+
+  auto End = reinterpret_cast<uintptr_t>(Address) + Size;
+
+  return {{reinterpret_cast<const void *>(Address),
+           reinterpret_cast<const void *>(End)},
+          true};
+}
+#endif
 
 namespace swift {
 namespace reflection {
@@ -45,6 +75,11 @@ class ReflectionContext
   using super::readObjCClassName;
 
   std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
+
+  /// All buffers we need to keep around long term. This will automatically free them
+  /// when this object is destroyed.
+  std::vector<MemoryReader::ReadBytesResult> savedBuffers;
+  std::vector<std::tuple<RemoteAddress, RemoteAddress>> imageRanges;
 
 public:
   using super::getBuilder;
@@ -62,7 +97,7 @@ public:
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
-
+  
   MemoryReader &getReader() {
     return *this->Reader;
   }
@@ -76,10 +111,111 @@ public:
     getBuilder().dumpAllSections();
   }
 
+#if defined(__APPLE__) && defined(__MACH__)
+  bool addImage(RemoteAddress ImageStart) {
+    auto Buf = this->getReader().readBytes(ImageStart, sizeof(MachHeader));
+    if (!Buf)
+      return false;
+
+    auto Header = reinterpret_cast<MachHeader *>(Buf.get());
+    if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
+      return false;
+    }
+    auto Length = Header->sizeofcmds;
+
+    // Read the commands.
+    Buf = this->getReader().readBytes(ImageStart, Length);
+    if (!Buf)
+      return false;
+
+    // Find the TEXT segment and figure out where the end is.
+    Header = reinterpret_cast<MachHeader *>(Buf.get());
+    unsigned long TextSize;
+    auto *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
+    if (TextSegment == nullptr)
+      return false;
+    
+    auto TextEnd =
+        TextSegment - reinterpret_cast<const uint8_t *>(Buf.get()) + TextSize;
+
+    // Read everything including the TEXT segment.
+    Buf = this->getReader().readBytes(ImageStart, TextEnd);
+    if (!Buf)
+      return false;
+
+    // Read all the metadata parts.
+    Header = reinterpret_cast<MachHeader *>(Buf.get());
+
+    // The docs say "not all sections may be present." We'll succeed if ANY of
+    // them are present. Not sure if that's the right thing to do.
+    auto FieldMd = findSection<FieldSection>(Header, "__swift4_fieldmd");
+    auto AssocTyMd =
+        findSection<AssociatedTypeSection>(Header, "__swift4_assocty");
+    auto BuiltinTyMd =
+        findSection<BuiltinTypeSection>(Header, "__swift4_builtin");
+    auto CaptureMd = findSection<CaptureSection>(Header, "__swift4_capture");
+    auto TyperefMd = findSection<GenericSection>(Header, "__swift4_typeref");
+    auto ReflStrMd = findSection<GenericSection>(Header, "__swift4_reflstr");
+
+    bool success = FieldMd.second || AssocTyMd.second || BuiltinTyMd.second ||
+                   CaptureMd.second || TyperefMd.second || ReflStrMd.second;
+    if (!success)
+      return false;
+
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
+    auto RemoteStartAddress = static_cast<uintptr_t>(ImageStart.getAddressData());
+
+    ReflectionInfo info = {
+        {{FieldMd.first.startAddress(), FieldMd.first.endAddress()}, 0},
+        {{AssocTyMd.first.startAddress(), AssocTyMd.first.endAddress()}, 0},
+        {{BuiltinTyMd.first.startAddress(), BuiltinTyMd.first.endAddress()}, 0},
+        {{CaptureMd.first.startAddress(), CaptureMd.first.endAddress()}, 0},
+        {{TyperefMd.first.startAddress(), TyperefMd.first.endAddress()}, 0},
+        {{ReflStrMd.first.startAddress(), ReflStrMd.first.endAddress()}, 0},
+        LocalStartAddress,
+        RemoteStartAddress};
+
+    this->addReflectionInfo(info);
+
+    unsigned long DataSize;
+    auto *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
+    if (DataSegment != nullptr) {
+      auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf.get())
+                            + ImageStart.getAddressData();
+      auto DataSegmentEnd = DataSegmentStart + DataSize;
+      imageRanges.push_back(std::make_tuple(ImageStart, RemoteAddress(DataSegmentEnd)));
+    }
+    
+    savedBuffers.push_back(std::move(Buf));
+
+    return true;
+  }
+#endif // defined(__APPLE__) && defined(__MACH__)
+  
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
-
+  
+  bool ownsObject(RemoteAddress ObjectAddress) {
+    auto MetadataAddress = readMetadataFromInstance(ObjectAddress.getAddressData());
+    if (!MetadataAddress)
+      return true;
+    return ownsAddress(RemoteAddress(*MetadataAddress));
+  }
+  
+  /// Returns true if the address falls within a registered image.
+  bool ownsAddress(RemoteAddress Address) {
+    for (auto Range : imageRanges) {
+      auto Start = std::get<0>(Range);
+      auto End = std::get<1>(Range);
+      if (Start.getAddressData() <= Address.getAddressData()
+          && Address.getAddressData() < End.getAddressData())
+        return true;
+    }
+  
+    return false;
+  }
+  
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
   const TypeInfo *getMetadataTypeInfo(StoredPointer MetadataAddress) {

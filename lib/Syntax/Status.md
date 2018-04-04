@@ -65,17 +65,14 @@
   * SubscriptDecl
   * ConstructorDecl
   * DestructorDecl
-
-### In-progress (UnknownDecl):
+  * EnumDecl
+  * EnumCaseDecl
 
 ### Not-started (UnknownDecl):
-  * EnumCaseDecl
   * PrecedenceGroupDecl
   * InfixOperatorDecl
   * PrefixOperatorDecl
   * PostfixOperatorDecl
-  * EnumDecl
-  * EnumElementDecl
 
 ## Statement
 ### Done:
@@ -92,8 +89,6 @@
   * GuardStmt
   * WhileStmt
   * ForInStmt
-
-### Not-started (UnknownStmt):
   * SwitchStmt
 
 ## Pattern

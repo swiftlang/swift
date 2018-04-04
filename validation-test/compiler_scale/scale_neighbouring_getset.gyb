@@ -1,4 +1,4 @@
-// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select typeCheckAbstractFunctionBody %s
+// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select NumFunctionsTypechecked %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

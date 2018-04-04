@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name extensions_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
 //
 // REQUIRES: objc_interop
 
@@ -12,15 +13,13 @@ extension Foo {
 }
 
 // CHECK-LABEL: sil hidden @$S15extensions_objc19extensionReferencesyyAA3FooCF
-// CHECK: bb0([[ARG:%.*]] : @owned $Foo):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo):
 func extensionReferences(_ x: Foo) {
   // dynamic extension methods are still dynamically dispatched.
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: objc_method [[BORROWED_ARG]] : $Foo, #Foo.kay!1.foreign
+  // CHECK: objc_method [[ARG]] : $Foo, #Foo.kay!1.foreign
   x.kay()
 
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: objc_method [[BORROWED_ARG]] : $Foo, #Foo.cox!getter.1.foreign
+  // CHECK: objc_method [[ARG]] : $Foo, #Foo.cox!getter.1.foreign
   _ = x.cox
 
 }

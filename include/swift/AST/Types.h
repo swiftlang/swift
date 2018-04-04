@@ -290,7 +290,7 @@ protected:
     HasCachedType : 1
   );
 
-  enum { NumFlagBits = 5 };
+  enum { NumFlagBits = 8 };
   SWIFT_INLINE_BITFIELD(ParenType, SugarType, NumFlagBits,
     /// Whether there is an original type.
     Flags : NumFlagBits
@@ -371,6 +371,16 @@ protected:
 
     /// The number of generic arguments.
     GenericArgCount : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+16,
+    : NumPadBits,
+
+    /// Whether we have a parent type.
+    HasParent : 1,
+
+    /// The number of substitutions.
+    NumSubstitutions : 16
   );
 
   } Bits;
@@ -553,6 +563,11 @@ public:
   /// underlying type.
   Type eraseDynamicSelfType();
 
+  /// Given a declaration context, returns a function type with the 'self'
+  /// type curried as the input if the declaration context describes a type.
+  /// Otherwise, returns the type itself.
+  Type addCurriedSelfType(const DeclContext *dc);
+
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext();
 
@@ -672,9 +687,24 @@ public:
   ///
   /// A type is SIL-illegal if it is:
   ///   - an l-value type,
-  ///   - an AST function type (i.e. subclasses of AnyFunctionType), or
+  ///   - a metatype without a representation,
+  ///   - an AST function type (i.e. subclasses of AnyFunctionType),
+  ///   - an optional whose object type is SIL-illegal, or
   ///   - a tuple type with a SIL-illegal element type.
   bool isLegalSILType();
+
+  /// \brief Determine whether this type is a legal formal type.
+  ///
+  /// A type is illegal as a formal type if it is:
+  ///   - an l-value type,
+  ///   - a reference storage type,
+  ///   - a metatype with a representation,
+  ///   - a lowered function type (i.e. SILFunctionType),
+  ///   - an optional whose object type is not a formal type, or
+  ///   - a tuple type with an element that is not a formal type.
+  ///
+  /// These are the types of the Swift type system.
+  bool isLegalFormalType();
 
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
@@ -997,11 +1027,6 @@ public:
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
-
-  /// Return T if this type is Optional<T>; otherwise, return the null
-  /// type. Set \p kind to OTK_Optional if it is an optional, OTK_None
-  /// otherwise.
-  Type getOptionalObjectType(bool &isOptional);
 
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
@@ -1507,8 +1532,8 @@ protected:
   SugarType(TypeKind K, const ASTContext *ctx,
             RecursiveTypeProperties properties)
       : TypeBase(K, nullptr, properties), Context(ctx) {
-    if (K != TypeKind::NameAlias)
-      assert(ctx != nullptr && "Context for SugarType should not be null");
+    assert(ctx != nullptr &&
+           "Context for SugarType should not be null");
     Bits.SugarType.HasCachedType = false;
   }
 
@@ -1543,22 +1568,88 @@ public:
   }
 };
 
-/// NameAliasType - An alias type is a name for another type, just like a
-/// typedef in C.
-class NameAliasType : public SugarType {
-  friend class TypeAliasDecl;
-  // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) 
-    : SugarType(TypeKind::NameAlias, (ASTContext*)nullptr,
-                RecursiveTypeProperties()),
-      TheDecl(d) {}
-  TypeAliasDecl *const TheDecl;
+/// A reference to a type alias that is somehow generic, along with the
+/// set of substitutions to apply to make the type concrete.
+class NameAliasType final
+  : public SugarType, public llvm::FoldingSetNode,
+    llvm::TrailingObjects<NameAliasType, Type, GenericSignature *,
+                          Substitution>
+{
+  TypeAliasDecl *typealias;
+
+  friend class ASTContext;
+  friend TrailingObjects;
+
+  NameAliasType(TypeAliasDecl *typealias, Type parent,
+                     const SubstitutionMap &substitutions, Type underlying,
+                     RecursiveTypeProperties properties);
+
+  unsigned getNumSubstitutions() const {
+    return Bits.NameAliasType.NumSubstitutions;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return Bits.NameAliasType.HasParent ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericSignature *>) const {
+    return getNumSubstitutions() > 0 ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Substitution>) const {
+    return getNumSubstitutions();
+  }
+
+  /// Retrieve the set of substitutions to be applied to the declaration to
+  /// produce the underlying type.
+  SubstitutionList getSubstitutionList() const {
+    return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
+  }
+
+  /// Retrieve the generic signature used for substitutions.
+  GenericSignature *getGenericSignature() const {
+    return getNumSubstitutions() > 0
+             ? *getTrailingObjects<GenericSignature *>()
+             : nullptr;
+  }
 
 public:
-  TypeAliasDecl *getDecl() const { return TheDecl; }
+  static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
+                                 const SubstitutionMap &substitutions,
+                                 Type underlying);
 
-  using TypeBase::setRecursiveProperties;
-   
+  /// \brief Returns the declaration that declares this type.
+  TypeAliasDecl *getDecl() const {
+    // Avoid requiring the definition of TypeAliasDecl.
+    return typealias;
+  }
+
+  /// Retrieve the parent of this type as written, e.g., the part that was
+  /// written before ".", if provided.
+  Type getParent() const {
+    return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
+                                             : Type();
+  }
+
+  /// Retrieve the substitution map applied to the declaration's underlying
+  /// to produce the described type.
+  SubstitutionMap getSubstitutionMap() const;
+
+  /// Get the innermost generic arguments, which correspond to the generic
+  /// arguments that are directly applied to the typealias declaration in
+  /// produced by \c getDecl().
+  ///
+  /// The result can be empty, if the declaration itself is non-generic but
+  /// the parent is generic.
+  SmallVector<Type, 2> getInnermostGenericArgs() const;
+
+  // Support for FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
+                      Type parent, const SubstitutionMap &substitutions,
+                      Type underlying);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
@@ -1580,8 +1671,9 @@ class ParameterTypeFlags {
     Escaping    = 1 << 2,
     InOut       = 1 << 3,
     Shared      = 1 << 4,
+    Owned       = 1 << 5,
 
-    NumBits = 5
+    NumBits = 6
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1599,7 +1691,8 @@ public:
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
               (ownership == ValueOwnership::InOut ? InOut : 0) |
-              (ownership == ValueOwnership::Shared ? Shared : 0)) {}
+              (ownership == ValueOwnership::Shared ? Shared : 0) |
+              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
@@ -1611,12 +1704,15 @@ public:
   bool isEscaping() const { return value.contains(Escaping); }
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
+  bool isOwned() const { return value.contains(Owned); }
 
   ValueOwnership getValueOwnership() const {
     if (isInOut())
       return ValueOwnership::InOut;
     else if (isShared())
       return ValueOwnership::Shared;
+    else if (isOwned())
+      return ValueOwnership::Owned;
 
     return ValueOwnership::Default;
   }
@@ -1639,6 +1735,11 @@ public:
   ParameterTypeFlags withShared(bool isShared) const {
     return ParameterTypeFlags(isShared ? value | ParameterTypeFlags::Shared
                                        : value - ParameterTypeFlags::Shared);
+  }
+
+  ParameterTypeFlags withOwned(bool isOwned) const {
+    return ParameterTypeFlags(isOwned ? value | ParameterTypeFlags::Owned
+                                      : value - ParameterTypeFlags::Owned);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2357,7 +2458,7 @@ BEGIN_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
 
 /// A language-level calling convention.
-enum class SILFunctionLanguage : unsigned char {
+enum class SILFunctionLanguage : uint8_t {
   /// A variation of the Swift calling convention.
   Swift = 0,
 
@@ -2530,6 +2631,9 @@ public:
     
     /// Whether the parameter is marked 'shared'
     bool isShared() const { return Flags.isShared(); }
+
+    /// Whether the parameter is marked 'owned'
+    bool isOwned() const { return Flags.isOwned(); }
   };
 
   class CanParam : public Param {

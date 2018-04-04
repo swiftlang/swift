@@ -50,12 +50,11 @@ public:
     // EnumMetadata header.
     asImpl().addNominalTypeDescriptor();
 
-    // If changing this layout, you must update the magic number in
-    // emitParentMetadataRef.
+    // Everything after this is type-specific.
+    asImpl().noteStartOfTypeSpecificMembers();
 
-    // Instantiation-specific.
-
-    // Add fields for generic cases.
+    // Generic arguments.
+    // This must always be the first piece of trailing data.
     asImpl().addGenericFields(Target, Target->getDeclaredTypeInContext());
 
     // Reserve a word to cache the payload size if the type has dynamic layout.
@@ -71,7 +70,8 @@ public:
 /// pointer-sized chunks) into the metadata for the next field.
 template <class Impl>
 class EnumMetadataScanner : public EnumMetadataVisitor<Impl> {
-  typedef EnumMetadataVisitor<Impl> super;
+  using super = EnumMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 
@@ -87,6 +87,7 @@ public:
     addPointer();
   }
   void addPayloadSize() { addPointer(); }
+  void noteStartOfTypeSpecificMembers() {}
 
 private:
   void addPointer() {

@@ -12,7 +12,7 @@ class C {
   }
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=3:1 -end-pos=5:13 >> %t.result/L3-5.swift
 // RUN: diff -u %S/Outputs/static/L3-5.swift.expected %t.result/L3-5.swift
 // RUN: %refactor -extract-function -source-filename %s -pos=9:1 -end-pos=11:13 >> %t.result/L9-11.swift

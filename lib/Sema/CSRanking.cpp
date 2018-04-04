@@ -254,27 +254,6 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
   return {SelfTypeRelationship::ConformsTo, conformance};
 }
 
-// Given a type and a declaration context, return a type with a curried
-// 'self' type as input if the declaration context describes a type.
-static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
-  if (!dc->isTypeContext())
-    return type;
-
-  GenericSignature *sig = dc->getGenericSignatureOfContext();
-  if (auto *genericFn = type->getAs<GenericFunctionType>()) {
-    sig = genericFn->getGenericSignature();
-    type = FunctionType::get(genericFn->getInput(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
-  }
-
-  auto selfTy = dc->getDeclaredInterfaceType();
-  if (sig)
-    return GenericFunctionType::get(sig, selfTy, type,
-                                    AnyFunctionType::ExtInfo());
-  return FunctionType::get(selfTy, type);
-}
-
 /// \brief Given two generic function declarations, signal if the first is more
 /// "constrained" than the second by comparing the number of constraints
 /// applied to each type parameter.
@@ -384,6 +363,21 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
   return param.getType();
 }
 
+// Is a particular parameter of a function or subscript declaration
+// declared to be an IUO?
+static bool paramIsIUO(Decl *decl, int paramNum) {
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    auto *paramList =
+        fn->getParameterList(fn->getDeclContext()->isTypeContext());
+    auto *param = paramList->get(paramNum);
+    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  }
+
+  auto *subscript = cast<SubscriptDecl>(decl);
+  auto *index = subscript->getIndices()->get(paramNum);
+  return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -465,8 +459,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         }
       } else {
         // Add a curried 'self' type.
-        type1 = addCurriedSelfType(tc.Context, type1, outerDC1);
-        type2 = addCurriedSelfType(tc.Context, type2, outerDC2);
+        type1 = type1->addCurriedSelfType(outerDC1);
+        type2 = type2->addCurriedSelfType(outerDC2);
 
         // For a subscript declaration, only look at the input type (i.e., the
         // indices).
@@ -675,6 +669,17 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             fewerEffectiveParameters = true;
             continue;
           }
+
+          // Emulate behavior from when IUO was a type, where IUOs
+          // were considered subtypes of plain optionals, but not
+          // vice-versa.  This wouldn't normally happen, but there are
+          // cases where we can rename imported APIs so that we have a
+          // name collision, and where the parameter type(s) are the
+          // same except for details of the kind of optional declared.
+          auto param1IsIUO = paramIsIUO(decl1, param1);
+          auto param2IsIUO = paramIsIUO(decl2, param2);
+          if (param2IsIUO && !param1IsIUO)
+            return false;
 
           if (!maybeAddSubtypeConstraint(params1[param1], params2[param2]))
             return false;
@@ -1007,31 +1012,13 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // Compare the type variable bindings.
   auto &tc = cs.getTypeChecker();
   for (auto &binding : diff.typeBindings) {
-    auto type1 = binding.bindings[idx1];
-    auto type2 = binding.bindings[idx2];
-
-    auto &impl = binding.typeVar->getImpl();
-
-    if (auto *locator = impl.getLocator()) {
-      auto path = locator->getPath();
-      if (!path.empty() &&
-          path.back().getKind() == ConstraintLocator::ClosureResult) {
-        // Since we support `() -> T` to `() -> Void` and
-        // `() -> Never` to `() -> T` conversions, it's always
-        // preferable to pick `T` rather than `Never` with
-        // all else being equal.
-        if (type2->isUninhabited())
-          ++score1;
-
-        if (type1->isUninhabited())
-          ++score2;
-      }
-    }
-
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
-    if (!impl.prefersSubtypeBinding())
+    if (!binding.typeVar->getImpl().prefersSubtypeBinding())
       continue;
+
+    auto type1 = binding.bindings[idx1];
+    auto type2 = binding.bindings[idx2];
 
     // If the types are equivalent, there's nothing more to do.
     if (type1->isEqual(type2))

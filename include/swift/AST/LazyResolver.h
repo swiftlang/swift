@@ -90,6 +90,16 @@ public:
   /// considered to be members of the extended type.
   virtual void resolveExtension(ExtensionDecl *ext) = 0;
 
+  using ConformanceConstructionInfo = std::pair<SourceLoc, ProtocolDecl *>;
+  /// Resolve enough of an extension to find which protocols it is declaring
+  /// conformance to.
+  ///
+  /// This can be called to ensure that the "extension Foo: Bar, Baz" part of
+  /// the extension is understood.
+  virtual void resolveExtensionForConformanceConstruction(
+      ExtensionDecl *ext,
+      SmallVectorImpl<ConformanceConstructionInfo> &protocols) = 0;
+
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
 
@@ -99,71 +109,6 @@ public:
   /// Mark the given conformance as "used" from the given declaration context.
   virtual void markConformanceUsed(ProtocolConformanceRef conformance,
                                    DeclContext *dc) = 0;
-};
-
-/// An implementation of LazyResolver that delegates to another.
-class DelegatingLazyResolver : public LazyResolver {
-protected:
-  LazyResolver &Principal;
-public:
-  DelegatingLazyResolver(LazyResolver &principal) : Principal(principal) {}
-  ~DelegatingLazyResolver(); // v-table anchor
-
-  void resolveTypeWitness(const NormalProtocolConformance *conformance,
-                          AssociatedTypeDecl *assocType) override {
-    Principal.resolveTypeWitness(conformance, assocType);
-  }
-
-  void resolveWitness(const NormalProtocolConformance *conformance,
-                      ValueDecl *requirement) override {
-    Principal.resolveWitness(conformance, requirement);
-  }
-
-  void resolveAccessControl(ValueDecl *VD) override {
-    Principal.resolveAccessControl(VD);
-  }
-
-  void resolveDeclSignature(ValueDecl *VD) override {
-    Principal.resolveDeclSignature(VD);
-  }
-
-  void resolveInheritanceClause(
-                llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) override {
-    Principal.resolveInheritanceClause(decl);
-  }
-
-  void resolveSuperclass(ClassDecl *classDecl) override {
-    Principal.resolveSuperclass(classDecl);
-  }
-
-  void resolveRawType(EnumDecl *enumDecl) override {
-    Principal.resolveRawType(enumDecl);
-  }
-
-  void resolveInheritedProtocols(ProtocolDecl *protocol) override {
-    Principal.resolveInheritedProtocols(protocol);
-  }
-
-  void bindExtension(ExtensionDecl *ext) override {
-    Principal.bindExtension(ext);
-  }
-
-  void resolveExtension(ExtensionDecl *ext) override {
-    Principal.resolveExtension(ext);
-  }
-
-  void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
-    Principal.resolveImplicitConstructors(nominal);
-  }
-
-  void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) override {
-    Principal.resolveImplicitMember(nominal, member);
-  }
-
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override {
-    return Principal.markConformanceUsed(conformance, dc);
-  }
 };
 
 class LazyMemberLoader;

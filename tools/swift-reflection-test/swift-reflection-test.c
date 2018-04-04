@@ -29,16 +29,16 @@
 #include <string.h>
 #include <unistd.h>
 
+typedef struct PipeMemoryReader {
+  int to_child[2];
+  int from_child[2];
+} PipeMemoryReader;
+
 typedef struct RemoteSection {
   uintptr_t StartAddress;
   uintptr_t Size;
   uintptr_t EndAddress;
 } RemoteSection;
-
-typedef struct PipeMemoryReader {
-  int to_child[2];
-  int from_child[2];
-} PipeMemoryReader;
 
 typedef struct RemoteReflectionInfo {
   RemoteSection fieldmd;
@@ -161,11 +161,6 @@ uint8_t PipeMemoryReader_getPointerSize(void *Context) {
 }
 
 static
-uint8_t PipeMemoryReader_getSizeSize(void *Context) {
-  return sizeof(size_t);
-}
-
-static
 void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
                                            void *Dest, size_t Size) {
   int ReadFD = PipeMemoryReader_getParentReadFD(Reader);
@@ -183,9 +178,34 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
   }
 }
 
+static int PipeMemoryReader_queryDataLayout(void *Context,
+                                             DataLayoutQueryType type,
+                                             void *inBuffer, void *outBuffer) {
+  switch (type) {
+    case DLQ_GetPointerSize: {
+      uint8_t *result = (uint8_t *)outBuffer;
+      *result = sizeof(void *);
+      return 1;
+    }
+    case DLQ_GetSizeSize: {
+      uint8_t *result = (uint8_t *)outBuffer;
+      *result = sizeof(size_t);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+static void PipeMemoryReader_freeBytes(void *reader_context, const void *bytes,
+                                       void *context) {
+  free((void *)bytes);
+}
+
 static
-int PipeMemoryReader_readBytes(void *Context, swift_addr_t Address, void *Dest,
-                               uint64_t Size) {
+const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
+                                       uint64_t Size,
+                                       void **outFreeContext) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
   size_t TargetSize = (size_t)Size;
@@ -193,8 +213,13 @@ int PipeMemoryReader_readBytes(void *Context, swift_addr_t Address, void *Dest,
   write(WriteFD, REQUEST_READ_BYTES, 2);
   write(WriteFD, &TargetAddress, sizeof(TargetAddress));
   write(WriteFD, &TargetSize, sizeof(size_t));
-  PipeMemoryReader_collectBytesFromPipe(Reader, Dest, Size);
-  return 1;
+  
+  void *Buf = malloc(Size);
+  PipeMemoryReader_collectBytesFromPipe(Reader, Buf, Size);
+  
+  *outFreeContext = NULL;
+  
+  return Buf;
 }
 
 static
@@ -258,6 +283,32 @@ RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
   RemoteSection RS = {Start, Size, Start + Size};
   return RS;
 }
+
+#if defined(__APPLE__) && defined(__MACH__)
+static void
+PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
+                                       const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_IMAGES, 2);
+  size_t NumReflectionInfos;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &NumReflectionInfos,
+                                        sizeof(NumReflectionInfos));
+
+  if (NumReflectionInfos == 0)
+    return;
+  
+  struct { uintptr_t Start, Size; } *Images;
+  Images = calloc(NumReflectionInfos, sizeof(*Images));
+  PipeMemoryReader_collectBytesFromPipe(Reader, Images,
+                                        NumReflectionInfos * sizeof(*Images));
+  
+  for (size_t i = 0; i < NumReflectionInfos; ++i) {
+    swift_reflection_addImage(RC, Images[i].Start);
+  }
+  
+  free(Images);
+}
+#endif
 
 static void
 PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
@@ -406,19 +457,22 @@ int doDumpHeapInstance(const char *BinaryFilename) {
     default: { // Parent
       close(PipeMemoryReader_getChildReadFD(&Pipe));
       close(PipeMemoryReader_getChildWriteFD(&Pipe));
-      SwiftReflectionContextRef RC = swift_reflection_createReflectionContext(
-        (void*)&Pipe,
-        PipeMemoryReader_getPointerSize,
-        PipeMemoryReader_getSizeSize,
-        PipeMemoryReader_readBytes,
-        PipeMemoryReader_getStringLength,
-        PipeMemoryReader_getSymbolAddress);
+      SwiftReflectionContextRef RC =
+          swift_reflection_createReflectionContextWithDataLayout(
+              (void *)&Pipe, PipeMemoryReader_queryDataLayout,
+              PipeMemoryReader_freeBytes, PipeMemoryReader_readBytes,
+              PipeMemoryReader_getStringLength,
+              PipeMemoryReader_getSymbolAddress);
 
       uint8_t PointerSize = PipeMemoryReader_getPointerSize((void*)&Pipe);
       if (PointerSize != sizeof(uintptr_t))
         errorAndExit("Child process had unexpected architecture");
 
+#if defined(__APPLE__) && defined(__MACH__)
+      PipeMemoryReader_receiveImages(RC, &Pipe);
+#else
       PipeMemoryReader_receiveReflectionInfo(RC, &Pipe);
+#endif
 
       while (1) {
         InstanceKind Kind = PipeMemoryReader_receiveInstanceKind(&Pipe);

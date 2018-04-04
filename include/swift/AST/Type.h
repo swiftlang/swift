@@ -398,7 +398,7 @@ class CanType : public Type {
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getOptionalObjectTypeImpl(CanType type, bool &isOptional);
+  static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -466,12 +466,7 @@ public:
   GenericTypeDecl *getAnyGeneric() const;
 
   CanType getOptionalObjectType() const {
-    bool isOptional;
-    return getOptionalObjectTypeImpl(*this, isOptional);
-  }
-
-  CanType getOptionalObjectType(bool &isOptional) const {
-    return getOptionalObjectTypeImpl(*this, isOptional);
+    return getOptionalObjectTypeImpl(*this);
   }
 
   CanType getReferenceStorageReferent() const {
@@ -674,7 +669,7 @@ namespace llvm {
 
   // A Type is "pointer like".
   template<>
-  class PointerLikeTypeTraits<swift::Type> {
+  struct PointerLikeTypeTraits<swift::Type> {
   public:
     static inline void *getAsVoidPointer(swift::Type I) {
       return (void*)I.getPointer();
@@ -686,7 +681,7 @@ namespace llvm {
   };
   
   template<>
-  class PointerLikeTypeTraits<swift::CanType> :
+  struct PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {
   public:
     static inline swift::CanType getFromVoidPointer(void *P) {
@@ -695,7 +690,7 @@ namespace llvm {
   };
 
   template<>
-  class PointerLikeTypeTraits<swift::CanGenericSignature> {
+  struct PointerLikeTypeTraits<swift::CanGenericSignature> {
   public:
     static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
       return swift::CanGenericSignature((swift::GenericSignature*)P);

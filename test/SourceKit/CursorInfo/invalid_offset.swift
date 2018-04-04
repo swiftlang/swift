@@ -9,4 +9,7 @@ let a = 12
 // RUN:   -req=cursor -offset=250 %s -- %s \
 // RUN: | %FileCheck %s
 
+// rdar://problem/38162017
+// REQUIRES: OS=macosx
+
 // CHECK: <empty cursor info>

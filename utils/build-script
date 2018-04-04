@@ -154,11 +154,12 @@ class HostSpecificConfiguration(object):
                     test = False
 
             if build:
-                # Validation and long tests require building the full standard
-                # library, whereas the other targets can build a slightly
-                # smaller subset which is faster to build.
+                # Validation, long, and stress tests require building the full
+                # standard library, whereas the other targets can build a
+                # slightly smaller subset which is faster to build.
                 if args.build_swift_stdlib_unittest_extra or \
-                        args.validation_test or args.long_test:
+                        args.validation_test or args.long_test or \
+                        args.stress_test:
                     self.swift_stdlib_build_targets.append(
                         "swift-stdlib-" + name)
                 else:
@@ -184,12 +185,15 @@ class HostSpecificConfiguration(object):
                 else:
                     suffix = ""
                 subset_suffix = ""
-                if args.validation_test and args.long_test:
+                if args.validation_test and args.long_test and \
+                        args.stress_test:
                     subset_suffix = "-all"
                 elif args.validation_test:
                     subset_suffix = "-validation"
                 elif args.long_test:
                     subset_suffix = "-only_long"
+                elif args.stress_test:
+                    subset_suffix = "-only_stress"
                 else:
                     subset_suffix = ""
                 self.swift_test_run_targets.append("check-swift{}{}-{}".format(
@@ -482,11 +486,16 @@ class BuildScriptInvocation(object):
             "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--swiftpm-build-type", args.build_variant,
+            "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
             "--swift-analyze-code-coverage", str(
                 args.swift_analyze_code_coverage).lower(),
+            "--llbuild-enable-assertions", str(
+                args.llbuild_assertions).lower(),
+            "--lldb-assertions", str(
+                args.lldb_assertions).lower(),
             "--cmake-generator", args.cmake_generator,
             "--build-jobs", str(args.build_jobs),
             "--common-cmake-options=%s" % ' '.join(
@@ -630,7 +639,7 @@ class BuildScriptInvocation(object):
         if not args.build_android:
             impl_args += ["--skip-build-android"]
 
-        if not args.test and not args.long_test:
+        if not args.test and not args.long_test and not args.stress_test:
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += ["--skip-test-cmark",
@@ -672,6 +681,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--validation-test"]
         if args.long_test:
             impl_args += ["--long-test"]
+        if args.stress_test:
+            impl_args += ["--stress-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:

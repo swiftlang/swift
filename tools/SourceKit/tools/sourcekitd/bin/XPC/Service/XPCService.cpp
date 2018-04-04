@@ -291,7 +291,7 @@ static void getInitializationInfo(xpc_connection_t peer) {
   }
 
   if (TracingEnabled) {
-    SourceKit::trace::enable();
+    sourcekitd::trace::enableXPCTracing();
   }
 }
 
@@ -333,7 +333,6 @@ int main(int argc, const char *argv[]) {
   llvm::install_fatal_error_handler(fatal_error_handler, 0);
   sourcekitd::enableLogging("sourcekit-serv");
   sourcekitd::initialize();
-  sourcekitd::trace::initialize();
 
   // Increase the file descriptor limit.
   // FIXME: Portability ?
@@ -374,14 +373,9 @@ void SKUIDToUIDMap::set(sourcekitd_uid_t SKDUID, UIdent UID) {
 }
 
 void sourcekitd::trace::sendTraceMessage(trace::sourcekitd_trace_message_t Msg) {
-  if (!SourceKit::trace::enabled()) {
-    xpc_release(Msg);
-    return;
-  }
-
   xpc_connection_t Peer = MainConnection;
   if (!Peer) {
-    SourceKit::trace::disable();
+    trace::disableXPCTracing();
     xpc_release(Msg);
     return;
   }
@@ -403,7 +397,7 @@ void sourcekitd::trace::sendTraceMessage(trace::sourcekitd_trace_message_t Msg) 
   xpc_release(Message);
 
   if (xpc_get_type(Reply) == XPC_TYPE_ERROR) {
-    SourceKit::trace::disable();
+    trace::disableXPCTracing();
     xpc_release(Reply);
     return;
   }

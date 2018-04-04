@@ -12,7 +12,6 @@
 
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
@@ -20,45 +19,7 @@
 
 using namespace swift;
 
-namespace {
-/// A helper class to collect all nominal type declarations.
-class NominalTypeWalker: public ASTWalker {
-  ClassHierarchyAnalysis::ProtocolImplementations &ProtocolImplementationsCache;
-public:
-  NominalTypeWalker(ClassHierarchyAnalysis::ProtocolImplementations
-                        &ProtocolImplementationsCache)
-    :ProtocolImplementationsCache(ProtocolImplementationsCache) {
-  }
-
-  bool walkToDeclPre(Decl *D) override {
-    auto *NTD = dyn_cast<NominalTypeDecl>(D);
-    if (!NTD || !NTD->hasInterfaceType())
-      return true;
-    auto Protocols = NTD->getAllProtocols();
-    // We are only interested in types implementing protocols.
-    if (!Protocols.empty()) {
-      for (auto &Protocol : Protocols) {
-        auto &K = ProtocolImplementationsCache[Protocol];
-        K.push_back(NTD);
-      }
-    }
-    return true;
-  }
-};
-} // end anonymous namespace
-
 void ClassHierarchyAnalysis::init() {
-  // Process all types implementing protocols.
-  SmallVector<Decl *, 32> Decls;
-  // TODO: It would be better if we could get all declarations
-  // from a given module, not only the top-level ones.
-  M->getSwiftModule()->getTopLevelDecls(Decls);
-
-  NominalTypeWalker Walker(ProtocolImplementationsCache);
-  for (auto *D: Decls) {
-    D->walk(Walker);
-  }
-
   // For each class declaration in our V-table list:
   for (auto &VT : M->getVTableList()) {
     ClassDecl *C = VT.getClass();

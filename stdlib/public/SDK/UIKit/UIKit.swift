@@ -39,23 +39,23 @@ public extension UIOffset {
 // Equatable types.
 //===----------------------------------------------------------------------===//
 
-@_transparent // @fragile
-public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
-  return lhs.top == rhs.top &&
-         lhs.left == rhs.left &&
-         lhs.bottom == rhs.bottom &&
-         lhs.right == rhs.right
+extension UIEdgeInsets : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
+    return lhs.top == rhs.top &&
+           lhs.left == rhs.left &&
+           lhs.bottom == rhs.bottom &&
+           lhs.right == rhs.right
+  }
 }
 
-extension UIEdgeInsets : Equatable {}
-
-@_transparent // @fragile
-public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
-  return lhs.horizontal == rhs.horizontal &&
-         lhs.vertical == rhs.vertical
+extension UIOffset : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
+    return lhs.horizontal == rhs.horizontal &&
+           lhs.vertical == rhs.vertical
+  }
 }
-
-extension UIOffset : Equatable {}
 
 //===----------------------------------------------------------------------===//
 // Numeric backed types
@@ -95,11 +95,9 @@ extension _UIKitNumericRawRepresentable {
   }
 }
 
-@available(swift 4)
 extension UIFont.Weight : _UIKitNumericRawRepresentable {}
 
 #if !os(watchOS)
-@available(swift 4)
 extension UILayoutPriority : _UIKitNumericRawRepresentable {}
 #endif
 

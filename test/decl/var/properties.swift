@@ -114,6 +114,9 @@ var x15: Int {
   // applied to the getter.
   weak
   var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
+  // expected-warning@-1 {{instance will be immediately deallocated as 'foo' is a 'weak' variable}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'foo' declared here}}
   return 0
 }
 

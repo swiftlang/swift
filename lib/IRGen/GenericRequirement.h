@@ -30,6 +30,7 @@ class Value;
 
 namespace swift {
 class CanGenericSignature;
+enum class MetadataState : size_t;
 class ModuleDecl;
 class NominalTypeDecl;
 class ProtocolDecl;
@@ -78,11 +79,13 @@ using GetTypeParameterInContextFn =
 void bindGenericRequirement(IRGenFunction &IGF,
                             GenericRequirement requirement,
                             llvm::Value *requiredValue,
+                            MetadataState metadataState,
                             GetTypeParameterInContextFn getInContext);
 
 void bindFromGenericRequirementsBuffer(IRGenFunction &IGF,
                                        ArrayRef<GenericRequirement> reqts,
                                        Address buffer,
+                                       MetadataState metadataState,
                                        GetTypeParameterInContextFn getInContext);
 
 
@@ -144,7 +147,7 @@ public:
   void emitInitOfBuffer(IRGenFunction &IGF, const SubstitutionMap &subs,
                         Address buffer);
 
-  void bindFromBuffer(IRGenFunction &IGF, Address buffer,
+  void bindFromBuffer(IRGenFunction &IGF, Address buffer, MetadataState state,
                       GetTypeParameterInContextFn getInContext);
 };
 

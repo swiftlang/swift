@@ -1,5 +1,6 @@
+
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
+// RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h -enable-sil-ownership
 // RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func='$S4Test16testPartialApplyyySoAA_pF' -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
@@ -7,7 +8,7 @@
 // @_transparent to force serialization.
 @_transparent
 public func testPartialApply(_ obj: Test) {
-  // CHECK-LABEL: @$S4Test16testPartialApplyyySoAA_pF : $@convention(thin) (@owned Test) -> () {
+  // CHECK-LABEL: @$S4Test16testPartialApplyyySoAA_pF : $@convention(thin) (@guaranteed Test) -> () {
   if let curried1 = obj.normalObject {
     // CHECK: dynamic_method_br [[CURRIED1_OBJ:%.+]] : $@opened([[CURRIED1_EXISTENTIAL:.+]]) Test, #Test.normalObject!1.foreign, [[CURRIED1_TRUE:[^,]+]], [[CURRIED1_FALSE:[^,]+]]
     // CHECK: [[CURRIED1_FALSE]]:

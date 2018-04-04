@@ -1758,28 +1758,13 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 
 static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
                                   PrintOptions Options) {
-  auto Nominal = ExtendedType->getAnyNominal();
-  assert(Nominal && "extension of non-nominal type");
-  if (auto nt = ExtendedType->getAs<NominalType>()) {
-    if (auto ParentType = nt->getParent()) {
-      if (auto *ParentNT = ParentType->getAs<NominalOrBoundGenericNominalType>()) {
-        // Avoid using the parent type directly because it can be bound
-        // generic type and sugared.
-        ParentNT->getDecl()->getDeclaredType().print(Printer, Options);
-      } else {
-        ParentType.print(Printer, Options);
-      }
-      Printer << ".";
-    }
-  }
+  Options.FullyQualifiedTypes = false;
+  Options.FullyQualifiedTypesIfAmbiguous = false;
 
-  // Respect alias type.
-  if (isa<NameAliasType>(ExtendedType.getPointer())) {
-    ExtendedType.print(Printer, Options);
-    return;
-  }
+  // Strip off generic arguments, if any.
+  auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();
 
-  Printer.printTypeRef(ExtendedType, Nominal, Nominal->getName());
+  Ty->print(Printer, Options);
 }
 
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
@@ -2147,8 +2132,21 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer << "@autoclosure ";
   if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
     printer << "@escaping ";
-  if (flags.isShared())
+
+  switch (flags.getValueOwnership()) {
+  case ValueOwnership::Default:
+    /* nothing */
+    break;
+  case ValueOwnership::InOut:
+    /* handled as part of an InOutType */
+    break;
+  case ValueOwnership::Shared:
     printer << "__shared ";
+    break;
+  case ValueOwnership::Owned:
+    printer << "__owned ";
+    break;
+  }
 }
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
@@ -2169,14 +2167,15 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       // Map all non-let specifiers to 'var'.  This is not correct, but
       // SourceKit relies on this for info about parameter decls.
       switch (decl->getSpecifier()) {
-        case VarDecl::Specifier::Owned:
-          Printer << tok::kw_let;
-          break;
-        case VarDecl::Specifier::Var:
-        case VarDecl::Specifier::InOut:
-        case VarDecl::Specifier::Shared:
-          Printer << tok::kw_var;
-          break;
+      case VarDecl::Specifier::Let:
+        Printer << tok::kw_let;
+        break;
+      case VarDecl::Specifier::Var:
+      case VarDecl::Specifier::InOut:
+      case VarDecl::Specifier::Shared:
+      case VarDecl::Specifier::Owned:
+        Printer << tok::kw_var;
+        break;
       }
       Printer << " ";
     }
@@ -2218,6 +2217,13 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     auto ArgName = param->getArgumentName();
     auto BodyName = param->getName();
     switch (Options.ArgAndParamPrinting) {
+    case PrintOptions::ArgAndParamPrintingMode::EnumElement:
+      if (ArgName.empty() && BodyName.empty() && !param->getDefaultValue()) {
+        // Don't print anything, in the style of a tuple element.
+        return;
+      }
+      // Else, print the argument only.
+      LLVM_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
       Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
@@ -2561,9 +2567,16 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
       Printer.printName(elt->getName());
     });
 
-  if (auto argTy = elt->getArgumentInterfaceType()) {
-    if (!Options.SkipPrivateStdlibDecls || !argTy.isPrivateStdlibType())
-      argTy.print(Printer, Options);
+  if (auto *PL = elt->getParameterList()) {
+    llvm::SaveAndRestore<PrintOptions::ArgAndParamPrintingMode>
+      mode(Options.ArgAndParamPrinting,
+           PrintOptions::ArgAndParamPrintingMode::EnumElement);
+    printParameterList(PL,
+                       elt->hasInterfaceType()
+                         ? elt->getArgumentInterfaceType()
+                         : nullptr,
+                       /*isCurried=*/false,
+                       /*isAPINameByDefault*/[]()->bool{return true;});
   }
 
   auto *raw = elt->getRawValueExpr();
@@ -3201,23 +3214,23 @@ public:
   }
 
   void visitBuiltinRawPointerType(BuiltinRawPointerType *T) {
-    Printer << "Builtin.RawPointer";
+    Printer << BUILTIN_TYPE_NAME_RAWPOINTER;
   }
 
   void visitBuiltinNativeObjectType(BuiltinNativeObjectType *T) {
-    Printer << "Builtin.NativeObject";
+    Printer << BUILTIN_TYPE_NAME_NATIVEOBJECT;
   }
 
   void visitBuiltinUnknownObjectType(BuiltinUnknownObjectType *T) {
-    Printer << "Builtin.UnknownObject";
+    Printer << BUILTIN_TYPE_NAME_UNKNOWNOBJECT;
   }
 
   void visitBuiltinBridgeObjectType(BuiltinBridgeObjectType *T) {
-    Printer << "Builtin.BridgeObject";
+    Printer << BUILTIN_TYPE_NAME_BRIDGEOBJECT;
   }
 
   void visitBuiltinUnsafeValueBufferType(BuiltinUnsafeValueBufferType *T) {
-    Printer << "Builtin.UnsafeValueBuffer";
+    Printer << BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER;
   }
 
   void visitBuiltinVectorType(BuiltinVectorType *T) {
@@ -3229,21 +3242,21 @@ public:
         llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
         T->getElementType().print(UnderlyingOS);
       }
-      if (UnderlyingStrVec.startswith("Builtin."))
+      if (UnderlyingStrVec.startswith(BUILTIN_TYPE_NAME_PREFIX))
         UnderlyingStr = UnderlyingStrVec.substr(8);
       else
         UnderlyingStr = UnderlyingStrVec;
     }
 
-    Printer << "Builtin.Vec" << T->getNumElements() << "x" << UnderlyingStr;
+    Printer << BUILTIN_TYPE_NAME_VEC << T->getNumElements() << "x" << UnderlyingStr;
   }
 
   void visitBuiltinIntegerType(BuiltinIntegerType *T) {
     auto width = T->getWidth();
     if (width.isFixedWidth()) {
-      Printer << "Builtin.Int" << width.getFixedWidth();
+      Printer << BUILTIN_TYPE_NAME_INT << width.getFixedWidth();
     } else if (width.isPointerWidth()) {
-      Printer << "Builtin.Word";
+      Printer << BUILTIN_TYPE_NAME_WORD;
     } else {
       llvm_unreachable("impossible bit width");
     }
@@ -3261,7 +3274,7 @@ public:
   }
 
   void visitSILTokenType(SILTokenType *T) {
-    Printer << "Builtin.SILToken";
+    Printer << BUILTIN_TYPE_NAME_SILTOKEN;
   }
 
   void visitNameAliasType(NameAliasType *T) {
@@ -3270,18 +3283,13 @@ public:
       return;
     }
 
-    auto ParentDC = T->getDecl()->getDeclContext();
-    auto ParentNominal = ParentDC ?
-      ParentDC->getAsNominalTypeOrNominalTypeExtensionContext() : nullptr;
-
-    if (ParentNominal) {
-      visit(ParentNominal->getDeclaredType());
+    if (auto parent = T->getParent()) {
+      visit(parent);
       Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
     }
 
     printTypeDeclName(T);
+    printGenericArgs(T->getInnermostGenericArgs());
   }
 
   void visitParenType(ParenType *T) {
@@ -4230,42 +4238,31 @@ void swift::printEnumElementsAsCases(
               return LHS->getNameStr().compare(RHS->getNameStr()) < 0;
             });
 
-  auto printPayloads = [](EnumElementDecl *EE, llvm::raw_ostream &OS) {
+  auto printPayloads = [](ParameterList *PL, llvm::raw_ostream &OS) {
     // If the enum element has no payloads, return.
-    auto TL = EE->getArgumentTypeLoc();
-    if (TL.isNull())
+    if (!PL)
       return;
-    TypeRepr *TR = EE->getArgumentTypeLoc().getTypeRepr();
-    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
-      SmallVector<Identifier, 4> Names;
-      if (TTR->hasElementNames()) {
-        // Get the name from the tuple repr, if exist.
-        TTR->getElementNames(Names);
+    OS << "(";
+    // Print each element in the pattern match.
+    for (auto i = PL->begin(); i != PL->end(); ++i) {
+      auto *param = *i;
+      if (param->hasName()) {
+        OS << tok::kw_let << " " << param->getName().str();
       } else {
-        // Create same amount of empty names to the elements.
-        Names.assign(TTR->getNumElements(), Identifier());
+        OS << "_";
       }
-      OS << "(";
-      // Print each element in the pattern match.
-      for (unsigned I = 0, N = Names.size(); I < N; I++) {
-        auto Id = Names[I];
-        if (Id.empty())
-          OS << "_";
-        else
-          OS << tok::kw_let << " " << Id.str();
-        if (I + 1 != N) {
-          OS << ", ";
-        }
+      if (i + 1 != PL->end()) {
+        OS << ", ";
       }
-      OS << ")";
     }
+    OS << ")";
   };
 
   // Print each enum element name.
   std::for_each(SortedElements.begin(), SortedElements.end(),
                 [&](EnumElementDecl *EE) {
                   OS << tok::kw_case << " ." << EE->getNameStr();
-                  printPayloads(EE, OS);
+                  printPayloads(EE->getParameterList(), OS);
                   OS << ": " << getCodePlaceholder() << "\n";
                 });
 }

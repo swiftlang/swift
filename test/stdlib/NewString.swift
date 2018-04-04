@@ -20,21 +20,26 @@ func repr(_ x: NSString) -> String {
 
 func repr(_ x: _StringGuts) -> String {
   if x._isNative {
-    return "Native("
-      + "owner: \(hexAddrVal(x._owner)), "
-      + "count: \(x.count), "
-      + "capacity: \(x.capacity))"
+    return """
+      Native(\
+      owner: \(hexAddrVal(x._owner)), \
+      count: \(x.count), \
+      capacity: \(x.capacity))
+      """
   } else if x._isCocoa {
-    return "Cocoa("
-      + "owner: \(hexAddrVal(x._owner)), "
-      + "count: \(x.count))"
+    return """
+      Cocoa(\
+      owner: \(hexAddrVal(x._owner)), \
+      count: \(x.count))
+      """
   } else if x._isSmall {
-    return "Cocoa("
-      + "owner: <tagged>, "
-      + "count: \(x.count))"
+    return """
+      Small(count: \(x.count))
+      """
   } else if x._isUnmanaged {
-    return "Unmanaged("
-      + "count: \(x.count))"
+    return """
+      Unmanaged(count: \(x.count))
+      """
   }
   return "?????"
 }
@@ -58,7 +63,7 @@ print("  \(repr(nsb))")
 var empty = String()
 // CHECK-NEXT: These are empty: <>
 print("These are empty: <\(empty)>")
-// CHECK-NEXT: String(Unmanaged(count: 0))
+// CHECK-NEXT: String({{Unmanaged|Small}}(count: 0))
 print("  \(repr(empty))")
 
 
@@ -161,17 +166,17 @@ ascii()
 // CHECK: --- Literals ---
 print("--- Literals ---")
 
-// CHECK-NEXT: String(Unmanaged(count: 6)) = "foobar"
-// CHECK-NEXT: true
+// CHECK-NEXT: String({{Unmanaged|Small}}(count: 6)) = "foobar"
+// X_CHECK-NEXT: true // FIXME: _StringGuts's isASCII should be renamed
 let asciiLiteral: String = "foobar"
 print("  \(repr(asciiLiteral))")
-print("  \(asciiLiteral._guts.isASCII)")
+//print("  \(asciiLiteral._guts.isASCII)")
 
 // CHECK-NEXT: String(Unmanaged(count: 11)) = "🏂☃❅❆❄︎⛄️❄️"
 // CHECK-NEXT: false
 let nonASCIILiteral: String = "🏂☃❅❆❄︎⛄️❄️"
 print("  \(repr(nonASCIILiteral))")
-print("  \(!asciiLiteral._guts.isASCII)")
+print("  \(nonASCIILiteral._guts.isASCII)")
 
 // ===------- Appending -------===
 

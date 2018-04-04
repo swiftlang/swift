@@ -26,3 +26,5 @@ var _: Int = nil
 // expected-error@-1 {{nil cannot initialize specified type 'Int'}} 
 // expected-note@-2 {{add '?' to form the optional type 'Int?'}} {{11-11=?}}
 
+// 'nil' can initialize the specified type, if its generic parameters are bound
+var _: Array? = nil // expected-error {{generic parameter 'Element' could not be inferred}}

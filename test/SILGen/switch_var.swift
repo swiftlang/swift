@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name switch_var -emit-silgen %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -408,10 +409,8 @@ func test_let() {
   case let x where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
   // CHECK:   [[A:%.*]] = function_ref @$S10switch_var1a1xySS_tF
-  // CHECK:   apply [[A]]([[VAL_COPY_COPY]])
-  // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
+  // CHECK:   apply [[A]]([[BORROWED_VAL_COPY]])
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT:bb[0-9]+]]
@@ -426,10 +425,8 @@ func test_let() {
   case let y where funged():
   // CHECK: [[CASE2]]:
   // CHECK:   [[BORROWED_VAL_COPY_2:%.*]] = begin_borrow [[VAL_COPY_2]]
-  // CHECK:   [[VAL_COPY_2_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY_2]]
   // CHECK:   [[B:%.*]] = function_ref @$S10switch_var1b1xySS_tF
-  // CHECK:   apply [[B]]([[VAL_COPY_2_COPY]])
-  // CHECK:   end_borrow [[BORROWED_VAL_COPY_2]] from [[VAL_COPY_2]]
+  // CHECK:   apply [[B]]([[BORROWED_VAL_COPY_2]])
   // CHECK:   destroy_value [[VAL_COPY_2]]
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   br [[CONT]]
@@ -442,8 +439,7 @@ func test_let() {
   // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[VAL]]
   // CHECK:   function_ref @$S10switch_var4barsSSyF
   // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [[VAL_COPY_3]]
-  // CHECK:   [[VAL_COPY_3_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY_3]]
-  // CHECK:   store [[VAL_COPY_3_COPY]] to [init] [[IN_ARG:%.*]] :
+  // CHECK:   store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
   // CHECK:   apply {{%.*}}<String>({{.*}}, [[IN_ARG]])
   // CHECK:   cond_br {{%.*}}, [[YES_CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
   // ExprPatterns implicitly contain a 'let' binding.
@@ -505,9 +501,8 @@ func test_mixed_let_var() {
 
   // CHECK: [[CASE2]]:
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
   // CHECK:   [[B:%.*]] = function_ref @$S10switch_var1b1xySS_tF
-  // CHECK:   apply [[B]]([[VAL_COPY_COPY]])
+  // CHECK:   apply [[B]]([[BORROWED_VAL_COPY]])
   // CHECK:   end_borrow [[BORROWED_VAL_COPY]] from [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   destroy_value [[VAL]]
@@ -521,8 +516,7 @@ func test_mixed_let_var() {
   // CHECK: [[NEXT_CASE]]
   // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
-  // CHECK:   [[VAL_COPY_COPY:%.*]] = copy_value [[BORROWED_VAL_COPY]]
-  // CHECK:   store [[VAL_COPY_COPY]] to [init] [[TMP_VAL_COPY_ADDR:%.*]] : $*String
+  // CHECK:   store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
   // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
   // CHECK:   cond_br {{.*}}, [[CASE3:bb[0-9]+]], [[NOCASE3:bb[0-9]+]]
   case bars():

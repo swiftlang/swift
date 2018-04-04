@@ -192,6 +192,13 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     compatible with `parse_results`. If `benchmarks` is not empty,
     only run tests included in it.
     """
+    # Set a constant hash seed. Some tests are currently sensitive to
+    # fluctuations in the number of hash collisions.
+    #
+    # FIXME: This should only be set in the environment of the child process
+    # that runs the tests.
+    os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
+
     (total_tests, total_min, total_max, total_mean) = (0, 0, 0, 0)
     output = []
     headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',

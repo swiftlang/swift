@@ -17,12 +17,13 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
-#include "swift/Driver/Driver.h"
-#include "swift/Driver/Job.h"
-#include "swift/Driver/Util.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Driver/Driver.h"
+#include "swift/Driver/Job.h"
+#include "swift/Driver/Util.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
@@ -51,6 +52,9 @@ namespace driver {
 enum class OutputLevel {
   /// Indicates that normal output should be produced.
   Normal,
+  
+  /// Indicates that only jobs should be printed and not run. (-###)
+  PrintJobs,
 
   /// Indicates that verbose output should be produced. (-v)
   Verbose,
@@ -156,6 +160,15 @@ private:
   /// of date.
   bool EnableIncrementalBuild;
 
+  /// When true, emit duplicated compilation record file whose filename is
+  /// suffixed with '~moduleonly'.
+  ///
+  /// This compilation record is used by '-emit-module'-only incremental builds
+  /// so that module-only builds do not affect compilation record file for
+  /// normal builds, while module-only incremental builds are able to use
+  /// artifacts of normal builds if they are already up to date.
+  bool OutputCompilationRecordForModuleOnlyBuild = false;
+
   /// Indicates whether groups of parallel frontend jobs should be merged
   /// together and run in composite "batch jobs" when possible, to reduce
   /// redundant work.
@@ -163,6 +176,11 @@ private:
 
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   unsigned BatchSeed;
+
+  /// In order to test repartitioning, set to true if
+  /// -driver-force-one-batch-repartition is present. This is cleared after the
+  /// forced repartition happens.
+  bool ForceOneBatchRepartition = false;
 
   /// True if temporary files should not be deleted.
   bool SaveTemps;
@@ -202,11 +220,15 @@ public:
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
+              std::string CompilationRecordPath,
+              bool OutputCompilationRecordForModuleOnlyBuild,
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+              llvm::sys::TimePoint<> LastBuildTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
+              bool ForceOneBatchRepartition = false,
               bool SkipTaskExecution = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
@@ -269,6 +291,8 @@ public:
     return EnableBatchMode;
   }
 
+  bool getForceOneBatchRepartition() const { return ForceOneBatchRepartition; }
+
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
   }
@@ -282,15 +306,6 @@ public:
 
   void setShowJobLifecycle(bool value = true) {
     ShowJobLifecycle = value;
-  }
-
-  void setCompilationRecordPath(StringRef path) {
-    assert(CompilationRecordPath.empty() && "already set");
-    CompilationRecordPath = path;
-  }
-
-  void setLastBuildTime(llvm::sys::TimePoint<> time) {
-    LastBuildTime = time;
   }
 
   /// Requests the path to a file containing all input source files. This can

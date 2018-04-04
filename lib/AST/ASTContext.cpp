@@ -67,7 +67,6 @@ STATISTIC(NumCollapsedSpecializedProtocolConformances,
 #define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
 
 LazyResolver::~LazyResolver() = default;
-DelegatingLazyResolver::~DelegatingLazyResolver() = default;
 void ModuleLoader::anchor() {}
 void ClangModuleLoader::anchor() {}
 
@@ -278,6 +277,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// arenas.
   struct Arena {
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
+    llvm::FoldingSet<NameAliasType> NameAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,char>,
@@ -425,7 +425,7 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
 }
 
 static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
-  auto M = ModuleDecl::create(ctx.getIdentifier("Builtin"), ctx);
+  auto M = ModuleDecl::create(ctx.getIdentifier(BUILTIN_NAME), ctx);
   M->addFile(*new (ctx) BuiltinUnit(*M));
   return M;
 }
@@ -1339,6 +1339,16 @@ void ASTContext::addExternalDecl(Decl *decl) {
   ExternalDefinitions.insert(decl);
 }
 
+void ASTContext::addSynthesizedDecl(Decl *decl) {
+  auto *mod = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
+  if (mod->getKind() == FileUnitKind::ClangModule) {
+    ExternalDefinitions.insert(decl);
+    return;
+  }
+
+  cast<SourceFile>(mod)->SynthesizedDecls.push_back(decl);
+}
+
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
   Impl.Cleanups.push_back(std::move(cleanup));
 }
@@ -2224,7 +2234,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
 
   // Fix the name of the function itself.
   if (name.getBaseName() != targetName.getBaseName()) {
-    diag.fixItReplace(func->getLoc(), targetName.getBaseIdentifier().str());
+    diag.fixItReplace(func->getLoc(), targetName.getBaseName().userFacingName());
   }
 
   // Fix the argument names that need fixing.
@@ -2885,6 +2895,101 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
+
+NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
+                                       const SubstitutionMap &substitutions,
+                                       Type underlying,
+                                       RecursiveTypeProperties properties)
+    : SugarType(TypeKind::NameAlias, underlying, properties),
+      typealias(typealias) {
+  // Record the parent (or absence of a parent).
+  if (parent) {
+    Bits.NameAliasType.HasParent = true;
+    *getTrailingObjects<Type>() = parent;
+  } else {
+    Bits.NameAliasType.HasParent = false;
+  }
+
+  // Record the substitutions.
+  if (auto genericSig = substitutions.getGenericSignature()) {
+    SmallVector<Substitution, 4> flatSubs;
+    genericSig->getSubstitutions(substitutions, flatSubs);
+    Bits.NameAliasType.NumSubstitutions = flatSubs.size();
+    std::copy(flatSubs.begin(), flatSubs.end(),
+              getTrailingObjects<Substitution>());
+
+    *getTrailingObjects<GenericSignature *>() = genericSig;
+  } else {
+    Bits.NameAliasType.NumSubstitutions = 0;
+  }
+}
+
+NameAliasType *NameAliasType::get(
+                                        TypeAliasDecl *typealias,
+                                        Type parent,
+                                        const SubstitutionMap &substitutions,
+                                        Type underlying) {
+  // Compute the recursive properties.
+  //
+  auto properties = underlying->getRecursiveProperties();
+  auto storedProperties = properties;
+  if (parent) {
+    properties |= parent->getRecursiveProperties();
+    if (parent->hasTypeVariable())
+      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
+  }
+  auto genericSig = substitutions.getGenericSignature();
+  if (genericSig) {
+    for (Type gp : genericSig->getGenericParams()) {
+      auto substGP = gp.subst(substitutions, SubstFlags::UseErrorType);
+      properties |= substGP->getRecursiveProperties();
+      if (substGP->hasTypeVariable())
+        storedProperties |= RecursiveTypeProperties::HasTypeVariable;
+    }
+  }
+
+  // Figure out which arena this type will go into.
+  auto &ctx = underlying->getASTContext();
+  auto arena = getArena(properties);
+
+  // Profile the type.
+  llvm::FoldingSetNodeID id;
+  NameAliasType::Profile(id, typealias, parent, substitutions, underlying);
+
+  // Did we already record this type?
+  void *insertPos;
+  auto &types = ctx.Impl.getArena(arena).NameAliasTypes;
+  if (auto result = types.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new type.
+  unsigned numSubstitutions =
+    genericSig ? genericSig->getSubstitutionListSize() : 0;
+  auto size =
+    totalSizeToAlloc<Type, GenericSignature *, Substitution>(
+                        parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
+  auto mem = ctx.Allocate(size, alignof(NameAliasType), arena);
+  auto result = new (mem) NameAliasType(typealias, parent, substitutions,
+                                        underlying, storedProperties);
+  types.InsertNode(result, insertPos);
+  return result;
+}
+
+void NameAliasType::Profile(llvm::FoldingSetNodeID &id) const {
+  Profile(id, getDecl(), getParent(), getSubstitutionMap(),
+          Type(getSinglyDesugaredType()));
+}
+
+void NameAliasType::Profile(
+                           llvm::FoldingSetNodeID &id,
+                           TypeAliasDecl *typealias,
+                           Type parent, const SubstitutionMap &substitutions,
+                           Type underlying) {
+  id.AddPointer(typealias);
+  id.AddPointer(parent.getPointer());
+  substitutions.profile(id);
+  id.AddPointer(underlying.getPointer());
+}
 
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
@@ -4086,6 +4191,7 @@ DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
 
 DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
+  assert(assocType && "Missing associated type");
   auto properties = base->getRecursiveProperties();
   properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
@@ -4289,7 +4395,7 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
 
 void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
-  if (argumentNames.size() == 0) {
+  if (argumentNames.empty()) {
     SimpleOrCompound = BaseNameAndCompound(baseName, true);
     return;
   }

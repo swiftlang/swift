@@ -114,7 +114,7 @@ public:
   llvm::StringRef ExternalPassPipelineFilename;
 
   /// Emit normal function arguments using the +0 guaranteed convention.
-  bool EnableGuaranteedNormalArguments = false;
+  bool EnableGuaranteedNormalArguments = true;
 
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;

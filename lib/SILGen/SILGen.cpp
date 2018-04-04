@@ -15,6 +15,7 @@
 #include "Scope.h"
 #include "swift/Strings.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -57,10 +58,6 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
 SILGenModule::~SILGenModule() {
   assert(!TopLevelSGF && "active source file lowering!?");
   M.verify();
-}
-
-EnumElementDecl *SILGenModule::getLoweredEnumElementDecl(EnumElementDecl *elt) {
-  return elt;
 }
 
 static SILDeclRef
@@ -1171,6 +1168,10 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
   if (!decl->getGetter())
     return false;
 
+  // If the getter is mutating, we cannot form a keypath to it at all.
+  if (decl->isGetterMutating())
+    return false;
+
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,
   // then we still do.
 
@@ -1204,7 +1205,78 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  // TODO
+  if (!M.getASTContext().LangOpts.EnableKeyPathResilience)
+    return;
+  
+  // TODO: Key path code emission doesn't handle opaque values properly yet.
+  if (!SILModuleConventions(M).useLoweredAddresses())
+    return;
+  
+  if (!doesPropertyNeedDescriptor(decl))
+    return;
+  
+  auto genericEnv = decl->getInnermostDeclContext()
+                        ->getGenericEnvironmentOfContext();
+  unsigned baseOperand = 0;
+  bool needsGenericContext = true;
+  
+  Type baseTy;
+  if (decl->getDeclContext()->isTypeContext()) {
+    baseTy = decl->getDeclContext()->getSelfInterfaceType()
+                 ->getCanonicalType(decl->getInnermostDeclContext()
+                                        ->getGenericSignatureOfContext());
+    if (decl->isStatic()) {
+      // TODO: Static properties should eventually be referenceable as
+      // keypaths from T.Type -> Element
+      //baseTy = MetatypeType::get(baseTy);
+      return;
+    }
+  } else {
+    // TODO: Global variables should eventually be referenceable as
+    // key paths from ()
+    //baseTy = TupleType::getEmpty(getASTContext());
+    return;
+  }
+  
+  SubstitutionList subs = {};
+  if (genericEnv)
+    subs = genericEnv->getForwardingSubstitutions();
+  
+  if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+    for (auto *index : *sub->getIndices()) {
+      // Keypaths can't capture inout indices.
+      if (index->isInOut())
+        return;
+
+      // TODO: Handle reabstraction and tuple explosion in thunk generation.
+      // This wasn't previously a concern because anything that was Hashable
+      // had only one abstraction level and no explosion.
+      auto indexTy = index->getInterfaceType();
+      
+      if (isa<TupleType>(indexTy->getCanonicalType(sub->getGenericSignature())))
+        return;
+      
+      if (genericEnv)
+        indexTy = genericEnv->mapTypeIntoContext(indexTy);
+      
+      auto indexLoweredTy = Types.getLoweredType(indexTy);
+      auto indexOpaqueLoweredTy =
+        Types.getLoweredType(AbstractionPattern::getOpaque(), indexTy);
+      
+      if (indexOpaqueLoweredTy.getAddressType()
+             != indexLoweredTy.getAddressType())
+        return;
+    }
+  }
+
+  auto component = emitKeyPathComponentForDecl(SILLocation(decl),
+                                               genericEnv,
+                                               baseOperand, needsGenericContext,
+                                               subs, decl, {},
+                                               baseTy->getCanonicalType(),
+                                               /*property descriptor*/ true);
+  
+  (void)SILProperty::create(M, /*serialized*/ false, decl, component);
 }
 
 void SILGenModule::emitPropertyBehavior(VarDecl *vd) {

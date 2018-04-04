@@ -1,8 +1,12 @@
+// RUN: rm -rf %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 // RUN: %swift-syntax-test -input-source-filename %s -eof > %t
+// RUN: diff -u %s %t
+// RUN: %swift-syntax-test -serialize-raw-tree -input-source-filename %s > %t.dump
+// RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
 // RUN: diff -u %s %t
 
 import ABC
@@ -31,6 +35,7 @@ class C {
     bar1(1.1)
     var f = /*comments*/+0.1/*comments*/
     foo()
+    _ = "🙂🤗🤩🤔🤨"
   }
 
   func foo1() {
@@ -233,6 +238,7 @@ func closure() {
     return 2
   }
   _ = { a, b in }
+  _ = { (a, b) in }
   _ = {}
   _ = { s1, s2 in s1 > s2 }
   _ = { $0 > $1 }
@@ -286,7 +292,7 @@ protocol P {
   var a: Int {}
 }
 
-class C {
+private final class D {
   @objc
   static private var a: Int = 3 { return 3 }, b: Int, c = 4, d : Int { get {} get {}}, (a, b): (Int, Int)
   let (a, b) = (1,2), _ = 4 {}
@@ -320,6 +326,8 @@ func statementTests() {
   }
   repeat { } while true
   LABEL: repeat { } while false
+  while true { }
+  LABEL: while true { }
   LABEL: do {}
   LABEL: switch foo {
     case 1:
@@ -355,6 +363,25 @@ func statementTests() {
 
   for var i in foo where i.foo {}
   for case is Int in foo {}
+
+  switch Foo {
+    case n1:
+      break
+    case n2, n3l:
+      break
+#if FOO
+    case let (x, y)  where !x, n3l where false:
+      break
+#elseif BAR
+    case let y:
+      break
+#else
+    case .foo(let x):
+      break
+#endif
+    default:
+      break
+  }
 }
 
 // MARK: - ExtensionDecl
@@ -399,4 +426,14 @@ func objectLiterals() {
   #file
   #function
   #dsohandle
+}
+
+enum E1 : String {
+  case foo = 1
+  case bar = "test", baz(x: Int, String) = 12
+  indirect case qux(E1)
+
+  indirect private enum E2<T>: String where T: SomeProtocol {
+    case foo, bar, baz
+  }
 }

@@ -231,6 +231,11 @@ Type TypeChecker::resolveTypeInContext(
        TypeResolutionOptions options,
        bool isSpecialized,
        GenericTypeResolver *resolver) {
+  // If we're just resolving the structure, the decl itself is all we need to
+  // know: return the unbound generic type.
+  if (options.contains(TypeResolutionFlags::ResolveStructure))
+    return typeDecl->getDeclaredInterfaceType();
+
   GenericTypeToArchetypeResolver defaultResolver(fromDC);
   if (!resolver)
     resolver = &defaultResolver;
@@ -358,6 +363,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
                                         TypeResolutionOptions options,
                                         GenericTypeResolver *resolver,
                                  UnsatisfiedDependency *unsatisfiedDependency) {
+  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
+         "should not touch generic arguments when resolving structure");
 
   if (type->hasError()) {
     generic->setInvalid();
@@ -484,7 +491,8 @@ Type TypeChecker::applyUnboundGenericArguments(
     TypeResolutionOptions options,
     GenericTypeResolver *resolver,
     UnsatisfiedDependency *unsatisfiedDependency) {
-
+  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
+         "should not touch generic arguments when resolving structure");
   options -= TypeResolutionFlags::SILType;
   options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
@@ -598,10 +606,27 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
   }
 
+  // For a typealias, use the underlying type. We'll wrap up the result
+  // later.
+  auto typealias = dyn_cast<TypeAliasDecl>(decl);
+  if (typealias) {
+    resultType = typealias->getUnderlyingTypeLoc().getType();
+  }
+
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
                                 LookUpConformance(*this, dc),
                                 SubstFlags::UseErrorType);
+
+  // Form a sugared typealias reference.
+  Type parentType = unboundType->getParent();
+  if (typealias && (!parentType || !parentType->isAnyExistentialType())) {
+    auto genericSig = typealias->getGenericSignature();
+    auto subMap = genericSig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
+                                                 LookUpConformance(*this, dc));
+    resultType = NameAliasType::get(typealias, parentType,
+                                         subMap, resultType);
+  }
 
   if (isa<NominalTypeDecl>(decl) && resultType) {
     if (useObjectiveCBridgeableConformancesOfArgs(
@@ -1024,13 +1049,12 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
     SmallVector<ValueDecl *, 4> decls;
     if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
                             comp->getIdentifier(),
-                            NL_QualifiedDefault|NL_ProtocolMembers,
+                            NL_OnlyTypes|NL_QualifiedDefault|NL_ProtocolMembers,
                             &TC,
                             decls)) {
       for (const auto decl : decls) {
         // FIXME: Better ambiguity handling.
-        auto typeDecl = dyn_cast<TypeDecl>(decl);
-        if (!typeDecl) continue;
+        auto typeDecl = cast<TypeDecl>(decl);
 
         if (!isa<ProtocolDecl>(typeDecl->getDeclContext())) continue;
 
@@ -1251,10 +1275,12 @@ static Type resolveNestedIdentTypeComponent(
     if (!memberType || memberType->hasError()) return memberType;
 
     // If there are generic arguments, apply them now.
-    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-      return TC.applyGenericArguments(
-        memberType, member, comp->getIdLoc(), DC, genComp,
-          options, resolver, unsatisfiedDependency);
+    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
+      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+        return TC.applyGenericArguments(memberType, member, comp->getIdLoc(),
+                                        DC, genComp, options, resolver,
+                                        unsatisfiedDependency);
+      }
     }
 
     if (memberType->is<UnboundGenericType>() &&
@@ -1425,11 +1451,10 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
                                         Type ty,
                                         TypeResolutionOptions options) {
   // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TypeResolutionFlags::FunctionInput) ||
-    options.contains(TypeResolutionFlags::ImmediateFunctionInput);
-
-  bool defaultNoEscape = isFunctionParam;
+  bool defaultNoEscape =
+    !options.contains(TypeResolutionFlags::EnumCase) &&
+    (options.contains(TypeResolutionFlags::FunctionInput) ||
+     options.contains(TypeResolutionFlags::ImmediateFunctionInput));
 
   // Desugar here
   auto *funcTy = ty->castTo<FunctionType>();
@@ -1509,19 +1534,20 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                GenericTypeResolver *resolver,
                                UnsatisfiedDependency *unsatisfiedDependency) {
   // FIXME: Verify that these aren't circular and infinite size.
-  
+  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
+         "ResolveStructure does not do full validation");
+
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
     return Loc.isError();
 
-  SWIFT_FUNC_STAT;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumTypesValidated++;
 
-  if (Loc.getType().isNull()) {
-    auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
-                            unsatisfiedDependency);
+  Type type = Loc.getType();
+  if (type.isNull()) {
+    type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
+                       unsatisfiedDependency);
     if (!type) {
       // If a dependency went unsatisfied, just return false.
       if (unsatisfiedDependency) return false;
@@ -1535,13 +1561,10 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
       Loc.setType(ErrorType::get(Context), true);
       return true;
     }
-
-    Loc.setType(type, true);
-    return Loc.isError();
   }
 
-  Loc.setType(Loc.getType(), true);
-  return Loc.isError();
+  Loc.setType(type, true);
+  return type->hasError();
 }
 
 namespace {
@@ -1657,11 +1680,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
-  if (!isa<InOutTypeRepr>(repr) &&
-      !isa<SharedTypeRepr>(repr) &&
-      !isa<TupleTypeRepr>(repr) &&
-      !isa<AttributedTypeRepr>(repr) &&
-      !isa<FunctionTypeRepr>(repr) &&
+  if (!isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
+      !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<IdentTypeRepr>(repr)) {
     options -= TypeResolutionFlags::ImmediateFunctionInput;
     options -= TypeResolutionFlags::FunctionInput;
@@ -1679,6 +1699,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
   case TypeReprKind::InOut:
   case TypeReprKind::Shared:
+  case TypeReprKind::Owned:
     return resolveSpecifierTypeRepr(cast<SpecifierTypeRepr>(repr), options);
 
   case TypeReprKind::SimpleIdent:
@@ -1768,10 +1789,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   };
 
   // Remember whether this is a function parameter.
-  bool isFunctionParam =
-    options.contains(TypeResolutionFlags::FunctionInput) ||
-    options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+  bool isParam = options.contains(TypeResolutionFlags::FunctionInput) ||
+                 options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+
   bool isVariadicFunctionParam =
+    !options.contains(TypeResolutionFlags::EnumCase) &&
     options.contains(TypeResolutionFlags::VariadicFunctionInput);
 
   // The type we're working with, in case we want to build it differently
@@ -1977,7 +1999,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // @autoclosure is only valid on parameters.
-    if (!isFunctionParam && attrs.has(TAK_autoclosure)) {
+    if (!isParam && attrs.has(TAK_autoclosure)) {
       TC.diagnose(attrs.getLoc(TAK_autoclosure),
                   isVariadicFunctionParam
                       ? diag::attr_not_on_variadic_parameters
@@ -2035,7 +2057,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           isVariadicFunctionParam && Context.isSwiftVersion3();
 
       // The attribute is meaningless except on parameter types.
-      if (!isFunctionParam && !skipDiagnostic) {
+      bool isEnum = options.contains(TypeResolutionFlags::EnumCase);
+      if ((isEnum || !isParam) && !skipDiagnostic) {
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(TC, loc);
 
@@ -2646,10 +2669,13 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 
 Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
                                             TypeResolutionOptions options) {
-  // inout is only valid for (non-subscript) function parameters.
+  // inout is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters.
   if ((options & TypeResolutionFlags::SubscriptParameters) ||
+      (options & TypeResolutionFlags::EnumCase) ||
         (!(options & TypeResolutionFlags::FunctionInput) &&
          !(options & TypeResolutionFlags::ImmediateFunctionInput))) {
+
     decltype(diag::attr_only_on_parameters) diagID;
     if (options & TypeResolutionFlags::SubscriptParameters) {
       diagID = diag::attr_not_on_subscript_parameters;
@@ -2658,10 +2684,21 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     } else {
       diagID = diag::attr_only_on_parameters;
     }
-    TC.diagnose(repr->getSpecifierLoc(), diagID,
-                (repr->getKind() == TypeReprKind::InOut)
-                  ? "'inout'"
-                  : "'__shared'");
+    StringRef name;
+    switch (repr->getKind()) {
+    case TypeReprKind::InOut:
+      name = "'inout'";
+      break;
+    case TypeReprKind::Shared:
+      name = "'__shared'";
+      break;
+    case TypeReprKind::Owned:
+      name = "'__owned'";
+      break;
+    default:
+      llvm_unreachable("unknown SpecifierTypeRepr kind");
+    }
+    TC.diagnose(repr->getSpecifierLoc(), diagID, name);
     repr->setInvalid();
     return ErrorType::get(Context);
   }
@@ -2688,8 +2725,10 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   if (!sliceTy)
     return ErrorType::get(Context);
 
-  // Check for _ObjectiveCBridgeable conformances in the element type.
-  TC.useObjectiveCBridgeableConformances(DC, baseTy);
+  if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
+    // Check for _ObjectiveCBridgeable conformances in the element type.
+    TC.useObjectiveCBridgeableConformances(DC, baseTy);
+  }
 
   return sliceTy;
 }
@@ -2709,20 +2748,23 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          valueTy)) {
     // Check the requirements on the generic arguments.
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
-    TypeLoc args[2] = { TypeLoc(repr->getKey()), TypeLoc(repr->getValue()) };
-    args[0].setType(keyTy, true);
-    args[1].setType(valueTy, true);
 
-    if (!TC.applyUnboundGenericArguments(
-            unboundTy, dictDecl, repr->getStartLoc(), DC, args,
-            options, Resolver, UnsatisfiedDependency)) {
-      return nullptr;
+    if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
+      TypeLoc args[2] = {TypeLoc(repr->getKey()), TypeLoc(repr->getValue())};
+      args[0].setType(keyTy, true);
+      args[1].setType(valueTy, true);
+
+      if (!TC.applyUnboundGenericArguments(
+              unboundTy, dictDecl, repr->getStartLoc(), DC, args, options,
+              Resolver, UnsatisfiedDependency)) {
+        return nullptr;
+      }
+
+      // Check for _ObjectiveCBridgeable conformances in the key and value
+      // types.
+      TC.useObjectiveCBridgeableConformances(DC, keyTy);
+      TC.useObjectiveCBridgeableConformances(DC, valueTy);
     }
-
-    // Check for _ObjectiveCBridgeable conformances in the key and value
-    // types.
-    TC.useObjectiveCBridgeableConformances(DC, keyTy);
-    TC.useObjectiveCBridgeableConformances(DC, valueTy);
 
     return dictTy;
   }
@@ -2750,14 +2792,21 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
        ImplicitlyUnwrappedOptionalTypeRepr *repr,
        TypeResolutionOptions options) {
   if (!options.contains(TypeResolutionFlags::AllowIUO)) {
-    Diagnostic diag = diag::
-        implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional;
-
-    if (TC.Context.isSwiftVersionAtLeast(5))
-      diag = diag::implicitly_unwrapped_optional_in_illegal_position;
-
-    TC.diagnose(repr->getStartLoc(), diag)
-        .fixItReplace(repr->getExclamationLoc(), "?");
+    if (options.contains(TypeResolutionFlags::AllowIUODeprecated)) {
+      TC.diagnose(
+          repr->getStartLoc(),
+          diag::implicitly_unwrapped_optional_deprecated_in_this_position);
+    } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
+      TC.diagnose(
+            repr->getStartLoc(),
+            diag::
+                implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
+          .fixItReplace(repr->getExclamationLoc(), "?");
+    } else {
+      TC.diagnose(repr->getStartLoc(),
+                  diag::implicitly_unwrapped_optional_in_illegal_position)
+          .fixItReplace(repr->getExclamationLoc(), "?");
+    }
   }
 
   auto elementOptions = withoutContext(options, true);
@@ -2862,6 +2911,9 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
       case TypeReprKind::InOut:
         ownership = ValueOwnership::InOut;
         break;
+      case TypeReprKind::Owned:
+        ownership = ValueOwnership::Owned;
+        break;
       default:
         ownership = ValueOwnership::Default;
         break;
@@ -2876,8 +2928,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   // or SIL, either.
   if (!isImmediateFunctionInput) {
     if (elements.size() == 1 && elements[0].hasName()
-        && !(options & TypeResolutionFlags::SILType)
-        && !(options & TypeResolutionFlags::EnumCase)) {
+        && !(options & TypeResolutionFlags::SILType)) {
       if (!complained) {
         TC.diagnose(repr->getElementNameLoc(0),
                     diag::tuple_single_element)
@@ -3126,6 +3177,8 @@ Type TypeResolver::buildProtocolType(
 Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
                                           Type baseTy) {
+  Type sugaredBaseTy = baseTy;
+
   // For type members of a base class, make sure we use the right
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
@@ -3133,8 +3186,10 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
   }
 
-  if (baseTy->is<ModuleType>())
+  if (baseTy->is<ModuleType>()) {
     baseTy = Type();
+    sugaredBaseTy = Type();
+  }
 
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
@@ -3151,7 +3206,8 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     }
   }
 
-  if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
+  auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
+  if (aliasDecl) {
     // FIXME: If this is a protocol typealias and we haven't built the
     // protocol's generic environment yet, do so now, to ensure the
     // typealias's underlying type has fully resolved dependent
@@ -3167,13 +3223,34 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
     }
   }
 
-  auto memberType = member->getDeclaredInterfaceType();
-  if (!baseTy || !memberType->hasTypeParameter())
-    return memberType;
+  Type resultType;
+  auto memberType = aliasDecl ? aliasDecl->getUnderlyingTypeLoc().getType()
+                              : member->getDeclaredInterfaceType();
+  SubstitutionMap subs;
+  if (baseTy) {
+    // Cope with the presence of unbound generic types, which are ill-formed
+    // at this point but break the invariants of getContextSubstitutionMap().
+    if (baseTy->hasUnboundGenericType()) {
+      if (memberType->hasTypeParameter())
+        return ErrorType::get(memberType);
 
-  auto subs = baseTy->getContextSubstitutionMap(
-      module, member->getDeclContext());
-  return memberType.subst(subs, SubstFlags::UseErrorType);
+      return memberType;
+    }
+
+    subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
+    resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+  } else {
+    resultType = memberType;
+  }
+
+  // If we're referring to a typealias within a generic context, build
+  // a sugared alias type.
+  if (aliasDecl && (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
+    resultType = NameAliasType::get(aliasDecl, sugaredBaseTy, subs,
+                                         resultType);
+  }
+
+  return resultType;
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {

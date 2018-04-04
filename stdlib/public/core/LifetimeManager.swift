@@ -19,7 +19,7 @@
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@_inlineable
+@inlinable
 public func withExtendedLifetime<T, Result>(
   _ x: T, _ body: () throws -> Result
 ) rethrows -> Result {
@@ -36,7 +36,7 @@ public func withExtendedLifetime<T, Result>(
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
-@_inlineable
+@inlinable
 public func withExtendedLifetime<T, Result>(
   _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
@@ -59,7 +59,7 @@ extension String {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_inlineable
+  @inlinable
   public func withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
@@ -71,7 +71,7 @@ extension String {
 
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _fixLifetime<T>(_ x: T) {
   Builtin.fixLifetime(x)
@@ -95,7 +95,7 @@ public func _fixLifetime<T>(_ x: T) {
 ///     The pointer argument is valid only for the duration of the function's
 ///     execution.
 /// - Returns: The return value, if any, of the `body` closure.
-@_inlineable
+@inlinable
 public func withUnsafeMutablePointer<T, Result>(
   to arg: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
@@ -121,7 +121,7 @@ public func withUnsafeMutablePointer<T, Result>(
 ///     value of the `withUnsafePointer(to:_:)` function. The pointer argument
 ///     is valid only for the duration of the function's execution.
 /// - Returns: The return value, if any, of the `body` closure.
-@_inlineable
+@inlinable
 public func withUnsafePointer<T, Result>(
   to arg: inout T,
   _ body: (UnsafePointer<T>) throws -> Result

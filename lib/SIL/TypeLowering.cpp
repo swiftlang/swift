@@ -118,9 +118,9 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       // If this is a non-address-only stored 'let' constant, we can capture it
       // by value.  If it is address-only, then we can't load it, so capture it
       // by its address (like a var) instead.
-      if ((var->isLet() || var->isShared())
-          && (!SILModuleConventions(M).useLoweredAddresses() ||
-              !getTypeLowering(var->getType()).isAddressOnly()))
+      if (var->isImmutable() &&
+          (!SILModuleConventions(M).useLoweredAddresses() ||
+           !getTypeLowering(var->getType()).isAddressOnly()))
         return CaptureKind::Constant;
 
       // In-out parameters are captured by address.
@@ -1722,14 +1722,16 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
-                                                     AbstractFunctionDecl *AFD,
+                                                     ValueDecl *VD,
+                                                     DeclContext *DC,
                                                      unsigned DefaultArgIndex) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
+  auto resultTy = getDefaultArgumentInfo(VD, DefaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
-  CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
+  CanType canResultTy = resultTy->getCanonicalType(
+                            DC->getGenericSignatureOfContext());
 
   // Remove @noescape from function return types. A @noescape
   // function return type is a contradiction.
@@ -1740,7 +1742,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   }
 
   // Get the generic signature from the surrounding context.
-  auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
+  auto funcInfo = TC.getConstantInfo(SILDeclRef(VD));
   return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
                                  TupleType::getEmpty(TC.Context),
                                  canResultTy);
@@ -1914,8 +1916,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorInterfaceType(*this,
-                                               cast<AbstractFunctionDecl>(vd),
+    return getDefaultArgGeneratorInterfaceType(*this, vd, vd->getDeclContext(),
                                                c.defaultArgIndex);
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(*this,
@@ -2071,25 +2072,28 @@ CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
   auto selfMetatypeType = MetatypeType::get(selfType,
                                             MetatypeRepresentation::Thick);
 
+  auto canSelfType = selfType->getCanonicalType(genericSig);
+  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
+  auto selfConvention = (storage->isSetterMutating()
+                         ? ParameterConvention::Indirect_Inout
+                         : ParameterConvention::Indirect_In_Guaranteed);
+
   {
     GenericContextScope scope(*this, genericSig);
 
     // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
     // selfMetatypeType.
-    if (auto metatype = selfType->getAs<MetatypeType>()) {
+    if (auto metatype = canSelfType->getAs<MetatypeType>()) {
       if (!metatype->hasRepresentation())
-        selfType = getLoweredType(metatype).getSwiftRValueType();
+        canSelfType = getLoweredType(metatype).getSwiftRValueType();
     }
   }
-
-  auto canSelfType = selfType->getCanonicalType(genericSig);
-  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
     { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
     { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { canSelfType, ParameterConvention::Indirect_Inout },
+    { canSelfType, selfConvention },
     { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
   };
   ArrayRef<SILResultInfo> results = {};
