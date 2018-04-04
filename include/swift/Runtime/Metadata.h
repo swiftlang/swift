@@ -1706,12 +1706,12 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   // argument array.
 
   /// Get a pointer to the field offset vector, if present, or null.
-  const StoredPointer *getFieldOffsets() const {
+  const uint32_t *getFieldOffsets() const {
     auto offset = getDescription()->FieldOffsetVectorOffset;
     if (offset == 0)
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
-    return reinterpret_cast<const StoredPointer *>(asWords + offset);
+    return reinterpret_cast<const uint32_t *>(asWords + offset);
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
@@ -4212,7 +4212,7 @@ void swift_initStructMetadata(StructMetadata *self,
                               StructLayoutFlags flags,
                               size_t numFields,
                               const TypeLayout * const *fieldTypes,
-                              size_t *fieldOffsets);
+                              uint32_t *fieldOffsets);
 
 /// Relocate the metadata for a class and copy fields from the given template.
 /// The final size of the metadata is calculated at runtime from the size of

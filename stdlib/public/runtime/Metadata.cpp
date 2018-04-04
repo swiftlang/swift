@@ -1758,12 +1758,12 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
 void swift::swift_initStructMetadata(StructMetadata *structType,
                                      StructLayoutFlags layoutFlags,
                                      size_t numFields,
-                                     const TypeLayout * const *fieldTypes,
-                                     size_t *fieldOffsets) {
+                                     const TypeLayout *const *fieldTypes,
+                                     uint32_t *fieldOffsets) {
   auto layout = getInitialLayoutForValueType();
   performBasicLayout(layout, fieldTypes, numFields,
     [&](const TypeLayout *fieldType) { return fieldType; },
-    [&](size_t i, const TypeLayout *fieldType, size_t offset) {
+    [&](size_t i, const TypeLayout *fieldType, uint32_t offset) {
       assignUnlessEqual(fieldOffsets[i], offset);
     });
 

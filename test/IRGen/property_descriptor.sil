@@ -43,7 +43,7 @@ public struct ExternalReabstractions<T> {
 sil_property #ExternalGeneric.ro <T: Comparable> (
   stored_property #ExternalGeneric.ro : $T)
 // CHECK-64: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" ={{( protected)?}}{{( protected)?}} constant
-// CHECK-64-SAME: <{ <i32 0x00ff_fffe>, i32 40 }>, align 8
+// CHECK-64-SAME: <{ <i32 0x00ff_fffe>, i32 36 }>, align 8
 // CHECK-32: @"$S19property_descriptor15ExternalGenericV2rwxvpMV" ={{( protected)?}} constant
 // CHECK-32-SAME: <{ <i32 0x00ff_fffe>, i32 20 }>, align 4
 sil_property #ExternalGeneric.rw <T: Comparable> (

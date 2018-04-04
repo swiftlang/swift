@@ -461,7 +461,7 @@ llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                               llvm::Value *offset,
                                               llvm::Type *objectType,
                                               const llvm::Twine &name) {
-  assert(offset->getType() == IGM.SizeTy);
+  assert(offset->getType() == IGM.SizeTy || offset->getType() == IGM.Int32Ty);
   auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
   addr = Builder.CreateInBoundsGEP(addr, offset);
   return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
