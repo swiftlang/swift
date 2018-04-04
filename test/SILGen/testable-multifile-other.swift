@@ -12,6 +12,8 @@
 // RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile.swift -module-name main -o /dev/null
 // RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -I %t -O -primary-file %s %S/testable-multifile.swift -module-name main -o /dev/null
 
+@testable import TestableMultifileHelper
+
 func use<F: Fooable>(_ f: F) { f.foo() }
 func test(internalFoo: FooImpl, publicFoo: PublicFooImpl) {
   use(internalFoo)

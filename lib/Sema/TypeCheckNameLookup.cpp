@@ -54,7 +54,10 @@ namespace {
                         NameLookupOptions options,
                         bool isMemberLookup)
       : TC(tc), Result(result), DC(dc), Options(options),
-        IsMemberLookup(isMemberLookup) { }
+        IsMemberLookup(isMemberLookup) {
+      if (!TC.Context.LangOpts.EnableAccessControl)
+        Options |= NameLookupFlags::IgnoreAccessControl;
+    }
 
     ~LookupResultBuilder() {
       // If any of the results have a base, we need to remove
@@ -184,6 +187,16 @@ namespace {
           .second;
       } else if (found->isProtocolRequirement()) {
         witness = concrete->getWitnessDecl(found, &TC);
+
+        // It is possible that a requirement is visible to us, but
+        // not the witness. In this case, just return the requirement;
+        // we will perform virtual dispatch on the concrete type.
+        if (witness &&
+            !Options.contains(NameLookupFlags::IgnoreAccessControl) &&
+            !witness->isAccessibleFrom(DC)) {
+          addResult(found);
+          return;
+        }
       }
 
       // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
