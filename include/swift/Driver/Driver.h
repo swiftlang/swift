@@ -389,8 +389,11 @@ private:
   /// there is an actual conflict.
   /// \param Args The input arguments.
   /// \param Inputs The inputs to the driver.
+  /// \param BatchModeOut An out-parameter flag that indicates whether to
+  /// batch the jobs of the resulting \c Mode::StandardCompile compilation.
   OutputInfo::Mode computeCompilerMode(const llvm::opt::DerivedArgList &Args,
-                                       const InputFileList &Inputs) const;
+                                       const InputFileList &Inputs,
+                                       bool &BatchModeOut) const;
 };
 
 } // end namespace driver
