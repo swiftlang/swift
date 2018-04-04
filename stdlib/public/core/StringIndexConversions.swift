@@ -49,7 +49,7 @@ extension String.Index {
   ///     `sourcePosition` must be a valid index of at least one of the views
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init?(
     _ sourcePosition: String.Index,
     within target: String
@@ -57,8 +57,7 @@ extension String.Index {
     guard target.unicodeScalars._isOnGraphemeClusterBoundary(sourcePosition)
     else { return nil }
 
-    self = target._characters._index(
-      atEncodedOffset: sourcePosition.encodedOffset)
+    self = target._index(atEncodedOffset: sourcePosition.encodedOffset)
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to
@@ -81,7 +80,7 @@ extension String.Index {
   ///   If this index does not have an exact corresponding position in `utf8`,
   ///   this method returns `nil`. For example, an attempt to convert the
   ///   position of a UTF-16 trailing surrogate returns `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
@@ -110,7 +109,7 @@ extension String.Index {
   ///   index. If this index does not have an exact corresponding position in
   ///   `utf16`, this method returns `nil`. For example, an attempt to convert
   ///   the position of a UTF-8 continuation byte returns `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {

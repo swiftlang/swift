@@ -251,12 +251,51 @@ func patternVarUsedInAnotherPattern(x: Int) {
   }
 }
 
-// Fallthroughs can't transfer control into a case label with bindings.
+// Fallthroughs can only transfer control into a case label with bindings if the previous case binds a superset of those vars.
 switch t {
 case (1, 2):
-  fallthrough // expected-error {{'fallthrough' cannot transfer control to a case label that declares variables}}
+  fallthrough // expected-error {{'fallthrough' from a case which doesn't bind variable 'a'}} expected-error {{'fallthrough' from a case which doesn't bind variable 'b'}}
 case (var a, var b): // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}} expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
   t = (b, a)
+}
+
+switch t { // specifically notice on next line that we shouldn't complain that a is unused - just never mutated
+case (var a, let b): // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  t = (b, b)
+  fallthrough // ok - notice that subset of bound variables falling through is fine
+case (2, let a):
+  t = (a, a)
+}
+
+func patternVarDiffType(x: Int, y: Double) {
+  switch (x, y) {
+  case (1, let a): // expected-error {{pattern variable bound to type 'Double', fallthrough case bound to type 'Int'}}
+    fallthrough
+  case (let a, _):
+    break
+  }
+}
+
+func patternVarDiffMutability(x: Int, y: Double) {
+  switch x {
+  case let a where a < 5, var a where a > 10: // expected-error {{'var' pattern binding must match previous 'let' pattern binding}}{{27-30=let}}
+    break
+  default:
+    break
+  }
+  switch (x, y) {
+  // Would be nice to have a fixit in the following line if we detect that all bindings in the same pattern have the same problem.
+  case let (a, b) where a < 5, var (a, b) where a > 10: // expected-error 2{{'var' pattern binding must match previous 'let' pattern binding}}{{none}}
+    break
+  case (let a, var b) where a < 5, (let a, let b) where a > 10: // expected-error {{'let' pattern binding must match previous 'var' pattern binding}}{{44-47=var}}
+    break
+  case (let a, let b) where a < 5, (var a, let b) where a > 10, (let a, var b) where a == 8:
+    // expected-error@-1 {{'var' pattern binding must match previous 'let' pattern binding}}{{37-40=let}}
+    // expected-error@-2 {{'var' pattern binding must match previous 'let' pattern binding}}{{73-76=let}}
+    break
+  default:
+    break
+  }
 }
 
 func test_label(x : Int) {

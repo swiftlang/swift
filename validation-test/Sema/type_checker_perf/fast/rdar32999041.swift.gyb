@@ -1,0 +1,10 @@
+// RUN: %scale-test --begin 3 --end 8 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+// FIXME: https://bugs.swift.org/browse/SR-6997
+// REQUIRES: SR6997
+
+_ = MemoryLayout<Int>.size
+%for i in range(0, N):
+  + MemoryLayout<Int>.size
+%end

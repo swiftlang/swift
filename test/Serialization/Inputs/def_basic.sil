@@ -30,7 +30,7 @@ bb0:
 }
 
 // This references a public global so we *SHOULD* deserialize this.
-// CHECK-LABEL: sil public_external [serialized] @_TV18lazy_global_access4Type10staticPropySia_public : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @_TV18lazy_global_access4Type10staticPropySia_public : $@convention(thin) () -> Builtin.RawPointer {
 sil [serialized] @_TV18lazy_global_access4Type10staticPropySia_public : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   // CHECK: alloc_global @public_global
@@ -62,7 +62,7 @@ class Class2 {
 
 // Instructions
 
-// CHECK-LABEL: sil public_external [serialized] @test1 : $@convention(thin) () -> ()
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test1 : $@convention(thin) () -> ()
 sil [serialized] @test1 : $@convention(thin) () -> () {
 bb0:                                  // CHECK: bb0:
   %0 = tuple ()                       // CHECK:   %0 = tuple ()
@@ -74,7 +74,7 @@ bb1:
 }
 
 // Forward referenced values.
-// CHECK-LABEL: sil public_external [serialized] @test2 : $@convention(thin) (Int) -> ()
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test2 : $@convention(thin) (Int) -> ()
 sil [serialized] @test2 : $@convention(thin) (Int) -> () {
   // CHECK: bb1:
   // CHECK: %[[VAL:[0-9]+]] = tuple ()
@@ -575,7 +575,7 @@ bb0(%0 : $*SomeProtocol):
   return %6 : $@thick SomeProtocol.Type
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_unreachable
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_unreachable
 sil [serialized] @test_unreachable : $@convention(thin) () -> () {
 bb0:
   unreachable
@@ -597,7 +597,7 @@ bb0(%0 : $SomeClass):
   return %5 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_basic_block_arguments
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_basic_block_arguments
 sil [serialized] @test_basic_block_arguments : $@convention(thin) (Builtin.Int1) -> Builtin.Word {
 bb0(%0 : $Builtin.Int1):
   // CHECK: cond_br
@@ -615,7 +615,7 @@ bb3(%6 : $Builtin.Word):
   return %6 : $Builtin.Word
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_cond_branch_basic_block_args
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_cond_branch_basic_block_args
 sil [serialized] @test_cond_branch_basic_block_args : $@convention(thin) (Int, Builtin.Int1) -> Int {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
@@ -628,7 +628,7 @@ bb3(%4 : $Int):
   return %4 : $Int
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_builtin_func_ref
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_builtin_func_ref
 sil [serialized] @test_builtin_func_ref : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int1>
@@ -646,7 +646,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   return %10 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_dealloc_ref
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_dealloc_ref
 sil [serialized] @test_dealloc_ref : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $Class1
@@ -655,7 +655,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_dealloc_partial_ref
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_dealloc_partial_ref
 sil [serialized] @test_dealloc_partial_ref : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $Class1
@@ -665,7 +665,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_dealloc_box
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_dealloc_box
 sil [serialized] @test_dealloc_box : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Class1>
@@ -674,7 +674,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_stack_flag
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_stack_flag
 sil [serialized] @test_stack_flag : $@convention(thin) () -> () {
 bb0:
   // CHECK: alloc_ref [stack] $Class1
@@ -685,7 +685,7 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_tail_elems
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_tail_elems
 sil [serialized] @test_tail_elems : $@convention(thin) (Builtin.Word, Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
   // CHECK: alloc_ref  [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] $Class1
@@ -696,7 +696,7 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_tail_elems_dynamic
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_tail_elems_dynamic
 sil [serialized] @test_tail_elems_dynamic : $@convention(thin) (Builtin.Word, Builtin.Word, @thick Class1.Type) -> () {
 bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $@thick Class1.Type):
   // CHECK: alloc_ref_dynamic  [tail_elems $Val * %0 : $Builtin.Word] [tail_elems $Aleph * %1 : $Builtin.Word] %2 : $@thick Class1
@@ -707,7 +707,7 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $@thick Class1.Type):
   return %4 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_tail_addr
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_tail_addr
 sil [serialized] @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1 {
 bb0(%0 : $Class1, %1 : $Builtin.Word):
   // CHECK: [[T:%[0-9]+]] = ref_tail_addr %0 : $Class1, $Val
@@ -748,7 +748,7 @@ sil [serialized] @$S6switch1ayyF : $@convention(thin) () -> ()
 sil [serialized] @$S6switch1byyF : $@convention(thin) () -> ()
 sil [serialized] @$S6switch1cyyF : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil public_external [serialized] @test_switch_union : $@convention(thin) (MaybePair) -> ()
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_switch_union : $@convention(thin) (MaybePair) -> ()
 sil [serialized] @test_switch_union : $@convention(thin) (MaybePair) -> () {
 bb0(%0 : $MaybePair):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <MaybePair>
@@ -791,7 +791,7 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
 sil [serialized] @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt.1: bb
@@ -810,7 +810,7 @@ bb3:
   return %t : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_switch_value : $@convention(thin) (Builtin.Word) -> ()
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_switch_value : $@convention(thin) (Builtin.Word) -> ()
 sil [serialized] @test_switch_value : $@convention(thin) (Builtin.Word) -> () {
 bb0(%0 : $Builtin.Word):
   // CHECK: switch_value %{{.*}} : $Builtin.Word, case %1: bb2, case %2: bb1
@@ -838,7 +838,7 @@ class ConcreteClass : ClassP {
 struct Spoon : Bendable {
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
 sil [serialized] @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable {
 bb0(%0 : $*Bendable, %1 : $Spoon):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <Spoon>
@@ -855,7 +855,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   return %8 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP
 sil [serialized] @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP {
 bb0(%0 : $ConcreteClass):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ConcreteClass>
@@ -869,13 +869,13 @@ bb0(%0 : $ConcreteClass):
   return %5 : $ClassP
 }
 
-sil [serialized] @test_assign : $@convention(thin) (Int, @inout Int) -> () {    // CHECK-LABEL: sil public_external [serialized] @test_assign
+sil [serialized] @test_assign : $@convention(thin) (Int, @inout Int) -> () {    // CHECK-LABEL: sil public_external [serialized] [canonical] @test_assign
 bb0(%0 : $Int, %1 : $*Int):
   assign %0 to %1 : $*Int                   // CHECK: assign
   unreachable
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_transparent : $@convention(thin) () -> () {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_transparent : $@convention(thin) () -> () {
 sil [serialized] @test_transparent : $@convention(thin) () -> () {
 bb0:
   // CHECK: function_ref
@@ -886,14 +886,14 @@ bb0:
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] [thunk] @test_thunk : $@convention(thin) () -> () {
+// CHECK-LABEL: sil public_external [serialized] [thunk] [canonical] @test_thunk : $@convention(thin) () -> () {
 sil [serialized] [thunk] @test_thunk : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
 }
 
-// CHECK-LABEL: [noinline] @noinline_callee
+// CHECK-LABEL: [noinline] [canonical] @noinline_callee
 sil [serialized] [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
   %0 = function_ref @$SSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
@@ -902,7 +902,7 @@ bb0:
   %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
   return %3 : $Int
 }
-// CHECK-LABEL: [always_inline] @always_inline_callee
+// CHECK-LABEL: [always_inline] [canonical] @always_inline_callee
 sil [serialized] [always_inline] @always_inline_callee : $@convention(thin) () -> Int {
 bb0:
   %0 = function_ref @$SSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
@@ -913,28 +913,28 @@ bb0:
 }
 sil [serialized] [transparent] @$SSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 
-// CHECK-LABEL: [_semantics "foo"] @test_semantics : $@convention(thin) () -> ()
+// CHECK-LABEL: [_semantics "foo"] [canonical] @test_semantics : $@convention(thin) () -> ()
 sil [serialized] [_semantics "foo"] @test_semantics : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: [Onone] @test_onone : $@convention(thin) () -> ()
+// CHECK-LABEL: [Onone] [canonical] @test_onone : $@convention(thin) () -> ()
 sil [serialized] [Onone] @test_onone : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: [Ospeed] @test_ospeed : $@convention(thin) () -> ()
+// CHECK-LABEL: [Ospeed] [canonical] @test_ospeed : $@convention(thin) () -> ()
 sil [serialized] [Ospeed] @test_ospeed : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: [Osize] @test_osize : $@convention(thin) () -> ()
+// CHECK-LABEL: [Osize] [canonical] @test_osize : $@convention(thin) () -> ()
 sil [serialized] [Osize] @test_osize : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
@@ -945,7 +945,7 @@ sil [serialized] @takes_unnamed_closure : $@convention(thin) (@callee_owned () -
 
 sil [serialized] @takes_int64_float32 : $@convention(thin) (Int, Float32) -> ()
 
-// CHECK-LABEL: sil public_external [serialized] @test_partial_apply : $@convention(thin) (Float) -> @callee_owned (Int) -> () {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_partial_apply : $@convention(thin) (Float) -> @callee_owned (Int) -> () {
 sil [serialized] @test_partial_apply : $@convention(thin) Float32 -> @callee_owned Int -> () {
 bb0(%0 : $Float32):
   %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
@@ -958,7 +958,7 @@ class X {
   @objc func f() { }
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
 sil [serialized] @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
@@ -983,7 +983,7 @@ bb3:
   return %28 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_mark_fn_escape
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_mark_fn_escape
 sil [serialized] @test_mark_fn_escape : $@convention(thin) () -> () {
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -997,7 +997,7 @@ sil [serialized] @test_mark_fn_escape : $@convention(thin) () -> () {
   return %28 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_copy_release_value
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_copy_release_value
 sil [serialized] @test_copy_release_value : $@convention(thin) (X) -> (X) {
 bb0(%0 : $X):
   retain_value %0 : $X
@@ -1010,7 +1010,7 @@ bb0(%0 : $X):
   // CHECK-NEXT: return [[T0]] : $X
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_set_deallocating
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_set_deallocating
 sil [serialized] @test_set_deallocating : $@convention(thin) (X) -> (X) {
 bb0(%0 : $X):
   set_deallocating %0 : $X
@@ -1019,7 +1019,7 @@ bb0(%0 : $X):
   // CHECK-NEXT: return [[T0]] : $X
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_pointer_to_address
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_pointer_to_address
 sil [serialized] @test_pointer_to_address : $@convention(thin) (Builtin.RawPointer, X) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $X):
   %2 = pointer_to_address %0 : $Builtin.RawPointer to $*X
@@ -1034,7 +1034,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $X):
   return %28 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @test_bind_memory
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_bind_memory
 sil [serialized] @test_bind_memory : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   bind_memory %0 : $Builtin.RawPointer, %1 : $Builtin.Word to $*X
@@ -1046,7 +1046,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 public func serialize_all() {
 }
 
-// CHECK: sil public_external [serialized] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK: sil public_external [serialized] [canonical] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 sil [serialized] @cond_fail_test : $@convention(thin) Builtin.Int1 -> () {
 entry(%0 : $Builtin.Int1):
   // CHECK: cond_fail %0 : $Builtin.Int1
@@ -1055,7 +1055,7 @@ entry(%0 : $Builtin.Int1):
   return %1 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @block_storage_type
+// CHECK-LABEL: sil public_external [serialized] [canonical] @block_storage_type
 sil [serialized] @block_storage_type : $@convention(thin) Int -> @convention(block) () -> () {
 entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
@@ -1074,7 +1074,7 @@ entry(%0 : $Int):
   return %b : $@convention(block) () -> ()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int) {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int) {
 // CHECK:  bb0(%0 : $Class1):
 // CHECK-NEXT:    %1 = unchecked_ref_cast %0 : $Class1 to $Class2
 // CHECK-NEXT:    %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
@@ -1093,7 +1093,7 @@ sil [serialized] @block_invoke : $@convention(c) (@inout_aliasable @block_storag
 
 // Test try_apply and throws
 // rdar://20925014
-// CHECK-LABEL: sil public_external [serialized] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
 sil [serialized]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error {
 bb0(%0 : $@convention(thin) () -> @error Error):
   // CHECK: try_apply %0() : $@convention(thin) () -> @error Error, normal bb2, error bb1
@@ -1108,7 +1108,7 @@ bb2(%3 : $Error):
 }
 
 // Test apply with the nothrow attribute
-// CHECK-LABEL: sil public_external [serialized] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> () {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> () {
 sil [serialized]  @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> () {
 bb0(%0 : $@convention(thin) () -> @error Error):
   // CHECK: apply [nothrow] %0() : $@convention(thin) () -> @error Error
@@ -1117,7 +1117,7 @@ bb0(%0 : $@convention(thin) () -> @error Error):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
 sil [serialized] @box_type : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>, Int) -> () {
 // CHECK: bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %1 : $Int):
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %1 : $Int):
@@ -1136,7 +1136,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %1 : $Int):
 // CHECK-LABEL: @test_forward_ref
 sil [serialized]  @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
 
-// CHECK-LABEL: sil public_external [serialized] @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int {
 // CHECK: [[PA:%.*]] = partial_apply {{%.*}}({{%.*}}) : $@convention(thin) (Int) -> @out Int
 // CHECK: apply [[PA]]({{%.*}}) : $@callee_owned () -> @out Int
 sil [serialized] @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int {
@@ -1188,7 +1188,7 @@ entry(%0 : $GenericStruct<Int64>):
   return %1 : $Int64
 }
 
-// CHECK-LABEL: sil public_external [serialized] @select_enum : $@convention(thin) (@in Beth) -> () {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @select_enum : $@convention(thin) (@in Beth) -> () {
 sil [serialized] @select_enum : $@convention(thin) (@in Beth) -> () {
 bb0(%0 : $*Beth):
   %1 = load %0 : $*Beth
@@ -1210,7 +1210,7 @@ struct SomeError: Error {
   var _code: Int { get }
 }
 
-// CHECK-LABEL: sil public_external [serialized] @existential_box : $@convention(thin) (SomeError) -> () {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @existential_box : $@convention(thin) (SomeError) -> () {
 sil [serialized] @existential_box : $@convention(thin) (SomeError) -> () {
 bb0(%0 : $SomeError):
   // CHECK: %1 = alloc_existential_box $Error, $SomeError
@@ -1228,7 +1228,7 @@ bb0(%0 : $SomeError):
   return undef : $()
 }
 
-// CHECK-LABEL: sil public_external [serialized] @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> () {
+// CHECK-LABEL: sil public_external [serialized] [canonical] @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> () {
 // CHECK:  bb0([[X:%.*]] : $Class1, [[W:%.*]] : $Builtin.Word):
 // CHECK-NEXT:    [[A:%.*]] = ref_to_bridge_object [[X]] : $Class1, [[W]] : $Builtin.Word
 // CHECK-NEXT:    [[B:%.*]] = bridge_object_to_ref [[A]] : $Builtin.BridgeObject to $Class1
@@ -1242,12 +1242,12 @@ entry(%x : $Class1, %w : $Builtin.Word):
   return undef : $()
 }
 
-// CHECK-LABEL: sil {{.*}}[reabstraction_thunk] @a_reabstraction_thunk : $@convention(thin) () -> ()
+// CHECK-LABEL: sil {{.*}}[reabstraction_thunk] [canonical] @a_reabstraction_thunk : $@convention(thin) () -> ()
 sil [reabstraction_thunk] @a_reabstraction_thunk : $@convention(thin) () -> () {
   %1 = tuple()
   return %1 : $()
 }
-// CHECK-LABEL: sil {{.*}}[thunk] @a_regular_thunk : $@convention(thin) () -> () {
+// CHECK-LABEL: sil {{.*}}[thunk] [canonical] @a_regular_thunk : $@convention(thin) () -> () {
 sil [serialized] [thunk] @a_regular_thunk : $@convention(thin) () -> () {
   %1 = tuple()
   return %1 : $()
@@ -1260,7 +1260,7 @@ public class WeakUnownedTest {
   deinit
 }
 
-// CHECK-LABEL: sil public_external [serialized] @weak_unowned : $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
+// CHECK-LABEL: sil public_external [serialized] [canonical] @weak_unowned : $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
 sil [serialized] @weak_unowned : $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> () {
 bb0(%0 : $WeakUnownedTest, %1 : $AnyObject):
   %2 = ref_element_addr %0 : $WeakUnownedTest, #WeakUnownedTest.unownedVal
@@ -1278,6 +1278,46 @@ bb0(%0 : $WeakUnownedTest, %1 : $AnyObject):
   return %r : $()
 }
 
+
+class A {
+  @sil_stored var property: Any { get set }
+  deinit
+  init()
+}
+
+// CHECK-LABEL: sil public_external [serialized] [canonical] @test_access : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: begin_access [read] [dynamic]
+// CHECK: end_access
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK: end_access
+// CHECK: begin_unpaired_access [read] [dynamic]
+// CHECK: end_unpaired_access [dynamic]
+// CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'test_access'
+sil [serialized] @test_access : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.property
+  %3 = begin_access [dynamic] [read] %2 : $*Any
+  copy_addr %3 to [initialization] %1 : $*Any
+  end_access %3 : $*Any
+  %6 = begin_access [dynamic] [read] [no_nested_conflict] %2 : $*Any
+  copy_addr %6 to %1 : $*Any
+  end_access %6 : $*Any
+  destroy_addr %1 : $*Any
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  end_unpaired_access [dynamic] %9 : $*Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [no_nested_conflict] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
+}
+
 public class Foo {
   subscript (x: Int, y: Int) -> Int32 { get set }
   var x: Int
@@ -1285,8 +1325,8 @@ public class Foo {
   init()
 }
 
-// CHECK-LABEL: sil [serialized] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32
-// CHECK_DECL-LABEL: sil [serialized] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32{{$}}
+// CHECK-LABEL: sil [serialized] [canonical] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32
+// CHECK_DECL-LABEL: sil [serialized] [canonical] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32{{$}}
 sil [serialized] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfg : $@convention(method) (Int, Int, @guaranteed Foo) -> Int32 {
 bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   %3 = tuple ()
@@ -1306,8 +1346,8 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Foo):
   return %13 : $Int32
 }
 
-// CHECK-LABEL: sil [serialized] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> ()
-// CHECK_DECL-LABEL: sil [serialized] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> (){{$}}
+// CHECK-LABEL: sil [serialized] [canonical] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> ()
+// CHECK_DECL-LABEL: sil [serialized] [canonical] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> (){{$}}
 sil [serialized] @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfs : $@convention(method) (Int32, Int, Int, @guaranteed Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value         // users: %16, %5
@@ -1493,6 +1533,7 @@ bb0:
   %151 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
   %152 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
   %153 = function_ref @weak_unowned: $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
+  %154 = function_ref @test_access : $@convention(thin) (@guaranteed A) -> ()
 
   %r = tuple ()
   return %r : $()

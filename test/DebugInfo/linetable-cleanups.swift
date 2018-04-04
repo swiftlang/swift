@@ -20,14 +20,14 @@ func main() {
 // CHECK: call {{.*}}void @"$S4main8markUsedyyxlF"
 // CHECK: br label
 // CHECK: <label>:
-// CHECK: call %Ts16IndexingIteratorVySaySiGG* @"$Ss16IndexingIteratorVySaySiGGWh0_"(%Ts16IndexingIteratorVySaySiGG* %{{.*}}), !dbg ![[LOOPHEADER_LOC:.*]]
+// CHECK: call %Ts16IndexingIteratorVySaySiGG* @"$Ss16IndexingIteratorVySaySiGGWOh"(%Ts16IndexingIteratorVySaySiGG* %{{.*}}), !dbg ![[LOOPHEADER_LOC:.*]]
 // CHECK: call {{.*}}void @"$S4main8markUsedyyxlF"
 // The cleanups should share the line number with the ret stmt.
-// CHECK:  call %TSa* @"$SSaySiGWh0_"(%TSa* %{{.*}}), !dbg ![[CLEANUPS:.*]]
+// CHECK:  call %TSa* @"$SSaySiGWOh"(%TSa* %{{.*}}), !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  load
-// CHECK-NEXT:  swift_rt_swift_release
+// CHECK-NEXT:  swift_release
 // CHECK-NEXT:  bitcast
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  ret void, !dbg ![[CLEANUPS]]

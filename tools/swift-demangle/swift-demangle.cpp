@@ -49,6 +49,10 @@ RemangleMode("test-remangle",
            llvm::cl::desc("Remangle test mode (show the remangled string)"));
 
 static llvm::cl::opt<bool>
+RemangleRtMode("remangle-objc-rt",
+           llvm::cl::desc("Remangle to the ObjC runtime name mangling scheme"));
+
+static llvm::cl::opt<bool>
 RemangleNew("remangle-new",
            llvm::cl::desc("Remangle the symbol with new mangling scheme"));
 
@@ -121,6 +125,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     if (hadLeadingUnderscore) llvm::outs() << '_';
     llvm::outs() << remangled;
     return;
+  } else if (RemangleRtMode) {
+    std::string remangled = name;
+    if (pointer) {
+      remangled = swift::Demangle::mangleNodeOld(pointer);
+    }
+    llvm::outs() << remangled;
   }
   if (!TreeOnly) {
     if (RemangleNew) {
@@ -165,7 +175,7 @@ static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   // Also accept the future mangling prefix.
   // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
-  llvm::Regex maybeSymbol("(_T|_*\\$S|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$.]+");
+  llvm::Regex maybeSymbol("(_T|_?\\$[Ss])[_a-zA-Z0-9$.]+");
 
   swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {
@@ -203,7 +213,12 @@ int main(int argc, char **argv) {
   } else {
     swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
-      demangle(llvm::outs(), name, DCtx, options);
+      if (name.startswith("S")) {
+        std::string correctedName = std::string("$") + name.str();
+        demangle(llvm::outs(), correctedName, DCtx, options);
+      } else {
+        demangle(llvm::outs(), name, DCtx, options);
+      }
       llvm::outs() << '\n';
     }
 

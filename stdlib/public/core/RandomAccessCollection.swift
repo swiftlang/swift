@@ -153,7 +153,7 @@ extension RandomAccessCollection {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
@@ -170,18 +170,18 @@ extension RandomAccessCollection {
 // for random access collections with strideable indices.
 extension RandomAccessCollection where Index : Strideable, Index.Stride == Int {
   @_implements(Collection, Indices)
-  public typealias _Default_Indices = CountableRange<Index>
+  public typealias _Default_Indices = Range<Index>
 }
 
 extension RandomAccessCollection
 where Index : Strideable, 
       Index.Stride == Int,
-      Indices == CountableRange<Index> {
+      Indices == Range<Index> {
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
-  @_inlineable
-  public var indices: CountableRange<Index> {
+  @inlinable
+  public var indices: Range<Index> {
     return startIndex..<endIndex
   }
 
@@ -190,7 +190,7 @@ where Index : Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests for the trap.
     _failEarlyRangeCheck(
@@ -203,7 +203,7 @@ where Index : Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     let result = i.advanced(by: -1)
     // FIXME: swift-3-indexing-model: tests for the trap.
@@ -234,7 +234,7 @@ where Index : Strideable,
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
     let result = i.advanced(by: n)
     // This range check is not precise, tighter bounds exist based on `n`.
@@ -256,7 +256,7 @@ where Index : Strideable,
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Index.Stride {
     // FIXME: swift-3-indexing-model: tests for traps.
     _failEarlyRangeCheck(

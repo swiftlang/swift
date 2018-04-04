@@ -234,8 +234,8 @@ String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
 
 // <rdar://problem/21553065> Spurious diagnostic: '_' can only appear in a pattern or on the left side of an assignment
 protocol r21553065Protocol {}
-class r21553065Class<T : AnyObject> {}
-_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Protocol' is not convertible to 'AnyObject'}}
+class r21553065Class<T : AnyObject> {} // expected-note{{requirement specified as 'T' : 'AnyObject'}}
+_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' requires that 'r21553065Protocol' be a class type}}
 
 // Type variables not getting erased with nested closures
 struct Toe {
@@ -457,8 +457,7 @@ func testTypeSugar(_ a : Int) {
 
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(_ y : Int) {
-  let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
-   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  let x = &(1.0 + y) // expected-error {{use of extraneous '&'}}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -633,7 +632,7 @@ func r23272739(_ contentType: String) {
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
 func r23641896() {
   var g = "Hello World"
-  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'CountableClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
+  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'ClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
 
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
@@ -981,7 +980,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note {{found this candidate}}
 }
 
 func SR_6272_d() {
@@ -1167,7 +1166,7 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 {{type of expression is ambiguous without more context}}
+    // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }
 

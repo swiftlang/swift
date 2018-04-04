@@ -1,0 +1,47 @@
+%{
+  # -*- mode: Python -*-
+  from gyb_sourcekit_support import *
+  assert check_uid_duplication(), "Found UID duplication"
+  # Ignore the following admonition; it applies to the resulting .def file only
+}%
+//// Automatically Generated From ProtocolUIDs.def.gyb.
+//// Do Not Edit Directly!
+//===---------------- ProtocolUIDs.def.gyb - SourceKitd UIDS -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef KEY
+#define KEY(NAME, CONTENT)
+#endif
+
+#ifndef REQUEST
+#define REQUEST(NAME, CONTENT)
+#endif
+
+#ifndef KIND
+#define KIND(NAME, CONTENT)
+#endif
+
+% for K in UID_KEYS:
+KEY(${K.internalName}, "${K.externalName}")
+% end
+
+% for R in UID_REQUESTS:
+REQUEST(${R.internalName}, "${R.externalName}")
+% end
+
+% for K in UID_KINDS:
+KIND(${K.internalName}, "${K.externalName}")
+% end
+
+#undef KIND
+#undef REQUEST
+#undef KEY

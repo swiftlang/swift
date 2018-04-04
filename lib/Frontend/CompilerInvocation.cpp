@@ -12,9 +12,9 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
@@ -81,9 +81,11 @@ SourceFileKind CompilerInvocation::getSourceFileKind() const {
   llvm_unreachable("Unhandled InputFileKind in switch.");
 }
 
-static bool ParseFrontendArgs(FrontendOptions &opts, ArgList &args,
-                              DiagnosticEngine &diags) {
-  return ArgsToFrontendOptionsConverter(diags, args, opts).convert();
+static bool ParseFrontendArgs(
+    FrontendOptions &opts, ArgList &args, DiagnosticEngine &diags,
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
+  ArgsToFrontendOptionsConverter converter(diags, args, opts);
+  return converter.convert(buffers);
 }
 
 static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
@@ -208,7 +210,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.EnableConstraintPropagation |= Args.hasArg(OPT_propagate_constraints);
   Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -308,6 +309,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    OPT_disable_nskeyedarchiver_diagnostics,
                    Opts.EnableNSKeyedArchiverDiagnostics);
 
+  Opts.EnableNonFrozenEnumExhaustivityDiagnostics =
+    Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
+                 OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
+                 Opts.EnableNonFrozenEnumExhaustivityDiagnostics);
+
   if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
     Opts.OptimizationRemarkPassedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
@@ -327,6 +333,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    Target.isOSDarwin());
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
 
+  Opts.EnableKeyPathResilience |= Args.hasArg(OPT_enable_key_path_resilience);
+  
 #if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
   Opts.UseDarwinPreStableABIBit = false;
 #else
@@ -478,10 +486,17 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
 }
 
 // Lifted from the clang driver.
-static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
+static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   const bool Escape = std::strpbrk(Arg, "\"\\$ ");
 
-  if (!Quote && !Escape) {
+  if (StringRef(Arg).startswith(TempDir)) {
+    // Don't write temporary file names in the debug info. This would prevent
+    // incremental llvm compilation because we would generate different IR on
+    // every compiler invocation.
+    Arg = "<temporary-file>";
+  }
+
+  if (!Escape) {
     OS << Arg;
     return;
   }
@@ -521,11 +536,6 @@ void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
   } else {
     Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
         A->getOption().getPrefixedName(), A->getValue());
-  }
-  if (Opts.shouldOptimize() && Opts.EnforceExclusivityDynamic) {
-    Diags.diagnose(SourceLoc(),
-                   diag::warning_argument_not_supported_with_optimization,
-                   A->getOption().getPrefixedName() + A->getValue());
   }
 }
 
@@ -663,8 +673,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableMandatorySemanticARCOpts |=
       !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
-  Opts.EnableGuaranteedNormalArguments |=
-      Args.hasArg(OPT_enable_guaranteed_normal_arguments);
+  Opts.EnableGuaranteedNormalArguments &=
+      !Args.hasArg(OPT_disable_guaranteed_normal_arguments);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
@@ -672,18 +682,18 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.
-    StringRef BaseName = FEOpts.getSingleOutputFilename();
+    std::string BaseName = FEOpts.InputsAndOutputs.getSingleOutputFilename();
     // If there are no or multiple outputfiles, derive the name
     // from the module name.
     if (BaseName.empty())
       BaseName = FEOpts.ModuleName;
-    Opts.SILOutputFileNameForDebugging = BaseName.str();
+    Opts.SILOutputFileNameForDebugging = BaseName;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_EQ)) {
     Opts.Sanitizers = parseSanitizerArgValues(
         Args, A, Triple, Diags,
-        /* sanitizerRuntimeLibExists= */[](StringRef libName) {
+        /* sanitizerRuntimeLibExists= */[](StringRef libName, bool shared) {
 
           // The driver has checked the existence of the library
           // already.
@@ -692,7 +702,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.Sanitizers = Opts.Sanitizers;
   }
 
-  if (Opts.shouldOptimize())
+  if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
+                               OPT_disable_verify_exclusivity)) {
+    Opts.VerifyExclusivity
+      = A->getOption().matches(OPT_enable_verify_exclusivity);
+  }
+  if (Opts.shouldOptimize() && !Opts.VerifyExclusivity)
     Opts.EnforceExclusivityDynamic = false;
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
@@ -705,9 +720,14 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
                                               const ArrayRef<const char*> &Args,
                                               StringRef SDKPath,
                                               StringRef ResourceDir) {
+  // This isn't guaranteed to be the same temp directory as what the driver
+  // uses, but it's highly likely.
+  llvm::SmallString<128> TDir;
+  llvm::sys::path::system_temp_directory(true, TDir);
+
   llvm::raw_string_ostream OS(Output);
   interleave(Args,
-             [&](const char *Argument) { PrintArg(OS, Argument, false); },
+             [&](const char *Argument) { PrintArg(OS, Argument, TDir.str()); },
              [&] { OS << " "; });
 
   // Inject the SDK path and resource dir if they are nonempty and missing.
@@ -723,11 +743,11 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
   }
   if (!haveSDKPath) {
     OS << " -sdk ";
-    PrintArg(OS, SDKPath.data(), false);
+    PrintArg(OS, SDKPath.data(), TDir.str());
   }
   if (!haveResourceDir) {
     OS << " -resource-dir ";
-    PrintArg(OS, ResourceDir.data(), false);
+    PrintArg(OS, ResourceDir.data(), TDir.str());
   }
 }
 
@@ -813,17 +833,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
-  // TODO: investigate whether these should be removed, in favor of definitions
-  // in other classes.
-  if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-    Opts.MainInputFilename = SILOpts.SILOutputFileNameForDebugging;
-  } else if (const InputFile *input =
-                 FrontendOpts.Inputs.getUniquePrimaryInput()) {
-    Opts.MainInputFilename = input->file();
-  } else if (FrontendOpts.Inputs.hasSingleInput()) {
-    Opts.MainInputFilename = FrontendOpts.Inputs.getFilenameOfFirstInput();
-  }
-  Opts.OutputFilenames = FrontendOpts.OutputFilenames;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
   if (Args.hasArg(OPT_use_jit))
@@ -906,8 +915,16 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
-bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
-                       StringRef ResourcePath, ArgList &Args,
+static std::string getScriptFileName(StringRef name, bool isSwiftVersion3) {
+  StringRef langVer = isSwiftVersion3 ? "3" : "4";
+  return (Twine(name) + langVer + ".json").str();
+}
+
+bool ParseMigratorArgs(MigratorOptions &Opts,
+                       const FrontendOptions &FrontendOpts,
+                       const llvm::Triple &Triple,
+                       const bool isSwiftVersion3,
+                       StringRef ResourcePath, const ArgList &Args,
                        DiagnosticEngine &Diags) {
   using namespace options;
 
@@ -937,31 +954,54 @@ bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
     llvm::SmallString<128> dataPath(ResourcePath);
     llvm::sys::path::append(dataPath, "migrator");
     if (Triple.isMacOSX())
-      llvm::sys::path::append(dataPath, "macos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("macos", isSwiftVersion3));
     else if (Triple.isiOS())
-      llvm::sys::path::append(dataPath, "ios.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("ios", isSwiftVersion3));
     else if (Triple.isTvOS())
-      llvm::sys::path::append(dataPath, "tvos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("tvos", isSwiftVersion3));
     else if (Triple.isWatchOS())
-      llvm::sys::path::append(dataPath, "watchos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("watchos", isSwiftVersion3));
     else
       Supported = false;
     if (Supported) {
       llvm::SmallString<128> authoredDataPath(ResourcePath);
       llvm::sys::path::append(authoredDataPath, "migrator");
-      llvm::sys::path::append(authoredDataPath, "overlay.json");
+      llvm::sys::path::append(authoredDataPath,
+                              getScriptFileName("overlay", isSwiftVersion3));
       // Add authored list first to take higher priority.
       Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
       Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
     }
   }
 
+  if (Opts.shouldRunMigrator()) {
+    assert(!FrontendOpts.InputsAndOutputs.isWholeModule());
+    // FIXME: In order to support batch mode properly, the migrator would have
+    // to support having one remap file path and one migrated file path per
+    // primary input. The easiest way to do this would be to move processing of
+    // these paths into FrontendOptions, like other supplementary outputs, and
+    // to call migrator::updateCodeAndEmitRemapIfNeeded once for each primary
+    // file.
+    //
+    // Supporting WMO would be similar, but WMO is set up to only produce one
+    // supplementary output for the whole compilation instead of one per input,
+    // so it's probably not worth it.
+    FrontendOpts.InputsAndOutputs.assertMustNotBeMoreThanOnePrimaryInput();
+  }
+
   return false;
 }
 
-bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
-                                   DiagnosticEngine &Diags,
-                                   StringRef workingDirectory) {
+bool CompilerInvocation::parseArgs(
+    ArrayRef<const char *> Args,
+    DiagnosticEngine &Diags,
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
+        *ConfigurationFileBuffers,
+    StringRef workingDirectory) {
   using namespace options;
 
   if (Args.empty())
@@ -987,7 +1027,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags)) {
+  if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
+                        ConfigurationFileBuffers)) {
     return true;
   }
 
@@ -1020,7 +1061,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseMigratorArgs(MigratorOpts, LangOpts.Target,
+  if (ParseMigratorArgs(MigratorOpts, FrontendOpts, LangOpts.Target,
+                        LangOpts.isSwiftVersion3(),
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
@@ -1064,7 +1106,7 @@ CompilerInvocation::setUpInputForSILTool(
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  getFrontendOptions().Inputs.addInput(
+  getFrontendOptions().InputsAndOutputs.addInput(
       InputFile(inputFilename, bePrimary, fileBufOrErr.get().get()));
 
   auto result = serialization::validateSerializedAST(

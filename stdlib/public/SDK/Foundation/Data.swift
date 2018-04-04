@@ -38,9 +38,6 @@ internal func __NSDataIsCompact(_ data: NSData) -> Bool {
 import _SwiftFoundationOverlayShims
 import _SwiftCoreFoundationOverlayShims
     
-@_silgen_name("__NSDataWriteToURL")
-internal func __NSDataWriteToURL(_ data: NSData, _ url: NSURL, _ options: UInt, _ error: NSErrorPointer) -> Bool
-    
 #endif
 
 public final class _DataStorage {
@@ -996,10 +993,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public typealias Base64DecodingOptions = NSData.Base64DecodingOptions
     
     public typealias Index = Int
-    public typealias Indices = CountableRange<Int>
+    public typealias Indices = Range<Int>
     
-    @_versioned internal var _backing : _DataStorage
-    @_versioned internal var _sliceRange: Range<Index>
+    @usableFromInline internal var _backing : _DataStorage
+    @usableFromInline internal var _sliceRange: Range<Index>
     
     
     // A standard or custom deallocator for `Data`.
@@ -1250,18 +1247,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
-    @_versioned
+    @usableFromInline
     internal init(backing: _DataStorage, range: Range<Index>) {
         _backing = backing
         _sliceRange = range
     }
     
-    @_versioned
+    @usableFromInline
     internal func _validateIndex(_ index: Int, message: String? = nil) {
         precondition(_sliceRange.contains(index), message ?? "Index \(index) is out of bounds of range \(_sliceRange)")
     }
     
-    @_versioned
+    @usableFromInline
     internal func _validateRange<R: RangeExpression>(_ range: R) where R.Bound == Int {
         let lower = R.Bound(_sliceRange.lowerBound)
         let upper = R.Bound(_sliceRange.upperBound)
@@ -1407,9 +1404,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 #else
             if _shouldUseNonAtomicWriteReimplementation(options: options) {
                 var error: NSError? = nil
-                guard __NSDataWriteToURL($0, url as NSURL, options.rawValue, &error) else { throw error! }
+                guard __NSDataWriteToURL($0, url, options, &error) else { throw error! }
             } else {
-                try $0.write(to: url, options: WritingOptions(rawValue: options.rawValue))
+                try $0.write(to: url, options: options)
             }
 #endif
         }
@@ -1428,9 +1425,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let nsRange : NSRange
         if let r = range {
             _validateRange(r)
-            nsRange = NSRange(location: r.lowerBound, length: r.upperBound - r.lowerBound)
+            nsRange = NSRange(location: r.lowerBound - startIndex, length: r.upperBound - r.lowerBound)
         } else {
-            nsRange = NSRange(location: 0, length: _backing.length)
+            nsRange = NSRange(location: 0, length: count)
         }
         let result = _backing.withInteriorPointerReference(_sliceRange) {
             $0.range(of: dataToFind, options: options, in: nsRange)
@@ -1438,7 +1435,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if result.location == NSNotFound {
             return nil
         }
-        return result.location..<(result.location + result.length)
+        return (result.location + startIndex)..<((result.location + startIndex) + result.length)
     }
     
     /// Enumerate the contents of the data.
@@ -1537,12 +1534,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inline(__always)
-    public mutating func replaceSubrange(_ subrange: CountableRange<Index>, with data: Data) {
-        let range: Range<Int> = subrange.lowerBound..<subrange.upperBound
-        replaceSubrange(range, with: data)
-    }
-    
     /// Replace a region of bytes in the data with new bytes from a buffer.
     ///
     /// This will resize the data if required, to fit the entire contents of `buffer`.
@@ -1552,7 +1543,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter buffer: The replacement bytes.
     @inline(__always)
     public mutating func replaceSubrange<SourceType>(_ subrange: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
-        guard buffer.count > 0  else { return }
+        guard !buffer.isEmpty  else { return }
         replaceSubrange(subrange, with: buffer.baseAddress!, count: buffer.count * MemoryLayout<SourceType>.stride)
     }
     
@@ -1634,7 +1625,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         var hashValue = 0
         let hashRange: Range<Int> = _sliceRange.lowerBound..<Swift.min(_sliceRange.lowerBound + 80, _sliceRange.upperBound)
         _withStackOrHeapBuffer(hashRange.count + 1) { buffer in
-            if hashRange.count > 0 {
+            if !hashRange.isEmpty {
                 _backing.withUnsafeBytes(in: hashRange) {
                     memcpy(buffer.pointee.memory, $0.baseAddress!, hashRange.count)
                 }
@@ -1743,7 +1734,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         return i + 1
     }
     
-    public var indices: CountableRange<Int> {
+    public var indices: Range<Int> {
         @inline(__always)
         get {
             return startIndex..<endIndex

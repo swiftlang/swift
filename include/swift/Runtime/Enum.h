@@ -64,34 +64,30 @@ void swift_initEnumMetadataSinglePayload(EnumMetadata *enumType,
 /// \param payload - type metadata for the payload case of the enum.
 /// \param emptyCases - the number of empty cases in the enum.
 ///
-/// \returns -1 if the payload case is inhabited. If an empty case is inhabited,
-///          returns a value greater than or equal to zero and less than
+/// \returns 0 if the payload case is inhabited. If an empty case is inhabited,
+///          returns a value greater than or equal to one and less than or equal
 ///          emptyCases.
-SWIFT_RT_ENTRY_VISIBILITY
-int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                   const Metadata *payload,
-                                   unsigned emptyCases)
-  SWIFT_CC(RegisterPreservingCC);
-
-
+SWIFT_RUNTIME_EXPORT
+unsigned swift_getEnumCaseSinglePayload(const OpaqueValue *value,
+                                        const Metadata *payload,
+                                        unsigned emptyCases);
 
 /// \brief Store the tag value for the given case into a single-payload enum,
 ///        whose associated payload (if any) has already been initialized.
 ///
 /// \param value - pointer to the enum value. If the case being initialized is
-///                the payload case (-1), then the payload should be
+///                the payload case (0), then the payload should be
 ///                initialized.
 /// \param payload - type metadata for the payload case of the enum.
-/// \param whichCase - unique value identifying the case. -1 for the payload
-///                    case, or a value greater than or equal to zero and less
-///                    than emptyCases for an empty case.
+/// \param whichCase - unique value identifying the case. 0 for the payload
+///                    case, or a value greater than or equal to one and less
+///                    than or equal emptyCases for an empty case.
 /// \param emptyCases - the number of empty cases in the enum.
-SWIFT_RT_ENTRY_VISIBILITY
+SWIFT_RUNTIME_EXPORT
 void swift_storeEnumTagSinglePayload(OpaqueValue *value,
                                      const Metadata *payload,
-                                     int whichCase,
-                                     unsigned emptyCases)
-  SWIFT_CC(RegisterPreservingCC);
+                                     unsigned whichCase,
+                                     unsigned emptyCases);
 
 /// \brief Initialize the type metadata for a generic, multi-payload
 ///        enum instance.

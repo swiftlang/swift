@@ -160,7 +160,7 @@ static StringRefLite findBaseName(StringRefLite demangledName) {
     return 0;
 
   // Is it a generic class?
-  if (theClass->getDescription()->GenericParams.isGeneric()) {
+  if (theClass->getDescription()->isGeneric()) {
     logIfFirstOccurrence(objcClass, ^{
       // Use actual NSStrings to force UTF-8.
       StringRefLite demangledName = swift_getTypeName(theClass,

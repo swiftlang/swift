@@ -21,7 +21,7 @@ tests.test("copy construction") {
 tests.test("subscript with Any") {
   let d = NSMutableDictionary()
   d["k"] = "@this is how the world ends"
-  expectEqual((d["k"]! as AnyObject).characterAtIndex(0), 0x40)
+  expectEqual((d["k"]! as AnyObject).character(at: 0), 0x40)
   d["k"] = nil
   expectTrue(d["k"] == nil)
 }

@@ -17,7 +17,7 @@ import Foundation
 /// are immutable and can be freely shared between syntax nodes.
 indirect enum RawSyntax: Codable {
   /// A tree node with a kind, an array of children, and a source presence.
-  case node(SyntaxKind, [RawSyntax], SourcePresence)
+  case node(SyntaxKind, [RawSyntax?], SourcePresence)
 
   /// A token with a token kind, leading trivia, trailing trivia, and a source
   /// presence.
@@ -39,7 +39,7 @@ indirect enum RawSyntax: Codable {
   }
 
   /// The layout of the children of this Raw syntax node.
-  var layout: [RawSyntax] {
+  var layout: [RawSyntax?] {
     switch self {
     case .node(_, let layout, _): return layout
     case .token(_, _, _, _): return []
@@ -78,7 +78,7 @@ indirect enum RawSyntax: Codable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let presence = try container.decode(SourcePresence.self, forKey: .presence)
     if let kind = try container.decodeIfPresent(SyntaxKind.self, forKey: .kind) {
-      let layout = try container.decode([RawSyntax].self, forKey: .layout)
+      let layout = try container.decode([RawSyntax?].self, forKey: .layout)
       self = .node(kind, layout, presence)
     } else {
       let kind = try container.decode(TokenKind.self, forKey: .tokenKind)
@@ -129,7 +129,7 @@ indirect enum RawSyntax: Codable {
   /// - Note: This function does nothing with `.token` nodes --- the same token
   ///         is returned.
   /// - Parameter newLayout: The children of the new node you're creating.
-  func replacingLayout(_ newLayout: [RawSyntax]) -> RawSyntax {
+  func replacingLayout(_ newLayout: [RawSyntax?]) -> RawSyntax {
     switch self {
     case let .node(kind, _, presence): return .node(kind, newLayout, presence)
     case .token(_, _, _, _): return self
@@ -150,7 +150,7 @@ indirect enum RawSyntax: Codable {
   /// Returns the child at the provided cursor in the layout.
   /// - Parameter index: The index of the child you're accessing.
   /// - Returns: The child at the provided index.
-  subscript<CursorType: RawRepresentable>(_ index: CursorType) -> RawSyntax
+  subscript<CursorType: RawRepresentable>(_ index: CursorType) -> RawSyntax?
     where CursorType.RawValue == Int {
       return layout[index.rawValue]
   }
@@ -178,6 +178,7 @@ extension RawSyntax: TextOutputStreamable {
     switch self {
     case .node(_, let layout, _):
       for child in layout {
+        guard let child = child else { continue }
         child.write(to: &target)
       }
     case let .token(kind, leadingTrivia, trailingTrivia, presence):
@@ -189,6 +190,73 @@ extension RawSyntax: TextOutputStreamable {
       for piece in trailingTrivia {
         piece.write(to: &target)
       }
+    }
+  }
+}
+
+extension RawSyntax {
+  func accumulateAbsolutePosition(_ pos: AbsolutePosition) {
+    switch self {
+    case .node(_, let layout, _):
+      for child in layout {
+        guard let child = child else { continue }
+        child.accumulateAbsolutePosition(pos)
+      }
+    case let .token(kind, leadingTrivia, trailingTrivia, presence):
+      guard case .present = presence else { return }
+      for piece in leadingTrivia {
+        piece.accumulateAbsolutePosition(pos)
+      }
+      pos.add(text: kind.text)
+      for piece in trailingTrivia {
+        piece.accumulateAbsolutePosition(pos)
+      }
+    }
+  }
+
+  var leadingTrivia: Trivia? {
+    switch self {
+    case .node(_, let layout, _):
+      for child in layout {
+        guard let child = child else { continue }
+        guard let result = child.leadingTrivia else { continue }
+        return result
+      }
+      return nil
+    case let .token(_, leadingTrivia, _, presence):
+      guard case .present = presence else { return nil }
+      return leadingTrivia
+    }
+  }
+
+  var trailingTrivia: Trivia? {
+    switch self {
+    case .node(_, let layout, _):
+      for child in layout.reversed() {
+        guard let child = child else { continue }
+        guard let result = child.trailingTrivia else { continue }
+        return result
+      }
+      return nil
+    case let .token(_, _, trailingTrivia, presence):
+      guard case .present = presence else { return nil }
+      return trailingTrivia
+    }
+  }
+
+  func accumulateLeadingTrivia(_ pos: AbsolutePosition) {
+    guard let trivia = leadingTrivia else { return }
+    for piece in trivia {
+      piece.accumulateAbsolutePosition(pos)
+    }
+  }
+
+  var isSourceFile: Bool {
+    switch self {
+    case .node(let kind, _, _):
+      return kind == SyntaxKind.sourceFile
+    default:
+      return false
     }
   }
 }

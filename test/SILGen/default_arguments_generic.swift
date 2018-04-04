@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -swift-version 3 %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -swift-version 4 %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name default_arguments_generic -emit-silgen -enable-sil-ownership -swift-version 3 %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name default_arguments_generic -emit-silgen -enable-sil-ownership -swift-version 4 %s | %FileCheck %s
 
 func foo<T: ExpressibleByIntegerLiteral>(_: T.Type, x: T = 0) { }
 
@@ -49,7 +50,7 @@ func testInitializable() {
 
 // Local generic functions with default arguments
 
-// CHECK-LABEL: sil hidden @$S25default_arguments_generic5outer1tyx_tlF : $@convention(thin) <T> (@in T) -> ()
+// CHECK-LABEL: sil hidden @$S25default_arguments_generic5outer1tyx_tlF : $@convention(thin) <T> (@in_guaranteed T) -> ()
 func outer<T>(t: T) {
   func inner1(x: Int = 0) {}
 

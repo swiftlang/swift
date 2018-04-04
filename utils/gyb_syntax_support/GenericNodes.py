@@ -15,6 +15,7 @@ GENERIC_NODES = [
 
     # same-type-requirement -> type-identifier == type
     Node('SameTypeRequirement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('LeftTypeIdentifier', kind='Type'),
              Child('EqualityToken', kind='Token',
@@ -34,6 +35,7 @@ GENERIC_NODES = [
     #                    | type-name : type-identifier
     #                    | type-name : protocol-composition-type
     Node('GenericParameter', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
@@ -56,6 +58,7 @@ GENERIC_NODES = [
 
     # conformance-requirement -> type-identifier : type-identifier
     Node('ConformanceRequirement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('LeftTypeIdentifier', kind='Type'),
              Child('Colon', kind='ColonToken'),

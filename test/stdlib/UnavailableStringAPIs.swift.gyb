@@ -6,15 +6,11 @@ func test_StringSubscriptByInt(
   x: String,
   i: Int,
   r1: Range<Int>,
-  r2: ClosedRange<Int>,
-  r3: CountableRange<Int>,
-  r4: CountableClosedRange<Int>
+  r2: ClosedRange<Int>
 ) {
   _ = x[i] // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}} {{none}}
-  _ = x[r1] // expected-error {{'subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}} {{none}}
-  _ = x[r2] // expected-error {{'subscript' is unavailable: cannot subscript String with a ClosedRange<Int>, see the documentation comment for discussion}} {{none}}
-  _ = x[r3] // expected-error {{'subscript' is unavailable: cannot subscript String with a CountableRange<Int>, see the documentation comment for discussion}} {{none}}
-  _ = x[r4] // expected-error {{'subscript' is unavailable: cannot subscript String with a CountableClosedRange<Int>, see the documentation comment for discussion}} {{none}}
+  _ = x[r1] // expected-error {{'subscript' is unavailable: cannot subscript String with an integer range, see the documentation comment for discussion}} {{none}}
+  _ = x[r2] // expected-error {{'subscript' is unavailable: cannot subscript String with an integer range, see the documentation comment for discussion}} {{none}}
 }
 
 % if _runtime == 'objc':

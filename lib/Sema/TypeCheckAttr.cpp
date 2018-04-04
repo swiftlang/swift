@@ -71,46 +71,57 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(CDecl)
-  IGNORED_ATTR(SILGenName)
-  IGNORED_ATTR(Available)
+  IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
+  IGNORED_ATTR(DiscardableResult)
+  IGNORED_ATTR(DowngradeExhaustivityCheck)
+  IGNORED_ATTR(DynamicMemberLookup)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(FixedLayout)
+  IGNORED_ATTR(Frozen)
+  IGNORED_ATTR(Implements)
+  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
+  IGNORED_ATTR(Inlinable)
   IGNORED_ATTR(Inline)
-  IGNORED_ATTR(Optimize)
-  IGNORED_ATTR(Inlineable)
+  IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
-  IGNORED_ATTR(NonObjC)
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
-  IGNORED_ATTR(RestatedObjCConformance)
+  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Optional)
   IGNORED_ATTR(Postfix)
   IGNORED_ATTR(Prefix)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(Required)
   IGNORED_ATTR(RequiresStoredPropertyInits)
+  IGNORED_ATTR(RestatedObjCConformance)
   IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
+  IGNORED_ATTR(ShowInInterface)
+  IGNORED_ATTR(SILGenName)
   IGNORED_ATTR(Specialize)
+  IGNORED_ATTR(StaticInitializeObjCMetadata)
   IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
-  IGNORED_ATTR(Versioned)
-  IGNORED_ATTR(ShowInInterface)
-  IGNORED_ATTR(DiscardableResult)
-  IGNORED_ATTR(Implements)
-  IGNORED_ATTR(StaticInitializeObjCMetadata)
-  IGNORED_ATTR(DowngradeExhaustivityCheck)
-  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
+  IGNORED_ATTR(UsableFromInline)
+  IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
+
+  void visitAvailableAttr(AvailableAttr *attr) {
+    if (!isa<ExtensionDecl>(D))
+      return;
+    if (attr->hasPlatform())
+      return;
+    diagnoseAndRemoveAttr(attr, diag::availability_extension_platform_agnostic);
+  }
 
   // @noreturn has been replaced with a 'Never' return type.
   void visitNoReturnAttr(NoReturnAttr *attr) {
@@ -186,8 +197,8 @@ public:
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
 
-  void visitOwnershipAttr(OwnershipAttr *attr) {
-    TC.checkOwnershipAttr(cast<VarDecl>(D), attr);
+  void visitReferenceOwnershipAttr(ReferenceOwnershipAttr *attr) {
+    TC.checkReferenceOwnershipAttr(cast<VarDecl>(D), attr);
   }
 
   void visitFinalAttr(FinalAttr *attr) {
@@ -225,7 +236,7 @@ public:
   void visitIndirectAttr(IndirectAttr *attr) {
     if (auto caseDecl = dyn_cast<EnumElementDecl>(D)) {
       // An indirect case should have a payload.
-      if (caseDecl->getArgumentTypeLoc().isNull())
+      if (!caseDecl->hasAssociatedValues())
         TC.diagnose(attr->getLocation(),
                     diag::indirect_case_without_payload, caseDecl->getName());
       // If the enum is already indirect, its cases don't need to be.
@@ -281,7 +292,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
     if (VD->hasStorage())
       return diagnoseAndRemoveAttr(attr,
                                    diag::attribute_invalid_on_stored_property,
-                                   attr->getAttrName());
+                                   attr);
   }
 }
 
@@ -476,7 +487,7 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Look through ownership types, and optionals.
   type = type->getReferenceStorageReferent();
   bool wasOptional = false;
-  if (Type underlying = type->getAnyOptionalObjectType()) {
+  if (Type underlying = type->getOptionalObjectType()) {
     type = underlying;
     wasOptional = true;
   }
@@ -496,9 +507,8 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
     TC.diagnose(symbolLoc, diag::note_make_optional,
                 OptionalType::get(type))
       .fixItInsert(symbolLoc, "?");
-    TC.diagnose(symbolLoc, diag::note_make_implicitly_unwrapped_optional,
-                ImplicitlyUnwrappedOptionalType::get(type))
-      .fixItInsert(symbolLoc, "!");
+    TC.diagnose(symbolLoc, diag::note_make_implicitly_unwrapped_optional)
+        .fixItInsert(symbolLoc, "!");
   }
 }
 
@@ -691,7 +701,7 @@ void AttributeEarlyChecker::visitSetterAccessAttr(
       storageKind = SK_Subscript;
     else if (storage->getDeclContext()->isTypeContext())
       storageKind = SK_Property;
-    else if (cast<VarDecl>(storage)->isLet())
+    else if (cast<VarDecl>(storage)->isImmutable())
       storageKind = SK_Constant;
     else
       storageKind = SK_Variable;
@@ -791,8 +801,10 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(ClangImporterSynthesizedType)
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
+    IGNORED_ATTR(DowngradeExhaustivityCheck)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
@@ -800,6 +812,7 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
+    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
@@ -811,32 +824,33 @@ public:
     IGNORED_ATTR(NSManaged) // checked early.
     IGNORED_ATTR(ObjC)
     IGNORED_ATTR(ObjCBridged)
+    IGNORED_ATTR(ObjCMembers)
     IGNORED_ATTR(ObjCNonLazyRealization)
     IGNORED_ATTR(ObjCRuntimeName)
-    IGNORED_ATTR(RestatedObjCConformance)
     IGNORED_ATTR(Optional)
-    IGNORED_ATTR(Ownership)
     IGNORED_ATTR(Override)
     IGNORED_ATTR(RawDocComment)
-    IGNORED_ATTR(Semantics)
-    IGNORED_ATTR(SILGenName)
-    IGNORED_ATTR(Transparent)
-    IGNORED_ATTR(SynthesizedProtocol)
+    IGNORED_ATTR(ReferenceOwnership)
     IGNORED_ATTR(RequiresStoredPropertyInits)
-    IGNORED_ATTR(SILStored)
-    IGNORED_ATTR(Testable)
-    IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(RestatedObjCConformance)
+    IGNORED_ATTR(Semantics)
     IGNORED_ATTR(ShowInInterface)
-    IGNORED_ATTR(ObjCMembers)
+    IGNORED_ATTR(SILGenName)
+    IGNORED_ATTR(SILStored)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
-    IGNORED_ATTR(DowngradeExhaustivityCheck)
-    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
+    IGNORED_ATTR(SynthesizedProtocol)
+    IGNORED_ATTR(Testable)
+    IGNORED_ATTR(Transparent)
+    IGNORED_ATTR(WarnUnqualifiedAccess)
+    IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
   
   void visitCDeclAttr(CDeclAttr *attr);
 
+  void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
+  
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
@@ -867,12 +881,14 @@ public:
   void visitSpecializeAttr(SpecializeAttr *attr);
 
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
-  void visitVersionedAttr(VersionedAttr *attr);
-  void visitInlineableAttr(InlineableAttr *attr);
+  void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
+  void visitInlinableAttr(InlinableAttr *attr);
   void visitOptimizeAttr(OptimizeAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
+
+  void visitFrozenAttr(FrozenAttr *attr);
 };
 } // end anonymous namespace
 
@@ -880,7 +896,7 @@ public:
 static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
                                             ParamDecl *param) {
   Type ty = param->getType();
-  if (auto unwrapped = ty->getAnyOptionalObjectType())
+  if (auto unwrapped = ty->getOptionalObjectType())
     ty = unwrapped;
 
   if (auto classDecl = ty->getClassOrBoundGenericClass()) {
@@ -917,6 +933,73 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
   return isiOS(TC) || iswatchOS(TC);
 }
 
+/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
+/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
+/// requirement.
+bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                                     DeclContext *DC,
+                                                     TypeChecker &TC) {
+  // The only thing that we care about is that the index list has exactly one
+  // non-variadic entry.  The type must conform to ExpressibleByStringLiteral.
+  auto indices = decl->getIndices();
+  
+  auto EBSL =
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+  
+  return indices->size() == 1 &&
+    !indices->get(0)->isVariadic() &&
+    TC.conformsToProtocol(indices->get(0)->getType(),
+                          EBSL, DC, ConformanceCheckOptions());
+}
+
+/// The @dynamicMemberLookup attribute is only allowed on types that have at
+/// least one subscript member declared like this:
+///
+/// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
+///   (dynamicMember name: KeywordType) -> LookupValue { get }
+///
+/// ... but doesn't care about the mutating'ness of the getter/setter.  We just
+/// manually check the requirements here.
+///
+void AttributeChecker::
+visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
+  // This attribute is only allowed on nominal types.
+  auto decl = cast<NominalTypeDecl>(D);
+  auto type = decl->getDeclaredType();
+  
+  // Lookup our subscript.
+  auto subscriptName =
+    DeclName(TC.Context, DeclBaseName::createSubscript(),
+             TC.Context.Id_dynamicMember);
+  
+  auto lookupOptions = defaultMemberTypeLookupOptions;
+  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+  
+  // Lookup the implementations of our subscript.
+  auto candidates = TC.lookupMember(decl, type, subscriptName, lookupOptions);
+  
+  // If we have none, then there is no attribute.
+  if (candidates.empty()) {
+    TC.diagnose(attr->getLocation(), diag::type_invalid_dml, type);
+    attr->setInvalid();
+    return;
+  }
+
+  
+  // If none of the ones we find are acceptable, then reject one.
+  auto oneCandidate = candidates.front();
+  candidates.filter([&](LookupResultEntry entry)->bool {
+    auto cand = cast<SubscriptDecl>(entry.getValueDecl());
+    return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
+  });
+  
+  if (candidates.empty()) {
+    TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
+                diag::type_invalid_dml, type);
+    attr->setInvalid();
+  }
+}
+
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().
   auto *FD = cast<FuncDecl>(D);
@@ -947,7 +1030,7 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
       Type ty = paramList->get(0)->getType();
       if (auto nominal = ty->getAnyNominal())
         if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
-          if (nominal->classifyAsOptionalType() == OTK_None)
+          if (!nominal->isOptionalDecl())
             if (ty->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
                                                cast<FuncDecl>(D)))
               break;  // Looks ok.
@@ -1000,8 +1083,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (TC.getLangOpts().DisableAvailabilityChecking)
     return;
 
-  if (!attr->isActivePlatform(TC.Context) || !attr->Introduced.hasValue())
+  if (!attr->hasPlatform() || !attr->isActivePlatform(TC.Context) ||
+      !attr->Introduced.hasValue()) {
     return;
+  }
 
   SourceLoc attrLoc = attr->getLocation();
 
@@ -1396,7 +1481,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   for (auto paramList : fn->getParameterLists()) {
     for (auto param : *paramList)
       if (hasThrowingFunctionParameter(param->getType()
-              ->lookThroughAllAnyOptionalTypes()
+              ->lookThroughAllOptionalTypes()
               ->getCanonicalType()))
         return;
   }
@@ -1861,63 +1946,50 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*respectVersionedAttr=*/true);
+                                    /*isUsageFromInline=*/true);
   if (access < AccessLevel::Public) {
-    TC.diagnose(attr->getLocation(),
-                diag::fixed_layout_attr_on_internal_type,
-                VD->getFullName(),
-                access)
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
+                          VD->getFullName(), access);
   }
 }
 
-void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
+void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   // FIXME: Once protocols can contain nominal types, do we want to allow
-  // these nominal types to have access control (and also @_versioned)?
+  // these nominal types to have access control (and also @usableFromInline)?
   if (isa<ProtocolDecl>(VD->getDeclContext())) {
-    TC.diagnose(attr->getLocation(),
-                diag::versioned_attr_in_protocol)
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::versioned_attr_in_protocol);
     return;
   }
 
-  // @_versioned can only be applied to internal declarations.
+  // @usableFromInline can only be applied to internal declarations.
   if (VD->getFormalAccess() != AccessLevel::Internal) {
-    TC.diagnose(attr->getLocation(), diag::versioned_attr_with_explicit_access,
-                VD->getFullName(),
-                VD->getFormalAccess())
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::versioned_attr_with_explicit_access,
+                          VD->getFullName(),
+                          VD->getFormalAccess());
     return;
   }
 
   // Symbols of dynamically-dispatched declarations are never referenced
-  // directly, so marking them as @_versioned does not make sense.
+  // directly, so marking them as @usableFromInline does not make sense.
   if (VD->isDynamic()) {
-    TC.diagnose(attr->getLocation(),
-                diag::versioned_dynamic_not_supported);
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::versioned_dynamic_not_supported);
     return;
   }
 }
 
-void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
-  // @_inlineable cannot be applied to stored properties.
+void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
+  // @inlinable cannot be applied to stored properties.
   //
-  // If the type is fixed-layout, the accessors are inlineable anyway;
-  // if the type is resilient, the accessors cannot be inlineable
+  // If the type is fixed-layout, the accessors are inlinable anyway;
+  // if the type is resilient, the accessors cannot be inlinable
   // because clients cannot directly access storage.
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->hasStorage() || VD->getAttrs().hasAttribute<LazyAttr>()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attribute_invalid_on_stored_property,
-                  attr->getAttrName())
-        .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
+      diagnoseAndRemoveAttr(attr,
+                            diag::attribute_invalid_on_stored_property,
+                            attr);
       return;
     }
   }
@@ -1925,25 +1997,20 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   // Calls to dynamically-dispatched declarations are never devirtualized,
-  // so marking them as @_inlinable does not make sense.
+  // so marking them as @inlinable does not make sense.
   if (VD->isDynamic()) {
-    TC.diagnose(attr->getLocation(),
-                diag::inlineable_dynamic_not_supported);
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::inlinable_dynamic_not_supported);
     return;
   }
 
-  // @_inlineable can only be applied to public or @_versioned
+  // @inlinable can only be applied to public or @usableFromInline
   // declarations.
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*respectVersionedAttr=*/true);
+                                    /*isUsageFromInline=*/true);
   if (access < AccessLevel::Public) {
-    TC.diagnose(attr->getLocation(),
-                diag::inlineable_decl_not_public,
-                VD->getBaseName(),
-                access)
-        .fixItRemove(attr->getRangeWithAt());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::inlinable_decl_not_public,
+                          VD->getBaseName(),
+                          access);
     return;
   }
 }
@@ -1951,11 +2018,9 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
 void AttributeChecker::visitOptimizeAttr(OptimizeAttr *attr) {
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (VD->hasStorage()) {
-      TC.diagnose(attr->getLocation(),
-                  diag::attribute_invalid_on_stored_property,
-                  attr->getAttrName())
-      .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
+      diagnoseAndRemoveAttr(attr,
+                            diag::attribute_invalid_on_stored_property,
+                            attr);
       return;
     }
   }
@@ -1966,10 +2031,9 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
     if (auto result = FD->getResultInterfaceType()) {
       auto resultIsVoid = result->isVoid();
       if (resultIsVoid || result->isUninhabited()) {
-        auto warn = diag::discardable_result_on_void_never_function;
-        auto diagnostic = TC.diagnose(D->getStartLoc(), warn, resultIsVoid);
-        diagnostic.fixItRemove(attr->getRangeWithAt());
-        attr->setInvalid();
+        diagnoseAndRemoveAttr(attr,
+                              diag::discardable_result_on_void_never_function,
+                              resultIsVoid);
       }
     }
   }
@@ -2020,6 +2084,24 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   }
 }
 
+void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
+  auto *ED = cast<EnumDecl>(D);
+
+  switch (ED->getModuleContext()->getResilienceStrategy()) {
+  case ResilienceStrategy::Default:
+    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+    return;
+  case ResilienceStrategy::Resilient:
+    break;
+  }
+
+  auto access = ED->getFormalAccess(/*useDC=*/nullptr,
+                                    /*isUsageFromInline=*/true);
+  if (access < AccessLevel::Public) {
+    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  }
+}
+
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(*this, D);
 
@@ -2033,11 +2115,12 @@ void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
   if (!var->hasType())
     return;
 
-  if (auto *attr = var->getAttrs().getAttribute<OwnershipAttr>())
-    checkOwnershipAttr(var, attr);
+  if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+    checkReferenceOwnershipAttr(var, attr);
 }
 
-void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
+void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
+                                              ReferenceOwnershipAttr *attr) {
   // Don't check ownership attribute if the declaration is already marked invalid.
   if (var->isInvalid())
     return;
@@ -2054,18 +2137,18 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
   // A weak variable must have type R? or R! for some ownership-capable type R.
   Type underlyingType = type;
   switch (ownershipKind) {
-  case Ownership::Strong:
+  case ReferenceOwnership::Strong:
     llvm_unreachable("Cannot specify 'strong' in an ownership attribute");
-  case Ownership::Unowned:
-  case Ownership::Unmanaged:
+  case ReferenceOwnership::Unowned:
+  case ReferenceOwnership::Unmanaged:
     break;
-  case Ownership::Weak:
+  case ReferenceOwnership::Weak:
     if (var->isLet()) {
       diagnose(var->getStartLoc(), diag::invalid_weak_let);
       attr->setInvalid();
     }
 
-    if (Type objType = type->getAnyOptionalObjectType()) {
+    if (Type objType = type->getOptionalObjectType()) {
       underlyingType = objType;
     } else {
       // @IBOutlet must be optional, but not necessarily weak. Let it diagnose.
@@ -2089,8 +2172,10 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, OwnershipAttr *attr) {
 
     diagnose(var->getStartLoc(), D, (unsigned) ownershipKind, underlyingType);
     attr->setInvalid();
-  } else if (dyn_cast<ProtocolDecl>(var->getDeclContext())) {
-    // Ownership does not make sense in protocols.
+  } else if (isa<ProtocolDecl>(var->getDeclContext()) &&
+             !cast<ProtocolDecl>(var->getDeclContext())->isObjC()) {
+    // Ownership does not make sense in protocols, except for "weak" on
+    // properties of Objective-C protocols.
     if (Context.isSwiftVersionAtLeast(5))
       diagnose(attr->getLocation(),
         diag::ownership_invalid_in_protocols,

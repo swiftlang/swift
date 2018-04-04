@@ -260,12 +260,12 @@ bool swift::immediate::IRGenImportedModules(
     }
     runSILLoweringPasses(*SILMod);
 
+    const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    auto SubModule = performIRGeneration(IRGenOpts, import,
-                                         std::move(SILMod),
-                                         import->getName().str(),
-                                         getGlobalLLVMContext());
+    auto SubModule = performIRGeneration(
+        IRGenOpts, import, std::move(SILMod), import->getName().str(), PSPs,
+        getGlobalLLVMContext(), ArrayRef<std::string>());
 
     if (CI.getASTContext().hadError()) {
       hadError = true;
@@ -299,12 +299,12 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
+  const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
-  auto ModuleOwner = performIRGeneration(IRGenOpts, swiftModule,
-                                         CI.takeSILModule(),
-                                         swiftModule->getName().str(),
-                                         getGlobalLLVMContext());
+  auto ModuleOwner = performIRGeneration(
+      IRGenOpts, swiftModule, CI.takeSILModule(), swiftModule->getName().str(),
+      PSPs, getGlobalLLVMContext(), ArrayRef<std::string>());
   auto *Module = ModuleOwner.get();
 
   if (Context.hadError())
@@ -359,8 +359,9 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
   std::string CPU;
+  std::string Triple;
   std::vector<std::string> Features;
-  std::tie(TargetOpt, CPU, Features)
+  std::tie(TargetOpt, CPU, Features, Triple)
     = getIRTargetOptions(IRGenOpts, swiftModule->getASTContext());
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);

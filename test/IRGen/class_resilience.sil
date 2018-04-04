@@ -21,7 +21,8 @@ import resilient_class
 // be an issue.
 
 // CHECK-LABEL: define {{(protected )?}}swiftcc void @allocResilientOutsideParent()
-// CHECK: [[META:%.*]] = call %swift.type* @"$S15resilient_class22ResilientOutsideParentCMa"()
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"(i64 0)
+// CHECK-NEXT: [[META:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[META_ADDR:%.*]] = bitcast %swift.type* [[META]] to i8*
 // CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[META_ADDR]], i32 48
 // CHECK-NEXT: [[SIZE_PTR:%.*]] = bitcast i8* [[SIZE_ADDR]] to i32*
@@ -31,7 +32,7 @@ import resilient_class
 // CHECK-NEXT: [[ALIGN_PTR:%.*]] = bitcast i8* [[ALIGN_ADDR]] to i16*
 // CHECK-NEXT: [[ALIGN_2:%.*]] = load i16, i16* [[ALIGN_PTR]], align 4
 // CHECK-NEXT: [[ALIGN:%.*]] = zext i16 [[ALIGN_2]] to i64
-// CHECK-NEXT: call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* [[META]], i64 [[SIZE]], i64 [[ALIGN]])
+// CHECK-NEXT: call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[META]], i64 [[SIZE]], i64 [[ALIGN]])
 
 sil @allocResilientOutsideParent : $@convention(thin) () -> () {
 bb0:

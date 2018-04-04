@@ -216,7 +216,11 @@ func f1(f: Any) -> (Int) -> Int {
 }
 
 FunctionConversionTestSuite.test("FuncExistential") {
-  let g11: ((Int) -> Int) -> Any = f1
+  let g11: (@escaping (Int) -> Int) -> Any = f1
+
+  // This used to be but a conversion from a noescape closure to Any is an
+  // oxymoron. The type checker should really forbid this.
+  // let g11: ((Int) -> Int) -> Any = f1
 
   expectEqual(100, f1(f: g11(sq))(10))
 }

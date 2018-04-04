@@ -20,6 +20,9 @@
 
 #include "swift/Runtime/Config.h"
 
+/// This API is only enabled if this define is set.
+#if defined(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
+
 #if defined(__cplusplus)
 
 namespace swift {
@@ -39,10 +42,6 @@ struct RuntimeFunctionCountersState;
 #define SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)                            \
   swift_trackRuntimeInvocation_##RT_FUNCTION
 
-/// Instrument the runtime functions only if we are building with
-/// assertions enabled.
-#if !defined(NDEBUG)
-
 /// Invoke a helper function for tracking the calls of a runtime function.
 #define SWIFT_RT_TRACK_INVOCATION(OBJ, RT_FUNCTION)                            \
   SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)(OBJ)
@@ -51,13 +50,6 @@ struct RuntimeFunctionCountersState;
   extern void SWIFT_RT_TRACK_INVOCATION_NAME(RT_FUNCTION)(HeapObject * OBJ);
 /// Declarations of external functions for invocations tracking.
 #include "RuntimeInvocationsTracking.def"
-
-#else
-
-/// It is just a NOP if assertions are not enabled.
-#define SWIFT_RT_TRACK_INVOCATION(OBJ, RT_FUNCTION)
-
-#endif // NDEBUG
 
 /// This type defines a callback to be called on any intercepted runtime
 /// function.
@@ -117,5 +109,13 @@ _swift_setObjectRuntimeFunctionCounters(HeapObject *object,
 SWIFT_RUNTIME_EXPORT RuntimeFunctionCountersUpdateHandler
 _swift_setGlobalRuntimeFunctionCountersUpdateHandler(
     RuntimeFunctionCountersUpdateHandler handler);
+
+#else
+
+/// Let runtime functions unconditionally use this define by making it a NOP if
+/// counters are not enabled.
+#define SWIFT_RT_TRACK_INVOCATION(OBJ, RT_FUNCTION)
+
+#endif // SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
 
 #endif

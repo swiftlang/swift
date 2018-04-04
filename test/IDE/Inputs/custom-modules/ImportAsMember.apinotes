@@ -12,6 +12,8 @@ Functions:
 Typedefs:
 - Name: IAMStruct1APINoteType
   SwiftName: Struct1.NewApiNoteType
+- Name: IncompleteImportTargetName
+  SwiftName: IncompleteImportTarget.Name
 SwiftVersions:
 - Version: 3
   Globals:
@@ -27,3 +29,5 @@ SwiftVersions:
   Typedefs:
   - Name: IAMStruct1APINoteType
     SwiftName: Struct1.OldApiNoteType
+  - Name: IncompleteImportTargetName
+    SwiftWrapper: none

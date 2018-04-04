@@ -4,6 +4,27 @@
 import resilient_struct
 import resilient_protocol
 
+public protocol Associate {
+  associatedtype X
+}
+
+// Dependent conformance
+// CHECK-LABEL: @"$S28protocol_conformance_records9DependentVyxGAA9AssociateAAMc" ={{ protected | }}constant
+// -- protocol descriptor
+// CHECK-SAME:           @"$S28protocol_conformance_records9AssociateMp"
+// -- nominal type descriptor
+// CHECK-SAME:           @"$S28protocol_conformance_records9DependentVMn"
+// -- witness table accessor
+// CHECK-SAME:           @"$S28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
+// -- flags
+// CHECK-SAME:           i32 1
+// CHECK-SAME:         }
+public struct Dependent<T> {}
+
+extension Dependent : Associate {
+  public typealias X = (T, T)
+}
+
 public protocol Runcible {
   func runce()
 }
@@ -81,26 +102,33 @@ extension Size: Runcible {
   public func runce() {}
 }
 
-// TODO: conformances that need lazy initialization
+// CHECK-LABEL: @"\01l_protocols"
+// CHECK-SAME: @"$S28protocol_conformance_records8RuncibleMp"
+// CHECK-SAME: @"$S28protocol_conformance_records5SpoonMp"
+
 public protocol Spoon { }
 
 // Conditional conformances
-// CHECK-LABEL: @"$S28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL: {{^}}@"$S28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc" ={{ protected | }}constant
 // -- protocol descriptor
-// CHECK-SAME:           [[SPOON:@"\$S28protocol_conformance_records5SpoonMp"]]
+// CHECK-SAME:           @"$S28protocol_conformance_records5SpoonMp"
 // -- nominal type descriptor
 // CHECK-SAME:           @"$S28protocol_conformance_records17NativeGenericTypeVMn"
 // -- witness table accessor
 // CHECK-SAME:           @"$S28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa
 // -- flags
 // CHECK-SAME:           i32 258
+// -- conditional requirement #1
+// CHECK-SAME:           i32 64,
+// CHECK-SAME:           i32 0,
+// CHECK-SAME:           @"$S28protocol_conformance_records5SpoonMp"
 // CHECK-SAME:         }
 extension NativeGenericType : Spoon where T: Spoon {
   public func runce() {}
 }
 
 // Retroactive conformance
-// CHECK-LABEL: @"$SSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL: @"$SSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc" ={{ protected | }}constant
 // -- protocol descriptor
 // CHECK-SAME:           @"got.$S18resilient_protocol22OtherResilientProtocolMp"
 // -- nominal type descriptor
@@ -108,16 +136,11 @@ extension NativeGenericType : Spoon where T: Spoon {
 // -- witness table accessor
 // CHECK-SAME:           @"$SSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsWa"
 // -- flags
-// CHECK-SAME:           i32 73
+// CHECK-SAME:           i32 73,
+// -- module context for retroactive conformance
+// CHECK-SAME:           @"$S28protocol_conformance_recordsMXM"
 // CHECK-SAME:         }
 extension Int : OtherResilientProtocol { }
-
-// CHECK-LABEL: @"\01l_protocols" = private constant [
-
-// CHECK: %swift.protocolref {
-// CHECK-SAME: @"$S28protocol_conformance_records8RuncibleMp"
-// CHECK-SAME: %swift.protocolref {
-// CHECK-SAME: @"$S28protocol_conformance_records5SpoonMp"
 
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant
 // CHECK-SAME: @"$S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc"
@@ -126,6 +149,3 @@ extension Int : OtherResilientProtocol { }
 // CHECK-SAME: @"$S16resilient_struct4SizeV28protocol_conformance_records8RuncibleADMc"
 // CHECK-SAME: @"$S28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc"
 // CHECK-SAME: @"$SSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc"
-
-
-

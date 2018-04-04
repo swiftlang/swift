@@ -81,14 +81,22 @@ func test8(_ x : AnyObject?) {
 
 
 // Partial ordering with optionals
-func test9_helper<T>(_ x: T) -> Int { }
-func test9_helper<T>(_ x: T?) -> Double { }
+func test9_helper<T: P>(_ x: T) -> Int { }
+func test9_helper<T: P>(_ x: T?) -> Double { }
+
+func test9_helper2<T>(_ x: T) -> Int { }
+func test9_helper2<T>(_ x: T?) -> Double { }
 
 func test9(_ i: Int, io: Int?) {
   let result = test9_helper(i)
   var _: Int = result
   let result2 = test9_helper(io)
   let _: Double = result2
+
+  let result3 = test9_helper2(i)
+  var _: Double = result3
+  let result4 = test9_helper2(io)
+  let _: Double = result4
 }
 
 protocol P { }
@@ -201,7 +209,7 @@ func sr2752(x: String?, y: String?) {
 var sr3248 : ((Int) -> ())!
 sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
 sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
-sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
+sr3248(a: 2)  // expected-error {{cannot call value of non-function type '((Int) -> ())?'}}
 
 struct SR_3248 {
     var callback: (([AnyObject]) -> Void)!
@@ -209,7 +217,7 @@ struct SR_3248 {
 
 SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
 SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
-SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
+SR_3248().callback("test")  // expected-error {{cannot invoke 'callback' with an argument list of type '(String)'}}
 
 _? = nil  // expected-error {{'nil' requires a contextual type}}
 _?? = nil // expected-error {{'nil' requires a contextual type}}
@@ -258,4 +266,9 @@ class Bar {
     let result = b ? nil : xOpt
     let _: Int = result // expected-error{{cannot convert value of type 'X?' to specified type 'Int'}}
   }
+}
+
+// rdar://problem/37508855
+func rdar37508855(_ e1: X?, _ e2: X?) -> [X] {
+  return [e1, e2].filter { $0 == nil }.map { $0! }
 }

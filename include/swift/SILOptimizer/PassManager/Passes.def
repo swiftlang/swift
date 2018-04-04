@@ -118,6 +118,8 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
+PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
+     "Diagnose Infinitely-Recursive Code")
 PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",
      "Static Enforcement of Law of Exclusivity")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
@@ -162,7 +164,7 @@ PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
 PASS(InstCount, "inst-count",
      "Record SIL Instruction, Block, and Function Counts as LLVM Statistics")
-PASS(JumpThreadSimplifyCFG, "simplify-cfg",
+PASS(JumpThreadSimplifyCFG, "jumpthread-simplify-cfg",
      "Simplify CFG via Jump Threading")
 PASS(LetPropertiesOpt, "let-properties-opt",
      "Let Property Optimization")
@@ -244,8 +246,7 @@ PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
-// TODO: Rename this command line string.
-PASS(SimplifyCFG, "normal-simplify-cfg",
+PASS(SimplifyCFG, "-simplify-cfg",
      "SIL CFG Simplification")
 PASS(SpeculativeDevirtualization, "specdevirt",
      "Speculative Devirtualization via Guarded Calls")

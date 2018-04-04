@@ -21,7 +21,7 @@ class CodingA : NSObject, NSCoding {
 
 // Nested classes
 extension CodingA {
-  // CHECK: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
+  // CHECK-NOT: class_decl "NestedA"{{.*}}@_staticInitializeObjCMetadata
   class NestedA : NSObject, NSCoding { // expected-error{{nested class 'CodingA.NestedA' has an unstable name when archiving via 'NSCoding'}}
     // expected-note@-1{{for compatibility with existing archives, use '@objc' to record the Swift 3 runtime name}}{{3-3=@objc(_TtCC8nscoding7CodingA7NestedA)}}
     // expected-note@-2{{for new classes, use '@objc' to specify a unique, prefixed Objective-C runtime name}}{{3-3=@objc(<#prefixed Objective-C class name#>)}}
@@ -36,14 +36,14 @@ extension CodingA {
     func encode(coder: NSCoder) { }
   }
 
-  // CHECK: class_decl "NestedC"{{.*}}@_staticInitializeObjCMetadata
+  // CHECK-NOT: class_decl "NestedC"{{.*}}@_staticInitializeObjCMetadata
   @objc(CodingA_NestedC)
   class NestedC : NSObject, NSCoding {
     required init(coder: NSCoder) { }
     func encode(coder: NSCoder) { }
   }
 
-  // CHECK: class_decl "NestedD"{{.*}}@_staticInitializeObjCMetadata
+  // CHECK-NOT: class_decl "NestedD"{{.*}}@_staticInitializeObjCMetadata
   @objc(CodingA_NestedD)
   class NestedD : NSObject {
     required init(coder: NSCoder) { }

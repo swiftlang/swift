@@ -30,9 +30,7 @@ reflect(object: obj)
 // CHECK-64-NEXT:          (field name=smallUTF16 offset=0
 // CHECK-64-NEXT:            (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
 // CHECK-64-NEXT:          (field name=large offset=0
-// CHECK-64-NEXT:            (struct size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647
-// CHECK-64-NEXT:              (field name=_nativeBuffer offset=0
-// CHECK-64-NEXT:                (reference kind=strong refcounting=native)))))))))
+// CHECK-64-NEXT:            (reference kind=strong refcounting=native)))))))
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Type reference:
@@ -47,9 +45,7 @@ reflect(object: obj)
 // CHECK-32-NEXT:           (field name=smallUTF16 offset=0
 // CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
 // CHECK-32-NEXT:           (field name=large offset=0
-// CHECK-32-NEXT:             (struct size=4 alignment=4 stride=4 num_extra_inhabitants=4096
-// CHECK-32-NEXT:               (field name=_nativeBuffer offset=0
-// CHECK-32-NEXT:                 (reference kind=strong refcounting=native)))))))))
+// CHECK-32-NEXT:            (reference kind=strong refcounting=native)))))))
 
 doneReflecting()
 

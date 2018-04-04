@@ -5,7 +5,7 @@ struct S { var s: String? }
 
 func rdar23861629(_ a: [S]) {
   _ = a.reduce("") {
-    // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
+    // expected-error@-1 {{reasonable time}}
     ($0 == "") ? ($1.s ?? "") : $0 + "," + ($1.s ?? "")
   }
 }

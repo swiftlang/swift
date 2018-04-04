@@ -83,7 +83,6 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   if (decls.empty())
     return false;
 
-  ASTContext &ctx = decls.front()->getASTContext();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
     while (auto overrides = decl->getOverriddenDecl()) {
@@ -95,7 +94,7 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
       // C.init overrides B.init overrides A.init, but only C.init and
       // A.init are in the chain. Make sure we still remove A.init from the
       // set in this case.
-      if (decl->getFullName().getBaseName() == ctx.Id_init) {
+      if (decl->getFullName().getBaseName() == DeclBaseName::createConstructor()) {
         /// FIXME: Avoid the possibility of an infinite loop by fixing the root
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
@@ -1273,7 +1272,7 @@ static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
     IterableDeclContext *IDC) {
   for (auto m : IDC->getCurrentMembersWithoutLoading()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
-      if (v->getFullName().matchesRef(name)) {
+      if (v->getFullName().matchesRef(name.getBaseName())) {
         LookupTable.addMember(m);
       }
     }
@@ -1352,12 +1351,10 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
-  RecursiveSharedTimer::Guard guard;
   ASTContext &ctx = getASTContext();
+  FrontendStatsTracer tracer(ctx.Stats, "lookup-direct", this);
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
-    guard = s->getFrontendRecursiveSharedTimers()
-                .NominalTypeDecl__lookupDirect.getGuard();
   }
 
   // We only use NamedLazyMemberLoading when a user opts-in and we have
@@ -1369,7 +1366,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // that appears to special-case initializers (clang-imported initializer
   // sorting, implicit initializer synthesis), so for the time being we have to
   // turn it off for them entirely.
-  if (name.getBaseName() == ctx.Id_init)
+  if (name.getBaseName() == DeclBaseName::createConstructor())
     useNamedLazyMemberLoading = false;
 
   DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
@@ -1558,6 +1555,18 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
 }
 
+Type AbstractStorageDecl::getStorageInterfaceType() const {
+  if (auto var = dyn_cast<VarDecl>(this)) {
+    return var->getInterfaceType();
+  }
+  
+  if (auto sub = dyn_cast<SubscriptDecl>(this)) {
+    return sub->getElementInterfaceType();
+  }
+  
+  llvm_unreachable("unhandled storage decl kind");
+}
+
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
                                   NLOptions options,
@@ -1700,7 +1709,8 @@ bool DeclContext::lookupQualified(Type type,
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        if (!ctor->isInheritable())
+        if (isa<ClassDecl>(ctor->getDeclContext()) &&
+            !ctor->isInheritable())
           return false;
       } else {
         return false;
@@ -1743,7 +1753,7 @@ bool DeclContext::lookupQualified(Type type,
 
     // Make sure we've resolved implicit members, if we need them.
     if (typeResolver) {
-      if (member.getBaseName() == ctx.Id_init)
+      if (member.getBaseName() == DeclBaseName::createConstructor())
         typeResolver->resolveImplicitConstructors(current);
 
       typeResolver->resolveImplicitMember(current, member);
@@ -1772,7 +1782,7 @@ bool DeclContext::lookupQualified(Type type,
       // current class permits inheritance. Even then, only find complete
       // object initializers.
       bool visitSuperclass = true;
-      if (member.getBaseName() == ctx.Id_init) {
+      if (member.getBaseName() == DeclBaseName::createConstructor()) {
         if (classDecl->inheritsSuperclassInitializers(typeResolver))
           onlyCompleteObjectInits = true;
         else

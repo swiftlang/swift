@@ -7,14 +7,14 @@
 // CHECK: func unknown()
 
 // CHECK: struct X {
-// CHECK-NEXT:  @_versioned
-// CHECK-NEXT:  @_inlineable func test()
+// CHECK-NEXT:  @usableFromInline
+// CHECK-NEXT:  @inlinable func test()
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
 
-// CHECK: sil @unknown : $@convention(thin) () -> ()
+// CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [serialized] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -31,14 +31,14 @@
 // SIB-CHECK: func unknown()
 
 // SIB-CHECK: struct X {
-// SIB-CHECK-NEXT:  @_versioned
-// SIB-CHECK-NEXT:  @_inlineable func test()
+// SIB-CHECK-NEXT:  @usableFromInline
+// SIB-CHECK-NEXT:  @inlinable func test()
 // SIB-CHECK-NEXT:  init
 // SIB-CHECK-NEXT: }
 
-// SIB-CHECK: sil @unknown : $@convention(thin) () -> ()
+// SIB-CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
 
-// SIB-CHECK-LABEL: sil [serialized] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
+// SIB-CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
 // SIB-CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -52,8 +52,8 @@
 public func unknown() -> ()
 
 public struct X {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   func test() {
     unknown()
   }

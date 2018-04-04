@@ -1,7 +1,7 @@
 // Check that we don't crash when we verify after every pass.
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-swift-frontend %s -I %S/../stdlib/Inputs/Mirror/ -o %t/Mirror \
+// RUN: %target-swift-frontend %s -I %S/../stdlib/Inputs/Mirror/ \
 // RUN: -emit-ir -sil-verify-all -o /dev/null
 
 class A : CustomReflectable {

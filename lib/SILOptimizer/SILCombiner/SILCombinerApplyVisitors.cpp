@@ -17,6 +17,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -24,7 +25,6 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -155,7 +155,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
   auto Args = PAI->getArguments();
   Params = Params.drop_front(Params.size() - Args.size());
 
-  llvm::SmallVector<std::pair<SILValue, unsigned>, 8> ArgsToHandle;
+  llvm::SmallVector<std::pair<SILValue, uint16_t>, 8> ArgsToHandle;
   for (unsigned i : indices(Args)) {
     SILValue Arg = Args[i];
     SILParameterInfo Param = Params[i];
@@ -197,8 +197,8 @@ bool PartialApplyCombiner::allocateTemporaries() {
     SILValue Arg = ArgWithIdx.first;
     Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
     // Create a new temporary at the beginning of a function.
-    auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(),
-                                        {/*Constant*/ true, ArgWithIdx.second});
+    SILDebugVariable DbgVar(/*Constant*/ true, ArgWithIdx.second);
+    auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(), DbgVar);
     Builder.setInsertionPoint(PAI);
     // Copy argument into this temporary.
     Builder.createCopyAddr(PAI->getLoc(), Arg, Tmp,
@@ -377,7 +377,7 @@ SILInstruction *PartialApplyCombiner::combine() {
     auto *User = Use->getUser();
 
     // Recurse through conversions.
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(User)) {
+    if (auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(User)) {
       // TODO: Handle argument conversion. All the code in this file needs to be
       // cleaned up and generalized. The argument conversion handling in
       // optimizeApplyOfConvertFunctionInst should apply to any combine
@@ -389,9 +389,9 @@ SILInstruction *PartialApplyCombiner::combine() {
       auto EscapingCalleeTy =
           ConvertCalleeTy->getWithExtInfo(
             ConvertCalleeTy->getExtInfo().withNoEscape(false));
-      if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
-        Uses.append(CFI->getUses().begin(), CFI->getUses().end());
-
+      assert(Use->get()->getType().castTo<SILFunctionType>() ==
+             EscapingCalleeTy);
+      Uses.append(CFI->getUses().begin(), CFI->getUses().end());
       continue;
     }
     // If this use of a partial_apply is not
@@ -1305,6 +1305,27 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   return true;
 }
 
+// Return a new apply with the specified callee. This creates a new apply rather
+// than simply rewriting the callee operand because the apply's SubstCalleeType,
+// derived from the callee and substitution list, may change.
+FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
+                                              SILValue callee) {
+  SmallVector<SILValue, 4> arguments;
+  for (SILValue arg : apply.getArguments())
+    arguments.push_back(arg);
+
+  Builder.addOpenedArchetypeOperands(apply.getInstruction());
+  if (auto *TAI = dyn_cast<TryApplyInst>(apply)) {
+    return Builder.createTryApply(TAI->getLoc(), callee,
+                                  TAI->getSubstitutions(), arguments,
+                                  TAI->getNormalBB(), TAI->getErrorBB());
+  } else {
+    return Builder.createApply(apply.getLoc(), callee, apply.getSubstitutions(),
+                               arguments,
+                               cast<ApplyInst>(apply)->isNonThrowing());
+  }
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
@@ -1317,7 +1338,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunction();
-  if (SF && SF->getEffectsKind() < EffectsKind::ReadWrite) {
+  if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       if (eraseApply(AI, Users))
@@ -1327,7 +1348,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->getEffectsKind() < EffectsKind::ReadWrite) {
+    if (SF->getEffectsKind() < EffectsKind::ReleaseNone) {
       // Try to optimize string concatenation.
       if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
         return I;
@@ -1346,20 +1367,11 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // (apply (thin_to_thick_function f)) to (apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
-    // TODO: Handle substitutions and indirect results
-    if (AI->hasSubstitutions() || AI->hasIndirectResults())
-      return nullptr;
-    SmallVector<SILValue, 4> Arguments;
-    for (auto &Op : AI->getArgumentOperands()) {
-      Arguments.push_back(Op.get());
-    }
-    // The type of the substitution is the source type of the thin to thick
-    // instruction.
-    Builder.addOpenedArchetypeOperands(AI);
-    auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
-                                      AI->getSubstitutions(), Arguments,
-                                      AI->isNonThrowing());
-    return NewAI;
+    // We currently don't remove any possible retain associated with the thick
+    // function when rewriting the callsite. This should be ok because the
+    // ABI normally expects a guaranteed callee.
+    if (!AI->getOrigCalleeType()->isCalleeConsumed())
+      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
   }
 
   // (apply (witness_method)) -> propagate information about
@@ -1450,7 +1462,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *Fn = AI->getReferencedFunction();
-  if (Fn && Fn->getEffectsKind() < EffectsKind::ReadWrite) {
+  if (Fn && Fn->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {
       SILBasicBlock *BB = AI->getParent();
@@ -1477,21 +1489,12 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
   // (try_apply (thin_to_thick_function f)) to (try_apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
-    // TODO: Handle substitutions and indirect results
-    if (AI->hasSubstitutions() || AI->hasIndirectResults())
-      return nullptr;
-    SmallVector<SILValue, 4> Arguments;
-    for (auto &Op : AI->getArgumentOperands()) {
-      Arguments.push_back(Op.get());
-    }
-    // The type of the substitution is the source type of the thin to thick
-    // instruction.
-    auto *NewAI = Builder.createTryApply(AI->getLoc(), TTTFI->getOperand(),
-                                         AI->getSubstitutions(), Arguments,
-                                         AI->getNormalBB(), AI->getErrorBB());
-    return NewAI;
+    // We currently don't remove any possible retain associated with the thick
+    // function when rewriting the callsite. This should be ok because the
+    // ABI normally expects a guaranteed callee.
+    if (!AI->getOrigCalleeType()->isCalleeConsumed())
+      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
   }
-
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {

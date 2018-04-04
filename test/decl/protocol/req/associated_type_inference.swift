@@ -149,7 +149,8 @@ struct XSubP0b : SubscriptP0 {
 
 struct XSubP0c : SubscriptP0 {
 // expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
-  subscript (i: Index) -> Element { get { } } // expected-error{{reference to invalid associated type 'Element' of type 'XSubP0c'}}
+  subscript (i: Index) -> Element { get { } }
+  // expected-error@-1 {{reference to invalid associated type 'Element' of type 'XSubP0c'}}
 }
 
 struct XSubP0d : SubscriptP0 {
@@ -469,3 +470,34 @@ protocol P17 {
 protocol Q17 : P17 where T == Int { }
 
 struct S17 : Q17 { }
+
+// Typealiases from protocol extensions should not inhibit associated type
+// inference.
+protocol P18 {
+  associatedtype A
+}
+
+protocol P19 : P18 {
+  associatedtype B
+}
+
+extension P18 where Self: P19 {
+  typealias A = B
+}
+
+struct X18<A> : P18 { }
+
+// rdar://problem/16316115
+protocol HasAssoc {
+  associatedtype Assoc
+}
+
+struct DefaultAssoc {}
+
+protocol RefinesAssocWithDefault: HasAssoc {
+  associatedtype Assoc = DefaultAssoc
+}
+
+struct Foo: RefinesAssocWithDefault {
+}
+

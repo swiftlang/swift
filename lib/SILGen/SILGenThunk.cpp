@@ -65,28 +65,28 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   return F;
 }
 
-SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
-                                              SILDeclRef constant,
-                                              CanSILFunctionType constantTy) {
+ManagedValue
+SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
+                                     CanSILFunctionType constantTy) {
   // If the method is foreign, its foreign thunk will handle the dynamic
   // dispatch for us.
   if (constant.isForeignToNativeThunk()) {
     if (!SGM.hasFunction(constant))
       SGM.emitForeignToNativeThunk(constant);
-    return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
+    return ManagedValue::forUnmanaged(
+        B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition)));
   }
 
   // Otherwise, we need a dynamic dispatch thunk.
   SILFunction *F = SGM.getDynamicThunk(constant, constantTy);
 
-  return B.createFunctionRef(loc, F);
+  return ManagedValue::forUnmanaged(B.createFunctionRef(loc, F));
 }
 
-static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
-                                       SILLocation loc,
-                                       SILDeclRef thunk,
-                                       SILValue selfArg,
-                                       SubstitutionList curriedSubs) {
+static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
+                                           SILDeclRef thunk,
+                                           ManagedValue selfArg,
+                                           SubstitutionList curriedSubs) {
   auto *vd = thunk.getDecl();
 
   // Reference the next uncurrying level of the function.
@@ -95,12 +95,12 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
 
   // If the function is natively foreign, reference its foreign entry point.
   if (requiresForeignToNativeThunk(vd))
-    return SGF.emitGlobalFunctionRef(loc, next);
+    return ManagedValue::forUnmanaged(SGF.emitGlobalFunctionRef(loc, next));
 
   // If the thunk is a curry thunk for a direct method reference, we are
   // doing a direct dispatch (eg, a fragile 'super.foo()' call).
   if (thunk.isDirectReference)
-    return SGF.emitGlobalFunctionRef(loc, next);
+    return ManagedValue::forUnmanaged(SGF.emitGlobalFunctionRef(loc, next));
 
   auto constantInfo = SGF.SGM.Types.getConstantInfo(next);
 
@@ -111,7 +111,9 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
         return SGF.emitDynamicMethodRef(loc, next, constantInfo.SILFnType);
 
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
-      return SGF.emitClassMethodRef(loc, selfArg, next, methodTy);
+      SILValue result =
+          SGF.emitClassMethodRef(loc, selfArg.getValue(), next, methodTy);
+      return ManagedValue::forUnmanaged(result);
     }
 
     // If the fully-uncurried reference is to a generic method, look up the
@@ -125,13 +127,14 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &SGF,
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(subMap)->getCanonicalType();
       auto conformance = subMap.lookupConformance(origSelfType, protocol);
-      return SGF.B.createWitnessMethod(loc, substSelfType, *conformance, next,
-                                      constantInfo.getSILType());
+      auto result = SGF.B.createWitnessMethod(loc, substSelfType, *conformance,
+                                              next, constantInfo.getSILType());
+      return ManagedValue::forUnmanaged(result);
     }
   }
 
   // Otherwise, emit a direct call.
-  return SGF.emitGlobalFunctionRef(loc, next);
+  return ManagedValue::forUnmanaged(SGF.emitGlobalFunctionRef(loc, next));
 }
 
 void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
@@ -145,16 +148,18 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
     (void) fd;
   }
 
+  Scope S(*this, vd);
+
   auto selfTy = vd->getInterfaceType()->castTo<AnyFunctionType>()
     ->getInput();
   selfTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
-  auto selfArg = F.begin()->createFunctionArgument(getLoweredType(selfTy));
+  ManagedValue selfArg =
+    B.createInputFunctionArgument(getLoweredType(selfTy), SILLocation(vd));
 
   // Forward substitutions.
   auto subs = F.getForwardingSubstitutions();
 
-  SILValue toFn = getNextUncurryLevelRef(*this, vd, thunk,
-                                         selfArg, subs);
+  ManagedValue toFn = getNextUncurryLevelRef(*this, vd, thunk, selfArg, subs);
 
   // FIXME: Using the type from the ConstantInfo instead of looking at
   // getConstantOverrideInfo() for methods looks suspect in the presence
@@ -163,15 +168,15 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
       SGM.Types.getConstantInfo(thunk).SILFnType, SGM.M);
   SILType resultTy = fromConv.getSingleSILResultType();
   resultTy = F.mapTypeIntoContext(resultTy);
-  auto substTy = toFn->getType().substGenericArgs(SGM.M,  subs);
-
-  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
+  auto substTy = toFn.getType().substGenericArgs(SGM.M, subs);
 
   // Partially apply the next uncurry level and return the result closure.
+  selfArg = selfArg.ensurePlusOne(*this, vd);
+  auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
-      toFn->getType(), /*appliedParams=*/1, SGM.M, subs, calleeConvention);
-  SILValue toClosure =
-    B.createPartialApply(vd, toFn, substTy, subs, {selfArg}, closureTy);
+      toFn.getType(), /*appliedParams=*/1, SGM.M, subs, calleeConvention);
+  ManagedValue toClosure =
+      B.createPartialApply(vd, toFn, substTy, subs, {selfArg}, closureTy);
   if (resultTy != closureTy) {
     CanSILFunctionType resultFnTy = resultTy.castTo<SILFunctionType>();
     CanSILFunctionType closureFnTy = closureTy.castTo<SILFunctionType>();
@@ -179,11 +184,10 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
       toClosure = B.createConvertFunction(vd, toClosure, resultTy);
     } else {
       toClosure =
-          emitCanonicalFunctionThunk(vd, ManagedValue::forUnmanaged(toClosure),
-                                     closureFnTy, resultFnTy)
-              .forward(*this);
+          emitCanonicalFunctionThunk(vd, toClosure, closureFnTy, resultFnTy);
     }
   }
+  toClosure = S.popPreservingValue(toClosure);
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
 }
 

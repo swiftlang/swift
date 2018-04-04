@@ -165,7 +165,7 @@ internal extension Base {
 }
 
 public class PublicSub: Base {
-  required init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-12=public }}
+  private required init() {} // expected-error {{'required' initializer must be accessible wherever class 'PublicSub' can be subclassed}} {{3-10=internal}}
   override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
   override var bar: Int { // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{12-12=public }}
     get { return 0 }
@@ -174,8 +174,12 @@ public class PublicSub: Base {
   override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{12-12=public }}
 }
 
+public class PublicSubGood: Base {
+  required init() {} // okay
+}
+
 internal class InternalSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=internal}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'InternalSub' can be subclassed}} {{12-19=internal}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=internal}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=internal}}
     get { return 0 }
@@ -207,7 +211,7 @@ internal class InternalSubPrivateSet: Base {
 }
 
 fileprivate class FilePrivateSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'FilePrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
@@ -249,7 +253,7 @@ fileprivate class FilePrivateSubPrivateSet: Base {
 }
 
 private class PrivateSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'PrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
@@ -454,8 +458,8 @@ enum DefaultEnumPrivate {
 }
 public enum PublicEnumPI {
   case A(InternalStruct) // expected-error {{enum case in a public enum uses an internal type}}
-  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}}
-  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
+  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}} expected-error {{enum case in a public enum uses an internal type}}
+  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}} expected-error {{enum case in a public enum uses an internal type}}
 }
 enum DefaultEnumPublic {
   case A(PublicStruct) // no-warning

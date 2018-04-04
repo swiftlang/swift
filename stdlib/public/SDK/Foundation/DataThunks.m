@@ -111,8 +111,8 @@ static NSError *_NSErrorWithFilePathAndErrno(NSInteger posixErrno, id pathOrURL,
     return error;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-BOOL __NSDataWriteToURL(NSData *NS_RELEASES_ARGUMENT data, NSURL *NS_RELEASES_ARGUMENT url, NSDataWritingOptions writingOptions, NSError **_Nullable errorPtr) {
+SWIFT_RUNTIME_STDLIB_INTERNAL
+BOOL __NSDataWriteToURL(NSData * _Nonnull data NS_RELEASES_ARGUMENT, NSURL * _Nonnull url NS_RELEASES_ARGUMENT, NSDataWritingOptions writingOptions, NSError **errorPtr) {
     assert((writingOptions & NSDataWritingAtomic) == 0);
 
     NSString *path = url.path;
@@ -120,6 +120,8 @@ BOOL __NSDataWriteToURL(NSData *NS_RELEASES_ARGUMENT data, NSURL *NS_RELEASES_AR
 
     if (![path getFileSystemRepresentation:cpath maxLength:1024]) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePath(NSFileWriteInvalidFileNameError, path);
+        SWIFT_CC_PLUSONE_GUARD([data release]);
+        SWIFT_CC_PLUSONE_GUARD([url release]);
         return NO;
     }
 
@@ -135,8 +137,8 @@ BOOL __NSDataWriteToURL(NSData *NS_RELEASES_ARGUMENT data, NSURL *NS_RELEASES_AR
     int32_t fd = _NSOpenFileDescriptor(cpath, flags, protectionClass, 0666);
     if (fd < 0) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePathAndErrno(errno, path, NO);
-        [url release];
-        [data release];
+        SWIFT_CC_PLUSONE_GUARD([url release]);
+        SWIFT_CC_PLUSONE_GUARD([data release]);
         return NO;
     }
 
@@ -170,12 +172,12 @@ BOOL __NSDataWriteToURL(NSData *NS_RELEASES_ARGUMENT data, NSURL *NS_RELEASES_AR
         if (errorPtr) {
             *errorPtr = _NSErrorWithFilePathAndErrno(errno, path, NO);
         }
-        [url release];
-        [data release];
+        SWIFT_CC_PLUSONE_GUARD([url release]);
+        SWIFT_CC_PLUSONE_GUARD([data release]);
         return NO;
     }
     close(fd);
-    [url release];
-    [data release];
+    SWIFT_CC_PLUSONE_GUARD([url release]);
+    SWIFT_CC_PLUSONE_GUARD([data release]);
     return YES;
 }

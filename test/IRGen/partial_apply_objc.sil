@@ -51,7 +51,7 @@ bb0(%0 : $ObjCClass):
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @indirect_partial_apply(i8*, %swift.refcounted*, i64) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[T0:%.*]] = bitcast i8* %0 to void (i64, %swift.refcounted*)*
-// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata, i32 0, i32 2), i64 40, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, i64, %swift.refcounted\*, i8\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store i64 %2, i64* [[X_ADDR]], align 8
@@ -85,7 +85,7 @@ entry(%f : $@callee_owned (Builtin.Word) -> (), %x : $Builtin.Word):
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @objc_partial_apply(%T18partial_apply_objc9ObjCClassC*) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.2, i32 0, i32 2), i64 24, i64 7)
+// CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_boxmetadata, %swift.full_boxmetadata* @metadata.2, i32 0, i32 2), i64 24, i64 7)
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, %T18partial_apply_objc9ObjCClassC\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]], [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK:   store %T18partial_apply_objc9ObjCClassC* %0, %T18partial_apply_objc9ObjCClassC** [[X_ADDR]], align 8
@@ -116,7 +116,7 @@ entry(%c : $ObjCClass):
 }
 
 // CHECK-LABEL: define{{.*}} { i8*, %swift.refcounted* } @objc_partial_apply_indirect_sil_argument(%T18partial_apply_objc9ObjCClassC*) {{.*}}
-// CHECK:  [[CTX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
+// CHECK:  [[CTX:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:  [[CTX_ADDR:%.*]] = bitcast %swift.refcounted* [[CTX]] to [[CTXTYPE:<{ %swift.refcounted, %T18partial_apply_objc9ObjCClassC\* }>]]*
 // CHECK:  [[SELF_ADDR:%.*]] = getelementptr inbounds [[CTXTYPE]], [[CTXTYPE]]* [[CTX_ADDR]], i32 0, i32 1
 // CHECK:  store %T18partial_apply_objc9ObjCClassC* %0, %T18partial_apply_objc9ObjCClassC** [[SELF_ADDR]]
@@ -148,7 +148,7 @@ entry(%c : $ObjCClass):
 // CHECK:   [[I8PTRSELF:%.*]] = bitcast %T18partial_apply_objc9ObjCClassC* [[SELF]] to [[OPAQUE4:%.*]]*
 // CHECK:   call [[OPAQUE3:%.*]]* bitcast (void ()* @objc_msgSend to [[OPAQUE3]]* ([[OPAQUE4:%.*]]*, i8*)*)([[OPAQUE4]]* [[I8PTRSELF]], i8* [[CMD]])
 // CHECK-NOT: release
-// CHECK:   call void @swift_rt_swift_release(%swift.refcounted* %0)
+// CHECK:   call void @swift_release(%swift.refcounted* %0)
 // CHECK-NOT: release
 // CHECK:   ret void
 // CHECK: }
@@ -191,7 +191,7 @@ done(%f : $@callee_owned Int -> ()):
 sil @partially_applyable_to_pure_objc : $@convention(thin) Gizmo -> ()
 
 // CHECK: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_pure_objc
-// CHECK:   @swift_rt_swift_allocObject
+// CHECK:   @swift_allocObject
 sil @partial_apply_pure_objc : $@convention(thin) Gizmo -> @callee_owned () -> () {
 entry(%c : $Gizmo):
   %f = function_ref @partially_applyable_to_pure_objc : $@convention(thin) Gizmo -> ()
@@ -227,7 +227,7 @@ entry(%c : $Gizmo):
 }
 
 // CHECK-LABEL: define {{.*}}@objc_partial_apply_callee_guaranteed
-// CHECK:  [[CONTEXT:%.*]] = call {{.*}}@swift_rt_swift_allocObject
+// CHECK:  [[CONTEXT:%.*]] = call {{.*}}@swift_allocObject
 // CHECK:  store
 // CHECK:  [[CLOSURE:%.*]] = insertvalue {{.*}}@"$STa.20"{{.*}}, {{.*}}[[CONTEXT]], 1
 // CHECK: ret {{.*}}[[CLOSURE]]
@@ -250,7 +250,7 @@ entry(%c : $ObjCClass):
 // CHECK: }
 
 // CHECK-LABEL: define {{.*}}@objc_partial_apply_2_callee_guaranteed
-// CHECK:  [[CONTEXT:%.*]] = call {{.*}}@swift_rt_swift_allocObject
+// CHECK:  [[CONTEXT:%.*]] = call {{.*}}@swift_allocObject
 // CHECK: store
 // CHECK:  [[CLOSURE:%.*]] = insertvalue {{.*}}@"$STa.23"{{.*}}, {{.*}}[[CONTEXT]], 1
 // CHECK: ret {{.*}}[[CLOSURE]]

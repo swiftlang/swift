@@ -37,7 +37,9 @@ func rdar29691909(o: AnyObject) -> Any? {
 }
 
 func rdar29907555(_ value: Any!) -> String {
-  return "\(value)" // no error
+  return "\(value)" // expected-warning {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
+  // expected-note@-1 {{use 'String(describing:)' to silence this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
 }
 
 struct SR3715 {
@@ -49,7 +51,10 @@ struct SR3715 {
   func take(_ a: [Any]) {}
 
   func test() {
-    take([overloaded]) // no error
+    take([overloaded]) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   }
 }
 

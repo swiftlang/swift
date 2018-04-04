@@ -111,22 +111,6 @@ of some benchmarks.
 ** FIXME ** `gyb` should be invoked automatically during the
    build so that manually invoking `generate_harness.py` is not required.
 
-### Generating harness files
-
-To generate `CMakeLists.txt` and `utils/main.swift` from test sources, run the
-command:
-
-    $ scripts/generate_harness/generate_harness.py
-
-### Modifying CMakeLists.txt or utils/main.swift
-
-To make changes to `CMakeLists.txt` or `utils/main.swift`, modify the template
-files `CMakeLists.txt.gyb` and `main.swift.gyb` These are templates, rendered by
-`gyb` in `generate_harness.py`, so ensure static changes don't interfere
-with the template portions. Test changes by
-[regenerating the harness](#generating-harness-files) and rebuilding the
-repository with `build-script`.
-
 Adding New Benchmarks
 ---------------------
 
@@ -136,9 +120,8 @@ To add a new single file test:
 
 1.  Add a new Swift file (`YourTestNameHere.swift`), built according to
     the template below, to the `single-source` directory.
-2.  Regenerate harness files by following the directions in
-    [Generating harness files](#generating-harness-files) before committing
-    changes.
+2.  Add the filename of the new Swift file to CMakeLists.txt
+3.  Edit `main.swift`. Import and register your new Swift module.
 
 To add a new multiple file test:
 
@@ -151,17 +134,19 @@ To add a new multiple file test:
         |   |   +-- TestFile2.swift
         |   |   +-- TestFile3.swift
 
-    At least one run function (specified in the template below) must
-    exist in the files.
+    At least one file must define a public `YourTestName` variable, initialized to an
+    instance of BenchmarkInfo (specified in the template below).
 
-2.  Regenerate harness files by following the directions in
-    [Generating harness files](#generating-harness-files) before committing
-    changes.
+2.  In `CMakeLists.txt` add the new directory name to
+    `SWIFT_MULTISOURCE_SWIFT3_BENCHES`, and set `YourTestName_sources` to the
+    list of source file paths.
+
+3.  Edit `main.swift`. Import and register your new Swift module.
 
 **Note:**
 
-The generator script looks for functions prefixed with `run_` in order to
-populate `utils/main.swift`.
+The benchmark harness will execute the routine referenced by
+`BenchmarkInfo.runFunction`.
 
 The benchmark driver will measure the time taken for `N = 1` and automatically calculate
 the necessary number of iterations `N` to run each benchmark in approximately one second,
@@ -175,14 +160,18 @@ If needed you can multiply N by a fixed amount (e.g. `1...100*N`) to achieve thi
 **Performance Test Template**
 
 ``` {.sourceCode .swift}
-// YourTestNameHere benchmark
+// YourTestName benchmark
 //
 // rdar://problem/00000000
-import Foundation
 import TestsUtils
 
+public let YourTestName = BenchmarkInfo(
+  name: "YourTestName",
+  runFunction: run_YourTestName,
+  tags: [.regression])
+
 @inline(never)
-public func run_YourTestNameHere(N: Int) {
+public func run_YourTestName(N: Int) {
     # Declare variables
 
     for i in 1...N {
@@ -194,3 +183,6 @@ public func run_YourTestNameHere(N: Int) {
     # Assert with CheckResults that work was done
 }
 ```
+
+The current set of tags are defined by the `BenchmarkCategory` enum in
+`TestsUtils.swift` .

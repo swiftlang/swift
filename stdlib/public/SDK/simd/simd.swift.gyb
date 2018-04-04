@@ -43,20 +43,20 @@ cardinal = { 2:'two', 3:'three', 4:'four'}
 @_alignment(${vecsize})
 public struct ${vectype} {
 
-  public var _vector: Builtin.${llvm_vectype}
+  public var _value: Builtin.${llvm_vectype}
 
 % for i in xrange(count):
   public var ${component[i]} : ${scalar} {
     @_transparent
     get {
-      let elt = Builtin.${extractelement}(_vector,
+      let elt = Builtin.${extractelement}(_value,
         (${i} as Int32)._value)
 
-      return ${scalar}(_bits: elt)
+      return ${scalar}(elt)
     }
     @_transparent
     set {
-      _vector = Builtin.${insertelement}(_vector,
+      _value = Builtin.${insertelement}(_value,
         newValue._value,
         (${i} as Int32)._value)
     }
@@ -68,8 +68,8 @@ public struct ${vectype} {
   public init() { self.init(0) }
 
   @_transparent
-  public init(_bits: Builtin.${llvm_vectype}) {
-    _vector = _bits
+  public init(_ _value: Builtin.${llvm_vectype}) {
+    self._value = _value
   }
 
   /// Initialize a vector with the specified elements.
@@ -81,7 +81,7 @@ public struct ${vectype} {
       ${component[i]}._value,
       (${i} as Int32)._value)
 % end
-    _vector = v
+    _value = v
   }
 
   /// Initialize a vector with the specified elements.
@@ -113,15 +113,15 @@ public struct ${vectype} {
     get {
       _precondition(index >= 0, "Vector index out of range")
       _precondition(index < ${count}, "Vector index out of range")
-      let elt = Builtin.${extractelement}(_vector,
+      let elt = Builtin.${extractelement}(_value,
         Int32(index)._value)
-      return ${scalar}(_bits: elt)
+      return ${scalar}(elt)
     }
     @_transparent
     set(value) {
       _precondition(index >= 0, "Vector index out of range")
       _precondition(index < ${count}, "Vector index out of range")
-      _vector = Builtin.${insertelement}(_vector,
+      _value = Builtin.${insertelement}(_value,
         value._value,
         Int32(index)._value)
     }
@@ -183,15 +183,13 @@ extension ${vectype} {
   /// Vector (elementwise) sum of `lhs` and `rhs`.
   @_transparent
   public static func ${wrap}+(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${prefix}add_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${prefix}add_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Vector (elementwise) difference of `lhs` and `rhs`.
   @_transparent
   public static func ${wrap}-(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${prefix}sub_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${prefix}sub_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Negation of `rhs`.
@@ -204,8 +202,7 @@ extension ${vectype} {
   /// vector product).
   @_transparent
   public static func ${wrap}*(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${prefix}mul_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${prefix}mul_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Scalar-Vector product.
@@ -223,8 +220,7 @@ extension ${vectype} {
   /// Elementwise quotient of `lhs` and `rhs`.
   @_transparent
   public static func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-    return ${vectype}(_bits:
-      Builtin.${divide}_${llvm_vectype}(lhs._vector, rhs._vector))
+    return ${vectype}(Builtin.${divide}_${llvm_vectype}(lhs._value, rhs._value))
   }
 
   /// Divide vector by scalar.
@@ -745,7 +741,7 @@ extension ${mattype} {
 %   if rows == cols:
   /// Inverse of the matrix if it exists, otherwise the contents of the
   /// resulting matrix are undefined.
-  @available(OSX 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
+  @available(macOS 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
   @_transparent
   public var inverse: ${mattype} {
     return simd_inverse(self)
@@ -849,7 +845,7 @@ public func matrix_from_diagonal(_ d: ${diagtype}) -> ${mattype} {
 }
 
 @available(swift, deprecated: 4, message: "Use the .inverse property instead.")
-@available(OSX 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
+@available(macOS 10.10, iOS 8.0, tvOS 10.0, watchOS 3.0, *)
 public func matrix_invert(_ x: ${mattype}) -> ${mattype} {
   return x.inverse
 }

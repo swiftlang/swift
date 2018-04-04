@@ -80,6 +80,23 @@ extension Dictionary : _ObjectiveCBridgeable {
       return
     }
 
+    if Key.self == String.self {
+      // String and NSString have different concepts of equality, so
+      // string-keyed NSDictionaries may generate key collisions when bridged
+      // over to Swift. See rdar://problem/35995647
+      var dict = Dictionary(minimumCapacity: d.count)
+      d.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
+        let key = Swift._forceBridgeFromObjectiveC(
+          anyKey as AnyObject, Key.self)
+        let value = Swift._forceBridgeFromObjectiveC(
+          anyValue as AnyObject, Value.self)
+        // FIXME: Log a warning if `dict` already had a value for `key`
+        dict[key] = value
+      })
+      result = dict
+      return
+    }
+
     // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
     // may not be backed by an NSDictionary.
     var builder = _DictionaryBuilder<Key, Value>(count: d.count)
@@ -115,26 +132,17 @@ extension Dictionary : _ObjectiveCBridgeable {
     // dictionary; map it to an empty dictionary.
     if _slowPath(d == nil) { return Dictionary() }
 
-    if let native = [Key : Value]._bridgeFromObjectiveCAdoptingNativeStorageOf(
-        d! as AnyObject) {
-      return native
-    }
+    var result: Dictionary? = nil
+    _forceBridgeFromObjectiveC(d!, result: &result)
+    return result!
+  }
+}
 
-    if _isBridgedVerbatimToObjectiveC(Key.self) &&
-       _isBridgedVerbatimToObjectiveC(Value.self) {
-      return [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d! as AnyObject, to: _NSDictionary.self))
-    }
-
-    // `Dictionary<Key, Value>` where either `Key` or `Value` is a value type
-    // may not be backed by an NSDictionary.
-    var builder = _DictionaryBuilder<Key, Value>(count: d!.count)
-    d!.enumerateKeysAndObjects({ (anyKey: Any, anyValue: Any, _) in
-      builder.add(
-          key: Swift._forceBridgeFromObjectiveC(anyKey as AnyObject, Key.self),
-          value: Swift._forceBridgeFromObjectiveC(anyValue as AnyObject, Value.self))
-    })
-    return builder.take()
+extension NSDictionary : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to avoid infinite recursion during bridging
+  @nonobjc
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(self as! Dictionary<AnyHashable, AnyHashable>)
   }
 }
 

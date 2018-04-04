@@ -32,11 +32,9 @@ class DiagnosticEngine;
 //         sanitizer dylib with a given name.
 /// \return Returns a SanitizerKind.
 OptionSet<SanitizerKind> parseSanitizerArgValues(
-        const llvm::opt::ArgList &Args,
-        const llvm::opt::Arg *A,
-        const llvm::Triple &Triple,
-        DiagnosticEngine &Diag,
-        llvm::function_ref<bool(llvm::StringRef)> sanitizerRuntimeLibExists);
+    const llvm::opt::ArgList &Args, const llvm::opt::Arg *A,
+    const llvm::Triple &Triple, DiagnosticEngine &Diag,
+    llvm::function_ref<bool(llvm::StringRef, bool)> sanitizerRuntimeLibExists);
 
 /// \brief Parses a -sanitize-coverage= argument's value.
 llvm::SanitizerCoverageOptions parseSanitizerCoverageArgValue(

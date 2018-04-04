@@ -12,13 +12,13 @@ using namespace swift::syntax;
 TEST(RawSyntaxTests, accumulateAbsolutePosition1) {
   auto Token = RawSyntax::make(tok::identifier,
                                OwnedString("aaa"),
-                               SourcePresence::Present, 
                                {
                                  TriviaPiece::newlines(2),
                                  TriviaPiece::carriageReturns(2),
                                  TriviaPiece::carriageReturnLineFeeds(2)
                                },
-                               {  });
+                               {  },
+                               SourcePresence::Present);
   AbsolutePosition Pos;
   Token->accumulateAbsolutePosition(Pos);
   ASSERT_EQ(7u, Pos.getLine());
@@ -29,9 +29,9 @@ TEST(RawSyntaxTests, accumulateAbsolutePosition1) {
 TEST(RawSyntaxTests, accumulateAbsolutePosition2) {
   auto Token = RawSyntax::make(tok::identifier,
                                OwnedString("aaa"),
-                               SourcePresence::Present,
                                {TriviaPiece::blockComment("/* \n\r\r\n */")},
-                               {  });
+                               {  },
+                               SourcePresence::Present);
   AbsolutePosition Pos;
   Token->accumulateAbsolutePosition(Pos);
   ASSERT_EQ(4u, Pos.getLine());

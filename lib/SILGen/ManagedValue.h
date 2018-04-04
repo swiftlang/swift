@@ -201,7 +201,33 @@ public:
     // either +0 or trivial (in which case +0 vs +1 doesn't matter).
     return !hasCleanup();
   }
-  
+
+  /// Returns true if this is an managed value that can be used safely as a +1
+  /// managed value.
+  ///
+  /// This returns true iff:
+  ///
+  /// 1. All sub-values are trivially typed.
+  /// 2. There exists at least one non-trivial typed sub-value and all such
+  /// sub-values all have cleanups.
+  ///
+  /// *NOTE* Due to 1. isPlusOne and isPlusZero both return true for managed
+  /// values consisting of only trivial values.
+  bool isPlusOne(SILGenFunction &SGF) const;
+
+  /// Returns true if this is an ManagedValue that can be used safely as a +0
+  /// ManagedValue.
+  ///
+  /// Specifically, we return true if:
+  ///
+  /// 1. All sub-values are trivially typed.
+  /// 2. At least 1 subvalue is non-trivial and all such non-trivial values do
+  /// not have a cleanup.
+  ///
+  /// *NOTE* Due to 1. isPlusOne and isPlusZero both return true for
+  /// ManagedValues consisting of only trivial values.
+  bool isPlusZero() const;
+
   SILValue getLValueAddress() const {
     assert(isLValue() && "This isn't an lvalue");
     return getValue();

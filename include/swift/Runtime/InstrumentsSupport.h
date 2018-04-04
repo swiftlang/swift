@@ -20,49 +20,39 @@
 
 namespace swift {
 
+// liboainject patches the function pointers and calls the functions below.
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*_swift_allocObject)(HeapMetadata const *metadata,
-                                             size_t requiredSize,
-                                             size_t requiredAlignmentMask);
-
-SWIFT_RUNTIME_EXPORT
-BoxPair (*swift_allocBox)(Metadata const *type);
-
+                                  size_t requiredSize,
+                                  size_t requiredAlignmentMask);
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*_swift_retain)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 HeapObject *(*_swift_retain_n)(HeapObject *object, uint32_t n);
 SWIFT_RUNTIME_EXPORT
-HeapObject *(*_swift_nonatomic_retain)(HeapObject *object);
-SWIFT_RUNTIME_EXPORT
 HeapObject *(*_swift_tryRetain)(HeapObject *object);
-SWIFT_RUNTIME_EXPORT
-bool (*_swift_isDeallocating)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 void (*_swift_release)(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 void (*_swift_release_n)(HeapObject *object, uint32_t n);
 SWIFT_RUNTIME_EXPORT
-void (*_swift_nonatomic_release)(HeapObject *object);
+size_t swift_retainCount(HeapObject *object);
 
-// liboainject on iOS 8 patches the function pointers below if present. 
+// liboainject tries to patch the function pointers and call the functions below
+// Swift used to implement these but no longer does.
 // Do not reuse these names unless you do what oainject expects you to do.
-typedef size_t AllocIndex;
 SWIFT_RUNTIME_EXPORT
-void *(*_swift_alloc)(AllocIndex idx);
+void *(*_swift_alloc)(size_t idx);
 SWIFT_RUNTIME_EXPORT
-void *(*_swift_tryAlloc)(AllocIndex idx);
+void *(*_swift_tryAlloc)(size_t idx);
 SWIFT_RUNTIME_EXPORT
-void *(*_swift_slowAlloc)(size_t bytes, size_t alignMask,
-                                     uintptr_t flags);
+void *(*_swift_slowAlloc)(size_t bytes, size_t alignMask, uintptr_t flags);
 SWIFT_RUNTIME_EXPORT
-void (*_swift_dealloc)(void *ptr, AllocIndex idx);
+void (*_swift_dealloc)(void *ptr, size_t idx);
 SWIFT_RUNTIME_EXPORT
 void (*_swift_slowDealloc)(void *ptr, size_t bytes, size_t alignMask);
 SWIFT_RUNTIME_EXPORT
-size_t _swift_indexToSize(AllocIndex idx);
-SWIFT_RUNTIME_EXPORT
-int _swift_sizeToIndex(size_t size);
+size_t _swift_indexToSize(size_t idx);
 SWIFT_RUNTIME_EXPORT
 void _swift_zone_init(void);
 

@@ -18,11 +18,11 @@
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_INTERFACE
 bool _swift_stdlib_NSObject_isKindOfClass(
-    id NS_RELEASES_ARGUMENT _Nonnull object,
-    NSString *NS_RELEASES_ARGUMENT _Nonnull className) {
+    id SWIFT_NS_RELEASES_ARGUMENT _Nonnull object,
+    NSString *SWIFT_NS_RELEASES_ARGUMENT _Nonnull className) {
   bool result = [object isKindOfClass:NSClassFromString(className)];
-  [object release];
-  [className release];
+  SWIFT_CC_PLUSONE_GUARD([object release]);
+  SWIFT_CC_PLUSONE_GUARD([className release]);
 
   return result;
 }

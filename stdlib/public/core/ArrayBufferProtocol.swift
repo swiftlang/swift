@@ -12,17 +12,19 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-@_versioned
+@usableFromInline
 internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
-  associatedtype Indices = CountableRange<Int>
+  associatedtype Indices = Range<Int>
 
   /// Create an empty buffer.
   init()
 
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
   init(_buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
+
+  init(copying buffer: Self)
 
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
@@ -124,16 +126,29 @@ internal protocol _ArrayBufferProtocol
   var endIndex: Int { get }
 }
 
-extension _ArrayBufferProtocol {
+extension _ArrayBufferProtocol where Indices == Range<Int>{
 
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
-  @_inlineable
-  @_versioned
+  // Make sure the compiler does not inline _copyBuffer to reduce code size.
+  @inlinable
+  @inline(never)
+  @usableFromInline
+  internal init(copying buffer: Self) {
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
+    buffer._copyContents(
+      subRange: buffer.indices,
+      initializing: newBuffer.firstElementAddress)
+    self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
+  }
+
+  @inlinable
+  @usableFromInline
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
@@ -160,7 +175,7 @@ extension _ArrayBufferProtocol {
 
       // Assign over the original subrange
       var i = newValues.startIndex
-      for j in CountableRange(subrange) {
+      for j in subrange {
         elements[j] = newValues[i]
         newValues.formIndex(after: &i)
       }

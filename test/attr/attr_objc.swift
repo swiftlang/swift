@@ -32,6 +32,9 @@ protocol Protocol_Class2 : class {}
 
 @objc extension PlainStruct { } // expected-error{{'@objc' can only be applied to an extension of a class}}{{1-7=}}
 
+class FáncyName {}
+@objc (FancyName) extension FáncyName {}
+
 @objc  
 var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 
@@ -2283,11 +2286,21 @@ class User: NSObject {
   }
 }
 
-// 'dynamic' methods cannot be @_inlineable or @_versioned
+// 'dynamic' methods cannot be @inlinable or @usableFromInline
 class BadClass {
-  @_inlineable @objc dynamic func badMethod1() {}
-  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to 'dynamic' declarations}}
+  @inlinable @objc dynamic func badMethod1() {}
+  // expected-error@-1 {{'@inlinable' attribute cannot be applied to 'dynamic' declarations}}
 
-  @_versioned @objc dynamic func badMethod2() {}
-  // expected-error@-1 {{'@_versioned' attribute cannot be applied to 'dynamic' declarations}}
+  @usableFromInline @objc dynamic func badMethod2() {}
+  // expected-error@-1 {{'@usableFromInline' attribute cannot be applied to 'dynamic' declarations}}
+}
+
+@objc
+protocol ObjCProtocolWithWeakProperty {
+   weak var weakProp: AnyObject? { get set } // okay
+}
+
+@objc
+protocol ObjCProtocolWithUnownedProperty {
+   unowned var unownedProp: AnyObject { get set } // okay
 }

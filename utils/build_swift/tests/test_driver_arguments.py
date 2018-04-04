@@ -590,7 +590,6 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.build_libicu)
             self.assertFalse(namespace.build_lldb)
             self.assertFalse(namespace.build_llbuild)
-            self.assertFalse(namespace.build_playgroundlogger)
             self.assertFalse(namespace.build_playgroundsupport)
             self.assertFalse(namespace.build_swiftpm)
             self.assertFalse(namespace.build_xctest)
@@ -646,6 +645,7 @@ class TestDriverArgumentParser(unittest.TestCase):
                 '--test', '0',
                 '--validation-test', '0',
                 '--long-test', '0',
+                '--stress-test', '0',
             ])
 
             self.assertFalse(namespace.test_linux)

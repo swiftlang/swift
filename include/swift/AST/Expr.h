@@ -104,7 +104,7 @@ enum class CheckedCastKind : unsigned {
   Last_CheckedCastKind = Swift3BridgingDowncast,
 };
 
-enum class AccessSemantics : unsigned char {
+enum class AccessSemantics : uint8_t {
   /// On a property or subscript reference, this is a direct access to
   /// the underlying storage.  On a function reference, this is a
   /// non-polymorphic access to a particular implementation.
@@ -113,7 +113,7 @@ enum class AccessSemantics : unsigned char {
   /// On a property or subscript reference, this is a direct,
   /// non-polymorphic access to the getter/setter accessors.
   DirectToAccessor,
-  
+
   /// On a property or subscript reference, this is an access to a property
   /// behavior that may be an initialization. Reads always go through the
   /// 'get' accessor on the property. Writes may go through the 'init' or
@@ -301,6 +301,10 @@ protected:
     NumElementMappings : 16,
     /// The arguments that are packed into the variadic element.
     NumVariadicArgs : 16
+  );
+
+  SWIFT_INLINE_BITFIELD(ForceValueExpr, Expr, 1,
+    ForcedIUO : 1
   );
 
   SWIFT_INLINE_BITFIELD(InOutToPointerExpr, ImplicitConversionExpr, 1,
@@ -562,8 +566,22 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(llvm::function_ref<Type(const Expr *)> getType,
+                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
+          const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
+                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
+          const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+
   void dump(raw_ostream &OS) const;
   void print(raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
+             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+             unsigned Indent = 0) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
@@ -2507,9 +2525,11 @@ class ForceValueExpr : public Expr {
   SourceLoc ExclaimLoc;
 
 public:
-  ForceValueExpr(Expr *subExpr, SourceLoc exclaimLoc)
+  ForceValueExpr(Expr *subExpr, SourceLoc exclaimLoc, bool forcedIUO = false)
     : Expr(ExprKind::ForceValue, /*Implicit=*/exclaimLoc.isInvalid(), Type()),
-      SubExpr(subExpr), ExclaimLoc(exclaimLoc) {}
+      SubExpr(subExpr), ExclaimLoc(exclaimLoc) {
+    Bits.ForceValueExpr.ForcedIUO = forcedIUO;
+  }
 
   SourceRange getSourceRange() const {
     if (ExclaimLoc.isInvalid())
@@ -2533,6 +2553,10 @@ public:
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *expr) { SubExpr = expr; }
+
+  bool isForceOfImplicitlyUnwrappedOptional() const {
+    return Bits.ForceValueExpr.ForcedIUO;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ForceValue;
@@ -4885,7 +4909,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
-        llvm_unreachable("no index expr for this kind");
+        return nullptr;
       }
     }
 
@@ -4918,7 +4942,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
-        llvm_unreachable("no hashable conformances for this kind");
+        return {};
       }
     }
     

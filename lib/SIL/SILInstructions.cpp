@@ -117,21 +117,28 @@ static void collectTypeDependentOperands(
 //===----------------------------------------------------------------------===//
 
 template <typename INST>
-static void *allocateDebugVarCarryingInst(SILModule &M, SILDebugVariable Var,
+static void *allocateDebugVarCarryingInst(SILModule &M,
+                                          Optional<SILDebugVariable> Var,
                                           ArrayRef<SILValue> Operands = {}) {
-  return M.allocateInst(sizeof(INST) + Var.Name.size() +
+  return M.allocateInst(sizeof(INST) + (Var ? Var->Name.size() : 0) +
                             sizeof(Operand) * Operands.size(),
                         alignof(INST));
 }
 
-TailAllocatedDebugVariable::TailAllocatedDebugVariable(SILDebugVariable Var,
-                                                       char *buf) {
-  Data.ArgNo = Var.ArgNo;
-  Data.Constant = Var.Constant;
-  Data.NameLength = Var.Name.size();
-  assert(Data.ArgNo == Var.ArgNo && "Truncation");
-  assert(Data.NameLength == Var.Name.size() && "Truncation");
-  memcpy(buf, Var.Name.data(), Var.Name.size());
+TailAllocatedDebugVariable::TailAllocatedDebugVariable(
+    Optional<SILDebugVariable> Var, char *buf) {
+  if (!Var) {
+    RawValue = 0;
+    return;
+  }
+
+  Data.HasValue = true;
+  Data.Constant = Var->Constant;
+  Data.ArgNo = Var->ArgNo;
+  Data.NameLength = Var->Name.size();
+  assert(Data.ArgNo == Var->ArgNo && "Truncation");
+  assert(Data.NameLength == Var->Name.size() && "Truncation");
+  memcpy(buf, Var->Name.data(), Data.NameLength);
 }
 
 StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
@@ -141,7 +148,7 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F,
-                               SILDebugVariable Var)
+                               Optional<SILDebugVariable> Var)
     : InstructionBase(Loc, elementType.getAddressType()) {
   SILInstruction::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
@@ -157,7 +164,7 @@ AllocStackInst *
 AllocStackInst::create(SILDebugLocation Loc,
                        SILType elementType, SILFunction &F,
                        SILOpenedArchetypesState &OpenedArchetypes,
-                       SILDebugVariable Var) {
+                       Optional<SILDebugVariable> Var) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                elementType.getSwiftRValueType());
@@ -167,8 +174,6 @@ AllocStackInst::create(SILDebugLocation Loc,
       AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var);
 }
 
-/// getDecl - Return the underlying variable declaration associated with this
-/// allocation, or null if this is a temporary allocation.
 VarDecl *AllocStackInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
@@ -184,7 +189,7 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
   SILInstruction::Bits.AllocRefInstBase.NumTailTypes = ElementTypes.size();
   assert(SILInstruction::Bits.AllocRefInstBase.NumTailTypes ==
          ElementTypes.size() && "Truncation");
-  assert(!objc || ElementTypes.size() == 0);
+  assert(!objc || ElementTypes.empty());
 }
 
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
@@ -194,7 +199,7 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                    ArrayRef<SILValue> ElementCountOperands,
                                    SILOpenedArchetypesState &OpenedArchetypes) {
   assert(ElementTypes.size() == ElementCountOperands.size());
-  assert(!objc || ElementTypes.size() == 0);
+  assert(!objc || ElementTypes.empty());
   SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
                                        ElementCountOperands.end());
   for (SILType ElemType : ElementTypes) {
@@ -234,7 +239,7 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
-                           SILFunction &F, SILDebugVariable Var)
+                           SILFunction &F, Optional<SILDebugVariable> Var)
     : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
                                       SILType::getPrimitiveObjectType(BoxType)),
       VarInfo(Var, getTrailingObjects<char>()) {
@@ -244,18 +249,16 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,
                                    SILFunction &F,
                                    SILOpenedArchetypesState &OpenedArchetypes,
-                                   SILDebugVariable Var) {
+                                   Optional<SILDebugVariable> Var) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
-                                                   Var.Name.size());
+                                                   Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
   return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var);
 }
 
-/// getDecl - Return the underlying variable declaration associated with this
-/// allocation, or null if this is a temporary allocation.
 VarDecl *AllocBoxInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
@@ -273,7 +276,8 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
 }
 
 DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,
-                                       SILValue Operand, SILDebugVariable Var)
+                                       SILValue Operand,
+                                       SILDebugVariable Var)
     : UnaryInstructionBase(DebugLoc, Operand),
       VarInfo(Var, getTrailingObjects<char>()) {}
 
@@ -1758,6 +1762,8 @@ OpenExistentialAddrInst::OpenExistentialAddrInst(
 OpenExistentialRefInst::OpenExistentialRefInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(DebugLoc, Operand, Ty) {
+  assert(Operand->getType().isObject() && "Operand must be an object.");
+  assert(Ty.isObject() && "Result type must be an object type.");
 }
 
 OpenExistentialMetatypeInst::OpenExistentialMetatypeInst(
@@ -1990,6 +1996,37 @@ ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   return CFI;
 }
 
+ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
+    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes, bool isLifetimeGuaranteed) {
+  SILModule &Mod = F.getModule();
+  SmallVector<SILValue, 8> TypeDependentOperands;
+  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
+                               Ty.getSwiftRValueType());
+  unsigned size =
+    totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+  void *Buffer = Mod.allocateInst(size, alignof(ConvertEscapeToNoEscapeInst));
+  auto *CFI = ::new (Buffer) ConvertEscapeToNoEscapeInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, isLifetimeGuaranteed);
+  // If we do not have lowered SIL, make sure that are not performing
+  // ABI-incompatible conversions.
+  //
+  // *NOTE* We purposely do not use an early return here to ensure that in
+  // builds without assertions this whole if statement is optimized out.
+  if (F.getModule().getStage() != SILStage::Lowered) {
+    // Make sure we are not performing ABI-incompatible conversions.
+    CanSILFunctionType opTI =
+        CFI->getOperand()->getType().castTo<SILFunctionType>();
+    (void)opTI;
+    CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
+    (void)resTI;
+    assert(
+        opTI->isABICompatibleWith(resTI).isCompatibleUpToNoEscapeConversion() &&
+        "Can not convert in between ABI incompatible function types");
+  }
+  return CFI;
+}
+
 bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   switch (getKind()) {
   case Kind::StoredProperty:
@@ -1997,6 +2034,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
   case Kind::OptionalChain:
   case Kind::OptionalWrap:
   case Kind::OptionalForce:
+  case Kind::External:
     llvm_unreachable("not a settable computed property");
   case Kind::SettableProperty: {
     auto setter = getComputedPropertySetter();
@@ -2014,6 +2052,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
   case KeyPathPatternComponent::Kind::OptionalChain:
   case KeyPathPatternComponent::Kind::OptionalWrap:
   case KeyPathPatternComponent::Kind::OptionalForce:
+  case KeyPathPatternComponent::Kind::External:
     return;
   case KeyPathPatternComponent::Kind::SettableProperty:
     forFunction(component.getComputedPropertySetter());
@@ -2032,9 +2071,9 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
       break;
     }
     
-    if (auto equals = component.getComputedPropertyIndexEquals())
+    if (auto equals = component.getSubscriptIndexEquals())
       forFunction(equals);
-    if (auto hash = component.getComputedPropertyIndexHash())
+    if (auto hash = component.getSubscriptIndexHash())
       forFunction(hash);
     return;
   }
@@ -2071,10 +2110,11 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::OptionalForce:
       break;
-      
+    
+    case KeyPathPatternComponent::Kind::External:
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
-      for (auto &index : component.getComputedPropertyIndices()) {
+      for (auto &index : component.getSubscriptIndices()) {
         maxOperandNo = std::max(maxOperandNo, (int)index.Operand);
       }
     }
@@ -2129,6 +2169,15 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(valueType.getPointer());
   ID.AddString(objcString);
   
+  auto profileIndices = [&](ArrayRef<KeyPathPatternComponent::Index> indices) {
+    for (auto &index : indices) {
+      ID.AddInteger(index.Operand);
+      ID.AddPointer(index.FormalType.getPointer());
+      ID.AddPointer(index.LoweredType.getOpaqueValue());
+      ID.AddPointer(index.Hashable.getOpaqueValue());
+    }
+  };
+  
   for (auto &component : components) {
     ID.AddInteger((unsigned)component.getKind());
     switch (component.getKind()) {
@@ -2140,6 +2189,13 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::StoredProperty:
       ID.AddPointer(component.getStoredPropertyDecl());
       break;
+      
+    case KeyPathPatternComponent::Kind::External: {
+      ID.AddPointer(component.getExternalDecl());
+      profileSubstitutionList(ID, component.getExternalSubstitutions());
+      profileIndices(component.getSubscriptIndices());
+      break;
+    }
       
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
@@ -2154,7 +2210,6 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
         ID.AddPointer(declRef.loc.getOpaqueValue());
         ID.AddInteger((unsigned)declRef.kind);
         ID.AddInteger(declRef.isCurried);
-        ID.AddBoolean(declRef.Expansion);
         ID.AddBoolean(declRef.isCurried);
         ID.AddBoolean(declRef.isForeign);
         ID.AddBoolean(declRef.isDirectReference);
@@ -2170,12 +2225,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
         break;
       }
       }
-      for (auto &index : component.getComputedPropertyIndices()) {
-        ID.AddInteger(index.Operand);
-        ID.AddPointer(index.FormalType.getPointer());
-        ID.AddPointer(index.LoweredType.getOpaqueValue());
-        ID.AddPointer(index.Hashable.getOpaqueValue());
-      }
+      profileIndices(component.getSubscriptIndices());
       break;
     }
   }

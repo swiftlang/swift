@@ -46,7 +46,8 @@ function(get_test_dependencies SDK result_var_name)
       swift-api-digester swift-refactor)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
-         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis llvm-profdata not)
+         clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
+         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not)
   endif()
   if(SWIFT_BUILD_SOURCEKIT)
     list(APPEND deps_binaries sourcekitd-test complete-test)
@@ -145,6 +146,7 @@ set(TEST_SUBSETS
     all
     only_validation
     only_long
+    only_stress
 )
 
 if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -157,8 +159,8 @@ foreach(SDK ${SWIFT_SDKS})
   foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
     # Configure variables for this subdirectory.
     set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
-    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}")
-    set(VARIANT_SDK "${SWIFT_SDK_${SDK}_PATH}")
+    set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_TRIPLE}${SWIFT_SDK_${SDK}_DEPLOYMENT_VERSION}")
+    set(VARIANT_SDK "${SWIFT_SDK_${SDK}_ARCH_${ARCH}_PATH}")
 
     # A directory where to put the xUnit-style XML test results.
     set(SWIFT_TEST_RESULTS_DIR
@@ -235,8 +237,8 @@ foreach(SDK ${SWIFT_SDKS})
               # These two directories may contain the same libraries,
               # but upload both to device just in case. Duplicates will be
               # overwritten, and uploading doesn't take very long anyway.
-              "${SWIFT_ANDROID_ICU_UC}"
-              "${SWIFT_ANDROID_ICU_I18N}")
+              "${SWIFT_ANDROID_${ARCH}_ICU_UC}"
+              "${SWIFT_ANDROID_${ARCH}_ICU_I18N}")
     endif()
     add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
         ${command_upload_stdlib}
@@ -270,12 +272,14 @@ foreach(SDK ${SWIFT_SDKS})
         if((test_subset STREQUAL "primary") OR
            (test_subset STREQUAL "validation") OR
            (test_subset STREQUAL "only_long") OR
+           (test_subset STREQUAL "only_stress") OR
            (test_subset STREQUAL "all"))
           list(APPEND directories "${test_bin_dir}")
         endif()
         if((test_subset STREQUAL "validation") OR
            (test_subset STREQUAL "only_validation") OR
            (test_subset STREQUAL "only_long") OR
+           (test_subset STREQUAL "only_stress") OR
            (test_subset STREQUAL "all"))
           list(APPEND directories "${validation_test_bin_dir}")
           list(APPEND dependencies ${validation_test_dependencies})

@@ -312,7 +312,7 @@ class ForeignErrorInitializationPlan : public ResultPlan {
   ManagedValue managedErrorTemp;
   CanType unwrappedPtrType;
   PointerTypeKind ptrKind;
-  OptionalTypeKind optKind;
+  bool isOptional;
   CanType errorPtrType;
 
 public:
@@ -328,7 +328,10 @@ public:
     // of optional.
     errorPtrType = errorParameter.getType();
     unwrappedPtrType = errorPtrType;
-    if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+    Type unwrapped = errorPtrType->getOptionalObjectType();
+    isOptional = (bool) unwrapped;
+
+    if (unwrapped)
       unwrappedPtrType = unwrapped->getCanonicalType();
 
     auto errorType =
@@ -371,7 +374,7 @@ public:
         SGF.emitLValueToPointer(loc, std::move(lvalue), pointerInfo);
 
     // Wrap up in an Optional if called for.
-    if (optKind != OTK_None) {
+    if (isOptional) {
       auto &optTL = SGF.getTypeLowering(errorPtrType);
       pointerValue = SGF.getOptionalSomeValue(loc, pointerValue, optTL);
     }
@@ -420,7 +423,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
   // need to make our own make SILResultInfo array.
   case ForeignErrorConvention::NilResult: {
     assert(allResults.size() == 1);
-    CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
+    CanType objectType = allResults[0].getType().getOptionalObjectType();
     SILResultInfo optResult = allResults[0].getWithType(objectType);
     allResults.clear();
     allResults.push_back(optResult);

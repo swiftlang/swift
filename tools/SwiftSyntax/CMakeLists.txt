@@ -14,14 +14,14 @@ add_swift_library(swiftSwiftSyntax SHARED
   Syntax.swift
   SyntaxData.swift
   SyntaxChildren.swift
-  SyntaxCollection.swift
+  SyntaxCollections.swift.gyb
   SyntaxBuilders.swift.gyb
   SyntaxFactory.swift.gyb
   SyntaxKind.swift.gyb
   SyntaxNodes.swift.gyb
   SyntaxRewriter.swift.gyb
   TokenKind.swift.gyb
-  Trivia.swift
+  Trivia.swift.gyb
 
   SWIFT_MODULE_DEPENDS Foundation
   INSTALL_IN_COMPONENT swift-syntax

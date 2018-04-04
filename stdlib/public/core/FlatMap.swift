@@ -20,7 +20,7 @@ extension LazySequenceProtocol {
   /// `s.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazySequence<
@@ -38,7 +38,7 @@ extension LazySequenceProtocol {
   ///   as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
@@ -60,7 +60,8 @@ extension LazySequenceProtocol {
   ///
   /// - Complexity: O(1)
   @inline(__always)
-  @available(*, deprecated, renamed: "compactMap(_:)")
+  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
+    message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapSequence<
@@ -82,7 +83,7 @@ extension LazyCollectionProtocol {
   /// `c.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Element) -> SegmentOfResult
   ) -> LazyCollection<
@@ -102,7 +103,7 @@ extension LazyCollectionProtocol {
   ///   collection as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapCollection<
@@ -123,8 +124,9 @@ extension LazyCollectionProtocol {
   ///   collection as its argument and returns an optional value.
   ///
   /// - Complexity: O(1)
-  @available(*, deprecated, renamed: "compactMap(_:)")
-  @_inlineable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
+    message: "Please use compactMap(_:) for the case where closure returns an optional value")
+  @inlinable // FIXME(sil-serialize-all)
   public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapCollection<

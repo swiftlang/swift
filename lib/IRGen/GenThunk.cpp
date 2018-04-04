@@ -19,7 +19,8 @@
 #include "Callee.h"
 #include "Explosion.h"
 #include "GenDecl.h"
-#include "GenMeta.h"
+#include "GenClass.h"
+#include "GenHeap.h"
 #include "GenOpaque.h"
 #include "GenProto.h"
 #include "IRGenFunction.h"
@@ -49,7 +50,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
   Signature signature = getSignature(fnType);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  return createFunction(*this, link, signature);
+  entry = createFunction(*this, link, signature);
+  return entry;
 }
 
 static FunctionPointer lookupMethod(IRGenFunction &IGF,

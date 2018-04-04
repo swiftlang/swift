@@ -92,7 +92,7 @@ namespace {
   template <class Impl, class Base>
   class TupleTypeInfoBase
       : public RecordTypeInfo<Impl, Base, TupleFieldInfo> {
-    typedef RecordTypeInfo<Impl, Base, TupleFieldInfo> super;
+    using super = RecordTypeInfo<Impl, Base, TupleFieldInfo>;
 
   protected:
     template <class... As>
@@ -339,15 +339,6 @@ namespace {
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             SILType T) const {
       return TupleNonFixedOffsets(T);
-    }
-
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      // Tuple value witness tables are instantiated by the runtime along with
-      // their metadata. We should never try to initialize one in the compiler.
-      llvm_unreachable("initializing value witness table for tuple?!");
     }
   };
 

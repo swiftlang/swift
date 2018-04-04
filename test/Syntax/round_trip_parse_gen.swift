@@ -1,8 +1,12 @@
+// RUN: rm -rf %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen > %t
 // RUN: diff -u %s %t
 // RUN: %swift-syntax-test -input-source-filename %s -parse-gen -print-node-kind > %t.withkinds
 // RUN: diff -u %S/Outputs/round_trip_parse_gen.swift.withkinds %t.withkinds
 // RUN: %swift-syntax-test -input-source-filename %s -eof > %t
+// RUN: diff -u %s %t
+// RUN: %swift-syntax-test -serialize-raw-tree -input-source-filename %s > %t.dump
+// RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
 // RUN: diff -u %s %t
 
 import ABC
@@ -10,6 +14,9 @@ import A.B.C
 @objc import A.B
 @objc import typealias A.B
 import struct A.B
+
+#warning("test warning")
+#error("test error")
 
 #if Blah
 class C {
@@ -28,6 +35,7 @@ class C {
     bar1(1.1)
     var f = /*comments*/+0.1/*comments*/
     foo()
+    _ = "🙂🤗🤩🤔🤨"
   }
 
   func foo1() {
@@ -37,11 +45,15 @@ class C {
     _ = bar3(a : bar3(a: bar3(a: 1)))
     _ = bar4(bar4(bar4(1)))
     _ = [:]
+    _ = []
     _ = [1, 2, 3, 4]
     _ = [1:1, 2:2, 3:3, 4:4]
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
     foo(nil, nil, nil)
+    _ = type(of: a).self
+    _ = A -> B.C<Int>
+    _ = [(A) throws -> B]()
   }
   func boolAnd() -> Bool { return true && false }
   func boolOr() -> Bool { return true || false }
@@ -66,6 +78,8 @@ class C {
     (1 + 1).a.b.foo
     _ = a as Bool || a as! Bool || a as? Bool
     _ = a is Bool
+    _ = self
+    _ = Self
   }
 
   func superExpr() {
@@ -82,6 +96,28 @@ class C {
     _ = .foo[12]
     _ = .foo.bar
   }
+
+  init() {}
+  @objc private init(a: Int)
+  init!(a: Int) {}
+  init?(a: Int) {}
+  public init(a: Int) throws {}
+
+  @objc deinit {}
+  private deinit {}
+
+  internal subscript(x: Int) -> Int { get {} set {} }
+  subscript() -> Int { return 1 }
+}
+
+protocol PP {
+  associatedtype A
+  associatedtype B: Sequence
+  associatedtype C = Int
+  associatedtype D: Sequence = [Int]
+  associatedtype E: Sequence = [[Int]] where A.Element : Sequence
+  private associatedtype F
+  @objc associatedtype G
 }
 
 #endif
@@ -202,6 +238,7 @@ func closure() {
     return 2
   }
   _ = { a, b in }
+  _ = { (a, b) in }
   _ = {}
   _ = { s1, s2 in s1 > s2 }
   _ = { $0 > $1 }
@@ -220,9 +257,14 @@ func postfix() {
   foo[] {}
   foo[1] {}
   foo[1][2,x:3]
-  foo?++.bar!(baz)
+  foo?++.bar!(baz).self
+  foo().0
+  foo<Int>.bar
+  foo<Int>()
+  foo.bar<Int>()
 
   foo(x:y:)()
+  foo(x:)<Int> { }
   _ = .foo(x:y:)
   _ = x.foo(x:y:)
   _ = foo(&d)
@@ -250,7 +292,7 @@ protocol P {
   var a: Int {}
 }
 
-class C {
+private final class D {
   @objc
   static private var a: Int = 3 { return 3 }, b: Int, c = 4, d : Int { get {} get {}}, (a, b): (Int, Int)
   let (a, b) = (1,2), _ = 4 {}
@@ -284,6 +326,8 @@ func statementTests() {
   }
   repeat { } while true
   LABEL: repeat { } while false
+  while true { }
+  LABEL: while true { }
   LABEL: do {}
   LABEL: switch foo {
     case 1:
@@ -319,6 +363,25 @@ func statementTests() {
 
   for var i in foo where i.foo {}
   for case is Int in foo {}
+
+  switch Foo {
+    case n1:
+      break
+    case n2, n3l:
+      break
+#if FOO
+    case let (x, y)  where !x, n3l where false:
+      break
+#elseif BAR
+    case let y:
+      break
+#else
+    case .foo(let x):
+      break
+#endif
+    default:
+      break
+  }
 }
 
 // MARK: - ExtensionDecl
@@ -363,4 +426,14 @@ func objectLiterals() {
   #file
   #function
   #dsohandle
+}
+
+enum E1 : String {
+  case foo = 1
+  case bar = "test", baz(x: Int, String) = 12
+  indirect case qux(E1)
+
+  indirect private enum E2<T>: String where T: SomeProtocol {
+    case foo, bar, baz
+  }
 }

@@ -36,11 +36,12 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
   case TermKind::ThrowInst:
   case TermKind::UnwindInst:
     return false;
-  // yield and try_apply are special because they can do arbitrary,
+  // yield is special because it can do arbitrary,
   // potentially-process-terminating things.
   case TermKind::YieldInst:
-  case TermKind::TryApplyInst:
     return false;
+  case TermKind::TryApplyInst:
+    return true;
   }
 
   llvm_unreachable("Unhandled TermKind in switch.");
@@ -71,7 +72,7 @@ findAllNonFailureExitBBs(SILFunction *F,
       continue;
 
     // A return inst is always a non-failure exit bb.
-    if (isa<ReturnInst>(TI)) {
+    if (isa<ReturnInst>(TI) || isa<ThrowInst>(TI)) {
       BBs.push_back(&BB);
       continue;
     }

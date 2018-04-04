@@ -56,15 +56,13 @@
 
 // EXTRACT-NOW-LABEL:   sil [serialized] @$S5basic7VehicleC3nowSiyF : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
-// EXTRACT-NOW:           ref_element_addr
-// EXTRACT-NOW-NEXT:      begin_access [read] [dynamic]
-// EXTRACT-NOW-NEXT:      load
-// EXTRACT-NOW-NEXT:      end_access
+// EXTRACT-NOW:           class_method
+// EXTRACT-NOW-NEXT:      apply
 // EXTRACT-NOW-NEXT:      return
 
 public struct X {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   func test() {
     foo()
   }
@@ -72,25 +70,25 @@ public struct X {
 
 @_fixed_layout
 public class Vehicle {
-    @_versioned
+    @usableFromInline
     var numOfWheels: Int
 
-    @_versioned
-    @_inlineable
+    @usableFromInline
+    @inlinable
     init(n: Int) {
       numOfWheels = n
     }
 
-    @_versioned
-    @_inlineable
+    @usableFromInline
+    @inlinable
     func now() -> Int {
         return numOfWheels
     }
 }
 
 @discardableResult
-@_versioned
-@_inlineable
+@usableFromInline
+@inlinable
 func foo() -> Int {
   return 7
 }

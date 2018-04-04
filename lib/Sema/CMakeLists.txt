@@ -8,7 +8,6 @@ add_swift_library(swiftSema STATIC
   CSBindings.cpp
   CSDiag.cpp
   CSGen.cpp
-  CSPropagate.cpp
   CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp
@@ -18,6 +17,8 @@ add_swift_library(swiftSema STATIC
   ConstraintGraph.cpp
   ConstraintLocator.cpp
   ConstraintSystem.cpp
+  DebuggerTestingTransform.cpp
+  DerivedConformanceCaseIterable.cpp
   DerivedConformanceCodable.cpp
   DerivedConformanceCodingKey.cpp
   DerivedConformanceEquatableHashable.cpp

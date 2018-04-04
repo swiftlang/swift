@@ -9,29 +9,40 @@
     "Character.swift",
     "CharacterUnicodeScalars.swift",
     "ICU.swift",
+    "NormalizedCodeUnitIterator.swift",
+    "SmallString.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
-    "StringBuffer.swift",
     "StringCharacterView.swift",
     "StringComparable.swift",
-    "StringCore.swift",
+    "StringComparison.swift",
+    "StringObject.swift",
+    "StringGuts.swift",
+    "StringGutsVisitor.swift",
+    "StringGraphemeBreaking.swift",  
     "StringHashable.swift",
     "StringIndex.swift",
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
+    "StringNormalization.swift",
+    "StringProtocol.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringStorage.swift",
     "StringSwitch.swift",
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
+    "StringVariant.swift",  
     "Substring.swift",
     "Unicode.swift",
     "UnicodeEncoding.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnavailableStringAPIs.swift",
+    "UnmanagedOpaqueString.swift",
+    "UnmanagedString.swift",
     "UTFEncoding.swift",
     "UTF8.swift",
     "UTF16.swift",
@@ -95,8 +106,9 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
-        "HashedCollections.swift",
-        "HashedCollectionsAnyHashableExtensions.swift"
+        "Dictionary.swift",
+        "HashedCollectionsAnyHashableExtensions.swift",
+        "Set.swift",
       ]
     }
   ],
@@ -115,16 +127,14 @@
     "Dump.swift",
     "Mirror.swift",
     "Mirrors.swift",
-    "ObjCMirrors.swift",
-    "ObjectIdentifier.swift",
-    "ReflectionLegacy.swift"
+    "ReflectionMirror.swift",
+    "ObjectIdentifier.swift"
   ],
   "Math": [
     "SetAlgebra.swift",
     "BuiltinMath.swift",
     {
     "Integers": [
-      "DoubleWidth.swift",
       "Integers.swift",
       "IntegerParsing.swift"],
     "Floating": [
@@ -146,6 +156,9 @@
   "Protocols": [
     "CompilerProtocols.swift",
     "ShadowProtocols.swift"
+  ],
+  "Playground": [
+    "PlaygroundDisplay.swift"
   ],
   "Misc": [
     "AnyHashable.swift",

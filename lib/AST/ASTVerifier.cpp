@@ -445,6 +445,14 @@ public:
     bool shouldVerify(Pattern *S) { return true; }
     bool shouldVerify(Decl *S) { return true; }
 
+    bool shouldVerify(TypeAliasDecl *typealias) {
+      // Don't verify type aliases formed by the debugger; they violate some
+      // AST invariants involving archetypes.
+      if (typealias->isDebuggerAlias()) return false;
+
+      return true;
+    }
+
     // Default cases for whether we should verify a checked subtree.
     bool shouldVerifyChecked(Expr *E) {
       if (!E->getType()) {
@@ -582,7 +590,7 @@ public:
         abort();
       }
 
-      bool foundError = type.findIf([&](Type type) -> bool {
+      bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
@@ -1686,10 +1694,10 @@ public:
                                  Expr *E) {
       auto optionalRVType = optionalType->getRValueType();
       auto objectRVType = objectType->getRValueType();
-      
-      checkSameType(objectRVType, optionalRVType->getAnyOptionalObjectType(),
+
+      checkSameType(objectRVType, optionalRVType->getOptionalObjectType(),
                     "optional object type");
-      
+
       if (objectType->is<LValueType>() != optionalType->is<LValueType>()) {
         Out << "optional operation must preserve lvalue-ness of base\n";
         E->print(Out);
@@ -1856,7 +1864,7 @@ public:
       PrettyStackTraceExpr debugStack(Ctx, "verifying InjectIntoOptionalExpr",
                                       E);
 
-      auto valueType = E->getType()->getAnyOptionalObjectType();
+      auto valueType = E->getType()->getOptionalObjectType();
       if (!valueType) {
         Out << "InjectIntoOptionalExpr is not of Optional type";
         abort();
@@ -2116,6 +2124,7 @@ public:
       // Make sure that there are no archetypes in the interface type.
       if (VD->getDeclContext()->isTypeContext() &&
           !hasEnclosingFunctionContext(VD->getDeclContext()) &&
+          VD->getInterfaceType()->hasArchetype() &&
           VD->getInterfaceType().findIf([](Type type) {
             return type->is<ArchetypeType>();
           })) {
@@ -2143,7 +2152,7 @@ public:
         if (ASD->getSetter() &&
             ASD->getSetter()->getFormalAccess() != setterAccess) {
           Out << "AbstractStorageDecl's setter access is out of sync"
-                 " with the access actually on the setter";
+                 " with the access actually on the setter\n";
           abort();
         }
       }
@@ -2151,21 +2160,22 @@ public:
       if (auto getter = ASD->getGetter()) {
         if (getter->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                 " with whether the getter is actually mutating";
+                 " with whether the getter is actually mutating\n";
           abort();
         }
       }
       if (auto setter = ASD->getSetter()) {
         if (setter->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether the setter is actually mutating";
+                 " with whether the setter is actually mutating\n";
           abort();
         }
       }
       if (auto materializeForSet = ASD->getMaterializeForSetFunc()) {
-        if (materializeForSet->isMutating() != ASD->isSetterMutating()) {
-          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether materializeForSet is mutating";
+        if (materializeForSet->isMutating() !=
+            (ASD->isSetterMutating() || ASD->isGetterMutating())) {
+          Out << "AbstractStorageDecl::is{Getter,Setter}Mutating is out of sync"
+                 " with whether materializeForSet is mutating\n";
           abort();
         }
       }
@@ -2249,9 +2259,9 @@ public:
 
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
-      if (var->getAttrs().hasAttribute<OwnershipAttr>() !=
+      if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>() !=
           isa<ReferenceStorageType>(var->getInterfaceType().getPointer())) {
-        if (var->getAttrs().hasAttribute<OwnershipAttr>()) {
+        if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>()) {
           Out << "VarDecl has an ownership attribute, but its type"
                  " is not a ReferenceStorageType: ";
         } else {
@@ -2320,7 +2330,7 @@ public:
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
-        if (!varTy->getAnyOptionalObjectType()) {
+        if (!varTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set on VarDecl "
                  "with optional type\n";
           abort();
@@ -2684,17 +2694,13 @@ public:
 
       // Verify that the optionality of the result type of the
       // initializer matches the failability of the initializer.
-      if (!CD->isInvalid() && 
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
-            != Ctx.getOptionalDecl() &&
-          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() 
-            != Ctx.getImplicitlyUnwrappedOptionalDecl()) {
-        OptionalTypeKind resultOptionality = OTK_None;
-        CD->getResultInterfaceType()->getAnyOptionalObjectType(resultOptionality);
-        auto declOptionality = CD->getFailability();
+      if (!CD->isInvalid() &&
+          CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
+              Ctx.getOptionalDecl()) {
+        bool resultIsOptional = (bool) CD->getResultInterfaceType()->getOptionalObjectType();
+        auto declIsOptional = CD->getFailability() != OTK_None;
 
-        if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
-            (resultOptionality == OTK_None || declOptionality == OTK_None)) {
+        if (resultIsOptional != declIsOptional) {
           Out << "Initializer has result optionality/failability mismatch\n";
           CD->dump(llvm::errs());
           abort();
@@ -2703,11 +2709,11 @@ public:
         // Also check the interface type.
         if (auto genericFn 
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
-          resultOptionality = OTK_None;
-          genericFn->getResult()->castTo<AnyFunctionType>()->getResult()
-            ->getAnyOptionalObjectType(resultOptionality);
-          if ((resultOptionality != OTK_None || declOptionality != OTK_None) &&
-              (resultOptionality == OTK_None || declOptionality == OTK_None)) {
+          resultIsOptional = (bool) genericFn->getResult()
+              ->castTo<AnyFunctionType>()
+              ->getResult()
+              ->getOptionalObjectType();
+          if (resultIsOptional != declIsOptional) {
             Out << "Initializer has result optionality/failability mismatch\n";
             CD->dump(llvm::errs());
             abort();
@@ -2734,7 +2740,7 @@ public:
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
-        if (!resultTy->getAnyOptionalObjectType()) {
+        if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on constructors with optional return types\n";
           CD->dump(llvm::errs());
@@ -2902,7 +2908,7 @@ public:
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
-        if (!resultTy->getAnyOptionalObjectType()) {
+        if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on functions with optional return types\n";
           abort();

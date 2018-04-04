@@ -31,8 +31,8 @@ bb0(%0 : $@sil_unowned C):
   return %3 : $()
 }
 // CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_class([[C]]*) {{.*}} {
-// CHECK:      call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_rt_swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned %0)
-// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRelease to void ([[C]]*)*)([[C]]* %0)
+// CHECK:      call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned %0)
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
 
 sil @test_weak_rr_proto : $@convention(thin) (@sil_unowned P) -> () {
@@ -43,8 +43,8 @@ bb0(%0 : $@sil_unowned P):
   return %3 : $()
 }
 // CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_proto(%swift.refcounted*, i8**) {{.*}} {
-// CHECK:      call %swift.refcounted* @swift_rt_swift_unownedRetain(%swift.refcounted* returned %0)
-// CHECK:      call void @swift_rt_swift_unownedRelease(%swift.refcounted* %0)
+// CHECK:      call %swift.refcounted* @swift_unownedRetain(%swift.refcounted* returned %0)
+// CHECK:      call void @swift_unownedRelease(%swift.refcounted* %0)
 // CHECK-NEXT: ret void
 
 // Value witnesses for A:
@@ -57,7 +57,7 @@ bb0(%0 : $@sil_unowned P):
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
 // CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
-// CHECK-NEXT: call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_rt_swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned [[T2]])
+// CHECK-NEXT: call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned [[T2]])
 // CHECK-NEXT: [[T0C:%.*]] = bitcast %swift.unowned* [[T0]] to [[C]]*
 // CHECK-NEXT: store [[C]]* [[T2]], [[C]]** [[T0C]], align 8
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
@@ -69,7 +69,7 @@ bb0(%0 : $@sil_unowned P):
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
 // CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
 // CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
-// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRelease to void ([[C]]*)*)([[C]]* [[T2]])
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* [[T2]])
 // CHECK-NEXT: ret void
 
 //   initializeWithCopy
@@ -80,7 +80,7 @@ bb0(%0 : $@sil_unowned P):
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: [[T1C:%.*]] = bitcast %swift.unowned* [[T1]] to [[C]]*
 // CHECK-NEXT: [[T2:%.*]] = load [[C]]*, [[C]]** [[T1C]], align 8
-// CHECK-NEXT: call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_rt_swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned [[T2]])
+// CHECK-NEXT: call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned [[T2]])
 // CHECK-NEXT: [[T0C:%.*]] = bitcast %swift.unowned* [[T0]] to [[C]]*
 // CHECK-NEXT: store [[C]]* [[T2]], [[C]]** [[T0C]], align 8
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
@@ -94,11 +94,11 @@ bb0(%0 : $@sil_unowned P):
 // CHECK-NEXT: [[SRC_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: [[SRC_X_C:%.*]] = bitcast %swift.unowned* [[SRC_X]] to [[C]]*
 // CHECK-NEXT: [[NEW:%.*]] = load [[C]]*, [[C]]** [[SRC_X_C]], align 8
-// CHECK-NEXT: call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_rt_swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned [[NEW]])
+// CHECK-NEXT: call [[C]]* bitcast ([[REF]]* ([[REF]]*)* @swift_unownedRetain to [[C]]* ([[C]]*)*)([[C]]* returned [[NEW]])
 // CHECK-NEXT: [[DEST_X_C:%.*]] = bitcast %swift.unowned* [[DEST_X]] to [[C]]*
 // CHECK-NEXT: [[OLD:%.*]] = load [[C]]*, [[C]]** [[DEST_X_C]], align 8
 // CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[DEST_X_C]], align 8
-// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRelease to void ([[C]]*)*)([[C]]* [[OLD]])
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* [[OLD]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
@@ -113,6 +113,6 @@ bb0(%0 : $@sil_unowned P):
 // CHECK-NEXT: [[DEST_X_C:%.*]] = bitcast %swift.unowned* [[DEST_X]] to [[C]]*
 // CHECK-NEXT: [[OLD:%.*]] = load [[C]]*, [[C]]** [[DEST_X_C]], align 8
 // CHECK-NEXT: store [[C]]* [[NEW]], [[C]]** [[DEST_X_C]], align 8
-// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRelease to void ([[C]]*)*)([[C]]* [[OLD]])
+// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_unownedRelease to void ([[C]]*)*)([[C]]* [[OLD]])
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]

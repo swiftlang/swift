@@ -46,64 +46,6 @@ struct ScalarEnumerationTraits<tok> {
   }
 };
 
-/// Serialization traits for TriviaPiece.
-/// - All trivia pieces will have a "kind" key that contains the serialized
-///   name of the trivia kind.
-/// - Comment trivia will have the associated text of the comment under the
-///   "value" key.
-/// - All other trivia will have the associated integer count of their
-///   occurrences under the "value" key.
-template<>
-struct ObjectTraits<syntax::TriviaPiece> {
-  static void mapping(Output &out, syntax::TriviaPiece &value) {
-    auto kind = value.getKind();
-    out.mapRequired("kind", kind);
-    switch (kind) {
-      case syntax::TriviaKind::Space:
-      case syntax::TriviaKind::Tab:
-      case syntax::TriviaKind::VerticalTab:
-      case syntax::TriviaKind::Formfeed:
-      case syntax::TriviaKind::Newline:
-      case syntax::TriviaKind::CarriageReturn:
-      case syntax::TriviaKind::CarriageReturnLineFeed:
-      case syntax::TriviaKind::Backtick: {
-        auto count = value.getCount();
-        out.mapRequired("value", count);
-        break;
-      }
-      case syntax::TriviaKind::LineComment:
-      case syntax::TriviaKind::BlockComment:
-      case syntax::TriviaKind::DocLineComment:
-      case syntax::TriviaKind::DocBlockComment:
-      case syntax::TriviaKind::GarbageText: {
-        auto text = value.getText();
-        out.mapRequired("value", text);
-        break;
-      }
-    }
-  }
-};
-
-/// Serialization traits for TriviaKind.
-template <>
-struct ScalarEnumerationTraits<syntax::TriviaKind> {
-  static void enumeration(Output &out, syntax::TriviaKind &value) {
-    out.enumCase(value, "Space", syntax::TriviaKind::Space);
-    out.enumCase(value, "Tab", syntax::TriviaKind::Tab);
-    out.enumCase(value, "VerticalTab", syntax::TriviaKind::VerticalTab);
-    out.enumCase(value, "Formfeed", syntax::TriviaKind::Formfeed);
-    out.enumCase(value, "Newline", syntax::TriviaKind::Newline);
-    out.enumCase(value, "CarriageReturn", syntax::TriviaKind::CarriageReturn);
-    out.enumCase(value, "CarriageReturnLineFeed", syntax::TriviaKind::CarriageReturnLineFeed);
-    out.enumCase(value, "LineComment", syntax::TriviaKind::LineComment);
-    out.enumCase(value, "BlockComment", syntax::TriviaKind::BlockComment);
-    out.enumCase(value, "DocLineComment", syntax::TriviaKind::DocLineComment);
-    out.enumCase(value, "DocBlockComment", syntax::TriviaKind::DocBlockComment);
-    out.enumCase(value, "Backtick", syntax::TriviaKind::Backtick);
-    out.enumCase(value, "GarbageText", syntax::TriviaKind::GarbageText);
-  }
-};
-
 /// Serialization traits for Trivia.
 /// Trivia will serialize as an array of the underlying TriviaPieces.
 template<>
@@ -151,25 +93,8 @@ template<>
 struct ObjectTraits<TokenDescription> {
   static void mapping(Output &out, TokenDescription &value) {
     out.mapRequired("kind", value.Kind);
-    switch (value.Kind) {
-      case tok::contextual_keyword:
-      case tok::integer_literal:
-      case tok::floating_literal:
-      case tok::string_literal:
-      case tok::unknown:
-      case tok::code_complete:
-      case tok::identifier:
-      case tok::oper_binary_unspaced:
-      case tok::oper_binary_spaced:
-      case tok::oper_postfix:
-      case tok::oper_prefix:
-      case tok::dollarident:
-      case tok::comment:
-      case tok::string_segment:
-        out.mapRequired("text", value.Text);
-        break;
-      default:
-        break;
+    if (!isTokenTextDetermined(value.Kind)) {
+      out.mapRequired("text", value.Text);
     }
   }
 };
@@ -194,28 +119,39 @@ struct ObjectTraits<TokenDescription> {
 /// }
 /// ```
 template<>
-struct ObjectTraits<RC<syntax::RawSyntax>> {
-  static void mapping(Output &out, RC<syntax::RawSyntax> &value) {
-    if (value->isToken()) {
-      auto tokenKind = value->getTokenKind();
-      auto text = value->getTokenText();
+struct ObjectTraits<syntax::RawSyntax> {
+  static void mapping(Output &out, syntax::RawSyntax &value) {
+    if (value.isToken()) {
+      auto tokenKind = value.getTokenKind();
+      auto text = value.getTokenText();
       auto description = TokenDescription { tokenKind, text };
       out.mapRequired("tokenKind", description);
 
-      auto leadingTrivia = value->getLeadingTrivia();
+      auto leadingTrivia = value.getLeadingTrivia();
       out.mapRequired("leadingTrivia", leadingTrivia);
 
-      auto trailingTrivia = value->getTrailingTrivia();
+      auto trailingTrivia = value.getTrailingTrivia();
       out.mapRequired("trailingTrivia", trailingTrivia);
     } else {
-      auto kind = value->getKind();
+      auto kind = value.getKind();
       out.mapRequired("kind", kind);
 
-      auto layout = value->getLayout();
+      auto layout = value.getLayout();
       out.mapRequired("layout", layout);
     }
-    auto presence = value->getPresence();
+    auto presence = value.getPresence();
     out.mapRequired("presence", presence);
+  }
+};
+
+template<>
+struct NullableTraits<RC<syntax::RawSyntax>> {
+  using value_type = syntax::RawSyntax;
+  static bool isNull(RC<syntax::RawSyntax> &value) {
+    return value == nullptr;
+  }
+  static syntax::RawSyntax &get(RC<syntax::RawSyntax> &value) {
+    return *value;
   }
 };
 } // end namespace json

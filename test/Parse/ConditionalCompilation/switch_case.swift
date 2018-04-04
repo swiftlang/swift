@@ -206,7 +206,7 @@ func foo(x: E, intVal: Int) {
   // 'fallthrough' target.
   switch intVal {
     case 1:
-      fallthrough // expected-error {{'fallthrough' cannot transfer control to a case label that declares variables}}
+      fallthrough // expected-error {{'fallthrough' from a case which doesn't bind variable 'val'}}
 #if ENABLE_C
     case let val:
       break

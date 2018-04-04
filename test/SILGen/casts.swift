@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name casts -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class B { }
 class D : B { }
@@ -16,20 +17,17 @@ func downcast(b: B) -> D {
 
 // CHECK-LABEL: sil hidden @$S5casts3isa{{[_0-9a-zA-Z]*}}F
 func isa(b: B) -> Bool {
-  // CHECK: bb0([[ARG:%.*]] : @owned $B):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[COPIED_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $B):
+  // CHECK:   [[COPIED_BORROWED_ARG:%.*]] = copy_value [[ARG]]
   // CHECK:   checked_cast_br [[COPIED_BORROWED_ARG]] : $B to $D, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   //
   // CHECK: [[YES]]([[CASTED_VALUE:%.*]] : @owned $D):
   // CHECK:   integer_literal {{.*}} -1
   // CHECK:   destroy_value [[CASTED_VALUE]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   //
   // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : @owned $B):
   // CHECK:   destroy_value [[ORIGINAL_VALUE]]
   // CHECK:   integer_literal {{.*}} 0
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   return b is D
 }
 
@@ -56,7 +54,7 @@ func downcast_archetype<T : B>(b: B) -> T {
 //
 // CHECK-LABEL: sil hidden @$S5casts12is_archetype{{[_0-9a-zA-Z]*}}F
 func is_archetype<T : B>(b: B, _: T) -> Bool {
-  // CHECK: bb0([[ARG1:%.*]] : @owned $B, [[ARG2:%.*]] : @owned $T):
+  // CHECK: bb0([[ARG1:%.*]] : @guaranteed $B, [[ARG2:%.*]] : @guaranteed $T):
   // CHECK:   checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   // CHECK: [[YES]]([[CASTED_ARG:%.*]] : @owned $T):
   // CHECK:   integer_literal {{.*}} -1
@@ -98,7 +96,6 @@ struct S : P {}
 //   Continuation block.
 // CHECK: bb3([[RESULT:%.*]] : @trivial $Optional<S>):
 // CHECK:   dealloc_stack [[COPY]]
-// CHECK:   destroy_addr [[IN]] : $*P
 // CHECK:   return [[RESULT]]
 func downcast_existential_conditional(p: P) -> S? {
   return p as? S

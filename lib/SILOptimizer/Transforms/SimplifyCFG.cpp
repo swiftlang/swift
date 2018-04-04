@@ -1115,11 +1115,8 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
       // unreachable block. In this case it can reference itself as operand.
       if (Result && Result != I) {
         DEBUG(llvm::dbgs() << "simplify branch operand " << *I);
-        I->replaceAllUsesWith(Result);
-        if (isInstructionTriviallyDead(I)) {
-          eraseFromParentWithDebugInsts(I);
-          Simplified = true;
-        }
+        replaceAllSimplifiedUsesAndErase(I, Result);
+        Simplified = true;
       }
     }
   }
@@ -1412,13 +1409,7 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
 /// condition.
 static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
                            SILBuilder &Builder) {
-  if (inverted) {
-    auto *True = Builder.createIntegerLiteral(Orig->getLoc(), Cond->getType(), 1);
-    Cond = Builder.createBuiltinBinaryFunction(Orig->getLoc(), "xor",
-                                               Cond->getType(), Cond->getType(),
-                                               {Cond, True});
-  }
-  Builder.createCondFail(Orig->getLoc(), Cond);
+  Builder.createCondFail(Orig->getLoc(), Cond, inverted);
 }
 
 /// Inverts the expected value of 'PotentialExpect' (if it is an expect
@@ -2004,6 +1995,10 @@ static SILValue getActualCallee(SILValue Callee) {
       Callee = CFI->getConverted();
       continue;
     }
+    if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Callee)) {
+      Callee = Cvt->getConverted();
+      continue;
+    }
     if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
       Callee = TTI->getConverted();
       continue;
@@ -2019,7 +2014,14 @@ static SILValue getActualCallee(SILValue Callee) {
 static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
                                               SILValue &Callee,
                                               SILType &CalleeType) {
-  auto *CFI = dyn_cast<ConvertFunctionInst>(TAI->getCallee());
+  auto CalleeOperand = TAI->getCallee();
+
+  // Look through a @noescape conversion.
+  auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeOperand);
+  if (Cvt)
+    CalleeOperand = Cvt->getConverted();
+
+  auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeOperand);
   if (!CFI)
     return false;
   
@@ -3583,30 +3585,35 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
 
 namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
-  bool EnableJumpThread;
-
 public:
-  SimplifyCFGPass(bool EnableJumpThread)
-      : EnableJumpThread(EnableJumpThread) {}
-
-  /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
-                    EnableJumpThread)
+                    /*EnableJumpThread=*/false)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
-
 };
 } // end anonymous namespace
 
 
 SILTransform *swift::createSimplifyCFG() {
-  return new SimplifyCFGPass(false);
+  return new SimplifyCFGPass();
 }
 
+namespace {
+class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
+public:
+  void run() override {
+    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
+                    /*EnableJumpThread=*/true)
+            .run())
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  }
+};
+} // end anonymous namespace
+
 SILTransform *swift::createJumpThreadSimplifyCFG() {
-  return new SimplifyCFGPass(true);
+  return new JumpThreadSimplifyCFGPass();
 }
 
 //===----------------------------------------------------------------------===//

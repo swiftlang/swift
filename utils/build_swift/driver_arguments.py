@@ -53,7 +53,8 @@ def _apply_default_arguments(args):
 
     # Build LLDB if any LLDB-related options were specified.
     if args.lldb_build_variant is not None or \
-       args.lldb_assertions is not None:
+       args.lldb_assertions is not None or \
+       args.lldb_build_with_xcode is not None:
         args.build_lldb = True
 
     # Set the default build variant.
@@ -74,6 +75,9 @@ def _apply_default_arguments(args):
 
     if args.lldb_build_variant is None:
         args.lldb_build_variant = args.build_variant
+
+    if args.lldb_build_with_xcode is None:
+        args.lldb_build_with_xcode = '1'
 
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
@@ -100,6 +104,12 @@ def _apply_default_arguments(args):
 
     if args.swift_stdlib_assertions is None:
         args.swift_stdlib_assertions = args.assertions
+
+    if args.llbuild_assertions is None:
+        args.llbuild_assertions = args.assertions
+
+    if args.lldb_assertions is None:
+        args.lldb_assertions = args.assertions
 
     # Set the default CMake generator.
     if args.cmake_generator is None:
@@ -137,7 +147,6 @@ def _apply_default_arguments(args):
         args.build_foundation = False
         args.build_libdispatch = False
         args.build_libicu = False
-        args.build_playgroundlogger = False
         args.build_playgroundsupport = False
 
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
@@ -314,7 +323,6 @@ def create_argument_parser():
            help='the number of parallel build jobs to use')
 
     option('--darwin-xcrun-toolchain', store,
-           default=defaults.DARWIN_XCRUN_TOOLCHAIN,
            help='the name of the toolchain to use on Darwin')
     option('--cmake', store_path(executable=True),
            help='the path to a CMake executable that will be used to build '
@@ -437,8 +445,8 @@ def create_argument_parser():
     option('--enable-sil-ownership', store_true,
            help='Enable the SIL ownership model')
 
-    option('--enable-guaranteed-normal-arguments', store_true,
-           help='Enable guaranteed normal arguments')
+    option('--disable-guaranteed-normal-arguments', store_true,
+           help='Disable guaranteed normal arguments')
 
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '
@@ -503,9 +511,6 @@ def create_argument_parser():
     option('--libicu', toggle_true('build_libicu'),
            help='build libicu')
 
-    option('--playgroundlogger', store_true('build_playgroundlogger'),
-           help='build playgroundlogger')
-
     option('--playgroundsupport', store_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
 
@@ -567,6 +572,14 @@ def create_argument_parser():
     option('--debug-lldb', store('lldb_build_variant'),
            const='Debug',
            help='build the Debug variant of LLDB')
+
+    option('--lldb-build-with-xcode', store('lldb_build_with_xcode'),
+           const='1',
+           help='build LLDB using xcodebuild, if possible')
+
+    option('--lldb-build-with-cmake', store('lldb_build_with_xcode'),
+           const='0',
+           help='build LLDB using CMake')
 
     option('--debug-cmark', store('cmark_build_variant'),
            const='Debug',
@@ -635,6 +648,13 @@ def create_argument_parser():
            const=False,
            help='disable assertions in LLDB')
 
+    option('--llbuild-assertions', store,
+           const=True,
+           help='enable assertions in llbuild')
+    option('--no-llbuild-assertions', store('llbuild_assertions'),
+           const=False,
+           help='disable assertions in llbuild')
+
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
 
@@ -682,6 +702,9 @@ def create_argument_parser():
 
     option('--long-test', toggle_true,
            help='run the long test suite')
+
+    option('--stress-test', toggle_true,
+           help='run the stress test suite')
 
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')

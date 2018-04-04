@@ -25,6 +25,36 @@
 using namespace swift;
 using namespace constraints;
 
+/// \brief Determine whether one type would be a valid substitution for an
+/// archetype.
+///
+/// \param type The potential type.
+///
+/// \param archetype The archetype for which type may (or may not) be
+/// substituted.
+///
+/// \param dc The context of the check.
+///
+/// \returns true if \c t1 is a valid substitution for \c t2.
+static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
+                               DeclContext *dc) {
+  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
+    return false;
+
+  if (auto superclass = archetype->getSuperclass()) {
+    if (!superclass->isExactSuperclassOf(type))
+      return false;
+  }
+
+  for (auto proto : archetype->getConformsTo()) {
+    if (!dc->getParentModule()->lookupConformance(
+          type, proto))
+      return false;
+  }
+
+  return true;
+}
+
 UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
 : declOrExpr(decl), level(level), substituted(false) {
   
@@ -38,10 +68,8 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
       ->getForwardingSubstitutions();
       entityType = GFT->substGenericArgs(subs);
     } else {
-      if (auto objType =
-          entityType->getImplicitlyUnwrappedOptionalObjectType())
-        entityType = objType;
-      
+      // FIXME: look through unforced IUOs here?
+
       entityType = DC->mapTypeIntoContext(entityType);
     }
   }
@@ -92,9 +120,11 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
       
       // The associated data of the case.
       if (level == 1) {
-        auto argTy = enumElt->getArgumentInterfaceType();
-        if (!argTy) return { };
-        gatherArgumentLabels(argTy, scratch);
+        auto *paramList = enumElt->getParameterList();
+        if (!paramList) return { };
+        for (auto param : *paramList) {
+          scratch.push_back(param->getArgumentName());
+        }
         return scratch;
       }
     }
@@ -428,14 +458,14 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
             if (!archetype->isPrimary())
               return { CC_ArgumentMismatch, {}};
             
-            if (!CS.TC.isSubstitutableFor(substitution, archetype, CS.DC)) {
+            if (!isSubstitutableFor(substitution, archetype, CS.DC)) {
               // If we have multiple non-substitutable types, this is just a mismatched mess.
               if (!nonSubstitutableArchetype.isNull())
                 return { CC_ArgumentMismatch, {}};
               
               if (auto argOptType = argType->getOptionalObjectType())
                 mismatchesAreNearMisses &=
-                CS.TC.isSubstitutableFor(argOptType, archetype, CS.DC);
+                  isSubstitutableFor(argOptType, archetype, CS.DC);
               else
                 mismatchesAreNearMisses = false;
               
@@ -457,7 +487,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
               // type might be the one that we should be substituting for instead.
               // Note that failureInfo is already set correctly for that case.
               if (isNonSubstitutableArchetype && nonSubstitutableArgs == 1 &&
-                  CS.TC.isSubstitutableFor(substitution, archetype, CS.DC)) {
+                  isSubstitutableFor(substitution, archetype, CS.DC)) {
                 mismatchesAreNearMisses = argumentMismatchIsNearMiss(existingSubstitution, substitution);
                 allGenericSubstitutions[archetype] = substitution;
               } else {
@@ -665,7 +695,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().getBaseIdentifier().str();
+    declName = UDE->getName().getBaseName().userFacingName();
     uncurryLevel = 1;
     
     // If we actually resolved the member to use, return it.
@@ -685,7 +715,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     
     // If we have useful information about the type we're
     // initializing, provide it.
-    if (UDE->getName().getBaseName() == CS.TC.Context.Id_init) {
+    if (UDE->getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
       if (!selfTy->hasTypeVariable())
         declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;
@@ -829,7 +859,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (cand.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) {
         // Look through optional or IUO to get the underlying type the decl was
         // found in.
-        substType = substType->getAnyOptionalObjectType();
+        substType = substType->getOptionalObjectType();
       } else if (cand.getKind() != OverloadChoiceKind::Decl) {
         // Otherwise, if it is a remapping we can't handle, don't try to compute
         // a substitution.
@@ -961,7 +991,7 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     
     // Check for optional near miss.
     if (auto argOptType = substitution->getOptionalObjectType()) {
-      if (CS.TC.isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
+      if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
         CS.TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional,
                        argType);
         foundFailure = true;

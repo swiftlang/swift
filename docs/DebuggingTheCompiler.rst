@@ -249,7 +249,17 @@ to be invoked with the sil function body. Note,
 ``sil-mode-display-function-cfg`` does not take any arguments.
 
 **NOTE** viewcfg must be in the $PATH for viewcfg to work.
+
 **NOTE** Since we use open, .dot files should be associated with the Graphviz app for viewcfg to work.
+
+There is another useful script to view the CFG of a disassembled function:
+``./utils/dev-scripts/blockifyasm``.
+It splits a disassembled function up into basic blocks which can then be
+used with viewcfg::
+
+    (lldb) disassemble
+      <copy-paste output to file.s>
+    $ blockifyasm < file.s | viewcfg
 
 Using Breakpoints
 ~~~~~~~~~~~~~~~~~
@@ -367,6 +377,53 @@ Then by running ``lldb test -s test.lldb``, lldb will:
 Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly every time.
 
+Custom LLDB Commands
+~~~~~~~~~~~~~~~~~~~~
+
+If you've ever found yourself repeatedly entering a complex sequence of
+commands within a debug session, consider using custom lldb commands. Custom
+commands are a handy way to automate debugging tasks.
+
+For example, say we need a command that prints the contents of the register
+``rax`` and then steps to the next instruction. Here's how to define that
+command within a debug session::
+
+    (lldb) script
+    Python Interactive Interpreter. To exit, type 'quit()', 'exit()' or Ctrl-D.
+    >>> def custom_step():
+    ...   print "rax =", lldb.frame.FindRegister("rax")
+    ...   lldb.thread.StepInstruction(True)
+    ...
+    >>> ^D
+
+You can call this function using the ``script`` command, or via an alias::
+
+    (lldb) script custom_step()
+    rax = ...
+    <debugger steps to the next instruction>
+
+    (lldb) command alias cs script custom_step()
+    (lldb) cs
+    rax = ...
+    <debugger steps to the next instruction>
+
+Printing registers and single-stepping are by no means the only things you can
+do with custom commands. The LLDB Python API surfaces a lot of useful
+functionality, such as arbitrary expression evaluation.
+
+There are some pre-defined custom commands which can be especially useful while
+debugging the swift compiler. These commands live in
+``swift/utils/lldb/lldbToolBox.py``. There is a wrapper script available in
+``SWIFT_BINARY_DIR/bin/lldb-with-tools`` which launches lldb with those
+commands loaded.
+
+A command named ``sequence`` is included in lldbToolBox. ``sequence`` runs
+multiple semicolon separated commands together as one command. This can be used
+to define custom commands using just other lldb commands. For example,
+``custom_step()`` function defined above could be defined as::
+
+    (lldb) command alias cs sequence p/x $rax; stepi
+
 Reducing SIL test cases using bug_reducer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -448,7 +505,7 @@ That will write the types log to the file passed to the -f option.
 
 **NOTE** Module loading can happen as a side-effect of other operations in lldb
  (e.g. the "file" command). To be sure that one has enabled logging before /any/
- module loading has occured, place the command into either::
+ module loading has occurred, place the command into either::
 
    ~/.lldbinit
    $PWD/.lldbinit
@@ -473,8 +530,8 @@ following non-exhaustive list of state:
 1. The unparsed, textual expression passed to the compiler.
 2. The parsed expression.
 3. The initial SILGen.
-4. SILGen after SILLinking has occured.
-5. SILGen after SILLinking and Guaranteed Optimizations have occured.
+4. SILGen after SILLinking has occurred.
+5. SILGen after SILLinking and Guaranteed Optimizations have occurred.
 6. The resulting LLVM IR.
 7. The assembly code that will be used by the JIT.
 

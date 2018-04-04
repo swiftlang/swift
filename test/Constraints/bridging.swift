@@ -302,7 +302,7 @@ func rdar20029786(_ ns: NSString?) {
 
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(_ nsma: NSMutableArray) {
-  var a1 = nsma as! Array // expected-error{{generic parameter 'Element' could not be inferred in cast to 'Array<_>'}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{26-26=<Any>}}
+  var a1 = nsma as! Array // expected-error{{generic parameter 'Element' could not be inferred in cast to 'Array'}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{26-26=<Any>}}
   var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}} {{17-20=as}}
   var a3 = nsma as Array<AnyObject>
 }
@@ -321,11 +321,11 @@ func force_cast_fixit(_ a : [NSString]) -> [NSString] {
 
 // <rdar://problem/21244068> QoI: IUO prevents specific diagnostic + fixit about non-implicitly converted bridge types
 func rdar21244068(_ n: NSString!) -> String {
-  return n  // expected-error {{'NSString!' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{11-11= as String}}
+  return n  // expected-error {{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}
 }
 
 func forceBridgeDiag(_ obj: BridgedClass!) -> BridgedStruct {
-  return obj // expected-error{{'BridgedClass!' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}{{13-13= as BridgedStruct}}
+  return obj // expected-error{{'BridgedClass' is not implicitly convertible to 'BridgedStruct'; did you mean to use 'as' to explicitly convert?}}
 }
 
 struct KnownUnbridged {}

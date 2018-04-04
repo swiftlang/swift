@@ -23,6 +23,7 @@
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -64,7 +65,6 @@ namespace swift {
   class GenericTypeParamType;
   class LazyResolver;
   class ModuleDecl;
-  class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -107,6 +107,7 @@ enum class DescriptiveDeclKind : uint8_t {
   EnumCase,
   TopLevelCode,
   IfConfig,
+  PoundDiagnostic,
   PatternBinding,
   Var,
   Param,
@@ -160,17 +161,6 @@ enum class CircularityCheck {
   Checked
 };
 
-/// Keeps track of whether a given class inherits initializers from its
-/// superclass.
-enum class StoredInheritsSuperclassInits {
-  /// We have not yet checked.
-  Unchecked,
-  /// Superclass initializers are not inherited.
-  NotInherited,
-  /// Convenience initializers in the superclass are inherited.
-  Inherited
-};
-
 /// Describes which spelling was used in the source for the 'static' or 'class'
 /// keyword.
 enum class StaticSpellingKind : uint8_t {
@@ -189,18 +179,6 @@ enum class AssociatedValueCheck {
   HasAssociatedValues,
 };
 
-/// Describes if an enum element constructor directly or indirectly references
-/// its enclosing type.
-enum class ElementRecursiveness {
-  /// The element does not reference its enclosing type.
-  NotRecursive,
-  /// The element is currently being validated, and may references its enclosing
-  /// type.
-  PotentiallyRecursive,
-  /// The element does not reference its enclosing type.
-  Recursive
-};
-
 /// Diagnostic printing of \c StaticSpellingKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 
@@ -215,25 +193,65 @@ struct OverloadSignature {
   DeclName Name;
 
   /// The kind of unary operator.
-  UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
+  UnaryOperatorKind UnaryOperator;
 
   /// Whether this is an instance member.
-  bool IsInstanceMember = false;
+  unsigned IsInstanceMember : 1;
 
-  /// Whether this is a property.
-  bool IsProperty = false;
+  /// Whether this is a variable.
+  unsigned IsVariable : 1;
+
+  /// Whether this is a function.
+  unsigned IsFunction : 1;
 
   /// Whether this signature is part of a protocol extension.
-  bool InProtocolExtension = false;
+  unsigned InProtocolExtension : 1;
+
+  /// Whether this signature is of a member defined in an extension of a generic
+  /// type.
+  unsigned InExtensionOfGenericType : 1;
+
+  OverloadSignature()
+      : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
+        IsVariable(false), IsFunction(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
+///
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
                  bool skipProtocolExtensionCheck = false);
 
+/// Determine whether two overload signatures and overload types conflict.
+///
+/// \param ctx The AST context.
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig1Type The overload type of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param sig2Type The overload type of the second declaration.
+/// \param wouldConflictInSwift5 If non-null, the referenced boolean will be set
+///        to \c true iff the function returns \c false for this version of
+///        Swift, but the given overloads will conflict in Swift 5 mode.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
+bool conflicting(ASTContext &ctx,
+                 const OverloadSignature& sig1, CanType sig1Type,
+                 const OverloadSignature& sig2, CanType sig2Type,
+                 bool *wouldConflictInSwift5 = nullptr,
+                 bool skipProtocolExtensionCheck = false);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+  enum class ValidationState {
+    Unchecked,
+    Checking,
+    Checked,
+  };
+
 protected:
   union { uint64_t OpaqueBits;
 
@@ -256,12 +274,8 @@ protected:
     /// FIXME: This is ugly.
     EarlyAttrValidation : 1,
 
-    /// \brief Whether this declaration is currently being validated.
-    BeingValidated : 1,
-
-    /// \brief Whether we have started validating the declaration; this *isn't*
-    /// reset after finishing it.
-    ValidationStarted : 1,
+    /// \brief The validation state of this declaration.
+    ValidationState : 2,
 
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
@@ -314,14 +328,14 @@ protected:
     StorageKind : 4
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+2+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1,
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1,
 
     /// \brief The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
-    Specifier : 2,
+    Specifier : 4,
 
     /// \brief Whether this declaration was an element of a capture list.
     IsCaptureList : 1,
@@ -348,13 +362,9 @@ protected:
     defaultArgumentKind : NumDefaultArgumentKindBits
   );
 
-  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 3,
-    /// \brief Whether or not this element has an associated value.
-    HasArgumentType : 1,
-
-    /// \brief Whether or not this element directly or indirectly references
-    /// the enum type.
-    Recursiveness : 2
+  SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
+    /// \brief The ResilienceExpansion to use for default arguments.
+    DefaultArgumentResilienceExpansion : 1
   );
   
   SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
@@ -450,9 +460,11 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
-    IsCompatibilityAlias : 1
+    IsCompatibilityAlias : 1,
+    /// Whether this was a global typealias synthesized by the debugger.
+    IsDebuggerAlias : 1
   );
 
   SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
@@ -504,7 +516,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+2+2+1+3+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     RequiresStoredPropertyInits : 1,
@@ -512,11 +524,8 @@ protected:
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
-    /// Whether this class inherits its superclass's convenience
-    /// initializers.
-    ///
-    /// This is a value of \c StoredInheritsSuperclassInits.
-    InheritsSuperclassInits : 2,
+    /// Whether this class inherits its superclass's convenience initializers.
+    InheritsSuperclassInits : 1,
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
@@ -541,12 +550,16 @@ protected:
     HasUnreferenceableStorage : 1
   );
   
-  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2,
+  SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+2+1,
     /// The stage of the raw type circularity check for this class.
     Circularity : 2,
 
     /// True if the enum has cases and at least one case has associated values.
-    HasAssociatedValues : 2
+    HasAssociatedValues : 2,
+    /// True if the enum has at least one case that has some availability
+    /// attribute.  A single bit because it's lazily computed along with the
+    /// HasAssociatedValues bit.
+    HasAnyUnavailableValues : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -591,6 +604,14 @@ protected:
     HadMissingEnd : 1
   );
 
+  SWIFT_INLINE_BITFIELD(PoundDiagnosticDecl, Decl, 1+1,
+    /// `true` if the diagnostic is an error, `false` if it's a warning.
+    IsError : 1,
+
+    /// Whether this diagnostic has already been emitted.
+    HasBeenEmitted : 1
+  );
+
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
     NumberOfFieldOffsetVectorEntries : 1,
     NumberOfVTableEntries : 2
@@ -625,8 +646,7 @@ protected:
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
     Bits.Decl.EarlyAttrValidation = false;
-    Bits.Decl.BeingValidated = false;
-    Bits.Decl.ValidationStarted = false;
+    Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
@@ -775,25 +795,32 @@ public:
   /// Whether the declaration has a valid interface type and
   /// generic signature.
   bool isBeingValidated() const {
-    return Bits.Decl.BeingValidated;
+    return Bits.Decl.ValidationState == unsigned(ValidationState::Checking);
   }
 
   /// Toggle whether or not the declaration is being validated.
   void setIsBeingValidated(bool ibv = true) {
-    assert(Bits.Decl.BeingValidated != ibv);
-    Bits.Decl.BeingValidated = ibv;
     if (ibv) {
-      Bits.Decl.ValidationStarted = true;
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Unchecked));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checking);
+    } else {
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Checking));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
     }
   }
 
-  bool hasValidationStarted() const { return Bits.Decl.ValidationStarted; }
+  bool hasValidationStarted() const {
+    return Bits.Decl.ValidationState >= unsigned(ValidationState::Checking);
+  }
 
   /// Manually indicate that validation has started for the declaration.
   ///
   /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
   /// and so rarely needs to be called directly.
-  void setValidationStarted() { Bits.Decl.ValidationStarted = true; }
+  void setValidationStarted() {
+    if (Bits.Decl.ValidationState != unsigned(ValidationState::Checking))
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
+  }
 
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
@@ -1416,7 +1443,7 @@ public:
   GenericEnvironment *getGenericEnvironment() const;
 
   /// Retrieve the innermost generic parameter types.
-  ArrayRef<GenericTypeParamType *> getInnermostGenericParamTypes() const;
+  TypeArrayView<GenericTypeParamType> getInnermostGenericParamTypes() const;
 
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
@@ -1432,6 +1459,10 @@ public:
 
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
+
+  /// Retrieve the position of any where clause for this context's
+  /// generic parameters.
+  SourceRange getGenericTrailingWhereClauseSourceRange() const;
 };
 static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
               sizeof(GenericContext), "Please add fields to _GenericContext");
@@ -1682,13 +1713,29 @@ public:
   /// Determine whether this is a constrained extension, which adds additional
   /// requirements beyond those of the nominal type.
   bool isConstrainedExtension() const;
+  
+  /// Determine whether this extension context is interchangeable with the
+  /// original nominal type context.
+  ///
+  /// False if any of the following properties hold:
+  /// - the extension is defined in a different module from the original
+  ///   nominal type decl,
+  /// - the extension is constrained, or
+  /// - the extension is to a protocol.
+  /// FIXME: In a world where protocol extensions are dynamically dispatched,
+  /// "extension is to a protocol" would no longer be a reason to use the
+  /// extension mangling, because an extension method implementation could be
+  /// resiliently moved into the original protocol itself.
+  bool isEquivalentToExtendedContext() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Extension;
   }
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::ExtensionDecl;
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     return C->getIterableContextKind() 
@@ -1979,7 +2026,9 @@ public:
     return D->getKind() == DeclKind::TopLevelCode;
   }
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::TopLevelCodeDecl;
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   
   using DeclContext::operator new;
@@ -2045,12 +2094,61 @@ public:
   }
 };
 
+class StringLiteralExpr;
+
+class PoundDiagnosticDecl : public Decl {
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+  StringLiteralExpr *Message;
+
+public:
+  PoundDiagnosticDecl(DeclContext *Parent, bool IsError, SourceLoc StartLoc,
+                      SourceLoc EndLoc, StringLiteralExpr *Message)
+    : Decl(DeclKind::PoundDiagnostic, Parent), StartLoc(StartLoc),
+      EndLoc(EndLoc), Message(Message) {
+      Bits.PoundDiagnosticDecl.IsError = IsError;
+      Bits.PoundDiagnosticDecl.HasBeenEmitted = false; 
+    }
+
+  DiagnosticKind getKind() {
+    return isError() ? DiagnosticKind::Error : DiagnosticKind::Warning;
+  }
+
+  StringLiteralExpr *getMessage() { return Message; }
+
+  bool isError() {
+    return Bits.PoundDiagnosticDecl.IsError;
+  }
+
+  bool hasBeenEmitted() {
+    return Bits.PoundDiagnosticDecl.HasBeenEmitted;
+  }
+
+  void markEmitted() {
+    Bits.PoundDiagnosticDecl.HasBeenEmitted = true;
+  }
+  
+  SourceLoc getEndLoc() const { return EndLoc; };
+  SourceLoc getLoc() const { return StartLoc; }
+  
+  SourceRange getSourceRange() const {
+    return SourceRange(StartLoc, EndLoc);
+  }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::PoundDiagnostic;
+  }
+};
+
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
+
+private:
+    bool isUsableFromInline() const;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2137,8 +2235,6 @@ public:
   /// \see getFormalAccess
   AccessLevel getFormalAccessImpl(const DeclContext *useDC) const;
 
-  bool isVersionedInternalDecl() const;
-
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
@@ -2147,14 +2243,19 @@ public:
   /// being used), features that affect formal access such as \c \@testable are
   /// taken into account.
   ///
+  /// If \p isUsageFromInline is true, the presence of the \c @usableFromInline
+  /// attribute will treat internal declarations as public. This is normally
+  /// false for name lookup and other source language concerns, but true when
+  /// computing the linkage of generated functions.
+  ///
   /// \sa getFormalAccessScope
   AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool respectVersionedAttr = false) const {
+                              bool isUsageFromInline = false) const {
     assert(hasAccess() && "access not computed yet");
     AccessLevel result = TypeAndAccess.getInt().getValue();
-    if (respectVersionedAttr &&
+    if (isUsageFromInline &&
         result == AccessLevel::Internal &&
-        isVersionedInternalDecl()) {
+        isUsableFromInline()) {
       assert(!useDC);
       return AccessLevel::Public;
     }
@@ -2185,8 +2286,8 @@ public:
                        bool respectVersionedAttr = false) const;
 
 
-  /// Copy the formal access level and @_versioned attribute from source.
-  void copyFormalAccessAndVersionedAttrFrom(ValueDecl *source);
+  /// Copy the formal access level and @usableFromInline attribute from source.
+  void copyFormalAccessFrom(ValueDecl *source);
 
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
@@ -2230,9 +2331,7 @@ public:
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
 
-  bool hasValidSignature() const {
-    return hasInterfaceType() && !isBeingValidated();
-  }
+  bool hasValidSignature() const;
 
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
@@ -2297,7 +2396,13 @@ public:
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
   /// context.
-  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC) const;
+  ///
+  /// \param DC The declaration context.
+  ///
+  /// \param isAccessOnSelf Whether this is a member access on the implicit
+  ///        'self' declaration of the declaration context.
+  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
+                                                bool isAccessOnSelf) const;
 
   /// Print a reference to the given declaration.
   std::string printRef() const;
@@ -2397,7 +2502,9 @@ public:
   using TypeDecl::getDeclaredInterfaceType;
 
   static bool classof(const DeclContext *C) {
-    return C->getContextKind() == DeclContextKind::GenericTypeDecl;
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_GenericTypeDecl &&
@@ -2458,6 +2565,12 @@ public:
     Bits.TypeAliasDecl.IsCompatibilityAlias = newValue;
   }
 
+  /// Is this a special debugger variable?
+  bool isDebuggerAlias() const { return Bits.TypeAliasDecl.IsDebuggerAlias; }
+  void markAsDebuggerAlias(bool isDebuggerAlias) {
+    Bits.TypeAliasDecl.IsDebuggerAlias = isDebuggerAlias;
+  }
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::TypeAlias;
   }
@@ -2465,8 +2578,9 @@ public:
     return D->getKind() == DeclKind::TypeAlias;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(GTD);
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
 };
 
@@ -2916,10 +3030,9 @@ public:
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
-  /// classifyAsOptionalType - Decide whether this declaration is one
-  /// of the library-intrinsic Optional<T> or ImplicitlyUnwrappedOptional<T> types.
-  OptionalTypeKind classifyAsOptionalType() const;
-  
+  /// Is this the decl for Optional<T>?
+  bool isOptionalDecl() const;
+
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {
@@ -2971,8 +3084,9 @@ public:
   }
 
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(GTD);
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     return C->getIterableContextKind()
@@ -3116,8 +3230,9 @@ public:
     return D->getKind() == DeclKind::Enum;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -3144,6 +3259,11 @@ public:
   /// Note that this is true for enums with absolutely no cases.
   bool hasOnlyCasesWithoutAssociatedValues() const;
 
+  /// True if any of the enum cases have availability annotations.
+  ///
+  /// Note that this is false for enums with absolutely no cases.
+  bool hasPotentiallyUnavailableCaseValue() const;
+
   /// True if the enum has cases.
   bool hasCases() const {
     return !getAllElements().empty();
@@ -3153,6 +3273,13 @@ public:
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
+
+  /// True if the enum can be exhaustively switched within \p useDC.
+  ///
+  /// Note that this property is \e not necessarily true for all children of
+  /// \p useDC. In particular, an inlinable function does not get to switch
+  /// exhaustively over a non-exhaustive enum declared in the same module.
+  bool isExhaustive(const DeclContext *useDC) const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:
@@ -3185,8 +3312,9 @@ public:
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -3386,6 +3514,15 @@ public:
   /// required for name lookup.
   bool inheritsSuperclassInitializers(LazyResolver *resolver);
 
+  /// Marks that this class inherits convenience initializers from its
+  /// superclass.
+  ///
+  /// This is computed as part of adding implicit initializers.
+  void setInheritsSuperclassInitializers() {
+    assert(addedImplicitInitializers());
+    Bits.ClassDecl.InheritsSuperclassInits = true;
+  }
+
   /// Figure out if this class has any @objc ancestors, in which case it should
   /// have implicitly @objc members. Note that a class with generic ancestry
   /// might have implicitly @objc members, but will never itself be @objc.
@@ -3442,8 +3579,9 @@ public:
     return D->getKind() == DeclKind::Class;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -3760,8 +3898,9 @@ public:
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const DeclContext *C) {
-    auto GTD = dyn_cast<GenericTypeDecl>(C);
-    return GTD && classof(static_cast<const Decl*>(GTD));
+    if (auto D = C->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   static bool classof(const IterableDeclContext *C) {
     auto NTD = dyn_cast<NominalTypeDecl>(C);
@@ -3791,7 +3930,7 @@ enum class AccessorKind {
 };
 
 /// The safety semantics of this addressor.
-enum class AddressorKind : unsigned char {
+enum class AddressorKind : uint8_t {
   /// \brief This is not an addressor.
   NotAddressor,
   /// \brief This is an unsafe addressor; it simply returns an address.
@@ -3808,7 +3947,7 @@ enum class AddressorKind : unsigned char {
 };
 
 /// Whether an access to storage is for reading, writing, or both.
-enum class AccessKind : unsigned char {
+enum class AccessKind : uint8_t {
   /// The access is just to read the current value.
   Read,
 
@@ -3820,11 +3959,11 @@ enum class AccessKind : unsigned char {
 };
 
 /// The way to actually evaluate an access to storage.
-enum class AccessStrategy : unsigned char {
+enum class AccessStrategy : uint8_t {
   /// The decl is a VarDecl with its own backing storage; evaluate its
   /// address directly.
   Storage,
-  
+
   /// The decl is a VarDecl with storage defined by a property behavior;
   /// this access may initialize or reassign the storage based on dataflow.
   BehaviorStorage,
@@ -4266,13 +4405,13 @@ public:
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
-  ObjCSelector getObjCGetterSelector(LazyResolver *resolver = nullptr,
-                                Identifier preferredName = Identifier()) const;
+  ObjCSelector
+  getObjCGetterSelector(Identifier preferredName = Identifier()) const;
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its setter selector.
-  ObjCSelector getObjCSetterSelector(LazyResolver *resolver = nullptr,
-                                Identifier preferredName = Identifier()) const;
+  ObjCSelector
+  getObjCSetterSelector(Identifier preferredName = Identifier()) const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl;
@@ -4325,6 +4464,13 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
+  /// Returns the interface type of elements of storage represented by this
+  /// declaration.
+  ///
+  /// For variables, this is the type of the variable itself.
+  /// For subscripts, this is the type of the subscript element.
+  Type getStorageInterfaceType() const;
+
   /// Does the storage use a behavior?
   bool hasBehavior() const {
     return BehaviorInfo.getPointer() != nullptr;
@@ -4359,17 +4505,18 @@ class VarDecl : public AbstractStorageDecl {
 public:
   enum class Specifier : uint8_t {
     // For Var Decls
-    
-    Let  = 0,
-    Var  = 1,
-    
+
+    Let = 0,
+    Var = 1,
+
     // For Param Decls
-    
-    Owned  = Let,
+
+    Default = Let,
     InOut = 2,
     Shared = 3,
+    Owned = 4,
   };
-  
+
 protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
@@ -4516,11 +4663,39 @@ public:
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
+  bool isImmutable() const {
+    switch (getSpecifier()) {
+    case Specifier::Let:
+    case Specifier::Shared:
+    case Specifier::Owned:
+      return true;
+    case Specifier::Var:
+    case Specifier::InOut:
+      return false;
+    }
+  }
   /// Is this an immutable 'let' property?
   bool isLet() const { return getSpecifier() == Specifier::Let; }
   /// Is this an immutable 'shared' property?
   bool isShared() const { return getSpecifier() == Specifier::Shared; }
-  
+  /// Is this an immutable 'owned' property?
+  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
+
+  ValueOwnership getValueOwnership() const {
+    switch (getSpecifier()) {
+    case Specifier::Let:
+      return ValueOwnership::Default;
+    case Specifier::Var:
+      return ValueOwnership::Default;
+    case Specifier::InOut:
+      return ValueOwnership::InOut;
+    case Specifier::Shared:
+      return ValueOwnership::Shared;
+    case Specifier::Owned:
+      return ValueOwnership::Owned;
+    }
+  }
+
   /// Is this an element in a capture list?
   bool isCaptureList() const { return Bits.VarDecl.IsCaptureList; }
 
@@ -4761,7 +4936,7 @@ public:
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
-  ObjCSubscriptKind getObjCSubscriptKind(LazyResolver *resolver) const;
+  ObjCSubscriptKind getObjCSubscriptKind() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(
@@ -4773,7 +4948,9 @@ public:
   }
   
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::SubscriptDecl;
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
 
   using DeclContext::operator new;
@@ -5047,22 +5224,11 @@ public:
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
   /// Retrieve the Objective-C selector that names this method.
-  ObjCSelector getObjCSelector(LazyResolver *resolver = nullptr,
-                               DeclName preferredName = DeclName()) const;
+  ObjCSelector getObjCSelector(DeclName preferredName = DeclName()) const;
 
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
   bool isObjCInstanceMethod() const;
-
-  /// Determine the default argument kind and type for the given argument index
-  /// in this declaration, which must be a function or constructor.
-  ///
-  /// \param Index The index of the argument for which we are querying the
-  /// default argument.
-  ///
-  /// \returns the default argument kind and, if there is a default argument,
-  /// the type of the corresponding parameter.
-  std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
 
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
@@ -5123,7 +5289,7 @@ public:
   /// The ResilienceExpansion for default arguments.
   ///
   /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlineable function bodies.
+  /// obey the restrictions imposed upon inlinable function bodies.
   ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
     return ResilienceExpansion(
         Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion);
@@ -5156,7 +5322,9 @@ public:
   }
 
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::AbstractFunctionDecl;
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
   
   /// True if the declaration is forced to be statically dispatched.
@@ -5213,6 +5381,8 @@ protected:
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       OverriddenOrBehaviorParamDecl(),
       Operator(nullptr) {
+    assert(!Name.getBaseName().isSpecial());
+
     Bits.FuncDecl.IsStatic =
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
@@ -5422,8 +5592,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 
@@ -5543,8 +5713,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 };
@@ -5617,7 +5787,7 @@ class EnumElementDecl : public ValueDecl {
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
   /// definitions.
-  TypeLoc ArgumentType;
+  ParameterList *Params;
   
   SourceLoc EqualsLoc;
   
@@ -5627,20 +5797,18 @@ class EnumElementDecl : public ValueDecl {
   Expr *TypeCheckedRawValueExpr = nullptr;
   
 public:
-  EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
-                  TypeLoc ArgumentType,
-                  bool HasArgumentType,
+  EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
+                  ParameterList *Params,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    ArgumentType(ArgumentType),
+    Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
   {
-    Bits.EnumElementDecl.Recursiveness =
-        static_cast<unsigned>(ElementRecursiveness::NotRecursive);
-    Bits.EnumElementDecl.HasArgumentType = HasArgumentType;
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        static_cast<unsigned>(ResilienceExpansion::Maximal);
   }
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
@@ -5657,8 +5825,7 @@ public:
 
   Type getArgumentInterfaceType() const;
 
-  TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
-  const TypeLoc &getArgumentTypeLoc() const { return ArgumentType; }
+  ParameterList *getParameterList() const { return Params; }
 
   bool hasRawValueExpr() const { return RawValueExpr; }
   LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
@@ -5669,6 +5836,21 @@ public:
   }
   void setTypeCheckedRawValueExpr(Expr *e) {
     TypeCheckedRawValueExpr = e;
+  }
+
+  /// The ResilienceExpansion for default arguments.
+  ///
+  /// In Swift 4 mode, default argument expressions are serialized, and must
+  /// obey the restrictions imposed upon inlinable function bodies.
+  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
+    return ResilienceExpansion(
+        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
+  }
+
+  /// Set the ResilienceExpansion for default arguments.
+  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        unsigned(expansion);
   }
   
   /// Return the containing EnumDecl.
@@ -5684,17 +5866,8 @@ public:
   }
   SourceRange getSourceRange() const;
   
-  ElementRecursiveness getRecursiveness() const {
-    return
-      static_cast<ElementRecursiveness>(Bits.EnumElementDecl.Recursiveness);
-  }
-  
-  void setRecursiveness(ElementRecursiveness recursiveness) {
-    Bits.EnumElementDecl.Recursiveness = static_cast<unsigned>(recursiveness);
-  }
-
   bool hasAssociatedValues() const {
-    return Bits.EnumElementDecl.HasArgumentType;
+    return getParameterList() != nullptr;
   }
 
   static bool classof(const Decl *D) {
@@ -5787,8 +5960,6 @@ public:
                   ParamDecl *SelfParam, ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
-
-  Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
   void setParameterLists(ParamDecl *selfParam, ParameterList *bodyParams);
 
@@ -5962,8 +6133,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 };
@@ -6006,8 +6177,8 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(DC))
-      return classof(fn);
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
     return false;
   }
 };
@@ -6510,6 +6681,12 @@ inline const GenericContext *Decl::getAsGenericContext() const {
   }
 }
 
+inline bool DeclContext::isExtensionContext() const {
+  if (auto D = getAsDeclOrDeclExtensionContext())
+    return ExtensionDecl::classof(D);
+  return false;
+}
+
 inline bool DeclContext::classof(const Decl *D) {
   switch (D->getKind()) { //
   default: return false;
@@ -6547,6 +6724,17 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   }
   return result;
 }
+
+/// Determine the default argument kind and type for the given argument index
+/// in this declaration, which must be a function or constructor.
+///
+/// \param Index The index of the argument for which we are querying the
+/// default argument.
+///
+/// \returns the default argument kind and, if there is a default argument,
+/// the type of the corresponding parameter.
+std::pair<DefaultArgumentKind, Type>
+getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
 
 } // end namespace swift
 

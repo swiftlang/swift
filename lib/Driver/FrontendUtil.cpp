@@ -17,17 +17,18 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/ToolChain.h"
 #include "swift/Frontend/Frontend.h"
 
 using namespace swift;
 using namespace swift::driver;
 
 std::unique_ptr<CompilerInvocation>
-swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
+swift::driver::createCompilerInvocation(ArrayRef<const char *> Argv,
                                         DiagnosticEngine &Diags) {
   SmallVector<const char *, 16> Args;
   Args.push_back("<swiftc>"); // FIXME: Remove dummy argument.
-  Args.insert(Args.end(), ArgList.begin(), ArgList.end());
+  Args.insert(Args.end(), Argv.begin(), Argv.end());
 
   // When creating a CompilerInvocation, ensure that the driver creates a single
   // frontend command.
@@ -40,7 +41,17 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
   // CompilerInvocation may wish to remap inputs to source buffers.
   TheDriver.setCheckInputFilesExist(false);
 
-  std::unique_ptr<Compilation> C = TheDriver.buildCompilation(Args);
+  std::unique_ptr<llvm::opt::InputArgList> ArgList =
+    TheDriver.parseArgStrings(ArrayRef<const char *>(Args).slice(1));
+  if (Diags.hadAnyError())
+    return nullptr;
+
+  std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
+  if (Diags.hadAnyError())
+    return nullptr;
+
+  std::unique_ptr<Compilation> C =
+      TheDriver.buildCompilation(*TC, std::move(ArgList));
   if (!C || C->getJobs().empty())
     return nullptr; // Don't emit an error; one should already have been emitted
 

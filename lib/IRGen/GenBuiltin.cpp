@@ -194,32 +194,52 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;
 
+  // Emit non-mergeable traps only.
+  if (IGF.Builder.isTrapIntrinsic(IID)) {
+    IGF.Builder.CreateNonMergeableTrap(IGF.IGM);
+    return;
+  }
+
   // Calls to the int_instrprof_increment intrinsic are emitted during SILGen.
   // At that stage, the function name GV used by the profiling pass is hidden.
   // Fix the intrinsic call here by pointing it to the correct GV.
   if (IID == llvm::Intrinsic::instrprof_increment) {
+    // If we import profiling intrinsics from a swift module but profiling is
+    // not enabled, ignore the increment.
+    if (!IGF.getSILModule().getOptions().GenerateProfile) {
+      (void)args.claimAll();
+      return;
+    }
+
     // Extract the PGO function name.
     auto *NameGEP = cast<llvm::User>(args.claimNext());
     auto *NameGV = dyn_cast<llvm::GlobalVariable>(NameGEP->stripPointerCasts());
-    if (NameGV) {
-      auto *NameC = NameGV->getInitializer();
-      StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
-      StringRef PGOFuncName = Name.rtrim(StringRef("\0", 1));
 
-      // Point the increment call to the right function name variable.
-      std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
-          PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
-      auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(PGOFuncNameVar);
-      if (!FuncNamePtr)
-        FuncNamePtr = llvm::createPGOFuncNameVar(
-            *IGF.IGM.getModule(), llvm::GlobalValue::LinkOnceAnyLinkage,
-            PGOFuncName);
-
-      llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
-      NameGEP = llvm::ConstantExpr::getGetElementPtr(
-          ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
-          FuncNamePtr, makeArrayRef(Indices));
+    // TODO: The SIL optimizer may rewrite the name argument in a way that
+    // makes it impossible to lower. Until that issue is fixed, defensively
+    // refuse to lower ill-formed intrinsics (rdar://39146527).
+    if (!NameGV) {
+      (void)args.claimAll();
+      return;
     }
+
+    auto *NameC = NameGV->getInitializer();
+    StringRef Name = cast<llvm::ConstantDataArray>(NameC)->getRawDataValues();
+    StringRef PGOFuncName = Name.rtrim(StringRef("\0", 1));
+
+    // Point the increment call to the right function name variable.
+    std::string PGOFuncNameVar = llvm::getPGOFuncNameVarName(
+        PGOFuncName, llvm::GlobalValue::LinkOnceAnyLinkage);
+    auto *FuncNamePtr = IGF.IGM.Module.getNamedGlobal(PGOFuncNameVar);
+    if (!FuncNamePtr)
+      FuncNamePtr = llvm::createPGOFuncNameVar(
+          *IGF.IGM.getModule(), llvm::GlobalValue::LinkOnceAnyLinkage,
+          PGOFuncName);
+
+    llvm::SmallVector<llvm::Value *, 2> Indices(2, NameGEP->getOperand(1));
+    NameGEP = llvm::ConstantExpr::getGetElementPtr(
+        ((llvm::PointerType *)FuncNamePtr->getType())->getElementType(),
+        FuncNamePtr, makeArrayRef(Indices));
 
     // Replace the placeholder value with the new GEP.
     Explosion replacement;
@@ -247,7 +267,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  // TODO: A linear series of ifs is suboptimal.
+  if (Builtin.ID == BuiltinValueKind::StringObjectOr) {
+    llvm::Value *lhs = args.claimNext();
+    llvm::Value *rhs = args.claimNext();
+    llvm::Value *v = IGF.Builder.CreateOr(lhs, rhs);
+    return out.add(v);
+  }
+
+    // TODO: A linear series of ifs is suboptimal.
 #define BUILTIN_SIL_OPERATION(id, name, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
     llvm_unreachable(name " builtin should be lowered away by SILGen!");

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/enum_with_raw_type.swiftmodule %S/Inputs/enum_with_raw_type.swift
 // RUN: %target-swift-frontend -I %t -typecheck -verify %s
 

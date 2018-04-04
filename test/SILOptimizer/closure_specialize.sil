@@ -520,15 +520,22 @@ sil_witness_table S: P module test {
 sil @testClosureConvertHelper : $(Int) -> ()
 
 // specialized testClosureConvertThunk
+// FIXME: Need to handle closures with multiple exceptional exits.
 // CHECK-LABEL: sil shared @$S23testClosureConvertThunk0abC6HelperSiTf1nc_n : $@convention(thin) (Int) -> (@out (), @error Error) {
 // CHECK: bb0(%0 : $*(), %1 : $Int):
 // CHECK:   [[F:%.*]] = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
 // CHECK:   [[PA:%.*]] = partial_apply [[F]](%1) : $@convention(thin) (Int) -> ()
-// CHECK:   [[CVT1:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+// CHECK:   [[CVT1:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
 // CHECK:   [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
 // CHECK:   try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
+// CHECK:  bb1
+// CHECK: release_value [[PA]]
+// CHECK: return
+// CHECK: bb2
+// CHECK: release_value [[PA]]
+// CHECK: throw
 // CHECK-LABEL: } // end sil function '$S23testClosureConvertThunk0abC6HelperSiTf1nc_n'
-sil @testClosureConvertThunk : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error) {
+sil @testClosureConvertThunk : $@convention(thin) (@noescape @callee_owned () -> @error Error) -> (@out (), @error Error) {
 bb0(%0 : $*(), %1 : $@noescape @callee_owned () -> @error Error):
   try_apply %1() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
 
@@ -546,10 +553,10 @@ bb0(%0 : $Int):
   %48 = alloc_stack $()
   %49 = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
   %50 = partial_apply %49(%0) : $@convention(thin) (Int) -> ()
-  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  %51 = convert_escape_to_noescape %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
   %52 = convert_function %51 : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
-  %53 = function_ref @testClosureConvertThunk : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error)
-  try_apply %53(%48, %52) : $@convention(thin) (@owned @noescape @callee_owned () -> @error Error) -> (@out (), @error Error), normal bb7, error bb11
+  %53 = function_ref @testClosureConvertThunk : $@convention(thin) (@noescape @callee_owned () -> @error Error) -> (@out (), @error Error)
+  try_apply %53(%48, %52) : $@convention(thin) (@noescape @callee_owned () -> @error Error) -> (@out (), @error Error), normal bb7, error bb11
 
 bb7(%callret : $()):
   br bb99
@@ -558,6 +565,45 @@ bb11(%128 : $Error):
   br bb99
 
 bb99:
+  dealloc_stack %48 : $*()
+  %empty = tuple ()
+  return %empty : $()
+}
+
+sil @testClosureThunkNoEscape : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@noescape @callee_guaranteed () -> ()):
+  apply %0() : $@noescape @callee_guaranteed () -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil shared @$S24testClosureThunkNoEscape0aB13ConvertHelperSiTf1c_n : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:   [[F:%.*]] = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (Int) -> ()
+// CHECK:   [[E:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK:   apply [[E]]() : $@noescape @callee_guaranteed () -> ()
+// CHECK:   release_value [[PA]]
+// CHECK:   return
+// CHECK: }
+// CHECK-LABEL: sil @testClosureNoEscape : $@convention(thin) (Int) -> () {
+// CHECK-NOT: partial_apply
+// CHECK:   [[FN:%.*]] = function_ref @$S24testClosureThunkNoEscape0aB13ConvertHelperSiTf1c_n : $@convention(thin) (Int) -> ()
+// CHECK-NOT: partial_apply
+// CHECK:   %5 = apply [[FN]](%0) : $@convention(thin) (Int) -> ()
+// CHECK-NOT: release
+// CHECK:   return
+// CHECK: }
+
+sil @testClosureNoEscape : $(Int) -> () {
+bb0(%0 : $Int):
+  %48 = alloc_stack $()
+  %49 = function_ref @testClosureConvertHelper : $@convention(thin) (Int) -> ()
+  %50 = partial_apply [callee_guaranteed] %49(%0) : $@convention(thin) (Int) -> ()
+  %51 = convert_escape_to_noescape %50 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %53 = function_ref @testClosureThunkNoEscape : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %53(%51) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  release_value %50: $@callee_guaranteed () ->()
   dealloc_stack %48 : $*()
   %empty = tuple ()
   return %empty : $()

@@ -74,6 +74,7 @@ static long double swift_strtold_l(const char *nptr,
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/SwiftDtoa.h"
 #include "swift/Basic/Lazy.h"
 
 #include "../SwiftShims/LibcShims.h"
@@ -190,6 +191,7 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 }
 #endif
 
+#if !SWIFT_DTOA_FLOAT80_SUPPORT
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
                                             T Value, const char *Format, 
@@ -242,26 +244,31 @@ static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
 
   return i;
 }
+#endif
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 uint64_t swift_float32ToString(char *Buffer, size_t BufferLength,
                                float Value, bool Debug) {
-  return swift_floatingPointToString<float>(Buffer, BufferLength, Value,
-                                            "%0.*g", Debug);
+  return swift_format_float(Value, Buffer, BufferLength);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 uint64_t swift_float64ToString(char *Buffer, size_t BufferLength,
                                double Value, bool Debug) {
-  return swift_floatingPointToString<double>(Buffer, BufferLength, Value,
-                                             "%0.*g", Debug);
+  return swift_format_double(Value, Buffer, BufferLength);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
                                long double Value, bool Debug) {
+#if SWIFT_DTOA_FLOAT80_SUPPORT
+  return swift_format_float80(Value, Buffer, BufferLength);
+#else
+  // Use this when 'long double' is not true Float80
   return swift_floatingPointToString<long double>(Buffer, BufferLength, Value,
                                                   "%0.*Lg", Debug);
+#endif
+
 }
 
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
@@ -467,6 +474,8 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   *outResult = ParsedValue;
 
   int pos = ValueStream.tellg();
+  if (ValueStream.eof())
+    pos = strlen(nptr);
   if (pos <= 0)
     return nullptr;
 

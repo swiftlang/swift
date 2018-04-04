@@ -1,0 +1,39 @@
+//===--- BuiltinTypes.def - Compiler declaration metaprogramming --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with compiler-known
+// built-in types.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef BUILTIN_TYPE
+#  define BUILTIN_TYPE(Symbol, Name)
+#endif
+
+BUILTIN_TYPE(Bi8_, "Builtin.Int8")
+BUILTIN_TYPE(Bi16_, "Builtin.Int16")
+BUILTIN_TYPE(Bi32_, "Builtin.Int32")
+BUILTIN_TYPE(Bi64_, "Builtin.Int64")
+BUILTIN_TYPE(Bi128_, "Builtin.Int128")
+BUILTIN_TYPE(Bi256_, "Builtin.Int256")
+BUILTIN_TYPE(Bi512_, "Builtin.Int512")
+
+BUILTIN_TYPE(Bo, "Builtin.NativeObject")
+BUILTIN_TYPE(Bb, "Builtin.BridgeObject")
+BUILTIN_TYPE(Bp, "Builtin.RawPointer")
+BUILTIN_TYPE(BB, "Builtin.UnsafeValueBuffer")
+
+#if SWIFT_OBJC_INTEROP
+BUILTIN_TYPE(BO, "Builtin.UnknownObject")
+#endif
+
+#undef BUILTIN_TYPE

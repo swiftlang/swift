@@ -10,6 +10,7 @@
 
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
+#define NS_NOESCAPE CF_NOESCAPE
 
 typedef struct objc_object { void *isa; } *id;
 
@@ -149,7 +150,7 @@ __attribute__((availability(ios,introduced=8.0)))
 - (id)copyWithZone:(nullable NSZone *)zone;
 @end
 
-@interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
+@interface NSDictionary<KeyType, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
 - (nullable ObjectType)objectForKey:(nonnull KeyType)aKey;
 - (nonnull NSEnumerator *)keyEnumerator;
@@ -867,6 +868,7 @@ typedef struct NonNilableReferences {
 @protocol NSProtocolWithOptionalRequirement
 @optional
 -(void)optionalRequirement;
+-(DummyClass *)optionalRequirementMethodWithIUOResult;
 @end
 
 @interface NSClassWithMethodFromNSProtocolWithOptionalRequirement
@@ -1074,6 +1076,10 @@ extern NSString *NSHTTPRequestKey;
 
 @end
 
+@protocol NSIdLoving
+- (void)takesIdViaProtocol:(id _Nonnull)x;
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
 
@@ -1143,3 +1149,15 @@ void install_global_event_handler(_Nullable event_handler handler);
 
 __nullable id returnNullableId(void);
 void takeNullableId(__nullable id);
+
+@interface I
+@end
+
+@protocol OptionalMethods
+@optional
+- (Coat *)optional;
+@end
+
+@interface IUOProperty
+@property (readonly) id<OptionalMethods> iuo;
+@end

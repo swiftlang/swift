@@ -157,10 +157,6 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable the experimental constraint propagation in the
-    /// type checker.
-    bool EnableConstraintPropagation = false;
-
     /// \brief Enable the iterative type checker.
     bool IterativeTypeChecker = false;
 
@@ -223,6 +219,9 @@ namespace swift {
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
+    
+    /// Enables key path resilience.
+    bool EnableKeyPathResilience = false;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
@@ -240,6 +239,10 @@ namespace swift {
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
 
+    /// Diagnose switches over non-frozen enums that do not have catch-all
+    /// cases.
+    bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
+
     /// Regex for the passes that should report passed and missed optimizations.
     ///
     /// These are shared_ptrs so that this class remains copyable.
@@ -252,9 +255,11 @@ namespace swift {
     /// This is used to guard preemptive testing for the fix-it.
     bool FixStringToSubstringConversions = false;
 
-    /// Whether to create and keep track of a libSyntax tree associated with
-    /// this source file.
-    bool KeepSyntaxInfoInSourceFile = false;
+    /// Whether collect tokens during parsing for syntax coloring.
+    bool CollectParsedToken = false;
+
+    /// Whether to parse syntax tree.
+    bool BuildSyntaxTree = false;
 
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;

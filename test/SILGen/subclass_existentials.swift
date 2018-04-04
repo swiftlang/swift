@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -parse-as-library -primary-file %s -verify | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -primary-file %s
+
+// RUN: %target-swift-frontend -module-name subclass_existentials -Xllvm -sil-full-demangle -emit-silgen -parse-as-library -primary-file %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -module-name subclass_existentials -emit-ir -parse-as-library -primary-file %s
 
 // Note: we pass -verify above to ensure there are no spurious
 // compiler warnings relating to casts.
@@ -41,8 +42,8 @@ class Derived : Base<Int>, P {
 
 protocol R {}
 
-// CHECK-LABEL: sil hidden @$S21subclass_existentials11conversions8baseAndP7derived0fE1R0dE5PType0F4Type0fE5RTypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAA1R_ANXcAaI_ALXcXpANmAaO_ANXcXptF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @owned Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
-
+// CHECK-LABEL: sil hidden @$S21subclass_existentials11conversions8baseAndP7derived0fE1R0dE5PType0F4Type0fE5RTypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAA1R_ANXcAaI_ALXcXpANmAaO_ANXcXptF : $@convention(thin) (@guaranteed Base<Int> & P, @guaranteed Derived, @guaranteed Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Base<Int> & P,
 
 func conversions(
   baseAndP: Base<Int> & P,
@@ -55,42 +56,34 @@ func conversions(
 
   // Values
 
-  // CHECK: [[BORROWED:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
   // CHECK: [[BASE:%.*]] = upcast [[REF]] : $@opened("{{.*}}") Base<Int> & P to $Base<Int>
   // CHECK: destroy_value [[BASE]] : $Base<Int>
-  // CHECK: end_borrow [[BORROWED]] from %0 : $Base<Int> & P
   let _: Base<Int> = baseAndP
 
-  // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[BORROW]] : $Base<Int> & P
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P
   // CHECK: [[RESULT:%.*]] = alloc_stack $P
   // CHECK: [[RESULT_PAYLOAD:%.*]] = init_existential_addr [[RESULT]] : $*P, $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
   // CHECK: store [[REF]] to [init] [[RESULT_PAYLOAD]]
   // CHECK: destroy_addr [[RESULT]] : $*P
   // CHECK: dealloc_stack [[RESULT]] : $*P
-  // CHECK: end_borrow [[BORROW]] from %0 : $Base<Int> & P
   let _: P = baseAndP
 
-  // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[BORROW]] : $Base<Int> & P
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P
   // CHECK: [[RESULT:%.*]] = alloc_stack $Q
   // CHECK: [[RESULT_PAYLOAD:%.*]] = init_existential_addr [[RESULT]] : $*Q, $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
   // CHECK: store [[REF]] to [init] [[RESULT_PAYLOAD]]
   // CHECK: destroy_addr [[RESULT]] : $*Q
   // CHECK: dealloc_stack [[RESULT]] : $*Q
-  // CHECK: end_borrow [[BORROW]] from %0 : $Base<Int> & P
   let _: Q = baseAndP
 
-  // CHECK: [[BORROW:%.*]] = begin_borrow %2 : $Derived & R
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[BORROW]] : $Derived & R
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG2:%.*]] : $Derived & R
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]]
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[REF]] : $@opened("{{.*}}") Derived & R : $@opened("{{.*}}") Derived & R, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]]
-  // CHECK: end_borrow [[BORROW]] from %2 : $Derived & R
   let _: Base<Int> & P = derivedAndR
 
   // Metatypes
@@ -117,14 +110,13 @@ func conversions(
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @$S21subclass_existentials11methodCalls8baseAndP0eF5PTypeyAA1P_AA4BaseCySiGXc_AaE_AHXcXptF : $@convention(thin) (@owned Base<Int> & P, @thick (Base<Int> & P).Type) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials11methodCalls8baseAndP0eF5PTypeyAA1P_AA4BaseCySiGXc_AaE_AHXcXptF : $@convention(thin) (@guaranteed Base<Int> & P, @thick (Base<Int> & P).Type) -> () {
 
 func methodCalls(
   baseAndP: Base<Int> & P,
   baseAndPType: (Base<Int> & P).Type) {
-
-  // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[BORROW]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
+  // CHECK: bb0([[ARG0:%.*]] : $Base<Int> & P,
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[CLASS_REF:%.*]] = upcast [[REF]] : $@opened("{{.*}}") Base<Int> & P to $Base<Int>
   // CHECK: [[METHOD:%.*]] = class_method [[CLASS_REF]] : $Base<Int>, #Base.classSelfReturn!1 : <T> (Base<T>) -> () -> @dynamic_self Base<T>, $@convention(method) <τ_0_0> (@guaranteed Base<τ_0_0>) -> @owned Base<τ_0_0>
@@ -133,11 +125,9 @@ func methodCalls(
   // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_CLASS_REF]] : $Base<Int> to $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]] : $Base<Int> & P
-  // CHECK: end_borrow [[BORROW]] from %0 : $Base<Int> & P
   let _: Base<Int> & P = baseAndP.classSelfReturn()
 
-  // CHECK: [[BORROW:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[BORROW]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
+  // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[RESULT_BOX:%.*]] = alloc_stack $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[SELF_BOX:%.*]] = alloc_stack $@opened("{{.*}}") Base<Int> & P
   // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
@@ -148,7 +138,6 @@ func methodCalls(
   // CHECK: [[RESULT:%.*]] = init_existential_ref [[RESULT_REF]] : $@opened("{{.*}}") Base<Int> & P : $@opened("{{.*}}") Base<Int> & P, $Base<Int> & P
   // CHECK: destroy_value [[RESULT]] : $Base<Int> & P
   // CHECK: dealloc_stack [[RESULT_BOX]] : $*@opened("{{.*}}") Base<Int> & P
-  // CHECK: end_borrow [[BORROW]] from %0 : $Base<Int> & P
   let _: Base<Int> & P = baseAndP.protocolSelfReturn()
 
   // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
@@ -205,7 +194,7 @@ class PropertyC {
   }
 }
 
-// CHECK-LABEL: sil hidden @$S21subclass_existentials16propertyAccessesyyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@owned PropertyC & PropertyP) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials16propertyAccessesyyAA9PropertyP_AA0E1CCXcF : $@convention(thin) (@guaranteed PropertyC & PropertyP) -> () {
 func propertyAccesses(_ x: PropertyP & PropertyC) {
   var xx = x
   xx.p.p = x
@@ -223,7 +212,7 @@ func propertyAccesses(_ x: PropertyP & PropertyC) {
   xx[(1, 2)] += 1
 }
 
-// CHECK-LABEL: sil hidden @$S21subclass_existentials19functionConversions15returnsBaseAndP0efG5PType0E7Derived0eI4Type0eiG1R0eiG5RTypeyAA1P_AA0F0CySiGXcyc_AaI_ALXcXpycAA0I0CycANmycAA1R_ANXcycAaO_ANXcXpyctF : $@convention(thin) (@owned @callee_guaranteed () -> @owned Base<Int> & P, @owned @callee_guaranteed () -> @thick (Base<Int> & P).Type, @owned @callee_guaranteed () -> @owned Derived, @owned @callee_guaranteed () -> @thick Derived.Type, @owned @callee_guaranteed () -> @owned Derived & R, @owned @callee_guaranteed () -> @thick (Derived & R).Type) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials19functionConversions15returnsBaseAndP0efG5PType0E7Derived0eI4Type0eiG1R0eiG5RTypeyAA1P_AA0F0CySiGXcyc_AaI_ALXcXpycAA0I0CycANmycAA1R_ANXcycAaO_ANXcXpyctF : $@convention(thin) (@guaranteed @callee_guaranteed () -> @owned Base<Int> & P, @guaranteed @callee_guaranteed () -> @thick (Base<Int> & P).Type, @guaranteed @callee_guaranteed () -> @owned Derived, @guaranteed @callee_guaranteed () -> @thick Derived.Type, @guaranteed @callee_guaranteed () -> @owned Derived & R, @guaranteed @callee_guaranteed () -> @thick (Derived & R).Type) -> () {
 func functionConversions(
   returnsBaseAndP: @escaping () -> (Base<Int> & P),
   returnsBaseAndPType: @escaping () -> (Base<Int> & P).Type,
@@ -254,30 +243,26 @@ func functionConversions(
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @$S21subclass_existentials9downcasts8baseAndP7derived0dE5PType0F4TypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAaG_AJXcXpALmtF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @thick (Base<Int> & P).Type, @thick Derived.Type) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials9downcasts8baseAndP7derived0dE5PType0F4TypeyAA1P_AA4BaseCySiGXc_AA7DerivedCAaG_AJXcXpALmtF : $@convention(thin) (@guaranteed Base<Int> & P, @guaranteed Derived, @thick (Base<Int> & P).Type, @thick Derived.Type) -> () {
 func downcasts(
   baseAndP: Base<Int> & P,
   derived: Derived,
   baseAndPType: (Base<Int> & P).Type,
   derivedType: Derived.Type) {
-
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: bb0([[ARG0:%.*]] : $Base<Int> & P, [[ARG1:%.*]] : $Derived, [[ARG2:%.*]] : $@thick (Base<Int> & P).Type, [[ARG3:%.*]] : $@thick Derived.Type):
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $Derived
   let _ = baseAndP as? Derived
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $Derived
   let _ = baseAndP as! Derived
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $Derived & R
   let _ = baseAndP as? (Derived & R)
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %0 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $Derived & R
   let _ = baseAndP as! (Derived & R)
 
@@ -303,7 +288,7 @@ func downcasts(
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @$S21subclass_existentials16archetypeUpcasts9baseTAndP0E7IntAndP7derivedyq__q0_q1_tAA4BaseCyxGRb_AA1PR_AGySiGRb0_AaIR0_AA7DerivedCRb1_r2_lF : $@convention(thin) <T, BaseTAndP, BaseIntAndP, DerivedT where BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@owned BaseTAndP, @owned BaseIntAndP, @owned DerivedT) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials16archetypeUpcasts9baseTAndP0E7IntAndP7derivedyq__q0_q1_tAA4BaseCyxGRb_AA1PR_AGySiGRb0_AaIR0_AA7DerivedCRb1_r2_lF : $@convention(thin) <T, BaseTAndP, BaseIntAndP, DerivedT where BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@guaranteed BaseTAndP, @guaranteed BaseIntAndP, @guaranteed DerivedT) -> () {
 func archetypeUpcasts<T,
                       BaseTAndP : Base<T> & P,
                       BaseIntAndP : Base<Int> & P,
@@ -311,19 +296,16 @@ func archetypeUpcasts<T,
   baseTAndP: BaseTAndP,
   baseIntAndP : BaseIntAndP,
   derived : DerivedT) {
-
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %0 : $BaseTAndP
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $BaseTAndP
+  // CHECK: bb0([[ARG0:%.*]] : $BaseTAndP, [[ARG1:%.*]] : $BaseIntAndP, [[ARG2:%.*]] : $DerivedT)
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG0]] : $BaseTAndP
   // CHECK-NEXT: init_existential_ref [[COPIED]] : $BaseTAndP : $BaseTAndP, $Base<T> & P
   let _: Base<T> & P = baseTAndP
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %1 : $BaseIntAndP
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $BaseIntAndP
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG1]] : $BaseIntAndP
   // CHECK-NEXT: init_existential_ref [[COPIED]] : $BaseIntAndP : $BaseIntAndP, $Base<Int> & P
   let _: Base<Int> & P = baseIntAndP
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %2 : $DerivedT
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $DerivedT
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG2]] : $DerivedT
   // CHECK-NEXT: init_existential_ref [[COPIED]] : $DerivedT : $DerivedT, $Base<Int> & P
   let _: Base<Int> & P = derived
 
@@ -331,7 +313,7 @@ func archetypeUpcasts<T,
   // CHECK-NEXT: }
 }
 
-// CHECK-LABEL: sil hidden @$S21subclass_existentials18archetypeDowncasts1s1t2pt5baseT0F3Int0f6TAndP_C00fg5AndP_C008derived_C00ji2R_C00fH10P_concrete0fgi2P_K0yx_q_q0_q1_q2_q3_q4_q5_AA1R_AA7DerivedCXcAA1P_AA4BaseCyq_GXcAaQ_ASySiGXctAaQR0_ATRb1_AURb2_ATRb3_AaQR3_AURb4_AaQR4_APRb5_r6_lF : $@convention(thin) <S, T, PT, BaseT, BaseInt, BaseTAndP, BaseIntAndP, DerivedT where PT : P, BaseT : Base<T>, BaseInt : Base<Int>, BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@in S, @in T, @in PT, @owned BaseT, @owned BaseInt, @owned BaseTAndP, @owned BaseIntAndP, @owned DerivedT, @owned Derived & R, @owned Base<T> & P, @owned Base<Int> & P) -> () {
+// CHECK-LABEL: sil hidden @$S21subclass_existentials18archetypeDowncasts1s1t2pt5baseT0F3Int0f6TAndP_C00fg5AndP_C008derived_C00ji2R_C00fH10P_concrete0fgi2P_K0yx_q_q0_q1_q2_q3_q4_q5_AA1R_AA7DerivedCXcAA1P_AA4BaseCyq_GXcAaQ_ASySiGXctAaQR0_ATRb1_AURb2_ATRb3_AaQR3_AURb4_AaQR4_APRb5_r6_lF : $@convention(thin) <S, T, PT, BaseT, BaseInt, BaseTAndP, BaseIntAndP, DerivedT where PT : P, BaseT : Base<T>, BaseInt : Base<Int>, BaseTAndP : Base<T>, BaseTAndP : P, BaseIntAndP : Base<Int>, BaseIntAndP : P, DerivedT : Derived> (@in_guaranteed S, @in_guaranteed T, @in_guaranteed PT, @guaranteed BaseT, @guaranteed BaseInt, @guaranteed BaseTAndP, @guaranteed BaseIntAndP, @guaranteed DerivedT, @guaranteed Derived & R, @guaranteed Base<T> & P, @guaranteed Base<Int> & P) -> () {
 func archetypeDowncasts<S,
                         T,
                         PT : P,
@@ -354,6 +336,8 @@ func archetypeDowncasts<S,
   baseTAndP_concrete: Base<T> & P,
   baseIntAndP_concrete: Base<Int> & P) {
 
+  // CHECK: ([[ARG0:%.*]] : $*S, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $*PT, [[ARG3:%.*]] : $BaseT, [[ARG4:%.*]] : $BaseInt, [[ARG5:%.*]] : $BaseTAndP, [[ARG6:%.*]] : $BaseIntAndP, [[ARG7:%.*]] : $DerivedT, [[ARG8:%.*]] : $Derived & R, [[ARG9:%.*]] : $Base<T> & P, [[ARG10:%.*]] : $Base<Int> & P)
+
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
   // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Base<T> & P
@@ -361,35 +345,32 @@ func archetypeDowncasts<S,
   let _ = s as? (Base<T> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S
+  // CHECK-NEXT: copy_addr [[ARG0]] to [initialization] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Base<T> & P
   // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to Base<T> & P in [[RESULT]] : $*Base<T> & P
   let _ = s as! (Base<T> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S
+  // CHECK-NEXT: copy_addr [[ARG0]] to [initialization] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Base<Int> & P
   // CHECK-NEXT: checked_cast_addr_br take_always S in [[COPY]] : $*S to Base<Int> & P in [[RESULT]] : $*Base<Int> & P
   let _ = s as? (Base<Int> & P)
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $S
-  // CHECK-NEXT: copy_addr %0 to [initialization] [[COPY]] : $*S
+  // CHECK-NEXT: copy_addr [[ARG0]] to [initialization] [[COPY]] : $*S
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast_addr S in [[COPY]] : $*S to Base<Int> & P in [[RESULT]] : $*Base<Int> & P
   let _ = s as! (Base<Int> & P)
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %5 : $BaseTAndP
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $BaseTAndP
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG5]] : $BaseTAndP
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $BaseTAndP to $Derived & R
   let _ = baseTAndP_archetype as? (Derived & R)
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %5 : $BaseTAndP
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $BaseTAndP
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG5]] : $BaseTAndP
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseTAndP to $Derived & R
   let _ = baseTAndP_archetype as! (Derived & R)
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Base<T> & P
   // CHECK-NEXT: store [[COPIED]] to [init] [[COPY]] : $*Base<T> & P
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<S>
@@ -398,55 +379,45 @@ func archetypeDowncasts<S,
   let _ = baseTAndP_concrete as? S
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $Base<T> & P
-  // CHECK-NEXT: [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: store [[COPIED]] to [init] [[COPY]] : $*Base<T> & P
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $S
   // CHECK-NEXT: unconditional_checked_cast_addr Base<T> & P in [[COPY]] : $*Base<T> & P to S in [[RESULT]] : $*S
   let _ = baseTAndP_concrete as! S
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to $BaseT
   let _ = baseTAndP_concrete as? BaseT
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to $BaseT
   let _ = baseTAndP_concrete as! BaseT
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to $BaseInt
   let _ = baseTAndP_concrete as? BaseInt
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to $BaseInt
   let _ = baseTAndP_concrete as! BaseInt
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<T> & P to $BaseTAndP
   let _ = baseTAndP_concrete as? BaseTAndP
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %9 : $Base<T> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<T> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG9]] : $Base<T> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<T> & P to $BaseTAndP
   let _ = baseTAndP_concrete as! BaseTAndP
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %6 : $BaseIntAndP
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $BaseIntAndP
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG6]] : $BaseIntAndP
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $BaseIntAndP to $Derived & R
   let _ = baseIntAndP_archetype as? (Derived & R)
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %6 : $BaseIntAndP
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $BaseIntAndP
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG6]] : $BaseIntAndP
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $BaseIntAndP to $Derived & R
   let _ = baseIntAndP_archetype as! (Derived & R)
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: [[COPY:%.*]] = alloc_stack $Base<Int> & P
   // CHECK-NEXT: store [[COPIED]] to [init] [[COPY]] : $*Base<Int> & P
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $Optional<S>
@@ -455,50 +426,41 @@ func archetypeDowncasts<S,
   let _ = baseIntAndP_concrete as? S
 
   // CHECK:      [[COPY:%.*]] = alloc_stack $Base<Int> & P
-  // CHECK-NEXT: [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: store [[COPIED]] to [init] [[COPY]] : $*Base<Int> & P
   // CHECK-NEXT: [[RESULT:%.*]] = alloc_stack $S
   // CHECK-NEXT: unconditional_checked_cast_addr Base<Int> & P in [[COPY]] : $*Base<Int> & P to S in [[RESULT]] : $*S
   let _ = baseIntAndP_concrete as! S
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $DerivedT
   let _ = baseIntAndP_concrete as? DerivedT
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $DerivedT
   let _ = baseIntAndP_concrete as! DerivedT
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $BaseT
   let _ = baseIntAndP_concrete as? BaseT
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $BaseT
   let _ = baseIntAndP_concrete as! BaseT
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $BaseInt
   let _ = baseIntAndP_concrete as? BaseInt
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $BaseInt
   let _ = baseIntAndP_concrete as! BaseInt
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: checked_cast_br [[COPIED]] : $Base<Int> & P to $BaseTAndP
   let _ = baseIntAndP_concrete as? BaseTAndP
 
-  // CHECK:      [[BORROWED:%.*]] = begin_borrow %10 : $Base<Int> & P
-  // CHECK-NEXT: [[COPIED:%.*]] = copy_value [[BORROWED]] : $Base<Int> & P
+  // CHECK: [[COPIED:%.*]] = copy_value [[ARG10]] : $Base<Int> & P
   // CHECK-NEXT: unconditional_checked_cast [[COPIED]] : $Base<Int> & P to $BaseTAndP
   let _ = baseIntAndP_concrete as! BaseTAndP
 

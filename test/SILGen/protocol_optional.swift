@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name protocol_optional -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
 
 @objc protocol P1 {
   @objc optional func method(_ x: Int)
@@ -8,16 +9,14 @@
   @objc optional subscript (i: Int) -> Int { get }
 }
 
-// CHECK-LABEL: sil hidden @$S17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @$S17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
 func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
-  // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
+  // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T_BORROW]]
+  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
-  // CHECK:   end_borrow [[T_BORROW]] from [[T]]
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed (Int) -> ()> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
@@ -28,16 +27,14 @@ func optionalMethodGeneric<T : P1>(t t : T) {
 }
 // CHECK: } // end sil function '$S17protocol_optional0B13MethodGeneric1tyx_tAA2P1RzlF'
 
-// CHECK-LABEL: sil hidden @$S17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @$S17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
 func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
-  // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
+  // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T_BORROW]]
+  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
-  // CHECK:   end_borrow [[T_BORROW]] from [[T]]
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
@@ -48,16 +45,14 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
 }
 // CHECK: } // end sil function '$S17protocol_optional0B15PropertyGeneric{{[_0-9a-zA-Z]*}}F'
 
-// CHECK-LABEL: sil hidden @$S17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @$S17protocol_optional0B16SubscriptGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P1> (@guaranteed T) -> ()
 func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
-  // CHECK: bb0([[T:%[0-9]+]] : @owned $T):
+  // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TBOX]]
-  // CHECK:   [[T_BORROW:%.*]] = begin_borrow [[T]]
-  // CHECK:   [[T_COPY:%.*]] = copy_value [[T_BORROW]]
+  // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
-  // CHECK:   end_borrow [[T_BORROW]] from [[T]]
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
   // CHECK:   project_box [[OPT_BOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T

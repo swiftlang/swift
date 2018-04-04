@@ -2,48 +2,11 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-@_silgen_name("swift_StringToNSString")
-public func _convertStringToNSString(_ string: String) -> NSString
-
-@_silgen_name("swift_NSStringToString")
-public func _convertNSStringToString(_ nsstring: NSString?) -> String
-
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
 public let NSUTF8StringEncoding: UInt = 8
-
-// NSArray bridging entry points
-public func _convertNSArrayToArray<T>(_ nsarr: NSArray?) -> [T] {
-  return [T]()
-}
-
-public func _convertArrayToNSArray<T>(_ arr: [T]) -> NSArray {
-  return NSArray()
-}
-
-// NSDictionary bridging entry points
-public func _convertDictionaryToNSDictionary<Key, Value>(
-    _ d: Dictionary<Key, Value>
-) -> NSDictionary {
-  return NSDictionary()
-}
-
-public func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
-       _ d: NSDictionary?
-     ) -> Dictionary<K, V> {
-  return Dictionary<K, V>()
-}
-
-// NSSet bridging entry points
-public func _convertSetToNSSet<T>(_ s: Set<T>) -> NSSet {
-  return NSSet()
-}
-
-public func _convertNSSetToSet<T>(_ s: NSSet?) -> Set<T> {
-  return Set<T>()
-}
 
 extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
@@ -206,7 +169,7 @@ extension NSError : Error {
   public var _code: Int { return code }
 }
 
-public enum _GenericObjCError : Error {
+internal enum _GenericObjCError : Error {
   case nilError
 }
 
@@ -219,5 +182,36 @@ public func _convertNSErrorToError(_ error: NSError?) -> Error {
 
 public func _convertErrorToNSError(_ error: Error) -> NSError {
   return error as NSError
+}
+
+extension _SwiftNewtypeWrapper where Self.RawValue == Error {
+  @inlinable // FIXME(sil-serialize-all)
+  public func _bridgeToObjectiveC() -> NSError {
+    return rawValue as NSError
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _forceBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) {
+    result = Self(rawValue: source)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ source: NSError,
+    result: inout Self?
+  ) -> Bool {
+    result = Self(rawValue: source)
+    return result != nil
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSError?
+  ) -> Self {
+    return Self(rawValue: _convertNSErrorToError(source))!
+  }
 }
 

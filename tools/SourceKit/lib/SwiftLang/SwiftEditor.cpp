@@ -46,6 +46,28 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static std::vector<unsigned> getSortedBufferIDs(
+    const llvm::DenseMap<unsigned, std::vector<DiagnosticEntryInfo>> &Map) {
+  std::vector<unsigned> bufferIDs;
+  bufferIDs.reserve(Map.size());
+  for (auto I = Map.begin(), E = Map.end(); I != E; ++I) {
+    bufferIDs.push_back(I->getFirst());
+  }
+  llvm::array_pod_sort(bufferIDs.begin(), bufferIDs.end());
+  return bufferIDs;
+}
+
+void EditorDiagConsumer::getAllDiagnostics(
+    SmallVectorImpl<DiagnosticEntryInfo> &Result) {
+  // Note: we cannot reuse InputBufIds because there may be diagnostics outside
+  // the inputs.  Instead, sort the extant buffers.
+  auto bufferIDs = getSortedBufferIDs(BufferDiagnostics);
+  for (unsigned bufferID : bufferIDs) {
+    const auto &diags = BufferDiagnostics[bufferID];
+    Result.append(diags.begin(), diags.end());
+  }
+}
+
 void EditorDiagConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
@@ -92,15 +114,10 @@ void EditorDiagConsumer::handleDiagnostic(
   if (!isInputBufferID(BufferID)) {
     if (Info.ID == diag::error_from_clang.ID ||
         Info.ID == diag::warning_from_clang.ID ||
-        Info.ID == diag::note_from_clang.ID) {
+        Info.ID == diag::note_from_clang.ID ||
+        !IsNote) {
       // Handle it as other diagnostics.
     } else {
-      if (!IsNote) {
-        LOG_WARN_FUNC("got swift diagnostic not pointing at input file, "
-                      "buffer name: " << SM.getIdentifierForBuffer(BufferID));
-        return;
-      }
-
       // FIXME: This is a note pointing to a synthesized declaration buffer for
       // a declaration coming from a module.
       // We should include the Decl* in the DiagnosticInfo and have a way for
@@ -657,13 +674,13 @@ public:
   void parse() {
     auto &P = Parser->getParser();
 
-    trace::TracedOperation TracedOp;
-    if (trace::enabled()) {
+    trace::TracedOperation TracedOp(trace::OperationKind::SimpleParse);
+    if (TracedOp.enabled()) {
       trace::SwiftInvocation Info;
       initArgsAndPrimaryFile(Info);
       auto Text = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)->getBuffer();
       Info.Files.push_back(std::make_pair(PrimaryFile, Text));
-      TracedOp.start(trace::OperationKind::SimpleParse, Info);
+      TracedOp.start(Info);
     }
 
     bool Done = false;
@@ -956,13 +973,13 @@ public:
     }
     unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
 
-    trace::TracedOperation TracedOp;
-    if (trace::enabled()) {
+    trace::TracedOperation TracedOp(trace::OperationKind::AnnotAndDiag);
+    if (TracedOp.enabled()) {
       trace::SwiftInvocation SwiftArgs;
       SemaInfoRef->getInvocation()->raw(SwiftArgs.Args.Args,
                                         SwiftArgs.Args.PrimaryFile);
       trace::initTraceFiles(SwiftArgs, CompIns);
-      TracedOp.start(trace::OperationKind::AnnotAndDiag, SwiftArgs);
+      TracedOp.start(SwiftArgs);
     }
 
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
@@ -1753,7 +1770,7 @@ void SwiftEditorDocument::updateSemaInfo() {
 }
 
 void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
-                                SwiftLangSupport &Lang) {
+                                SwiftLangSupport &Lang, bool BuildSyntexTree) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   assert(Impl.SemanticInfo && "Impl.SemanticInfo must be set");
@@ -1766,13 +1783,14 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
     Impl.SemanticInfo->getInvocation()->applyTo(CompInv);
     Impl.SemanticInfo->getInvocation()->raw(Args, PrimaryFile);
   } else {
-    ArrayRef<const char *> Args;
+    SmallVector<const char *, 1> Args;
+    Args.push_back(Impl.FilePath.c_str()); // Input
     std::string Error;
     // Ignore possible error(s)
     Lang.getASTManager().
       initCompilerInvocation(CompInv, Args, StringRef(), Error);
   }
-
+  CompInv.getLangOptions().BuildSyntaxTree = BuildSyntexTree;
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
@@ -1783,11 +1801,11 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
 void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::ReadSyntaxInfo);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation Info;
     Impl.buildSwiftInv(Info);
-    TracedOp.start(trace::OperationKind::ReadSyntaxInfo, Info);
+    TracedOp.start(Info);
   }
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
@@ -1797,9 +1815,9 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   if (Consumer.syntaxTreeEnabled()) {
     std::string SyntaxContent;
     llvm::raw_string_ostream OS(SyntaxContent);
-    json::Output JsonOut(OS);
+    json::Output JsonOut(OS, /*PrettyPrint=*/false);
     auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
-    JsonOut << Root;
+    JsonOut << *Root;
     Consumer.handleSerializedSyntaxTree(OS.str());
   }
 
@@ -1835,11 +1853,11 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                                            EditorConsumer& Consumer) {
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::ReadSemanticInfo);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation Info;
     Impl.buildSwiftInv(Info);
-    TracedOp.start(trace::OperationKind::ReadSemanticInfo, Info);
+    TracedOp.start(Info);
   }
 
   std::vector<SwiftSemanticToken> SemaToks;
@@ -1898,8 +1916,8 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   SourceManager &SM = SyntaxInfo->getSourceManager();
   unsigned BufID = SyntaxInfo->getBufferID();
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::FormatText);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     // Compiler arguments do not matter
     auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);
@@ -1914,7 +1932,7 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
                      std::to_string(Impl.FormatOptions.TabWidth)),
       std::make_pair("UseTabs",
                      std::to_string(Impl.FormatOptions.UseTabs))};
-    TracedOp.start(trace::OperationKind::FormatText, SwiftArgs, OpArgs);
+    TracedOp.start(SwiftArgs, OpArgs);
   }
 
   LineRange inputRange = LineRange(Line, Length);
@@ -1948,8 +1966,8 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
     return;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::ExpandPlaceholder);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SyntaxInfo->initArgsAndPrimaryFile(SwiftArgs);
     auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);
@@ -1957,7 +1975,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
     trace::StringPairs OpArgs = {
       std::make_pair("Offset", std::to_string(Offset)),
       std::make_pair("Length", std::to_string(Length))};
-    TracedOp.start(trace::OperationKind::ExpandPlaceholder, SwiftArgs, OpArgs);
+    TracedOp.start(SwiftArgs, OpArgs);
   }
 
   PlaceholderExpansionScanner Scanner(SM);
@@ -2094,12 +2112,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
-
+  const bool BuildSyntaxTree = Consumer.syntaxTreeEnabled();
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
     Snapshot = EditorDoc->initializeText(Buf, Args);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
     if (EditorDocuments.getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
@@ -2112,7 +2130,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
   if (!Snapshot) {
     Snapshot = EditorDoc->initializeText(Buf, Args);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
   }
 
   if (Consumer.needsSemanticInfo()) {
@@ -2160,7 +2178,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     Snapshot = EditorDoc->replaceText(Offset, Length, Buf,
                                       Consumer.needsSemanticInfo());
     assert(Snapshot);
-    EditorDoc->parse(Snapshot, *this);
+    EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
     EditorDoc->readSyntaxInfo(Consumer);
   } else {
     Snapshot = EditorDoc->getLatestSnapshot();

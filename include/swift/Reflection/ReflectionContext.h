@@ -18,6 +18,10 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <mach-o/getsect.h>
+#endif
+
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/Records.h"
@@ -30,6 +34,32 @@
 #include <set>
 #include <vector>
 #include <unordered_map>
+#include <utility>
+
+#if defined(__APPLE__) && defined(__MACH__)
+#ifndef __LP64__
+using MachHeader = const struct mach_header;
+#else
+using MachHeader = const struct mach_header_64;
+#endif
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+template <typename Section>
+static std::pair<Section, bool> findSection(MachHeader *Header,
+                                            const char *Name) {
+  unsigned long Size;
+  auto Address = getsectiondata(Header, "__TEXT", Name, &Size);
+  if (!Address)
+    return {{nullptr, nullptr}, false};
+
+  auto End = reinterpret_cast<uintptr_t>(Address) + Size;
+
+  return {{reinterpret_cast<const void *>(Address),
+           reinterpret_cast<const void *>(End)},
+          true};
+}
+#endif
 
 namespace swift {
 namespace reflection {
@@ -46,8 +76,14 @@ class ReflectionContext
 
   std::unordered_map<typename super::StoredPointer, const TypeInfo *> Cache;
 
+  /// All buffers we need to keep around long term. This will automatically free them
+  /// when this object is destroyed.
+  std::vector<MemoryReader::ReadBytesResult> savedBuffers;
+  std::vector<std::tuple<RemoteAddress, RemoteAddress>> imageRanges;
+
 public:
   using super::getBuilder;
+  using super::readDemanglingForContextDescriptor;
   using super::readIsaMask;
   using super::readTypeFromMetadata;
   using super::readGenericArgFromMetadata;
@@ -55,11 +91,13 @@ public:
   using typename super::StoredPointer;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
-    : super(std::move(reader)) {}
+    : super(std::move(reader)) {
+    getBuilder().setSymbolicReferenceResolverReader(*this);
+  }
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
-
+  
   MemoryReader &getReader() {
     return *this->Reader;
   }
@@ -73,10 +111,111 @@ public:
     getBuilder().dumpAllSections();
   }
 
+#if defined(__APPLE__) && defined(__MACH__)
+  bool addImage(RemoteAddress ImageStart) {
+    auto Buf = this->getReader().readBytes(ImageStart, sizeof(MachHeader));
+    if (!Buf)
+      return false;
+
+    auto Header = reinterpret_cast<MachHeader *>(Buf.get());
+    if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
+      return false;
+    }
+    auto Length = Header->sizeofcmds;
+
+    // Read the commands.
+    Buf = this->getReader().readBytes(ImageStart, Length);
+    if (!Buf)
+      return false;
+
+    // Find the TEXT segment and figure out where the end is.
+    Header = reinterpret_cast<MachHeader *>(Buf.get());
+    unsigned long TextSize;
+    auto *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
+    if (TextSegment == nullptr)
+      return false;
+    
+    auto TextEnd =
+        TextSegment - reinterpret_cast<const uint8_t *>(Buf.get()) + TextSize;
+
+    // Read everything including the TEXT segment.
+    Buf = this->getReader().readBytes(ImageStart, TextEnd);
+    if (!Buf)
+      return false;
+
+    // Read all the metadata parts.
+    Header = reinterpret_cast<MachHeader *>(Buf.get());
+
+    // The docs say "not all sections may be present." We'll succeed if ANY of
+    // them are present. Not sure if that's the right thing to do.
+    auto FieldMd = findSection<FieldSection>(Header, "__swift4_fieldmd");
+    auto AssocTyMd =
+        findSection<AssociatedTypeSection>(Header, "__swift4_assocty");
+    auto BuiltinTyMd =
+        findSection<BuiltinTypeSection>(Header, "__swift4_builtin");
+    auto CaptureMd = findSection<CaptureSection>(Header, "__swift4_capture");
+    auto TyperefMd = findSection<GenericSection>(Header, "__swift4_typeref");
+    auto ReflStrMd = findSection<GenericSection>(Header, "__swift4_reflstr");
+
+    bool success = FieldMd.second || AssocTyMd.second || BuiltinTyMd.second ||
+                   CaptureMd.second || TyperefMd.second || ReflStrMd.second;
+    if (!success)
+      return false;
+
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
+    auto RemoteStartAddress = static_cast<uintptr_t>(ImageStart.getAddressData());
+
+    ReflectionInfo info = {
+        {{FieldMd.first.startAddress(), FieldMd.first.endAddress()}, 0},
+        {{AssocTyMd.first.startAddress(), AssocTyMd.first.endAddress()}, 0},
+        {{BuiltinTyMd.first.startAddress(), BuiltinTyMd.first.endAddress()}, 0},
+        {{CaptureMd.first.startAddress(), CaptureMd.first.endAddress()}, 0},
+        {{TyperefMd.first.startAddress(), TyperefMd.first.endAddress()}, 0},
+        {{ReflStrMd.first.startAddress(), ReflStrMd.first.endAddress()}, 0},
+        LocalStartAddress,
+        RemoteStartAddress};
+
+    this->addReflectionInfo(info);
+
+    unsigned long DataSize;
+    auto *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
+    if (DataSegment != nullptr) {
+      auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf.get())
+                            + ImageStart.getAddressData();
+      auto DataSegmentEnd = DataSegmentStart + DataSize;
+      imageRanges.push_back(std::make_tuple(ImageStart, RemoteAddress(DataSegmentEnd)));
+    }
+    
+    savedBuffers.push_back(std::move(Buf));
+
+    return true;
+  }
+#endif // defined(__APPLE__) && defined(__MACH__)
+  
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
-
+  
+  bool ownsObject(RemoteAddress ObjectAddress) {
+    auto MetadataAddress = readMetadataFromInstance(ObjectAddress.getAddressData());
+    if (!MetadataAddress)
+      return true;
+    return ownsAddress(RemoteAddress(*MetadataAddress));
+  }
+  
+  /// Returns true if the address falls within a registered image.
+  bool ownsAddress(RemoteAddress Address) {
+    for (auto Range : imageRanges) {
+      auto Start = std::get<0>(Range);
+      auto End = std::get<1>(Range);
+      if (Start.getAddressData() <= Address.getAddressData()
+          && Address.getAddressData() < End.getAddressData())
+        return true;
+    }
+  
+    return false;
+  }
+  
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
   const TypeInfo *getMetadataTypeInfo(StoredPointer MetadataAddress) {
@@ -91,19 +230,17 @@ public:
 
     auto TR = readTypeFromMetadata(MetadataAddress);
     auto kind = this->readKindFromMetadata(MetadataAddress);
-    if (TR != nullptr && kind.first) {
-      switch (kind.second) {
+    if (TR != nullptr && kind) {
+      switch (*kind) {
       case MetadataKind::Class: {
         // Figure out where the stored properties of this class begin
         // by looking at the size of the superclass
-        bool valid;
-        unsigned start;
-        std::tie(valid, start) =
+        auto start =
             this->readInstanceStartAndAlignmentFromClassMetadata(MetadataAddress);
 
         // Perform layout
-        if (valid)
-          TI = TC.getClassInstanceTypeInfo(TR, start);
+        if (start)
+          TI = TC.getClassInstanceTypeInfo(TR, *start);
 
         break;
       }
@@ -121,20 +258,20 @@ public:
   /// metadata as its isa pointer.
   const TypeInfo *getInstanceTypeInfo(StoredPointer ObjectAddress) {
     auto MetadataAddress = readMetadataFromInstance(ObjectAddress);
-    if (!MetadataAddress.first)
+    if (!MetadataAddress)
       return nullptr;
 
-    auto kind = this->readKindFromMetadata(MetadataAddress.second);
-    if (!kind.first)
+    auto kind = this->readKindFromMetadata(*MetadataAddress);
+    if (!kind)
       return nullptr;
 
-    switch (kind.second) {
+    switch (*kind) {
     case MetadataKind::Class:
-      return getMetadataTypeInfo(MetadataAddress.second);
+      return getMetadataTypeInfo(*MetadataAddress);
 
     case MetadataKind::HeapLocalVariable: {
-      auto CDAddr = this->readCaptureDescriptorFromMetadata(MetadataAddress.second);
-      if (!CDAddr.first)
+      auto CDAddr = this->readCaptureDescriptorFromMetadata(*MetadataAddress);
+      if (!CDAddr)
         return nullptr;
 
       // FIXME: Non-generic SIL boxes also use the HeapLocalVariable metadata
@@ -143,7 +280,7 @@ public:
       //
       // Non-generic SIL boxes share metadata among types with compatible
       // layout, but we need some way to get an outgoing pointer map for them.
-      auto *CD = getBuilder().getCaptureDescriptor(CDAddr.second);
+      auto *CD = getBuilder().getCaptureDescriptor(*CDAddr);
       if (CD == nullptr)
         return nullptr;
 
@@ -155,7 +292,7 @@ public:
     case MetadataKind::HeapGenericLocalVariable: {
       // Generic SIL @box type - there is always an instantiated metadata
       // pointer for the boxed type.
-      if (auto Meta = readMetadata(MetadataAddress.second)) {
+      if (auto Meta = readMetadata(*MetadataAddress)) {
         auto GenericHeapMeta =
           cast<TargetGenericBoxHeapMetadata<Runtime>>(Meta.getLocalBuffer());
         return getMetadataTypeInfo(GenericHeapMeta->BoxedType);
@@ -255,12 +392,10 @@ public:
     case RecordKind::ErrorExistential: {
       // We have a pointer to an error existential, which is always heap object.
 
-      bool successfullyGotIsa = false;
-      StoredPointer MetadataAddress = 0;
-      std::tie(successfullyGotIsa, MetadataAddress)
+      auto MetadataAddress
         = readMetadataFromInstance(ExistentialAddress.getAddressData());
 
-      if (!successfullyGotIsa)
+      if (!MetadataAddress)
         return false;
 
       bool isObjC = false;
@@ -268,14 +403,14 @@ public:
       // If we can determine the Objective-C class name, this is probably an
       // error existential with NSError-compatible layout.
       std::string ObjCClassName;
-      if (readObjCClassName(MetadataAddress, ObjCClassName)) {
+      if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
         if (ObjCClassName == "_SwiftNativeNSError")
           isObjC = true;
       } else {
         // Otherwise, we can check to see if this is a class metadata with the
         // kind value's least significant bit set, which indicates a pure
         // Swift class.
-        auto Meta = readMetadata(MetadataAddress);
+        auto Meta = readMetadata(*MetadataAddress);
         auto ClassMeta = dyn_cast<TargetClassMetadata<Runtime>>(Meta);
         if (!ClassMeta)
           return false;
@@ -293,13 +428,12 @@ public:
 
       // We need to get the instance's alignment info so we can get the exact
       // offset of the start of its data in the class.
-      StoredPointer InstanceMetadataAddress = 0;
-      std::tie(successfullyGotIsa, InstanceMetadataAddress) =
+      auto InstanceMetadataAddress =
         readMetadataFromInstance(InstanceMetadataAddressAddress);
-      if (!successfullyGotIsa)
+      if (!InstanceMetadataAddress)
         return false;
 
-      auto InstanceTR = readTypeFromMetadata(InstanceMetadataAddress);
+      auto InstanceTR = readTypeFromMetadata(*InstanceMetadataAddress);
       if (!InstanceTR)
         return false;
 
@@ -339,18 +473,18 @@ private:
                                   RecordKind::ClosureContext);
 
     auto Metadata = readMetadataFromInstance(Context);
-    if (!Metadata.first)
+    if (!Metadata)
       return nullptr;
 
     // Calculate the offset of the first capture.
     // See GenHeap.cpp, buildPrivateMetadata().
     auto OffsetToFirstCapture =
-        this->readOffsetToFirstCaptureFromMetadata(Metadata.second);
-    if (!OffsetToFirstCapture.first)
+        this->readOffsetToFirstCaptureFromMetadata(*Metadata);
+    if (!OffsetToFirstCapture)
       return nullptr;
 
     // Initialize the builder.
-    Builder.addField(OffsetToFirstCapture.second, sizeof(StoredPointer),
+    Builder.addField(*OffsetToFirstCapture, sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0);
 
     // Skip the closure's necessary bindings struct, if it's present.
@@ -414,10 +548,10 @@ private:
           continue;
 
         auto Metadata = readMetadataSource(Context, Source.second, Builder);
-        if (!Metadata.first)
+        if (!Metadata)
           return nullptr;
 
-        auto *SubstTR = readTypeFromMetadata(Metadata.second);
+        auto *SubstTR = readTypeFromMetadata(*Metadata);
         if (SubstTR == nullptr)
           return nullptr;
 
@@ -475,7 +609,7 @@ private:
   /// above.
   ///
   /// \param Builder Used to obtain offsets of elements known so far.
-  std::pair<bool, StoredPointer>
+  llvm::Optional<StoredPointer>
   readMetadataSource(StoredPointer Context,
                      const MetadataSource *MS,
                      const RecordTypeInfoBuilder &Builder) {
@@ -498,7 +632,7 @@ private:
                                    &MetadataAddress))
         break;
 
-      return std::make_pair(true, MetadataAddress);
+      return MetadataAddress;
     }
     case MetadataSourceKind::ReferenceCapture: {
       unsigned Index = cast<ReferenceCaptureMetadataSource>(MS)->getIndex();
@@ -527,27 +661,27 @@ private:
                                    &CaptureAddress))
         break;
 
-      return std::make_pair(true, CaptureAddress);
+      return CaptureAddress;
     }
     case MetadataSourceKind::GenericArgument: {
       auto *GAMS = cast<GenericArgumentMetadataSource>(MS);
       auto Base = readMetadataSource(Context, GAMS->getSource(), Builder);
-      if (!Base.first)
+      if (!Base)
         break;
 
       unsigned Index = GAMS->getIndex();
-      auto Arg = readGenericArgFromMetadata(Base.second, Index);
-      if (!Arg.first)
+      auto Arg = readGenericArgFromMetadata(*Base, Index);
+      if (!Arg)
         break;
 
-      return Arg;
+      return *Arg;
     }
     case MetadataSourceKind::Self:
     case MetadataSourceKind::SelfWitnessTable:
       break;
     }
 
-    return std::make_pair(false, StoredPointer(0));
+    return llvm::None;
   }
 };
 

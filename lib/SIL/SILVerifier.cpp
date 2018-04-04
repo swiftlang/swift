@@ -17,10 +17,12 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PostOrder.h"
@@ -58,7 +60,7 @@ static llvm::cl::opt<bool> AbortOnFailure(
 
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(false));
+                              llvm::cl::init(true));
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -109,6 +111,321 @@ public:
 } // end anonymous namespace
 
 namespace {
+
+/// Verify invariants on a key path component.
+void verifyKeyPathComponent(SILModule &M,
+                            llvm::function_ref<void(bool, StringRef)> require,
+                            CanType &baseTy,
+                            CanType leafTy,
+                            const KeyPathPatternComponent &component,
+                            ArrayRef<Operand> operands,
+                            CanGenericSignature patternSig,
+                            SubstitutionList patternSubList,
+                            bool forPropertyDescriptor,
+                            bool hasIndices) {
+  auto &C = M.getASTContext();
+  
+  SubstitutionMap patternSubs;
+  if (patternSig)
+    patternSubs  = patternSig->getSubstitutionMap(patternSubList);
+  
+  auto loweredBaseTy =
+    M.Types.getLoweredType(AbstractionPattern::getOpaque(), baseTy);
+  auto componentTy = component.getComponentType().subst(patternSubs)
+    ->getCanonicalType();
+  auto loweredComponentTy =
+    M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentTy);
+
+  auto checkIndexEqualsAndHash = [&]{
+    if (!component.getSubscriptIndices().empty()) {
+      // Equals should be
+      // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
+      {
+        auto equals = component.getSubscriptIndexEquals();
+        require(equals, "key path pattern with indexes must have equals "
+                        "operator");
+        
+        auto substEqualsType = equals->getLoweredFunctionType()
+          ->substGenericArgs(M, patternSubList);
+        
+        require(substEqualsType->getParameters().size() == 2,
+                "must have two arguments");
+        for (unsigned i = 0; i < 2; ++i) {
+          auto param = substEqualsType->getParameters()[i];
+          require(param.getConvention()
+                    == ParameterConvention::Direct_Unowned,
+                  "indices pointer should be trivial");
+          require(param.getType()->getAnyNominal()
+                    == C.getUnsafeRawPointerDecl(),
+                  "indices pointer should be an UnsafeRawPointer");
+        }
+        
+        require(substEqualsType->getResults().size() == 1,
+                "must have one result");
+        
+        require(substEqualsType->getResults()[0].getConvention()
+                  == ResultConvention::Unowned,
+                "result should be unowned");
+        require(substEqualsType->getResults()[0].getType()->getAnyNominal()
+                  == C.getBoolDecl(),
+                "result should be Bool");
+      }
+      {
+        // Hash should be
+        // <Sig...> @convention(thin) (RawPointer) -> Int
+        auto hash = component.getSubscriptIndexHash();
+        require(hash, "key path pattern with indexes must have hash "
+                      "operator");
+        
+        auto substHashType = hash->getLoweredFunctionType()
+          ->substGenericArgs(M, patternSubList);
+        
+        require(substHashType->getParameters().size() == 1,
+                "must have two arguments");
+        auto param = substHashType->getParameters()[0];
+        require(param.getConvention()
+                  == ParameterConvention::Direct_Unowned,
+                "indices pointer should be trivial");
+        require(param.getType()->getAnyNominal()
+                  == C.getUnsafeRawPointerDecl(),
+                "indices pointer should be an UnsafeRawPointer");
+        
+        require(substHashType->getResults().size() == 1,
+                "must have one result");
+        
+        require(substHashType->getResults()[0].getConvention()
+                  == ResultConvention::Unowned,
+                "result should be unowned");
+        require(substHashType->getResults()[0].getType()->getAnyNominal()
+                  == C.getIntDecl(),
+                "result should be Int");
+      }
+    } else {
+      require(!component.getSubscriptIndexEquals()
+              && !component.getSubscriptIndexHash(),
+              "component without indexes must not have equals/hash");
+    }
+  };
+
+  switch (auto kind = component.getKind()) {
+  case KeyPathPatternComponent::Kind::StoredProperty: {
+    auto property = component.getStoredPropertyDecl();
+    auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
+                         ->getReferenceStorageReferent()
+                         ->getCanonicalType();
+    require(fieldTy == componentTy,
+            "property decl should be a member of the base with the same type "
+            "as the component");
+    switch (property->getStorageKind()) {
+    case AbstractStorageDecl::Stored:
+    case AbstractStorageDecl::StoredWithObservers:
+    case AbstractStorageDecl::StoredWithTrivialAccessors:
+      break;
+    case AbstractStorageDecl::Addressed:
+    case AbstractStorageDecl::AddressedWithObservers:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+    case AbstractStorageDecl::Computed:
+    case AbstractStorageDecl::ComputedWithMutableAddress:
+    case AbstractStorageDecl::InheritedWithObservers:
+      require(false, "property must be stored");
+    }
+    auto propertyTy = loweredBaseTy.getFieldType(property, M);
+    require(propertyTy.getObjectType()
+              == loweredComponentTy.getObjectType(),
+            "component type should match the maximal abstraction of the "
+            "formal type");
+    break;
+  }
+    
+  case KeyPathPatternComponent::Kind::GettableProperty:
+  case KeyPathPatternComponent::Kind::SettableProperty: {
+    if (forPropertyDescriptor) {
+      require(component.getSubscriptIndices().empty()
+              && !component.getSubscriptIndexEquals()
+              && !component.getSubscriptIndexHash(),
+              "property descriptor should not have index information");
+    } else {
+      require(hasIndices == !component.getSubscriptIndices().empty(),
+              "component for subscript should have indices");
+    }
+  
+    ParameterConvention normalArgConvention;
+    if (M.getOptions().EnableGuaranteedNormalArguments)
+      normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
+    else
+      normalArgConvention = ParameterConvention::Indirect_In;
+  
+    // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
+    {
+      auto getter = component.getComputedPropertyGetter();
+      auto substGetterType = getter->getLoweredFunctionType()
+        ->substGenericArgs(M, patternSubList);
+      require(substGetterType->getRepresentation() ==
+                SILFunctionTypeRepresentation::Thin,
+              "getter should be a thin function");
+      
+      require(substGetterType->getNumParameters() == 1 + hasIndices,
+              "getter should have one parameter");
+      auto baseParam = substGetterType->getParameters()[0];
+      require(baseParam.getConvention() == normalArgConvention,
+              "getter base parameter should have normal arg convention");
+      require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
+              "getter base parameter should match base of component");
+      
+      if (hasIndices) {
+        auto indicesParam = substGetterType->getParameters()[1];
+        require(indicesParam.getConvention()
+                  == ParameterConvention::Direct_Unowned,
+                "indices pointer should be trivial");
+        require(indicesParam.getType()->getAnyNominal()
+                  == C.getUnsafeRawPointerDecl(),
+                "indices pointer should be an UnsafeRawPointer");
+      }
+
+      require(substGetterType->getNumResults() == 1,
+              "getter should have one result");
+      auto result = substGetterType->getResults()[0];
+      require(result.getConvention() == ResultConvention::Indirect,
+              "getter result should be @out");
+      require(result.getType() == loweredComponentTy.getSwiftRValueType(),
+              "getter result should match the maximal abstraction of the "
+              "formal component type");
+    }
+    
+    if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+      // Setter should be
+      // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
+      
+      auto setter = component.getComputedPropertySetter();
+      auto substSetterType = setter->getLoweredFunctionType()
+        ->substGenericArgs(M, patternSubList);
+      
+      require(substSetterType->getRepresentation() ==
+                SILFunctionTypeRepresentation::Thin,
+              "setter should be a thin function");
+      
+      require(substSetterType->getNumParameters() == 2 + hasIndices,
+              "setter should have two parameters");
+
+      auto newValueParam = substSetterType->getParameters()[0];
+      // TODO: This should probably be unconditionally +1 when we
+      // can represent that.
+      require(newValueParam.getConvention() == normalArgConvention,
+              "setter value parameter should havee normal arg convention");
+
+      auto baseParam = substSetterType->getParameters()[1];
+      require(baseParam.getConvention() == normalArgConvention
+              || baseParam.getConvention() ==
+                  ParameterConvention::Indirect_Inout,
+              "setter base parameter should be normal arg convention "
+              "or @inout");
+      
+      if (hasIndices) {
+        auto indicesParam = substSetterType->getParameters()[2];
+        require(indicesParam.getConvention()
+                  == ParameterConvention::Direct_Unowned,
+                "indices pointer should be trivial");
+        require(indicesParam.getType()->getAnyNominal()
+                  == C.getUnsafeRawPointerDecl(),
+                "indices pointer should be an UnsafeRawPointer");
+      }
+
+      require(newValueParam.getType() ==
+                loweredComponentTy.getSwiftRValueType(),
+              "setter value should match the maximal abstraction of the "
+              "formal component type");
+      
+      require(substSetterType->getNumResults() == 0,
+              "setter should have no results");
+    }
+    
+    if (!forPropertyDescriptor) {
+      for (auto &index : component.getSubscriptIndices()) {
+        auto opIndex = index.Operand;
+        auto contextType =
+          index.LoweredType.subst(M, patternSubs);
+        require(contextType == operands[opIndex].get()->getType(),
+                "operand must match type required by pattern");
+        SILType loweredType = index.LoweredType;
+        require(loweredType.isLoweringOf(M, index.FormalType),
+                "pattern index formal type doesn't match lowered type");
+      }
+
+      checkIndexEqualsAndHash();
+    }
+    
+    break;
+  }
+  case KeyPathPatternComponent::Kind::External: {
+    // The component type should match the substituted type of the
+    // referenced property.
+    auto decl = component.getExternalDecl();
+    auto sig = decl->getInnermostDeclContext()
+                   ->getGenericSignatureOfContext();
+    SubstitutionMap subs;
+    CanGenericSignature canSig = nullptr;
+    if (sig) {
+      canSig = sig->getCanonicalSignature();
+      subs = sig->getSubstitutionMap(component.getExternalSubstitutions());
+    }
+    auto substType = component.getExternalDecl()->getStorageInterfaceType()
+      .subst(subs);
+    require(substType->isEqual(component.getComponentType()),
+            "component type should match storage type of referenced "
+            "declaration");
+
+    // Index types should match the lowered index types expected by the
+    // external declaration.
+    if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+      auto indexParams = sub->getIndices();
+      require(indexParams->size() == component.getSubscriptIndices().size(),
+              "number of subscript indices should match referenced decl");
+      for (unsigned i : indices(*indexParams)) {
+        auto param = (*indexParams)[i];
+        auto &index = component.getSubscriptIndices()[i];
+        auto paramTy = param->getInterfaceType()->getCanonicalType();
+        auto substParamTy = paramTy.subst(subs);
+        auto loweredTy = M.Types.getLoweredType(
+          AbstractionPattern(canSig, paramTy), substParamTy);
+        require(index.LoweredType == loweredTy,
+                "index lowered types should match referenced decl");
+        require(index.FormalType == substParamTy->getCanonicalType(),
+                "index formal types should match referenced decl");
+      }
+      
+      checkIndexEqualsAndHash();
+    } else {
+      require(component.getSubscriptIndices().empty(),
+              "external var reference should not apply indices");
+      require(!component.getSubscriptIndexEquals()
+              && !component.getSubscriptIndexHash(),
+              "external var reference should not apply hash");
+    }
+    
+    break;
+  }
+  case KeyPathPatternComponent::Kind::OptionalChain: {
+    require(baseTy->getOptionalObjectType()->isEqual(componentTy),
+            "chaining component should unwrap optional");
+    require((bool)leafTy->getOptionalObjectType(),
+            "key path with chaining component should have optional "
+            "result");
+    break;
+  }
+  case KeyPathPatternComponent::Kind::OptionalForce: {
+    require(baseTy->getOptionalObjectType()->isEqual(componentTy),
+            "forcing component should unwrap optional");
+    break;
+  }
+  case KeyPathPatternComponent::Kind::OptionalWrap: {
+    require(componentTy->getOptionalObjectType()->isEqual(baseTy),
+            "wrapping component should wrap optional");
+    break;
+  }
+  }
+  
+  baseTy = componentTy;
+}
 
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
@@ -225,7 +542,7 @@ public:
                                                 const Twine &valueDescription) {
     require(value->getType().isObject(), valueDescription +" must be an object");
     
-    auto objectTy = value->getType().unwrapAnyOptionalType();
+    auto objectTy = value->getType().unwrapOptionalType();
     
     require(objectTy.isReferenceCounted(F.getModule()),
             valueDescription + " must have reference semantics");
@@ -328,9 +645,48 @@ public:
       delete Dominance;
   }
 
+  // FIXME: For sanity, address-type block args should be prohibited at all SIL
+  // stages. However, the optimizer currently breaks the invariant in three
+  // places:
+  // 1. Normal Simplify CFG during conditional branch simplification
+  //    (sneaky jump threading).
+  // 2. Simplify CFG via Jump Threading.
+  // 3. Loop Rotation.
+  //
+  //
+  bool prohibitAddressBlockArgs() {
+    // If this function was deserialized from canonical SIL, this invariant may
+    // already have been violated regardless of this module's SIL stage or
+    // exclusivity enforcement level. Presumably, access markers were already
+    // removed prior to serialization.
+    if (F.wasDeserializedCanonical())
+      return false;
+
+    SILModule &M = F.getModule();
+    return M.getStage() == SILStage::Raw;
+  }
+
   void visitSILArgument(SILArgument *arg) {
     checkLegalType(arg->getFunction(), arg, nullptr);
     checkValueBaseOwnership(arg);
+
+    if (isa<SILPHIArgument>(arg) && prohibitAddressBlockArgs()) {
+      // As a structural SIL property, we disallow address-type block
+      // arguments. Supporting them would prevent reliably reasoning about the
+      // underlying storage of memory access. This reasoning is important for
+      // diagnosing violations of memory access rules and supporting future
+      // optimizations such as bitfield packing. Address-type block arguments
+      // also create unnecessary complexity for SIL optimization passes that
+      // need to reason about memory aliasing.
+      //
+      // Note: We could allow non-phi block arguments to be addresses, because
+      // the address source would still be uniquely recoverable. But then
+      // we would need to separately ensure that something like begin_access is
+      // never passed as a block argument before being used by end_access. For
+      // now, it simpler to have a strict prohibition.
+      require(!arg->getType().isAddress(),
+              "Block arguments cannot be addresses");
+    }
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -473,47 +829,37 @@ public:
     // that accidentally remove inline information (stored in the SILDebugScope)
     // from debug-variable-carrying instructions.
     if (!DS->InlinedCallSite) {
-      SILDebugVariable VarInfo;
-      if (auto *DI = dyn_cast<AllocStackInst>(I)) {
+      Optional<SILDebugVariable> VarInfo;
+      if (auto *DI = dyn_cast<AllocStackInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<AllocBoxInst>(I)) {
+      else if (auto *DI = dyn_cast<AllocBoxInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<DebugValueInst>(I)) {
+      else if (auto *DI = dyn_cast<DebugValueInst>(I))
         VarInfo = DI->getVarInfo();
-      } else if (auto *DI = dyn_cast<DebugValueAddrInst>(I)) {
+      else if (auto *DI = dyn_cast<DebugValueAddrInst>(I))
         VarInfo = DI->getVarInfo();
-      }
 
-      if (unsigned ArgNo = VarInfo.ArgNo) {
-        // It is a function argument.
-        if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
-          require(DebugVars[ArgNo] == VarInfo.Name,
-                  "Scope contains conflicting debug variables for one function "
-                  "argument");
-        } else {
-          // Reserve enough space.
-          while (DebugVars.size() <= ArgNo) {
-            DebugVars.push_back(StringRef());
+      if (VarInfo)
+        if (unsigned ArgNo = VarInfo->ArgNo) {
+          // It is a function argument.
+          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
+            require(
+                DebugVars[ArgNo] == VarInfo->Name,
+                "Scope contains conflicting debug variables for one function "
+                "argument");
+          } else {
+            // Reserve enough space.
+            while (DebugVars.size() <= ArgNo) {
+              DebugVars.push_back(StringRef());
+            }
           }
-        }
-        DebugVars[ArgNo] = VarInfo.Name;
+          DebugVars[ArgNo] = VarInfo->Name;
       }
     }
 
     // Regular locations are allowed on all instructions.
     if (LocKind == SILLocation::RegularKind)
       return;
-
-#if 0
-    // FIXME: This check was tautological before the removal of
-    // AutoreleaseReturnInst, and it turns out that we're violating it.
-    // Fix incoming.
-    if (LocKind == SILLocation::CleanupKind ||
-        LocKind == SILLocation::InlinedKind)
-      require(InstKind != SILInstructionKind::ReturnInst ||
-              InstKind != SILInstructionKind::AutoreleaseReturnInst,
-        "cleanup and inlined locations are not allowed on return instructions");
-#endif
 
     if (LocKind == SILLocation::ReturnKind ||
         LocKind == SILLocation::ImplicitReturnKind)
@@ -572,10 +918,7 @@ public:
     }
 
     // Optionals should have had their objects lowered.
-    OptionalTypeKind optKind;
-    if (auto objectType = rvalueType.getAnyOptionalObjectType(optKind)) {
-      require(optKind == OTK_Optional,
-              "ImplicitlyUnwrappedOptional is not legal in SIL values");
+    if (auto objectType = rvalueType.getOptionalObjectType()) {
       return checkLegalSILType(F, objectType, I);
     }
 
@@ -1338,7 +1681,7 @@ public:
 
   void checkLoadWeakInst(LoadWeakInst *LWI) {
     require(LWI->getType().isObject(), "Result of load must be an object");
-    require(LWI->getType().getAnyOptionalObjectType(),
+    require(LWI->getType().getOptionalObjectType(),
             "Result of weak load must be an optional");
     auto PointerType = LWI->getOperand()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
@@ -1353,7 +1696,7 @@ public:
   void checkStoreWeakInst(StoreWeakInst *SWI) {
     require(SWI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(SWI->getSrc()->getType().getAnyOptionalObjectType(),
+    require(SWI->getSrc()->getType().getOptionalObjectType(),
             "store_weak must be of an optional value");
     auto PointerType = SWI->getDest()->getType();
     auto PointerRVType = PointerType.getSwiftRValueType();
@@ -2310,6 +2653,8 @@ public:
         if (inst->isTypeDependentOperand(*use))
           continue;
         switch (inst->getKind()) {
+        case SILInstructionKind::MarkDependenceInst:
+          break;
         case SILInstructionKind::ApplyInst:
         case SILInstructionKind::TryApplyInst:
         case SILInstructionKind::PartialApplyInst:
@@ -2891,8 +3236,10 @@ public:
     require(resFTy->getRepresentation() == SILFunctionType::Representation::Thick,
             "result of thin_to_thick_function must be thick");
 
-    auto adjustedOperandExtInfo = opFTy->getExtInfo().withRepresentation(
-                                           SILFunctionType::Representation::Thick);
+    auto adjustedOperandExtInfo =
+        opFTy->getExtInfo()
+            .withRepresentation(SILFunctionType::Representation::Thick)
+            .withNoEscape(resFTy->isNoEscape());
     require(adjustedOperandExtInfo == resFTy->getExtInfo(),
             "operand and result of thin_to_think_function must agree in particulars");
   }
@@ -3016,12 +3363,12 @@ public:
 
     // Upcast from Optional<B> to Optional<A> is legal as long as B is a
     // subclass of A.
-    if (ToTy.getSwiftRValueType().getAnyOptionalObjectType() &&
-        FromTy.getSwiftRValueType().getAnyOptionalObjectType()) {
+    if (ToTy.getSwiftRValueType().getOptionalObjectType() &&
+        FromTy.getSwiftRValueType().getOptionalObjectType()) {
       ToTy = SILType::getPrimitiveObjectType(
-          ToTy.getSwiftRValueType().getAnyOptionalObjectType());
+          ToTy.getSwiftRValueType().getOptionalObjectType());
       FromTy = SILType::getPrimitiveObjectType(
-          FromTy.getSwiftRValueType().getAnyOptionalObjectType());
+          FromTy.getSwiftRValueType().getOptionalObjectType());
     }
 
     auto ToClass = ToTy.getClassOrBoundGenericClass();
@@ -3160,6 +3507,22 @@ public:
     // convert_function is required to be an ABI-compatible conversion.
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI");
+  }
+
+  void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
+    auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
+                                  "convert_escape_to_noescape operand");
+    auto resTI = ICI->getType().castTo<SILFunctionType>();
+
+    // FIXME: Not yet, to be enabled when this is true.
+    // require(resTI->isTrivial(F.getModule()),
+    //         "convert_escape_to_noescape should produce a trivial result type");
+
+    // convert_escape_to_noescape is required to be an ABI-compatible
+    // conversion once escapability is the same on both sides.
+    requireABICompatibleFunctionTypes(
+        opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
+        "convert_escape_to_noescape cannot change function ABI");
   }
 
   void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -3427,7 +3790,7 @@ public:
                   "switch_enum destination for case w/ args must take 1 "
                   "argument");
         } else {
-          require(dest->getArguments().size() == 0 ||
+          require(dest->getArguments().empty() ||
                       dest->getArguments().size() == 1,
                   "switch_enum destination for case w/ args must take 0 or 1 "
                   "arguments");
@@ -3436,14 +3799,18 @@ public:
         if (dest->getArguments().size() == 1) {
           SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
           SILType bbArgTy = dest->getArguments()[0]->getType();
-          require(eltArgTy == bbArgTy,
-                  "switch_enum destination bbarg must match case arg type");
+          if (F.getModule().getStage() != SILStage::Lowered) {
+            // During the lowered stage, a function type might have different
+            // signature
+            require(eltArgTy == bbArgTy,
+                    "switch_enum destination bbarg must match case arg type");
+          }
           require(!dest->getArguments()[0]->getType().isAddress(),
                   "switch_enum destination bbarg type must not be an address");
         }
 
       } else {
-        require(dest->getArguments().size() == 0,
+        require(dest->getArguments().empty(),
                 "switch_enum destination for no-argument case must take no "
                 "arguments");
       }
@@ -3501,7 +3868,7 @@ public:
       unswitchedElts.erase(elt);
 
       // The destination BB must not have BB arguments.
-      require(dest->getArguments().size() == 0,
+      require(dest->getArguments().empty(),
               "switch_enum_addr destination must take no BB args");
     }
 
@@ -3750,237 +4117,53 @@ public:
                                           pattern->getGenericSignature());
       
       for (auto &component : pattern->getComponents()) {
-        auto loweredBaseTy =
-          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             baseTy);
-        auto componentTy = component.getComponentType().subst(patternSubs)
-          ->getCanonicalType();
-        auto loweredComponentTy =
-          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             componentTy);
-        
-        switch (auto kind = component.getKind()) {
-        case KeyPathPatternComponent::Kind::StoredProperty: {
-          auto property = component.getStoredPropertyDecl();
-          require(property->getDeclContext()
-                   == baseTy->getAnyNominal(),
-                  "property decl should be a member of the component base type");
-          switch (property->getStorageKind()) {
-          case AbstractStorageDecl::Stored:
-          case AbstractStorageDecl::StoredWithObservers:
-          case AbstractStorageDecl::StoredWithTrivialAccessors:
-            break;
-          case AbstractStorageDecl::Addressed:
-          case AbstractStorageDecl::AddressedWithObservers:
-          case AbstractStorageDecl::AddressedWithTrivialAccessors:
-          case AbstractStorageDecl::Computed:
-          case AbstractStorageDecl::ComputedWithMutableAddress:
-          case AbstractStorageDecl::InheritedWithObservers:
-            require(false, "property must be stored");
-          }
-          auto propertyTy = loweredBaseTy.getFieldType(property, F.getModule());
-          require(propertyTy.getObjectType()
-                    == loweredComponentTy.getObjectType(),
-                  "component type should match the maximal abstraction of the "
-                  "formal type");
+        bool hasIndices;
+        switch (component.getKind()) {
+        case KeyPathPatternComponent::Kind::External:
+          if (auto subscript =
+                           dyn_cast<SubscriptDecl>(component.getExternalDecl()))
+            hasIndices = subscript->getIndices()->size() != 0;
+          else
+            hasIndices = false;
           break;
-        }
-          
+        
         case KeyPathPatternComponent::Kind::GettableProperty:
-        case KeyPathPatternComponent::Kind::SettableProperty: {
-          bool hasIndices = !component.getComputedPropertyIndices().empty();
+        case KeyPathPatternComponent::Kind::SettableProperty:
+          hasIndices = !component.getSubscriptIndices().empty();
+          break;
         
-          // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
-          {
-            auto getter = component.getComputedPropertyGetter();
-            auto substGetterType = getter->getLoweredFunctionType()
-              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-            require(substGetterType->getRepresentation() ==
-                      SILFunctionTypeRepresentation::Thin,
-                    "getter should be a thin function");
-            
-            require(substGetterType->getNumParameters() == 1 + hasIndices,
-                    "getter should have one parameter");
-            auto baseParam = substGetterType->getParameters()[0];
-            require(baseParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "getter base parameter should be @in");
-            require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
-                    "getter base parameter should match base of component");
-            
-            if (hasIndices) {
-              auto indicesParam = substGetterType->getParameters()[1];
-              require(indicesParam.getConvention()
-                        == ParameterConvention::Direct_Unowned,
-                      "indices pointer should be trivial");
-              require(indicesParam.getType()->getAnyNominal()
-                        == C.getUnsafeRawPointerDecl(),
-                      "indices pointer should be an UnsafeRawPointer");
-            }
-
-            require(substGetterType->getNumResults() == 1,
-                    "getter should have one result");
-            auto result = substGetterType->getResults()[0];
-            require(result.getConvention() == ResultConvention::Indirect,
-                    "getter result should be @out");
-            require(result.getType() == loweredComponentTy.getSwiftRValueType(),
-                    "getter result should match the maximal abstraction of the "
-                    "formal component type");
-          }
-          
-          if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
-            // Setter should be
-            // <Sig...> @convention(thin) (@in Result, @in Base) -> ()
-            
-            auto setter = component.getComputedPropertySetter();
-            auto substSetterType = setter->getLoweredFunctionType()
-              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-            
-            require(substSetterType->getRepresentation() ==
-                      SILFunctionTypeRepresentation::Thin,
-                    "setter should be a thin function");
-            
-            require(substSetterType->getNumParameters() == 2 + hasIndices,
-                    "setter should have two parameters");
-
-            auto newValueParam = substSetterType->getParameters()[0];
-            require(newValueParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "setter value parameter should be @in");
-
-            auto baseParam = substSetterType->getParameters()[1];
-            require(baseParam.getConvention() ==
-                      ParameterConvention::Indirect_In
-                    || baseParam.getConvention() ==
-                        ParameterConvention::Indirect_Inout,
-                    "setter base parameter should be @in or @inout");
-            
-            if (hasIndices) {
-              auto indicesParam = substSetterType->getParameters()[2];
-              require(indicesParam.getConvention()
-                        == ParameterConvention::Direct_Unowned,
-                      "indices pointer should be trivial");
-              require(indicesParam.getType()->getAnyNominal()
-                        == C.getUnsafeRawPointerDecl(),
-                      "indices pointer should be an UnsafeRawPointer");
-            }
-
-            require(newValueParam.getType() ==
-                      loweredComponentTy.getSwiftRValueType(),
-                    "setter value should match the maximal abstraction of the "
-                    "formal component type");
-            
-            require(substSetterType->getNumResults() == 0,
-                    "setter should have no results");
-          }
-          
-          for (auto &index : component.getComputedPropertyIndices()) {
-            auto opIndex = index.Operand;
-            auto contextType =
-              index.LoweredType.subst(F.getModule(), patternSubs);
-            requireSameType(contextType,
-                            KPI->getAllOperands()[opIndex].get()->getType(),
-                            "operand must match type required by pattern");
-            require(isLoweringOf(index.LoweredType, index.FormalType),
-                    "pattern index formal type doesn't match lowered type");
-          }
-          
-          if (!component.getComputedPropertyIndices().empty()) {
-            // Equals should be
-            // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
-            {
-              auto equals = component.getComputedPropertyIndexEquals();
-              require(equals, "key path pattern with indexes must have equals "
-                              "operator");
-              
-              auto substEqualsType = equals->getLoweredFunctionType()
-                ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-              
-              require(substEqualsType->getParameters().size() == 2,
-                      "must have two arguments");
-              for (unsigned i = 0; i < 2; ++i) {
-                auto param = substEqualsType->getParameters()[i];
-                require(param.getConvention()
-                          == ParameterConvention::Direct_Unowned,
-                        "indices pointer should be trivial");
-                require(param.getType()->getAnyNominal()
-                          == C.getUnsafeRawPointerDecl(),
-                        "indices pointer should be an UnsafeRawPointer");
-              }
-              
-              require(substEqualsType->getResults().size() == 1,
-                      "must have one result");
-              
-              require(substEqualsType->getResults()[0].getConvention()
-                        == ResultConvention::Unowned,
-                      "result should be unowned");
-              require(substEqualsType->getResults()[0].getType()->getAnyNominal()
-                        == C.getBoolDecl(),
-                      "result should be Bool");
-            }
-            {
-              // Hash should be
-              // <Sig...> @convention(thin) (RawPointer) -> Int
-              auto hash = component.getComputedPropertyIndexHash();
-              require(hash, "key path pattern with indexes must have hash "
-                            "operator");
-              
-              auto substHashType = hash->getLoweredFunctionType()
-                ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-              
-              require(substHashType->getParameters().size() == 1,
-                      "must have two arguments");
-              auto param = substHashType->getParameters()[0];
-              require(param.getConvention()
-                        == ParameterConvention::Direct_Unowned,
-                      "indices pointer should be trivial");
-              require(param.getType()->getAnyNominal()
-                        == C.getUnsafeRawPointerDecl(),
-                      "indices pointer should be an UnsafeRawPointer");
-              
-              require(substHashType->getResults().size() == 1,
-                      "must have one result");
-              
-              require(substHashType->getResults()[0].getConvention()
-                        == ResultConvention::Unowned,
-                      "result should be unowned");
-              require(substHashType->getResults()[0].getType()->getAnyNominal()
-                        == C.getIntDecl(),
-                      "result should be Int");
-            }
-          } else {
-            require(!component.getComputedPropertyIndexEquals()
-                    && !component.getComputedPropertyIndexHash(),
-                    "component without indexes must not have equals/hash");
-          }
-
+        case KeyPathPatternComponent::Kind::StoredProperty:
+        case KeyPathPatternComponent::Kind::OptionalChain:
+        case KeyPathPatternComponent::Kind::OptionalWrap:
+        case KeyPathPatternComponent::Kind::OptionalForce:
+          hasIndices = false;
           break;
         }
-        case KeyPathPatternComponent::Kind::OptionalChain: {
-          require(baseTy->getAnyOptionalObjectType()->isEqual(componentTy),
-                  "chaining component should unwrap optional");
-          require(leafTy->getAnyOptionalObjectType(),
-                  "key path with chaining component should have optional "
-                  "result");
-          break;
-        }
-        case KeyPathPatternComponent::Kind::OptionalForce: {
-          require(baseTy->getAnyOptionalObjectType()->isEqual(componentTy),
-                  "forcing component should unwrap optional");
-          break;
-        }
-        case KeyPathPatternComponent::Kind::OptionalWrap: {
-          require(componentTy->getAnyOptionalObjectType()->isEqual(baseTy),
-                  "wrapping component should wrap optional");
-          break;
-        }
-        }
-        
-        baseTy = componentTy;
+      
+        verifyKeyPathComponent(F.getModule(),
+          [&](bool reqt, StringRef message) { _require(reqt, message); },
+          baseTy,
+          leafTy,
+          component,
+          KPI->getAllOperands(),
+          KPI->getPattern()->getGenericSignature(),
+          KPI->getSubstitutions(),
+          /*property descriptor*/false,
+          hasIndices);
       }
     }
     require(CanType(baseTy) == CanType(leafTy),
             "final component should match leaf value type of key path type");
+  }
+
+  void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
+    auto fnType = IEC->getOperand()->getType().getAs<SILFunctionType>();
+    require(fnType && fnType->getExtInfo().hasContext() &&
+                !fnType->isNoEscape() &&
+                fnType->getExtInfo().getRepresentation() ==
+                    SILFunctionTypeRepresentation::Thick,
+            "is_escaping_closure must have a thick "
+            "function operand");
   }
 
   // This verifies that the entry block of a SIL function doesn't have
@@ -4362,16 +4545,14 @@ public:
 
     const SILDebugScope *LastSeenScope = nullptr;
     for (SILInstruction &SI : *BB) {
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
       LastSeenScope = SI.getDebugScope();
       AlreadySeenScopes.insert(LastSeenScope);
       break;
     }
     for (SILInstruction &SI : *BB) {
-      // `alloc_stack` can create false positive, so we skip it
-      // for now.
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
 
       // If we haven't seen this debug scope yet, update the
@@ -4409,6 +4590,9 @@ public:
       }
       if (DS != LastSeenScope) {
         DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
+        DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
+        DEBUG(llvm::dbgs() <<
+          "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");
@@ -4538,6 +4722,62 @@ void SILFunction::verify(bool SingleFunction) const {
   SILVerifier(*this, SingleFunction).verify();
 }
 
+/// Verify that a property descriptor follows invariants.
+void SILProperty::verify(const SILModule &M) const {
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
+
+  auto *decl = getDecl();
+  auto *dc = decl->getInnermostDeclContext();
+  auto &component = getComponent();
+  
+  // TODO: base type for global/static descriptors
+  auto sig = dc->getGenericSignatureOfContext();
+  auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
+                  ->getCanonicalType(sig);
+  auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
+                    ->getCanonicalType(sig);
+  SubstitutionList subs;
+  if (sig) {
+    auto env = dc->getGenericEnvironmentOfContext();
+    subs = env->getForwardingSubstitutions();
+    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
+    leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
+  }
+  bool hasIndices = false;
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    hasIndices = subscript->getIndices()->size() != 0;
+  }
+
+  auto canSig = sig ? sig->getCanonicalSignature() : nullptr;
+  Lowering::GenericContextScope scope(M.Types, canSig);
+
+  auto require = [&](bool reqt, StringRef message) {
+      if (!reqt) {
+        llvm::errs() << message << "\n";
+        assert(false && "invoking standard assertion failure");
+      }
+    };
+
+  verifyKeyPathComponent(const_cast<SILModule&>(M),
+    require,
+    baseTy,
+    leafTy,
+    component,
+    {},
+    canSig,
+    subs,
+    /*property descriptor*/true,
+    hasIndices);
+  
+  // verifyKeyPathComponent updates baseTy to be the projected type of the
+  // component, which should be the same as the type of the declared storage
+  require(baseTy == leafTy,
+          "component type of property descriptor should match type of storage");
+}
+
 /// Verify that a vtable follows invariants.
 void SILVTable::verify(const SILModule &M) const {
 #ifdef NDEBUG
@@ -4605,7 +4845,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
     return;
 #endif
   if (isDeclaration())
-    assert(getEntries().size() == 0 &&
+    assert(getEntries().empty() &&
            "A witness table declaration should not have any entries.");
 
   auto *protocol = getConformance()->getProtocol();
@@ -4771,6 +5011,12 @@ void SILModule::verify() const {
       assert(false && "triggering standard assertion failure routine");
     }
     wt.verify(*this);
+  }
+  
+  // Check property descriptors.
+  DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
+  for (auto &prop : getPropertyList()) {
+    prop.verify(*this);
   }
 }
 

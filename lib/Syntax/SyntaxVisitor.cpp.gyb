@@ -34,12 +34,12 @@ void swift::syntax::SyntaxVisitor::visit(Syntax node) {
   SWIFT_DEFER { visitPost(node); };
   switch (node.getKind()) {
   case SyntaxKind::Token:
-    visit(make<TokenSyntax>(node.getRaw()));
+    visit(node.castTo<TokenSyntax>());
     return;
 % for node in SYNTAX_NODES:
 %   if is_visitable(node):
   case SyntaxKind::${node.syntax_kind}:
-    visit(make<${node.name}>(node.getRaw()));
+    visit(node.castTo<${node.name}>());
     return;
 %   end
 % end

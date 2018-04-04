@@ -4,6 +4,8 @@ public struct Continuation<A> {
    private let magicToken = "Hello World"
    fileprivate let f: (() -> A)?
 
+   private let _makeMeBigger = 0
+
   public func run() {}
 }
 

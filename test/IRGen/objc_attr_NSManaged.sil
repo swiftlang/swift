@@ -43,7 +43,7 @@ bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnSQyACGSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
+sil @$S19objc_attr_NSManaged10SwiftGizmoC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, @owned SwiftGizmo) -> @owned SwiftGizmo? {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   unreachable
 }

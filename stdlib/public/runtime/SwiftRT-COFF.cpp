@@ -25,22 +25,23 @@
 #define PRAGMA(pragma) _Pragma(#pragma)
 
 #define DECLARE_SWIFT_SECTION(name)                                            \
-  PRAGMA(section("." #name "$A", long, read, write))                           \
+  PRAGMA(section("." #name "$A", long, read))                                  \
   __declspec(allocate("." #name "$A"))                                         \
   static uintptr_t __start_##name = 0;                                         \
                                                                                \
-  PRAGMA(section("." #name "$C", long, read, write))                           \
+  PRAGMA(section("." #name "$C", long, read))                                  \
   __declspec(allocate("." #name "$C"))                                         \
   static uintptr_t __stop_##name = 0;
 
 extern "C" {
-DECLARE_SWIFT_SECTION(sw2prtc)
-DECLARE_SWIFT_SECTION(sw2tymd)
+DECLARE_SWIFT_SECTION(sw5prt)
+DECLARE_SWIFT_SECTION(sw5prtc)
+DECLARE_SWIFT_SECTION(sw5tymd)
 
-DECLARE_SWIFT_SECTION(sw3tyrf)
-DECLARE_SWIFT_SECTION(sw3rfst)
-DECLARE_SWIFT_SECTION(sw3flmd)
-DECLARE_SWIFT_SECTION(sw3asty)
+DECLARE_SWIFT_SECTION(sw5tyrf)
+DECLARE_SWIFT_SECTION(sw5rfst)
+DECLARE_SWIFT_SECTION(sw5flmd)
+DECLARE_SWIFT_SECTION(sw5asty)
 }
 
 namespace {
@@ -59,19 +60,22 @@ static void swift_image_constructor() {
       nullptr,
       nullptr,
 
-      SWIFT_SECTION_RANGE(sw2prtc),
-      SWIFT_SECTION_RANGE(sw2tymd),
+      SWIFT_SECTION_RANGE(sw5prt),
+      SWIFT_SECTION_RANGE(sw5prtc),
+      SWIFT_SECTION_RANGE(sw5tymd),
 
-      SWIFT_SECTION_RANGE(sw3tyrf),
-      SWIFT_SECTION_RANGE(sw3rfst),
-      SWIFT_SECTION_RANGE(sw3flmd),
-      SWIFT_SECTION_RANGE(sw3asty),
+      SWIFT_SECTION_RANGE(sw5tyrf),
+      SWIFT_SECTION_RANGE(sw5rfst),
+      SWIFT_SECTION_RANGE(sw5flmd),
+      SWIFT_SECTION_RANGE(sw5asty),
   };
 
 #undef SWIFT_SECTION_RANGE
 
   swift_addNewDSOImage(&sections);
 }
+
+#pragma section(".CRT$XCIS", long, read)
 
 __declspec(allocate(".CRT$XCIS"))
 extern "C" void (*pSwiftImageConstructor)(void) = &swift_image_constructor;

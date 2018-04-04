@@ -791,7 +791,8 @@ void SILCloner<ImplClass>::visitBeginAccessInst(BeginAccessInst *Inst) {
       Inst, getBuilder().createBeginAccess(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand()),
                                            Inst->getAccessKind(),
-                                           Inst->getEnforcement()));
+                                           Inst->getEnforcement(),
+                                           Inst->hasNoNestedConflict()));
 }
 
 template <typename ImplClass>
@@ -812,7 +813,8 @@ void SILCloner<ImplClass>::visitBeginUnpairedAccessInst(
                                            getOpValue(Inst->getSource()),
                                            getOpValue(Inst->getBuffer()),
                                            Inst->getAccessKind(),
-                                           Inst->getEnforcement()));
+                                           Inst->getEnforcement(),
+                                           Inst->hasNoNestedConflict()));
 }
 
 template <typename ImplClass>
@@ -886,7 +888,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createDebugValue(
                           Inst->getLoc(), getOpValue(Inst->getOperand()),
-                          Inst->getVarInfo()));
+                          *Inst->getVarInfo()));
 }
 template<typename ImplClass>
 void
@@ -900,8 +902,8 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   // Do not remap the location for a debug Instruction.
   SILValue OpValue = getOpValue(Inst->getOperand());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createDebugValueAddr(
-                          Inst->getLoc(), OpValue, Inst->getVarInfo()));
+  doPostProcess(Inst, getBuilder().createDebugValueAddr(Inst->getLoc(), OpValue,
+                                                        *Inst->getVarInfo()));
 }
 
 
@@ -978,6 +980,16 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
     getBuilder().createConvertFunction(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
+    ConvertEscapeToNoEscapeInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createConvertEscapeToNoEscape(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()), Inst->isLifetimeGuaranteed()));
 }
 
 template<typename ImplClass>
@@ -1132,6 +1144,15 @@ SILCloner<ImplClass>::visitRefToRawPointerInst(RefToRawPointerInst *Inst) {
     getBuilder().createRefToRawPointer(getOpLocation(Inst->getLoc()),
                                        getOpValue(Inst->getOperand()),
                                        getOpType(Inst->getType())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitValueToBridgeObjectInst(
+    ValueToBridgeObjectInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createValueToBridgeObject(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>
@@ -1993,6 +2014,14 @@ visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createIsUniqueOrPinned(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand())));
+}
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitIsEscapingClosureInst(
+    IsEscapingClosureInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createIsEscapingClosure(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

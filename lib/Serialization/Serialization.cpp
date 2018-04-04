@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
+#include "swift/Strings.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -103,6 +104,8 @@ namespace {
           return llvm::HashString(key.getIdentifier().str());
         case DeclBaseName::Kind::Subscript:
           return static_cast<uint8_t>(DeclNameKind::Subscript);
+        case DeclBaseName::Kind::Constructor:
+          return static_cast<uint8_t>(DeclNameKind::Constructor);
         case DeclBaseName::Kind::Destructor:
           return static_cast<uint8_t>(DeclNameKind::Destructor);
       }
@@ -132,6 +135,9 @@ namespace {
         break;
       case DeclBaseName::Kind::Subscript:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Subscript));
+        break;
+      case DeclBaseName::Kind::Constructor:
+        writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Constructor));
         break;
       case DeclBaseName::Kind::Destructor:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Destructor));
@@ -315,6 +321,8 @@ namespace {
         return llvm::HashString(key.getIdentifier().str());
       case DeclBaseName::Kind::Subscript:
         return static_cast<uint8_t>(DeclNameKind::Subscript);
+      case DeclBaseName::Kind::Constructor:
+        return static_cast<uint8_t>(DeclNameKind::Constructor);
       case DeclBaseName::Kind::Destructor:
         return static_cast<uint8_t>(DeclNameKind::Destructor);
       }
@@ -343,6 +351,9 @@ namespace {
         break;
       case DeclBaseName::Kind::Subscript:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Subscript));
+        break;
+      case DeclBaseName::Kind::Constructor:
+        writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Constructor));
         break;
       case DeclBaseName::Kind::Destructor:
         writer.write<uint8_t>(static_cast<uint8_t>(DeclNameKind::Destructor));
@@ -642,6 +653,8 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   }
   case DeclBaseName::Kind::Subscript:
     return SUBSCRIPT_ID;
+  case DeclBaseName::Kind::Constructor:
+    return CONSTRUCTOR_ID;
   case DeclBaseName::Kind::Destructor:
     return DESTRUCTOR_ID;
   }
@@ -813,6 +826,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
+  BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
+  BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
@@ -850,6 +865,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_WITNESS_TABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_DEFAULT_WITNESS_TABLE_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_PROPERTY_OFFSETS);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -1718,6 +1734,7 @@ static bool shouldSerializeMember(Decl *D) {
     llvm_unreachable("should never need to reserialize a member placeholder");
 
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
     return false;
 
   case DeclKind::EnumCase:
@@ -1867,8 +1884,16 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
     auto generic = cast<GenericTypeDecl>(DC);
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+
+    Identifier discriminator;
+    if (generic->isOutermostPrivateOrFilePrivateScope()) {
+      auto *containingFile = cast<FileUnit>(generic->getModuleScopeContext());
+      discriminator = containingFile->getDiscriminatorForPrivateValue(generic);
+    }
+
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(generic->getName()),
+                                        addDeclBaseNameRef(discriminator),
                                         false);
     break;
   }
@@ -2018,8 +2043,17 @@ void Serializer::writeCrossReference(const Decl *D) {
   bool isProtocolExt = D->getDeclContext()->getAsProtocolExtensionContext();
   if (auto type = dyn_cast<TypeDecl>(D)) {
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
+
+    Identifier discriminator;
+    if (type->isOutermostPrivateOrFilePrivateScope()) {
+      auto *containingFile =
+         cast<FileUnit>(type->getDeclContext()->getModuleScopeContext());
+      discriminator = containingFile->getDiscriminatorForPrivateValue(type);
+    }
+
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(type->getName()),
+                                        addDeclBaseNameRef(discriminator),
                                         isProtocolExt);
     return;
   }
@@ -2150,7 +2184,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
   switch (DA->getKind()) {
   case DAK_RawDocComment:
-  case DAK_Ownership: // Serialized as part of the type.
+  case DAK_ReferenceOwnership: // Serialized as part of the type.
   case DAK_AccessControl:
   case DAK_SetterAccess:
   case DAK_ObjCBridged:
@@ -2158,6 +2192,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_Implements:
   case DAK_ObjCRuntimeName:
   case DAK_RestatedObjCConformance:
+  case DAK_ClangImporterSynthesizedType:
     llvm_unreachable("cannot serialize attribute");
 
   case DAK_Count:
@@ -2503,6 +2538,8 @@ static uint8_t getRawStableVarDeclSpecifier(swift::VarDecl::Specifier sf) {
     return uint8_t(serialization::VarDeclSpecifier::InOut);
   case swift::VarDecl::Specifier::Shared:
     return uint8_t(serialization::VarDeclSpecifier::Shared);
+  case swift::VarDecl::Specifier::Owned:
+    return uint8_t(serialization::VarDeclSpecifier::Owned);
   }
   llvm_unreachable("bad variable decl specifier kind");
 }
@@ -2642,6 +2679,9 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::IfConfig:
     llvm_unreachable("#if block declarations should not be serialized");
+
+  case DeclKind::PoundDiagnostic:
+    llvm_unreachable("#warning/#error declarations should not be serialized");
 
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);
@@ -3009,6 +3049,10 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
 
+    bool inheritsSuperclassInitializers =
+        const_cast<ClassDecl *>(theClass)->
+          inheritsSuperclassInitializers(nullptr);
+
     unsigned abbrCode = DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(Out, ScratchRecord, abbrCode,
                             addDeclBaseNameRef(theClass->getName()),
@@ -3016,6 +3060,7 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->isImplicit(),
                             theClass->isObjC(),
                             theClass->requiresStoredPropertyInits(),
+                            inheritsSuperclassInitializers,
                             addGenericEnvironmentRef(
                                              theClass->getGenericEnvironment()),
                             addTypeRef(theClass->getSuperclass()),
@@ -3250,29 +3295,45 @@ void Serializer::writeDecl(const Decl *D) {
     auto elem = cast<EnumElementDecl>(D);
     auto contextID = addDeclContextRef(elem->getDeclContext());
 
+    SmallVector<IdentifierID, 4> nameComponentsAndDependencies;
+    nameComponentsAndDependencies.push_back(addDeclBaseNameRef(elem->getBaseName()));
+    for (auto argName : elem->getFullName().getArgumentNames())
+      nameComponentsAndDependencies.push_back(addDeclBaseNameRef(argName));
+
+    Type ty = elem->getInterfaceType();
+    for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
+      nameComponentsAndDependencies.push_back(addTypeRef(dependency));
+
     // We only serialize the raw values of @objc enums, because they're part
     // of the ABI. That isn't the case for Swift enums.
     auto RawValueKind = EnumElementRawValueKind::None;
     bool Negative = false;
-    StringRef RawValueText;
+    Identifier RawValueText;
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       RawValueKind = EnumElementRawValueKind::IntegerLiteral;
       auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
-      RawValueText = ILE->getDigitsText();
+      RawValueText = M->getASTContext().getIdentifier(ILE->getDigitsText());
       Negative = ILE->isNegative();
     }
 
+    uint8_t rawResilienceExpansion =
+        getRawStableResilienceExpansion(
+            elem->getDefaultArgumentResilienceExpansion());
     unsigned abbrCode = DeclTypeAbbrCodes[EnumElementLayout::Code];
     EnumElementLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                  addDeclBaseNameRef(elem->getName()),
                                   contextID,
                                   addTypeRef(elem->getInterfaceType()),
-                                  elem->hasAssociatedValues(),
                                   elem->isImplicit(),
+                                  elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
                                   Negative,
-                                  RawValueText);
+                                  addDeclBaseNameRef(RawValueText),
+                                  rawResilienceExpansion,
+                                  elem->getFullName().getArgumentNames().size()+1,
+                                  nameComponentsAndDependencies);
+    if (auto *PL = elem->getParameterList())
+      writeParameterList(PL);
     break;
   }
 
@@ -3455,12 +3516,24 @@ static uint8_t getRawStableSILCoroutineKind(
 
 /// Translate from the AST ownership enum to the Serialization enum
 /// values, which are guaranteed to be stable.
-static uint8_t getRawStableOwnership(swift::Ownership ownership) {
+static uint8_t
+getRawStableReferenceOwnership(swift::ReferenceOwnership ownership) {
   switch (ownership) {
-  SIMPLE_CASE(Ownership, Strong)
-  SIMPLE_CASE(Ownership, Weak)
-  SIMPLE_CASE(Ownership, Unowned)
-  SIMPLE_CASE(Ownership, Unmanaged)
+  SIMPLE_CASE(ReferenceOwnership, Strong)
+  SIMPLE_CASE(ReferenceOwnership, Weak)
+  SIMPLE_CASE(ReferenceOwnership, Unowned)
+  SIMPLE_CASE(ReferenceOwnership, Unmanaged)
+  }
+  llvm_unreachable("bad ownership kind");
+}
+/// Translate from the AST ownership enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableValueOwnership(swift::ValueOwnership ownership) {
+  switch (ownership) {
+  SIMPLE_CASE(ValueOwnership, Default)
+  SIMPLE_CASE(ValueOwnership, InOut)
+  SIMPLE_CASE(ValueOwnership, Shared)
+  SIMPLE_CASE(ValueOwnership, Owned)
   }
   llvm_unreachable("bad ownership kind");
 }
@@ -3502,7 +3575,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
   T->print(OS);
-  assert(FullName.startswith("Builtin."));
+  assert(FullName.startswith(BUILTIN_TYPE_NAME_PREFIX));
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
@@ -3542,36 +3615,45 @@ void Serializer::writeType(Type ty) {
     TypeAliasDecl *typeAlias =
       findTypeAliasForBuiltin(M->getASTContext(), ty);
 
-    unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
-    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias,
-                                               /*forceSerialization*/false,
-                                               /*allowTypeAliasXRef*/true),
-                                    TypeID());
+    unsigned abbrCode = DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
+    BuiltinAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                       addDeclRef(typeAlias,
+                                                  /*forceSerialization*/false,
+                                                  /*allowTypeAliasXRef*/true),
+                                       TypeID());
     break;
   }
   case TypeKind::NameAlias: {
-    auto nameAlias = cast<NameAliasType>(ty.getPointer());
-    const TypeAliasDecl *typeAlias = nameAlias->getDecl();
+    auto alias = cast<NameAliasType>(ty.getPointer());
+    const TypeAliasDecl *typeAlias = alias->getDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
-    NameAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    addDeclRef(typeAlias,
-                                               /*forceSerialization*/false,
-                                               /*allowTypeAliasXRef*/true),
-                                    addTypeRef(ty->getCanonicalType()));
+    NameAliasTypeLayout::emitRecord(
+                             Out, ScratchRecord, abbrCode,
+                             addDeclRef(typeAlias,
+                                        /*forceSerialization*/false,
+                                        /*allowTypeAliasXRef*/true),
+                             addTypeRef(alias->getParent()),
+                             addTypeRef(alias->getSinglyDesugaredType()));
+    // Write the set of substitutions.
+    SmallVector<Substitution, 4> flatSubs;
+    if (auto genericSig = typeAlias->getGenericSignature())
+      genericSig->getSubstitutions(alias->getSubstitutionMap(), flatSubs);
+    writeSubstitutions(flatSubs, DeclTypeAbbrCodes);
     break;
   }
 
   case TypeKind::Paren: {
     auto parenTy = cast<ParenType>(ty.getPointer());
     auto paramFlags = parenTy->getParameterFlags();
+    auto rawOwnership =
+        getRawStableValueOwnership(paramFlags.getValueOwnership());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParenTypeLayout::Code];
     ParenTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(parenTy->getUnderlyingType()),
         paramFlags.isVariadic(), paramFlags.isAutoClosure(),
-        paramFlags.isEscaping(), paramFlags.isInOut(), paramFlags.isShared());
+        paramFlags.isEscaping(), rawOwnership);
     break;
   }
 
@@ -3584,11 +3666,12 @@ void Serializer::writeType(Type ty) {
     abbrCode = DeclTypeAbbrCodes[TupleTypeEltLayout::Code];
     for (auto &elt : tupleTy->getElements()) {
       auto paramFlags = elt.getParameterFlags();
+      auto rawOwnership =
+          getRawStableValueOwnership(paramFlags.getValueOwnership());
       TupleTypeEltLayout::emitRecord(
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(elt.getName()),
           addTypeRef(elt.getType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(),
-          paramFlags.isInOut(), paramFlags.isShared());
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
     }
 
     break;
@@ -3838,17 +3921,6 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::ImplicitlyUnwrappedOptional: {
-    auto optionalTy = cast<ImplicitlyUnwrappedOptionalType>(ty.getPointer());
-
-    Type base = optionalTy->getBaseType();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ImplicitlyUnwrappedOptionalTypeLayout::Code];
-    ImplicitlyUnwrappedOptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                      addTypeRef(base));
-    break;
-  }
-
   case TypeKind::ProtocolComposition: {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
@@ -3878,7 +3950,8 @@ void Serializer::writeType(Type ty) {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];
-    auto stableOwnership = getRawStableOwnership(refTy->getOwnership());
+    auto stableOwnership =
+        getRawStableReferenceOwnership(refTy->getOwnership());
     ReferenceStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            stableOwnership,
                                   addTypeRef(refTy->getReferentType()));
@@ -3922,6 +3995,7 @@ void Serializer::writeType(Type ty) {
 void Serializer::writeAllDeclsAndTypes() {
   BCBlockRAII restoreBlock(Out, DECLS_AND_TYPES_BLOCK_ID, 8);
   using namespace decls_block;
+  registerDeclTypeAbbr<BuiltinAliasTypeLayout>();
   registerDeclTypeAbbr<NameAliasTypeLayout>();
   registerDeclTypeAbbr<GenericTypeParamDeclLayout>();
   registerDeclTypeAbbr<AssociatedTypeDeclLayout>();
@@ -3946,7 +4020,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
-  registerDeclTypeAbbr<ImplicitlyUnwrappedOptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
   registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 
@@ -4318,7 +4391,7 @@ class YamlGroupInputParser {
     if (!MapNode) {
       return true;
     }
-    for (auto Pair : *MapNode) {
+    for (auto &Pair : *MapNode) {
       auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
       auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
 

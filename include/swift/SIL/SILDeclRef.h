@@ -20,7 +20,6 @@
 #define SWIFT_SIL_SILDeclRef_H
 
 #include "swift/AST/ClangNode.h"
-#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/DenseMap.h"
@@ -140,8 +139,6 @@ struct SILDeclRef {
   Loc loc;
   /// The Kind of this SILDeclRef.
   Kind kind : 4;
-  /// The required resilience expansion of the declaration.
-  unsigned Expansion : 1;
   /// True if the SILDeclRef is a curry thunk.
   unsigned isCurried : 1;
   /// True if this references a foreign entry point for the referenced decl.
@@ -153,14 +150,12 @@ struct SILDeclRef {
   unsigned defaultArgIndex : 10;
   
   /// Produces a null SILDeclRef.
-  SILDeclRef() : loc(), kind(Kind::Func), Expansion(0),
+  SILDeclRef() : loc(), kind(Kind::Func),
                  isCurried(0), isForeign(0), isDirectReference(0),
                  defaultArgIndex(0) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
-                      ResilienceExpansion expansion
-                        = ResilienceExpansion::Minimal,
                       bool isCurried = false,
                       bool isForeign = false);
   
@@ -181,8 +176,6 @@ struct SILDeclRef {
   /// (Self) -> (Args...) -> Result, rather than a direct reference to
   /// the actual method whose lowered type is (Args..., Self) -> Result.
   explicit SILDeclRef(Loc loc,
-                      ResilienceExpansion expansion
-                        = ResilienceExpansion::Minimal,
                       bool isCurried = false,
                       bool isForeign = false);
 
@@ -281,15 +274,13 @@ struct SILDeclRef {
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(loc.getOpaqueValue(),
                               static_cast<int>(kind),
-                              Expansion, isCurried,
-                              isForeign, isDirectReference,
+                              isCurried, isForeign, isDirectReference,
                               defaultArgIndex);
   }
 
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
-      && Expansion == rhs.Expansion
       && isCurried == rhs.isCurried
       && isForeign == rhs.isForeign
       && isDirectReference == rhs.isDirectReference
@@ -303,10 +294,6 @@ struct SILDeclRef {
   void dump() const;
 
   unsigned getParameterListCount() const;
-
-  ResilienceExpansion getResilienceExpansion() const {
-    return ResilienceExpansion(Expansion);
-  }
   
   // Returns the SILDeclRef for an entity at a shallower uncurry level.
   SILDeclRef asCurried(bool curried = true) const {
@@ -314,7 +301,7 @@ struct SILDeclRef {
     // Curry thunks are never foreign.
     bool willBeForeign = isForeign && !curried;
     bool willBeDirect = isDirectReference;
-    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion,
+    return SILDeclRef(loc.getOpaqueValue(), kind,
                       curried, willBeDirect, willBeForeign,
                       defaultArgIndex);
   }
@@ -323,7 +310,7 @@ struct SILDeclRef {
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
     assert(!isCurried);
-    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion,
+    return SILDeclRef(loc.getOpaqueValue(), kind,
                       isCurried, isDirectReference, foreign, defaultArgIndex);
   }
   
@@ -386,14 +373,12 @@ private:
   /// Produces a SILDeclRef from an opaque value.
   explicit SILDeclRef(void *opaqueLoc,
                       Kind kind,
-                      unsigned rawExpansion,
                       bool isCurried,
                       bool isDirectReference,
                       bool isForeign,
                       unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
       kind(kind),
-      Expansion(rawExpansion),
       isCurried(isCurried),
       isForeign(isForeign), isDirectReference(isDirectReference),
       defaultArgIndex(defaultArgIndex)
@@ -415,17 +400,16 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   using SILDeclRef = swift::SILDeclRef;
   using Kind = SILDeclRef::Kind;
   using Loc = SILDeclRef::Loc;
-  using ResilienceExpansion = swift::ResilienceExpansion;
   using PointerInfo = DenseMapInfo<void*>;
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func,
-                      0, false, false, false, 0);
+                      false, false, false, 0);
   }
   static SILDeclRef getTombstoneKey() {
     return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func,
-                      0, false, false, false, 0);
+                      false, false, false, 0);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());

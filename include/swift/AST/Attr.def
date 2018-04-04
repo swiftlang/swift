@@ -111,7 +111,8 @@ SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
 SIMPLE_DECL_ATTR(_exported, Exported, OnImport | UserInaccessible, 8)
 
-/// NOTE: 9 is unused.
+SIMPLE_DECL_ATTR(dynamicMemberLookup, DynamicMemberLookup,
+                 OnClass | OnStruct | OnEnum | OnProtocol, 9)
 
 SIMPLE_DECL_ATTR(NSCopying, NSCopying,
                  OnVar, 10)
@@ -163,9 +164,9 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
                  OnExtension | OnFunc | OnVar | OnSubscript | OnConstructor, 30)
 
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
-                 OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
+                 OnVar | OnClass | OnStruct | UserInaccessible, 31)
 
-SIMPLE_DECL_ATTR(_inlineable, Inlineable,
+SIMPLE_DECL_ATTR(inlinable, Inlinable,
                  OnVar | OnSubscript | OnFunc | OnConstructor | OnDestructor |
                  UserInaccessible, 32)
 
@@ -213,9 +214,9 @@ DECL_ATTR(__raw_doc_comment, RawDocComment, OnAnyDecl |
           NotSerialized | RejectByParser, /* Not serialized */48)
 
 // Also handles unowned and unowned(weak).
-DECL_ATTR(weak, Ownership, OnVar | OnParam | DeclModifier | NotSerialized,
+DECL_ATTR(weak, ReferenceOwnership, OnVar | OnParam | DeclModifier | NotSerialized,
           /* Not serialized */49)
-DECL_ATTR_ALIAS(unowned, Ownership)
+DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
 
 DECL_ATTR(effects, Effects, OnFunc | OnConstructor | OnDestructor |
           UserInaccessible, 50)
@@ -258,9 +259,7 @@ SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
 DECL_ATTR(_cdecl, CDecl,
           OnFunc | LongAttribute | UserInaccessible, 63)
 
-// A testing attribute for Library Evolution ("resilience").
-// FIXME: Replace with improved @available attribute.
-SIMPLE_DECL_ATTR(_versioned, Versioned,
+SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
                  OnFunc | OnVar | OnSubscript | OnConstructor |
                  OnDestructor | OnStruct | OnEnum | OnClass |
                  OnProtocol | LongAttribute | UserInaccessible,
@@ -301,6 +300,19 @@ SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional,
 DECL_ATTR(_optimize, Optimize,
           OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar |
           UserInaccessible, 73)
+
+DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
+          OnClass | OnStruct | OnEnum | OnProtocol | OnTypeAlias |
+          LongAttribute | NotSerialized | RejectByParser | UserInaccessible,
+          /*Not serialized*/74)
+
+SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
+                 OnEnum | OnStruct | OnClass | OnProtocol |
+                 OnFunc | OnVar | OnSubscript | OnConstructor | OnEnumElement |
+                 UserInaccessible,
+                 75)
+
+SIMPLE_DECL_ATTR(_frozen, Frozen, OnEnum | UserInaccessible, 76)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

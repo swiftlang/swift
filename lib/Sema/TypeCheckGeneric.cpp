@@ -361,11 +361,13 @@ void TypeChecker::validateRequirements(
 
 std::string
 TypeChecker::gatherGenericParamBindingsText(
-                                ArrayRef<Type> types,
-                                ArrayRef<GenericTypeParamType *> genericParams,
-                                TypeSubstitutionFn substitutions) {
+                              ArrayRef<Type> types,
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                              TypeSubstitutionFn substitutions) {
   llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
   for (auto type : types) {
+    if (type.isNull()) continue;
+
     type.visit([&](Type type) {
       if (auto gp = type->getAs<GenericTypeParamType>()) {
         knownGenericParams.insert(
@@ -853,6 +855,12 @@ TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 
   configureInterfaceType(func, sig);
+
+  // Make sure that there are no unresolved
+  // dependent types in the generic signature.
+  assert(func->getInterfaceType()->hasError() ||
+         !func->getInterfaceType()->findUnresolvedDependentMemberType());
+
   return sig;
 }
 
@@ -875,7 +883,7 @@ void TypeChecker::configureInterfaceType(AbstractFunctionDecl *func,
 
     // Adjust result type for failability.
     if (ctor->getFailability() != OTK_None)
-      funcTy = OptionalType::get(ctor->getFailability(), funcTy);
+      funcTy = OptionalType::get(funcTy);
 
     // Set the IUO attribute on the decl if this was declared with !.
     if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
@@ -1139,13 +1147,14 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                       bool allowConcreteGenericParams,
                       ExtensionDecl *ext,
                       llvm::function_ref<void(GenericSignatureBuilder &)>
-                        inferRequirements) {
+                        inferRequirements,
+                      bool mustInferRequirements) {
   assert(genericParams && "Missing generic parameters?");
   bool recursivelyVisitGenericParams =
     genericParams->getOuterParameters() && !parentSig;
 
   GenericSignature *sig;
-  if (!ext || ext->getTrailingWhereClause() ||
+  if (!ext || mustInferRequirements || ext->getTrailingWhereClause() ||
       getExtendedTypeGenericDepth(ext) != genericParams->getDepth()) {
     // Collect the generic parameters.
     SmallVector<GenericTypeParamType *, 4> allGenericParams;
@@ -1268,7 +1277,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 
 RequirementCheckResult TypeChecker::checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
-    ArrayRef<GenericTypeParamType *> genericParams,
+    TypeArrayView<GenericTypeParamType> genericParams,
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
@@ -1380,12 +1389,16 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         break;
       }
 
-      case RequirementKind::Layout: {
-        // TODO: Statically check if a the first type
-        // conforms to the layout constraint, once we
-        // support such static checks.
-        continue;
-      }
+      case RequirementKind::Layout:
+        // TODO: Statically check other layout constraints, once they can
+        // be spelled in Swift.
+        if (req.getLayoutConstraint()->isClass() &&
+            !firstType->satisfiesClassConstraint()) {
+          diagnostic = diag::type_is_not_a_class;
+          diagnosticNote = diag::anyobject_requirement;
+          requirementFailure = true;
+        }
+        break;
 
       case RequirementKind::Superclass:
         // Superclass requirements.

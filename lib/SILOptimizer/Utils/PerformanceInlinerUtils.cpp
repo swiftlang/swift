@@ -130,6 +130,9 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
       } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
         val = cfi->getOperand();
         continue;
+      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
+        val = cvt->getOperand();
+        continue;
       }
       return inst;
     } else if (SILValue param = getParam(val)) {
@@ -654,7 +657,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   return true;
 }
 
-// Returns the callee of an apply_inst if it is basically inlineable.
+// Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
   // For now, we cannot inline begin_apply at all.

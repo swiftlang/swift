@@ -26,8 +26,11 @@
 using namespace swift;
 using namespace swift::migrator;
 
-bool migrator::updateCodeAndEmitRemap(CompilerInstance *Instance,
-                                      const CompilerInvocation &Invocation) {
+bool migrator::updateCodeAndEmitRemapIfNeeded(
+    CompilerInstance *Instance, const CompilerInvocation &Invocation) {
+  if (!Invocation.getMigratorOptions().shouldRunMigrator())
+    return false;
+
   // Delete the remap file, in case someone is re-running the Migrator. If the
   // file fails to compile and we don't get a chance to overwrite it, the old
   // changes may get picked up.
@@ -53,7 +56,10 @@ bool migrator::updateCodeAndEmitRemap(CompilerInstance *Instance,
   }
 
   // Phase 2: Syntactic Transformations
-  if (Invocation.getLangOptions().EffectiveLanguageVersion[0] < 4) {
+  // Don't run these passes if we're already in Swift 4.2
+  auto Opts = Invocation.getLangOptions().EffectiveLanguageVersion;
+  bool isFourTwo = Opts.size() == 2 && Opts[0] == 4 && Opts[1] == 2;
+  if (!isFourTwo) {
     auto FailedSyntacticPasses = M.performSyntacticPasses();
     if (FailedSyntacticPasses) {
       return true;
@@ -118,7 +124,7 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
     llvm::MemoryBuffer::getMemBufferCopy(InputText, getInputFilename());
 
   CompilerInvocation Invocation { StartInvocation };
-  Invocation.getFrontendOptions().Inputs.clearInputs();
+  Invocation.getFrontendOptions().InputsAndOutputs.clearInputs();
   Invocation.getLangOptions().EffectiveLanguageVersion = SwiftLanguageVersion;
   auto &LLVMArgs = Invocation.getFrontendOptions().LLVMArgs;
   auto aarch64_use_tbi = std::find(LLVMArgs.begin(), LLVMArgs.end(),
@@ -144,10 +150,10 @@ Migrator::performAFixItMigration(version::Version SwiftLanguageVersion) {
 
   const auto &OrigFrontendOpts = StartInvocation.getFrontendOptions();
 
-  assert(OrigFrontendOpts.Inputs.hasPrimaryInputs() &&
+  assert(OrigFrontendOpts.InputsAndOutputs.hasPrimaryInputs() &&
          "Migration must have a primary");
-  for (const auto &input : OrigFrontendOpts.Inputs.getAllFiles()) {
-    Invocation.getFrontendOptions().Inputs.addInput(
+  for (const auto &input : OrigFrontendOpts.InputsAndOutputs.getAllInputs()) {
+    Invocation.getFrontendOptions().InputsAndOutputs.addInput(
         InputFile(input.file(), input.isPrimary(),
                   input.isPrimary() ? InputBuffer.get() : input.buffer()));
   }
@@ -438,6 +444,6 @@ const MigratorOptions &Migrator::getMigratorOptions() const {
 
 const StringRef Migrator::getInputFilename() const {
   auto &PrimaryInput = StartInvocation.getFrontendOptions()
-                           .Inputs.getRequiredUniquePrimaryInput();
+                           .InputsAndOutputs.getRequiredUniquePrimaryInput();
   return PrimaryInput.file();
 }

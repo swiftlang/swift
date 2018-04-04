@@ -45,8 +45,10 @@ struct SyntaxVisitor {
   void visit(Syntax node);
 
   void visitChildren(Syntax node) {
-    for (auto C: node.getRaw()->getLayout())
-      visit(make<Syntax>(C));
+    for (unsigned i = 0, e = node.getNumChildren(); i != e; ++i) {
+      if (auto Child = node.getChild(i))
+        visit(*Child);
+    }
   }
 };
 }

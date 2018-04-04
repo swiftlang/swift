@@ -43,6 +43,8 @@ class CalleeTypeInfo;
 class ResultPlan;
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 class ArgumentScope;
+class PostponedCleanup;
+class Scope;
 
 enum class ApplyOptions : unsigned {
   /// No special treatment is required.
@@ -245,6 +247,10 @@ public:
 
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
+
+  /// Currently active postponed cleanups.
+  PostponedCleanup *CurrentlyActivePostponedCleanup = nullptr;
+  void enterPostponedCleanup(SILValue forValue);
 
   /// \brief Values to end dynamic access enforcement on.  A hack for
   /// materializeForSet.
@@ -655,7 +661,7 @@ public:
                   ArrayRef<ParameterList *> paramPatterns, Type resultType,
                   bool throws);
   /// returns the number of variables in paramPatterns.
-  unsigned emitProlog(ArrayRef<ParameterList *> paramPatterns, Type resultType,
+  uint16_t emitProlog(ArrayRef<ParameterList *> paramPatterns, Type resultType,
                       DeclContext *DeclCtx, bool throws);
 
   /// Create SILArguments in the entry block that bind all the values
@@ -1046,8 +1052,8 @@ public:
   
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
-  SILValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
-                                CanSILFunctionType constantTy);
+  ManagedValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
+                                    CanSILFunctionType constantTy);
 
   /// Returns a reference to a vtable-dispatched method.
   SILValue emitClassMethodRef(SILLocation loc, SILValue selfPtr,
@@ -1104,14 +1110,12 @@ public:
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
-  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          SubstitutionList substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
                          RValue &&optionalSubscripts, SGFContext C);
 
-  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionList substitutions,
                        ArgumentSource &&optionalSelfValue,
@@ -1119,7 +1123,6 @@ public:
                        RValue &&optionalSubscripts,
                        ArgumentSource &&value);
 
-  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 SubstitutionList substitutions,
@@ -1136,8 +1139,6 @@ public:
                                        SubstitutionList witnessSubs);
   void emitMaterializeForSet(AccessorDecl *decl);
 
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                         SubstitutionList substitutions,
@@ -1145,11 +1146,6 @@ public:
                         bool isSuper, bool isDirectAccessorUse,
                         RValue &&optionalSubscripts,
                         SILType addressType);
-
-  RValue emitApplyConversionFunction(SILLocation loc,
-                                     Expr *funcExpr,
-                                     Type resultType,
-                                     RValue &&operand);
 
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
@@ -1309,7 +1305,7 @@ public:
                    SILLocation loc, ManagedValue fn, SubstitutionList subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
-                   SGFContext evalContext);
+                   SGFContext evalContext, PostponedCleanup &cleanup);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -1412,10 +1408,10 @@ public:
   llvm::SmallDenseMap<OpaqueValueExpr *, OpaqueValueState>
     OpaqueValues;
 
-  /// A mapping from opaque value expressions to the open-existential
-  /// expression that determines them, used while lowering lvalues.
-  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
-    OpaqueValueExprs;
+  /// A mapping from opaque value lvalue expressions to the address of the
+  /// opened value in memory.
+  llvm::SmallDenseMap<OpaqueValueExpr *, std::pair<SILValue, CanType>>
+    OpaqueLValues;
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///
@@ -1514,10 +1510,18 @@ public:
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
   ///
-  /// NOTE: This operation does *not* consume the managed value.
+  /// NOTE: This operation does consume the managed value.
+  ManagedValue emitBindOptional(SILLocation loc,
+                                ManagedValue optionalAddrOrValue,
+                                unsigned depth);
+
+  /// Emit the control flow for an optional 'bind' operation, branching to the
+  /// active failure destination if the optional value addressed by optionalAddr
+  /// is nil, and leaving the insertion point on the success branch.
   ///
-  void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
-                        unsigned depth);
+  /// NOTE: This operation does not consume the managed address.
+  void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
+                               unsigned depth);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,
@@ -1613,7 +1617,8 @@ public:
   ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
                                     CanType inputType,
                                     CanType outputType,
-                                    SGFContext ctx = SGFContext());
+                                    SGFContext ctx = SGFContext(),
+                                    bool postponeToNoEscapeCleanup = true);
 
   /// Most general form of the above.
   ManagedValue emitTransformedValue(SILLocation loc, ManagedValue input,
@@ -1621,7 +1626,8 @@ public:
                                     CanType inputSubstType,
                                     AbstractionPattern outputOrigType,
                                     CanType outputSubstType,
-                                    SGFContext ctx = SGFContext());
+                                    SGFContext ctx = SGFContext(),
+                                    bool postponeToNoEscapeCleanup = true);
   RValue emitTransformedValue(SILLocation loc, RValue &&input,
                               AbstractionPattern inputOrigType,
                               CanType inputSubstType,
@@ -1631,8 +1637,9 @@ public:
 
   /// Used for emitting SILArguments of bare functions, such as thunks and
   /// open-coded materializeForSet.
-  void collectThunkParams(SILLocation loc,
-                          SmallVectorImpl<ManagedValue> &params);
+  void collectThunkParams(
+      SILLocation loc, SmallVectorImpl<ManagedValue> &params,
+      SmallVectorImpl<SILArgument *> *indirectResultParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,
@@ -1640,7 +1647,16 @@ public:
                                     CanType &inputSubstType,
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
-                                    SubstitutionMap &interfaceSubs);
+                                    SubstitutionMap &interfaceSubs,
+                                    bool withoutActuallyEscaping=false);
+
+  //===--------------------------------------------------------------------===//
+  // NoEscaping to Escaping closure thunk
+  //===--------------------------------------------------------------------===//
+  ManagedValue
+  createWithoutActuallyEscapingClosure(SILLocation loc,
+                                       ManagedValue noEscapingFunctionValue,
+                                       SILType escapingFnTy);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -1670,6 +1686,10 @@ public:
     // No lowering support needed.
   }
   void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
+    // No lowering support needed.
+  }
+
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
     // No lowering support needed.
   }
 
@@ -1847,6 +1867,37 @@ public:
     }
     SGF.CurFunctionSection = SavedSection;
   }
+};
+
+/// Utility class to facilitate posponment of cleanup of @noescape
+/// partial_apply arguments into the 'right' scope.
+///
+/// If a Postponed cleanup is active at the end of a scope. The scope will
+/// actively push the cleanup into its surrounding scope.
+class PostponedCleanup {
+  friend SILGenFunction;
+  friend Scope;
+
+  SmallVector<std::pair<CleanupHandle, SILValue>, 16> deferredCleanups;
+  CleanupsDepth depth;
+  SILGenFunction &SGF;
+  PostponedCleanup *previouslyActiveCleanup;
+  bool active;
+  bool applyRecursively;
+
+  void postponeCleanup(CleanupHandle cleanup, SILValue forValue);
+public:
+  PostponedCleanup(SILGenFunction &SGF);
+  PostponedCleanup(SILGenFunction &SGF, bool applyRecursively);
+  ~PostponedCleanup();
+
+  void end();
+
+  PostponedCleanup() = delete;
+  PostponedCleanup(const PostponedCleanup &) = delete;
+  PostponedCleanup &operator=(const PostponedCleanup &) = delete;
+  PostponedCleanup &operator=(PostponedCleanup &&other) = delete;
+  PostponedCleanup(PostponedCleanup &&) = delete;
 };
 
 } // end namespace Lowering

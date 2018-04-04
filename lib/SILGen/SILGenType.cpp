@@ -478,16 +478,6 @@ public:
                                IsFreeFunctionWitness_t isFree,
                                Witness witness) {
     // Emit the witness thunk and add it to the table.
-
-    // If this is a non-present optional requirement, emit a MissingOptional.
-    if (!witnessRef) {
-      auto *fd = requirementRef.getDecl();
-      assert(fd->getAttrs().hasAttribute<OptionalAttr>() &&
-             "Non-optional protocol requirement lacks a witness?");
-      Entries.push_back(SILWitnessTable::MissingOptionalWitness{ fd });
-      return;
-    }
-
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerialized = Serialized;
     if (witnessSerialized &&
@@ -885,6 +875,8 @@ public:
     // FIXME: Default implementations in protocols.
     if (asd->isObjC() && !isa<ProtocolDecl>(asd->getDeclContext()))
       SGM.emitObjCPropertyMethodThunks(asd);
+    
+    SGM.tryEmitPropertyDescriptor(asd);
   }
 };
 
@@ -973,6 +965,8 @@ public:
   void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
     if (vd->isObjC())
       SGM.emitObjCPropertyMethodThunks(vd);
+    
+    SGM.tryEmitPropertyDescriptor(vd);
   }
 };
 

@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -170,18 +171,18 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
                     { Context.getIdentifier("_colorLiteralRed"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
   }
   case ObjectLiteralExpr::imageLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
                     { Context.getIdentifier("imageLiteralResourceName") });
   }
   case ObjectLiteralExpr::fileLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
             { Context.getIdentifier("fileReferenceLiteralResourceName") });
   }
   }
@@ -322,7 +323,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
       if (extendedNominal) {
         extendedType = extendedNominal->getDeclaredType();
-        ED->getExtendedTypeLoc().setType(extendedType);
+        if (!isPassThroughTypealias(aliasDecl))
+          ED->getExtendedTypeLoc().setType(extendedType);
       }
     }
   }
@@ -403,9 +405,10 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
 
-static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
+static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
+  unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
@@ -414,29 +417,16 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
 
-      // HACK: don't type-check the same function body twice.  This is
-      // supposed to be handled by just not enqueuing things twice,
-      // but that gets tricky with synthesized function bodies.
-      if (AFD->isBodyTypeChecked()) continue;
-
-      PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
-
-      AFD->setBodyTypeCheckedIfPresent();
     }
 
+    // Type check external definitions.
     for (unsigned n = TC.Context.ExternalDefinitions.size();
          currentExternalDef != n;
          ++currentExternalDef) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-      
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // HACK: don't type-check the same function body twice.  This is
-        // supposed to be handled by just not enqueuing things twice,
-        // but that gets tricky with synthesized function bodies.
-        if (AFD->isBodyTypeChecked()) continue;
 
-        PrettyStackTraceDecl StackEntry("type-checking", AFD);
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
         TC.typeCheckAbstractFunctionBody(AFD);
         continue;
       }
@@ -471,6 +461,15 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       TC.finalizeDecl(decl);
     }
 
+    // Type check synthesized functions and their bodies.
+    for (unsigned n = SF.SynthesizedDecls.size();
+         currentSynthesizedDecl != n;
+         ++currentSynthesizedDecl) {
+      auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
+      TC.typeCheckDecl(decl, /*isFirstPass*/true);
+      TC.typeCheckDecl(decl, /*isFirstPass*/false);
+    }
+
     // Ensure that the requirements of the given conformance are
     // fully checked.
     for (unsigned i = 0; i != TC.PartiallyCheckedConformances.size(); ++i) {
@@ -489,6 +488,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
+           currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            !TC.DeclsToFinalize.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
            !TC.UsedConformances.empty() ||
@@ -496,6 +496,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
+  SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
   // Now that all types have been finalized, run any delayed
   // circularity checks.
@@ -537,7 +538,7 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
   assert(SF.ASTStage == SourceFile::TypeChecked);
   auto &Ctx = SF.getASTContext();
   TypeChecker TC(Ctx);
-  typeCheckFunctionsAndExternalDecls(TC);
+  typeCheckFunctionsAndExternalDecls(SF, TC);
 }
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
@@ -552,6 +553,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   auto &Ctx = SF.getASTContext();
 
   // Make sure we have a type checker.
+  //
+  // FIXME: We should never have a type checker here, but currently do when
+  // we're using immediate together with -enable-source-import.
+  //
+  // This possibility should be eliminated, since it results in duplicated
+  // work.
   Optional<TypeChecker> MyTC;
   if (!Ctx.getLazyResolver())
     MyTC.emplace(Ctx);
@@ -652,7 +659,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
       TC.processREPLTopLevel(SF, TLC, StartElem);
 
-    typeCheckFunctionsAndExternalDecls(TC);
+    typeCheckFunctionsAndExternalDecls(SF, TC);
   }
 
   // Checking that benefits from having the whole module available.
@@ -671,8 +678,18 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     verify(SF);
 
     // Verify imported modules.
+    //
+    // Skip per-file verification in whole-module mode. Verifying imports
+    // between files could cause the importer to cache declarations without
+    // adding them to the ASTContext. This happens when the importer registers a
+    // declaration without a valid TypeChecker instance, as is the case during
+    // verification. A subsequent file may require that declaration to be fully
+    // imported (e.g. to synthesized a function body), but since it has already
+    // been cached, it will never be added to the ASTContext. The solution is to
+    // skip verification and avoid caching it.
 #ifndef NDEBUG
-    if (SF.Kind != SourceFileKind::REPL &&
+    if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking) &&
+        SF.Kind != SourceFileKind::REPL &&
         SF.Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
       Ctx.verifyAllLoadedModules();
@@ -682,12 +699,27 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
-  SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();
+  FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
   Ctx.diagnoseAttrsRequiringFoundation(SF);
   Ctx.diagnoseObjCMethodConflicts(SF);
   Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+
+  // In whole-module mode, import verification is deferred until all files have
+  // been type checked. This avoids caching imported declarations when a valid
+  // type checker is not present. The same declaration may need to be fully
+  // imported by subsequent files.
+  //
+  // FIXME: some playgrounds tests (playground_lvalues.swift) fail with
+  // verification enabled.
+#if 0
+  if (SF.Kind != SourceFileKind::REPL &&
+      SF.Kind != SourceFileKind::SIL &&
+      !Ctx.LangOpts.DebuggerSupport) {
+    Ctx.verifyAllLoadedModules();
+  }
+#endif
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,

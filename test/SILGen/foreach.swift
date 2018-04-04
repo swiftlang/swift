@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name foreach -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -49,8 +50,8 @@ protocol GenericCollection : Collection {
 // Trivial Struct
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil hidden @$S7foreach13trivialStructyySaySiGF : $@convention(thin) (@owned Array<Int>) -> () {
-// CHECK: bb0([[ARRAY:%.*]] : @owned $Array<Int>):
+// CHECK-LABEL: sil hidden @$S7foreach13trivialStructyySaySiGF : $@convention(thin) (@guaranteed Array<Int>) -> () {
+// CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<Int>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
@@ -70,7 +71,6 @@ protocol GenericCollection : Collection {
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
-// CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach13trivialStructyySaySiGF'
 func trivialStruct(_ xx: [Int]) {
   for x in xx {
@@ -105,13 +105,12 @@ func trivialStructBreak(_ xx: [Int]) {
   funcEnd()
 }
 
-// CHECK-LABEL: sil hidden @$S7foreach26trivialStructContinueBreakyySaySiGF : $@convention(thin) (@owned Array<Int>) -> () {
-// CHECK: bb0([[ARRAY:%.*]] : @owned $Array<Int>):
+// CHECK-LABEL: sil hidden @$S7foreach26trivialStructContinueBreakyySaySiGF : $@convention(thin) (@guaranteed Array<Int>) -> () {
+// CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<Int>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<Int>> }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
-// CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<Int>
-// CHECK:   store_borrow [[BORROWED_ARRAY]] to [[BORROWED_ARRAY_STACK]]
+// CHECK:   store_borrow [[ARRAY]] to [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$Ss10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[Int]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
@@ -155,7 +154,6 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<Int>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
-// CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach26trivialStructContinueBreakyySaySiGF'
 func trivialStructContinueBreak(_ xx: [Int]) {
   for x in xx {
@@ -210,20 +208,19 @@ func existentialBreak(_ xx: [P]) {
   funcEnd()
 }
 
-// CHECK-LABEL: sil hidden @$S7foreach24existentialContinueBreakyySayAA1P_pGF : $@convention(thin) (@owned Array<P>) -> () {
-// CHECK: bb0([[ARRAY:%.*]] : @owned $Array<P>):
+// CHECK-LABEL: sil hidden @$S7foreach24existentialContinueBreakyySayAA1P_pGF : $@convention(thin) (@guaranteed Array<P>) -> () {
+// CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<P>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var IndexingIterator<Array<P>> }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
-// CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<P>
-// CHECK:   store_borrow [[BORROWED_ARRAY]] to [[BORROWED_ARRAY_STACK]]
+// CHECK:   store_borrow [[ARRAY]] to [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$Ss10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[P]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
 // CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<P>
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
-// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<P>> // users: %16, %15
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<P>>
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @$Ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
 // CHECK:   apply [[FUNC_REF]]<[P]>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<P>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -269,7 +266,6 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   destroy_value [[ITERATOR_BOX]] : ${ var IndexingIterator<Array<P>> }
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
-// CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach24existentialContinueBreakyySayAA1P_pGF'
 func existentialContinueBreak(_ xx: [P]) {
   for x in xx {
@@ -375,13 +371,12 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
   funcEnd()
 }
 
-// CHECK-LABEL: sil hidden @$S7foreach26genericStructContinueBreakyySayAA07GenericC0VyxGGlF : $@convention(thin) <T> (@owned Array<GenericStruct<T>>) -> () {
-// CHECK: bb0([[ARRAY:%.*]] : @owned $Array<GenericStruct<T>>):
+// CHECK-LABEL: sil hidden @$S7foreach26genericStructContinueBreakyySayAA07GenericC0VyxGGlF : $@convention(thin) <T> (@guaranteed Array<GenericStruct<T>>) -> () {
+// CHECK: bb0([[ARRAY:%.*]] : @guaranteed $Array<GenericStruct<T>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0> { var IndexingIterator<Array<GenericStruct<τ_0_0>>> } <T>, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
-// CHECK:   [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<GenericStruct<T>>
-// CHECK:   store_borrow [[BORROWED_ARRAY]] to [[BORROWED_ARRAY_STACK]]
+// CHECK:   store_borrow [[ARRAY]] to [[BORROWED_ARRAY_STACK]]
 // CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$Ss10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF : $@convention(method) <τ_0_0 where τ_0_0 : Collection, τ_0_0.Iterator == IndexingIterator<τ_0_0>> (@in_guaranteed τ_0_0) -> @out IndexingIterator<τ_0_0>
 // CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[GenericStruct<T>]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
 // CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<GenericStruct<T>>
@@ -434,7 +429,6 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
-// CHECK:   destroy_value [[ARRAY]]
 // CHECK: } // end sil function '$S7foreach26genericStructContinueBreakyySayAA07GenericC0VyxGGlF'
 func genericStructContinueBreak<T>(_ xx: [GenericStruct<T>]) {
   for x in xx {
@@ -488,7 +482,7 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
   funcEnd()
 }
 
-// CHECK-LABEL: sil hidden @$S7foreach30genericCollectionContinueBreakyyxs0C0RzlF : $@convention(thin) <T where T : Collection> (@in T) -> () {
+// CHECK-LABEL: sil hidden @$S7foreach30genericCollectionContinueBreakyyxs0C0RzlF : $@convention(thin) <T where T : Collection> (@in_guaranteed T) -> () {
 // CHECK: bb0([[COLLECTION:%.*]] : @trivial $*T):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Collection> { var τ_0_0.Iterator } <T>, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
@@ -544,7 +538,6 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 // CHECK:   destroy_value [[ITERATOR_BOX]]
 // CHECK:   [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
 // CHECK:   apply [[FUNC_END_FUNC]]()
-// CHECK:   destroy_addr [[COLLECTION]]
 // CHECK: } // end sil function '$S7foreach30genericCollectionContinueBreakyyxs0C0RzlF'
 func genericCollectionContinueBreak<T : Collection>(_ xx: T) {
   for x in xx {
@@ -629,8 +622,8 @@ func tupleElements(_ xx: [(C, C)]) {
 // Make sure that when we have an unused value, we properly iterate over the
 // loop rather than run through the loop once.
 //
-// CHECK-LABEL: sil hidden @$S7foreach16unusedArgPatternyySaySiGF : $@convention(thin) (@owned Array<Int>) -> () {
-// CHECK: bb0([[ARG:%.*]] : @owned $Array<Int>):
+// CHECK-LABEL: sil hidden @$S7foreach16unusedArgPatternyySaySiGF : $@convention(thin) (@guaranteed Array<Int>) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Array<Int>):
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:

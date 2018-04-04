@@ -182,12 +182,12 @@ _TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_clo
 _TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> specialized thunk for @callee_owned (@unowned Int) -> (@unowned ())
 _TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_DT__XFo_iSi_DT__ ---> specialized thunk for @callee_owned (@unowned Int) -> (@unowned_inner_pointer ())
 _TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> specialized take_closure(_:)
-_TTSf0gs___TFVs11_StringCore15_invariantCheckfT_T_ ---> specialized _StringCore._invariantCheck()
-_TTSf2g___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf2dg___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf2dgs___TTSf2s_d___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf3d_i_d_i_d_i___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
-_TTSf3d_i_n_i_d_i___TFVs11_StringCoreCfVs13_StringBufferS_ ---> specialized _StringCore.init(_:)
+_TTSf0gs___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> specialized _LegacyStringCore._invariantCheck()
+_TTSf2g___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf2dg___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf2dgs___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf3d_i_d_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
+_TTSf3d_i_n_i_d_i___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> specialized _LegacyStringCore.init(_:)
 _TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb ---> implicit closure #1 in variable initialization expression of static HasVarInit.state
 _TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContexturFqd__T_L_3fooFTqd__x_T_ ---> foo #1 (_:_:) in GenericTypeContext.closureInGenericContext<A>(_:)
 _TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextxL_3fooFT_x ---> foo #1 () in GenericTypeContext.closureInGenericPropertyContext.getter

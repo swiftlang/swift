@@ -148,7 +148,7 @@ public protocol RawRepresentable {
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue == rhs.rawValue
@@ -159,7 +159,7 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
@@ -172,10 +172,44 @@ public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
   where T : RawRepresentable, T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
+}
+
+/// A type that can produce a collection of all of its values.
+///
+/// Simple Enumerations
+/// ===================
+///
+/// For any Swift enumeration where every case does not have an associated
+/// value, the Swift compiler can automatically fill out the `CaseIterable`
+/// conformance. When defining your own custom enumeration, specify a
+/// conformance to `CaseIterable` to take advantage of this automatic
+/// derivation.
+///
+/// For example, every case of the `CardinalPoint` enumeration defined here
+/// does not have an associated value:
+///
+///     enum CardinalPoint: CaseIterable {
+///         case north, south, east, west
+///     }
+///
+/// So the compiler automatically creates a conformance.
+///
+///     for cardinality in CardinalPoint.allCases {
+///         print(cardinality)
+///     }
+///     // Prints "north"
+///     // Prints "south"
+///     // Prints "east"
+///     // Prints "west"
+public protocol CaseIterable {
+  associatedtype AllCases: Collection
+    where AllCases.Element == Self
+  /// Returns a collection of all values of this type.
+  static var allCases: AllCases { get }
 }
 
 /// A type that can be initialized using the nil literal, `nil`.
@@ -405,7 +439,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(unicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
     self.init(extendedGraphemeClusterLiteral: value)
@@ -471,7 +505,7 @@ public protocol ExpressibleByStringLiteral
 extension ExpressibleByStringLiteral
   where StringLiteralType == ExtendedGraphemeClusterLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StringLiteralType) {
     self.init(stringLiteral: value)
@@ -731,7 +765,7 @@ public protocol _ExpressibleByColorLiteral {
 }
 
 extension _ExpressibleByColorLiteral {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, obsoleted: 4.0,
     message: "This initializer is only meant to be used by color literals")
   public init(

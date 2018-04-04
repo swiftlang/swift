@@ -1,4 +1,4 @@
-//===--- ArgsToFrontendInputsConverter.cpp ----------------------*- C++ -*-===//
+//===--- ArgsToFrontendInputsConverter.cpp --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendInputsConverter.h"
 
+#include "ArgsToFrontendOutputsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
@@ -29,23 +31,47 @@ using namespace swift;
 using namespace llvm::opt;
 
 ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
-    DiagnosticEngine &diags, const ArgList &args, FrontendInputs &inputs)
-    : Diags(diags), Args(args), Inputs(inputs),
+    DiagnosticEngine &diags, const ArgList &args)
+    : Diags(diags), Args(args),
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
       PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)) {}
 
-bool ArgsToFrontendInputsConverter::convert() {
+Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
+  SWIFT_DEFER {
+    if (buffers) {
+      std::move(ConfigurationFileBuffers.begin(),
+                ConfigurationFileBuffers.end(),
+                std::back_inserter(*buffers));
+      // Clearing the original list of buffers isn't strictly necessary, but
+      // makes the behavior more sensible if we were to call convert() again.
+      ConfigurationFileBuffers.clear();
+    }
+  };
+
   if (enforceFilelistExclusion())
-    return true;
+    return None;
+
   if (FilelistPathArg ? readInputFilesFromFilelist()
                       : readInputFilesFromCommandLine())
-    return true;
+    return None;
   Optional<std::set<StringRef>> primaryFiles = readPrimaryFiles();
   if (!primaryFiles)
-    return true;
-  std::set<StringRef> unusedPrimaryFiles =
+    return None;
+
+  FrontendInputsAndOutputs result;
+  std::set<StringRef> unusedPrimaryFiles;
+  std::tie(result, unusedPrimaryFiles) =
       createInputFilesConsumingPrimaries(*primaryFiles);
-  return checkForMissingPrimaryFiles(unusedPrimaryFiles);
+
+  if (diagnoseUnusedPrimaryFiles(unusedPrimaryFiles))
+    return None;
+
+  // Must be set before iterating over inputs needing outputs.
+  result.setBypassBatchModeChecks(
+      Args.hasArg(options::OPT_bypass_batch_mode_checks));
+
+  return std::move(result);
 }
 
 bool ArgsToFrontendInputsConverter::enforceFilelistExclusion() {
@@ -103,7 +129,7 @@ bool ArgsToFrontendInputsConverter::forAllFilesInFilelist(
        llvm::make_range(llvm::line_iterator(*filelistBufferOrError->get()),
                         llvm::line_iterator()))
     fn(file);
-  BuffersToKeepAlive.push_back(std::move(*filelistBufferOrError));
+  ConfigurationFileBuffers.push_back(std::move(*filelistBufferOrError));
   return false;
 }
 
@@ -126,24 +152,36 @@ ArgsToFrontendInputsConverter::readPrimaryFiles() {
   return primaryFiles;
 }
 
-std::set<StringRef>
+std::pair<FrontendInputsAndOutputs, std::set<StringRef>>
 ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
     std::set<StringRef> primaryFiles) {
+  bool hasAnyPrimaryFiles = !primaryFiles.empty();
+
+  FrontendInputsAndOutputs result;
   for (auto &file : Files) {
     bool isPrimary = primaryFiles.count(file) > 0;
-    Inputs.addInput(InputFile(file, isPrimary));
+    result.addInput(InputFile(file, isPrimary));
     if (isPrimary)
       primaryFiles.erase(file);
   }
-  return primaryFiles;
+
+  if (!Files.empty() && !hasAnyPrimaryFiles) {
+    Optional<std::vector<std::string>> userSuppliedNamesOrErr =
+        OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
+                                                                         Diags);
+    if (userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1)
+      result.setIsSingleThreadedWMO(true);
+  }
+
+  return {std::move(result), std::move(primaryFiles)};
 }
 
-bool ArgsToFrontendInputsConverter::checkForMissingPrimaryFiles(
+bool ArgsToFrontendInputsConverter::diagnoseUnusedPrimaryFiles(
     std::set<StringRef> primaryFiles) {
   for (auto &file : primaryFiles) {
     // Catch "swiftc -frontend -c -filelist foo -primary-file
     // some-file-not-in-foo".
-    assert(FilelistPathArg && "Missing primary with no filelist");
+    assert(FilelistPathArg && "Unused primary with no filelist");
     Diags.diagnose(SourceLoc(), diag::error_primary_file_not_found, file,
                    FilelistPathArg->getValue());
   }

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/test_runtime_function_counters
 // RUN: %target-run %t/test_runtime_function_counters 2>&1 | %FileCheck %s
-// REQUIRES: swift_stdlib_asserts
+// REQUIRES: runtime_function_counters
 // REQUIRES: executable_test
 
 /// Test functionality related to the runtime function counters.
@@ -44,15 +44,30 @@ public func length<T>(_ l: List<T>) -> Int {
 }
 
 /// CHECK-LABEL: TEST: Collect references inside objects
-/// Constant strings do not have an owner, thus no references.
-/// CHECK: Constant string: []
+
+// Constant strings don't really have a reference, but BridgeObject
+// still counts as one.
+//
+// FIXME(TODO: JIRA): On 32-bit, we use AnyObject? instead of BridgeObject. If
+// we get back onto a real reference (or if 64-bit gets off of a real
+// reference), then drop adjust the optionality of the following check.
+//
+/// CHECK: Constant string: [{{([0-9a-fA-Fx]+)?}}]
+
 /// An array has one reference
 /// CHECK: Array<Int>: [{{[0-9a-fA-Fx]+}}]
-/// MyStruct has two references
-/// CHECK: MyStruct: [{{[0-9a-fA-Fx]+}}, {{[0-9a-fA-Fx]+}}]
-/// Dictionary has once reference
+
+/// MyStruct has two references plus a String with a third
+//
+// FIXME(TODO: JIRA): On 32-bit, we use AnyObject? instead of BridgeObject. If
+// we get back onto a real reference (or if 64-bit gets off of a real
+// reference), then drop adjust the optionality of the following check.
+//
+/// CHECK: MyStruct: [{{[0-9a-fA-Fx]+}}, {{[0-9a-fA-Fx]+}}{{(, [0-9a-fA-Fx]+)?}}]
+
+/// Dictionary has one reference
 /// CHECK: Dictionary<Int, Int>: [{{[0-9a-fA-Fx]+}}]
-/// Set has once reference
+/// Set has one reference
 /// CHECK: Set<Int>: [{{[0-9a-fA-Fx]+}}]
 /// Test collection of references inside different types of objects.
 @inline(never)

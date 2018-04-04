@@ -23,59 +23,23 @@
 
 import SwiftShims
 
-@_fixed_layout // FIXME(sil-serialize-all)
+@_frozen // FIXME(sil-serialize-all)
 public // @testable
-struct _Hashing {
-  // FIXME(ABI)#41 : make this an actual public API.
-  @_inlineable // FIXME(sil-serialize-all)
-  public // SPI
-  static var secretKey: (UInt64, UInt64) {
-    get {
-      // The variable itself is defined in C++ code so that it is initialized
-      // during static construction.  Almost every Swift program uses hash
-      // tables, so initializing the secret key during the startup seems to be
-      // the right trade-off.
-      return (
-        _swift_stdlib_Hashing_secretKey.key0,
-        _swift_stdlib_Hashing_secretKey.key1)
-    }
-    set {
-      (_swift_stdlib_Hashing_secretKey.key0,
-       _swift_stdlib_Hashing_secretKey.key1) = newValue
-    }
-  }
-}
+enum _HashingDetail {
 
-@_fixed_layout // FIXME(sil-serialize-all)
-public // @testable
-struct _HashingDetail {
-
-  @_inlineable // FIXME(sil-serialize-all)
-  public // @testable
-  static var fixedSeedOverride: UInt64 {
-    get {
-      // HACK: the variable itself is defined in C++ code so that it is
-      // guaranteed to be statically initialized.  This is a temporary
-      // workaround until the compiler can do the same for Swift.
-      return _swift_stdlib_HashingDetail_fixedSeedOverride
-    }
-    set {
-      _swift_stdlib_HashingDetail_fixedSeedOverride = newValue
-    }
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  // FIXME(hasher): Remove
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   @_transparent
   internal static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
     // implementation.
-    let seed: UInt64 = 0xff51afd7ed558ccd
-    return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
+    return 0xff51afd7ed558ccd
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  // FIXME(hasher): Remove
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   @_transparent
   internal static func hash16Bytes(_ low: UInt64, _ high: UInt64) -> UInt64 {
     // Murmur-inspired hashing.
@@ -98,7 +62,8 @@ struct _HashingDetail {
 // their inputs and just exhibit avalanche effect.
 //
 
-@_inlineable // FIXME(sil-serialize-all)
+// FIXME(hasher): Remove
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt32(_ value: UInt32) -> UInt32 {
@@ -112,14 +77,16 @@ func _mixUInt32(_ value: UInt32) -> UInt32 {
   return UInt32((extendedResult >> 3) & 0xffff_ffff)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+// FIXME(hasher): Remove
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt32(_ value: Int32) -> Int32 {
   return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+// FIXME(hasher): Remove
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt64(_ value: UInt64) -> UInt64 {
@@ -130,14 +97,16 @@ func _mixUInt64(_ value: UInt64) -> UInt64 {
   return _HashingDetail.hash16Bytes(seed &+ (low << 3), high)
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+// FIXME(hasher): Remove
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt64(_ value: Int64) -> Int64 {
   return Int64(bitPattern: _mixUInt64(UInt64(bitPattern: value)))
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+// FIXME(hasher): Remove
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixUInt(_ value: UInt) -> UInt {
@@ -148,7 +117,8 @@ func _mixUInt(_ value: UInt) -> UInt {
 #endif
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+// FIXME(hasher): Remove
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _mixInt(_ value: Int) -> Int {
@@ -157,35 +127,6 @@ func _mixInt(_ value: Int) -> Int {
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   return Int(_mixInt64(Int64(value)))
 #endif
-}
-
-/// Given a hash value, returns an integer value in the range of
-/// 0..<`upperBound` that corresponds to a hash value.
-///
-/// The `upperBound` must be positive and a power of 2.
-///
-/// This function is superior to computing the remainder of `hashValue` by
-/// the range length.  Some types have bad hash functions; sometimes simple
-/// patterns in data sets create patterns in hash values and applying the
-/// remainder operation just throws away even more information and invites
-/// even more hash collisions.  This effect is especially bad because the
-/// range is a power of two, which means to throws away high bits of the hash
-/// (which would not be a problem if the hash was known to be good). This
-/// function mixes the bits in the hash value to compensate for such cases.
-///
-/// Of course, this function is a compressing function, and applying it to a
-/// hash value does not change anything fundamentally: collisions are still
-/// possible, and it does not prevent malicious users from constructing data
-/// sets that will exhibit pathological collisions.
-@_inlineable // FIXME(sil-serialize-all)
-public // @testable
-func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
-  _sanityCheck(_isPowerOf2(upperBound))
-  let mixedHashValue = _mixInt(hashValue)
-
-  // As `upperBound` is a power of two we can do a bitwise-and to calculate
-  // mixedHashValue % upperBound.
-  return mixedHashValue & (upperBound &- 1)
 }
 
 /// Returns a new value that combines the two given hash values.
@@ -199,12 +140,267 @@ func _squeezeHashValue(_ hashValue: Int, _ upperBound: Int) -> Int {
 /// specific hashing logic can be refined without requiring major changes to the
 /// code that creates the synthesized AST nodes.
 ///
-/// [ref]: http://goanna.cs.rmit.edu.au/~jz/fulltext/jasist-tch.pdf
+/// [ref]: https://pdfs.semanticscholar.org/03bf/7be88e88ba047c6ab28036d0f28510299226.pdf
 @_transparent
 public // @testable
 func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
-  let magic = 0x9e3779b9 as UInt // Based on the golden ratio.
+  // Use a magic number based on the golden ratio
+  // (0x1.9e3779b97f4a7c15f39cc0605cedc8341082276bf3a27251f86c6a11d0c18e95p0).
+#if arch(i386) || arch(arm)
+  let magic = 0x9e3779b9 as UInt
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  let magic = 0x9e3779b97f4a7c15 as UInt
+#endif
   var x = UInt(bitPattern: firstValue)
   x ^= UInt(bitPattern: secondValue) &+ magic &+ (x &<< 6) &+ (x &>> 2)
   return Int(bitPattern: x)
+}
+
+// FIXME(hasher): This hasher emulates Swift 4.1 hashValues. It is purely for
+// benchmarking; to be removed.
+internal struct _LegacyHasher {
+  internal var _hash: Int
+
+  @inline(__always)
+  internal init(key: (UInt64, UInt64) = (0, 0)) { // key is ignored
+    _hash = 0
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: Int) {
+    _hash = (_hash == 0 ? value : _combineHashValues(_hash, value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt) {
+    append(Int(bitPattern: value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt32) {
+    append(Int(truncatingIfNeeded: value))
+  }
+
+  @inline(__always)
+  internal mutating func append(_ value: UInt64) {
+    if UInt64.bitWidth > Int.bitWidth {
+      append(Int(truncatingIfNeeded: value ^ (value &>> 32)))
+    } else {
+      append(Int(truncatingIfNeeded: value))
+    }
+  }
+
+  @inline(__always)
+  internal mutating func finalize() -> UInt64 {
+    return UInt64(
+      _truncatingBits: UInt(bitPattern: _mixInt(_hash))._lowWord)
+  }
+}
+
+
+// NOT @_fixed_layout
+@_fixed_layout // FIXME - remove - radar 38549901
+public struct _Hasher {
+  internal typealias Core = _SipHash13
+
+  // NOT @usableFromInline
+  internal var _core: Core
+
+  // NOT @inlinable
+  @effects(releasenone)
+  public init() {
+    self._core = Core(key: _Hasher._seed)
+  }
+
+  // NOT @inlinable
+  @effects(releasenone)
+  public init(seed: (UInt64, UInt64)) {
+    self._core = Core(key: seed)
+  }
+
+  /// Indicates whether we're running in an environment where hashing needs to
+  /// be deterministic. If this is true, the hash seed is not random, and hash
+  /// tables do not apply per-instance perturbation that is not repeatable.
+  /// This is not recommended for production use, but it is useful in certain
+  /// test environments where randomization may lead to unwanted nondeterminism
+  /// of test results.
+  public // SPI
+  static var _isDeterministic: Bool {
+    @inlinable
+    @inline(__always)
+    get {
+      return _swift_stdlib_Hashing_parameters.deterministic;
+    }
+  }
+
+  /// The 128-bit hash seed used to initialize the hasher state. Initialized
+  /// once during process startup.
+  public // SPI
+  static var _seed: (UInt64, UInt64) {
+    @inlinable
+    @inline(__always)
+    get {
+      // The seed itself is defined in C++ code so that it is initialized during
+      // static construction.  Almost every Swift program uses hash tables, so
+      // initializing the seed during the startup seems to be the right
+      // trade-off.
+      return (
+        _swift_stdlib_Hashing_parameters.seed0,
+        _swift_stdlib_Hashing_parameters.seed1)
+    }
+  }
+
+  @inlinable
+  @inline(__always)
+  public mutating func append<H: Hashable>(_ value: H) {
+    value._hash(into: &self)
+  }
+
+  // NOT @inlinable
+  @effects(releasenone)
+  public mutating func append(bits: UInt) {
+    _core.append(bits)
+  }
+  // NOT @inlinable
+  @effects(releasenone)
+  public mutating func append(bits: UInt32) {
+    _core.append(bits)
+  }
+  // NOT @inlinable
+  @effects(releasenone)
+  public mutating func append(bits: UInt64) {
+    _core.append(bits)
+  }
+
+  // NOT @inlinable
+  @effects(releasenone)
+  public mutating func append(bits: Int) {
+    _core.append(UInt(bitPattern: bits))
+  }
+  // NOT @inlinable
+  @effects(releasenone)
+  public mutating func append(bits: Int32) {
+    _core.append(UInt32(bitPattern: bits))
+  }
+  // NOT @inlinable
+  @effects(releasenone)
+  public mutating func append(bits: Int64) {
+    _core.append(UInt64(bitPattern: bits))
+  }
+
+  // NOT @inlinable
+  @effects(releasenone)
+  public mutating func finalize() -> Int {
+    return Int(truncatingIfNeeded: _core.finalize())
+  }
+}
+
+/// This protocol is only used for compile-time checks that
+/// every buffer type implements all required operations.
+internal protocol _HashBuffer {
+  associatedtype Key
+  associatedtype Value
+  associatedtype Index
+  associatedtype SequenceElement
+  associatedtype SequenceElementWithoutLabels
+  var startIndex: Index { get }
+  var endIndex: Index { get }
+
+  func index(after i: Index) -> Index
+
+  func formIndex(after i: inout Index)
+
+  func index(forKey key: Key) -> Index?
+
+  func assertingGet(_ i: Index) -> SequenceElement
+
+  func assertingGet(_ key: Key) -> Value
+
+  func maybeGet(_ key: Key) -> Value?
+
+  @discardableResult
+  mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
+
+  @discardableResult
+  mutating func insert(
+    _ value: Value, forKey key: Key
+  ) -> (inserted: Bool, memberAfterInsert: Value)
+
+  @discardableResult
+  mutating func remove(at index: Index) -> SequenceElement
+
+  @discardableResult
+  mutating func removeValue(forKey key: Key) -> Value?
+
+  mutating func removeAll(keepingCapacity keepCapacity: Bool)
+
+  var count: Int { get }
+
+  static func fromArray(_ elements: [SequenceElementWithoutLabels]) -> Self
+}
+
+/// The inverse of the default hash table load factor.  Factored out so that it
+/// can be used in multiple places in the implementation and stay consistent.
+/// Should not be used outside `Dictionary` implementation.
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
+@_transparent
+internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
+  return 1.0 / 0.75
+}
+
+#if _runtime(_ObjC)
+/// Call `[lhs isEqual: rhs]`.
+///
+/// This function is part of the runtime because `Bool` type is bridged to
+/// `ObjCBool`, which is in Foundation overlay.
+/// FIXME(sil-serialize-all): this should be internal
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
+@_silgen_name("swift_stdlib_NSObject_isEqual")
+internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
+#endif
+
+
+/// A temporary view of an array of AnyObject as an array of Unmanaged<AnyObject>
+/// for fast iteration and transformation of the elements.
+///
+/// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
+/// memory accesses. The memory remains bound to managed AnyObjects.
+@_fixed_layout // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
+internal struct _UnmanagedAnyObjectArray {
+  /// Underlying pointer.
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal var value: UnsafeMutableRawPointer
+
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal init(_ up: UnsafeMutablePointer<AnyObject>) {
+    self.value = UnsafeMutableRawPointer(up)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
+    guard let unwrapped = up else { return nil }
+    self.init(unwrapped)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
+  internal subscript(i: Int) -> AnyObject {
+    get {
+      let unmanaged = value.load(
+        fromByteOffset: i * MemoryLayout<AnyObject>.stride,
+        as: Unmanaged<AnyObject>.self)
+      return unmanaged.takeUnretainedValue()
+    }
+    nonmutating set(newValue) {
+      let unmanaged = Unmanaged.passUnretained(newValue)
+      value.storeBytes(of: unmanaged,
+        toByteOffset: i * MemoryLayout<AnyObject>.stride,
+        as: Unmanaged<AnyObject>.self)
+    }
+  }
 }

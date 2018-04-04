@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -module-name mandatory_inlining -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 import Builtin
 import Swift
@@ -1183,4 +1183,24 @@ bb0(%0: $C):
 // @callee_guaranteed.
   apply %closure() : $@callee_guaranteed () -> ()
   return %closure : $@callee_guaranteed () -> ()
+}
+
+
+sil [transparent] @return_one : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 1
+  return %0 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @test_thin_convert_function_inline
+// CHECK-NEXT: bb0
+// CHECK-NEXT: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT  return [[RES]]
+sil @test_thin_convert_function_inline : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32
+  %1 = convert_function %0 : $@convention(thin) () -> Builtin.Int32 to $@convention(thin) @noescape () -> Builtin.Int32
+  %2 = thin_to_thick_function %1 : $@convention(thin) @noescape () -> Builtin.Int32 to $@noescape () -> Builtin.Int32
+  %3 = apply %2() : $@noescape () -> Builtin.Int32
+  return %3 : $Builtin.Int32
 }

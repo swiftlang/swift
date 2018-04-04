@@ -35,6 +35,8 @@ namespace swift {
   static const char SWIFT_ONONE_SUPPORT[] = "SwiftOnoneSupport";
   /// The name of the SwiftShims module, which contains private stdlib decls.
   static const char SWIFT_SHIMS_NAME[] = "SwiftShims";
+  /// The name of the Builtin module, which contains Builtin functions.
+  static const char BUILTIN_NAME[] = "Builtin";
   /// The prefix of module names used by LLDB to capture Swift expressions
   static const char LLDB_EXPRESSIONS_MODULE_NAME_PREFIX[] = "__lldb_expr_";
 
@@ -42,6 +44,43 @@ namespace swift {
   static const char MANGLING_MODULE_OBJC[] = "__C";
   /// The name of the fake module used to hold synthesized ClangImporter things.
   static const char MANGLING_MODULE_CLANG_IMPORTER[] = "__C_Synthesized";
+
+  /// The name of the Builtin type prefix
+  static const char BUILTIN_TYPE_NAME_PREFIX[] = "Builtin.";
+  /// The name of the Builtin type for Int
+  static const char BUILTIN_TYPE_NAME_INT[] = "Builtin.Int";
+  /// The name of the Builtin type for Int8
+  static const char BUILTIN_TYPE_NAME_INT8[] = "Builtin.Int8";
+  /// The name of the Builtin type for Int16
+  static const char BUILTIN_TYPE_NAME_INT16[] = "Builtin.Int16";
+  /// The name of the Builtin type for Int32
+  static const char BUILTIN_TYPE_NAME_INT32[] = "Builtin.Int32";
+  /// The name of the Builtin type for Int64
+  static const char BUILTIN_TYPE_NAME_INT64[] = "Builtin.Int64";
+  /// The name of the Builtin type for Int128
+  static const char BUILTIN_TYPE_NAME_INT128[] = "Builtin.Int128";
+  /// The name of the Builtin type for Int256
+  static const char BUILTIN_TYPE_NAME_INT256[] = "Builtin.Int256";
+  /// The name of the Builtin type for Int512
+  static const char BUILTIN_TYPE_NAME_INT512[] = "Builtin.Int512";
+  /// The name of the Builtin type for Float
+  static const char BUILTIN_TYPE_NAME_FLOAT[] = "Builtin.Float";
+  /// The name of the Builtin type for NativeObject
+  static const char BUILTIN_TYPE_NAME_NATIVEOBJECT[] = "Builtin.NativeObject";
+  /// The name of the Builtin type for BridgeObject
+  static const char BUILTIN_TYPE_NAME_BRIDGEOBJECT[] = "Builtin.BridgeObject";
+  /// The name of the Builtin type for RawPointer
+  static const char BUILTIN_TYPE_NAME_RAWPOINTER[] = "Builtin.RawPointer";
+  /// The name of the Builtin type for UnsafeValueBuffer
+  static const char BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER[] = "Builtin.UnsafeValueBuffer";
+  /// The name of the Builtin type for UnknownObject
+  static const char BUILTIN_TYPE_NAME_UNKNOWNOBJECT[] = "Builtin.UnknownObject";
+  /// The name of the Builtin type for Vector
+  static const char BUILTIN_TYPE_NAME_VEC[] = "Builtin.Vec";
+  /// The name of the Builtin type for SILToken
+  static const char BUILTIN_TYPE_NAME_SILTOKEN[] = "Builtin.SILToken";
+  /// The name of the Builtin type for Word
+  static const char BUILTIN_TYPE_NAME_WORD[] = "Builtin.Word";
 } // end namespace swift
 
 #endif // SWIFT_STRINGS_H

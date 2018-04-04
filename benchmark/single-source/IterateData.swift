@@ -16,13 +16,14 @@ import Foundation
 public let IterateData = BenchmarkInfo(
   name: "IterateData",
   runFunction: run_IterateData,
-  tags: [.validation, .api])
+  tags: [.validation, .api, .Data])
 
 @inline(never)
 func generateData() -> Data {
   var data = Data(count: 16 * 1024)
+  let n = data.count
   data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) -> () in
-    for i in 0..<data.count {
+    for i in 0..<n {
       ptr[i] = UInt8(i % 23)
     }
   }

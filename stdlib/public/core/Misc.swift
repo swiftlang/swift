@@ -14,15 +14,8 @@
 
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public // @testable
-func _countLeadingZeros(_ value: Int64) -> Int64 {
-    return Int64(Builtin.int_ctlz_Int64(value._value, false._value))
-}
-
 /// Returns if `x` is a power of 2.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: UInt) -> Bool {
@@ -35,7 +28,7 @@ func _isPowerOf2(_ x: UInt) -> Bool {
 }
 
 /// Returns if `x` is a power of 2.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: Int) -> Bool {
@@ -48,7 +41,7 @@ func _isPowerOf2(_ x: Int) -> Bool {
 }
 
 #if _runtime(_ObjC)
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _autorelease(_ x: AnyObject) {
   Builtin.retain(x)
@@ -61,8 +54,8 @@ public func _autorelease(_ x: AnyObject) {
 ///
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 internal func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
@@ -78,18 +71,17 @@ internal func _withUninitializedString<R>(
 // with type names that we are nested in.
 // But we can place it behind #if _runtime(_Native) and remove it from ABI on
 // Apple platforms, deferring discussions mentioned above.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_getTypeName")
 public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
-  return ._fromWellFormedCodeUnitSequence(UTF8.self,
-    input: UnsafeBufferPointer(start: stringPtr, count: count))
+  return ._fromASCII(UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
 /// Lookup a class given a name. Until the demangled encoding of type
@@ -131,26 +123,4 @@ func _typeByMangledName(_ name: String,
                                   parametersPerLevel,
                                   flatSubstitutions)
   }
-}
-
-/// Returns `floor(log(x))`.  This equals to the position of the most
-/// significant non-zero bit, or 63 - number-of-zeros before it.
-///
-/// The function is only defined for positive values of `x`.
-///
-/// Examples:
-///
-///      floorLog2(1) == 0
-///      floorLog2(2) == floorLog2(3) == 1
-///      floorLog2(9) == floorLog2(15) == 3
-///
-/// TODO: Implement version working on Int instead of Int64.
-@_inlineable // FIXME(sil-serialize-all)
-@_transparent
-public // @testable
-func _floorLog2(_ x: Int64) -> Int {
-  _sanityCheck(x > 0, "_floorLog2 operates only on non-negative integers")
-  // Note: use unchecked subtraction because we this expression cannot
-  // overflow.
-  return 63 &- Int(_countLeadingZeros(x))
 }

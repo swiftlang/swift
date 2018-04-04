@@ -74,16 +74,15 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
                                              DeclNameLoc(), /*Implicit=*/true);
 
   // rawValue param to init(rawValue:)
-  auto *rawValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                         SourceLoc(), C.Id_rawValue,
-                                         SourceLoc(), C.Id_rawValue,
-                                         valueParam->getType(), parentDC);
+  auto *rawValueDecl = new (C) ParamDecl(
+      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
+      SourceLoc(), C.Id_rawValue, valueParam->getType(), parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
 
   // init(rawValue:) constructor name
-  DeclName ctorName(C, C.Id_init, paramList);
+  DeclName ctorName(C, DeclBaseName::createConstructor(), paramList);
 
   // self.init(rawValue:) expr
   auto *selfRef = createSelfDeclRef(initDecl);
@@ -124,15 +123,15 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   auto *parentDC = cast<DeclContext>(parentDecl);
 
   // rawValue
-  auto *rawDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                    paramName, SourceLoc(), paramName,
-                                    paramType, parentDC);
+  auto *rawDecl =
+      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                        paramName, SourceLoc(), paramName, paramType, parentDC);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();
 
   // init(rawValue:) name
   auto *paramList = ParameterList::createWithoutLoc(rawDecl);
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   // init(rawValue:) decl
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
@@ -182,12 +181,9 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccess(enumDecl->getFormalAccess());
+  initDecl->setValidationStarted();
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (enumDecl->hasClangNode())
-    tc.Context.addExternalDecl(initDecl);
+  tc.Context.addSynthesizedDecl(initDecl);
 
   cast<IterableDeclContext>(parentDecl)->addMember(initDecl);
   return initDecl;
@@ -488,7 +484,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
 
     return deriveProperty(tc, parentDecl, enumDecl, optionalIntType,
                           C.Id_intValue, synth);
-  } else if (name == C.Id_init) {
+  } else if (name == DeclBaseName::createConstructor()) {
     auto argumentNames = requirement->getFullName().getArgumentNames();
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == C.Id_stringValue) {

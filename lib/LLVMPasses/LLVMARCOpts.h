@@ -18,10 +18,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/ADT/StringSwitch.h"
 
-#if defined(SWIFT_WRAPPER_PREFIX)
-#define SWIFT_WRAPPER_NAME(Name) SWIFT_WRAPPER_PREFIX Name
-#endif
-
 namespace swift {
 
 enum RT_Kind {
@@ -50,15 +46,6 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("__swift_" #TextualName, RT_ ## Name)
 #include "LLVMSwift.def"
 
-#if defined(SWIFT_WRAPPER_PREFIX)
-#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
-    .Case(SWIFT_WRAPPER_NAME("swift_" #TextualName), RT_ ## Name)
-#define OBJC_FUNC(Name, MemBehavior, TextualName) \
-    .Case(SWIFT_WRAPPER_NAME("objc_" #TextualName), RT_ ## Name)
-#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
-#include "LLVMSwift.def"
-#endif
-
     // Support non-atomic versions of reference counting entry points.
 #define SWIFT_FUNC(Name, MemBehavior, TextualName) \
     .Case("swift_nonatomic_" #TextualName, RT_ ## Name)
@@ -67,14 +54,6 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
 #define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
 #include "LLVMSwift.def"
 
-#if defined(SWIFT_WRAPPER_PREFIX)
-#define SWIFT_FUNC(Name, MemBehavior, TextualName) \
-    .Case(SWIFT_WRAPPER_NAME("swift_nonatomic_" #TextualName), RT_ ## Name)
-#define OBJC_FUNC(Name, MemBehavior, TextualName) \
-    .Case(SWIFT_WRAPPER_NAME("objc_nonatomic_" #TextualName), RT_ ## Name)
-#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName)
-#include "LLVMSwift.def"
-#endif
     .Default(RT_Unknown);
 }
 

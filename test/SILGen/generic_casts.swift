@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
+
+// RUN: %target-swift-frontend -module-name generic_casts -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}
@@ -129,7 +130,6 @@ func opaque_existential_to_opaque_archetype
   // CHECK-NEXT: copy_addr [[ARG]] to [initialization] [[TEMP]]
   // CHECK-NEXT: unconditional_checked_cast_addr NotClassBound in [[TEMP]] : $*NotClassBound to T in [[RET]] : $*T
   // CHECK-NEXT: dealloc_stack [[TEMP]]
-  // CHECK-NEXT: destroy_addr [[ARG]]
   // CHECK-NEXT: [[T0:%.*]] = tuple ()
   // CHECK-NEXT: return [[T0]]
 }
@@ -217,7 +217,74 @@ func class_existential_is_class(_ p: ClassBound) -> Bool {
 }
 
 // CHECK-LABEL: sil hidden @$S13generic_casts27optional_anyobject_to_classyAA1CCSgyXlSgF
-// CHECK:         checked_cast_br {{%.*}} : $AnyObject to $C
 func optional_anyobject_to_class(_ p: AnyObject?) -> C? {
   return p as? C
+  // CHECK: checked_cast_br {{%.*}} : $AnyObject to $C
 }
+
+// The below tests are to ensure we don't dig into an optional operand when
+// casting to a non-class archetype, as it could dynamically be an optional type.
+
+// CHECK-LABEL: sil hidden @$S13generic_casts32optional_any_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_to_opaque_archetype<T>(_ x: Any?) -> T {
+  return x as! T
+  // CHECK: bb0([[RET:%.*]] : @trivial $*T, {{%.*}} : @trivial $*Optional<Any>):
+  // CHECK: unconditional_checked_cast_addr Optional<Any> in {{%.*}} : $*Optional<Any> to T in [[RET]] : $*T
+}
+
+// CHECK-LABEL: sil hidden @$S13generic_casts46optional_any_conditionally_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_conditionally_to_opaque_archetype<T>(_ x: Any?) -> T? {
+  return x as? T
+  // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to T in {{%.*}} : $*T
+}
+
+// CHECK-LABEL: sil hidden @$S13generic_casts32optional_any_is_opaque_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_is_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
+  return x is T
+  // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to T in {{%.*}} : $*T
+}
+
+// But we can dig into at most one layer of the operand if it's
+// an optional archetype...
+
+// CHECK-LABEL: sil hidden @$S13generic_casts016optional_any_to_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_to_optional_opaque_archetype<T>(_ x: Any?) -> T? {
+  return x as! T?
+  // CHECK: unconditional_checked_cast_addr Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
+}
+
+// CHECK-LABEL: sil hidden @$S13generic_casts030optional_any_conditionally_to_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_conditionally_to_optional_opaque_archetype<T>(_ x: Any?) -> T?? {
+  return x as? T?
+  // CHECK: checked_cast_addr_br take_always Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
+}
+
+// CHECK-LABEL: sil hidden @$S13generic_casts016optional_any_is_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_is_optional_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
+  return x is T?
+  //   Because the levels of optional are the same, 'is' doesn't transform into an 'as?',
+  //   so we just cast directly without digging into the optional operand.
+  // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to Optional<T> in {{%.*}} : $*Optional<T>
+}
+
+// And we can dig into the operand when casting to a class archetype, as it
+// cannot dynamically be optional...
+
+// CHECK-LABEL: sil hidden @$S13generic_casts31optional_any_to_class_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_to_class_archetype<T : AnyObject>(_ x: Any?) -> T {
+  return x as! T
+  // CHECK: unconditional_checked_cast_addr Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
+}
+
+// CHECK-LABEL: sil hidden @$S13generic_casts45optional_any_conditionally_to_class_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_conditionally_to_class_archetype<T : AnyObject>(_ x: Any?) -> T? {
+  return x as? T
+  // CHECK: checked_cast_addr_br take_always Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
+}
+
+// CHECK-LABEL: sil hidden @$S13generic_casts31optional_any_is_class_archetype{{[_0-9a-zA-Z]*}}F
+func optional_any_is_class_archetype<T : AnyObject>(_ x: Any?, _: T) -> Bool {
+  return x is T
+  // CHECK: checked_cast_addr_br take_always Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
+}
+

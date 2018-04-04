@@ -1,33 +1,30 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name objc_error -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @$S10objc_error20NSErrorError_erasureys0D0_pSo0C0CF : $@convention(thin) (@owned NSError) -> @owned Error {
-// CHECK:         bb0([[ERROR:%.*]] : @owned $NSError):
-// CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
-// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK-LABEL: sil hidden @$S10objc_error20NSErrorError_erasureys0D0_pSo0C0CF : $@convention(thin) (@guaranteed NSError) -> @owned Error {
+// CHECK:         bb0([[ERROR:%.*]] : @guaranteed $NSError):
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
 // CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[ERROR_COPY]] : $NSError : $NSError, $Error
-// CHECK:           end_borrow [[BORROWED_ERROR]] from [[ERROR]]
-// CHECK:           destroy_value [[ERROR]]
+// CHECK-NOT:           destroy_value [[ERROR]]
 // CHECK:           return [[ERROR_TYPE]]
 // CHECK:       } // end sil function '$S10objc_error20NSErrorError_erasureys0D0_pSo0C0CF'
 func NSErrorError_erasure(_ x: NSError) -> Error {
   return x
 }
 
-// CHECK-LABEL: sil hidden @$S10objc_error30NSErrorError_archetype_erasureys0D0_pxSo0C0CRbzlF : $@convention(thin) <T where T : NSError> (@owned T) -> @owned Error {
-// CHECK:         bb0([[ERROR:%.*]] : @owned $T):
-// CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
-// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK-LABEL: sil hidden @$S10objc_error30NSErrorError_archetype_erasureys0D0_pxSo0C0CRbzlF : $@convention(thin) <T where T : NSError> (@guaranteed T) -> @owned Error {
+// CHECK:         bb0([[ERROR:%.*]] : @guaranteed $T):
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
 // CHECK:           [[T0:%.*]] = upcast [[ERROR_COPY]] : $T to $NSError
 // CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[T0]] : $NSError : $NSError, $Error
-// CHECK:           end_borrow [[BORROWED_ERROR]] from [[ERROR]]
-// CHECK:           destroy_value [[ERROR]]
+// CHECK-NOT:           destroy_value [[ERROR]]
 // CHECK:           return [[ERROR_TYPE]]
 // CHECK: } // end sil function '$S10objc_error30NSErrorError_archetype_erasureys0D0_pxSo0C0CRbzlF'
 func NSErrorError_archetype_erasure<T : NSError>(_ t: T) -> Error {
