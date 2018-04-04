@@ -2433,9 +2433,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
 
-  SourceLoc tryLoc;
-  (void)consumeIf(tok::kw_try, tryLoc);
-
   // Note that we're parsing a declaration.
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::Declaration);
@@ -2452,6 +2449,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
   SourceLoc StaticLoc;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   parseDeclModifierList(Attributes, StaticLoc, StaticSpelling);
+
+  // We emit diagnostics for 'try let ...' in parseDeclVar().
+  SourceLoc tryLoc;
+  if (Tok.is(tok::kw_try) && peekToken().isAny(tok::kw_let, tok::kw_var))
+    tryLoc = consumeToken(tok::kw_try);
 
   ParserResult<Decl> DeclResult;
 
