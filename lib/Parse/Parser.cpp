@@ -559,7 +559,6 @@ void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.back().setToken(Kind, Txt);
   Trivia EmptyTrivia;
   SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
-  LeadingTrivia.empty();
   TokReceiver->receive(SplitTokens.back());
 }
 
