@@ -2243,17 +2243,17 @@ public:
   /// being used), features that affect formal access such as \c \@testable are
   /// taken into account.
   ///
-  /// If \p isUsageFromInline is true, the presence of the \c @usableFromInline
-  /// attribute will treat internal declarations as public. This is normally
+  /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
+  /// \c @usableFromInline attribute are treated as public. This is normally
   /// false for name lookup and other source language concerns, but true when
   /// computing the linkage of generated functions.
   ///
   /// \sa getFormalAccessScope
   AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool isUsageFromInline = false) const {
+                              bool treatUsableFromInlineAsPublic = false) const {
     assert(hasAccess() && "access not computed yet");
     AccessLevel result = TypeAndAccess.getInt().getValue();
-    if (isUsageFromInline &&
+    if (treatUsableFromInlineAsPublic &&
         result == AccessLevel::Internal &&
         isUsableFromInline()) {
       assert(!useDC);
@@ -2277,13 +2277,19 @@ public:
   /// taken into account.
   ///
   /// \invariant
-  /// <code>value.isAccessibleFrom(value.getFormalAccessScope())</code>
+  /// <code>value.isAccessibleFrom(
+  ///     value.getFormalAccessScope().getDeclContext())</code>
+  ///
+  /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
+  /// \c @usableFromInline attribute are treated as public. This is normally
+  /// false for name lookup and other source language concerns, but true when
+  /// computing the linkage of generated functions.
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
-                       bool respectVersionedAttr = false) const;
+                       bool treatUsableFromInlineAsPublic = false) const;
 
 
   /// Copy the formal access level and @usableFromInline attribute from source.

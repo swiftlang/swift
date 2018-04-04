@@ -1946,7 +1946,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   auto *VD = cast<ValueDecl>(D);
 
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*isUsageFromInline=*/true);
+                                    /*treatUsableFromInlineAsPublic=*/true);
   if (access < AccessLevel::Public) {
     diagnoseAndRemoveAttr(attr, diag::fixed_layout_attr_on_internal_type,
                           VD->getFullName(), access);
@@ -2006,7 +2006,7 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
   // @inlinable can only be applied to public or @usableFromInline
   // declarations.
   auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*isUsageFromInline=*/true);
+                                    /*treatUsableFromInlineAsPublic=*/true);
   if (access < AccessLevel::Public) {
     diagnoseAndRemoveAttr(attr, diag::inlinable_decl_not_public,
                           VD->getBaseName(),
@@ -2096,7 +2096,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 
   auto access = ED->getFormalAccess(/*useDC=*/nullptr,
-                                    /*isUsageFromInline=*/true);
+                                    /*treatUsableFromInlineAsPublic=*/true);
   if (access < AccessLevel::Public) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
   }
