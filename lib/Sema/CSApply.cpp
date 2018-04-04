@@ -1177,7 +1177,7 @@ namespace {
     }
     
     /// \brief Describes either a type or the name of a type to be resolved.
-    typedef llvm::PointerUnion<Identifier, Type> TypeOrName;
+    using TypeOrName = llvm::PointerUnion<Identifier, Type>;
 
     /// \brief Convert the given literal expression via a protocol pair.
     ///
