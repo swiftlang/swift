@@ -1443,6 +1443,16 @@ ERROR(objc_generics_cannot_conditionally_conform,none,
       "type %0 cannot conditionally conform to protocol %1 because "
       "the type uses the Objective-C generics model",
       (Type, Type))
+ERROR(conditional_conformances_cannot_imply_conformances,none,
+      "conditional conformance of type %0 to protocol %1 does not imply conformance to "
+      "inherited protocol %2",
+      (Type, Type, Type))
+NOTE(note_explicitly_state_conditional_conformance_different,none,
+     "did you mean to explicitly state the conformance with different bounds?", ())
+NOTE(note_explicitly_state_conditional_conformance_relaxed,none,
+     "did you mean to explicitly state the conformance with relaxed bounds?", ())
+NOTE(note_explicitly_state_conditional_conformance_same,none,
+     "did you mean to explicitly state the conformance with the same bounds?", ())
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
