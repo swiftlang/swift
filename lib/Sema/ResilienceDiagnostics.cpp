@@ -27,8 +27,15 @@ std::pair<FragileFunctionKind, bool>
 TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   for (; DC->isLocalContext(); DC = DC->getParent()) {
     if (isa<DefaultArgumentInitializer>(DC)) {
+      // Default argument generators of public functions cannot reference
+      // @usableFromInline declarations; all other fragile function kinds
+      // can.
+      auto *VD = cast<ValueDecl>(DC->getInnermostDeclarationDeclContext());
+      auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/false);
       return std::make_pair(FragileFunctionKind::DefaultArgument,
-                            /*treatUsableFromInlineAsPublic=*/true);
+                            !access.isPublic());
     }
 
     if (isa<PatternBindingInitializer>(DC))
@@ -121,21 +128,11 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
            D->getFormalAccessScope().accessLevelForDiagnostics(),
            static_cast<unsigned>(Kind));
 
-  bool isDefaultArgument = false;
-  while (DC->isLocalContext()) {
-    if (isa<DefaultArgumentInitializer>(DC)) {
-      isDefaultArgument = true;
-      break;
-    }
-
-    DC = DC->getParent();
-  }
-
-  if (isDefaultArgument) {
+  if (TreatUsableFromInlineAsPublic) {
     diagnose(D, diag::resilience_decl_declared_here,
              D->getDescriptiveKind(), D->getFullName());
   } else {
-    diagnose(D, diag::resilience_decl_declared_here_versioned,
+    diagnose(D, diag::resilience_decl_declared_here_public,
              D->getDescriptiveKind(), D->getFullName());
   }
 
