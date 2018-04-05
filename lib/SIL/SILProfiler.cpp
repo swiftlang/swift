@@ -480,21 +480,20 @@ struct PGOMapping : public ASTWalker {
       CounterMap[thenExpr] = NextCounter++;
       auto thenCount = loadExecutionCount(thenExpr);
       LoadedCounterMap[thenExpr] = thenCount;
-      if (auto elseExpr = IE->getElseExpr()) {
-        CounterMap[elseExpr] = parent;
-        auto count = loadExecutionCount(elseExpr);
-        if (!parent) {
-          auto thenVal = thenCount.getValue();
-          for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-            auto cCount = LoadedCounts->Counts[pCount];
-            if (cCount > thenVal) {
-              count = cCount;
-              break;
-            }
+      auto elseExpr = IE->getElseExpr();
+      CounterMap[elseExpr] = parent;
+      auto count = loadExecutionCount(elseExpr);
+      if (!parent) {
+        auto thenVal = thenCount.getValue();
+        for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
+          auto cCount = LoadedCounts->Counts[pCount];
+          if (cCount > thenVal) {
+            count = cCount;
+            break;
           }
         }
-        LoadedCounterMap[elseExpr] = subtract(count, thenCount);
       }
+      LoadedCounterMap[elseExpr] = subtract(count, thenCount);
     } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
       CounterMap[E] = NextCounter++;
       auto eCount = loadExecutionCount(E);
