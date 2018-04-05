@@ -24,7 +24,7 @@ using namespace api;
 inline raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   switch (Value) {
-#define NODE_KIND(Name) case SDKNodeKind::Name: return Out << #Name;
+#define NODE_KIND(Name, Value) case SDKNodeKind::Name: return Out << #Value;
 #include "swift/IDE/DigesterEnums.def"
   }
   llvm_unreachable("Undefined SDK node kind.");
@@ -39,7 +39,7 @@ operator<<(raw_ostream &Out, const NodeAnnotation Value) {
 
 SDKNodeKind swift::ide::api::parseSDKNodeKind(StringRef Content) {
   return llvm::StringSwitch<SDKNodeKind>(Content)
-#define NODE_KIND(NAME) .Case(#NAME, SDKNodeKind::NAME)
+#define NODE_KIND(NAME, VALUE) .Case(#VALUE, SDKNodeKind::NAME)
 #include "swift/IDE/DigesterEnums.def"
   ;
 }

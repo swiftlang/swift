@@ -1,5 +1,5 @@
 #ifndef NODE_KIND
-#define NODE_KIND(NAME)
+#define NODE_KIND(NAME, EXTERNAL_NAME)
 #endif
 
 #ifndef NODE_ANNOTATION
@@ -34,17 +34,17 @@
 #define SPECIAL_CASE_ID(NAME)
 #endif
 
-NODE_KIND(Root)
-NODE_KIND(TypeDecl)
-NODE_KIND(TypeNominal)
-NODE_KIND(TypeFunc)
-NODE_KIND(TypeNameAlias)
-NODE_KIND(Function)
-NODE_KIND(Constructor)
-NODE_KIND(Getter)
-NODE_KIND(Setter)
-NODE_KIND(Var)
-NODE_KIND(TypeAlias)
+NODE_KIND(Root, Root)
+NODE_KIND(TypeNominal, TypeNominal)
+NODE_KIND(TypeFunc, TypeFunc)
+NODE_KIND(TypeAlias, TypeNameAlias)
+NODE_KIND(DeclType, TypeDecl)
+NODE_KIND(DeclFunction, Function)
+NODE_KIND(DeclConstructor, Constructor)
+NODE_KIND(DeclGetter, Getter)
+NODE_KIND(DeclSetter, Setter)
+NODE_KIND(DeclVar, Var)
+NODE_KIND(DeclTypeAlias, TypeAlias)
 
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
