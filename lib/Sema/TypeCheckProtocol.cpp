@@ -1313,7 +1313,11 @@ static void diagnoseConformanceImpliedByConditionalConformance(
     llvm::raw_svector_ostream prefixStream(prefix);
     llvm::raw_svector_ostream suffixStream(suffix);
 
-    prefixStream << "extension " << T << ": " << protoType << " ";
+    ValueDecl *decl = T->getAnyNominal();
+    if (!decl)
+      decl = T->getAnyGeneric();
+
+    prefixStream << "extension " << decl->getFullName() << ": " << protoType << " ";
     suffixStream << " {\n"
                  << indent << extraIndent << "<#witnesses#>\n"
                  << indent << "}\n\n"
