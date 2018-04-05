@@ -594,10 +594,6 @@ Driver::buildCompilation(const ToolChain &TC,
     Incremental = false;
   }
 
-  bool BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
-                                    options::OPT_disable_batch_mode,
-                                    false);
-
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
   bool ContinueBuildingAfterErrors =
     ArgList->hasArg(options::OPT_continue_building_after_errors);
@@ -631,6 +627,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
+  bool BatchMode = false;
+  OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
 
   if (Diags.hadAnyError())
@@ -1122,8 +1120,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                               ? file_types::TY_Nothing
                               : file_types::TY_Object;
 
-  OI.CompilerMode = computeCompilerMode(Args, Inputs);
-
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
     if (BatchMode) {
       Diags.diagnose(SourceLoc(), diag::warning_cannot_multithread_batch_mode);
@@ -1393,26 +1389,31 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
 OutputInfo::Mode
 Driver::computeCompilerMode(const DerivedArgList &Args,
-                            const InputFileList &Inputs) const {
+                            const InputFileList &Inputs,
+                            bool &BatchModeOut) const {
 
   if (driverKind == Driver::DriverKind::Interactive)
     return Inputs.empty() ? OutputInfo::Mode::REPL
                           : OutputInfo::Mode::Immediate;
 
-  const Arg *ArgRequiringWMO = Args.getLastArg(
+  const Arg *ArgRequiringSingleCompile = Args.getLastArg(
       options::OPT_whole_module_optimization, options::OPT_index_file);
 
-  if (!ArgRequiringWMO)
+  BatchModeOut = Args.hasFlag(options::OPT_enable_batch_mode,
+                              options::OPT_disable_batch_mode,
+                              false);
+
+  if (!ArgRequiringSingleCompile)
     return OutputInfo::Mode::StandardCompile;
 
-  // Test for -enable-batch-mode, rather than the BatchMode flag that is
-  // passed into the caller because the diagnostic is intended to warn against
-  // overriding *explicit* batch mode. No warning should be given if in batch
-  // mode by default.
-  if (Args.hasArg(options::OPT_enable_batch_mode))
+  // Override batch mode if given -wmo or -index-file.
+  if (BatchModeOut) {
+    BatchModeOut = false;
+    // Emit a warning about such overriding (FIXME: we might conditionalize
+    // this based on the user or xcode passing -disable-batch-mode).
     Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
-                   ArgRequiringWMO->getOption().getPrefixedName());
-
+                   ArgRequiringSingleCompile->getOption().getPrefixedName());
+  }
   return OutputInfo::Mode::SingleCompile;
 }
 

@@ -64,7 +64,17 @@ public:
     /// A compilation using a single frontend invocation without -primary-file.
     SingleCompile,
 
-    /// A single process that batches together multiple StandardCompile jobs.
+    /// A single process that batches together multiple StandardCompile Jobs.
+    ///
+    /// Note: this is a transient value to use _only_ for the individual
+    /// BatchJobs that are the temporary containers for multiple StandardCompile
+    /// Jobs built by ToolChain::constructBatchJob.
+    ///
+    /// In particular, the driver treats a batch-mode-enabled Compilation as
+    /// having OutputInfo::CompilerMode == StandardCompile, with the
+    /// Compilation::BatchModeEnabled flag set to true, _not_ as a
+    /// BatchModeCompile Compilation. The top-level OutputInfo::CompilerMode for
+    /// a Compilation should never be BatchModeCompile.
     BatchModeCompile,
 
     /// Invoke the REPL
@@ -389,8 +399,11 @@ private:
   /// there is an actual conflict.
   /// \param Args The input arguments.
   /// \param Inputs The inputs to the driver.
+  /// \param BatchModeOut An out-parameter flag that indicates whether to
+  /// batch the jobs of the resulting \c Mode::StandardCompile compilation.
   OutputInfo::Mode computeCompilerMode(const llvm::opt::DerivedArgList &Args,
-                                       const InputFileList &Inputs) const;
+                                       const InputFileList &Inputs,
+                                       bool &BatchModeOut) const;
 };
 
 } // end namespace driver
