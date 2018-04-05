@@ -271,6 +271,31 @@ nay:
   unreachable
 }
 
+// CHECK: define swiftcc {{.*}} @checked_downcast_optional_class_to_ex([[INT]])
+// CHECK: entry:
+// CHECK:   [[V1:%.*]] = inttoptr [[INT]] %0 to %T5casts1AC*
+// CHECK:   [[V2:%.*]] = icmp ne %T5casts1AC* [[V1]], null
+// CHECK:   br i1 [[V2]], label %[[LBL:.*]], label
+// CHECK:    [[LBL]]:
+// CHECK:   [[V4:%.*]] = bitcast %T5casts1AC* [[V1]] to %swift.type**
+// CHECK:    load %swift.type*, %swift.type** [[V4]]
+sil @checked_downcast_optional_class_to_ex : $@convention(thin) (@guaranteed Optional<A>) -> @owned Optional<CP> {
+bb0(%0 : $Optional<A>):
+  checked_cast_br %0 : $Optional<A> to $CP, bb1, bb2
+
+bb1(%3 : $CP):
+  %4 = enum $Optional<CP>, #Optional.some!enumelt.1, %3 : $CP
+  retain_value %0 : $Optional<A>
+  br bb3(%4 : $Optional<CP>)
+
+bb2:
+  %7 = enum $Optional<CP>, #Optional.none!enumelt
+  br bb3(%7 : $Optional<CP>)
+
+bb3(%9 : $Optional<CP>):
+  return %9 : $Optional<CP>
+}
+
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @checked_metatype_to_object_casts
 sil @checked_metatype_to_object_casts : $@convention(thin) <T> (@thick Any.Type) -> () {
 entry(%e : $@thick Any.Type):
