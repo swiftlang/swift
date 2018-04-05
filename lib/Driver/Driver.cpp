@@ -536,7 +536,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
 }
 
 // warn if -embed-bitcode is set and the output type is not an object
-static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
+static void validateEmbedBitcode(DerivedArgList &Args, const OutputInfo &OI,
                                  DiagnosticEngine &Diags) {
   if (Args.hasArg(options::OPT_embed_bitcode) &&
       OI.CompilerOutputType != file_types::TY_Object) {
