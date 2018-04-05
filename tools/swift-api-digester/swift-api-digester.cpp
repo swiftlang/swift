@@ -962,7 +962,7 @@ public:
   static bool classof(const SDKNode *N);
 };
 
-#define NODE_KIND(X)                                                       \
+#define NODE_KIND(X, NAME)                                                 \
   bool SDKNode##X::classof(const SDKNode *N) {                             \
     return N->getKind() == SDKNodeKind::X;                                 \
   }
@@ -1387,7 +1387,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
 SDKNode *SDKNodeInitInfo::createSDKNode(SDKNodeKind Kind) {
   switch(Kind) {
-#define NODE_KIND(X)                                                           \
+#define NODE_KIND(X, NAME)                                                     \
 case SDKNodeKind::X:                                                           \
   return static_cast<SDKNode*>(new (Ctx.allocator().Allocate<SDKNode##X>())    \
     SDKNode##X(*this));                                                        \
