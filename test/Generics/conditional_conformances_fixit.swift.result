@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -emit-fixits-path %t.remap -fixit-all
+// RUN: %target-typecheck-verify-swift -emit-fixits-path %t.remap -fixit-all -diagnostics-editor-mode
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 protocol P1 {}
@@ -7,11 +7,11 @@ protocol P2: P1 {}
 
 struct S1<T> {}
 
-extension S1<T>: P1 where T: P1 {
+extension S1: P1 where T: P1 {
     <#witnesses#>
 }
 
-extension S1<T>: P1 where <#requirements#> {
+extension S1: P1 where <#requirements#> {
     <#witnesses#>
 }
 
@@ -25,15 +25,15 @@ protocol P3 {
 }
 struct S2<T, U, V: P3> {}
 
-extension S2<T, U, V>: P1 where T: P1, U: P1, V.X: P1 {
+extension S2: P1 where T: P1, U: P1, V.X: P1 {
     <#witnesses#>
 }
 
-extension S2<T, U, V>: P1 where T: P2, U: P2, V.X: P2 {
+extension S2: P1 where T: P2, U: P2, V.X: P2 {
     <#witnesses#>
 }
 
-extension S2<T, U, V>: P1 where <#requirements#> {
+extension S2: P1 where <#requirements#> {
     <#witnesses#>
 }
 
@@ -46,11 +46,11 @@ extension S2: P2 where T: P2, U: P2, V.X: P2 {}
 
 struct S3<T, U, V: P3> {}
 
-extension S3<T, U, V>: P1 where T: P2, U: P2, V.X == Int {
+extension S3: P1 where T: P2, U: P2, V.X == Int {
     <#witnesses#>
 }
 
-extension S3<T, U, V>: P1 where <#requirements#> {
+extension S3: P1 where <#requirements#> {
     <#witnesses#>
 }
 
@@ -62,11 +62,11 @@ extension S3: P2 where T: P2, U: P2, V.X == Int {}
 
 struct S4<T, U, V: P3> {}
 
-extension S4<T, U, V>: P1 where T: P2, U: P3, V.X: P2 {
+extension S4: P1 where T: P2, U: P3, V.X: P2 {
     <#witnesses#>
 }
 
-extension S4<T, U, V>: P1 where <#requirements#> {
+extension S4: P1 where <#requirements#> {
     <#witnesses#>
 }
 

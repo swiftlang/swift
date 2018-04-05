@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -emit-fixits-path %t.remap -fixit-all
+// RUN: %target-typecheck-verify-swift -emit-fixits-path %t.remap -fixit-all -diagnostics-editor-mode
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 protocol P1 {}
