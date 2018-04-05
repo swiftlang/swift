@@ -433,22 +433,17 @@ static std::tuple<FullApplySite, SILBasicBlock::iterator>
 tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
                            ClassHierarchyAnalysis *CHA) {
   auto NewInstPair = tryDevirtualizeApply(InnerAI, CHA);
-  auto *NewInst = NewInstPair.first;
-  if (!NewInst)
+  if (!NewInstPair.second) {
     return std::make_tuple(InnerAI, I);
+  }
 
-  replaceDeadApply(InnerAI, NewInst);
+  replaceDeadApply(InnerAI, NewInstPair.first);
 
   auto newApplyAI = NewInstPair.second.getInstruction();
   assert(newApplyAI && "devirtualized but removed apply site?");
-  I = newApplyAI->getIterator();
-  auto NewAI = FullApplySite::isa(newApplyAI);
-  // *NOTE*, it is important that we return I here since we may have
-  // devirtualized but not have a full apply site anymore.
-  if (!NewAI)
-    return std::make_tuple(FullApplySite(), I);
 
-  return std::make_tuple(NewAI, I);
+  return std::make_tuple(FullApplySite::isa(newApplyAI),
+                         newApplyAI->getIterator());
 }
 
 /// \brief Inlines all mandatory inlined functions into the body of a function,
