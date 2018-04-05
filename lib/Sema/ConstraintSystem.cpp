@@ -263,15 +263,48 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
     return *result;
 
   // We are performing dynamic lookup. Filter out redundant results early.
-  llvm::DenseSet<std::tuple<char, ObjCSelector, CanType>> known;
-  result->filter([&](LookupResultEntry entry) -> bool {
+  llvm::DenseMap<std::tuple<char, ObjCSelector, CanType>, ValueDecl *> known;
+  bool anyRemovals = false;
+  for (const auto &entry : *result) {
     auto *decl = entry.getValueDecl();
 
-    if (decl->isInvalid())
-      return false;
+    // Remove invalid declarations so the constraint solver doesn't need to
+    // cope with them.
+    if (decl->isInvalid()) {
+      anyRemovals = true;
+      continue;
+    }
 
-    return known.insert(getDynamicResultSignature(decl)).second;
-  });
+    // If this is the first entry with the signature, record it.
+    auto &uniqueEntry = known[getDynamicResultSignature(decl)];
+    if (!uniqueEntry) {
+      uniqueEntry = decl;
+      continue;
+    }
+
+    // We have duplication; note that we'll need to remove something,
+    anyRemovals = true;
+
+    // If the entry we recorded was unavailable but this new entry is not,
+    // replace the recorded entry with this one.
+    if (uniqueEntry->getAttrs().isUnavailable(TC.Context) &&
+        !decl->getAttrs().isUnavailable(TC.Context)) {
+      uniqueEntry = decl;
+    }
+  }
+
+  // If there's anything to remove, filter it out now.
+  if (anyRemovals) {
+    result->filter([&](LookupResultEntry entry) -> bool {
+      auto *decl = entry.getValueDecl();
+
+      // Remove invalid declarations so the constraint solver doesn't need to
+      // cope with them.
+      if (decl->isInvalid()) return false;
+
+      return known[getDynamicResultSignature(decl)] == decl;
+    });
+  }
 
   return *result;
 }
