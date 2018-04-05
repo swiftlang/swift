@@ -876,6 +876,13 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 
   switch value as Optional {
+  case .a?: break
+  case .b?: break
+  case nil: break
+  @unknown case _: break
+  } // no-warning
+
+  switch value as Optional {
   case _?: break
   case nil: break
   } // no-warning
@@ -886,11 +893,36 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case (_, true): break
   }
 
+  switch (value, flag) {
+  case (.a, _): break
+  case (.b, false): break
+  case (_, true): break
+  @unknown case _: break
+  } // no-warning
+
   switch (flag, value) { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(false, _)'}}
   case (_, .a): break
   case (false, .b): break
   case (true, _): break
   }
+
+  switch (flag, value) {
+  case (_, .a): break
+  case (false, .b): break
+  case (true, _): break
+  @unknown case _: break
+  } // no-warning
+
+  switch (value, value) { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '(_, _)'}}
+  case (.a, _), (_, .a): break
+  case (.b, _), (_, .b): break
+  }
+
+  switch (value, value) {
+  case (.a, _), (_, .a): break
+  case (.b, _), (_, .b): break
+  @unknown case _: break
+  } // no-warning
 
   // Test interaction with @_downgrade_exhaustivity_check.
   switch (value, interval) { // expected-error {{switch must be exhaustive}} {{none}}
@@ -945,7 +977,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .b(false): break
   }
 
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
   case .a: break
   case .b(false): break
   @unknown case _: break
@@ -1057,7 +1089,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case .b(false): break
   }
 
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
+  switch payload { // expected-warning {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}}
   case .a: break
   case .b(false): break
   @unknown case _: break

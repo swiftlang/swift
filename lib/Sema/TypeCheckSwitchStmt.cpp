@@ -121,7 +121,7 @@ namespace {
 
   #define PAIRCASE(XS, YS) case PairSwitch(XS, YS)
     
-    class Space final {
+    class Space final : public RelationalOperationsBase<Space> {
     private:
       SpaceKind Kind;
       llvm::PointerIntPair<Type, 1, bool> TypeAndVal;
@@ -191,8 +191,8 @@ namespace {
       explicit Space(Type T, Identifier NameForPrinting)
         : Kind(SpaceKind::Type), TypeAndVal(T),
           Head(NameForPrinting), Spaces({}){}
-      explicit Space(Type T, UnknownCase_t)
-        : Kind(SpaceKind::UnknownCase), TypeAndVal(T), Head(Identifier()),
+      explicit Space(UnknownCase_t)
+        : Kind(SpaceKind::UnknownCase), TypeAndVal(Type()), Head(Identifier()),
           Spaces({}) {}
       explicit Space(Type T, Identifier H, bool downgrade,
                      ArrayRef<Space> SP)
@@ -211,6 +211,11 @@ namespace {
       explicit Space(bool C)
         : Kind(SpaceKind::BooleanConstant), TypeAndVal(Type(), C),
           Head(Identifier()), Spaces({}) {}
+
+      bool operator==(const Space &other) const {
+        return Kind == other.Kind && TypeAndVal == other.TypeAndVal &&
+               Head == other.Head && Spaces == other.Spaces;
+      }
 
       SpaceKind getKind() const { return Kind; }
 
@@ -236,8 +241,7 @@ namespace {
 
       Type getType() const {
         assert((getKind() == SpaceKind::Type
-                || getKind() == SpaceKind::Constructor
-                || getKind() == SpaceKind::UnknownCase)
+                || getKind() == SpaceKind::Constructor)
                && "Wrong kind of space tried to access space type");
         return TypeAndVal.getPointer();
       }
@@ -412,7 +416,11 @@ namespace {
           return true;
         }
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase):
-          // FIXME: Support '@unknown' matching nested UnknownCase spaces.
+          for (auto &param : this->getSpaces()) {
+            if (param.isSubspace(other, TC, DC)) {
+              return true;
+            }
+          }
           return false;
 
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Disjunct):
@@ -440,7 +448,7 @@ namespace {
           return false;
 
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
-          return this->getType()->isEqual(other.getType());
+          return true;
 
         default:
           llvm_unreachable("Uncovered pair found while computing subspaces?");
@@ -543,10 +551,17 @@ namespace {
         }
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
           return *this;
-        PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase):
-          // FIXME: Support '@unknown' matching nested UnknownCase spaces.
-          return Space();
-            
+
+        PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
+          SmallVector<Space, 4> newSubSpaces;
+          for (auto subSpace : this->getSpaces()) {
+            Space nextSpace = subSpace.intersect(other, TC, DC);
+            newSubSpaces.push_back(nextSpace.simplify(TC, DC));
+          }
+          return Space(this->getType(), this->getHead(),
+                       this->canDowngradeToWarning(), newSubSpaces);
+        }
+
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads don't match, the intersection of
           // the constructor spaces is empty.
@@ -576,11 +591,10 @@ namespace {
         }
 
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
-          return *this;
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
-          return Space();
+          return other.intersect(*this, TC, DC);
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
-          return this->getType()->isEqual(other.getType()) ? *this : Space();
+          return *this;
 
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
           return this->getBoolValue() == other.getBoolValue() ? *this : Space();
@@ -670,10 +684,11 @@ namespace {
             SmallVector<Space, 4> spaces;
             this->decompose(TC, DC, this->getType(), spaces);
             auto decomp = examineDecomp(spaces);
-            return decomp.minus(other, TC, DC);
-          } else {
-            return *this;
+            auto result = decomp.minus(other, TC, DC);
+            if (result != decomp)
+              return result;
           }
+          return *this;
         }
         PAIRCASE (SpaceKind::Empty, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::Type, SpaceKind::Disjunct):
@@ -704,9 +719,17 @@ namespace {
         }
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
           return Space();
-        PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase):
-          // FIXME: Support '@unknown' matching nested UnknownCase spaces.
-          return *this;
+        PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
+          SmallVector<Space, 4> newSubSpaces;
+          for (auto subSpace : this->getSpaces()) {
+            Space nextSpace = subSpace.minus(other, TC, DC).simplify(TC, DC);
+            if (nextSpace.isEmpty())
+              return Space();
+            newSubSpaces.push_back(nextSpace);
+          }
+          return Space(this->getType(), this->getHead(),
+                       this->canDowngradeToWarning(), newSubSpaces);
+        }
 
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads of the constructors don't match then
@@ -799,7 +822,7 @@ namespace {
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
           return *this;
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
-          return this->getType()->isEqual(other.getType()) ? Space() : *this;
+          return Space();
 
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Constructor, SpaceKind::BooleanConstant):
@@ -876,9 +899,7 @@ namespace {
             // We special-case this to use "@unknown case _" at the top level.
             buffer << "_";
           } else {
-            buffer << "UNKNOWN(";
-            getType()->print(buffer);
-            buffer << ")";
+            buffer << "UNKNOWN";
           }
           break;
         }
@@ -1013,7 +1034,7 @@ namespace {
           });
 
           if (!E->isExhaustive(DC))
-            arr.push_back(Space(tp, UnknownCase));
+            arr.push_back(Space(UnknownCase));
 
         } else if (auto *TTy = tp->castTo<TupleType>()) {
           // Decompose each of the elements into its component type space.
@@ -1161,7 +1182,7 @@ namespace {
 
           Space projection;
           if (caseBlock->hasUnknownAttr()) {
-            projection = Space(caseItem.getPattern()->getType(), UnknownCase);
+            projection = Space(UnknownCase);
             hasUnknownCase = true;
           } else {
             projection = projectPattern(TC, caseItem.getPattern(),
@@ -1223,12 +1244,15 @@ namespace {
         if (Space::canDecompose(uncovered.getType(), DC)) {
           SmallVector<Space, 4> spaces;
           Space::decompose(TC, DC, uncovered.getType(), spaces);
-          diagnoseMissingCases(RequiresDefault::No, Space(spaces));
+          diagnoseMissingCases(RequiresDefault::No, Space(spaces),
+                               /*sawDowngradablePattern*/false,
+                               hasUnknownCase);
         } else {
           diagnoseMissingCases(Switch->getCases().empty()
                                  ? RequiresDefault::EmptySwitchBody
                                  : RequiresDefault::UncoveredSwitch,
-                               uncovered);
+                               uncovered, /*sawDowngradablePattern*/false,
+                               hasUnknownCase);
         }
         return;
       }
@@ -1265,17 +1289,7 @@ namespace {
       auto mainDiagType = diag::non_exhaustive_switch;
       if (!uncovered.isEmpty() && hasUnknownCase) {
         assert(defaultReason == RequiresDefault::No);
-        // If everything left uncovered is a full case, it's okay for that to be
-        // handled by the unknown case. Downgrade to a warning.
-        bool allSpacesAreCases = llvm::all_of(uncovered.getSpaces(),
-                                              [](const Space &space) {
-          return space.getKind() == SpaceKind::Constructor &&
-                 llvm::all_of(space.getSpaces(), [](const Space &subspace) {
-            return subspace.getKind() == SpaceKind::Type;
-          });
-        });
-        if (allSpacesAreCases)
-          mainDiagType = diag::non_exhaustive_switch_warn;
+        mainDiagType = diag::non_exhaustive_switch_warn;
       }
       switch (uncovered.checkDowngradeToWarning()) {
       case DowngradeToWarning::No:
