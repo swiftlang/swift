@@ -34,7 +34,7 @@ public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
   public typealias BoolTensor = Tensor<Bool>
 
   /// The underlying `TensorHandle`.
-  /// NOTE: `handle` is public to allow user defined ops, but should not
+  /// - Note: `handle` is public to allow user defined ops, but should not
   /// normally be used otherwise.
   public let handle: TensorHandle<Scalar>
 
@@ -331,14 +331,7 @@ extension Tensor : ExpressibleByArrayLiteral {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
-  @_inlineable
-  var shape: TensorShape {
-    @inline(__always)
-    get {
-      return TensorShape(shapeTensor.scalars)
-    }
-  }
-
+  /// The number of dimensions of the `Tensor`.
   @_inlineable
   var rank: Int32 {
     @inline(__always)
@@ -347,6 +340,16 @@ public extension Tensor {
     }
   }
 
+  /// The dimensions of the `Tensor`.
+  @_inlineable
+  var shape: TensorShape {
+    @inline(__always)
+    get {
+      return TensorShape(shapeTensor.scalars)
+    }
+  }
+
+  /// The number of scalars in the `Tensor`.
   @_inlineable
   var scalarCount: Int32 {
     @inline(__always)
@@ -450,6 +453,9 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 public extension Float {
+  /// Produces a random value from the standard uniform distribution.
+  /// - Parameter state: An optional `RandomState` instance. If `nil`,
+  ///   `RandomState.global` will be used.
   static func randomUniform(state: RandomState? = nil) -> Float {
     let state = state ?? RandomState.global
     return Float(state.generate()) / Float(RAND_MAX)
@@ -457,7 +463,14 @@ public extension Float {
 
   private static var boxMullerHelper: Float = randomUniform()
 
-  /// Random value from normal distribution using the Box-Muller method.
+  /// Produces a random value from a normal distribution using the Box-Muller
+  /// method.
+  ///
+  /// - Parameters:
+  ///   - mean: The mean of the normal distribution.
+  ///   - stddev: The standard deviation of the normal distribution.
+  ///   - state: An optional `RandomState` instance. If `nil`,
+  ///     `RandomState.global` will be used.
   static func randomNormal(mean: Float = 0, stddev: Float = 1,
                            state: RandomState? = nil) -> Float {
     let tmp = randomUniform(state: state)
@@ -468,6 +481,9 @@ public extension Float {
 }
 
 public extension Double {
+  /// Produces a random value from the standard uniform distribution.
+  /// - Parameter state: An optional `RandomState` instance. If `nil`,
+  ///   `RandomState.global` will be used.
   static func randomUniform(state: RandomState? = nil) -> Double {
     let state = state ?? RandomState.global
     return Double(state.generate()) / Double(RAND_MAX)
@@ -475,7 +491,14 @@ public extension Double {
 
   private static var boxMullerHelper: Double = randomUniform()
 
-  /// Random value from normal distribution using the Box-Muller method.
+  /// Produces a random value from a normal distribution using the Box-Muller
+  /// method.
+  ///
+  /// - Parameters:
+  ///   - mean: The mean of the normal distribution.
+  ///   - stddev: The standard deviation of the normal distribution.
+  ///   - state: An optional `RandomState` instance. If `nil`,
+  ///     `RandomState.global` will be used.
   static func randomNormal(mean: Double = 0, stddev: Double = 1,
                            state: RandomState? = nil) -> Double {
     let tmp = randomUniform(state: state)
@@ -653,6 +676,7 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
+  /// Returns `true` if `rank` is equal to 0 and `false` otherwise.
   @_inlineable
   var isScalar: Bool {
     @inline(__always)
@@ -661,8 +685,8 @@ public extension Tensor {
     }
   }
 
-  /// Returns the underlying scalar from a 0-ranked `Tensor`.
-  /// - Precondition: the `Tensor` is 0-ranked.
+  /// Returns the single scalar element if `rank` is equal to 0 and `nil`
+  /// otherwise.
   @_inlineable
   var scalar: Scalar? {
     @inline(__always)
