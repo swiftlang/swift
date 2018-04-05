@@ -237,8 +237,8 @@ MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
 
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  SEA->getEffects(ApplyEffects, AI);
+  FunctionSideEffects ApplyEffects;
+  SEA->getCalleeEffects(ApplyEffects, AI);
 
   MemBehavior Behavior = MemBehavior::None;
 
