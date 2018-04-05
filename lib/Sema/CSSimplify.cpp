@@ -1204,8 +1204,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer())) {
           auto innerTy = paren1->getUnderlyingType();
-          if (func2Input->isVoid() && innerTy->isVoid())
+          if (func2Input->isVoid() && innerTy->isVoid()) {
             func1Input = innerTy;
+            // If the other input is also parenthesized, remove one
+            // layer of parens from it as well.
+            if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer()))
+              func2Input = paren2->getUnderlyingType();
+          }
         }
       }
     }
