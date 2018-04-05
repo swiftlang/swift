@@ -854,7 +854,7 @@ public final class _DataStorage {
     }
     
     public func withInteriorPointerReference<T>(_ range: Range<Int>, _ work: (NSData) throws -> T) rethrows -> T {
-        if range.count == 0 {
+        if range.isEmpty {
             return try work(NSData()) // zero length data can be optimized as a singleton
         }
         
@@ -886,7 +886,7 @@ public final class _DataStorage {
     }
     
     public func bridgedReference(_ range: Range<Int>) -> NSData {
-        if range.count == 0 {
+        if range.isEmpty {
             return NSData() // zero length data can be optimized as a singleton
         }
         
@@ -1464,7 +1464,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter buffer: The buffer of bytes to append. The size is calculated from `SourceType` and `buffer.count`.
     @inline(__always)
     public mutating func append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
-        if buffer.count == 0 { return }
+        if buffer.isEmpty { return }
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
@@ -1588,7 +1588,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     public func subdata(in range: Range<Index>) -> Data {
         _validateRange(range)
-        if count == 0 {
+        if isEmpty {
             return Data()
         }
         return _backing.subdata(in: range)
