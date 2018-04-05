@@ -852,7 +852,6 @@ void ASTMangler::appendType(Type type) {
           appendAnyGenericType(NDecl);
           bool isFirstArgList = true;
           appendBoundGenericArgs(type, isFirstArgList);
-          appendRetroactiveConformances(type);
           appendOperator("G");
         }
         addSubstitution(type.getPointer());
