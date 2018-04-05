@@ -39,7 +39,28 @@
 // CLANG_IMPORTER-NEXT:     key.severity: source.diagnostic.severity.error,
 // CLANG_IMPORTER-NEXT:     key.description: {{.*}}not found
 
+// RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -Xcc -ivfsoverlay -Xcc /doesnotexist | %FileCheck %s -check-prefix=CLANG_IMPORTER_UNKNOWN
+// CLANG_IMPORTER_UNKNOWN: key.notification: source.notification.compile-did-finish,
+// CLANG_IMPORTER_UNKNOWN-NEXT: key.diagnostics: [
+// CLANG_IMPORTER_UNKNOWN-NEXT:   {
+// CLANG_IMPORTER_UNKNOWN-NEXT:     key.filepath: "<unknown>"
+// CLANG_IMPORTER_UNKNOWN-NEXT:     key.severity: source.diagnostic.severity.error,
+// CLANG_IMPORTER_UNKNOWN-NEXT:     key.offset: 0
+// CLANG_IMPORTER_UNKNOWN-NEXT:     key.description: "virtual filesystem{{.*}}not found
+
 // Note: we're missing the "compiler is in code completion mode" diagnostic,
 // which is probably just as well.
 // RUN: %sourcekitd-test -req=track-compiles == -req=complete -offset=0 %s -- %s | %FileCheck %s -check-prefix=NODIAGS
 // RUN: %sourcekitd-test -req=track-compiles == -req=complete -pos=2:1 %S/Inputs/sema-error.swift -- %S/Inputs/sema-error.swift | %FileCheck %s -check-prefix=SEMA
+
+// FIXME: invalid arguments cause us to early-exit and not send the notifications
+// RUN_DISABLED: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -invalid-arg | %FileCheck %s -check-prefix=INVALID_ARG
+
+// RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -Xcc -invalid-arg | %FileCheck %s -check-prefix=INVALID_ARG_CLANG
+// INVALID_ARG_CLANG: key.notification: source.notification.compile-did-finish,
+// INVALID_ARG_CLANG-NEXT: key.diagnostics: [
+// INVALID_ARG_CLANG-NEXT:   {
+// INVALID_ARG_CLANG-NEXT:     key.filepath: "<unknown>"
+// INVALID_ARG_CLANG-NEXT:     key.severity: source.diagnostic.severity.warning,
+// INVALID_ARG_CLANG-NEXT:     key.offset: 0
+// INVALID_ARG_CLANG-NEXT:     key.description: "argument unused
