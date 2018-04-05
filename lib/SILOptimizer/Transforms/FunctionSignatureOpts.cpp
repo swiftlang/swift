@@ -255,8 +255,6 @@ void FunctionSignatureTransform::addThunkArgument(
 
 } // end anonymous namespace
 
-} // end anonymous namespace
-
 std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
   auto ArgumentDescList = TransformDescriptor.ArgumentDescList;
