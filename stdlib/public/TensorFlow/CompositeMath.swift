@@ -16,13 +16,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Computes `sigmoid` of the specified tensor element-wise.
+/// Specifically, computes `1 / (1 + exp(-x))`.
 @_inlineable @inline(__always)
 public func sigmoid<T : TensorProtocol>(_ x: T) -> T
   where T.Scalar : BinaryFloatingPoint {
-  let expx = exp(-x)
-  return 1.0 / (1.0 + expx)
+  return 1 / (1 + exp(-x))
 }
 
+/// Computes `relu` of the specified tensor element-wise.
+/// Specifically, computes `max(0, x)`.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointRelu(_:partial:seed:))
 public func relu<T : TensorProtocol>(_ x: T) -> T
@@ -30,6 +33,8 @@ public func relu<T : TensorProtocol>(_ x: T) -> T
   return max(0, x)
 }
 
+/// Computes the softmax of the specified tensor element-wise.
+/// Specifically, computes `exp(x) / exp(x).sum()`.
 @_inlineable @inline(__always)
 public func softmax<T : TensorProtocol>(_ x: T) -> T
   where T.Scalar : FloatingPoint {
@@ -37,11 +42,12 @@ public func softmax<T : TensorProtocol>(_ x: T) -> T
   return expx / expx.sum()
 }
 
+/// Computes the softmax of the specified tensor along the specified axis.
+/// Specifically, computes `exp(x) / exp(x).sum(alongAxes: axis)`.
 @_inlineable @inline(__always)
 public func softmax<T : TensorProtocol>(
   _ x: T, alongAxis axis: Int32
-) -> T
-  where T.Scalar : FloatingPoint {
+) -> T where T.Scalar : FloatingPoint {
   let expx = exp(x)
   return expx / expx.sum(alongAxes: axis)
 }

@@ -112,22 +112,3 @@ internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
     self.init(owning: cTensor!)
   }
 }
-
-// For "print", REPL, and Playgrounds integration, we'll eventually want to
-// implement this, probably in terms of fetching a summary. For now, this is
-// disabled.
-/*
-/// String conversion
-extension TensorHandle : CustomStringConvertible {
-  public var description: String {
-    fatalError("Unimplemented")
-  }
-}
-
-/// Xcode Playground display conversion.
-extension TensorHandle : CustomPlaygroundDisplayConvertible {
-  public var playgroundDescription: Any {
-    return description
-  }
-}
-*/

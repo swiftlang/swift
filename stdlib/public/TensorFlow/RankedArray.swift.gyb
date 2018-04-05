@@ -89,23 +89,28 @@ public struct ${ArrayXD}<Scalar> {
   @_versioned
   internal var base: ShapedArray<Scalar>
 
+  /// The number of dimensions of the `${ArrayXD}`.
+  public static var rank: Int {
+    return ${rank}
+  }
+
+  /// The number of dimensions of the `${ArrayXD}`.
+  /// `rank` is always equal to ${rank} for `${ArrayXD}`.
+  public var rank: Int {
+    return ${ArrayXD}.rank
+  }
+
   /// The dimensions of the `${ArrayXD}`.
   public var shape: [Int] {
     return base.shape
   }
 
-  public static var rank: Int {
-    return ${rank}
-  }
-
-  public var rank: Int {
-    return ${ArrayXD}.rank
-  }
-
+  /// The number of scalars in the `${ArrayXD}`.
   public var scalarCount: Int {
     return base.scalarCount
   }
 
+  /// The scalars of the `${ArrayXD}`, in row-major order.
   public var scalars: [Scalar] {
     get {
       return base.scalars
@@ -311,8 +316,9 @@ extension ${ArrayXD} : CustomReflectable {
   }
 }
 
+/// A ${rankName(rank)}-dimensional wrapper around a `ShapedArraySlice`.
 @_fixed_layout
-public struct ${SliceXD}<Scalar>  {
+public struct ${SliceXD}<Scalar> {
   /// The underlying ShapedArraySlice of the `${SliceXD}`.
   fileprivate var base: ShapedArraySlice<Scalar>
 
@@ -325,18 +331,23 @@ public struct ${SliceXD}<Scalar>  {
 }
 
 public extension ${SliceXD} {
+  /// The number of dimensions of the `${SliceXD}`.
+  /// `rank` is always equal to ${rank} for `${SliceXD}`.
   var rank: Int {
     return ${rank}
   }
 
+  /// The dimensions of the `${SliceXD}`.
   var shape: [Int] {
     return base.shape
   }
 
+  /// The number of scalars in the`${SliceXD}`.
   var scalarCount: Int {
     return base.scalarCount
   }
 
+  /// The scalars of the `${SliceXD}`, in row-major order.
   var scalars: [Scalar] {
     get {
       return base.scalars

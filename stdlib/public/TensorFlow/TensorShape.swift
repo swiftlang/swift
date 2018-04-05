@@ -9,17 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// A struct representing the shape of a tensor.
-//
-// TensorShape is a thin wrapper around an array of integers that represent
-// shape dimensions. All tensor types use TensorShape to represent their shape.
-//
-//===----------------------------------------------------------------------===//
 
-// NOTE: it may be possible to edit TensorShape to support "labeled tensors".
+// NOTE: it may be possible to edit `TensorShape` to support "labeled tensors".
 // Dimensions may be either an Int32 or an enum representing a label.
 
+/// A struct representing the shape of a tensor.
+///
+/// `TensorShape` is a thin wrapper around an array of integers that represent
+/// shape dimensions. All tensor types use `TensorShape` to represent their shape.
 @_fixed_layout
 public struct TensorShape : ExpressibleByArrayLiteral {
   /// The dimensions of the shape.

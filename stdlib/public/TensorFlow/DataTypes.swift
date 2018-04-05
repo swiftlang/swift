@@ -29,6 +29,10 @@ public struct _TensorDataType {
   }
 }
 
+/// A scalar data type compatible with TensorFlow.
+///
+/// Types that conform to `AccelerableByTensorFlow` can be used as the `Scalar`
+/// associated type of `Tensor`, `Tensor1D`, `Tensor2D`, etc.
 public protocol AccelerableByTensorFlow {
   /// The underlying TensorFlow data type.
   /// - Note: This is not intended for general use.
