@@ -22,6 +22,7 @@
 #include "Linker.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -772,6 +773,23 @@ bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   case BuiltinValueKind::ErrorInMain:
     return true;
   }
+}
+
+bool SILModule::
+shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const {
+  // Serialize entities associated with this module's associated context.
+  if (DC->isChildContextOf(getAssociatedContext())) {
+    return true;
+  }
+  
+  // Serialize entities associated with clang modules, since other entities
+  // may depend on them, and someone who deserializes those entities may not
+  // have their own copy.
+  if (isa<ClangModuleUnit>(DC->getModuleScopeContext())) {
+    return true;
+  }
+  
+  return false;
 }
 
 /// Returns true if it is the OnoneSupport module.

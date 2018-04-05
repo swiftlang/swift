@@ -31,6 +31,9 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
   /// The SILLoader that this visitor is using to link.
   SerializedSILLoader *Loader;
 
+  /// Break cycles visiting recursive protocol conformances.
+  llvm::DenseSet<ProtocolConformance *> VisitedConformances;
+
   /// Worklist of SILFunctions we are processing.
   llvm::SmallVector<SILFunction *, 128> Worklist;
 
@@ -65,6 +68,7 @@ public:
   bool visitFunctionRefInst(FunctionRefInst *FRI);
   bool visitProtocolConformance(ProtocolConformanceRef C,
                                 const Optional<SILDeclRef> &Member);
+  bool visitApplySubstitutions(const SubstitutionMap &subs);
   bool visitWitnessMethodInst(WitnessMethodInst *WMI) {
     return visitProtocolConformance(WMI->getConformance(), WMI->getMember());
   }
