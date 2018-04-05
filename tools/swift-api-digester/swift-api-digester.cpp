@@ -108,7 +108,8 @@ static llvm::cl::list<std::string>
 ModuleInputPaths("I", llvm::cl::desc("add a module for input"));
 
 static llvm::cl::list<std::string>
-CCSystemFrameworkPaths("iframework", llvm::cl::desc("add a directory to the clang importer system framework search path"));
+CCSystemFrameworkPaths("iframework",
+  llvm::cl::desc("add a directory to the clang importer system framework search path"));
 
 static llvm::cl::opt<bool>
 AbortOnModuleLoadFailure("abort-on-module-fail",
@@ -181,6 +182,8 @@ typedef SDKNode* NodePtr;
 typedef std::map<NodePtr, NodePtr> ParentMap;
 typedef std::map<NodePtr, NodePtr> NodeMap;
 typedef std::vector<NodePtr> NodeVector;
+typedef std::vector<CommonDiffItem> DiffVector;
+typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
 
 // The interface used to visit the SDK tree.
 class SDKNodeVisitor {
@@ -233,7 +236,7 @@ class SDKContext {
   llvm::BumpPtrAllocator Allocator;
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
-
+  TypeMemberDiffVector TypeMemberDiffs;
 public:
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
@@ -247,7 +250,9 @@ public:
   NodeMap &getTypeAliasUpdateMap() {
     return TypeAliasUpdateMap;
   }
-
+  TypeMemberDiffVector &getTypeMemberDiffs() {
+    return TypeMemberDiffs;
+  }
 };
 
 // A node matcher will traverse two trees of SDKNode and find matched nodes
@@ -2743,11 +2748,6 @@ public:
     return;
   }
 };
-
-typedef std::vector<CommonDiffItem> DiffVector;
-
-typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
-
 } // end anonymous namespace
 
 static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
@@ -3101,10 +3101,10 @@ class DiagnosisEmitter : public SDKNodeVisitor {
   UpdatedNodesMap &UpdateMap;
   NodeMap &TypeAliasUpdateMap;
   TypeMemberDiffVector &MemberChanges;
-  DiagnosisEmitter(SDKContext &Ctx, TypeMemberDiffVector &MemberChanges):
+  DiagnosisEmitter(SDKContext &Ctx):
     UpdateMap(Ctx.getNodeUpdateMap()),
     TypeAliasUpdateMap(Ctx.getTypeAliasUpdateMap()),
-    MemberChanges(MemberChanges){}
+    MemberChanges(Ctx.getTypeMemberDiffs()){}
 
 public:
   static void diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
@@ -3226,10 +3226,7 @@ void DiagnosisEmitter::DeclAttrDiag::output() const {
 
 void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
                                  SDKContext &Ctx) {
-  // Find member hoist changes to help refine diagnostics.
-  TypeMemberDiffVector MemberChanges;
-  findTypeMemberDiffs(LeftRoot, RightRoot, MemberChanges);
-  DiagnosisEmitter Emitter(Ctx, MemberChanges);
+  DiagnosisEmitter Emitter(Ctx);
   collectAddedDecls(RightRoot, Emitter.AddedDecls);
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
@@ -3552,6 +3549,8 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
   Prune.pass(LeftModule, RightModule);
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
   RefinementPass.pass(LeftModule, RightModule);
+  // Find member hoist changes to help refine diagnostics.
+  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
   DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
   return 0;
 }
@@ -3580,8 +3579,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   // Structural diffs: not merely name changes but changes in SDK tree
   // structure.
   llvm::errs() << "Detecting type member diffs" << "\n";
-  TypeMemberDiffVector typeMemberDiffs;
-  findTypeMemberDiffs(LeftModule, RightModule, typeMemberDiffs);
+  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
 
   PrunePass Prune(Ctx.getNodeUpdateMap());
   Prune.pass(LeftModule, RightModule);
@@ -3603,6 +3601,7 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   std::vector<OverloadedFuncInfo> Overloads;
   // OverloadMemberFunctionEmitter::collectDiffItems(RightModule, Overloads);
 
+  auto &typeMemberDiffs = Ctx.getTypeMemberDiffs();
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);
   if (options::OutputInJson) {
