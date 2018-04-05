@@ -129,9 +129,37 @@ struct FunctionSignatureTransformDescriptor {
   /// descriptor.
   void computeOptimizedArgInterface(ArgumentDescriptor &A,
                                     SILParameterInfoList &O);
+
+  /// Setup the thunk arguments based on the given argument descriptor info.
+  /// Every transformation must defines this interface. Default implementation
+  /// simply passes it through.
+  void addThunkArgument(ArgumentDescriptor &AD, SILBuilder &Builder,
+                        SILBasicBlock *BB,
+                        llvm::SmallVectorImpl<SILValue> &NewArgs);
 };
 
 } // end anonymous namespace
+
+void FunctionSignatureTransformDescriptor::addThunkArgument(
+    ArgumentDescriptor &AD, SILBuilder &Builder, SILBasicBlock *BB,
+    llvm::SmallVectorImpl<SILValue> &NewArgs) {
+  // Dead argument.
+  if (AD.IsEntirelyDead) {
+    return;
+  }
+
+  // Explode the argument.
+  if (AD.Explode) {
+    llvm::SmallVector<SILValue, 4> LeafValues;
+    AD.ProjTree.createTreeFromValue(Builder, BB->getParent()->getLocation(),
+                                    BB->getArgument(AD.Index), LeafValues);
+    NewArgs.append(LeafValues.begin(), LeafValues.end());
+    return;
+  }
+
+  // All other arguments get pushed as what they are.
+  NewArgs.push_back(BB->getArgument(AD.Index));
+}
 
 std::string
 FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
@@ -526,13 +554,6 @@ private:
   /// the original argument.
   void ArgumentExplosionFinalizeOptimizedFunction();
 
-  /// Setup the thunk arguments based on the given argument descriptor info.
-  /// Every transformation must defines this interface. Default implementation
-  /// simply passes it through.
-  void addThunkArgument(ArgumentDescriptor &AD, SILBuilder &Builder,
-                        SILBasicBlock *BB,
-                        llvm::SmallVectorImpl<SILValue> &NewArgs);
-
   /// Take ArgumentDescList and ResultDescList and create an optimized function
   /// based on the current function we are analyzing. This also has the side
   /// effect of turning the current function into a thunk.
@@ -562,27 +583,6 @@ public:
   /// by a direct reference to the specialized function.
   bool removeDeadArgs(int minPartialAppliedArgs);
 };
-
-void FunctionSignatureTransform::addThunkArgument(
-    ArgumentDescriptor &AD, SILBuilder &Builder, SILBasicBlock *BB,
-    llvm::SmallVectorImpl<SILValue> &NewArgs) {
-  // Dead argument.
-  if (AD.IsEntirelyDead) {
-    return;
-  }
-
-  // Explode the argument.
-  if (AD.Explode) {
-    llvm::SmallVector<SILValue, 4> LeafValues;
-    AD.ProjTree.createTreeFromValue(Builder, BB->getParent()->getLocation(),
-                                    BB->getArgument(AD.Index), LeafValues);
-    NewArgs.append(LeafValues.begin(), LeafValues.end());
-    return;
-  }
-
-  // All other arguments get pushed as what they are.
-  NewArgs.push_back(BB->getArgument(AD.Index));
-}
 
 } // end anonymous namespace
 
@@ -656,7 +656,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the args for the thunk's apply, ignoring any dead arguments.
   llvm::SmallVector<SILValue, 8> ThunkArgs;
   for (auto &ArgDesc : TransformDescriptor.ArgumentDescList) {
-    addThunkArgument(ArgDesc, Builder, ThunkBody, ThunkArgs);
+    TransformDescriptor.addThunkArgument(ArgDesc, Builder, ThunkBody,
+                                         ThunkArgs);
   }
 
   SILValue ReturnValue;
