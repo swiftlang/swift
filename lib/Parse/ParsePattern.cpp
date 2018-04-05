@@ -617,15 +617,13 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
     case ParameterContextKind::Operator:
       diagID = diag::func_decl_without_paren;
       break;
-    case ParameterContextKind::EnumElement:
-      diagID = diag::enum_element_decl_without_paren;
-      break;
     case ParameterContextKind::Subscript:
       diagID = diag::expected_lparen_subscript;
       break;
     case ParameterContextKind::Initializer:
       diagID = diag::expected_lparen_initializer;
       break;
+    case ParameterContextKind::EnumElement:
     case ParameterContextKind::Closure:
     case ParameterContextKind::Curried:
       llvm_unreachable("should never be here");
