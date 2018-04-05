@@ -279,16 +279,14 @@ struct InheritImplicitOne<T> {}
 // incorrect/insufficiently general).
 extension InheritImplicitOne: P5 where T: P1 {}
 // expected-error@-1{{conditional conformance of type 'InheritImplicitOne<T>' to protocol 'P5' does not imply conformance to inherited protocol 'P2'}}
-// expected-note@-2{{did you mean to explicitly state the conformance with the same bounds?}}
-// expected-note@-3{{did you mean to explicitly state the conformance with different bounds?}}
+// expected-note@-2{{did you mean to explicitly state the conformance like 'extension InheritImplicitOne: P2 where ...'?}}
 
 struct InheritImplicitTwo<T> {}
 // Even if we relax the rule about implication, this double-up should still be
 // an error, because either conformance could imply InheritImplicitTwo: P2.
 extension InheritImplicitTwo: P5 where T: P1 {}
 // expected-error@-1{{conditional conformance of type 'InheritImplicitTwo<T>' to protocol 'P5' does not imply conformance to inherited protocol 'P2'}}
-// expected-note@-2{{did you mean to explicitly state the conformance with the same bounds?}}
-// expected-note@-3{{did you mean to explicitly state the conformance with different bounds?}}
+// expected-note@-2{{did you mean to explicitly state the conformance like 'extension InheritImplicitTwo: P2 where ...'?}}
 extension InheritImplicitTwo: P6 where T: P1 {}
 
 // However, if there's a non-conditional conformance that implies something, we

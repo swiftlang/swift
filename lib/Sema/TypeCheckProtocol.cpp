@@ -1300,8 +1300,9 @@ static void diagnoseConformanceImpliedByConditionalConformance(
   // want to encourage it.
 
   auto ext = cast<ExtensionDecl>(implyingConf->getDeclContext());
+  auto &ctxt = ext->getASTContext();
 
-  auto &SM = ext->getASTContext().SourceMgr;
+  auto &SM = ctxt.SourceMgr;
   StringRef extraIndent;
   StringRef indent = Lexer::getIndentationForLine(SM, loc, &extraIndent);
 
@@ -1322,6 +1323,16 @@ static void diagnoseConformanceImpliedByConditionalConformance(
                  << indent << extraIndent << "<#witnesses#>\n"
                  << indent << "}\n\n"
                  << indent;
+  }
+
+  if (!ctxt.LangOpts.DiagnosticsEditorMode) {
+    // The fixits below are too complicated for the command line: the suggested
+    // code ends up not being displayed, and the text by itself doesn't help. So
+    // instead we skip all that and just have some text.
+    Diags.diagnose(loc,
+                   diag::note_explicitly_state_conditional_conformance_noneditor,
+                   prefix.str());
+    return;
   }
 
   // First, we do the fixit for "matching" requirements (i.e. X: P where T: P).
