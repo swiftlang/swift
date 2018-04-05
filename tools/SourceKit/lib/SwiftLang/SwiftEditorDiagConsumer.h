@@ -24,6 +24,7 @@ class EditorDiagConsumer : public swift::DiagnosticConsumer {
   /// Maps from a BufferID to the diagnostics that were emitted inside that
   /// buffer.
   llvm::DenseMap<unsigned, DiagnosticsTy> BufferDiagnostics;
+  DiagnosticsTy InvalidLocDiagnostics;
 
   SmallVector<unsigned, 8> InputBufIDs;
   int LastDiagBufferID = -1;
