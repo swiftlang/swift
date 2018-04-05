@@ -884,7 +884,8 @@ static bool performCompile(CompilerInstance &Instance,
     return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action))
-    Instance.performParseOnly();
+    Instance.performParseOnly(/*EvaluateConditionals*/
+                    Action == FrontendOptions::ActionType::EmitImportedModules);
   else
     Instance.performSema();
 

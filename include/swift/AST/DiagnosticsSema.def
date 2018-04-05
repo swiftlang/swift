@@ -1453,6 +1453,9 @@ NOTE(note_explicitly_state_conditional_conformance_relaxed,none,
      "did you mean to explicitly state the conformance with relaxed bounds?", ())
 NOTE(note_explicitly_state_conditional_conformance_same,none,
      "did you mean to explicitly state the conformance with the same bounds?", ())
+NOTE(note_explicitly_state_conditional_conformance_noneditor,none,
+     "did you mean to explicitly state the conformance like '%0where ...'?",
+     (StringRef))
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
