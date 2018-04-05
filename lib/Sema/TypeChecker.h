@@ -2309,13 +2309,18 @@ public:
 
   bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
                                 const DeclContext *DC,
-                                FragileFunctionKind Kind);
+                                FragileFunctionKind Kind,
+                                bool TreatUsableFromInlineAsPublic);
 
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///
+  /// The second element of the pair is true if references to @usableFromInline
+  /// declarations are permitted.
+  ///
   /// \see FragileFunctionKind
-  FragileFunctionKind getFragileFunctionKind(const DeclContext *DC);
+  std::pair<FragileFunctionKind, bool>
+  getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
   ///

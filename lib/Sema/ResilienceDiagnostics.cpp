@@ -23,13 +23,17 @@
 using namespace swift;
 using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 
-FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
+std::pair<FragileFunctionKind, bool>
+TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   for (; DC->isLocalContext(); DC = DC->getParent()) {
-    if (isa<DefaultArgumentInitializer>(DC))
-      return FragileFunctionKind::DefaultArgument;
+    if (isa<DefaultArgumentInitializer>(DC)) {
+      return std::make_pair(FragileFunctionKind::DefaultArgument,
+                            /*treatUsableFromInlineAsPublic=*/true);
+    }
 
     if (isa<PatternBindingInitializer>(DC))
-      return FragileFunctionKind::PropertyInitializer;
+      return std::make_pair(FragileFunctionKind::PropertyInitializer,
+                            /*treatUsableFromInlineAsPublic=*/true);
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // If the function is a nested function, we will serialize its body if
@@ -40,20 +44,24 @@ FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
       // Bodies of public transparent and always-inline functions are
       // serialized, so use conservative access patterns.
       if (AFD->isTransparent())
-        return FragileFunctionKind::Transparent;
+        return std::make_pair(FragileFunctionKind::Transparent,
+                              /*treatUsableFromInlineAsPublic=*/true);
 
       if (AFD->getAttrs().hasAttribute<InlinableAttr>())
-        return FragileFunctionKind::Inlinable;
+        return std::make_pair(FragileFunctionKind::Inlinable,
+                              /*treatUsableFromInlineAsPublic=*/true);
 
       if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
         if (attr->getKind() == InlineKind::Always)
-          return FragileFunctionKind::InlineAlways;
+          return std::make_pair(FragileFunctionKind::InlineAlways,
+                                /*treatUsableFromInlineAsPublic=*/true);
 
       // If a property or subscript is @inlinable, the accessors are
       // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
         if (accessor->getStorage()->getAttrs().getAttribute<InlinableAttr>())
-          return FragileFunctionKind::Inlinable;
+          return std::make_pair(FragileFunctionKind::Inlinable,
+                                /*treatUsableFromInlineAsPublic=*/true);
     }
   }
 
@@ -64,16 +72,18 @@ void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
   auto *DC = NTD->getDeclContext();
   auto expansion = DC->getResilienceExpansion();
   if (expansion == ResilienceExpansion::Minimal) {
+    auto kind = getFragileFunctionKind(DC);
     diagnose(NTD, diag::local_type_in_inlinable_function,
              NTD->getFullName(),
-             static_cast<unsigned>(getFragileFunctionKind(DC)));
+             static_cast<unsigned>(kind.first));
   }
 }
 
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            const ValueDecl *D,
                                            const DeclContext *DC,
-                                           FragileFunctionKind Kind) {
+                                           FragileFunctionKind Kind,
+                                           bool TreatUsableFromInlineAsPublic) {
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;
@@ -84,7 +94,7 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
 
   // Public declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              /*treatUsableFromInlineAsPublic*/true).isPublic())
+                              TreatUsableFromInlineAsPublic).isPublic())
     return false;
 
   // Enum cases are handled as part of their containing enum.
