@@ -2298,9 +2298,6 @@ public:
 
   void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
-                                const DeclContext *DC);
-
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
@@ -2309,6 +2306,10 @@ public:
     DefaultArgument,
     PropertyInitializer
   };
+
+  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+                                const DeclContext *DC,
+                                FragileFunctionKind Kind);
 
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.

@@ -72,13 +72,8 @@ void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
 
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            const ValueDecl *D,
-                                           const DeclContext *DC) {
-  auto expansion = DC->getResilienceExpansion();
-
-  // Internal declarations referenced from non-inlinable contexts are OK.
-  if (expansion == ResilienceExpansion::Maximal)
-    return false;
-
+                                           const DeclContext *DC,
+                                           FragileFunctionKind Kind) {
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;
@@ -89,7 +84,7 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
 
   // Public declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              /*respectVersionedAttr=*/true).isPublic())
+                              /*treatUsableFromInlineAsPublic*/true).isPublic())
     return false;
 
   // Enum cases are handled as part of their containing enum.
@@ -114,7 +109,7 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   diagnose(loc, diag::resilience_decl_unavailable,
            D->getDescriptiveKind(), D->getFullName(),
            D->getFormalAccessScope().accessLevelForDiagnostics(),
-           static_cast<unsigned>(getFragileFunctionKind(DC)));
+           static_cast<unsigned>(Kind));
 
   bool isDefaultArgument = false;
   while (DC->isLocalContext()) {

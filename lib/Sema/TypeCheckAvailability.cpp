@@ -2233,10 +2233,16 @@ class AvailabilityWalker : public ASTWalker {
   DeclContext *DC;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
+  ResilienceExpansion Expansion;
+  Optional<TypeChecker::FragileFunctionKind> FragileKind;
 
 public:
   AvailabilityWalker(
-      TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {}
+      TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {
+    Expansion = DC->getResilienceExpansion();
+    if (Expansion == ResilienceExpansion::Minimal)
+      FragileKind = TC.getFragileFunctionKind(DC);
+  }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     ExprStack.push_back(E);
@@ -2457,9 +2463,10 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
       return true;
   }
 
-  if (R.isValid())
-    if (TC.diagnoseInlinableDeclRef(R.Start, D, DC))
-      return true;
+  if (FragileKind)
+    if (R.isValid())
+      if (TC.diagnoseInlinableDeclRef(R.Start, D, DC, *FragileKind))
+        return true;
 
   if (TC.diagnoseExplicitUnavailability(D, R, DC, call))
     return true;
