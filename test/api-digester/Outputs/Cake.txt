@@ -1,4 +1,6 @@
 
+/* RawRepresentable Changes */
+
 /* Removed Decls */
 cake1: Constructor Somestruct2.init(_:) has been removed
 cake1: Func C4.foo() has been removed
