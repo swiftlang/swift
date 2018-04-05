@@ -2091,7 +2091,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // This is really painful. We need better abstractions for dealing with
   // @usableFromInline.
   if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
-                                      /*isUsableFromInline=*/true)
+                                      /*treatUsableFromInlineAsPublic=*/true)
         >= AccessLevel::Public) {
     if (access == AccessLevel::Internal &&
         !superclassCtor->isDynamic()) {
@@ -2102,7 +2102,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Inherit the @inlinable attribute.
   if (ctor->getFormalAccess(/*useDC=*/nullptr,
-                            /*isUsableFromInline=*/true)
+                            /*treatUsableFromInlineAsPublic=*/true)
         >= AccessLevel::Public) {
     if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
       auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
