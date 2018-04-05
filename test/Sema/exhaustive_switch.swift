@@ -367,8 +367,7 @@ func checkDiagnosticMinimality(x: Runcible?) {
   switch (x!, x!) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.fork, _)'}}
   // expected-note@-2 {{add missing case: '(.hat, .hat)'}}
-  // expected-note@-3 {{add missing case: '(.hat, .fork)'}}
-  // expected-note@-4 {{add missing case: '(_, .fork)'}}
+  // expected-note@-3 {{add missing case: '(_, .fork)'}}
   case (.spoon, .spoon):
     break
   case (.spoon, .hat):
@@ -380,9 +379,8 @@ func checkDiagnosticMinimality(x: Runcible?) {
   switch (x!, x!) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.fork, _)'}}
   // expected-note@-2 {{add missing case: '(.hat, .spoon)'}}
-  // expected-note@-3 {{add missing case: '(.hat, .fork)'}}
-  // expected-note@-4 {{add missing case: '(.spoon, .hat)'}}
-  // expected-note@-5 {{add missing case: '(_, .fork)'}}
+  // expected-note@-3 {{add missing case: '(.spoon, .hat)'}}
+  // expected-note@-4 {{add missing case: '(_, .fork)'}}
   case (.spoon, .spoon):
     break
   case (.hat, .hat):
@@ -545,13 +543,13 @@ indirect enum MutuallyRecursive {
 
 func infinitelySized() -> Bool {
   switch (InfinitelySized.one, InfinitelySized.one) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 10 {{add missing case:}}
+  // expected-note@-1 8 {{add missing case:}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
   
   switch (MutuallyRecursive.one, MutuallyRecursive.one) { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 10 {{add missing case:}}
+  // expected-note@-1 8 {{add missing case:}}
   case (.one, .one): return true
   case (.two, .two): return true
   }
@@ -835,7 +833,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   }
 
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{none}}
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{3-3=@unknown case _:\n<#fatalError#>()\n}}
   case .a: break
   case .b: break
   }
@@ -948,7 +946,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   }
 
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{none}}
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{3-3=@unknown case _:\n<#fatalError#>()\n}}
   case .a: break
   case .b: break
   }

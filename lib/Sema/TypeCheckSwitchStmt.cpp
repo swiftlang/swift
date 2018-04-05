@@ -447,6 +447,9 @@ namespace {
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
           return this->getBoolValue() == other.getBoolValue();
 
+        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::UnknownCase):
+          return false;
+
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Constructor, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant):
@@ -1264,7 +1267,8 @@ namespace {
           return;
         }
 
-        diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space());
+        diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
+                             unknownCase);
         return;
       }
 
@@ -1291,20 +1295,20 @@ namespace {
         if (Space::canDecompose(uncovered.getType(), DC)) {
           SmallVector<Space, 4> spaces;
           Space::decompose(TC, DC, uncovered.getType(), spaces);
-          diagnoseMissingCases(RequiresDefault::No, Space(spaces),
-                               /*sawDowngradablePattern*/false, unknownCase);
+          diagnoseMissingCases(RequiresDefault::No, Space(spaces), unknownCase,
+                               /*sawDowngradablePattern*/false);
         } else {
           diagnoseMissingCases(Switch->getCases().empty()
                                  ? RequiresDefault::EmptySwitchBody
                                  : RequiresDefault::UncoveredSwitch,
-                               uncovered, /*sawDowngradablePattern*/false,
-                               unknownCase);
+                               uncovered, unknownCase,
+                               /*sawDowngradablePattern*/false);
         }
         return;
       }
 
-      diagnoseMissingCases(RequiresDefault::No, uncovered,
-                           sawDowngradablePattern, unknownCase);
+      diagnoseMissingCases(RequiresDefault::No, uncovered, unknownCase,
+                           sawDowngradablePattern);
     }
     
     enum class RequiresDefault {
@@ -1315,25 +1319,23 @@ namespace {
     };
 
     void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
-                              bool sawDowngradablePattern = false,
-                              bool hasUnknownCase = false) {
+                              const CaseStmt *unknownCase = nullptr,
+                              bool sawDowngradablePattern = false) {
       SourceLoc startLoc = Switch->getStartLoc();
-      SourceLoc endLoc = Switch->getEndLoc();
+      SourceLoc insertLoc;
+      if (unknownCase)
+        insertLoc = unknownCase->getStartLoc();
+      else
+        insertLoc = Switch->getEndLoc();
       StringRef placeholder = getCodePlaceholder();
       llvm::SmallString<128> buffer;
       llvm::raw_svector_ostream OS(buffer);
 
       bool InEditor = TC.Context.LangOpts.DiagnosticsEditorMode;
 
-      // If the space isn't a disjunct then make it one. This simplifies logic
-      // down below that wants to iterate over all uncovered patterns.
-      if (!uncovered.isEmpty() && uncovered.getKind() != SpaceKind::Disjunct) {
-        uncovered = Space(llvm::makeArrayRef(uncovered));
-      }
-
       // Decide whether we want an error or a warning.
       auto mainDiagType = diag::non_exhaustive_switch;
-      if (!uncovered.isEmpty() && hasUnknownCase) {
+      if (!uncovered.isEmpty() && unknownCase) {
         assert(defaultReason == RequiresDefault::No);
         mainDiagType = diag::non_exhaustive_switch_warn;
       }
@@ -1367,21 +1369,21 @@ namespace {
       case RequiresDefault::EmptySwitchBody: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
         TC.diagnose(startLoc, diag::empty_switch_stmt)
-          .fixItInsert(endLoc, buffer.str());
+          .fixItInsert(insertLoc, buffer.str());
       }
         return;
       case RequiresDefault::UncoveredSwitch: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
         TC.diagnose(startLoc, mainDiagType);
         TC.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
-          .fixItInsert(endLoc, buffer.str());
+          .fixItInsert(insertLoc, buffer.str());
       }
         return;
       case RequiresDefault::SpaceTooLarge: {
         OS << tok::kw_default << ":\n" << "<#fatalError()#>" << "\n";
         TC.diagnose(startLoc, diag::non_exhaustive_switch);
         TC.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
-          .fixItInsert(endLoc, buffer.str());
+          .fixItInsert(insertLoc, buffer.str());
       }
         return;
       }
@@ -1390,6 +1392,61 @@ namespace {
       if (uncovered.isEmpty()) return;
 
       TC.diagnose(startLoc, mainDiagType);
+
+      // Add notes to explain what's missing.
+      auto processUncoveredSpaces =
+          [&](llvm::function_ref<void(const Space &space,
+                                      bool onlyOneUncoveredSpace)> process) {
+
+        // Flatten away all disjunctions.
+        SmallVector<Space, 4> flats;
+        flatten(uncovered, flats);
+
+        // Then figure out which of the remaining spaces are interesting.
+        // To do this, we sort by size, largest spaces first...
+        SmallVector<const Space *, 4> flatsSortedBySize;
+        flatsSortedBySize.reserve(flats.size());
+        for (const Space &space : flats)
+          flatsSortedBySize.push_back(&space);
+        std::stable_sort(flatsSortedBySize.begin(), flatsSortedBySize.end(),
+                         [&](const Space *left, const Space *right) {
+          return left->getSize(TC, DC) > right->getSize(TC, DC);
+        });
+
+        // ...and then remove any of the later spaces that are contained
+        // entirely in an earlier one.
+        SmallPtrSet<const Space *, 4> flatsToEmit;
+        for (const Space *space : flatsSortedBySize) {
+          bool alreadyHandled =
+              llvm::any_of(flatsToEmit, [&](const Space *previousSpace) {
+            return space->isSubspace(*previousSpace, TC, DC);
+          });
+          if (alreadyHandled)
+            continue;
+          flatsToEmit.insert(space);
+        }
+
+        // Finally we can iterate over the flat spaces in their original order,
+        // but only emit the interesting ones.
+        for (const Space &flat : flats) {
+          if (!flatsToEmit.count(&flat))
+            continue;
+
+          if (flat.getKind() == SpaceKind::UnknownCase) {
+            assert(&flat == &flats.back() && "unknown case must be last");
+            if (unknownCase) {
+              // This can occur if the /only/ case in the switch is 'unknown'.
+              // In that case we won't do any analysis on the input space, but
+              // will later decompose the space into cases.
+              continue;
+            }
+            if (!TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics)
+              continue;
+          }
+
+          process(flat, flats.size() == 1);
+        }
+      };
 
       // If editing is enabled, emit a formatted error of the form:
       //
@@ -1408,72 +1465,44 @@ namespace {
       if (InEditor) {
         buffer.clear();
 
-        SmallVector<Space, 8> emittedSpaces;
-        for (auto &uncoveredSpace : uncovered.getSpaces()) {
-          SmallVector<Space, 4> flats;
-          flatten(uncoveredSpace, flats);
-          for (auto &flat : flats) {
-            if (flat.isSubspace(Space(emittedSpaces), TC, DC)) {
-              continue;
+        bool alreadyEmittedSomething = false;
+        processUncoveredSpaces([&](const Space &space,
+                                   bool onlyOneUncoveredSpace) {
+          if (space.getKind() == SpaceKind::UnknownCase) {
+            OS << "@unknown " << tok::kw_case << " _";
+            if (onlyOneUncoveredSpace) {
+              OS << ":\n<#fatalError()#>\n";
+              TC.diagnose(startLoc, diag::missing_unknown_case)
+                .fixItInsert(insertLoc, buffer.str());
+              alreadyEmittedSomething = true;
+              return;
             }
-
-            if (flat.getKind() == SpaceKind::UnknownCase) {
-              if (hasUnknownCase) {
-                // This can occur if the /only/ case in the switch is 'unknown'.
-                // In that case we won't do any analysis on the input space, but
-                // will later decompose the space into cases.
-                continue;
-              }
-              if (!TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics)
-                continue;
-              OS << "@unknown " << tok::kw_case << " _";
-              assert(&flat == &flats.back() && "unknown case must be last");
-            } else {
-              OS << tok::kw_case << " ";
-              flat.show(OS);
-            }
-            OS << ":\n" << placeholder << "\n";
-
-            emittedSpaces.push_back(flat);
+          } else {
+            OS << tok::kw_case << " ";
+            space.show(OS);
           }
-        }
+          OS << ":\n" << placeholder << "\n";
+        });
 
-        TC.diagnose(startLoc, diag::missing_several_cases, false)
-          .fixItInsert(endLoc, buffer.str());
+        if (!alreadyEmittedSomething) {
+          TC.diagnose(startLoc, diag::missing_several_cases, false)
+            .fixItInsert(insertLoc, buffer.str());
+        }
 
       } else {
-        SmallVector<Space, 8> emittedSpaces;
-        for (auto &uncoveredSpace : uncovered.getSpaces()) {
-          SmallVector<Space, 4> flats;
-          flatten(uncoveredSpace, flats);
-          std::stable_sort(flats.begin(), flats.end(),
-                           [this](const Space &left, const Space &right) {
-            return left.getSize(TC, DC) > right.getSize(TC, DC);
-          });
-          for (auto &flat : flats) {
-            if (flat.isSubspace(Space(emittedSpaces), TC, DC)) {
-              continue;
-            }
-            
-            if (flat.getKind() == SpaceKind::UnknownCase) {
-              if (hasUnknownCase) {
-                // This can occur if the /only/ case in the switch is 'unknown'.
-                // In that case we won't do any analysis on the input space, but
-                // will later decompose the space into cases.
-                continue;
-              }
-              if (TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics)
-                TC.diagnose(startLoc, diag::missing_unknown_case);
-              continue;
-            }
-
-            buffer.clear();
-            flat.show(OS);
-            TC.diagnose(startLoc, diag::missing_particular_case, buffer.str());
-            
-            emittedSpaces.push_back(flat);
+        processUncoveredSpaces([&](const Space &space,
+                                   bool onlyOneUncoveredSpace) {
+          if (space.getKind() == SpaceKind::UnknownCase) {
+            auto note = TC.diagnose(startLoc, diag::missing_unknown_case);
+            if (onlyOneUncoveredSpace)
+              note.fixItInsert(insertLoc, "@unknown case _:\n<#fatalError#>()\n");
+            return;
           }
-        }
+
+          buffer.clear();
+          space.show(OS);
+          TC.diagnose(startLoc, diag::missing_particular_case, buffer.str());
+        });
       }
     }
 

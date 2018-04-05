@@ -130,6 +130,7 @@ struct FixitFilter {
         Info.ID == diag::objc_inference_swift3_objc_derived.ID ||
         Info.ID == diag::missing_several_cases.ID ||
         Info.ID == diag::missing_particular_case.ID ||
+        Info.ID == diag::missing_unknown_case.ID ||
         Info.ID == diag::paren_void_probably_void.ID ||
         Info.ID == diag::make_decl_objc.ID ||
         Info.ID == diag::optional_req_nonobjc_near_match_add_objc.ID)
