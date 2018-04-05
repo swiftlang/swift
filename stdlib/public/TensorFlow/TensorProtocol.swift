@@ -18,7 +18,7 @@
 /// (`Tensor1D`, `Tensor2D`, etc). Common tensor properties and operations are
 /// defined on `TensorProtocol`.
 ///
-/// NOTE: `TensorProtocol` intentionally does not refine `Collection` in order
+/// - Note: `TensorProtocol` intentionally does not refine `Collection` in order
 /// for predictable and guaranteed acceleration. Methods for indexing/slicing
 /// are defined as standalone subscript methods. Users are encouraged to use
 /// aggregate operations rather than loops when working with `TensorProtocol`
@@ -32,17 +32,17 @@ public protocol TensorProtocol {
   /// The number of dimensions of the tensor.
   var rank: Int32 { get }
 
-  /// The sizes of the tensor along each dimension.
+  /// The dimensions of the tensor.
   var shape: TensorShape { get }
 
   /// The number of scalars in the tensor.
   /// Always equal to the product of the elements of `shape`.
   var scalarCount: Int32 { get }
 
-  /// Scalars of the tensor, in row-major order.
+  /// The scalars of the tensor, in row-major order.
   var scalars: [Scalar] { get }
 
-  /// Underlying tensor handle.
+  /// The underlying `TensorHandle`.
   /// - Note: Do NOT remove this. This is a compiler requirement.
   var handle: TensorHandle<Scalar> { get }
 
@@ -55,24 +55,30 @@ public protocol TensorProtocol {
 // Memory transfer markers
 //===----------------------------------------------------------------------===//
 
-// TODO: Remove when send/receive semantics gets revisited.
+/// TODO: Remove when send/receive semantics gets revisited.
 public extension TensorProtocol {
+  /// Mark memory transfer to device.
   @_inlineable @inline(__always)
   func toDevice() -> Self {
     return Self(handle: _TFSend(handle))
   }
 
+  /// Mark memory transfer to host.
   @_inlineable @inline(__always)
   func toHost() -> Self {
     return Self(handle: _TFReceive(handle))
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Parameter aggregate
+//===----------------------------------------------------------------------===//
 
 public protocol ParameterAggregate {
   associatedtype Parameter : TensorProtocol
     where Parameter.Scalar : FloatingPoint
   typealias Scalar = Parameter.Scalar
-  mutating func update(with other: Self,
+  /// Update self with the gradient value using the `updateParameter` function.
+  mutating func update(with gradient: Self,
                        by updateParameter: (inout Parameter, Parameter) -> Void)
 }

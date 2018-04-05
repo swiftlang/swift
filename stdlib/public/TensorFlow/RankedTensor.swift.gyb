@@ -55,6 +55,8 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
   @_versioned
   internal var base: Tensor<Scalar>
 
+  /// The number of dimensions of the `${TensorXD}`.
+  /// `rank` is always equal to ${rank} for `${TensorXD}`.
   @_inlineable
   public static var rank: Int32 {
     @inline(__always)
@@ -63,6 +65,8 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     }
   }
 
+  /// The number of dimensions of the `${TensorXD}`.
+  /// `rank` is always equal to ${rank} for `${TensorXD}`.
   @_inlineable
   public var rank: Int32 {
     @inline(__always)
@@ -71,14 +75,16 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     }
   }
 
+  /// The dimensions of the `${TensorXD}`.
   @_inlineable
-  public var scalars: [Scalar] {
+  public var shape: TensorShape {
     @inline(__always)
     get {
-      return base.scalars
+      return base.shape
     }
   }
 
+  /// The number of scalars in the `${TensorXD}`.
   @_inlineable
   public var scalarCount: Int32 {
     @inline(__always)
@@ -87,19 +93,21 @@ public struct ${TensorXD}<Scalar : AccelerableByTensorFlow> : TensorProtocol {
     }
   }
 
+  /// The scalars of the `${TensorXD}`, in row-major order.
+  @_inlineable
+  public var scalars: [Scalar] {
+    @inline(__always)
+    get {
+      return base.scalars
+    }
+  }
+
+  /// The underlying `TensorHandle`.
   @_inlineable
   public var handle: TensorHandle<Scalar> {
     @inline(__always)
     get {
       return base.handle
-    }
-  }
-
-  @_inlineable
-  public var shape: TensorShape {
-    @inline(__always)
-    get {
-      return base.shape
     }
   }
 

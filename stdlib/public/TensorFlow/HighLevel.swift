@@ -35,7 +35,7 @@ public protocol Parameterized {
   /// marked with `@parameter`.
   associatedtype Parameters : ParameterAggregate
 
-  /// A synthesized instance of Parameters.
+  /// A synthesized instance of `Parameters`.
   var parameters: Parameters { get set }
 }
 
@@ -179,16 +179,15 @@ public protocol Learnable : DifferentiableModule {
 
 /// A reference type whose instances can optimize `Learnable` trainees.
 ///
-/// `Optimizer` instances can optimize `Trainee` instances given the gradient of
-/// the trainee's parameters.
+/// `Optimizer` instances can optimize `ParameterAggregate` instances given
+/// their gradient.
 public protocol Optimizer : AnyObject {
   associatedtype Scalar : BinaryFloatingPoint
 
   /// The learning rate for gradient descent.
   var learningRate: Scalar { get }
 
-  /// Optimizes the parameters of a `Trainee` instance given the gradient of the
-  /// trainee's parameters.
+  /// Optimizes a `ParameterAggregate` instance given its gradient.
   func optimize<P : ParameterAggregate>(_ parameters: inout P, gradient: P)
     where P.Scalar == Scalar
 }
@@ -197,6 +196,7 @@ public protocol Optimizer : AnyObject {
 // Common optimizers
 //===----------------------------------------------------------------------===//
 
+/// A stochastic gradient descent optimizer.
 @_fixed_layout
 public final class StochasticGradientDescent<Scalar> : Optimizer
   where Scalar : BinaryFloatingPoint {
@@ -375,8 +375,8 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
 /// A fully-connected layer with weight and bias tensors. Fully-connected layers
 /// apply a linear transformation to inputs.
 // TODO:
-// - Add initializers that take in input/output sizes and initialization
-//   strategies for weight/bias (ones, zeros, random uniform, etc).
+// - Add initialization strategies for weight/bias (ones, zeros, random uniform,
+//   etc).
 @_fixed_layout
 public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   where Scalar : FloatingPoint & AccelerableByTensorFlow {
@@ -402,6 +402,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     self.bias = bias
   }
 
+  /// Creates a new instance with the specified input and output counts.
   @_inlineable @inline(__always)
   public init(inputCount: Int32, outputCount: Int32) {
     self.init(weight: Tensor(randomNormal: [inputCount, outputCount]),

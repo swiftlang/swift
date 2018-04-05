@@ -56,7 +56,7 @@ infix operator ++ : AdditionPrecedence
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar : Numeric {
-  /// Perform an element-wise type conversion from a Bool tensor.
+  /// Perform an element-wise type conversion from a `Bool` tensor.
   @_inlineable @inline(__always)
   init(_ other: BoolTensor) {
     self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
@@ -64,22 +64,28 @@ public extension TensorProtocol where Scalar : Numeric {
 }
 
 //===----------------------------------------------------------------------===//
-// Elementwise binary arithmetics
+// Element-wise binary arithmetics
 //===----------------------------------------------------------------------===//
 
 extension TensorProtocol where Scalar : Numeric {
+  /// Adds two tensors and produces their sum.
+  /// - Note: `+` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointAdd(_:_:partial:seed:))
   public static func + (lhs: Self, rhs: Self) -> Self {
     return #tfop("Add", lhs, rhs)
   }
 
+  /// Subtracts one tensor from another and produces their difference.
+  /// - Note: `-` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointSubtract(_:_:partial:seed:))
   public static func - (lhs: Self, rhs: Self) -> Self {
     return #tfop("Sub", lhs, rhs)
   }
 
+  /// Multiplies two tensors and produces their product.
+  /// - Note: `*` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointMultiply(_:_:partial:seed:))
   public static func * (lhs: Self, rhs: Self) -> Self {
@@ -88,112 +94,156 @@ extension TensorProtocol where Scalar : Numeric {
 }
 
 public extension TensorProtocol where Scalar : Numeric {
+  /// Adds the scalar to every scalar of the tensor and produces the sum.
   @_inlineable @inline(__always)
   static func + (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) + rhs
   }
 
+  /// Adds the scalar to every scalar of the tensor and produces the sum.
   @_inlineable @inline(__always)
   static func + (lhs: Self, rhs: Scalar) -> Self {
     return lhs + Self(handle: _TFMakeScalarTensor(rhs))
   }
 
+  /// Adds two tensors and stores the result in the left-hand-side variable.
+  /// - Note: `+=` supports broadcasting.
   @_inlineable @inline(__always)
   static func += (lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
+  /// Adds the scalar to every scalar of the tensor and stores the result in the
+  /// left-hand-side variable.
   @_inlineable @inline(__always)
   static func += (lhs: inout Self, rhs: Scalar) {
     lhs = lhs + rhs
   }
 
+  /// Subtracts the scalar from every scalar of the tensor and produces the
+  /// difference.
   @_inlineable @inline(__always)
   static func - (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) - rhs
   }
 
+  /// Subtracts the scalar from every scalar of the tensor and produces the
+  /// difference.
   @_inlineable @inline(__always)
   static func - (lhs: Self, rhs: Scalar) -> Self {
     return lhs - Self(handle: _TFMakeScalarTensor(rhs))
   }
 
+  /// Subtracts the second tensor from the first and stores the result in the
+  /// left-hand-side variable.
+  /// - Note: `-=` supports broadcasting.
   @_inlineable @inline(__always)
   static func -= (lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
 
+  /// Subtracts the scalar from every scalar of the tensor and stores the result
+  /// in the left-hand-side variable.
   @_inlineable @inline(__always)
   static func -= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs - rhs
   }
 
+  /// Multiplies the scalar with every scalar of the tensor and produces the
+  /// product.
   @_inlineable @inline(__always)
   static func * (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) * rhs
   }
 
+  /// Multiplies the scalar with every scalar of the tensor and produces the
+  /// product.
   @_inlineable @inline(__always)
   static func * (lhs: Self, rhs: Scalar) -> Self {
     return lhs * Self(handle: _TFMakeScalarTensor(rhs))
   }
 
+  /// Multiplies two tensors and stores the result in the left-hand-side
+  /// variable.
+  /// - Note: `*=` supports broadcasting.
   @_inlineable @inline(__always)
   static func *= (lhs: inout Self, rhs: Self) {
     lhs = lhs * rhs
   }
 
+  /// Multiplies the scalar with every scalar of the tensor and stores the
+  /// result in the left-hand-side variable.
   @_inlineable @inline(__always)
   static func *= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs * rhs
   }
 
+  /// Returns the quotient of dividing the first tensor by the second.
+  /// - Note: `/` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointDivide(_:_:partial:seed:))
   static func / (lhs: Self, rhs: Self) -> Self {
     return #tfop("Div", lhs, rhs)
   }
 
+  /// Returns the quotient of dividing the scalar by the tensor, broadcasting
+  /// the scalar.
   @_inlineable @inline(__always)
   static func / (lhs: Scalar, rhs: Self) -> Self {
     return Self(handle: _TFMakeScalarTensor(lhs)) / rhs
   }
 
+  /// Returns the quotient of dividing the tensor by the scalar, broadcasting
+  /// the scalar.
   @_inlineable @inline(__always)
   static func / (lhs: Self, rhs: Scalar) -> Self {
     return lhs / Self(handle: _TFMakeScalarTensor(rhs))
   }
 
+  /// Divides the first tensor by the second and stores the quotient in the
+  /// left-hand-side variable.
   @_inlineable @inline(__always)
   static func /= (lhs: inout Self, rhs: Self) {
     lhs = lhs / rhs
   }
 
+  /// Divides the tensor by the scalar, broadcasting the scalar, and stores the
+  /// quotient in the left-hand-side variable.
   @_inlineable @inline(__always)
   static func /= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs / rhs
   }
 
+  /// Returns the remainder of dividing the first tensor by the second.
+  /// - Note: `%` supports broadcasting.
   @_inlineable @inline(__always)
   static func % (lhs: Self, rhs: Self) -> Self {
     return #tfop("Mod", lhs, rhs)
   }
 
+  /// Returns the remainder of dividing the tensor by the scalar, broadcasting
+  /// the scalar.
   @_inlineable @inline(__always)
   static func % (lhs: Self, rhs: Scalar) -> Self {
     return #tfop("Mod", lhs, _TFMakeScalarTensor(rhs))
   }
 
+  /// Returns the remainder of dividing the scalar by the tensor, broadcasting
+  /// the scalar.
   @_inlineable @inline(__always)
   static func % (lhs: Scalar, rhs: Self) -> Self {
     return #tfop("Mod", _TFMakeScalarTensor(lhs), rhs)
   }
 
+  /// Divides the first tensor by the second and stores the remainder in the
+  /// left-hand-side variable.
   @_inlineable @inline(__always)
   static func %= (lhs: inout Self, rhs: Self) {
     lhs = lhs % rhs
   }
 
+  /// Divides the tensor by the scalar and stores the remainder in the
+  /// left-hand-side variable.
   @_inlineable @inline(__always)
   static func %= (lhs: inout Self, rhs: Scalar) {
     lhs = lhs % rhs
@@ -205,16 +255,18 @@ public extension TensorProtocol where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar : Numeric {
+  /// Performs matrix multiplication with another tensor and produces the
+  /// result.
   @_inlineable @inline(__always)
-  // FIXME: Uncomment @differentiable attribute when differenting with respect
-  // to `self` is fixed.
-  // @differentiable(
-  //   withRespectTo: (self, .0), gradient: _adjointDot(_:partial:seed:)
-  // )
+  @differentiable(
+    withRespectTo: (self, .0), gradient: _adjointDot(_:partial:seed:)
+  )
   func dot(_ other: Self) -> Self {
     return #tfop("MatMul", self, other)
   }
 
+  /// Performs matrix multiplication between two tensors and produces the
+  /// result.
   @_inlineable @inline(__always)
   static func ⊗ (lhs: Self, rhs: Self) -> Self {
     return lhs.dot(rhs)
@@ -222,65 +274,81 @@ public extension TensorProtocol where Scalar : Numeric {
 }
 
 //===----------------------------------------------------------------------===//
-// Elementwise binary comparison
+// Element-wise binary comparison
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar : Comparable {
+  /// Computes `lhs < rhs` element-wise.
+  /// - Note: `<` supports broadcasting.
   @_inlineable @inline(__always)
   static func < (lhs: Self, rhs: Self) -> BoolTensor {
     return #tfop("Less", lhs, rhs)
   }
 
+  /// Computes `lhs < rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func < (lhs: Self, rhs: Scalar) -> BoolTensor {
     return #tfop("Less", lhs, _TFMakeScalarTensor(rhs))
   }
 
+  /// Computes `lhs < rhs`, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func < (lhs: Scalar, rhs: Self) -> BoolTensor {
     return #tfop("Less", _TFMakeScalarTensor(lhs), rhs)
   }
 
+  /// Computes `lhs <= rhs` element-wise.
+  /// - Note: `<=` supports broadcasting.
   @_inlineable @inline(__always)
   static func <= (lhs: Self, rhs: Self) -> BoolTensor {
     return #tfop("LessEqual", lhs, rhs)
   }
 
+  /// Computes `lhs <= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func <= (lhs: Self, rhs: Scalar) -> BoolTensor {
     return #tfop("LessEqual", lhs, _TFMakeScalarTensor(rhs))
   }
 
+  /// Computes `lhs <= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func <= (lhs: Scalar, rhs: Self) -> BoolTensor {
     return #tfop("LessEqual", _TFMakeScalarTensor(lhs), rhs)
   }
 
+  /// Computes `lhs > rhs` element-wise.
+  /// - Note: `>` supports broadcasting.
   @_inlineable @inline(__always)
   static func > (lhs: Self, rhs: Self) -> BoolTensor {
     return #tfop("Greater", lhs, rhs)
   }
 
+  /// Computes `lhs <= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func > (lhs: Self, rhs: Scalar) -> BoolTensor {
     return #tfop("Greater", lhs, _TFMakeScalarTensor(rhs))
   }
 
+  /// Computes `lhs <= rhs`, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func > (lhs: Scalar, rhs: Self) -> BoolTensor {
     return #tfop("Greater", _TFMakeScalarTensor(lhs), rhs)
   }
 
+  /// Computes `lhs >= rhs` element-wise.
+  /// - Note: `>=` supports broadcasting.
   @_inlineable @inline(__always)
   static func >= (lhs: Self, rhs: Self) -> BoolTensor {
     return #tfop("GreaterEqual", lhs, rhs)
   }
 
+  /// Computes `lhs >= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func >= (lhs: Self, rhs: Scalar) -> BoolTensor {
     return #tfop("GreaterEqual", lhs, _TFMakeScalarTensor(rhs))
   }
 
+  /// Computes `lhs >= rhs`, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func >= (lhs: Scalar, rhs: Self) -> BoolTensor {
     return #tfop("GreaterEqual", _TFMakeScalarTensor(lhs), rhs)
@@ -288,21 +356,27 @@ public extension TensorProtocol where Scalar : Comparable {
 }
 
 public extension TensorProtocol where Scalar : Equatable {
+  /// Computes `self == other` element-wise.
+  /// - Note: `elementsEqual` supports broadcasting.
   @_inlineable @inline(__always)
   func elementsEqual(_ other: Self) -> BoolTensor {
     return #tfop("Equal", self, other)
   }
 
+  /// Computes `self == other` element-wise, broadcasting `other`.
   @_inlineable @inline(__always)
   func elementsEqual(_ other: Scalar) -> BoolTensor {
     return #tfop("Equal", self, _TFMakeScalarTensor(other))
   }
 
+  /// Computes `self != other` element-wise.
+  /// - Note: `elementsNotEqual` supports broadcasting.
   @_inlineable @inline(__always)
   func elementsNotEqual(_ other: Self) -> BoolTensor {
     return #tfop("NotEqual", self, other)
   }
 
+  /// Computes `self != other` element-wise, broadcasting `other`.
   @_inlineable @inline(__always)
   func elementsNotEqual(_ other: Scalar) -> BoolTensor {
     return #tfop("NotEqual", self, _TFMakeScalarTensor(other))
@@ -310,36 +384,45 @@ public extension TensorProtocol where Scalar : Equatable {
 }
 
 public extension TensorProtocol where Scalar == Bool {
+  /// Performs a logical NOT operation element-wise.
   @_inlineable @inline(__always)
   static prefix func ! (x: Self) -> Self {
     return #tfop("LogicalNot", x)
   }
 
+  /// Performs a logical AND operation element-wise.
+  /// - Note: `&&` supports broadcasting.
   @_inlineable @inline(__always)
   static func && (lhs: Self, rhs: Self) -> Self {
     return #tfop("LogicalAnd", lhs, rhs)
   }
 
+  /// Performs a logical AND operation element-wise, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func && (lhs: Self, rhs: Scalar) -> Self {
     return #tfop("LogicalAnd", lhs, _TFMakeScalarTensor(rhs))
   }
 
+  /// Performs a logical AND operation element-wise, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func && (lhs: Scalar, rhs: Self) -> Self {
     return #tfop("LogicalAnd", _TFMakeScalarTensor(lhs), rhs)
   }
 
+  /// Performs a logical OR operation element-wise.
+  /// - Note: `||` supports broadcasting.
   @_inlineable @inline(__always)
   static func || (lhs: Self, rhs: Self) -> Self {
     return #tfop("LogicalOr", lhs, rhs)
   }
 
+  /// Performs a logical OR operation element-wise, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func || (lhs: Self, rhs: Scalar) -> Self {
     return #tfop("LogicalOr", lhs, _TFMakeScalarTensor(rhs))
   }
 
+  /// Performs a logical OR operation element-wise, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func || (lhs: Scalar, rhs: Self) -> Self {
     return #tfop("LogicalOr", _TFMakeScalarTensor(lhs), rhs)
@@ -347,7 +430,7 @@ public extension TensorProtocol where Scalar == Bool {
 }
 
 //===----------------------------------------------------------------------===//
-// Elementwise binary ops with scalar on one side for Tensor
+// Element-wise binary ops with scalar on one side for Tensor
 //
 // NOTE: scalar-tensor binary ops are already defined on TensorProtocol.
 // However, since Tensor conforms to ExpressibleByXXLiteral, it requires
@@ -595,10 +678,11 @@ public extension TensorProtocol {
 }
 
 //===----------------------------------------------------------------------===//
-// Elementwise math functions
+// Element-wise math functions
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar : SignedNumeric {
+  /// Computes the negation of the specified tensor element-wise.
   @_inlineable @inline(__always)
   @differentiable(gradient: _adjointNegate(_:partial:seed:))
   static prefix func - (rhs: Self) -> Self {
@@ -606,12 +690,14 @@ public extension TensorProtocol where Scalar : SignedNumeric {
   }
 }
 
+/// Computes the absolute value of the specified tensor element-wise.
 @_inlineable @inline(__always)
 public func abs<T : TensorProtocol>(_ x: T) -> T
   where T.Scalar : SignedNumeric {
   return #tfop("Abs", x)
 }
 
+/// Computes the natural logarithm of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointLog(_:partial:seed:))
 public func log<T : TensorProtocol>(_ x: T) -> T
@@ -619,6 +705,7 @@ public func log<T : TensorProtocol>(_ x: T) -> T
   return #tfop("Log", x)
 }
 
+/// Computes `sin` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointSin(_:partial:seed:))
 public func sin<T : TensorProtocol>(_ x: T) -> T
@@ -626,6 +713,7 @@ public func sin<T : TensorProtocol>(_ x: T) -> T
   return #tfop("Sin", x)
 }
 
+/// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointCos(_:partial:seed:))
 public func cos<T : TensorProtocol>(
@@ -634,6 +722,7 @@ public func cos<T : TensorProtocol>(
   return #tfop("Cos", x)
 }
 
+/// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointTan(_:partial:seed:))
 public func tan<T : TensorProtocol>(_ x: T) -> T
@@ -641,6 +730,7 @@ public func tan<T : TensorProtocol>(_ x: T) -> T
   return #tfop("Tan", x)
 }
 
+/// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointSinh(_:partial:seed:))
 public func sinh<T : TensorProtocol>(_ x: T) -> T
@@ -648,6 +738,7 @@ public func sinh<T : TensorProtocol>(_ x: T) -> T
   return #tfop("Sinh", x)
 }
 
+/// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointCosh(_:partial:seed:))
 public func cosh<T : TensorProtocol>(
@@ -656,6 +747,7 @@ public func cosh<T : TensorProtocol>(
   return #tfop("Cosh", x)
 }
 
+/// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointTanh(_:partial:seed:))
 public func tanh<T : TensorProtocol>(_ x: T) -> T
@@ -663,6 +755,7 @@ public func tanh<T : TensorProtocol>(_ x: T) -> T
   return #tfop("Tanh", x)
 }
 
+/// Computes the square root of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointSqrt(_:partial:seed:))
 public func sqrt<T : TensorProtocol>(_ x: T) -> T
@@ -670,6 +763,7 @@ public func sqrt<T : TensorProtocol>(_ x: T) -> T
   return #tfop("Sqrt", x)
 }
 
+/// Computes the inverse square root of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointRsqrt(_:partial:seed:))
 public func rsqrt<T : TensorProtocol>(
@@ -678,6 +772,7 @@ public func rsqrt<T : TensorProtocol>(
   return #tfop("Rsqrt", x)
 }
 
+/// Computes `exp` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointExp(_:partial:seed:))
 public func exp<T : TensorProtocol>(_ x: T) -> T
@@ -685,6 +780,7 @@ public func exp<T : TensorProtocol>(_ x: T) -> T
   return #tfop("Exp", x)
 }
 
+/// Computes the power of the first tensor to the second tensor.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointPow(_:_:partial:seed:))
 public func pow<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
@@ -692,18 +788,22 @@ public func pow<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
   return #tfop("Pow", lhs, rhs)
 }
 
+/// Computes the power of the scalar to the tensor, broadcasting the scalar.
 @_inlineable @inline(__always)
 public func pow<T : TensorProtocol>(_ lhs: T.Scalar, _ rhs: T) -> T
   where T.Scalar : FloatingPoint {
   return pow(T(handle: _TFMakeScalarTensor(lhs)), rhs)
 }
 
+/// Computes the power of the tensor to the scalar, broadcasting the scalar.
 @_inlineable @inline(__always)
 public func pow<T : TensorProtocol>(_ lhs: T, _ rhs: T.Scalar) -> T
   where T.Scalar : FloatingPoint {
   return pow(lhs, T(handle: _TFMakeScalarTensor(rhs)))
 }
 
+/// Computes the element-wise maximum of two tensors.
+/// - Note: `max` supports broadcasting.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointMax(_:_:partial:seed:))
 public func max<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
@@ -711,18 +811,24 @@ public func max<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
   return #tfop("Maximum", lhs, rhs)
 }
 
+/// Computes the element-wise maximum of the scalar and the tensor, broadcasting
+/// the scalar.
 @_inlineable @inline(__always)
 public func max<T : TensorProtocol>(_ lhs: T.Scalar, _ rhs: T) -> T
   where T.Scalar : Numeric & Comparable {
   return max(T(handle: _TFMakeScalarTensor(lhs)), rhs)
 }
 
+/// Computes the element-wise maximum of the scalar and the tensor, broadcasting
+/// the scalar.
 @_inlineable @inline(__always)
 public func max<T : TensorProtocol>(_ lhs: T, _ rhs: T.Scalar) -> T
   where T.Scalar : Numeric & Comparable {
   return max(lhs, T(handle: _TFMakeScalarTensor(rhs)))
 }
 
+/// Computes the element-wise minimum of two tensors.
+/// - Note: `min` supports broadcasting.
 @_inlineable @inline(__always)
 @differentiable(gradient: _adjointMin(_:_:partial:seed:))
 public func min<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
@@ -730,18 +836,23 @@ public func min<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
   return #tfop("Minimum", lhs, rhs)
 }
 
+/// Computes the element-wise minimum of the scalar and the tensor, broadcasting
+/// the scalar.
 @_inlineable @inline(__always)
 public func min<T : TensorProtocol>(_ lhs: T.Scalar, _ rhs: T) -> T
   where T.Scalar : Numeric & Comparable {
   return min(T(handle: _TFMakeScalarTensor(lhs)), rhs)
 }
 
+/// Computes the element-wise minimum of the scalar and the tensor, broadcasting
+/// the scalar.
 @_inlineable @inline(__always)
 public func min<T : TensorProtocol>(_ lhs: T, _ rhs: T.Scalar) -> T
   where T.Scalar : Numeric & Comparable {
   return min(lhs, T(handle: _TFMakeScalarTensor(rhs)))
 }
 
+/// Computes the square of the tensor.
 public extension TensorProtocol where Scalar : Numeric {
   @_inlineable @inline(__always)
   func squared() -> Self {
@@ -753,6 +864,7 @@ public extension TensorProtocol where Scalar : Numeric {
 // Non-elementwise math functions
 //===----------------------------------------------------------------------===//
 
+/// Computes the log-softmax of the specified tensor element-wise.
 @_inlineable @inline(__always)
 public func logSoftmax<T : TensorProtocol>(_ x: T) -> T
   where T.Scalar : BinaryFloatingPoint {
@@ -764,16 +876,32 @@ public func logSoftmax<T : TensorProtocol>(_ x: T) -> T
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar == Bool {
+  /// Returns a new tensor containing elements from either `left` or `right`,
+  /// depending on the elements of `self`.
+  ///
+  /// `self` acts as a amsk that chooses, based on the value at each scalar,
+  ///  whether the corresponding scalar in the output should be taken from
+  /// `left` (if `true`) or `right` (if `false`).
+  ///
+  /// - Precondition: `left` and `right` must have the same shape. If
+  ///   `left` and `right` are scalar, then `self` must also be scalar. If
+  ///   `left` and `right` have rank greater than or equal to 1, then `self`
+  ///   must be either have the same shape as `left` or be a 1-D `Tensor` such
+  ///   that `self.scalarCount == left[0]`.
   @_inlineable @inline(__always)
   public func selecting<T : TensorProtocol>(_ left: T, _ right: T) -> T {
     return #tfop("Select", handle, left, right)
   }
 
+  // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
+  // have the same shapes. An explicit broadcast must be added.
   @_inlineable @inline(__always)
   public func selecting<T : TensorProtocol>(_ left: T.Scalar, _ right: T) -> T {
     return #tfop("Select", handle, _TFMakeScalarTensor(left), right)
   }
 
+  // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
+  // have the same shapes. An explicit broadcast must be added.
   @_inlineable @inline(__always)
   public func selecting<T : TensorProtocol>(_ left: T, _ right: T.Scalar) -> T {
     return #tfop("Select", handle, left, _TFMakeScalarTensor(right))
@@ -785,24 +913,34 @@ public extension TensorProtocol where Scalar == Bool {
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar : Numeric {
+  /// Returns the arithmetic mean of all scalars.
   @_inlineable @inline(__always)
   func mean() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("Mean", self, axes))
   }
 
+  /// Returns the sum of all scalars.
   @_inlineable @inline(__always)
   func sum() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("Sum", self, axes))
   }
 
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func mean(alongAxes axes: Int32...) -> Self {
     return #tfop("Mean", handle, Tensor<Int32>(axes), keep_dims: true,
                  Tidx: Int32.self)
   }
 
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func sum(alongAxes axes: Int32...) -> Self {
     return #tfop("Sum", handle, Tensor<Int32>(axes), keep_dims: true,
@@ -811,30 +949,41 @@ public extension TensorProtocol where Scalar : Numeric {
 }
 
 public extension TensorProtocol where Scalar : Numeric & Comparable {
+  /// Returns the minimum of all scalars.
   @_inlineable @inline(__always)
   func min() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("Min", self, axes))
   }
 
+  /// Returns the maximum of all scalars.
   @_inlineable @inline(__always)
   func max() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("Max", self, axes))
   }
 
+  /// Returns the minimum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func min(alongAxes axes: Int32...) -> Self {
     return #tfop("Min", handle, Tensor<Int32>(axes), keep_dims: true,
                  Tidx: Int32.self)
   }
 
+  /// Returns the minimum along the specified axes. The reduced dimensions are
+  /// retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func max(alongAxes axes: Int32...) -> Self {
     return #tfop("Max", handle, Tensor<Int32>(axes), keep_dims: true,
                  Tidx: Int32.self)
   }
 
+  /// Returns the index of the maximum value of the flattened scalars.
   @_inlineable @inline(__always)
   func argmax() -> Int32 {
     let flattened: Self = #tfop("Reshape", handle, Tensor<Int32>([-1]))
@@ -842,6 +991,7 @@ public extension TensorProtocol where Scalar : Numeric & Comparable {
                                    output_type: Int32.self))
   }
 
+  /// Returns the index of the minimum value of the flattened scalars.
   @_inlineable @inline(__always)
   func argmin() -> Int32 {
     let flattened: Self = #tfop("Reshape", handle, Tensor<Int32>([-1]))
@@ -851,24 +1001,36 @@ public extension TensorProtocol where Scalar : Numeric & Comparable {
 }
 
 public extension TensorProtocol where Scalar == Bool {
+  /// Returns `true` if all scalars are equal to `true`. Otherwise, returns
+  /// `false`.
   @_inlineable @inline(__always)
   func all() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("All", self, axes))
   }
 
+  /// Returns `true` if any scalars are equal to `true`. Otherwise, returns
+  /// `false`.
   @_inlineable @inline(__always)
   func any() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
     return _TFGetScalarOrDie(#tfop("Any", self, axes))
   }
 
+  /// Performs a logical AND operation along the specified axes. The reduced
+  /// dimensions are retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func all(alongAxes axes: Int32...) -> Self {
     return #tfop("All", handle, Tensor<Int32>(axes), keep_dims: true,
                  Tidx: Int32.self)
   }
 
+  /// Performs a logical OR operation along the specified axes. The reduced
+  /// dimensions are retained with value 1.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func any(alongAxes axes: Int32...) -> Self {
     return #tfop("Any", handle, Tensor<Int32>(axes), keep_dims: true,
@@ -877,6 +1039,8 @@ public extension TensorProtocol where Scalar == Bool {
 }
 
 public extension Tensor where Scalar == Bool {
+  /// Returns `true` if all scalars are equal to `true`. Otherwise, returns
+  /// `false`.
   // NOTE: This overload is necessary, otherwise `all()` would refer
   // to the variadic method `all(squeezingAxes:)` with zero indices.
   @_inlineable @inline(__always)
@@ -885,6 +1049,8 @@ public extension Tensor where Scalar == Bool {
     return _TFGetScalarOrDie(#tfop("All", self, axes))
   }
 
+  /// Returns `true` if any scalars are equal to `true`. Otherwise, returns
+  /// `false`.
   // NOTE: This overload is necessary, otherwise `any()` would refer
   // to the variadic method `any(squeezingAxes:)` with zero indices.
   @_inlineable @inline(__always)
@@ -893,12 +1059,20 @@ public extension Tensor where Scalar == Bool {
     return _TFGetScalarOrDie(#tfop("Any", self, axes))
   }
 
+  /// Performs a logical AND operation along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func all(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("All", handle, Tensor<Int32>(axes), keep_dims: false,
                  Tidx: Int32.self)
   }
 
+  /// Performs a logical AND operation along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func any(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("Any", handle, Tensor<Int32>(axes), keep_dims: false,
@@ -923,23 +1097,39 @@ public extension Tensor where Scalar : Numeric & Comparable {
     return _TFGetScalarOrDie(#tfop("Max", self, axes))
   }
 
+  /// Returns the maximum values along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func max(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("Max", handle, Tensor<Int32>(axes), keep_dims: false,
                  Tidx: Int32.self)
   }
 
+  /// Returns the minimum values along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func min(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("Min", handle, Tensor<Int32>(axes), keep_dims: false,
                  Tidx: Int32.self)
   }
 
+  /// Returns the indices of the maximum values along the specified axes. The
+  /// reduced dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func argmax(squeezingAxis axis: Int32) -> Tensor<Int32> {
     return #tfop("ArgMax", handle, Tensor<Int32>(axis), output_type: Int32.self)
   }
 
+  /// Returns the indices of the minimum values along the specified axes. The
+  /// reduced dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func argmin(squeezingAxis axis: Int32) -> Tensor<Int32> {
     return #tfop("ArgMin", handle, Tensor<Int32>(axis), output_type: Int32.self)
@@ -963,12 +1153,20 @@ public extension Tensor where Scalar : Numeric {
     return _TFGetScalarOrDie(#tfop("Sum", self, axes))
   }
 
+  /// Returns the arithmetic mean along the specified axes. The reduced
+  /// dimensions are removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @_inlineable @inline(__always)
   func mean(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("Mean", handle, Tensor<Int32>(axes), keep_dims: false,
                  Tidx: Int32.self)
   }
 
+  /// Returns the sum along the specified axes. The reduced dimensions are
+  /// removed.
+  /// - Parameter axes: The dimensions to reduce.
+  /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @_inlineable @inline(__always)
   func sum(squeezingAxes axes: Int32...) -> Tensor {
     return #tfop("Sum", handle, Tensor<Int32>(axes), keep_dims: false,
@@ -981,14 +1179,7 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol {
-  @_inlineable
-  var shapeTensor: Tensor<Int32> {
-    @inline(__always)
-    get {
-      return #tfop("Shape", handle)
-    }
-  }
-
+  /// The rank of the tensor, represented as a `Tensor<Int32>`.
   @_inlineable
   var rankTensor: Tensor<Int32> {
     @inline(__always)
@@ -997,6 +1188,16 @@ public extension TensorProtocol {
     }
   }
 
+  /// The dimensions of the tensor, represented as a `Tensor<Int32>`.
+  @_inlineable
+  var shapeTensor: Tensor<Int32> {
+    @inline(__always)
+    get {
+      return #tfop("Shape", handle)
+    }
+  }
+
+  /// The number of scalars in the tensor, represented as a `Tensor<Int32>`.
   @_inlineable
   var scalarCountTensor: Tensor<Int32> {
     @inline(__always)
@@ -1043,6 +1244,7 @@ public extension TensorProtocol {
 //===----------------------------------------------------------------------===//
 
 public extension TensorProtocol where Scalar : Numeric {
+  /// Returns a padded tensor according to the specified padding sizes.
   @_inlineable @inline(__always)
   func padded(
     forSizes sizes: @autoclosure () -> [(before: Int32, after: Int32)],
@@ -1166,16 +1368,16 @@ public extension Tensor {
   // Ideas for strided slice API: it could be another subscript method, or it
   // be a top level `stride` function like Swift's `stride(from:to:by:)`.
 
-  /// Extracts a slice from a tensor. This operation extracts a slice at the
-  /// ranges specified by `dimensionalBounds`.
+  /// Extracts a slice from the tensor defined by lower and upper bounds for
+  /// each dimension.
   ///
-  /// - Parameter dimensionalBounds: Bounds at each dimension.
-  ///
+  /// - Parameter lowerBounds: The lower bounds at each dimension.
+  /// - Parameter upperBounds: The upper bounds at each dimension.
   @_inlineable @inline(__always)
   func slice(lowerBounds: [Int32], upperBounds: [Int32]) -> Tensor {
-    // TODO: Precondition `lowerBounds.count == upperBounds.count`,
-    // preferably in graph.
-    let lowerBoundsTensor = Tensor<Int32>(lowerBounds) 
+    /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
+    /// preferably in graph.
+    let lowerBoundsTensor = Tensor<Int32>(lowerBounds)
     return #tfop("Slice", self, lowerBoundsTensor,
                  Tensor<Int32>(upperBounds) - lowerBoundsTensor)
   }
@@ -1186,9 +1388,21 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor where Scalar : BinaryFloatingPoint {
+  /// Computes the batch normalized tensor along the specified axis.
+  ///
+  /// Specifically, returns `(self - mu)/(var + epsilon) * gamma + beta` where
+  /// `mu` and `var` are respectively the mean and variance of `self` along
+  /// `axis`.
+  ///
+  /// - Parameters:
+  ///   - axis: The batch dimension.
+  ///   - offset: The scalar offset, also known as beta.
+  ///   - scale: The scalar scale, also known as gamma.
+  ///   - epsilon: A small value added to the denominator for numerical
+  ///     stability.
   // NOTE: It is not possible to provide a floating point initial value for
-  // arguments (like `epsilon`) because FloatingPoint is not
-  // ExpressibleByFloatLiteral.
+  // arguments (like `epsilon`) because `FloatingPoint` is not
+  // `ExpressibleByFloatLiteral`.
   @_inlineable @inline(__always)
   @differentiable(
     withRespectTo: (self, .1, .2),
@@ -1213,8 +1427,12 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
 // Convolution and pooling
 //===----------------------------------------------------------------------===//
 
+/// A padding scheme. Used by padding, convolution, and pooling ops.
 public enum Padding {
-  case same, valid
+  /// The "valid" padding scheme.
+  case valid
+  /// The "same" padding scheme.
+  case same
 }
 
 internal extension Padding {
@@ -1231,6 +1449,16 @@ internal extension Padding {
 }
 
 public extension Tensor where Scalar : FloatingPoint {
+  /// Computes a 2-D convolution using `self` as input, with the specified
+  /// filter, strides, and padding.
+  ///
+  /// - Parameters:
+  ///   - filter: The convolution filter.
+  ///   - strides: The strides of the sliding filter for each dimension of the
+  ///     input.
+  ///   - padding: The padding for the operation.
+  /// - Precondition: `self` must have rank 4.
+  /// - Precondition: `filter` must have rank 4.
   @_inlineable @inline(__always)
   @differentiable(
     withRespectTo: (self, .0),
@@ -1246,6 +1474,14 @@ public extension Tensor where Scalar : FloatingPoint {
                  padding: padding.cName)
   }
 
+  /// Computes a 2-D max pooling, with the specified kernel sizes, strides, and
+  /// padding.
+  ///
+  /// - Parameters:
+  ///   - kernelSize: The dimensions of the pooling kernel.
+  ///   - strides: The strides of the sliding filter for each dimension of the
+  ///     input.
+  ///   - padding: The padding for the operation.
   @_inlineable @inline(__always)
   @differentiable(
     withRespectTo: (self),
@@ -1261,6 +1497,14 @@ public extension Tensor where Scalar : FloatingPoint {
                  Tensor<Int32>(strides), padding: padding.cName)
   }
 
+  /// Computes a 2-D average pooling, with the specified kernel sizes, strides,
+  /// and padding.
+  ///
+  /// - Parameters:
+  ///   - kernelSize: The dimensions of the pooling kernel.
+  ///   - strides: The strides of the sliding filter for each dimension of the
+  ///     input.
+  ///   - padding: The padding for the operation.
   @_inlineable @inline(__always)
   @differentiable(
     withRespectTo: (self),
@@ -1281,6 +1525,14 @@ public extension Tensor where Scalar : FloatingPoint {
 }
 
 public extension Tensor4D where Scalar : FloatingPoint {
+  /// Computes a 2-D convolution using `self` as input, with the specified
+  /// filter, strides, and padding.
+  ///
+  /// - Parameters:
+  ///   - filter: The convolution filter.
+  ///   - strides: The strides of the sliding filter for each dimension of the
+  ///     input.
+  ///   - padding: The padding for the operation.
   @_inlineable @inline(__always)
   func convolved2D(
     withFilter filter: Tensor4D,

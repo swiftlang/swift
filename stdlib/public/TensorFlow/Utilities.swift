@@ -25,8 +25,8 @@ import CTensorFlow
 // Standard library extensions
 //===----------------------------------------------------------------------===//
 
-extension Sequence {
-  /// Returns true if all elements satisfy the predicate
+public extension Sequence {
+  /// Returns true if all elements satisfy the predicate.
   func forAll(_ predicate: (Element) throws -> Bool) rethrows -> Bool {
     return try first(where: { try !predicate($0) }) == nil
   }
@@ -63,31 +63,31 @@ func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
 // Type aliases
 //===----------------------------------------------------------------------===//
 
-/// TF_Session* type
+/// The `TF_Session *` type.
 typealias CTFSession = OpaquePointer
 
-/// TF_Status* type
+/// The `TF_Status *` type.
 typealias CTFStatus = OpaquePointer
 
-/// TF_Graph* type
+/// The `TF_Graph*` type.
 typealias CTFGraph = OpaquePointer
 
-/// TF_Function* type
+/// The `TF_Function*` type.
 typealias CTFFunction = OpaquePointer
 
-/// TF_Tensor* type
+/// The `TF_Tensor *` type.
 typealias CTensor = OpaquePointer
 
-/// TF_TensorHandle* type
+/// The `TF_TensorHandle *` type.
 ///
-/// This is made public so that compiler generated code can read/write tensor
+/// - Note: This is public so that compiler generated code can read/write tensor
 /// handles when calling runtime APIs.
 public typealias CTensorHandle = OpaquePointer
 
-/// TFE_Context* type
+/// The `TFE_Context *` type.
 typealias CTFEContext = OpaquePointer
 
-/// TFE_Op* type
+/// The `TFE_Op *` type.
 typealias CTFEOp = OpaquePointer
 
 //===----------------------------------------------------------------------===//
@@ -143,6 +143,7 @@ func debugLog(_ message: @autoclosure () -> String,
 private func random() -> Int
 #endif
 
+/// A pseudorandom state.
 @_fixed_layout
 open class RandomState {
   /// The global pseudorandom state.
@@ -160,7 +161,7 @@ open class RandomState {
     bufferAddress.deallocate()
   }
 
-  /// Create a pseudorandom state with the given seed in a buffer of the given
+  /// Creates a pseudorandom state with the given seed in a buffer of the given
   /// size.
   ///
   /// - Parameters:
@@ -176,7 +177,7 @@ open class RandomState {
     self.seed(with: seed)
   }
 
-  /// Create a pseudorandom state by copying from another pseudorandom state.
+  /// Creates a pseudorandom state by copying from another pseudorandom state.
   ///
   /// - Parameter other: The pseudorandom state to copy from.
   ///
@@ -186,7 +187,7 @@ open class RandomState {
     bufferAddress.initialize(from: other.bufferAddress, count: bufferSize)
   }
 
-  /// Create a pseudorandom state with the given seed.
+  /// Creates a pseudorandom state with the given seed.
   ///
   /// - Parameter seed: A number used to initialize the pseudorandom state.
   ///
@@ -215,10 +216,11 @@ open class RandomState {
     return Int32(random())
   }
 
-  /// Returns the next few pseudorandom numbers and updates the internal state.
+  /// Returns an array containing the next specified count of pseudorandom
+  /// numbers and updates the internal state.
   ///
-  /// - Parameter count: The number of pseudonumbers to generate.
-  /// - Returns: The next pseudorandom number.
+  /// - Parameter count: The number of pseudorandom numbers to generate.
+  /// - Returns: An array containing the next pseudorandom numbers.
   ///
   open func generate(_ count: Int) -> [Int32] {
     let previousState = setstate(bufferAddress)
@@ -230,6 +232,7 @@ open class RandomState {
 /// A sequence of pseudorandom numbers.
 @_fixed_layout
 public struct RandomNumberSequence : Sequence {
+  /// The seed value for random sequence generation.
   public let seed: UInt32?
 
   /// Creates a sequence of pseudorandom numbers. If a seed is given, a random
@@ -238,8 +241,7 @@ public struct RandomNumberSequence : Sequence {
   /// updated. Use a seed if the use case requires the random sequence to be
   /// reproducible.
   ///
-  /// - Parameter seed: The seed value that the random sequence is being
-  ///   generated based on.
+  /// - Parameter seed: The seed value for random sequence generation.
   ///
   public init(seed: UInt32? = nil) {
     self.seed = seed
