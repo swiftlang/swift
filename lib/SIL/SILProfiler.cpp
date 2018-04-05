@@ -100,7 +100,20 @@ static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
   }
 }
 
-SILProfiler *SILProfiler::create(SILModule &M, ASTNode N) {
+SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
+                                 ASTNode N) {
+  // Avoid generating profiling state for declarations.
+  if (!forDefinition)
+    return nullptr;
+
+  // Assert that the input AST has at least been type-checked.
+  assert([&] {
+    DeclContext *DC = N.getAsDeclContext();
+    assert(DC && "Invalid AST node for profiling");
+    SourceFile *SF = DC->getParentSourceFile();
+    return !SF || SF->ASTStage >= SourceFile::TypeChecked;
+  }() && "Cannot use this AST for code coverage");
+
   if (auto *D = N.dyn_cast<Decl *>()) {
     assert(isa<AbstractFunctionDecl>(D) ||
            isa<TopLevelCodeDecl>(D) && "Cannot create profiler");
