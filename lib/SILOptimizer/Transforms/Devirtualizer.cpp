@@ -52,7 +52,6 @@ class Devirtualizer : public SILFunctionTransform {
 bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
                                                   ClassHierarchyAnalysis *CHA) {
   bool Changed = false;
-  llvm::SmallVector<SILInstruction *, 8> DeadApplies;
   llvm::SmallVector<ApplySite, 8> NewApplies;
   OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
 
@@ -76,18 +75,8 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
 
     Changed = true;
 
-    auto *AI = Apply.getInstruction();
-    if (!isa<TryApplyInst>(AI))
-      cast<SingleValueInstruction>(AI)->replaceAllUsesWith(NewInstPair.first);
-
-    DeadApplies.push_back(AI);
+    replaceDeadApply(Apply, NewInstPair.first);
     NewApplies.push_back(NewInstPair.second);
-  }
-
-  // Remove all the now-dead applies.
-  while (!DeadApplies.empty()) {
-    auto *AI = DeadApplies.pop_back_val();
-    recursivelyDeleteTriviallyDeadInstructions(AI, true);
   }
 
   // For each new apply, attempt to link in function bodies if we do
