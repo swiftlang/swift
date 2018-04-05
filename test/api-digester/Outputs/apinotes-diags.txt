@@ -1,4 +1,6 @@
 
+/* RawRepresentable Changes */
+
 /* Removed Decls */
 APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc2() has been removed
 APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc3() has been removed

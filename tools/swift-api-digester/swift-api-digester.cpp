@@ -179,6 +179,7 @@ bool contains(ArrayRef<T> container, T instance) {
 class SDKNode;
 typedef SDKNode* NodePtr;
 typedef std::map<NodePtr, NodePtr> ParentMap;
+typedef std::map<NodePtr, NodePtr> NodeMap;
 typedef std::vector<NodePtr> NodeVector;
 
 // The interface used to visit the SDK tree.
@@ -231,6 +232,7 @@ class SDKContext {
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   UpdatedNodesMap UpdateMap;
+  NodeMap TypeAliasUpdateMap;
 
 public:
   llvm::BumpPtrAllocator &allocator() {
@@ -242,6 +244,10 @@ public:
   UpdatedNodesMap &getNodeUpdateMap() {
     return UpdateMap;
   }
+  NodeMap &getTypeAliasUpdateMap() {
+    return TypeAliasUpdateMap;
+  }
+
 };
 
 // A node matcher will traverse two trees of SDKNode and find matched nodes
@@ -838,6 +844,15 @@ public:
     return None;
   }
 
+  SDKNodeType *getRawValueType() const {
+    if (isConformingTo(KnownProtocolKind::RawRepresentable)) {
+      if (auto RV = lookupChildByPrintedName("rawValue")) {
+        return (*(*RV)->getChildBegin())->getAs<SDKNodeType>();
+      }
+    }
+    return nullptr;
+  }
+
   bool isConformingTo(KnownProtocolKind Kind) const {
     StringRef Usr;
     switch (Kind) {
@@ -855,6 +870,9 @@ class SDKNodeTypeAlias : public SDKNodeDecl {
 public:
   SDKNodeTypeAlias(SDKNodeInitInfo Info) : SDKNodeDecl(Info,
                                                        SDKNodeKind::TypeAlias) {}
+  const SDKNodeType* getUnderlyingType() const {
+    return getOnlyChild()->getAs<SDKNodeType>();
+  }
   static bool classof(const SDKNode *N);
 };
 
@@ -1592,8 +1610,8 @@ public:
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
-  NodePtr getSDKRoot() {
-    return RootNode;
+  SDKNodeRoot* getSDKRoot() {
+    return static_cast<SDKNodeRoot*>(RootNode);
   }
 
   void printTopLevelNames() {
@@ -2517,6 +2535,57 @@ private:
 
 };
 
+/// This is to find type alias of raw types being changed to RawRepresentable.
+/// e.g. AttributeName was a typealias of String in the old SDK however it becomes
+/// a RawRepresentable struct in the new SDK.
+/// This happens typically when we use apinotes to preserve API stability by
+/// using SwiftWrapper:none in the old SDK.
+class TypeAliasDiffFinder: public SDKNodeVisitor {
+  SDKNodeRoot *leftRoot;
+  SDKNodeRoot *rightRoot;
+  NodeMap &result;
+
+  static bool checkTypeMatch(const SDKNodeType* aliasType,
+      const SDKNodeType* rawType) {
+    StringRef Left = aliasType->getPrintedName();
+    StringRef Right = rawType->getPrintedName();
+    if (Left == "NSString" && Right == "String")
+      return true;
+    if (Left == "String" && Right == "String")
+      return true;
+    if (Left == "Int" && Right == "Int")
+      return true;
+    if (Left == "UInt" && Right == "UInt")
+      return true;
+    return false;
+  }
+
+  void visit(NodePtr node) override {
+    auto alias = dyn_cast<SDKNodeTypeAlias>(node);
+    if (!alias)
+      return;
+    const SDKNodeType* aliasType = alias->getUnderlyingType();
+    for (auto *counter: rightRoot->getDescendantsByUsr(alias->getUsr())) {
+      if (auto DT = dyn_cast<SDKNodeTypeDecl>(counter)) {
+        if (auto *rawType = DT->getRawValueType()) {
+          if (checkTypeMatch(aliasType, rawType)) {
+            result.insert({alias, DT});
+            return;
+          }
+        }
+      }
+    }
+  }
+public:
+  TypeAliasDiffFinder(SDKNodeRoot *leftRoot, SDKNodeRoot *rightRoot,
+    NodeMap &result): leftRoot(leftRoot), rightRoot(rightRoot),
+      result(result) {}
+
+  void search() {
+    SDKNode::preorderVisit(leftRoot, *this);
+  }
+};
+
 // Given a condition, search whether a node satisfies that condition exists
 // in a tree.
 class SearchVisitor : public SDKNodeVisitor {
@@ -2999,21 +3068,47 @@ class DiagnosisEmitter : public SDKNodeVisitor {
     static void theme(raw_ostream &OS) { OS << "Type Changes"; };
   };
 
+  struct RawRepresentableChangeDiag: public DiagBase {
+    DeclKind Kind;
+    StringRef DeclName;
+    StringRef UnderlyingType;
+    StringRef RawTypeName;
+    RawRepresentableChangeDiag(MetaInfo Info, DeclKind Kind, StringRef DeclName,
+        StringRef UnderlyingType, StringRef RawTypeName): DiagBase(Info),
+        Kind(Kind), DeclName(DeclName), UnderlyingType(UnderlyingType),
+        RawTypeName(RawTypeName) {}
+    bool operator<(RawRepresentableChangeDiag Other) const {
+      if (Kind != Other.Kind)
+        return Kind < Other.Kind;
+      return DeclName.compare(Other.DeclName) < 0;
+    }
+    void output() const override {
+      llvm::outs() << Kind << " " << printName(DeclName)
+        << "(" << UnderlyingType << ")"
+        << " is now " << RawTypeName << " representable\n";
+    }
+    static void theme(raw_ostream &OS) { OS << "RawRepresentable Changes"; };
+  };
+
   std::set<SDKNodeDecl*> AddedDecls;
   DiagBag<DeclAttrDiag> AttrChangedDecls;
   DiagBag<DeclTypeChangeDiag> TypeChangedDecls;
   DiagBag<RenamedDeclDiag> RenamedDecls;
   DiagBag<MovedDeclDiag> MovedDecls;
   DiagBag<RemovedDeclDiag> RemovedDecls;
+  DiagBag<RawRepresentableChangeDiag> RawRepresentableDecls;
 
   UpdatedNodesMap &UpdateMap;
+  NodeMap &TypeAliasUpdateMap;
   TypeMemberDiffVector &MemberChanges;
-  DiagnosisEmitter(UpdatedNodesMap &UpdateMap,
-                   TypeMemberDiffVector &MemberChanges):
-                     UpdateMap(UpdateMap), MemberChanges(MemberChanges) {}
+  DiagnosisEmitter(SDKContext &Ctx, TypeMemberDiffVector &MemberChanges):
+    UpdateMap(Ctx.getNodeUpdateMap()),
+    TypeAliasUpdateMap(Ctx.getTypeAliasUpdateMap()),
+    MemberChanges(MemberChanges){}
+
 public:
   static void diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
-                        UpdatedNodesMap &UpdateMap);
+                        SDKContext &Ctx);
 };
 
 void DiagnosisEmitter::collectAddedDecls(NodePtr Root,
@@ -3130,11 +3225,11 @@ void DiagnosisEmitter::DeclAttrDiag::output() const {
 }
 
 void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
-                                 UpdatedNodesMap &UpdateMap) {
+                                 SDKContext &Ctx) {
   // Find member hoist changes to help refine diagnostics.
   TypeMemberDiffVector MemberChanges;
   findTypeMemberDiffs(LeftRoot, RightRoot, MemberChanges);
-  DiagnosisEmitter Emitter(UpdateMap, MemberChanges);
+  DiagnosisEmitter Emitter(Ctx, MemberChanges);
   collectAddedDecls(RightRoot, Emitter.AddedDecls);
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
@@ -3168,6 +3263,19 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       RenamedDecls.Diags.emplace_back(ScreenInfo, Node->getDeclKind(),
         Node->getDeclKind(), Node->getFullyQualifiedName(),
         Ctx.buffer((Twine(It->newTypeName) + "." + It->newPrintedName).str()));
+      return;
+    }
+
+    // If a type alias of a raw type has been changed to a struct/enum that
+    // conforms to RawRepresentable in the later version of SDK, we show the
+    // refine diagnostics message instead of showing the type alias has been
+    // removed.
+    if (TypeAliasUpdateMap.find((SDKNode*)Node) != TypeAliasUpdateMap.end()) {
+      RawRepresentableDecls.Diags.emplace_back(ScreenInfo, Node->getDeclKind(),
+        Node->getFullyQualifiedName(),
+        Node->getAs<SDKNodeTypeAlias>()->getUnderlyingType()->getPrintedName(),
+        TypeAliasUpdateMap[(SDKNode*)Node]->getAs<SDKNodeTypeDecl>()->
+          getRawValueType()->getPrintedName());
       return;
     }
 
@@ -3438,11 +3546,13 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
   RightCollector.deSerialize(RightPath);
   auto LeftModule = LeftCollector.getSDKRoot();
   auto RightModule = RightCollector.getSDKRoot();
+  TypeAliasDiffFinder(LeftModule, RightModule,
+                      Ctx.getTypeAliasUpdateMap()).search();
   PrunePass Prune(Ctx.getNodeUpdateMap());
   Prune.pass(LeftModule, RightModule);
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
   RefinementPass.pass(LeftModule, RightModule);
-  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx.getNodeUpdateMap());
+  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
   return 0;
 }
 
