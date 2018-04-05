@@ -144,7 +144,7 @@ namespace {
         case SpaceKind::BooleanConstant:
           return 1;
         case SpaceKind::UnknownCase:
-          return 1;
+          return isAllowedButNotRequired() ? 0 : 1;
         case SpaceKind::Type: {
           if (!canDecompose(getType(), DC)) {
             return 1;
@@ -191,8 +191,9 @@ namespace {
       explicit Space(Type T, Identifier NameForPrinting)
         : Kind(SpaceKind::Type), TypeAndVal(T),
           Head(NameForPrinting), Spaces({}){}
-      explicit Space(UnknownCase_t)
-        : Kind(SpaceKind::UnknownCase), TypeAndVal(Type()), Head(Identifier()),
+      explicit Space(UnknownCase_t, bool allowedButNotRequired)
+        : Kind(SpaceKind::UnknownCase),
+          TypeAndVal(Type(), allowedButNotRequired), Head(Identifier()),
           Spaces({}) {}
       explicit Space(Type T, Identifier H, bool downgrade,
                      ArrayRef<Space> SP)
@@ -236,6 +237,12 @@ namespace {
         assert((getKind() == SpaceKind::Type
                 || getKind() == SpaceKind::Constructor)
                && "Wrong kind of space tried to access downgrade");
+        return TypeAndVal.getInt();
+      }
+
+      bool isAllowedButNotRequired() const {
+        assert(getKind() == SpaceKind::UnknownCase
+               && "Wrong kind of space tried to access not-required flag");
         return TypeAndVal.getInt();
       }
 
@@ -372,10 +379,8 @@ namespace {
           Space or1Space(disjuncts);
           return or1Space.isSubspace(other, TC, DC);
         }
-        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor):
-        PAIRCASE (SpaceKind::Type, SpaceKind::UnknownCase): {
+        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           // (_ : Ty1) <= H(p1 | ... | pn) iff D(Ty1) <= H(p1 | ... | pn)
-          // FIXME: This is a slow way to do UnknownCase.
           if (canDecompose(this->getType(), DC)) {
             SmallVector<Space, 4> disjuncts;
             decompose(TC, DC, this->getType(), disjuncts);
@@ -385,9 +390,13 @@ namespace {
           // An undecomposable type is always larger than its constructor space.
           return false;
         }
+        PAIRCASE (SpaceKind::Type, SpaceKind::UnknownCase):
+          return false;
+
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
           // Typechecking guaranteed this constructor is a subspace of the type.
+          return true;
+        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
           return true;
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Type):
           return other.getType()->isBool();
@@ -448,6 +457,8 @@ namespace {
           return false;
 
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
+          if (other.isAllowedButNotRequired())
+            return this->isAllowedButNotRequired();
           return true;
 
         default:
@@ -537,9 +548,7 @@ namespace {
             return other;
           }
         }
-        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor):
-        PAIRCASE (SpaceKind::Type, SpaceKind::UnknownCase): {
-          // FIXME: This can be done more efficiently for UnknownCase.
+        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
             SmallVector<Space, 4> spaces;
             decompose(TC, DC, this->getType(), spaces);
@@ -549,6 +558,14 @@ namespace {
             return other;
           }
         }
+        PAIRCASE (SpaceKind::Type, SpaceKind::UnknownCase):
+          // Note: This is not technically correct for decomposable types, but
+          // you'd only get "typeSpace - unknownCaseSpace" if you haven't tried
+          // to match any of the decompositions of the space yet. In that case,
+          // we'd rather not expand the type, because it might be infinitely
+          // decomposable.
+          return *this;
+
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
           return *this;
 
@@ -594,6 +611,8 @@ namespace {
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
           return other.intersect(*this, TC, DC);
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
+          if (other.isAllowedButNotRequired())
+            return other;
           return *this;
 
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
@@ -678,18 +697,24 @@ namespace {
           }
           return Space();
         }
-        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor):
-        PAIRCASE (SpaceKind::Type, SpaceKind::UnknownCase): {
+        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
             SmallVector<Space, 4> spaces;
             this->decompose(TC, DC, this->getType(), spaces);
             auto decomp = examineDecomp(spaces);
-            auto result = decomp.minus(other, TC, DC);
-            if (result != decomp)
-              return result;
+            return decomp.minus(other, TC, DC);
+          } else {
+            return *this;
           }
-          return *this;
         }
+        PAIRCASE (SpaceKind::Type, SpaceKind::UnknownCase):
+          // Note: This is not technically correct for decomposable types, but
+          // you'd only get "typeSpace - unknownCaseSpace" if you haven't tried
+          // to match any of the decompositions of the space yet. In that case,
+          // we'd rather not expand the type, because it might be infinitely
+          // decomposable.
+          return *this;
+
         PAIRCASE (SpaceKind::Empty, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::Type, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Disjunct):
@@ -822,6 +847,10 @@ namespace {
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
           return *this;
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
+          if (other.isAllowedButNotRequired() &&
+              !this->isAllowedButNotRequired()) {
+            return *this;
+          }
           return Space();
 
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
@@ -884,14 +913,15 @@ namespace {
         }
           break;
         case SpaceKind::Type: {
-          if (!forDisplay) {
-            getType()->print(buffer);
-          }
           Identifier Name = getPrintingName();
           if (Name.empty())
             buffer << "_";
           else
             buffer << tok::kw_let << " " << Name.str();
+          if (!forDisplay) {
+            buffer << ": ";
+            getType()->print(buffer);
+          }
         }
           break;
         case SpaceKind::UnknownCase:
@@ -900,6 +930,8 @@ namespace {
             buffer << "_";
           } else {
             buffer << "UNKNOWN";
+            if (isAllowedButNotRequired())
+              buffer << "(not_required)";
           }
           break;
         }
@@ -1033,8 +1065,11 @@ namespace {
             return Space(tp, eed->getName(), canDowngrade, constElemSpaces);
           });
 
-          if (!E->isExhaustive(DC))
-            arr.push_back(Space(UnknownCase));
+          if (!E->isExhaustive(DC)) {
+            arr.push_back(Space(UnknownCase, /*allowedButNotRequired*/false));
+          } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
+            arr.push_back(Space(UnknownCase, /*allowedButNotRequired*/true));
+          }
 
         } else if (auto *TTy = tp->castTo<TupleType>()) {
           // Decompose each of the elements into its component type space.
@@ -1167,9 +1202,15 @@ namespace {
 
       bool sawDowngradablePattern = false;
       bool sawRedundantPattern = false;
-      bool hasUnknownCase = false;
+      const CaseStmt *unknownCase = nullptr;
       SmallVector<Space, 4> spaces;
       for (auto *caseBlock : Switch->getCases()) {
+        if (caseBlock->hasUnknownAttr()) {
+          assert(unknownCase == nullptr);
+          unknownCase = caseBlock;
+          continue;
+        }
+
         for (auto &caseItem : caseBlock->getCaseLabelItems()) {
           // 'where'-clauses on cases mean the case does not contribute to
           // the exhaustiveness of the pattern.
@@ -1180,14 +1221,8 @@ namespace {
           if (caseItem.isDefault())
             return;
 
-          Space projection;
-          if (caseBlock->hasUnknownAttr()) {
-            projection = Space(UnknownCase);
-            hasUnknownCase = true;
-          } else {
-            projection = projectPattern(TC, caseItem.getPattern(),
-                                        sawDowngradablePattern);
-          }
+          Space projection = projectPattern(TC, caseItem.getPattern(),
+                                            sawDowngradablePattern);
 
           if (projection.isUseful()
                 && projection.isSubspace(Space(spaces), TC, DC)) {
@@ -1234,6 +1269,18 @@ namespace {
       }
 
       auto uncovered = totalSpace.minus(coveredSpace, TC, DC).simplify(TC, DC);
+      if (unknownCase && uncovered.isEmpty()) {
+        TC.diagnose(unknownCase->getLoc(), diag::redundant_particular_case)
+          .highlight(unknownCase->getSourceRange());
+      }
+
+      // Account for unknown cases. If the developer wrote `unknown`, they're
+      // all handled; otherwise, we ignore the ones that were added for enums
+      // that are implicitly frozen.
+      uncovered = uncovered.minus(Space(UnknownCase, unknownCase == nullptr),
+                                  TC, DC);
+      uncovered = uncovered.simplify(TC, DC);
+
       if (uncovered.isEmpty())
         return;
 
@@ -1245,20 +1292,19 @@ namespace {
           SmallVector<Space, 4> spaces;
           Space::decompose(TC, DC, uncovered.getType(), spaces);
           diagnoseMissingCases(RequiresDefault::No, Space(spaces),
-                               /*sawDowngradablePattern*/false,
-                               hasUnknownCase);
+                               /*sawDowngradablePattern*/false, unknownCase);
         } else {
           diagnoseMissingCases(Switch->getCases().empty()
                                  ? RequiresDefault::EmptySwitchBody
                                  : RequiresDefault::UncoveredSwitch,
                                uncovered, /*sawDowngradablePattern*/false,
-                               hasUnknownCase);
+                               unknownCase);
         }
         return;
       }
 
       diagnoseMissingCases(RequiresDefault::No, uncovered,
-                           sawDowngradablePattern, hasUnknownCase);
+                           sawDowngradablePattern, unknownCase);
     }
     
     enum class RequiresDefault {
@@ -1372,6 +1418,12 @@ namespace {
             }
 
             if (flat.getKind() == SpaceKind::UnknownCase) {
+              if (hasUnknownCase) {
+                // This can occur if the /only/ case in the switch is 'unknown'.
+                // In that case we won't do any analysis on the input space, but
+                // will later decompose the space into cases.
+                continue;
+              }
               if (!TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics)
                 continue;
               OS << "@unknown " << tok::kw_case << " _";
@@ -1394,12 +1446,22 @@ namespace {
         for (auto &uncoveredSpace : uncovered.getSpaces()) {
           SmallVector<Space, 4> flats;
           flatten(uncoveredSpace, flats);
+          std::stable_sort(flats.begin(), flats.end(),
+                           [this](const Space &left, const Space &right) {
+            return left.getSize(TC, DC) > right.getSize(TC, DC);
+          });
           for (auto &flat : flats) {
             if (flat.isSubspace(Space(emittedSpaces), TC, DC)) {
               continue;
             }
             
             if (flat.getKind() == SpaceKind::UnknownCase) {
+              if (hasUnknownCase) {
+                // This can occur if the /only/ case in the switch is 'unknown'.
+                // In that case we won't do any analysis on the input space, but
+                // will later decompose the space into cases.
+                continue;
+              }
               if (TC.getLangOpts().EnableNonFrozenEnumExhaustivityDiagnostics)
                 TC.diagnose(startLoc, diag::missing_unknown_case);
               continue;

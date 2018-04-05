@@ -383,8 +383,7 @@ func checkDiagnosticMinimality(x: Runcible?) {
   // expected-note@-2 {{add missing case: '(.hat, .spoon)'}}
   // expected-note@-3 {{add missing case: '(.hat, .fork)'}}
   // expected-note@-4 {{add missing case: '(.spoon, .hat)'}}
-  // expected-note@-5 {{add missing case: '(.spoon, .fork)'}}
-  // expected-note@-6 {{add missing case: '(_, .fork)'}}
+  // expected-note@-5 {{add missing case: '(_, .fork)'}}
   case (.spoon, .spoon):
     break
   case (.hat, .hat):
@@ -974,6 +973,31 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .b(false): break
   @unknown case _: break
   }
+
+  // Test fully-covered switches.
+  switch interval {
+  case .seconds, .milliseconds, .microseconds, .nanoseconds: break
+  case .never: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  switch flag {
+  case true: break
+  case false: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  switch flag as Optional {
+  case _?: break
+  case nil: break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
+
+  switch (flag, value) {
+  case (true, _): break
+  case (false, _): break
+  @unknown case _: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
+  }
 }
 
 public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
@@ -1036,6 +1060,21 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case (true, _): break
   }
 
+  switch (value, value) { // no-warning
+  case (.a, _): break
+  case (.b, _): break
+  case (_, .a): break
+  case (_, .b): break
+  }
+
+  switch (value, value) { // no-warning
+  case (.a, _): break
+  case (.b, _): break
+  case (_, .a): break
+  case (_, .b): break
+  @unknown case _: break
+  }
+
   // Test interaction with @_downgrade_exhaustivity_check.
   switch (value, interval) { // no-warning
   case (_, .seconds): break
@@ -1048,7 +1087,6 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case (.a, _): break
   case (.b, _): break
   }
-
 
   // Test payloaded enums.
   switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}}

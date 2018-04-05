@@ -403,7 +403,7 @@ case .Thing:
   x = 0
 }
 
-switch Whatever.Thing { // expected-error {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
 @unknown default where x == 0: // expected-error{{'default' cannot be used with a 'where' guard expression}}
   x = 0
 }
