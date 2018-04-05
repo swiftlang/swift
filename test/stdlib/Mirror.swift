@@ -782,4 +782,20 @@ mirrors.test("String.init") {
   expectEqual("42", String(reflecting: 42))
   expectEqual("\"42\"", String(reflecting: "42"))
 }
+
+struct a<b>  {
+    enum c{}
+}
+class d  {}
+struct e<f> {
+    var constraints: [Int: a<f>.c] = [:]
+}
+
+mirrors.test("field with generic nested type") {
+  let x = e<d>()
+  
+  expectTrue(type(of: Mirror(reflecting: x).children.first!.value)
+              == [Int: a<d>.c].self)
+}
+
 runAllTests()
