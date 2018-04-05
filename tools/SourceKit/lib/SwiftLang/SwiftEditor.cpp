@@ -82,8 +82,6 @@ void EditorDiagConsumer::handleDiagnostic(
     return;
 
   if (Loc.isInvalid()) {
-    if (Kind == DiagnosticKind::Error)
-      HadInvalidLocError = true;
     clearLastDiag();
     return;
   }

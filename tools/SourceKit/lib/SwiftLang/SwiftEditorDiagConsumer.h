@@ -40,7 +40,6 @@ class EditorDiagConsumer : public swift::DiagnosticConsumer {
     return BufferDiagnostics[LastDiagBufferID][LastDiagIndex];
   }
 
-  bool HadInvalidLocError = false;
   bool HadAnyError = false;
 
 public:
@@ -63,8 +62,6 @@ public:
   }
 
   void getAllDiagnostics(SmallVectorImpl<DiagnosticEntryInfo> &Result);
-
-  bool hadErrorWithInvalidLoc() const { return HadInvalidLocError; }
 
   bool hadAnyError() const { return HadAnyError; }
 
