@@ -1926,7 +1926,7 @@ bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
 //      'required'
 //      'lazy'
 //      'final'
-//      'dyntamic'
+//      'dynamic'
 //      'prefix'
 //      'postfix'
 //      'infix'
