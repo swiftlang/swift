@@ -108,6 +108,9 @@ protected:
         llvm::opt::ArgStringList &Arguments,
         std::vector<FilelistInfo> &FilelistInfos) const;
 
+    void writeArgumentsToResponseFile(
+        llvm::opt::ArgStringList &Arguments) const;
+
   private:
     void addFrontendCommandLineInputArguments(
         bool mayHavePrimaryInputs, bool useFileList, bool usePrimaryFileList,

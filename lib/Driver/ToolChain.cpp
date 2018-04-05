@@ -63,6 +63,35 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
   return C.getArgs().MakeArgString(buffer.str());
 }
 
+static void
+writeResponseFile(llvm::raw_ostream &OS, llvm::opt::ArgStringList &Arguments) {
+  // wrap arguments in quotes to ensure compatibility with Unix and Windows
+  for (const char *arg : Arguments) {
+    OS << '"';
+    for (; *arg != '\0'; arg++) {
+      if (*arg == '\"' || *arg == '\\') {
+        OS << '\\'; // escape quote and backslash characters
+      }
+      OS << *arg;
+    }
+    OS << "\" ";
+  }
+}
+
+void
+ToolChain::JobContext::writeArgumentsToResponseFile(
+    llvm::opt::ArgStringList &Arguments) const {
+  const char *responseFile = getTemporaryFilePath("arguments", "resp");
+  std::string responseContents;
+  llvm::raw_string_ostream SS(responseContents);
+  writeResponseFile(SS, Arguments);
+  SS.flush();
+  llvm::sys::writeFileWithEncoding(responseFile, responseContents,
+                                   llvm::sys::WEM_UTF8);
+  Arguments.clear();
+  Arguments.push_back(Args.MakeArgString(Twine("@") + responseFile));
+}
+
 std::unique_ptr<Job>
 ToolChain::constructJob(const JobAction &JA,
                         Compilation &C,
@@ -116,6 +145,14 @@ ToolChain::constructJob(const JobAction &JA,
         executablePath = invocationInfo.ExecutableName;
       }
     }
+  }
+
+  // if the number of command line arguments is too high, place them in a
+  // response file
+  if (!llvm::sys::commandLineFitsWithinSystemLimits(executablePath,
+                                                    invocationInfo.Arguments)
+      && JA.allowsResponseFiles()) {
+    context.writeArgumentsToResponseFile(invocationInfo.Arguments);
   }
 
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
