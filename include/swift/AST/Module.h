@@ -830,6 +830,9 @@ private:
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
 
+  /// \brief Whether this file is sourced from a primary input.
+  bool IsPrimaryInput;
+
   /// The list of protocol conformances that were "used" within this
   /// source file.
   llvm::SetVector<NormalProtocolConformance *> UsedConformances;
@@ -899,7 +902,7 @@ public:
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
-             bool KeepSyntaxTree = false);
+             bool KeepSyntaxTree = false, bool IsPrimary = false);
 
   void
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
@@ -988,6 +991,9 @@ public:
       return None;
     return BufferID;
   }
+
+  /// Returns whether this file is sourced from a primary input.
+  bool isPrimaryInput() const { return IsPrimaryInput; }
 
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
