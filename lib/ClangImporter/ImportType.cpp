@@ -2015,9 +2015,6 @@ ImportedType ClangImporter::Implementation::importMethodType(
       continue;
     }
 
-    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter)
-      nonNullArgs.empty();
-
     // Import the parameter type into Swift.
 
     // Check nullability of the parameter.

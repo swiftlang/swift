@@ -312,3 +312,27 @@ let _: DynamicIUO? = o[dyn_iuo]
 o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO??'}}
 o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO?'}}
 o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO'}}
+
+
+// Check that we avoid picking an unavailable overload if there's an
+// alternative.
+class OverloadedWithUnavailable1 {
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc
+  @available(swift, obsoleted: 3)
+  func overloadedWithUnavailableB() { }
+}
+
+class OverloadedWithUnavailable2 {
+  @available(swift, obsoleted: 3)
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc func overloadedWithUnavailableB() { }
+}
+
+func testOverloadedWithUnavailable(ao: AnyObject) {
+  ao.overloadedWithUnavailableA()
+  ao.overloadedWithUnavailableB()
+}
+
