@@ -810,6 +810,8 @@ function(_add_swift_library_single target name)
   if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGET}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
     add_custom_target("${SWIFTLIB_SINGLE_MODULE_TARGET}"
       DEPENDS ${swift_module_dependency_target})
+    set_target_properties("${SWIFTLIB_SINGLE_MODULE_TARGET}" PROPERTIES
+      FOLDER "Swift libraries/Modules")
   endif()
 
   # For standalone overlay builds to work

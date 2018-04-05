@@ -201,6 +201,9 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   swift_common_standalone_build_config_llvm(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_clang(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_cmark(${product})
+
+  # Enable groups for IDE generators (Xcode and MSVC).
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endmacro()
 
 # Common cmake project config for unified builds.
