@@ -2,6 +2,7 @@ add_swift_library(swiftSIL STATIC
   AbstractionPattern.cpp
   BasicBlockUtils.cpp
   Bridging.cpp
+  DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
   InstructionUtils.cpp

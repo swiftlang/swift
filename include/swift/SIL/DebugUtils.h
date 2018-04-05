@@ -210,6 +210,11 @@ inline void eraseFromParentWithDebugInsts(SILInstruction *I) {
   eraseFromParentWithDebugInsts(I, nullIter);
 }
 
+/// Return true if the def-use graph rooted at \p V contains any non-debug,
+/// non-trivial users.
+bool hasNonTrivialNonDebugTransitiveUsers(
+    PointerUnion<SILInstruction *, SILArgument *> V);
+
 } // end namespace swift
 
 #endif /* SWIFT_SIL_DEBUGUTILS_H */
