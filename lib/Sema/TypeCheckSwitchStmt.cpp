@@ -1093,6 +1093,7 @@ namespace {
             continue;
 
           // Space is trivially covered with a default clause.
+          // FIXME: This is obviously not the right behavior for `unknown`.
           if (caseItem.isDefault())
             return;
 

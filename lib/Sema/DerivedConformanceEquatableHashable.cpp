@@ -252,7 +252,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
-                                     /*HasBoundDecls=*/false,
+                                     /*HasBoundDecls=*/false, SourceLoc(),
                                      SourceLoc(), body));
   }
 
@@ -446,7 +446,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
-                                     SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body));
   }
 
   // default: result = false
@@ -464,7 +464,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), defaultItem,
                                      /*HasBoundDecls*/ false,
-                                     SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body));
   }
 
   // switch (a, b) { <case statements> }
@@ -840,7 +840,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
     auto hasBoundDecls = !payloadVars.empty();
     auto body = BraceStmt::create(C, SourceLoc(), combineExprs, SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
-                                     SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body));
   }
 
   // generate: switch enumVar { }

@@ -111,7 +111,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     body));
+                                     SourceLoc(), body));
   }
 
   auto selfRef = createSelfDeclRef(toRawDecl);
@@ -231,7 +231,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     body));
+                                     SourceLoc(), body));
     Idx++;
   }
 
@@ -244,7 +244,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                     ASTNode(dfltReturnStmt), SourceLoc());
   cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
                                    /*HasBoundDecls=*/false, SourceLoc(),
-                                   dfltBody));
+                                   SourceLoc(), dfltBody));
 
   auto rawDecl = initDecl->getParameterList(1)->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);

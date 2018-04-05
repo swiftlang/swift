@@ -891,19 +891,21 @@ class CaseStmt final : public Stmt,
     private llvm::TrailingObjects<CaseStmt, CaseLabelItem> {
   friend TrailingObjects;
 
+  SourceLoc UnknownAttrLoc;
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
 
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-           bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
-           Optional<bool> Implicit);
+           bool HasBoundDecls, SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
+           Stmt *Body, Optional<bool> Implicit);
 
 public:
   static CaseStmt *create(ASTContext &C, SourceLoc CaseLoc,
                           ArrayRef<CaseLabelItem> CaseLabelItems,
-                          bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
+                          bool HasBoundDecls, SourceLoc UnknownAttrLoc,
+                          SourceLoc ColonLoc, Stmt *Body,
                           Optional<bool> Implicit = None);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
@@ -922,13 +924,25 @@ public:
   /// Get the source location of the 'case' or 'default' of the first label.
   SourceLoc getLoc() const { return CaseLoc; }
 
-  SourceLoc getStartLoc() const { return getLoc(); }
+  SourceLoc getStartLoc() const {
+    if (UnknownAttrLoc.isValid())
+      return UnknownAttrLoc;
+    return getLoc();
+  }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
   SourceRange getLabelItemsRange() const {
     return ColonLoc.isValid() ? SourceRange(getLoc(), ColonLoc) : getSourceRange();
   }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
+
+  bool hasUnknownAttr() const {
+    // Note: This representation doesn't allow for synthesized @unknown cases.
+    // However, that's probably sensible; the purpose of @unknown is for
+    // diagnosing otherwise-non-exhaustive switches, and the user can't edit
+    // a synthesized case.
+    return UnknownAttrLoc.isValid();
+  }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
 };

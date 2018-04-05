@@ -253,11 +253,12 @@ STMT_NODES = [
              Child('Body', kind='CodeBlock'),
          ]),
 
-    # switch-case -> switch-case-label stmt-list
-    #              | default-label stmt-list
+    # switch-case -> unknown-attr? switch-case-label stmt-list
+    #              | unknown-attr? switch-default-label stmt-list
     Node('SwitchCase', kind='Syntax',
          traits=['WithStatements'],
          children=[
+             Child('UnknownAttr', kind='Attribute', is_optional=True),
              Child('Label', kind='Syntax',
                    node_choices=[
                        Child('Default', kind='SwitchDefaultLabel'),
@@ -270,6 +271,13 @@ STMT_NODES = [
     Node('SwitchDefaultLabel', kind='Syntax',
          children=[
              Child('DefaultKeyword', kind='DefaultToken'),
+             Child('Colon', kind='ColonToken'),
+         ]),
+
+    # switch-unknown-label -> 'unknown' ':'
+    Node('SwitchUnknownLabel', kind='Syntax',
+         children=[
+             Child('UnknownKeyword', kind='Token'),
              Child('Colon', kind='ColonToken'),
          ]),
 

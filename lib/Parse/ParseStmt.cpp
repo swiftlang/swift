@@ -137,25 +137,51 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   return ResultExpr;
 }
 
+/// Returns whether the parser's current position is the start of a switch case,
+/// given that we're in the middle of a switch already.
+static bool isAtStartOfSwitchCase(Parser &parser,
+                                  bool needsToBacktrack = true) {
+  Optional<Parser::BacktrackingScope> backtrack;
+
+  // Check for and consume attributes. The only valid attribute is `@unknown`
+  // but that's a semantic restriction.
+  while (parser.Tok.is(tok::at_sign)) {
+    if (!parser.peekToken().is(tok::identifier))
+      return false;
+
+    if (needsToBacktrack && !backtrack)
+      backtrack.emplace(parser);
+
+    parser.consumeToken(tok::at_sign);
+    parser.consumeIdentifier();
+    if (parser.Tok.is(tok::l_paren))
+      parser.skipSingle();
+  }
+
+  return parser.Tok.isAny(tok::kw_case, tok::kw_default);
+}
+
 bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                               ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
   case BraceItemListKind::Brace:
     return false;
-  case BraceItemListKind::Case:
+  case BraceItemListKind::Case: {
     if (Tok.is(tok::pound_if)) {
+      // Backtracking scopes are expensive, so avoid setting one up if possible.
+      Parser::BacktrackingScope Backtrack(*this);
       // '#if' here could be to guard 'case:' or statements in cases.
       // If the next non-directive line starts with 'case' or 'default', it is
       // for 'case's.
-      Parser::BacktrackingScope Backtrack(*this);
       do {
         consumeToken();
         while (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
           skipSingle();
       } while (Tok.isAny(tok::pound_if, tok::pound_elseif, tok::pound_else));
-      return Tok.isAny(tok::kw_case, tok::kw_default);
+      return isAtStartOfSwitchCase(*this, /*needsToBacktrack*/false);
     }
-    return Tok.isAny(tok::kw_case, tok::kw_default);
+    return isAtStartOfSwitchCase(*this);
+  }
   case BraceItemListKind::TopLevelCode:
     // When parsing the top level executable code for a module, if we parsed
     // some executable code, then we're done.  We want to process (name bind,
@@ -2025,7 +2051,7 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
   ParserStatus Status;
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
-    if (Tok.isAny(tok::kw_case, tok::kw_default)) {
+    if (isAtStartOfSwitchCase(*this)) {
       ParserResult<CaseStmt> Case = parseStmtCase(IsActive);
       Status |= Case;
       if (Case.isNonNull())
@@ -2158,6 +2184,30 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SmallVector<CaseLabelItem, 2> CaseLabelItems;
   SmallVector<VarDecl *, 4> BoundDecls;
 
+  SourceLoc UnknownAttrLoc;
+  while (Tok.is(tok::at_sign)) {
+    SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
+    UnknownAttrLoc = consumeToken(tok::at_sign);
+
+    if (Tok.isContextualKeyword("unknown")) {
+      consumeIdentifier();
+
+      // Form an empty TokenList for the arguments of the 'Attribute' Syntax
+      // node.
+      SyntaxParsingContext(SyntaxContext, SyntaxKind::TokenList);
+    } else {
+      UnknownAttrLoc = SourceLoc();
+
+      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      consumeIdentifier();
+
+      if (Tok.is(tok::l_paren)) {
+        SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
+        skipSingle();
+      }
+    }
+  }
+
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
   if (Tok.is(tok::kw_case)) {
@@ -2172,8 +2222,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SmallVector<ASTNode, 8> BodyItems;
 
   SourceLoc StartOfBody = Tok.getLoc();
-  if (Tok.isNot(tok::kw_case) && Tok.isNot(tok::kw_default) &&
-      Tok.isNot(tok::r_brace)) {
+  if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
     Status |= parseBraceItems(BodyItems, BraceItemListKind::Case);
   } else if (Status.isSuccess()) {
     diagnose(CaseLoc, diag::case_stmt_without_body,
@@ -2192,5 +2241,6 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 
   return makeParserResult(
       Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems,
-                               !BoundDecls.empty(), ColonLoc, Body));
+                               !BoundDecls.empty(), UnknownAttrLoc, ColonLoc,
+                               Body));
 }
