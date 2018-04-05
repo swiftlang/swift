@@ -209,7 +209,6 @@ S_RDAR_28991372(x: #^RDAR_28991372^#, y: <#T##Int#>)
 protocol P where #^RDAR_31981486^#
 // RDAR_31981486: Begin completions
 
-
 // rdar://problem/38149042
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_38149042 | %FileCheck %s -check-prefix=RDAR_38149042
 class Baz_38149042 {
@@ -226,3 +225,24 @@ func foo_38149042(bar: Bar_38149042) {
 // RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
 // RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
 // RDAR_38149042: End completions
+
+// rdar://problem/38272904
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_38272904 | %FileCheck %s -check-prefix=RDAR_38272904
+public protocol P_38272904 {
+    associatedtype A = Error
+    associatedtype B
+}
+
+public func ?? <T: P_38272904>(lhs: T, rhs: @autoclosure() throws -> T.B) rethrows -> T.B {
+  fatalError()
+}
+
+class A_38272904 {
+  open class func foo() -> A_38272904 { fatalError() }
+}
+
+func bar_38272904(a: A_38272904) {}
+func foo_38272904(a: A_38272904) {
+  bar_38272904(a: .foo() #^RDAR_38272904^#)
+}
+// RDAR_38272904: Begin completions

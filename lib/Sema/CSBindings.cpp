@@ -253,6 +253,17 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->hasError())
     return None;
 
+  // Don't deduce autoclosure types or single-element, non-variadic
+  // tuples.
+  if (shouldBindToValueType(constraint)) {
+    if (auto funcTy = type->getAs<FunctionType>()) {
+      if (funcTy->isAutoClosure())
+        type = funcTy->getResult();
+    }
+
+    type = type->getWithoutImmediateLabel();
+  }
+
   // If the source of the binding is 'OptionalObject' constraint
   // and type variable is on the left-hand side, that means
   // that it _has_ to be of optional type, since the right-hand
@@ -304,17 +315,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
     result.InvolvesTypeVariables = true;
     return None;
-  }
-
-  // Don't deduce autoclosure types or single-element, non-variadic
-  // tuples.
-  if (shouldBindToValueType(constraint)) {
-    if (auto funcTy = type->getAs<FunctionType>()) {
-      if (funcTy->isAutoClosure())
-        type = funcTy->getResult();
-    }
-
-    type = type->getWithoutImmediateLabel();
   }
 
   // Make sure we aren't trying to equate type variables with different
