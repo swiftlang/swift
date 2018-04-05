@@ -804,13 +804,14 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
     SourceFileKind fileKind, SourceFile::ImplicitModuleImportKind importKind,
     Optional<unsigned> bufferID) {
   ModuleDecl *mainModule = getMainModule();
+  bool isPrimary = bufferID && isPrimaryInput(*bufferID);
   SourceFile *inputFile = new (*Context)
       SourceFile(*mainModule, fileKind, bufferID, importKind,
                  Invocation.getLangOptions().CollectParsedToken,
-                 Invocation.getLangOptions().BuildSyntaxTree);
+                 Invocation.getLangOptions().BuildSyntaxTree, isPrimary);
   MainModule->addFile(*inputFile);
 
-  if (bufferID && isPrimaryInput(*bufferID)) {
+  if (isPrimary) {
     recordPrimarySourceFile(inputFile);
   }
 

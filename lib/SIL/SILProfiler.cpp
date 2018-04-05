@@ -101,6 +101,22 @@ static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
 }
 
 SILProfiler *SILProfiler::create(SILModule &M, ASTNode N) {
+  // Unless there are no primary inputs (WMO), code outside of a primary input
+  // may not be fully formed. Defer instrumenting non-primary files, with the
+  // expectation that that code will be visited later.
+  const auto &Opts = M.getOptions();
+  DeclContext *DC = N.getAsDeclContext();
+  if (!DC)
+    llvm_unreachable("Invalid AST node for profiling");
+  SourceFile *ParentSF = DC->getParentSourceFile();
+  bool shouldProfile =
+      M.isWholeModule() || (ParentSF && ParentSF->isPrimaryInput());
+  if (!shouldProfile)
+    return nullptr;
+
+  // Assert that the input AST has at least been type-checked.
+  assert(!ParentSF || ParentSF->ASTStage >= SourceFile::TypeChecked);
+
   if (auto *D = N.dyn_cast<Decl *>()) {
     assert(isa<AbstractFunctionDecl>(D) ||
            isa<TopLevelCodeDecl>(D) && "Cannot create profiler");
@@ -110,7 +126,6 @@ SILProfiler *SILProfiler::create(SILModule &M, ASTNode N) {
     llvm_unreachable("Invalid AST node for profiling");
   }
 
-  const auto &Opts = M.getOptions();
   if ((!Opts.GenerateProfile && Opts.UseProfile.empty()) || isUnmapped(N))
     return nullptr;
 
@@ -465,21 +480,20 @@ struct PGOMapping : public ASTWalker {
       CounterMap[thenExpr] = NextCounter++;
       auto thenCount = loadExecutionCount(thenExpr);
       LoadedCounterMap[thenExpr] = thenCount;
-      if (auto elseExpr = IE->getElseExpr()) {
-        CounterMap[elseExpr] = parent;
-        auto count = loadExecutionCount(elseExpr);
-        if (!parent) {
-          auto thenVal = thenCount.getValue();
-          for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-            auto cCount = LoadedCounts->Counts[pCount];
-            if (cCount > thenVal) {
-              count = cCount;
-              break;
-            }
+      auto elseExpr = IE->getElseExpr();
+      CounterMap[elseExpr] = parent;
+      auto count = loadExecutionCount(elseExpr);
+      if (!parent) {
+        auto thenVal = thenCount.getValue();
+        for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
+          auto cCount = LoadedCounts->Counts[pCount];
+          if (cCount > thenVal) {
+            count = cCount;
+            break;
           }
         }
-        LoadedCounterMap[elseExpr] = subtract(count, thenCount);
       }
+      LoadedCounterMap[elseExpr] = subtract(count, thenCount);
     } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
       CounterMap[E] = NextCounter++;
       auto eCount = loadExecutionCount(E);

@@ -1,0 +1,1 @@
+func empty_func() {}
