@@ -99,4 +99,23 @@ StringForPrintObjectTests.test("DontBridgeThisStruct") {
 }
 #endif
 
+class RefCountedObj {
+  var patatino : Int
+  init(_ p : Int) {
+    self.patatino = p
+  }
+  public func f() -> Int {
+    return self.patatino
+  }
+}
+
+let RefcountTests = TestSuite("RefCount")
+RefcountTests.test("Basic") {
+  var Obj = RefCountedObj(47);
+  expectEqual(_getRetainCount(Obj), 2);
+  expectEqual(_getWeakRetainCount(Obj), 1);
+  expectEqual(_getUnownedRetainCount(Obj), 1);
+  let _ = Obj.f() // try to keep the object live here.
+}
+
 runAllTests()
