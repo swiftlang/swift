@@ -34,7 +34,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
 
-  typedef SILClonerWithScopes<ImplClass> super;
+  using super = SILClonerWithScopes<ImplClass>;
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     llvm_unreachable("Clients need to explicitly call a base class impl!");
