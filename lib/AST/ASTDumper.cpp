@@ -2874,12 +2874,13 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
         }
         PrintWithColorRAII(out, ParenthesisColor) << ')';
       });
+
+      for (auto conformance : normal->getSignatureConformances()) {
+        out << '\n';
+        conformance.dump(out, indent + 2);
+      }
     }
 
-    for (auto conformance : normal->getSignatureConformances()) {
-      out << '\n';
-      conformance.dump(out, indent + 2);
-    }
     for (auto requirement : normal->getConditionalRequirements()) {
       out << '\n';
       out.indent(indent + 2);
