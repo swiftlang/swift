@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @inline(__always)
 internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   codeUnit u_: CodeUnit, radix: Result
@@ -31,7 +30,6 @@ internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @inline(__always)
 internal func _parseUnsignedASCII<
   Rest : IteratorProtocol, Result: FixedWidthInteger
@@ -68,7 +66,6 @@ where Rest.Element : UnsignedInteger {
 //
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @inline(__always)
 internal func _parseASCII<
   CodeUnits : IteratorProtocol, Result: FixedWidthInteger
@@ -99,7 +96,6 @@ extension FixedWidthInteger {
   // detail for FixedWidthInteger.init(_: radix:) on the slow path to save code
   // size.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(never)
   internal static func _parseASCIISlowPath<

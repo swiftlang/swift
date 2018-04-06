@@ -1413,8 +1413,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                 SourceLoc(), /*implicit*/ true);
   Parameter->setBody(Body);
   
-  typeCheckDecl(Parameter, true);
-  typeCheckDecl(Parameter, false);
+  typeCheckDecl(Parameter);
   addMemberToContextIfNeeded(Parameter, DC);
 
   // Add the witnesses to the conformance.
@@ -1997,6 +1996,69 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setStubImplementation(true);
 }
 
+static void configureDesignatedInitAttributes(TypeChecker &tc,
+                                              ClassDecl *classDecl,
+                                              ConstructorDecl *ctor,
+                                              ConstructorDecl *superclassCtor) {
+  auto &ctx = tc.Context;
+
+  AccessLevel access = classDecl->getFormalAccess();
+  access = std::max(access, AccessLevel::Internal);
+  access = std::min(access, superclassCtor->getFormalAccess());
+
+  ctor->setAccess(access);
+
+  // Inherit the @inlinable attribute.
+  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true)
+      >= AccessLevel::Public) {
+    if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
+      auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
+      ctor->getAttrs().add(clonedAttr);
+    }
+  }
+
+  // Inherit the @usableFromInline attribute. We need better abstractions
+  // for dealing with @usableFromInline.
+  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true)
+        >= AccessLevel::Public) {
+    if (access == AccessLevel::Internal &&
+        !superclassCtor->isDynamic() &&
+        !ctor->getAttrs().hasAttribute<InlinableAttr>()) {
+      auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
+      ctor->getAttrs().add(clonedAttr);
+    }
+  }
+
+  // Make sure the constructor is only as available as its superclass's
+  // constructor.
+  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
+
+  if (superclassCtor->isObjC()) {
+    // Inherit the @objc name from the superclass initializer, if it
+    // has one.
+    if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
+      if (objcAttr->hasName()) {
+        auto *clonedAttr = objcAttr->clone(ctx);
+        clonedAttr->setImplicit(true);
+        ctor->getAttrs().add(clonedAttr);
+      }
+    }
+
+    auto errorConvention = superclassCtor->getForeignErrorConvention();
+    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
+  }
+  if (superclassCtor->isRequired())
+    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
+  if (superclassCtor->isDynamic())
+    ctor->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit*/true));
+
+  // Wire up the overrides.
+  ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
+  ctor->setOverriddenDecl(superclassCtor);
+}
+
 ConstructorDecl *
 swift::createDesignatedInitOverride(TypeChecker &tc,
                                     ClassDecl *classDecl,
@@ -2082,65 +2144,13 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   ctor->setImplicit();
 
-  AccessLevel access = classDecl->getFormalAccess();
-  access = std::max(access, AccessLevel::Internal);
-  access = std::min(access, superclassCtor->getFormalAccess());
-
-  ctor->setAccess(access);
-
-  // This is really painful. We need better abstractions for dealing with
-  // @usableFromInline.
-  if (superclassCtor->getFormalAccess(/*useDC=*/nullptr,
-                                      /*treatUsableFromInlineAsPublic=*/true)
-        >= AccessLevel::Public) {
-    if (access == AccessLevel::Internal &&
-        !superclassCtor->isDynamic()) {
-      auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-      ctor->getAttrs().add(clonedAttr);
-    }
-  }
-
-  // Inherit the @inlinable attribute.
-  if (ctor->getFormalAccess(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true)
-        >= AccessLevel::Public) {
-    if (superclassCtor->getAttrs().hasAttribute<InlinableAttr>()) {
-      auto *clonedAttr = new (ctx) InlinableAttr(/*implicit=*/true);
-      ctor->getAttrs().add(clonedAttr);
-    }
-  }
-
-  // Make sure the constructor is only as available as its superclass's
-  // constructor.
-  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
-
   // Set the interface type of the initializer.
   ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
   tc.configureInterfaceType(ctor, ctor->getGenericSignature());
-
-  if (superclassCtor->isObjC()) {
-    // Inherit the @objc name from the superclass initializer, if it
-    // has one.
-    if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
-      if (objcAttr->hasName()) {
-        auto *clonedAttr = objcAttr->clone(ctx);
-        clonedAttr->setImplicit(true);
-        ctor->getAttrs().add(clonedAttr);
-      }
-    }
-
-    auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
-  }
-  if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (tc.Context) RequiredAttr(/*IsImplicit=*/true));
-  if (superclassCtor->isDynamic())
-    ctor->getAttrs().add(new (tc.Context) DynamicAttr(/*IsImplicit*/true));
-
-  // Wire up the overrides.
-  ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
-  ctor->setOverriddenDecl(superclassCtor);
   ctor->setValidationStarted();
+
+  configureDesignatedInitAttributes(tc, classDecl,
+                                    ctor, superclassCtor);
 
   if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.

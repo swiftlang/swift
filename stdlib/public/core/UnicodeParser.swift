@@ -27,14 +27,12 @@ extension Unicode {
   case error(length: Int)
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     internal var _valid: T? {
       if case .valid(let result) = self { return result }
       return nil
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     internal var _error: Int? {
       if case .error(let result) = self { return result }
       return nil
@@ -61,7 +59,6 @@ public protocol _UnicodeParser {
 
 extension _UnicodeParser {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @inline(__always)
   @discardableResult
   internal static func _parse<I: IteratorProtocol>(

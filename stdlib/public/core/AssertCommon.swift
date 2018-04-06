@@ -31,7 +31,6 @@ func _isDebugAssertConfiguration() -> Bool {
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline
 @_transparent
 internal func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
@@ -64,7 +63,6 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline
 @_transparent
 internal
 func _fatalErrorFlags() -> UInt32 {

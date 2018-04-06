@@ -282,7 +282,6 @@ public struct StrideToIterator<Element : Strideable> {
   internal var _current: (index: Int?, value: Element)
 
   @inlinable
-  @usableFromInline
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     self._start = _start
     _end = end
@@ -323,7 +322,6 @@ public struct StrideTo<Element : Strideable> {
   internal let _stride: Element.Stride
 
   @inlinable
-  @usableFromInline
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "Stride size must not be zero")
     // At start, striding away from end is allowed; it just makes for an
@@ -496,7 +494,6 @@ public struct StrideThroughIterator<Element : Strideable> {
   internal var _didReturnEnd: Bool = false
 
   @inlinable
-  @usableFromInline
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     self._start = _start
     _end = end
@@ -543,7 +540,6 @@ public struct StrideThrough<Element: Strideable> {
   internal let _stride: Element.Stride
   
   @inlinable
-  @usableFromInline
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "Stride size must not be zero")
     self._start = _start

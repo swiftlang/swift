@@ -1003,7 +1003,6 @@ extension ${Self} : CustomReflectable {
 
 extension ${Self} : CustomPlaygroundQuickLookable {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var summary: String {
     let selfType = "${Self}"
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -1055,7 +1054,6 @@ extension UInt {
 
 extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _max : ${Self} {
     return ${Self}(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride

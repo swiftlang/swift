@@ -13,7 +13,6 @@
 import SwiftShims
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_bufferAllocate")
 internal func _swift_bufferAllocate(
   bufferType type: AnyClass,
@@ -73,14 +72,12 @@ open class ManagedBuffer<Header, Element> {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal final var firstElementAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self,
                                                          Element.self))
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal final var headerAddress: UnsafeMutablePointer<Header> {
     return UnsafeMutablePointer<Header>(Builtin.addressof(&header))
   }
@@ -134,7 +131,6 @@ open class ManagedBuffer<Header, Element> {
 
   /// Make ordinary initialization unavailable
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only initialize these by calling create")
   }
@@ -237,7 +233,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// for the _ContiguousArrayBuffer that this check must always succeed we omit
   /// it in this specialized constructor.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._sanityCheckValidBufferClass(type(of: buffer))
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
@@ -329,7 +324,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   ///   properties.  The `deinit` of `bufferClass` must destroy its
   ///   stored `Header` and any constructed `Element`s.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(
     bufferClass: AnyClass,
     minimumCapacity: Int
@@ -346,7 +340,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// Internal version for use by _ContiguousArrayBuffer.init where we know that
   /// we have a valid buffer class and that the capacity is >= 0.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
@@ -372,7 +365,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// - Note: It is an error to use the `header` property of the resulting
   ///   instance unless it has been initialized.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_ buffer: ManagedBuffer<Header, Element>) {
     _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
@@ -380,7 +372,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   internal typealias _My = ManagedBufferPointer
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func _checkValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
@@ -399,7 +390,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func _sanityCheckValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
@@ -419,7 +409,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 
   /// The required alignment for allocations of this type, minus 1
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _alignmentMask: Int {
     return max(
       MemoryLayout<_HeapObject>.alignment,
@@ -428,21 +417,18 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 
   /// The actual number of bytes allocated for this object.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _capacityInBytes: Int {
     return _stdlib_malloc_size(_address)
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _address: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_nativeBuffer))
   }
 
   /// Offset from the allocated storage for `self` to the stored `Header`
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _headerOffset: Int {
     _onFastPath()
     return _roundUp(
@@ -454,7 +440,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// instance.  Not safe to use without _fixLifetime calls to
   /// guarantee it doesn't dangle
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
     return (_address + _My._headerOffset).assumingMemoryBound(
@@ -465,7 +450,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// safe to use without _fixLifetime calls to guarantee it doesn't
   /// dangle.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
     return (_address + _My._elementOffset).assumingMemoryBound(
@@ -474,7 +458,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 
   /// Offset from the allocated storage for `self` to the `Element` storage
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _elementOffset: Int {
     _onFastPath()
     return _roundUp(
@@ -489,7 +472,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     return lhs._address == rhs._address
   }
 
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline
   internal var _nativeBuffer: Builtin.NativeObject
 }
 
@@ -561,7 +544,6 @@ public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
 }
 
 @inlinable
-@usableFromInline
 internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout T) -> Bool {
   return _isUniqueOrPinned(&object)
 }

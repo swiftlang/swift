@@ -384,7 +384,6 @@ extension Unicode.UTF16 : UnicodeCodec {
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal mutating func _decodeOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> (UnicodeDecodingResult, Int) where I.Element == CodeUnit {
@@ -488,7 +487,6 @@ extension Unicode.UTF32 : UnicodeCodec {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func _decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
@@ -886,7 +884,6 @@ extension Unicode.Scalar {
   /// Create an instance with numeric value `value`, bypassing the regular
   /// precondition checks for code point validity.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_unchecked value: UInt32) {
     _sanityCheck(value < 0xD800 || value > 0xDFFF,
       "high- and low-surrogate code points are not valid Unicode scalar values")

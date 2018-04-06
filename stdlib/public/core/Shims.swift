@@ -18,7 +18,6 @@
 import SwiftShims
 
 @inlinable
-@usableFromInline
 internal func _makeSwiftNSFastEnumerationState()
    -> _SwiftNSFastEnumerationState {
   return _SwiftNSFastEnumerationState(

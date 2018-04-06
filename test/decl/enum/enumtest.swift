@@ -313,7 +313,10 @@ print(E21269142.Foo.rawValue)  // expected-error {{value of type 'E21269142' has
 enum SyntheticMember { // expected-note {{did you mean the implicitly-synthesized property 'hashValue'?}}
   case Foo
 }
-print(SyntheticMember.Foo.hasValue) // expected-error {{value of type 'SyntheticMember' has no member 'hasValue'}}
+
+func useSynthesizedMember() {
+  print(SyntheticMember.Foo.hasValue) // expected-error {{value of type 'SyntheticMember' has no member 'hasValue'}}
+}
 
 // Non-materializable argument type
 enum Lens<T> {

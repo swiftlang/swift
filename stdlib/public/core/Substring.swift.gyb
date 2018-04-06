@@ -108,13 +108,11 @@ public struct Substring : StringProtocol {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_slice: Slice<String>) {
     self._slice = _slice
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
     self.init(
       _base: String(guts),
@@ -134,7 +132,6 @@ public struct Substring : StringProtocol {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init<R: RangeExpression>(
     _base base: String, _ bounds: R
   ) where R.Bound == Index {
@@ -307,7 +304,6 @@ public struct Substring : StringProtocol {
 
 extension Substring : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent: String {
     return String(self)
   }
@@ -395,7 +391,6 @@ extension Substring.${_View} : BidirectionalCollection {
 
   /// Creates an instance that slices `base` at `_bounds`.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ base: String.${_View}, _bounds: Range<Index>) {
     _slice = Slice(
       base: String(base._guts).${_property},
@@ -404,13 +399,11 @@ extension Substring.${_View} : BidirectionalCollection {
 
   /// The entire String onto whose slice this view is a projection.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _wholeString: String {
     return String(_slice._base._guts)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _encodedOffsetRange: Range<Int> {
     return startIndex.encodedOffset..<endIndex.encodedOffset
   }

@@ -52,7 +52,6 @@ where
 
 extension _StringVariant {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _copyToNativeStorage<TargetCodeUnit>(
     of codeUnit: TargetCodeUnit.Type = TargetCodeUnit.self,
     unusedCapacity: Int = 0
@@ -66,7 +65,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(_ i: Index) {
     _precondition(i >= startIndex && i < endIndex,
@@ -74,7 +72,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(_ range: Range<Index>) {
     _precondition(range.lowerBound >= startIndex,
@@ -84,7 +81,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(offset i: Int) {
     _precondition(i >= 0 && i < count,
@@ -92,7 +88,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(offsetRange range: Range<Int>) {
     _precondition(range.lowerBound >= 0 && range.upperBound <= count,
@@ -100,28 +95,24 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   internal func codeUnit(atCheckedIndex index: Index) -> Element {
     _boundsCheck(index)
     return self[index]
   }
 
   @inlinable
-  @usableFromInline
   internal func codeUnit(atCheckedOffset offset: Int) -> Element {
     _boundsCheck(offset: offset)
     return self[offset]
   }
 
   @inlinable
-  @usableFromInline
   internal func checkedSlice(_ range: Range<Int>) -> Self {
     _boundsCheck(offsetRange: range)
     return self[range]
   }
 
   @inlinable
-  @usableFromInline
   internal func checkedSlice(from startOffset: Int) -> Self {
     let r: Range<Int> = startOffset..<count
     _boundsCheck(offsetRange: r)
@@ -129,7 +120,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   internal func checkedSlice(upTo endOffset: Int) -> Self {
     let r: Range<Int> = 0..<endOffset
     _boundsCheck(offsetRange: r)
@@ -139,7 +129,6 @@ extension _StringVariant {
 
 extension _StringVariant {
   @inlinable
-  @usableFromInline
   internal func unicodeScalarWidth(startingAt offset: Int) -> Int {
     _boundsCheck(offset: offset)
     if _slowPath(UTF16.isLeadSurrogate(self[offset])) {
@@ -152,7 +141,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   func unicodeScalarWidth(endingAt offset: Int) -> Int {
     _boundsCheck(offset: offset - 1)
     if _slowPath(UTF16.isTrailSurrogate(self[offset - 1])) {
@@ -164,7 +152,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   func unicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
     let u0 = self.codeUnit(atCheckedOffset: offset)
     if _fastPath(UTF16._isScalar(u0)) {
@@ -180,7 +167,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   func unicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
     let u1 = self.codeUnit(atCheckedOffset: offset - 1)
     if _fastPath(UTF16._isScalar(u1)) {

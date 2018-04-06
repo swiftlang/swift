@@ -49,7 +49,6 @@ struct _StringGuts {
 
   public typealias _RawBitPattern = (_StringObject._RawBitPattern, UInt)
 
-  @usableFromInline
   @inlinable
   internal var rawBits: _RawBitPattern {
     @inline(__always)
@@ -67,7 +66,6 @@ struct _StringGuts {
 
 extension _StringGuts {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     _object._invariantCheck()
@@ -168,7 +166,6 @@ extension _StringGuts {
     return _object.isSingleByte
   }
 
-  @usableFromInline
   @inlinable
   internal
   var _isEmptySingleton: Bool {
@@ -181,7 +178,6 @@ extension _StringGuts {
     return _object.byteWidth
   }
 
-  @usableFromInline
   @inlinable
   internal
   var _nativeCount: Int {
@@ -197,7 +193,7 @@ extension _StringGuts {
   }
 
   // TODO(SSO): consider a small-checking variant
-  @usableFromInline
+  @inlinable
   @inline(__always)
   internal
   init<CodeUnit>(_large storage: _SwiftStringStorage<CodeUnit>)
@@ -231,7 +227,6 @@ extension _StringGuts {
       Builtin.reinterpretCast(_unsafeBitPattern))
   }
 
-  @usableFromInline
   @inlinable
   var _cocoaCount: Int {
     @inline(__always)
@@ -244,7 +239,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   var _cocoaRawStart: UnsafeRawPointer {
     @inline(__always)
@@ -257,7 +251,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   func _asContiguousCocoa<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self
@@ -311,7 +304,6 @@ extension _StringGuts {
 #endif // _runtime(_ObjC)
 
 extension _StringGuts {
-  @usableFromInline
   @inlinable
   internal var _unmanagedRawStart: UnsafeRawPointer {
     @inline(__always) get {
@@ -320,7 +312,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal var _unmanagedCount: Int {
     @inline(__always) get {
@@ -329,7 +320,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -346,7 +336,6 @@ extension _StringGuts {
   }
 
   // TODO(SSO): consider a small-checking variant
-  @usableFromInline
   @inlinable
   init<CodeUnit>(_large s: _UnmanagedString<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
@@ -363,7 +352,6 @@ extension _StringGuts {
 
 // Small strings
 extension _StringGuts {
-  @usableFromInline
   @inlinable
   internal var _smallUTF8Count: Int {
     @inline(__always) get {
@@ -375,7 +363,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal var _smallUTF8String: _SmallUTF8String {
     @inline(__always) get {
@@ -388,7 +375,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal init(_ small: _SmallUTF8String) {
@@ -403,7 +389,6 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @usableFromInline
   @inlinable
   internal
   var _unmanagedASCIIView: _UnmanagedString<UInt8> {
@@ -425,7 +410,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var _unmanagedUTF16View: _UnmanagedString<UTF16.CodeUnit> {
@@ -449,7 +433,6 @@ extension _StringGuts {
 }
 
 extension _StringGuts {
-  @usableFromInline
   @inlinable
   internal
   var _isOpaque: Bool {
@@ -457,7 +440,6 @@ extension _StringGuts {
     get { return _object.isOpaque }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var _isContiguous: Bool {
@@ -658,7 +640,6 @@ extension _StringGuts {
   @_specialize(where CodeUnit == UInt8)
   @_specialize(where CodeUnit == UInt16)
   @_specialize(where CodeUnit == UTF16.CodeUnit)
-  @usableFromInline
   @inlinable
   internal
   func _copyToNativeStorage<CodeUnit>(
@@ -706,7 +687,6 @@ extension _StringGuts {
       _large: _copyToNativeStorage(of: UTF16.CodeUnit.self, from: range))
   }
 
-  @usableFromInline
   @inlinable
   internal mutating func allocationParametersForMutableStorage<CodeUnit>(
     of type: CodeUnit.Type,
@@ -738,7 +718,6 @@ extension _StringGuts {
 
   // Convert ourselves (if needed) to a native string with the specified storage
   // parameters and call `body` on the resulting native storage.
-  @usableFromInline
   @inlinable
   internal
   mutating func withMutableStorage<CodeUnit, R>(
@@ -769,7 +748,6 @@ extension _StringGuts {
     return result
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -781,7 +759,6 @@ extension _StringGuts {
       of: UInt8.self, unusedCapacity: unusedCapacity, body)
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -798,19 +775,16 @@ extension _StringGuts {
 // String API
 //
 extension _StringGuts {
-  @usableFromInline
   @inlinable
   internal var _hasStoredCount: Bool {
     @inline(__always) get { return !_object.isSmallOrCocoa }
   }
 
-  @usableFromInline
   @inlinable
   internal var startIndex: Int {
     return 0
   }
 
-  @usableFromInline
   @inlinable
   internal var endIndex: Int {
     @inline(__always) get { return count }
@@ -915,7 +889,6 @@ extension _StringGuts {
 
 
   // Copy code units from a slice of this string into a buffer.
-  @usableFromInline
   @inlinable // FIXME(sil-serialize-all)
   internal func _copy<CodeUnit>(
     range: Range<Int>,
@@ -1011,7 +984,6 @@ extension _StringGuts {
     _invariantCheck()
   }
 
-  @usableFromInline
   @inlinable
   internal
   mutating func append(_ other: _UnmanagedASCIIString) {
@@ -1034,7 +1006,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   mutating func append(_ other: _UnmanagedUTF16String) {
@@ -1044,7 +1015,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   mutating func append(_ other: _UnmanagedOpaqueString) {
@@ -1055,7 +1025,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal
   mutating func append<S: StringProtocol>(_ other: S) {
     self.append(other._wholeString._guts, range: other._encodedOffsetRange)
@@ -1145,7 +1114,6 @@ extension _StringGuts {
   //
   @_specialize(where C == Character._SmallUTF16)
   @inlinable
-  @usableFromInline
   mutating func append<C : RandomAccessCollection>(contentsOf other: C)
   where C.Element == UInt16 {
     if self._isSmall {
@@ -1278,7 +1246,6 @@ extension _StringGuts : Sequence {
     internal var _bufferIndex: Int = 0
 
     @inlinable
-    @usableFromInline
     internal init(_ guts: _StringGuts, range: Range<Int>) {
       self._guts = guts
       self._endOffset = range.upperBound
@@ -1324,7 +1291,6 @@ extension _StringGuts : Sequence {
   }
 
   @inlinable
-  @usableFromInline
   internal func makeIterator(in range: Range<Int>) -> Iterator {
     return Iterator(self, range: range)
   }
@@ -1334,7 +1300,6 @@ extension _StringGuts {
   // TODO: Drop or unify with String._fromCodeUnits
   //
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal
   static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
     _ input: Input,
@@ -1401,7 +1366,6 @@ extension _SwiftStringStorage {
   /// specified encoding. If any invalid sequences are found, they are replaced
   /// with REPLACEMENT CHARACTER (U+FFFD).
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal
   func _initialize<Input : Sequence, Encoding: _UnicodeEncoding>(
     fromCodeUnits input: Input,

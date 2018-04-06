@@ -279,7 +279,6 @@ internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
@@ -417,7 +416,6 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
 @inlinable
-@usableFromInline
 @inline(never) @effects(readonly)
 internal func _toStringReadOnlyStreamable<
   T : TextOutputStreamable
@@ -428,7 +426,6 @@ internal func _toStringReadOnlyStreamable<
 }
 
 @inlinable
-@usableFromInline
 @inline(never) @effects(readonly)
 internal func _toStringReadOnlyPrintable<
   T : CustomStringConvertible
@@ -466,7 +463,6 @@ public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
@@ -542,23 +538,19 @@ internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
 @usableFromInline // FIXME(sil-serialize-all)
 internal struct _Stdout : TextOutputStream {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func _lock() {
     _swift_stdlib_flockfile_stdout()
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func _unlock() {
     _swift_stdlib_funlockfile_stdout()
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
@@ -631,7 +623,6 @@ internal struct _TeeStream<
 > : TextOutputStream {
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(left: L, right: R) {
     self.left = left
     self.right = right
@@ -644,16 +635,13 @@ internal struct _TeeStream<
   
   /// Append the given `string` to this stream.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func write(_ string: String) {
     left.write(string); right.write(string)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func _lock() { left._lock(); right._lock() }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func _unlock() { right._unlock(); left._unlock() }
 }
 

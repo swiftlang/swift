@@ -35,7 +35,6 @@ public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
   ///
   /// - Complexity: O(1)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base) {
     self._base = _base
   }
@@ -51,7 +50,6 @@ extension FlattenSequence {
 
     /// Construct around a `base` iterator.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Base.Iterator) {
       self._base = _base
     }
@@ -188,7 +186,6 @@ extension FlattenCollection {
     internal let _inner: Base.Element.Index?
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _outer: Base.Index, _ inner: Base.Element.Index?) {
       self._outer = _outer
       self._inner = inner
@@ -312,7 +309,6 @@ extension FlattenCollection : Collection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _index(after i: Index) -> Index {
     let innerCollection = _base[i._outer]
     let nextInner = innerCollection.index(after: i._inner!)
@@ -333,7 +329,6 @@ extension FlattenCollection : Collection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _index(before i: Index) -> Index {
     var prevOuter = i._outer
     if prevOuter == _base.endIndex {
@@ -393,7 +388,6 @@ extension FlattenCollection : Collection {
 
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _advanceIndex(_ i: inout Index, step: Int) {
     _sanityCheck(-1...1 ~= step, "step should be within the -1...1 range")
     i = step < 0 ? _index(before: i) : _index(after: i)
@@ -401,7 +395,6 @@ extension FlattenCollection : Collection {
 
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _ensureBidirectional(step: Int) {
     // FIXME: This seems to be the best way of checking whether _base is
     // forward only without adding an extra protocol requirement.

@@ -56,13 +56,11 @@ public func _arrayForceCast<SourceElement, TargetElement>(
 @usableFromInline // FIXME(sil-serialize-all)
 internal struct _UnwrappingFailed : Error {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 }
 
 extension Optional {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func unwrappedOrError() throws -> Wrapped {
     if let x = self { return x }
     throw _UnwrappingFailed()

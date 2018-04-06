@@ -35,7 +35,6 @@ extension Unicode {
   @_fixed_layout
   public struct Scalar {    
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     internal init(_value: UInt32) {
       self._value = _value
     }
@@ -280,7 +279,6 @@ extension Unicode.Scalar :
 
   // FIXME: Unicode makes this interesting.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _isPrintableASCII: Bool {
     return (self >= Unicode.Scalar(0o040) && self <= Unicode.Scalar(0o176))
   }
@@ -400,8 +398,7 @@ extension Unicode.Scalar : Comparable {
 extension Unicode.Scalar {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF16View {
-    @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)    
     internal init(value: Unicode.Scalar) {
       self.value = value
     }
@@ -457,7 +454,6 @@ func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
 
 extension Unicode.Scalar {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _replacementCharacter: Unicode.Scalar {
     return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
   }

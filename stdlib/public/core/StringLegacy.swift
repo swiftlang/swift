@@ -66,7 +66,6 @@ extension String {
 // TODO: since this is generally useful, make public via evolution proposal.
 extension BidirectionalCollection {
   @inlinable
-  @usableFromInline
   internal func _ends<Suffix: BidirectionalCollection>(
     with suffix: Suffix, by areEquivalent: (Element,Element) -> Bool
   ) -> Bool where Suffix.Element == Element {
@@ -82,7 +81,6 @@ extension BidirectionalCollection {
 
 extension BidirectionalCollection where Element: Equatable {
   @inlinable
-  @usableFromInline
   internal func _ends<Suffix: BidirectionalCollection>(
     with suffix: Suffix
   ) -> Bool where Suffix.Element == Element {
@@ -297,7 +295,6 @@ extension String {
 
 extension _StringGuts {
   @inlinable
-  @usableFromInline
   func _repeated(_ n: Int) -> _StringGuts {
     _sanityCheck(n > 1)
     if self._isSmall {

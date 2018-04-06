@@ -90,7 +90,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   public var endIndex: Index { return Index(encodedOffset: _guts.count) }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _boundsCheck(_ index: Index) {
     _precondition(index.encodedOffset >= 0 && index.encodedOffset < _guts.count,
@@ -98,7 +97,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _boundsCheck(_ range: Range<Index>) {
     _precondition(
@@ -108,7 +106,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _boundsCheck(_ range: ClosedRange<Index>) {
     _precondition(
@@ -118,7 +115,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _index(atEncodedOffset offset: Int) -> Index {
     return _visitGuts(_guts, args: offset,
       ascii: { ascii, offset in return ascii.characterIndex(atOffset: offset) },
@@ -464,7 +460,6 @@ extension String {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _stride(of i: Index) -> Int {
     if case .character(let stride) = i._cache {
       // TODO: should _fastPath the case somehow

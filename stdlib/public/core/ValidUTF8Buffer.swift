@@ -25,13 +25,11 @@ public struct _ValidUTF8Buffer<Storage: UnsignedInteger & FixedWidthInteger> {
   internal var _biasedBits: Storage
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_biasedBits: Storage) {
     self._biasedBits = _biasedBits
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_containing e: Element) {
     _sanityCheck(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
@@ -72,7 +70,6 @@ extension _ValidUTF8Buffer : Collection {
     internal var _biasedBits: Storage
     
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     internal init(_biasedBits: Storage) { self._biasedBits = _biasedBits }
     
     @inlinable // FIXME(sil-serialize-all)
@@ -186,7 +183,6 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func _isValid(_ i: Index) -> Bool {
     return i == endIndex || indices.contains(i)
   }

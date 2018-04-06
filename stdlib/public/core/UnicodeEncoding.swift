@@ -76,7 +76,6 @@ extension _UnicodeEncoding {
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static func _encode(_ content: Unicode.Scalar) -> EncodedScalar {
     return encode(content) ?? encodedReplacementCharacter
   }
@@ -85,7 +84,6 @@ extension _UnicodeEncoding {
   /// `encodedReplacementCharacter` if the scalar can't be represented in this
   /// encoding.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static func _transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar {
@@ -94,7 +92,6 @@ extension _UnicodeEncoding {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static func _transcode<
   Source: Sequence, SourceEncoding: Unicode.Encoding>(
     _ source: Source,
