@@ -14,9 +14,12 @@
 
 namespace llvm {
   class LLVMContext;
+  template<typename T, unsigned N> class SmallVector;
 }
 
 namespace swift {
+class ASTContext;
+class LinkLibrary;
 class SILModule;
 
 namespace irgen {
@@ -32,6 +35,16 @@ createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
 
 /// Delete the IRGenModule and IRGenerator obtained by the above call.
 void deleteIRGenModule(std::pair<IRGenerator *, IRGenModule *> &Module);
+
+/// Collect the set of libraries to autolink against by mining the
+/// external definitions stored in an AST context.
+///
+/// This entire thing is a hack that we shouldn't need, but it reflects the
+/// fact that we can end up referencing something via an external definition
+/// (e.g., an imported Clang declaration) indirectly via the Clang importer
+/// that would not be visible directly. In such cases, we would fail to
+llvm::SmallVector<LinkLibrary, 4> collectLinkLibrariesFromExternals(
+                                                           ASTContext &ctx);
 
 } // end namespace irgen
 } // end namespace swift
