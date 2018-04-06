@@ -256,10 +256,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         if (CI->isRename()) {
           IgnoreBase = true;
           switch(CI->NodeKind) {
-          case SDKNodeKind::Function:
+          case SDKNodeKind::DeclFunction:
             IgnoreBase = false;
             LLVM_FALLTHROUGH;
-          case SDKNodeKind::Constructor:
+          case SDKNodeKind::DeclConstructor:
             return DeclNameViewer(CI->getNewName());
           default:
             return DeclNameViewer();
@@ -282,7 +282,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
     // Simple rename.
     if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
-      if (CI->NodeKind == SDKNodeKind::Var && CI->isRename()) {
+      if (CI->NodeKind == SDKNodeKind::DeclVar && CI->isRename()) {
         Text = CI->getNewName();
         return true;
       }
