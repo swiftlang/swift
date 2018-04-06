@@ -2510,6 +2510,14 @@ public:
 
   /// Compute an ordering between two type declarations that is ABI-stable.
   static int compare(const TypeDecl *type1, const TypeDecl *type2);
+
+  /// Compute an ordering between two type declarations that is ABI-stable.
+  /// This version takes a pointer-to-a-pointer for use with
+  /// llvm::array_pod_sort() and similar.
+  template<typename T>
+  static int compare(T * const* type1, T * const* type2) {
+    return compare(*type1, *type2);
+  }
 };
 
 /// A type declaration that can have generic parameters attached to it.  Because

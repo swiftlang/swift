@@ -1613,7 +1613,7 @@ static int compareSimilarAssociatedTypes(AssociatedTypeDecl *const *lhs,
                                          AssociatedTypeDecl *const *rhs) {
   auto lhsProto = (*lhs)->getProtocol();
   auto rhsProto = (*rhs)->getProtocol();
-  return ProtocolType::compareProtocols(&lhsProto, &rhsProto);
+  return TypeDecl::compare(lhsProto, rhsProto);
 }
 
 ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
