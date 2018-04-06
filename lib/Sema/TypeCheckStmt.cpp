@@ -913,7 +913,38 @@ public:
           labelItem.setGuardExpr(guard);
         }
       }
-        
+
+      // Check restrictions on '@unknown'.
+      if (caseBlock->hasUnknownAttr()) {
+        if (caseBlock->getCaseLabelItems().size() != 1) {
+          assert(!caseBlock->getCaseLabelItems().empty() &&
+                 "parser should not produce case blocks with no items");
+          TC.diagnose(caseBlock->getLoc(),
+                      diag::unknown_case_multiple_patterns)
+            .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+        }
+
+        if (!caseBlock->isDefault() && FallthroughDest != nullptr) {
+          TC.diagnose(caseBlock->getLoc(),
+                      diag::unknown_case_must_be_last);
+        }
+
+        const CaseLabelItem &labelItem = caseBlock->getCaseLabelItems().front();
+        if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+          TC.diagnose(labelItem.getStartLoc(),
+                      diag::unknown_case_where_clause)
+            .highlight(labelItem.getGuardExpr()->getSourceRange());
+        }
+
+        const Pattern *pattern =
+            labelItem.getPattern()->getSemanticsProvidingPattern();
+        if (!isa<AnyPattern>(pattern)) {
+          TC.diagnose(labelItem.getStartLoc(),
+                      diag::unknown_case_must_be_catchall)
+            .highlight(pattern->getSourceRange());
+        }
+      }
+
       // If the previous case fellthrough, similarly check that that case's bindings
       // includes our first label item's pattern bindings and types.
       if (PreviousFallthrough) {

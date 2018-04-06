@@ -2944,6 +2944,15 @@ ERROR(type_mismatch_multiple_pattern_list,none,
 ERROR(type_mismatch_fallthrough_pattern_list,none,
       "pattern variable bound to type %0, fallthrough case bound to type %1", (Type, Type))
 
+ERROR(unknown_case_must_be_catchall,none,
+      "'@unknown' is only supported for catch-all cases (\"case _\")", ())
+ERROR(unknown_case_where_clause,none,
+      "'where' cannot be used with '@unknown'", ())
+ERROR(unknown_case_multiple_patterns,none,
+      "'@unknown' cannot be applied to multiple patterns", ())
+ERROR(unknown_case_must_be_last,none,
+      "'@unknown' can only be applied to the last case in a switch", ())
+
 WARNING(where_on_one_item, none,
         "'where' only applies to the second pattern match in this case", ())
 
