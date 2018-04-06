@@ -78,7 +78,6 @@ extension String {
     internal var _coreOffset: Int
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts, coreOffset: Int = 0) {
       self._guts = _guts
       self._coreOffset = coreOffset
@@ -89,7 +88,6 @@ extension String {
     /// Translates a `_guts` index into a `UnicodeScalarIndex` using this
     /// view's `_coreOffset`.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal func _fromCoreIndex(_ i: Int) -> Index {
       return Index(encodedOffset: i + _coreOffset)
     }
@@ -97,7 +95,6 @@ extension String {
     /// Translates a `UnicodeScalarIndex` into a `_guts` index using this
     /// view's `_coreOffset`.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal func _toCoreIndex(_ i: Index) -> Int {
       return i.encodedOffset - _coreOffset
     }
@@ -195,7 +192,6 @@ extension String {
       internal var _smallIterator: _SmallUTF8String.UnicodeScalarIterator?
 
       @inlinable // FIXME(sil-serialize-all)
-      @usableFromInline // FIXME(sil-serialize-all)
       internal init(_ guts: _StringGuts) {
         if _slowPath(guts._isOpaque) {
           self.init(_opaque: guts)
@@ -205,7 +201,6 @@ extension String {
       }
 
       @inlinable // FIXME(sil-serialize-all)
-      @usableFromInline // FIXME(sil-serialize-all)
       @inline(__always)
       internal init(_concrete guts: _StringGuts) {
         _sanityCheck(!guts._isOpaque)
@@ -303,7 +298,6 @@ extension String {
 
 extension _StringGuts {
   @inlinable
-  @usableFromInline
   internal func unicodeScalar(startingAt offset: Int) -> Unicode.Scalar {
     return _visitGuts(self, args: offset,
       ascii: { ascii, offset in
@@ -316,7 +310,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal func unicodeScalar(endingAt offset: Int) -> Unicode.Scalar {
     return _visitGuts(self, args: offset,
       ascii: { ascii, offset in
@@ -331,17 +324,14 @@ extension _StringGuts {
 
 extension String.UnicodeScalarView : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent : String { return String(_guts) }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _wholeString : String {
     return String(_guts)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _encodedOffsetRange : Range<Int> {
     return 0..<_guts.count
   }
@@ -537,7 +527,6 @@ extension String.UnicodeScalarIndex {
 
 extension String.UnicodeScalarView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _isOnUnicodeScalarBoundary(_ i: Index) -> Bool {
     if _fastPath(_guts.isASCII) { return true }
     if i == startIndex || i == endIndex {
@@ -552,7 +541,6 @@ extension String.UnicodeScalarView {
   // NOTE: Don't make this function inlineable.  Grapheme cluster
   // segmentation uses a completely different algorithm in Unicode 9.0.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
     if i == startIndex || i == endIndex {
       return true

@@ -98,7 +98,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
   internal var value: AnyObject.Type
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(value: AnyObject.Type) {
     self.value = value
   }
@@ -342,7 +341,6 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 // -- Pointer argument bridging
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @_transparent
 internal var _nilNativeObject: AnyObject? {
   return nil
@@ -472,7 +470,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
@@ -488,7 +485,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
@@ -601,14 +597,12 @@ internal struct _CocoaFastEnumerationStackBuf {
   internal var _item15: UnsafeRawPointer?
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @_transparent
   internal var count: Int {
     return 16
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init() {
     _item0 = nil
     _item1 = _item0

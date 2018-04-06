@@ -116,7 +116,6 @@ extension String {
     internal let _legacyPartialCharacters: (start: Bool, end: Bool)
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(
       _ _guts: _StringGuts,
       legacyOffsets: (Int, Int) = (0, 0),
@@ -162,7 +161,6 @@ extension String {
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     internal func _index(atEncodedOffset n: Int) -> Index {
       if _fastPath(_guts.isASCII) { return Index(encodedOffset: n) }
       let count = _guts.count
@@ -281,7 +279,6 @@ extension String {
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     @inline(__always)
     internal func _forwardDistance(from i: Index, to j: Index) -> Int {
       return j._transcodedOffset - i._transcodedOffset +
@@ -372,7 +369,6 @@ extension String {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _withUnsafeBufferPointerToUTF8<R>(
     _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
   ) rethrows -> R {
@@ -433,19 +429,16 @@ extension String {
 
 extension String.UTF8View : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
     return String(self._guts)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _wholeString : String {
     return String(_guts)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _encodedOffsetRange : Range<Int> {
     return 0..<_guts.count
   }
@@ -474,7 +467,6 @@ extension String.UTF8View.Iterator : IteratorProtocol {
   public typealias Element = String.UTF8View.Element
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ utf8: String.UTF8View) {
     self._guts = utf8._guts
     self._nextOffset = 0
@@ -552,7 +544,6 @@ extension String.UTF8View.Iterator : IteratorProtocol {
 
 extension String.UTF8View {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func _count<Source: Sequence>(fromUTF16 source: Source) -> Int
   where Source.Element == Unicode.UTF16.CodeUnit
   {

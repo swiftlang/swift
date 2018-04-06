@@ -55,7 +55,6 @@ extension LazyFilterSequence {
     /// Creates an instance that produces the elements `x` of `base`
     /// for which `isIncluded(x) == true`.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Base.Iterator, _ isIncluded: @escaping (Base.Element) -> Bool) {
       self._base = _base
       self._predicate = isIncluded
@@ -218,7 +217,6 @@ extension LazyFilterCollection : LazyCollectionProtocol {
 
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _advanceIndex(_ i: inout Index, step: Int) {
     repeat {
       _base.formIndex(&i, offsetBy: step)
@@ -227,7 +225,6 @@ extension LazyFilterCollection : LazyCollectionProtocol {
 
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _ensureBidirectional(step: Int) {
     // FIXME: This seems to be the best way of checking whether _base is
     // forward only without adding an extra protocol requirement.

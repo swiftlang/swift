@@ -59,7 +59,6 @@ public struct ReversedCollection<Base: BidirectionalCollection> {
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  @usableFromInline
   @inlinable
   internal init(_base: Base) {
     self._base = _base

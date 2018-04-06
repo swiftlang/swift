@@ -25,7 +25,6 @@ internal protocol _HeapBufferHeader_ {
 internal struct _HeapBufferHeader<T> : _HeapBufferHeader_ {
   internal typealias Value = T
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ value: T) { self.value = value }
   @usableFromInline // FIXME(sil-serialize-all)
   internal var value: T
@@ -41,7 +40,6 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
   internal typealias Value = Header.Value
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(
     _ storageClass: AnyClass,
     _ initializer: Value, _ capacity: Int
@@ -55,7 +53,6 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var value: Value {
     @inline(__always)
     get {
@@ -68,7 +65,6 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal subscript(i: Int) -> Element {
     @inline(__always)
     get {
@@ -77,7 +73,6 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var baseAddress: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
@@ -86,7 +81,6 @@ extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var storage: AnyObject? {
     @inline(__always)
     get {

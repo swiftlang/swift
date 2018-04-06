@@ -25,7 +25,6 @@ from gyb_stdlib_support import (
 import SwiftShims
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline
 @inline(never)
 internal func _abstract(
   file: StaticString = #file,
@@ -95,7 +94,6 @@ public struct AnyIterator<Element> {
   }
 
   @inlinable
-  @usableFromInline
   internal init(_box: _AnyIteratorBoxBase<Element>) {
     self._box = _box
   }
@@ -120,12 +118,10 @@ extension AnyIterator: Sequence { }
 @_fixed_layout
 internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
   @inlinable
-  @usableFromInline
   internal init(_ body: @escaping () -> Element?) {
     self._body = body
   }
   @inlinable
-  @usableFromInline
   internal func next() -> Element? { return _body() }
   @usableFromInline
   internal let _body: () -> Element?
@@ -135,11 +131,9 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
 @usableFromInline
 internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -148,7 +142,6 @@ internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
   ///
   /// - Note: Subclasses must override this method.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func next() -> Element? { _abstract() }
 }
 
@@ -158,13 +151,10 @@ internal final class _IteratorBox<
   Base : IteratorProtocol
 > : _AnyIteratorBoxBase<Base.Element> {
   @inlinable
-  @usableFromInline
   internal init(_ base: Base) { self._base = base }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
   @inlinable
-  @usableFromInline
   internal override func next() -> Base.Element? { return _base.next() }
   @usableFromInline
   internal var _base: Base
@@ -194,18 +184,14 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 %   if Kind == 'Sequence':
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() { }
 
-  @usableFromInline
   @inlinable
   internal func _makeIterator() -> AnyIterator<Element> { _abstract() }
 
-  @usableFromInline
   @inlinable
   internal var _underestimatedCount: Int { _abstract() }
 
-  @usableFromInline
   @inlinable
   internal func _map<T>(
     _ transform: (Element) throws -> T
@@ -213,7 +199,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func _filter(
     _ isIncluded: (Element) throws -> Bool
@@ -221,7 +206,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func _forEach(
     _ body: (Element) throws -> Void
@@ -229,7 +213,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func __customContainsEquatableElement(
     _ element: Element
@@ -237,7 +220,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func __preprocessingPass<R>(
     _ preprocess: () throws -> R
@@ -245,13 +227,11 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func __copyToContiguousArray() -> ContiguousArray<Element> {
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
     -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
@@ -262,11 +242,9 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 % # This deinit has to be present on all the types
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 
 %   override = 'override' if Kind != 'Sequence' else ''
-  @usableFromInline
   @inlinable
   internal ${override} func _drop(
     while predicate: (Element) throws -> Bool
@@ -274,25 +252,21 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal ${override} func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal ${override} func _prefix(
     while predicate: (Element) throws -> Bool
@@ -300,13 +274,11 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
@@ -316,19 +288,15 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
 %   if Kind == 'Collection':
-  @usableFromInline
   @inlinable
   internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
 
-  @usableFromInline
   @inlinable
   internal func _index(after i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
 
-  @usableFromInline
   @inlinable
   internal func _formIndex(after i: _AnyIndexBox) { _abstract() }
 
-  @usableFromInline
   @inlinable
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: Int
@@ -336,7 +304,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func _index(
     _ i: _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
@@ -344,13 +311,11 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func _formIndex(_ i: inout _AnyIndexBox, offsetBy n: Int) {
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func _formIndex(
     _ i: inout _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
@@ -358,7 +323,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
     _abstract()
   }
 
-  @usableFromInline
   @inlinable
   internal func _distance(
     from start: _AnyIndexBox, to end: _AnyIndexBox
@@ -380,7 +344,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
   */
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var _count: Int { _abstract() }
 
   // TODO: swift-3-indexing-model: forward the following methods.
@@ -389,10 +352,8 @@ internal class _AnyRandomAccessCollectionBox<Element>
   */
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var _first: Element? { _abstract() }
 
-  @usableFromInline
   @inlinable
   internal init(
     _startIndex: _AnyIndexBox,
@@ -411,7 +372,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 %   if Kind in ['Collection', 'BidirectionalCollection', 'RandomAccessCollection']:
 %     override = 'override' if Kind != 'Collection' else ''
-  @usableFromInline
   @inlinable
   internal ${override} subscript(
     start start: _AnyIndexBox,
@@ -420,13 +380,10 @@ internal class _AnyRandomAccessCollectionBox<Element>
 %   end
 
 %   if Kind == 'BidirectionalCollection':
-  @usableFromInline
   @inlinable
   internal func _index(before i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
-  @usableFromInline
   @inlinable
   internal func _formIndex(before i: _AnyIndexBox) { _abstract() }
-  @usableFromInline
   @inlinable
   internal var _last: Element? { _abstract() }
 %   end
@@ -455,99 +412,83 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 {
   internal typealias Element = S.Element
 
-  @usableFromInline
   @inlinable
   internal override func _makeIterator() -> AnyIterator<Element> {
     return AnyIterator(_base.makeIterator())
   }
-  @usableFromInline
   @inlinable
   internal override var _underestimatedCount: Int {
     return _base.underestimatedCount
   }
-  @usableFromInline
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
-  @usableFromInline
   @inlinable
   internal override func _filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element] {
     return try _base.filter(isIncluded)
   }
-  @usableFromInline
   @inlinable
   internal override func _forEach(
     _ body: (Element) throws -> Void
   ) rethrows {
     return try _base.forEach(body)
   }
-  @usableFromInline
   @inlinable
   internal override func __customContainsEquatableElement(
     _ element: Element
   ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
-  @usableFromInline
   @inlinable
   internal override func __preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
-  @usableFromInline
   @inlinable
   internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
   }
-  @usableFromInline
   @inlinable
   internal override func __copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
     -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
-  @usableFromInline
   @inlinable
   internal override func _drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
     return try _${Kind}Box<S.SubSequence>(_base: _base.drop(while: predicate))
   }
-  @usableFromInline
   @inlinable
   internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropFirst(n))
   }
-  @usableFromInline
   @inlinable
   internal override func _dropLast(_ n: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.dropLast(n))
   }
-  @usableFromInline
   @inlinable
   internal override func _prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
     return try _${Kind}Box<S.SubSequence>(_base: _base.prefix(while: predicate))
   }
-  @usableFromInline
   @inlinable
   internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.prefix(maxLength))
   }
-  @usableFromInline
   @inlinable
   internal override func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.suffix(maxLength))
   }
 %   for ResultKind in EqualAndWeakerKinds:
-  @usableFromInline
   @inlinable
   internal override func _split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
@@ -564,18 +505,15 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
 %   end
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 
 %   if Kind == 'Sequence':
-  @usableFromInline
   @inlinable
   internal init(_base: S) {
     self._base = _base
   }
 %   else:
   @inlinable
-  @usableFromInline
   internal init(_base: S) {
     self._base = _base
     super.init(
@@ -583,7 +521,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
       endIndex: _IndexBox(_base: _base.endIndex))
   }
 
-  @usableFromInline
   @inlinable
   internal func _unbox(
     _ position: _AnyIndexBox, file: StaticString = #file, line: UInt = #line
@@ -594,13 +531,11 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     fatalError("Index type mismatch!", file: file, line: line)
   }
 
-  @usableFromInline
   @inlinable
   internal override subscript(position: _AnyIndexBox) -> Element {
     return _base[_unbox(position)]
   }
 
-  @usableFromInline
   @inlinable
   internal override subscript(start start: _AnyIndexBox, end end: _AnyIndexBox)
     -> _Any${Kind}Box<Element>
@@ -610,13 +545,11 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     )
   }
 
-  @usableFromInline
   @inlinable
   internal override func _index(after position: _AnyIndexBox) -> _AnyIndexBox {
     return _IndexBox(_base: _base.index(after: _unbox(position)))
   }
 
-  @usableFromInline
   @inlinable
   internal override func _formIndex(after position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
@@ -625,7 +558,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     fatalError("Index type mismatch!")
   }
 
-  @usableFromInline
   @inlinable
   internal override func _index(
     _ i: _AnyIndexBox, offsetBy n: Int
@@ -633,7 +565,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return _IndexBox(_base: _base.index(_unbox(i), offsetBy: numericCast(n)))
   }
 
-  @usableFromInline
   @inlinable
   internal override func _index(
     _ i: _AnyIndexBox,
@@ -647,7 +578,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
       .map { _IndexBox(_base: $0) }
   }
 
-  @usableFromInline
   @inlinable
   internal override func _formIndex(
     _ i: inout _AnyIndexBox, offsetBy n: Int
@@ -658,7 +588,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     fatalError("Index type mismatch!")
   }
 
-  @usableFromInline
   @inlinable
   internal override func _formIndex(
     _ i: inout _AnyIndexBox, offsetBy n: Int, limitedBy limit: _AnyIndexBox
@@ -672,7 +601,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     fatalError("Index type mismatch!")
   }
 
-  @usableFromInline
   @inlinable
   internal override func _distance(
     from start: _AnyIndexBox,
@@ -681,26 +609,22 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     return numericCast(_base.distance(from: _unbox(start), to: _unbox(end)))
   }
 
-  @usableFromInline
   @inlinable
   internal override var _count: Int {
     return numericCast(_base.count)
   }
 
-  @usableFromInline
   @inlinable
   internal override var _first: Element? {
     return _base.first
   }
 
 %     if Kind in ['BidirectionalCollection', 'RandomAccessCollection']:
-  @usableFromInline
   @inlinable
   internal override func _index(before position: _AnyIndexBox) -> _AnyIndexBox {
     return _IndexBox(_base: _base.index(before: _unbox(position)))
   }
 
-  @usableFromInline
   @inlinable
   internal override func _formIndex(before position: _AnyIndexBox) {
     if let p = position as? _IndexBox<S.Index> {
@@ -709,7 +633,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
     fatalError("Index type mismatch!")
   }
 
-  @usableFromInline
   @inlinable
   internal override var _last: Element? {
     return _base.last
@@ -728,7 +651,6 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol> {
   @usableFromInline
   internal var _makeUnderlyingIterator: () -> Iterator
 
-  @usableFromInline
   @inlinable
   internal init(_ makeUnderlyingIterator: @escaping () -> Iterator) {
     self._makeUnderlyingIterator = makeUnderlyingIterator
@@ -736,7 +658,6 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol> {
 }
 
 extension _ClosureBasedSequence: Sequence {
-  @usableFromInline
   @inlinable
   internal func makeIterator() -> Iterator {
     return _makeUnderlyingIterator()
@@ -763,7 +684,6 @@ public struct AnySequence<Element> {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
-  @usableFromInline
   @inlinable
   internal init(_box: _AnySequenceBox<Element>) {
     self._box = _box
@@ -916,37 +836,31 @@ internal final class _IndexBox<
   @usableFromInline
   internal var _base: BaseIndex
 
-  @usableFromInline
   @inlinable
   internal init(_base: BaseIndex) {
     self._base = _base
   }
 
-  @usableFromInline
   @inlinable
   internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
     return unsafeDowncast(other, to: _IndexBox.self)._base
   }
 
-  @usableFromInline
   @inlinable
   internal var _typeID: ObjectIdentifier {
     return ObjectIdentifier(type(of: self))
   }
 
-  @usableFromInline
   @inlinable
   internal func _unbox<T : Comparable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
-  @usableFromInline
   @inlinable
   internal func _isEqual(to rhs: _AnyIndexBox) -> Bool {
     return _base == _unsafeUnbox(rhs)
   }
 
-  @usableFromInline
   @inlinable
   internal func _isLess(than rhs: _AnyIndexBox) -> Bool {
     return _base < _unsafeUnbox(rhs)
@@ -965,13 +879,11 @@ public struct AnyIndex {
     self._box = _IndexBox(_base: base)
   }
 
-  @usableFromInline
   @inlinable
   internal init(_box: _AnyIndexBox) {
     self._box = _box
   }
 
-  @usableFromInline
   @inlinable
   internal var _typeID: ObjectIdentifier {
     return _box._typeID
@@ -1032,7 +944,6 @@ public struct ${Self}<Element> {
   @usableFromInline
   internal let _box: _${Self}Box<Element>
 
-  @usableFromInline
   @inlinable
   internal init(_box: _${Self}Box<Element>) {
     self._box = _box

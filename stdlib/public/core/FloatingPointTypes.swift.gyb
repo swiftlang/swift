@@ -172,19 +172,16 @@ extension ${Self}: BinaryFloatingPoint {
 
   //  Implementation details.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _infinityExponent: UInt {
     @inline(__always) get { return 1 &<< UInt(exponentBitCount) - 1 }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _exponentBias: UInt {
     @inline(__always) get { return _infinityExponent &>> 1 }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _significandMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount) - 1
@@ -192,7 +189,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount - 1)
@@ -325,31 +321,26 @@ extension ${Self}: BinaryFloatingPoint {
     internal var _storage: (UInt64, UInt16, /* pad */ UInt16, UInt16, UInt16)
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var explicitSignificand: UInt64 { return _storage.0 }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var signAndExponent: UInt16 { return _storage.1 }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var sign: FloatingPointSign {
       return FloatingPointSign(rawValue: Int(signAndExponent &>> 15))!
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var exponentBitPattern: UInt {
       return UInt(signAndExponent) & 0x7fff
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal init(explicitSignificand: UInt64, signAndExponent: UInt16) {
       _storage = (explicitSignificand, signAndExponent, 0, 0, 0)
@@ -357,7 +348,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _representation: _Representation {
     return unsafeBitCast(self, to: _Representation.self)
   }
@@ -381,7 +371,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _explicitBitMask: UInt64 {
     @inline(__always) get { return 1 &<< 63 }
   }

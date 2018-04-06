@@ -18,7 +18,6 @@
 // else ARC.
 //
 extension String {
-  @usableFromInline
   @inlinable
   @inline(__always)
   func _visit<Result>(
@@ -105,7 +104,6 @@ extension String {
     return opaque(view)
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   func _visit<T, Result>(
@@ -195,7 +193,6 @@ extension String {
   }
 }
 
-@usableFromInline
 @inlinable
 @inline(__always)
 internal
@@ -210,7 +207,6 @@ func _visitGuts<Result>(
     range: range, ascii: ascii, utf16: utf16, opaque: opaque)
 }
 
-@usableFromInline
 @inlinable
 @inline(__always)
 internal

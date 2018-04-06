@@ -20,7 +20,6 @@ public struct Unmanaged<Instance : AnyObject> {
   internal unowned(unsafe) var _value: Instance
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(_private: Instance) { _value = _private }
 

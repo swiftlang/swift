@@ -129,7 +129,6 @@ internal protocol _ArrayBufferProtocol
 extension _ArrayBufferProtocol where Indices == Range<Int>{
 
   @inlinable
-  @usableFromInline
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
@@ -137,7 +136,6 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
   @inlinable
   @inline(never)
-  @usableFromInline
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
@@ -148,7 +146,6 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
   }
 
   @inlinable
-  @usableFromInline
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,

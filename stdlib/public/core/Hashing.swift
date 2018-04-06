@@ -29,7 +29,6 @@ enum _HashingDetail {
 
   // FIXME(hasher): Remove
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
@@ -39,7 +38,6 @@ enum _HashingDetail {
 
   // FIXME(hasher): Remove
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal static func hash16Bytes(_ low: UInt64, _ high: UInt64) -> UInt64 {
     // Murmur-inspired hashing.
@@ -343,7 +341,6 @@ internal protocol _HashBuffer {
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @_transparent
 internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
@@ -355,7 +352,6 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
 /// FIXME(sil-serialize-all): this should be internal
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSObject_isEqual")
 internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
@@ -375,20 +371,17 @@ internal struct _UnmanagedAnyObjectArray {
   internal var value: UnsafeMutableRawPointer
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutableRawPointer(up)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
     guard let unwrapped = up else { return nil }
     self.init(unwrapped)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(i: Int) -> AnyObject {
     get {
       let unmanaged = value.load(

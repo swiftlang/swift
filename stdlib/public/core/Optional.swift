@@ -724,7 +724,6 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
 extension Optional : _ObjectiveCBridgeable {
   // The object that represents `none` for an Optional of this type.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _nilSentinel : AnyObject {
     @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
     get

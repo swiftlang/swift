@@ -122,7 +122,6 @@ public func withVaList<R>(_ args: [CVarArg],
 
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _withVaList<R>(
   _ builder: _VaListBuilder,
   _ body: (CVaListPointer) -> R
@@ -377,7 +376,6 @@ final internal class _VaListBuilder {
   @usableFromInline
   internal struct Header {
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init() {}
 
     @usableFromInline // FIXME(sil-serialize-all)
@@ -392,18 +390,15 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {
     // prepare the register save area
     storage = ContiguousArray(repeating: 0, count: _registerSaveWords)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func append(_ arg: CVarArg) {
     var encoded = arg._cVarArgEncoding
 
@@ -445,7 +440,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func va_list() -> CVaListPointer {
     header.reg_save_area = storage._baseAddress
     header.overflow_arg_area
@@ -476,11 +470,9 @@ final internal class _VaListBuilder {
 final internal class _VaListBuilder {
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func append(_ arg: CVarArg) {
     // Write alignment padding if necessary.
     // This is needed on architectures where the ABI alignment of some
@@ -521,7 +513,6 @@ final internal class _VaListBuilder {
   // FIXME: this should be packaged into a better storage type
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func appendWords(_ words: [Int]) {
     let newCount = count + words.count
     if newCount > allocated {
@@ -548,7 +539,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func rawSizeAndAlignment(
     _ wordCount: Int
   ) -> (Builtin.Word, Builtin.Word) {
@@ -557,7 +547,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func allocStorage(wordCount: Int) -> UnsafeMutablePointer<Int> {
     let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
@@ -574,7 +563,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {
     if let allocatedStorage = storage {
       deallocStorage(wordCount: allocated, storage: allocatedStorage)

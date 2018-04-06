@@ -157,13 +157,11 @@ public struct Mirror {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func _noSuperclassMirror() -> Mirror? { return nil }
 
   @_semantics("optimize.sil.specialize.generic.never")
   @inline(never)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
@@ -399,14 +397,12 @@ extension Mirror {
   @usableFromInline // FIXME(sil-serialize-all)
   internal struct _Dummy : CustomReflectable {
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(mirror: Mirror) {
       self.mirror = mirror
     }
     @usableFromInline // FIXME(sil-serialize-all)
     internal var mirror: Mirror
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var customMirror: Mirror { return mirror }
   }
 

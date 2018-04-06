@@ -185,7 +185,6 @@ public struct LazySequence<Base : Sequence>: _SequenceWrapper {
   /// which some operations such as `map` and `filter` are implemented
   /// lazily.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base) {
     self._base = _base
   }

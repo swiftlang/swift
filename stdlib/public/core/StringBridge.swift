@@ -113,12 +113,10 @@ internal func _cocoaStringSubscript(
 //
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
@@ -373,7 +371,6 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   /// anything transitively reachable form this object. Doing so
   /// will result in undefined behavior.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @_semantics("self_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointer<Result>(
     _ body: (OpaquePointer) throws -> Result
@@ -390,7 +387,6 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   /// transitively reachable objects. Doing so will result in undefined
   /// behavior.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @_semantics("pair_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointerPair<Result>(
     _ rhs: _NSContiguousString,

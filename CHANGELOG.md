@@ -61,6 +61,18 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0193][]
+
+  Various function-like declarations can now be marked as `@inlinable`,
+  making their bodies available for optimizations from other modules.
+
+  Inlinable function bodies must only reference public declarations, unless
+  the referenced declaration is marked as `@usableFromInline`.
+
+  Note that the presence of the attribute itself does not force inlining or
+  any other optimization to be performed, nor does it have any effect on
+  optimizations performed within a single module.
+
 * The C `long double` type is now imported as `Float80` on i386 and x86_64
   macOS and Linux. The tgmath functions in the Darwin and glibc modules now
   support `Float80` as well as `Float` and `Double`. Several tgmath
@@ -103,10 +115,10 @@ Swift 4.2
 
 * [SE-0143][]
 
-	Runtime query of conditional conformances is now implemented. Therefore,
-	a dynamic cast such as `value as? P`, where the dynamic type of `value`
-	conditionally conforms to `P`, will succeed when the conditional
-	requirements are met.
+  Runtime query of conditional conformances is now implemented. Therefore,
+  a dynamic cast such as `value as? P`, where the dynamic type of `value`
+  conditionally conforms to `P`, will succeed when the conditional
+  requirements are met.
 
 **Add new entries to the top of this section, not here!**
 

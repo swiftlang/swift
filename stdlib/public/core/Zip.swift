@@ -101,7 +101,6 @@ extension Zip2Sequence {
 
     /// Creates an instance around a pair of underlying iterators.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(
     _ iterator1: Sequence1.Iterator, 
     _ iterator2: Sequence2.Iterator

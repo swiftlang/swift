@@ -474,7 +474,6 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
   @inlinable
-  @usableFromInline
   internal init(_buffer: _Buffer) {
     self._buffer = _buffer
   }
@@ -483,7 +482,6 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
   @inlinable
-  @usableFromInline
   internal init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
     self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
   }
@@ -826,14 +824,12 @@ extension ${Self} {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.get_count")
   internal func _getCount() -> Int {
     return _buffer.count
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.get_capacity")
   internal func _getCapacity() -> Int {
     return _buffer.capacity
@@ -841,14 +837,13 @@ extension ${Self} {
 
   /// - Precondition: The array has a native buffer.
   @inlinable
-  @usableFromInline
   @_semantics("array.owner")
   internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
     return Builtin.unsafeCastToNativeObject(_buffer.nativeOwner)
   }
 
   /// - Precondition: The array has a native buffer.
-  @usableFromInline
+  @inlinable
   @inline(__always)
   internal func _getOwner_native() -> Builtin.NativeObject {
 #if _runtime(_ObjC)
@@ -866,7 +861,6 @@ extension ${Self} {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
@@ -875,7 +869,6 @@ extension ${Self} {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
@@ -886,7 +879,7 @@ extension ${Self} {
 
   /// Check that the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.
-  @usableFromInline
+  @inlinable
   @inline(__always)
   internal func _checkSubscript_native(_ index: Int) {
 % if Self != 'Array':
@@ -919,7 +912,6 @@ extension ${Self} {
 
   /// Check that the specified `index` is valid, i.e. `0 ≤ index ≤ count`.
   @inlinable
-  @usableFromInline
   @_semantics("array.check_index")
   internal func _checkIndex(_ index: Int) {
     _precondition(index <= endIndex, "${Self} index is out of range")
@@ -946,7 +938,6 @@ extension ${Self} {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer.subscriptBaseAddress + index
@@ -1125,7 +1116,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
   @inlinable
-  @usableFromInline
   @inline(never)
   internal static func _allocateBufferUninitialized(
     minimumCapacity: Int
@@ -1137,7 +1127,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
 
   /// Construct a ${Self} of `count` uninitialized elements.
   @inlinable
-  @usableFromInline
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     // Note: Sinking this constructor into an else branch below causes an extra
@@ -1157,7 +1146,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// Entry point for `Array` literal construction; builds and returns
   /// a ${Self} of `count` uninitialized elements.
   @inlinable
-  @usableFromInline
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
@@ -1174,7 +1162,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Precondition: `storage is _ContiguousArrayStorage`.
   @inlinable
-  @usableFromInline
   @_semantics("array.uninitialized")
   internal static func _adoptStorage(
     _ storage: __owned _ContiguousArrayStorage<Element>, count: Int
@@ -1193,7 +1180,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// Entry point for aborting literal construction: deallocates
   /// a ${Self} containing only uninitialized elements.
   @inlinable
-  @usableFromInline
   internal mutating func _deallocateUninitialized() {
     // Set the count to zero and just release as normal.
     // Somewhat of a hack.
@@ -1254,7 +1240,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage
   @inlinable
-  @usableFromInline
   internal var _baseAddress: UnsafeMutablePointer<Element> {
     return _buffer.firstElementAddress
   }
@@ -1352,7 +1337,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
-  @usableFromInline
   @inlinable
   @inline(never)
   internal mutating func _copyToNewBuffer(oldCount: Int) {
@@ -1364,7 +1348,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.make_mutable")
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
@@ -1373,7 +1356,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
@@ -1403,7 +1385,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.mutate_unknown")
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
@@ -1493,7 +1474,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
   @inlinable
-  @usableFromInline
   @_semantics("array.reserve_capacity_for_append")
   internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
     let oldCount = self.count
@@ -1682,7 +1662,7 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 }
 
 extension ${Self} {
-  @usableFromInline
+  @inlinable
   @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
@@ -1847,7 +1827,6 @@ extension ${Self} {
 // and CustomDebugStringConvertible using a bracketed list of elements,
 // like an array.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _makeCollectionDescription<C : Collection>
   (for items: C, withTypeName type: String?) -> String {
   var result = ""
@@ -1875,7 +1854,6 @@ internal struct _InitializeMemoryFromCollection<
   C: Collection
 > : _PointerFunction {
   @inlinable
-  @usableFromInline
   internal func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
@@ -1888,7 +1866,6 @@ internal struct _InitializeMemoryFromCollection<
   }
 
   @inlinable
-  @usableFromInline
   internal init(_ newValues: C) {
     self.newValues = newValues
   }
@@ -1899,7 +1876,6 @@ internal struct _InitializeMemoryFromCollection<
 
 extension _ArrayBufferProtocol {
   @inlinable
-  @usableFromInline
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
     _ bounds: Range<Int>,
@@ -1924,7 +1900,6 @@ extension _ArrayBufferProtocol {
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
 @inlinable
-@usableFromInline
 internal func _expectEnd<C : Collection>(of s: C, is i: C.Index) {
   _debugPrecondition(
     i == s.endIndex,
@@ -1932,7 +1907,6 @@ internal func _expectEnd<C : Collection>(of s: C, is i: C.Index) {
 }
 
 @inlinable
-@usableFromInline
 internal func _growArrayCapacity(_ capacity: Int) -> Int {
   return capacity * 2
 }
@@ -2016,7 +1990,6 @@ extension _ArrayBufferProtocol {
   ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
   ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
   @inlinable
-  @usableFromInline
   @inline(never)
   internal func _forceCreateUniqueMutableBuffer(
     newCount: Int, requiredCapacity: Int
@@ -2033,7 +2006,6 @@ extension _ArrayBufferProtocol {
   ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
   ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
   @inlinable
-  @usableFromInline
   @inline(never)
   internal func _forceCreateUniqueMutableBuffer(
     countForNewBuffer: Int, minNewCapacity: Int
@@ -2051,7 +2023,6 @@ extension _ArrayBufferProtocol {
   ///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
   ///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
   @inlinable
-  @usableFromInline
   internal func _forceCreateUniqueMutableBufferImpl(
     countForBuffer: Int, minNewCapacity: Int,
     requiredCapacity: Int
@@ -2084,7 +2055,6 @@ extension _ArrayBufferProtocol {
   /// As an optimization, may move elements out of source rather than
   /// copying when it isUniquelyReferenced.
   @inlinable
-  @usableFromInline
   @inline(never)
   internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
     _ dest: inout _ContiguousArrayBuffer<Element>,
@@ -2158,12 +2128,10 @@ extension _ArrayBufferProtocol {
 @_fixed_layout
 internal struct _IgnorePointer<T> : _PointerFunction {
   @inlinable
-  @usableFromInline
   internal func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
   }
 
-  @usableFromInline
   @inlinable
   internal init() {
   }
@@ -2171,7 +2139,6 @@ internal struct _IgnorePointer<T> : _PointerFunction {
 
 extension _ArrayBufferProtocol {
   @inlinable
-  @usableFromInline
   @inline(never)
   internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
 
@@ -2187,7 +2154,6 @@ extension _ArrayBufferProtocol {
 
   /// Append items from `newItems` to a buffer.
   @inlinable
-  @usableFromInline
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
   ) where S.Element == Element {

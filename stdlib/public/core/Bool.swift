@@ -76,7 +76,6 @@ public struct Bool {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
   

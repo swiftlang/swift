@@ -110,7 +110,6 @@ public struct OpaquePointer {
   internal var _rawValue: Builtin.RawPointer
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(_ v: Builtin.RawPointer) {
     self._rawValue = v
@@ -248,7 +247,6 @@ extension CVaListPointer : CustomDebugStringConvertible {
   }
 }
 
-@usableFromInline
 @inlinable
 internal func _memcpy(
   dest destination: UnsafeMutableRawPointer,
@@ -268,7 +266,6 @@ internal func _memcpy(
 ///
 /// The memory regions `source..<source + count` and
 /// `dest..<dest + count` may overlap.
-@usableFromInline
 @inlinable
 internal func _memmove(
   dest destination: UnsafeMutableRawPointer,
