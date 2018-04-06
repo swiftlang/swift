@@ -217,7 +217,7 @@ private:
   // Callbacks registered by the SIL optimizer to run on each deserialized
   // function body. This is intentionally a stateless type because the
   // ModuleDecl and SILFunction should be sufficient context.
-  typedef void (*SILFunctionBodyCallback)(ModuleDecl *, SILFunction *F);
+  using SILFunctionBodyCallback = void (*)(ModuleDecl *, SILFunction *F);
   SmallVector<SILFunctionBodyCallback, 0> DeserializationCallbacks;
 
   /// The SILLoader used when linking functions into this module.
