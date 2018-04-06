@@ -299,6 +299,17 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 #endif
 }
 
+void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
+  if (!ED->isResilient(SwiftModule, ResilienceExpansion::Minimal))
+    return;
+
+  // Emit resilient tags.
+  for (auto *elt : ED->getAllElements()) {
+    auto entity = LinkEntity::forEnumCase(elt);
+    addSymbol(entity);
+  }
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet &symbols,
                                            bool hasMultipleIGMs,
