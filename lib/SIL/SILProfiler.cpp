@@ -100,7 +100,22 @@ static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
   }
 }
 
-SILProfiler *SILProfiler::create(SILModule &M, ASTNode N) {
+/// Check that the input AST has at least been type-checked.
+static bool hasASTBeenTypeChecked(ASTNode N) {
+  DeclContext *DC = N.getAsDeclContext();
+  assert(DC && "Invalid AST node for profiling");
+  SourceFile *SF = DC->getParentSourceFile();
+  return !SF || SF->ASTStage >= SourceFile::TypeChecked;
+}
+
+SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
+                                 ASTNode N) {
+  // Avoid generating profiling state for declarations.
+  if (!forDefinition)
+    return nullptr;
+
+  assert(hasASTBeenTypeChecked(N) && "Cannot use this AST for code coverage");
+
   if (auto *D = N.dyn_cast<Decl *>()) {
     assert(isa<AbstractFunctionDecl>(D) ||
            isa<TopLevelCodeDecl>(D) && "Cannot create profiler");
@@ -465,21 +480,21 @@ struct PGOMapping : public ASTWalker {
       CounterMap[thenExpr] = NextCounter++;
       auto thenCount = loadExecutionCount(thenExpr);
       LoadedCounterMap[thenExpr] = thenCount;
-      if (auto elseExpr = IE->getElseExpr()) {
-        CounterMap[elseExpr] = parent;
-        auto count = loadExecutionCount(elseExpr);
-        if (!parent) {
-          auto thenVal = thenCount.getValue();
-          for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-            auto cCount = LoadedCounts->Counts[pCount];
-            if (cCount > thenVal) {
-              count = cCount;
-              break;
-            }
+      auto elseExpr = IE->getElseExpr();
+      assert(elseExpr && "An if-expr must have an else subexpression");
+      CounterMap[elseExpr] = parent;
+      auto count = loadExecutionCount(elseExpr);
+      if (!parent) {
+        auto thenVal = thenCount.getValue();
+        for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
+          auto cCount = LoadedCounts->Counts[pCount];
+          if (cCount > thenVal) {
+            count = cCount;
+            break;
           }
         }
-        LoadedCounterMap[elseExpr] = subtract(count, thenCount);
       }
+      LoadedCounterMap[elseExpr] = subtract(count, thenCount);
     } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
       CounterMap[E] = NextCounter++;
       auto eCount = loadExecutionCount(E);

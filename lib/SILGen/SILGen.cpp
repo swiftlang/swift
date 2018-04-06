@@ -500,7 +500,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     if (auto *fd = constant.getFuncDecl()) {
       if (hasSILBody(fd)) {
         // Set up the function for profiling instrumentation.
-        F->createProfiler(fd);
+        F->createProfiler(fd, forDefinition);
         profiledNode = fd->getBody(/*canSynthesize=*/false);
       }
     }
@@ -519,7 +519,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
     if (!profiledNode) {
       if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
-        F->createProfiler(ce);
+        F->createProfiler(ce, forDefinition);
         profiledNode = ce;
       }
     }
@@ -747,19 +747,23 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   SILDeclRef constant(decl);
 
-  bool ForCoverageMapping = M.getOptions().EmitProfileCoverageMapping;
+  ForDefinition_t ForCoverageMapping = M.getOptions().EmitProfileCoverageMapping
+                                           ? ForDefinition
+                                           : NotForDefinition;
 
   if (decl->getDeclContext()->getAsClassOrClassExtensionContext()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
-    emitOrDelayFunction(*this, constant, [this,constant,decl](SILFunction *f){
-      preEmitFunction(constant, decl, f, decl);
-      PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-      f->createProfiler(decl);
-      SILGenFunction(*this, *f)
-        .emitClassConstructorAllocator(decl);
-      postEmitFunction(constant, f);
-    }, /*forceEmission=*/ForCoverageMapping);
+    emitOrDelayFunction(
+        *this, constant,
+        [this, constant, decl, ForCoverageMapping](SILFunction *f) {
+          preEmitFunction(constant, decl, f, decl);
+          PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+          f->createProfiler(decl, ForCoverageMapping);
+          SILGenFunction(*this, *f).emitClassConstructorAllocator(decl);
+          postEmitFunction(constant, f);
+        },
+        /*forceEmission=*/ForCoverageMapping);
 
     // If this constructor was imported, we don't need the initializing
     // constructor to be emitted.
@@ -775,13 +779,16 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     }
   } else {
     // Struct and enum constructors do everything in a single function.
-    emitOrDelayFunction(*this, constant, [this,constant,decl](SILFunction *f) {
-      preEmitFunction(constant, decl, f, decl);
-      PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-      f->createProfiler(decl);
-      SILGenFunction(*this, *f).emitValueConstructor(decl);
-      postEmitFunction(constant, f);
-    }, /*forceEmission=*/ForCoverageMapping);
+    emitOrDelayFunction(
+        *this, constant,
+        [this, constant, decl, ForCoverageMapping](SILFunction *f) {
+          preEmitFunction(constant, decl, f, decl);
+          PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+          f->createProfiler(decl, ForCoverageMapping);
+          SILGenFunction(*this, *f).emitValueConstructor(decl);
+          postEmitFunction(constant, f);
+        },
+        /*forceEmission=*/ForCoverageMapping);
   }
 }
 
@@ -865,7 +872,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
     SILFunction *f = getFunction(dealloc, ForDefinition);
     preEmitFunction(dealloc, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
-    f->createProfiler(dd);
+    f->createProfiler(dd, ForDefinition);
     SILGenFunction(*this, *f).emitObjCDestructor(dealloc);
     postEmitFunction(dealloc, f);
   }
@@ -935,7 +942,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     SILFunction *f = getFunction(deallocator, ForDefinition);
     preEmitFunction(deallocator, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
-    f->createProfiler(dd);
+    f->createProfiler(dd, ForDefinition);
     SILGenFunction(*this, *f).emitDeallocatingDestructor(dd);
     f->setDebugScope(new (M) SILDebugScope(dd, f));
     postEmitFunction(deallocator, f);
@@ -1303,7 +1310,7 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   // A single SILFunction may be used to lower multiple top-level decls. When
   // this happens, fresh profile counters must be assigned to the new decl.
   TopLevelSGF->F.discardProfiler();
-  TopLevelSGF->F.createProfiler(td);
+  TopLevelSGF->F.createProfiler(td, ForDefinition);
 
   TopLevelSGF->emitProfilerIncrement(td->getBody());
  

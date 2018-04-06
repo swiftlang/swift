@@ -266,9 +266,9 @@ public:
     Profiler = InheritedProfiler;
   }
 
-  void createProfiler(ASTNode Root) {
+  void createProfiler(ASTNode Root, ForDefinition_t forDefinition) {
     assert(!Profiler && "Function already has a profiler");
-    Profiler = SILProfiler::create(Module, Root);
+    Profiler = SILProfiler::create(Module, forDefinition, Root);
   }
 
   void discardProfiler() { Profiler = nullptr; }
