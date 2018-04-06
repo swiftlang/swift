@@ -124,7 +124,6 @@ extension _UnmanagedOpaqueString {
 }
 
 extension _SmallUTF8String {
-  @usableFromInline
   @inlinable
   internal func computeHashValue(into hasher: inout _Hasher) {
 #if arch(i386) || arch(arm)

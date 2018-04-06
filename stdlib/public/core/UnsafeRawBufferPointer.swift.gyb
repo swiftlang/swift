@@ -106,7 +106,6 @@ extension UnsafeRawBufferPointer {
     @usableFromInline
     internal var _position, _end: UnsafeRawPointer?
 
-    @usableFromInline
     @inlinable
     internal init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
       self._position = _position

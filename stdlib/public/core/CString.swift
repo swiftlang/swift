@@ -171,7 +171,6 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
 }
 
 @inlinable
-@usableFromInline
 internal func _decodeValidCString(
   _ cString: UnsafePointer<Int8>, repair: Bool
 ) -> String {
@@ -184,7 +183,6 @@ internal func _decodeValidCString(
 }
 
 @inlinable
-@usableFromInline
 internal func _decodeValidCString(
   _ cString: UnsafePointer<UInt8>, repair: Bool
 ) -> String {
@@ -194,7 +192,6 @@ internal func _decodeValidCString(
 }
 
 @inlinable
-@usableFromInline
 internal func _decodeCString(
   _ cString: UnsafePointer<Int8>, repair: Bool
 ) -> String? {
@@ -207,7 +204,6 @@ internal func _decodeCString(
 }
 
 @inlinable
-@usableFromInline
 internal func _decodeCString(
   _ cString: UnsafePointer<UInt8>, repair: Bool
 ) -> String? {
@@ -221,7 +217,6 @@ internal func _decodeCString(
 ///
 /// This internal helper takes the string length as an argument.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _decodeCString<Encoding : _UnicodeEncoding>(
   _ cString: UnsafePointer<Encoding.CodeUnit>,
   as encoding: Encoding.Type, length: Int,

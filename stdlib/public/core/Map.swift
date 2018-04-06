@@ -27,7 +27,6 @@ public struct LazyMapSequence<Base : Sequence, Element> {
   /// Creates an instance with elements `transform(x)` for each element
   /// `x` of base.
   @inlinable
-  @usableFromInline
   internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform
@@ -46,7 +45,6 @@ extension LazyMapSequence {
     public var base: Base.Iterator { return _base }
 
     @inlinable
-    @usableFromInline
     internal init(
       _base: Base.Iterator, 
       _transform: @escaping (Base.Element) -> Element
@@ -108,7 +106,6 @@ public struct LazyMapCollection<Base: Collection, Element> {
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
   @inlinable
-  @usableFromInline
   internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform

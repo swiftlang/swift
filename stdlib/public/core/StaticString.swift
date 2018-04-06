@@ -167,7 +167,6 @@ public struct StaticString
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(
     _start: Builtin.RawPointer,
@@ -185,7 +184,6 @@ public struct StaticString
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(
     unicodeScalar: Builtin.Int32

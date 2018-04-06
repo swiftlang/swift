@@ -125,7 +125,6 @@ extension String {
     @_fixed_layout // FIXME(sil-serialize-all)
     public struct Indices {
       @inlinable // FIXME(sil-serialize-all)
-      @usableFromInline // FIXME(sil-serialize-all)
       internal init(
         _elements: String.UTF16View, _startIndex: Index, _endIndex: Index
       ) {
@@ -189,7 +188,6 @@ extension String {
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal func _internalIndex(at i: Int) -> Int {
       return _guts.startIndex + i
     }
@@ -256,13 +254,11 @@ extension String {
 #endif
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts) {
       self.init(_guts, offset: 0, length: _guts.count)
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
@@ -351,20 +347,16 @@ extension String {
 
 extension String.UTF16View : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _ephemeralContent : String { return _persistentContent }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent : String { return String(self._guts) }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _wholeString : String {
     return String(_guts)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _encodedOffsetRange : Range<Int> {
     return _offset..<_offset+_length
   }
@@ -459,7 +451,6 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   public typealias SubSequence = String.UTF16View.Indices
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(
     _elements: String.UTF16View,
     startIndex: Index,

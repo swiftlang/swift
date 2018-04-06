@@ -45,7 +45,6 @@ extension Repeated: RandomAccessCollection {
 
   /// Creates an instance that contains `count` elements having the
   /// value `repeatedValue`.
-  @usableFromInline
   @inlinable
   internal init(_repeating repeatedValue: Element, count: Int) {
     _precondition(count >= 0, "Repetition count should be non-negative")

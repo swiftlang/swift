@@ -649,7 +649,6 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
   @usableFromInline
   internal var _dropped: Int
 
-  @usableFromInline
   @inlinable
   internal init(_iterator: Base, limit: Int, dropped: Int = 0) {
     self._iterator = _iterator
@@ -657,13 +656,11 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
     self._dropped = dropped
   }
 
-  @usableFromInline
   @inlinable
   internal func makeIterator() -> _DropFirstSequence<Base> {
     return self
   }
 
-  @usableFromInline
   @inlinable
   internal mutating func next() -> Base.Element? {
     while _dropped < _limit {
@@ -676,7 +673,6 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
     return _iterator.next()
   }
 
-  @usableFromInline
   @inlinable
   internal func dropFirst(_ n: Int) -> AnySequence<Base.Element> {
     // If this is already a _DropFirstSequence, we need to fold in
@@ -705,7 +701,6 @@ internal struct _PrefixSequence<Base : IteratorProtocol>
   @usableFromInline
   internal var _taken: Int
 
-  @usableFromInline
   @inlinable
   internal init(_iterator: Base, maxLength: Int, taken: Int = 0) {
     self._iterator = _iterator
@@ -713,13 +708,11 @@ internal struct _PrefixSequence<Base : IteratorProtocol>
     self._taken = taken
   }
 
-  @usableFromInline
   @inlinable
   internal func makeIterator() -> _PrefixSequence<Base> {
     return self
   }
 
-  @usableFromInline
   @inlinable
   internal mutating func next() -> Base.Element? {
     if _taken >= _maxLength { return nil }
@@ -733,7 +726,6 @@ internal struct _PrefixSequence<Base : IteratorProtocol>
     return nil
   }
 
-  @usableFromInline
   @inlinable
   internal func prefix(_ maxLength: Int) -> AnySequence<Base.Element> {
     return AnySequence(
@@ -760,7 +752,6 @@ internal struct _DropWhileSequence<Base : IteratorProtocol>
   @usableFromInline
   internal var _nextElement: Base.Element?
 
-  @usableFromInline
   @inlinable
   internal init(
     iterator: Base,
@@ -775,13 +766,11 @@ internal struct _DropWhileSequence<Base : IteratorProtocol>
     }
   }
 
-  @usableFromInline
   @inlinable
   internal func makeIterator() -> _DropWhileSequence<Base> {
     return self
   }
 
-  @usableFromInline
   @inlinable
   internal mutating func next() -> Element? {
     guard _nextElement != nil else {
@@ -793,7 +782,6 @@ internal struct _DropWhileSequence<Base : IteratorProtocol>
     return next
   }
 
-  @usableFromInline
   @inlinable
   internal func drop(
     while predicate: (Element) throws -> Bool

@@ -29,7 +29,6 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal var rawStart: UnsafeMutableRawPointer {
     _abstract()
@@ -54,7 +53,6 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
   /// Create uninitialized storage of at least the specified capacity.
   @inlinable
-  @usableFromInline
   @nonobjc
   internal static func create(
     capacity: Int,
@@ -84,7 +82,6 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal override final var rawStart: UnsafeMutableRawPointer {
     return UnsafeMutableRawPointer(start)
@@ -149,42 +146,36 @@ extension _SwiftStringStorage {
   // Basic properties
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final var start: UnsafeMutablePointer<CodeUnit> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, CodeUnit.self))
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final var end: UnsafeMutablePointer<CodeUnit> {
     return start + count
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final var capacityEnd: UnsafeMutablePointer<CodeUnit> {
     return start + capacity
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   var usedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
     return UnsafeMutableBufferPointer(start: start, count: count)
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   var unusedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
     return UnsafeMutableBufferPointer(start: end, count: capacity - count)
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   var unmanagedView: _UnmanagedString<CodeUnit> {
     return _UnmanagedString(start: self.start, count: self.count)
@@ -195,7 +186,6 @@ extension _SwiftStringStorage {
   // Append operations
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<OtherCodeUnit>(
     _ other: _UnmanagedString<OtherCodeUnit>
@@ -208,7 +198,6 @@ extension _SwiftStringStorage {
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _UnmanagedOpaqueString) {
     let otherCount = Int(other.count)
@@ -218,7 +207,6 @@ extension _SwiftStringStorage {
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<C: Collection>(contentsOf other: C)
   where C.Element == CodeUnit {
@@ -232,7 +220,6 @@ extension _SwiftStringStorage {
   }
 
   @inlinable
-  @usableFromInline
   @_specialize(where C == Character._SmallUTF16, CodeUnit == UInt8)
   @nonobjc
   internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)
@@ -251,7 +238,6 @@ extension _SwiftStringStorage {
 
 extension _SwiftStringStorage {
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
     if _slowPath(other._isOpaque) {
@@ -283,7 +269,6 @@ extension _SwiftStringStorage {
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
     if _slowPath(other._isOpaque) {
@@ -313,14 +298,12 @@ extension _SwiftStringStorage {
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: String) {
     self._appendInPlace(other._guts)
   }
 
   @inlinable
-  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<S : StringProtocol>(_ other: S) {
     self._appendInPlace(

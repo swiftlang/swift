@@ -53,7 +53,6 @@ public struct LazyCollection<Base : Collection> {
   /// Creates an instance with `base` as its underlying Collection
   /// instance.
   @inlinable
-  @usableFromInline
   internal init(_base: Base) {
     self._base = _base
   }

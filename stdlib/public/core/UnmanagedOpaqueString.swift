@@ -41,7 +41,6 @@ internal struct _UnmanagedOpaqueString {
 
 #if _runtime(_ObjC) // FIXME unify
   @inlinable
-  @usableFromInline
   init(_ object: _CocoaString, range: Range<Int>, isSlice: Bool) {
     self.object = object
     self.range = range
@@ -55,13 +54,11 @@ internal struct _UnmanagedOpaqueString {
   }
 
   @inlinable
-  @usableFromInline
   init(_ object: _CocoaString, count: Int) {
     self.init(object, range: 0..<count, isSlice: false)
   }
 #else
   @inlinable
-  @usableFromInline
   init(_ object: _OpaqueString, range: Range<Int>, isSlice: Bool) {
     self.object = object
     self.range = range
@@ -74,7 +71,6 @@ internal struct _UnmanagedOpaqueString {
   }
 
   @inlinable
-  @usableFromInline
   init(_ object: _OpaqueString, count: Int) {
     self.init(object, range: 0..<count, isSlice: false)
   }
@@ -85,13 +81,11 @@ extension _UnmanagedOpaqueString : Sequence {
   typealias Element = UTF16.CodeUnit
 
   @inlinable
-  @usableFromInline
   func makeIterator() -> Iterator {
     return Iterator(self, startingAt: range.lowerBound)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func makeIterator(startingAt position: Int) -> Iterator {
     return Iterator(self, startingAt: position)
   }
@@ -119,14 +113,12 @@ extension _UnmanagedOpaqueString : Sequence {
     internal var _bufferIndex: Int8 = 0
 
     @inlinable
-    @usableFromInline
     init(_ string: _UnmanagedOpaqueString, startingAt start: Int) {
       self._object = string.object
       self._range = start..<string.range.upperBound
     }
 
     @inlinable
-    @usableFromInline
     @inline(__always)
     mutating func next() -> Element? {
       if _fastPath(_bufferIndex < _buffer.count) {
@@ -172,21 +164,18 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
     @usableFromInline
     internal var _value: Int
 
-    @usableFromInline
     @inlinable
     @inline(__always)
     init(_ value: Int) {
       self._value = value
     }
 
-    @usableFromInline
     @inlinable
     @inline(__always)
     func distance(to other: Index) -> Int {
       return other._value - self._value
     }
 
-    @usableFromInline
     @inlinable
     @inline(__always)
     func advanced(by n: Int) -> Index {
@@ -194,25 +183,21 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
     }
   }
 
-  @usableFromInline
   @inlinable
   var startIndex: Index {
     return Index(range.lowerBound)
   }
 
-  @usableFromInline
   @inlinable
   var endIndex: Index {
     return Index(range.upperBound)
   }
 
-  @usableFromInline
   @inlinable
   var count: Int {
     return range.count
   }
 
-  @usableFromInline
   @inlinable // FIXME(sil-serialize-all)
   subscript(position: Index) -> UTF16.CodeUnit {
     _sanityCheck(position._value >= range.lowerBound)
@@ -224,7 +209,6 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
 #endif
   }
 
-  @usableFromInline
   @inlinable // FIXME(sil-serialize-all)
   subscript(bounds: Range<Index>) -> _UnmanagedOpaqueString {
     _sanityCheck(bounds.lowerBound._value >= range.lowerBound)
@@ -240,13 +224,11 @@ extension _UnmanagedOpaqueString : _StringVariant {
   internal typealias CodeUnit = Encoding.CodeUnit
 
   @inlinable
-  @usableFromInline
   var isASCII: Bool {
     @inline(__always) get { return false }
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(_ i: Index) {
     _precondition(i._value >= range.lowerBound && i._value < range.upperBound,
@@ -254,7 +236,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(_ range: Range<Index>) {
     _precondition(
@@ -264,7 +245,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(offset: Int) {
     _precondition(offset >= 0 && offset < range.count,
@@ -272,14 +252,12 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   func _boundsCheck(offsetRange range: Range<Int>) {
     _precondition(range.lowerBound >= 0 && range.upperBound <= count,
       "String index range is out of bounds")
   }
 
-  @usableFromInline
   @inlinable // FIXME(sil-serialize-all)
   subscript(offset: Int) -> UTF16.CodeUnit {
     _sanityCheck(offset >= 0 && offset < count)
@@ -290,7 +268,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
 #endif
   }
 
-  @usableFromInline
   @inlinable // FIXME(sil-serialize-all)
   subscript(offsetRange: Range<Int>) -> _UnmanagedOpaqueString {
     _sanityCheck(offsetRange.lowerBound >= 0)
@@ -303,7 +280,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
     _sanityCheck(offsetRange.upperBound <= range.count)
     let b: Range<Int> =
@@ -314,7 +290,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
     _sanityCheck(offsetRange.upperBound <= range.count)
     let b: Range<Int> =
@@ -325,7 +300,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
     _sanityCheck(offsetRange.lowerBound < range.count)
     let b: Range<Int> =
@@ -336,7 +310,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _copy(
     into dest: UnsafeMutableBufferPointer<UTF16.CodeUnit>
   ) {
@@ -353,7 +326,6 @@ extension _UnmanagedOpaqueString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _copy<TargetCodeUnit>(
     into dest: UnsafeMutableBufferPointer<TargetCodeUnit>
   )

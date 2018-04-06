@@ -21,7 +21,6 @@ public struct DefaultIndices<Elements: Collection> {
   internal var _endIndex: Elements.Index
 
   @inlinable
-  @usableFromInline
   internal init(
     _elements: Elements,
     startIndex: Elements.Index,

@@ -59,7 +59,6 @@ internal struct _ThreadLocalStorage {
 
   // private: Should only be called by _initializeThreadLocalStorage
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_uBreakIterator: OpaquePointer) {
     self.uBreakIterator = _uBreakIterator
   }
@@ -67,7 +66,6 @@ internal struct _ThreadLocalStorage {
   // Get the current thread's TLS pointer. On first call for a given thread,
   // creates and initializes a new one.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func getPointer()
     -> UnsafeMutablePointer<_ThreadLocalStorage>
   {
@@ -81,7 +79,6 @@ internal struct _ThreadLocalStorage {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func getUBreakIterator(
     start: UnsafePointer<UTF16.CodeUnit>,
     count: Int32
@@ -99,7 +96,6 @@ internal struct _ThreadLocalStorage {
 
 // Destructor to register with pthreads. Responsible for deallocating any memory
 // owned.
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("_stdlib_destroyTLS")
 internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
@@ -128,7 +124,6 @@ internal let _tlsKey: __swift_thread_key_t = {
 }()
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @inline(never)
 internal func _initializeThreadLocalStorage()
   -> UnsafeMutablePointer<_ThreadLocalStorage>

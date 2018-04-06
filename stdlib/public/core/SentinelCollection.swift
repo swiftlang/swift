@@ -33,14 +33,12 @@ where IsSentinel.Input == Base.Element {
   internal var _expired: Bool = false
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ base: Base, until condition: IsSentinel) {
     _base = base
     _isSentinel = condition
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func next() -> Base.Element? {
     guard _fastPath(!_expired) else { return nil }
     let x = _base.next()
@@ -65,7 +63,6 @@ where IsSentinel.Input == Base.Iterator.Element {
   internal var _base : Base
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func makeIterator() -> _SentinelIterator<Base.Iterator, IsSentinel> {
     return _SentinelIterator(_base.makeIterator(), until: _isSentinel)
   }
@@ -74,7 +71,6 @@ where IsSentinel.Input == Base.Iterator.Element {
   @usableFromInline // FIXME(sil-serialize-all)
   internal struct Index : Comparable {
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(
       _impl: (position: Base.Index, element: Base.Iterator.Element)?
     ) {
@@ -85,14 +81,12 @@ where IsSentinel.Input == Base.Iterator.Element {
     internal var _impl: (position: Base.Index, element: Base.Iterator.Element)?
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal static func == (lhs: Index, rhs: Index) -> Bool {
       if rhs._impl == nil { return lhs._impl == nil }
       return lhs._impl != nil && rhs._impl!.position == lhs._impl!.position
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal static func < (lhs: Index, rhs: Index) -> Bool {
       if rhs._impl == nil { return lhs._impl != nil }
       return lhs._impl != nil && rhs._impl!.position < lhs._impl!.position
@@ -100,31 +94,26 @@ where IsSentinel.Input == Base.Iterator.Element {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var startIndex : Index {
     return _index(at: _base.startIndex)
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var endIndex : Index {
     return Index(_impl: nil)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(i: Index) -> Base.Iterator.Element {
     return i._impl!.element
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func index(after i: Index) -> Index {
     return _index(at: _base.index(after: i._impl!.position))
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _index(at i: Base.Index) -> Index {
     // We don't need this check if it's a precondition that the sentinel will be
     // found
@@ -135,7 +124,6 @@ where IsSentinel.Input == Base.Iterator.Element {
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_ base: Base, until condition: IsSentinel) {
     _base = base
     _isSentinel = condition
@@ -146,11 +134,9 @@ where IsSentinel.Input == Base.Iterator.Element {
 @usableFromInline // FIXME(sil-serialize-all)
 internal struct _IsZero<T : BinaryInteger> : _Predicate {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func apply(_ x: T) -> Bool {
     return x == 0
   }

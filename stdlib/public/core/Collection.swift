@@ -1005,7 +1005,6 @@ extension Collection {
 
   /// Do not use this method directly; call advanced(by: n) instead.
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _advanceForward(_ i: Index, by n: Int) -> Index {
     _precondition(n >= 0,
@@ -1020,7 +1019,6 @@ extension Collection {
 
   /// Do not use this method directly; call advanced(by: n, limit) instead.
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _advanceForward(
     _ i: Index, by n: Int, limitedBy limit: Index

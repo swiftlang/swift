@@ -22,7 +22,6 @@ enum _GutsClassification: UInt {
 }
 
 extension _StringGuts {
-  @usableFromInline
   @inlinable
   var classification: _GutsClassification {
     if _isSmall { return .smallUTF8 }
@@ -684,7 +683,6 @@ internal func _tryNormalize(
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func compareASCII(to other: _UnmanagedString<UInt8>) -> Int {
     // FIXME Results should be the same across all platforms.
     if self.start == other.start {

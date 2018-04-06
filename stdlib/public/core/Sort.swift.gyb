@@ -34,7 +34,6 @@ else:
 }%
 
 @inlinable
-@usableFromInline
 internal func _insertionSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -177,7 +176,6 @@ func _sort3<C>(
 /// - Precondition: The count of `range` must be >= 3:
 ///   `elements.distance(from: range.lowerBound, to: range.upperBound) >= 3`
 @inlinable
-@usableFromInline
 internal func _partition<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -254,7 +252,6 @@ func _introSort<C>(
 }
 
 @inlinable
-@usableFromInline
 internal func _introSortImpl<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -301,7 +298,6 @@ internal func _introSortImpl<C>(
 }
 
 @inlinable
-@usableFromInline
 internal func _siftDown<C>(
   _ elements: inout C,
   index: C.Index,
@@ -344,7 +340,6 @@ internal func _siftDown<C>(
 }
 
 @inlinable
-@usableFromInline
 internal func _heapify<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -376,7 +371,6 @@ internal func _heapify<C>(
 }
 
 @inlinable
-@usableFromInline
 internal func _heapSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
