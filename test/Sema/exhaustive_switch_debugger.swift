@@ -22,7 +22,7 @@ public enum NonExhaustivePayload {
 // case.
 @inlinable
 public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
-  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{none}}
+  switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
   case .a: break
   }
 
@@ -95,7 +95,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 
   // Test payloaded enums.
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{none}}
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
   case .a: break
   }
 
@@ -121,7 +121,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   }
 
-  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}} expected-note {{handle unknown values using "@unknown case _"}} {{none}}
+  switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(true)'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
   case .a: break
   case .b(false): break
   }

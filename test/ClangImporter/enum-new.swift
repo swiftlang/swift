@@ -5,11 +5,11 @@ _ = .Red as Color
 _ = .Cyan as MoreColor
 
 func test() {
-  switch getColor() { // expected-warning {{switch must be exhaustive}} expected-note{{handle unknown values using "@unknown case _"}}
+  switch getColor() { // expected-warning {{switch must be exhaustive}} expected-note{{handle unknown values using "@unknown default"}}
   case .Red, .Blue, .Green: break
   }
 
-  switch getMoreColor() { // expected-warning {{switch must be exhaustive}} expected-note{{handle unknown values using "@unknown case _"}}
+  switch getMoreColor() { // expected-warning {{switch must be exhaustive}} expected-note{{handle unknown values using "@unknown default"}}
   case .Yellow, .Magenta, .Black, .Cyan: break
   }
 

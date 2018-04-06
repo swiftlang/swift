@@ -3902,7 +3902,7 @@ NOTE(missing_several_cases,none,
      "%select{missing cases|a default clause}0"
      "?", (bool))
 NOTE(missing_unknown_case,none,
-     "handle unknown values using \"@unknown case _\"", ())
+     "handle unknown values using \"@unknown default\"", ())
 
 NOTE(missing_particular_case,none,
      "add missing case: '%0'", (StringRef))

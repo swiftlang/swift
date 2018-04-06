@@ -929,7 +929,7 @@ namespace {
           break;
         case SpaceKind::UnknownCase:
           if (forDisplay) {
-            // We special-case this to use "@unknown case _" at the top level.
+            // We special-case this to use "@unknown default" at the top level.
             buffer << "_";
           } else {
             buffer << "UNKNOWN";
@@ -1469,7 +1469,7 @@ namespace {
         processUncoveredSpaces([&](const Space &space,
                                    bool onlyOneUncoveredSpace) {
           if (space.getKind() == SpaceKind::UnknownCase) {
-            OS << "@unknown " << tok::kw_case << " _";
+            OS << "@unknown " << tok::kw_default;
             if (onlyOneUncoveredSpace) {
               OS << ":\n<#fatalError()#>\n";
               TC.diagnose(startLoc, diag::missing_unknown_case)
@@ -1495,7 +1495,7 @@ namespace {
           if (space.getKind() == SpaceKind::UnknownCase) {
             auto note = TC.diagnose(startLoc, diag::missing_unknown_case);
             if (onlyOneUncoveredSpace)
-              note.fixItInsert(insertLoc, "@unknown case _:\n<#fatalError#>()\n");
+              note.fixItInsert(insertLoc, "@unknown default:\n<#fatalError#>()\n");
             return;
           }
 

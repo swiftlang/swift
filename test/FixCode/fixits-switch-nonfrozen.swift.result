@@ -428,14 +428,14 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b:
 <#code#>
-@unknown case _:
+@unknown default:
 <#code#>
 }
 
   switch value {
   case .a: break
   case .b: break
-  @unknown case _:
+  @unknown default:
 <#fatalError()#>
 }
   
@@ -564,14 +564,14 @@ case (_, .nanoseconds(_)):
   case .a: break
   case .b(_):
 <#code#>
-@unknown case _:
+@unknown default:
 <#code#>
 }
 
   switch payload {
   case .a: break
   case .b: break
-  @unknown case _:
+  @unknown default:
 <#fatalError()#>
 }
   
@@ -599,7 +599,7 @@ case (_, .nanoseconds(_)):
   case .b(false): break
   case .b(true):
 <#code#>
-@unknown case _:
+@unknown default:
 <#code#>
 }
 
