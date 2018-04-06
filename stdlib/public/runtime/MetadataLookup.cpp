@@ -747,8 +747,20 @@ public:
     // Figure out the various levels of generic parameters we have in
     // this type.
     std::vector<unsigned> genericParamCounts;
-    bool innermostIsGeneric =
-      _gatherGenericParameterCounts(typeDecl, genericParamCounts);
+    bool innermostIsGeneric;
+
+    // If we have no parent given, try to form the whole type in one go.
+    if (!parent) {
+      innermostIsGeneric = !genericArgs.empty();
+      if (innermostIsGeneric) {
+        genericParamCounts.push_back(genericArgs.size());
+      }
+    // Otherwise, we'll need to steal the generic arguments from the parent
+    // type to build a nested type.
+    } else {
+      innermostIsGeneric = _gatherGenericParameterCounts(typeDecl,
+                                                         genericParamCounts);
+    }
     bool isGeneric = !genericParamCounts.empty();
 
     // Gather the generic arguments.
