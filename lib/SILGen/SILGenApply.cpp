@@ -590,18 +590,20 @@ public:
     case Kind::WitnessMethod: {
       auto constantInfo = SGF.getConstantInfo(*constant);
 
-      auto proto = cast<ProtocolDecl>(
-        Constant.getDecl()->getDeclContext());
-      auto lookupType = getSubstFormalType()
-                            .getInput()
-                            ->getRValueInstanceType()
-                            ->getCanonicalType();
+      auto proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
+      auto genericSig = cast<AbstractFunctionDecl>(Constant.getDecl())
+        ->getGenericSignature();
+      auto subMap = genericSig->getSubstitutionMap(Substitutions);
+      auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
+      auto lookupType = selfType.subst(subMap)->getCanonicalType();
+      auto conformance = *subMap.lookupConformance(selfType, proto);
 
       SILValue fn;
 
       if (!constant->isForeign) {
+
         fn = SGF.B.createWitnessMethod(
-          Loc, lookupType, ProtocolConformanceRef(proto), *constant,
+          Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
       } else {
         fn = SGF.B.createObjCMethod(Loc, borrowedSelf->getValue(),

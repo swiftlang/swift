@@ -2393,10 +2393,7 @@ public:
       require(AMI->getTypeDependentOperands().empty(),
               "Should not have an operand for the opened existential");
     }
-    if (isa<ArchetypeType>(lookupType) || lookupType->isAnyExistentialType()) {
-      require(AMI->getConformance().isAbstract(),
-              "archetype or existential lookup should have abstract conformance");
-    } else {
+    if (!isa<ArchetypeType>(lookupType)) {
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();
