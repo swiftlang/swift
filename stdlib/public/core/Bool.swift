@@ -159,8 +159,8 @@ extension Bool : Equatable, Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append((self ? 1 : 0) as UInt8)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine((self ? 1 : 0) as UInt8)
   }
 
   @inlinable // FIXME(sil-serialize-all)

@@ -2132,7 +2132,7 @@ ERROR(broken_equatable_requirement,none,
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_no_hasher,none,
-      "Hashable protocol is broken: _Hasher type not found", ())
+      "Hashable protocol is broken: Hasher type not found", ())
 ERROR(broken_errortype_requirement,none,
       "Error protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,none,

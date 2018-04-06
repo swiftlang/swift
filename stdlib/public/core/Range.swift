@@ -405,9 +405,9 @@ extension Range: Hashable where Bound: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(lowerBound)
-    hasher.append(upperBound)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(lowerBound)
+    hasher.combine(upperBound)
   }
 }
 

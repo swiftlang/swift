@@ -17,8 +17,8 @@ extension _CFObject {
   public var hashValue: Int {
     return Int(bitPattern: CFHash(self))
   }
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(self.hashValue)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.hashValue)
   }
   public static func ==(left: Self, right: Self) -> Bool {
     return CFEqual(left, right)

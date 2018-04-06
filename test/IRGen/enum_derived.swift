@@ -3,13 +3,13 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %t -O -primary-file %s -emit-ir | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %t -O -primary-file %s -enable-testing -emit-ir | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 //
-// FIXME: The switch inside synthesized _hash(into:) implementations for enums
-// doesn't get optimized away yet. 
+// FIXME: The switch inside synthesized hash(into:) implementations for enums
+// doesn't get optimized away yet.
 // XFAIL: *
 
 import def_enum
 
-// Check if hashValue, _hash(into:) and == for an enum (without payload) are
+// Check if hashValue, hash(into:) and == for an enum (without payload) are
 // generated and check that functions are compiled in an optimal way.
 
 enum E {
@@ -32,13 +32,13 @@ enum E {
 // CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc i{{.*}} @"$S12enum_derived1EO9hashValueSivg"(i8)
 // CHECK: ret i{{.*}}
 
-// Check if the _hash(into:) method can be compiled to a simple zext instruction
-// followed by a call to _Hasher.append(bits:).
+// Check if the hash(into:) method can be compiled to a simple zext instruction
+// followed by a call to Hasher.combine(bits:).
 
-// CHECK-NORMAL-LABEL:define hidden swiftcc void @"$S12enum_derived1EO5_hash4intoys7_HasherVz_tF"
-// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc void @"$S12enum_derived1EO5_hash4intoys7_HasherVz_tF"
+// CHECK-NORMAL-LABEL:define hidden swiftcc void @"$S12enum_derived1EO4hash4intoys6HasherVz_tF"
+// CHECK-TESTABLE-LABEL:define{{( protected)?}} swiftcc void @"$S12enum_derived1EO4hash4intoys6HasherVz_tF"
 // CHECK: [[V:%.*]] = zext i8 %1 to i{{.*}}
-// CHECK: tail call swiftcc i{{.*}} @"$Ss7_HasherV6append4bitsySu_tF"(i{{.*}} [[V]],
+// CHECK: tail call swiftcc i{{.*}} @"$Ss6HasherV7combine4bitsySu_tF"(i{{.*}} [[V]],
 // CHECK: ret void
 
 // Derived conformances from extensions

@@ -492,12 +492,12 @@ extension Set: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     var hash = 0
     for member in self {
       hash ^= _hashValue(for: member)
     }
-    hasher.append(hash)
+    hasher.combine(hash)
   }
 }
 
@@ -1806,7 +1806,7 @@ internal struct _NativeSetBuffer<Element> {
     //
     // FIXME: Use an approximation of true per-instance seeding. We can't just
     // use the base address, because COW copies need to share the same seed.
-    let seed = _Hasher._seed
+    let seed = Hasher._seed
     let perturbation = bucketCount
     _storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
   }
@@ -2096,8 +2096,8 @@ extension _NativeSetBuffer where Element: Hashable
   @usableFromInline
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(seed: _storage.seed)
-    hasher.append(k)
+    var hasher = Hasher(_rawSeed: _storage.seed)
+    hasher.combine(k)
     return hasher.finalize() & _bucketMask
   }
 

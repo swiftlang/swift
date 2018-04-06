@@ -51,23 +51,23 @@ internal struct ASCIIHasher {
 extension _UnmanagedString where CodeUnit == UInt8 {
   // NOT @usableFromInline
   @effects(releasenone)
-  internal func hashASCII(into hasher: inout _Hasher) {
+  internal func hashASCII(into hasher: inout Hasher) {
     var asciiHasher = ASCIIHasher()
     for c in self {
       if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: c)) {
-        hasher.append(combined)
+        hasher.combine(combined)
       }
     }
 
     if let combined = asciiHasher.consume() {
-      hasher.append(combined)
+      hasher.combine(combined)
     }
   }
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   // NOT @usableFromInline
-  internal func hashUTF16(into hasher: inout _Hasher) {
+  internal func hashUTF16(into hasher: inout Hasher) {
     var asciiHasher = ASCIIHasher()
 
     for i in self.indices {
@@ -77,25 +77,25 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 
       guard cuIsASCII && isSingleSegmentScalar else {
         if let combined = asciiHasher.consume() {
-          hasher.append(combined)
+          hasher.combine(combined)
         }
 
         let codeUnitSequence = IteratorSequence(
           _NormalizedCodeUnitIterator(self[i..<endIndex])
         )
         for element in codeUnitSequence {
-          hasher.append(UInt(element))
+          hasher.combine(UInt(element))
         }
         return
       }
 
       if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: cu)) {
-        hasher.append(combined)
+        hasher.combine(combined)
       }
     }
 
     if let combined = asciiHasher.consume() {
-      hasher.append(combined)
+      hasher.combine(combined)
     }
   }
 }
@@ -103,7 +103,7 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 extension _UnmanagedString where CodeUnit == UInt8 {
   @effects(releasenone)
   @usableFromInline
-  internal func computeHashValue(into hasher: inout _Hasher) {
+  internal func computeHashValue(into hasher: inout Hasher) {
     self.hashASCII(into: &hasher)
   }
 }
@@ -111,14 +111,14 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 extension _UnmanagedString where CodeUnit == UInt16 {
   @effects(releasenone)
   @usableFromInline
-  internal func computeHashValue(into hasher: inout _Hasher) {
+  internal func computeHashValue(into hasher: inout Hasher) {
     self.hashUTF16(into: &hasher)
   }
 }
 
 extension _UnmanagedOpaqueString {
   @usableFromInline
-  internal func computeHashValue(into hasher: inout _Hasher) {
+  internal func computeHashValue(into hasher: inout Hasher) {
     self.hashUTF16(into: &hasher)
   }
 }
@@ -126,7 +126,7 @@ extension _UnmanagedOpaqueString {
 extension _SmallUTF8String {
   @usableFromInline
   @inlinable
-  internal func computeHashValue(into hasher: inout _Hasher) {
+  internal func computeHashValue(into hasher: inout Hasher) {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
@@ -141,7 +141,7 @@ extension _SmallUTF8String {
 extension _StringGuts {
   @usableFromInline
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
-  internal func _hash(into hasher: inout _Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     if _isSmall {
       return _smallUTF8String.computeHashValue(into: &hasher)
     }
@@ -160,7 +160,7 @@ extension _StringGuts {
 
   @usableFromInline
   @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
-  internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
+  internal func hash(_ range: Range<Int>, into hasher: inout Hasher) {
     if _isSmall {
       return _smallUTF8String[range].computeHashValue(into: &hasher)
     }
@@ -189,8 +189,8 @@ extension String : Hashable {
   }
 
   @inlinable
-  public func _hash(into hasher: inout _Hasher) {
-    _guts._hash(into: &hasher)
+  public func hash(into hasher: inout Hasher) {
+    _guts.hash(into: &hasher)
   }
 }
 
@@ -201,7 +201,7 @@ extension StringProtocol {
   }
 
   @inlinable
-  public func _hash(into hasher: inout _Hasher) {
-    _wholeString._guts._hash(_encodedOffsetRange, into: &hasher)
+  public func _hash(into hasher: inout Hasher) {
+    _wholeString._guts.hash(_encodedOffsetRange, into: &hasher)
   }
 }

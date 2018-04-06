@@ -733,41 +733,41 @@ static Expr *integerLiteralExpr(ASTContext &C, int64_t value) {
 
 /// Returns a new \c CallExpr representing
 ///
-///   hasher.append(hashable)
+///   hasher.combine(hashable)
 ///
 /// \param C The AST context to create the expression in.
 ///
 /// \param hasher The parameter decl to make the call on.
 ///
 /// \param hashable The parameter to the call.
-static CallExpr *createHasherAppendCall(ASTContext &C,
-                                        ParamDecl *hasher,
-                                        Expr *hashable) {
+static CallExpr *createHasherCombineCall(ASTContext &C,
+                                         ParamDecl *hasher,
+                                         Expr *hashable) {
   Expr *hasherExpr = new (C) DeclRefExpr(ConcreteDeclRef(hasher),
                                          DeclNameLoc(), /*implicit*/ true);
-  DeclName name(C, C.Id_append, {Identifier()});
-  // hasher.append(_:)
-  auto *appendCall = new (C) UnresolvedDotExpr(hasherExpr, SourceLoc(),
-                                               name, DeclNameLoc(),
-                                               /*implicit*/ true);
+  DeclName name(C, C.Id_combine, {Identifier()});
+  // hasher.combine(_:)
+  auto *combineCall = new (C) UnresolvedDotExpr(hasherExpr, SourceLoc(),
+                                                name, DeclNameLoc(),
+                                                /*implicit*/ true);
   
-  // hasher.append(hashable)
-  return CallExpr::createImplicit(C, appendCall, {hashable}, {Identifier()});
+  // hasher.combine(hashable)
+  return CallExpr::createImplicit(C, combineCall, {hashable}, {Identifier()});
 }
 
 static FuncDecl *
 deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
                         NominalTypeDecl *typeDecl,
                         void (*bodySynthesizer)(AbstractFunctionDecl *)) {
-  // @derived func _hash(into hasher: inout _Hasher)
+  // @derived func hash(into hasher: inout Hasher)
 
   ASTContext &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
-  // Expected type: (Self) -> (into: inout _Hasher) -> ()
+  // Expected type: (Self) -> (into: inout Hasher) -> ()
   // Constructed as:
   //   func type(input: Self,
-  //             output: func type(input: inout _UnsafeHasher,
+  //             output: func type(input: inout Hasher,
   //                               output: ()))
   // Created from the inside out:
 
@@ -793,7 +793,7 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
   // Return type: ()
   auto returnType = TupleType::getEmpty(C);
 
-  // Func name: _hash(into: inout _Hasher) -> ()
+  // Func name: hash(into hasher: inout Hasher) -> ()
   DeclName name(C, C.Id_hash, params[1]);
   auto *hashDecl = FuncDecl::create(C,
                                     SourceLoc(), StaticSpellingKind::None,
@@ -805,7 +805,7 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Evaluate type of Self in (Self) -> (into: inout _Hasher) -> ()
+  // Evaluate type of Self in (Self) -> (into: inout Hasher) -> ()
   auto selfParam = computeSelfParam(hashDecl);
   auto inoutFlag = ParameterTypeFlags().withInOut(true);
   auto hasherParam = AnyFunctionType::Param(hasherType, C.Id_into, inoutFlag);
@@ -818,7 +818,7 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
     interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
                                              FunctionType::ExtInfo());
   } else {
-    // (Self) -> innerType == (inout _Hasher) -> ()
+    // (Self) -> innerType == (inout Hasher) -> ()
     interfaceType = FunctionType::get({selfParam}, innerType,
                                       FunctionType::ExtInfo());
   }
@@ -832,12 +832,12 @@ deriveHashable_hashInto(TypeChecker &tc, Decl *parentDecl,
   return hashDecl;
 }
 
-/// Derive the body for the _hash(into:) method when hashValue has a
+/// Derive the body for the hash(into:) method when hashValue has a
 /// user-supplied implementation.
 static void
 deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
-  // func _hash(into hasher: inout _Hasher) {
-  //   hasher.append(self.hashValue)
+  // func hash(into hasher: inout Hasher) {
+  //   hasher.combine(self.hashValue)
   // }
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -849,7 +849,7 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
                                                  C.Id_hashValue, DeclNameLoc(),
                                                  /*implicit*/ true);
   auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
-  auto hasherExpr = createHasherAppendCall(C, hasherParam, hashValueExpr);
+  auto hasherExpr = createHasherCombineCall(C, hasherParam, hashValueExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
                                 SourceLoc(), /*implicit*/ true);
@@ -861,31 +861,31 @@ static void
 deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   // enum SomeEnum {
   //   case A, B, C
-  //   @derived func _hash(into hasher: inout _Hasher) {
+  //   @derived func hash(into hasher: inout Hasher) {
   //     switch self {
   //     case A:
-  //       hasher.append(0)
+  //       hasher.combine(0)
   //     case B:
-  //       hasher.append(1)
+  //       hasher.combine(1)
   //     case C:
-  //       hasher.append(2)
+  //       hasher.combine(2)
   //     }
   //   }
   // }
   //
   // enum SomeEnumWithAssociatedValues {
   //   case A, B(Int), C(String, Int)
-  //   @derived func _hash(into hasher: inout _Hasher) {
+  //   @derived func hash(into hasher: inout Hasher) {
   //     switch self {
   //     case A:
-  //       hasher.append(0)
+  //       hasher.combine(0)
   //     case B(let a0):
-  //       hasher.append(1)
-  //       hasher.append(a0)
+  //       hasher.combine(1)
+  //       hasher.combine(a0)
   //     case C(let a0, let a1):
-  //       hasher.append(2)
-  //       hasher.append(a0)
-  //       hasher.append(a1)
+  //       hasher.combine(2)
+  //       hasher.combine(a0)
+  //       hasher.combine(a1)
   //     }
   //   }
   // }
@@ -926,19 +926,19 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
     // first term fed into the hasher.
 
     {
-      // Generate: hasher.append(<ordinal>)
+      // Generate: hasher.combine(<ordinal>)
       auto ordinalExpr = integerLiteralExpr(C, index++);
-      auto appendExpr = createHasherAppendCall(C, hasherParam, ordinalExpr);
-      statements.emplace_back(ASTNode(appendExpr));
+      auto combineExpr = createHasherCombineCall(C, hasherParam, ordinalExpr);
+      statements.emplace_back(ASTNode(combineExpr));
     }
 
     // Generate a sequence of statements that feed the payloads into hasher.
     for (auto payloadVar : payloadVars) {
       auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
                                                /*implicit*/ true);
-      // Generate: hasher.append(<payloadVar>)
-      auto appendExpr = createHasherAppendCall(C, hasherParam, payloadVarRef);
-      statements.emplace_back(ASTNode(appendExpr));
+      // Generate: hasher.combine(<payloadVar>)
+      auto combineExpr = createHasherCombineCall(C, hasherParam, payloadVarRef);
+      statements.emplace_back(ASTNode(combineExpr));
     }
 
     auto hasBoundDecls = !payloadVars.empty();
@@ -964,9 +964,9 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   // struct SomeStruct {
   //   var x: Int
   //   var y: String
-  //   @derived func _hash(into hasher: inout _Hasher) {
-  //     hasher.append(x)
-  //     hasher.append(y)
+  //   @derived func hash(into hasher: inout Hasher) {
+  //     hasher.combine(x)
+  //     hasher.combine(y)
   //   }
   // }
   auto parentDC = hashIntoDecl->getDeclContext();
@@ -990,9 +990,9 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
                                        /*implicit*/ true);
     auto selfPropertyExpr = new (C) DotSyntaxCallExpr(propertyRef, SourceLoc(),
                                                       selfRef);
-    // Generate: hasher.append(self.<property>)
-    auto appendExpr = createHasherAppendCall(C, hasherParam, selfPropertyExpr);
-    statements.emplace_back(ASTNode(appendExpr));
+    // Generate: hasher.combine(self.<property>)
+    auto combineExpr = createHasherCombineCall(C, hasherParam, selfPropertyExpr);
+    statements.emplace_back(ASTNode(combineExpr));
   }
 
   auto body = BraceStmt::create(C, SourceLoc(), statements,

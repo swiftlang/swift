@@ -113,14 +113,14 @@ public protocol Hashable : Equatable {
   ///
   /// If this requirement is not explicitly implemented, the compiler
   /// automatically synthesizes an implementation for it.
-  func _hash(into hasher: inout _Hasher)
+  func hash(into hasher: inout Hasher)
 }
 
 // Called by synthesized `hashValue` implementations.
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
-  var hasher = _Hasher()
-  hasher.append(value)
+  var hasher = Hasher()
+  hasher.combine(value)
   return hasher.finalize()
 }
 

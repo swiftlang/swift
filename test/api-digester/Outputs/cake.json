@@ -569,10 +569,10 @@
         },
         {
           "kind": "Function",
-          "name": "_hash",
-          "printedName": "_hash(into:)",
+          "name": "hash",
+          "printedName": "hash(into:)",
           "declKind": "Func",
-          "usr": "s:4cake6NumberO5_hash4intoys7_HasherVz_tF",
+          "usr": "s:4cake6NumberO4hash4intoys6HasherVz_tF",
           "location": "",
           "moduleName": "cake",
           "children": [
@@ -584,7 +584,7 @@
             {
               "kind": "TypeNominal",
               "name": "InOut",
-              "printedName": "inout _Hasher"
+              "printedName": "inout Hasher"
             }
           ]
         },

@@ -173,7 +173,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
         return getRequirement(KnownProtocolKind::Encodable);
     }
 
-    // Hashable._hash(into: _UnsafeHasher) -> _UnsafeHasher
+    // Hashable.hash(into: Hasher)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_hash) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)

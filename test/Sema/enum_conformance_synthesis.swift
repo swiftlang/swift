@@ -2,7 +2,7 @@
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_conformance_synthesis_other.swift -verify-ignore-unknown
 
-var hasher = _Hasher()
+var hasher = Hasher()
 
 enum Foo: CaseIterable {
   case A, B
@@ -10,7 +10,7 @@ enum Foo: CaseIterable {
 
 if Foo.A == .B { }
 var aHash: Int = Foo.A.hashValue
-Foo.A._hash(into: &hasher)
+Foo.A.hash(into: &hasher)
 _ = Foo.allCases
 
 Foo.A == Foo.B // expected-warning {{result of operator '==' is unused}}
@@ -27,7 +27,7 @@ enum Generic<T>: CaseIterable {
 
 if Generic<Foo>.A == .B { }
 var gaHash: Int = Generic<Foo>.A.hashValue
-Generic<Foo>.A._hash(into: &hasher)
+Generic<Foo>.A.hash(into: &hasher)
 _ = Generic<Foo>.allCases
 
 func localEnum() -> Bool {
@@ -49,7 +49,7 @@ func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 4 {{non
 
 if CustomHashable.A == .B { }
 var custHash: Int = CustomHashable.A.hashValue
-CustomHashable.A._hash(into: &hasher)
+CustomHashable.A.hash(into: &hasher)
 
 // We still synthesize conforming overloads of '==' and 'hashValue' if
 // explicit definitions don't satisfy the protocol requirements. Probably
@@ -66,7 +66,7 @@ if InvalidCustomHashable.A == .B { }
 var s: String = InvalidCustomHashable.A == .B
 s = InvalidCustomHashable.A.hashValue
 var i: Int = InvalidCustomHashable.A.hashValue
-InvalidCustomHashable.A._hash(into: &hasher)
+InvalidCustomHashable.A.hash(into: &hasher)
 
 // Check use of an enum's synthesized members before the enum is actually declared.
 struct UseEnumBeforeDeclaration {
@@ -119,9 +119,9 @@ _ = EnumWithHashablePayload.A(1).hashValue
 _ = EnumWithHashablePayload.B("x", 1).hashValue
 _ = EnumWithHashablePayload.C.hashValue
 
-EnumWithHashablePayload.A(1)._hash(into: &hasher)
-EnumWithHashablePayload.B("x", 1)._hash(into: &hasher)
-EnumWithHashablePayload.C._hash(into: &hasher)
+EnumWithHashablePayload.A(1).hash(into: &hasher)
+EnumWithHashablePayload.B("x", 1).hash(into: &hasher)
+EnumWithHashablePayload.C.hash(into: &hasher)
 
 // ...and they should also inherit equatability from Hashable.
 if EnumWithHashablePayload.A(1) == .B("x", 1) { }
@@ -151,7 +151,7 @@ enum GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not
 }
 if GenericNotHashable<String>.A("a") == .B { }
 let _: Int = GenericNotHashable<String>.A("a").hashValue // No error. hashValue is always synthesized, even if Hashable derivation fails
-GenericNotHashable<String>.A("a")._hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member '_hash'}}
+GenericNotHashable<String>.A("a").hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hash'}}
 
 // An enum with no cases should not derive conformance.
 enum NoCases: Hashable {} // expected-error 2 {{does not conform}}

@@ -88,7 +88,7 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_NO_DOT: Begin completions
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal: .Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: ._hash({#self: FooEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(FooEnum)
+// FOO_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .hash({#self: FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(FooEnum)
 // FOO_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal: .AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal: .allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_NO_DOT-NEXT: End completions
@@ -96,7 +96,7 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT: Begin completions
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: _hash({#self: FooEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(FooEnum)
+// FOO_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: hash({#self: FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(FooEnum)
 // FOO_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT-NEXT: End completions
@@ -104,7 +104,7 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_INVALID: Begin completions
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo1[#FooEnum#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[EnumElement]/CurrNominal: Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_DOT_INVALID-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: _hash({#self: FooEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(FooEnum)
+// FOO_ENUM_DOT_INVALID-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: hash({#self: FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(FooEnum)
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: Decl[StaticVar]/CurrNominal: allCases[#[FooEnum]#]{{; name=.+$}}
 // FOO_ENUM_DOT_INVALID-NEXT: End completions
@@ -251,7 +251,7 @@ enum QuxEnum : Int {
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .RawValue[#Int#]{{; name=.+$}}
-// QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: ._hash({#self: QuxEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(QuxEnum)
+// QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .hash({#self: QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(QuxEnum)
 // QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: End completions
 
@@ -259,7 +259,7 @@ enum QuxEnum : Int {
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[EnumElement]/CurrNominal:    Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      RawValue[#Int#]{{; name=.+$}}
-// QUX_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: _hash({#self: QuxEnum#})[#(into: inout _Hasher) -> Void#]; name=_hash(QuxEnum)
+// QUX_ENUM_DOT-NEXT: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: hash({#self: QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(QuxEnum)
 // QUX_ENUM_DOT-NEXT: Decl[Constructor]/CurrNominal:    init({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
 // QUX_ENUM_DOT-NEXT: End completions
 

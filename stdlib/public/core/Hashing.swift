@@ -200,7 +200,7 @@ internal struct _LegacyHasher {
 
 // NOT @_fixed_layout
 @_fixed_layout // FIXME - remove - radar 38549901
-public struct _Hasher {
+public struct Hasher {
   internal typealias Core = _SipHash13
 
   // NOT @usableFromInline
@@ -209,12 +209,19 @@ public struct _Hasher {
   // NOT @inlinable
   @effects(releasenone)
   public init() {
-    self._core = Core(key: _Hasher._seed)
+    self.init(_rawSeed: Hasher._seed)
   }
 
   // NOT @inlinable
   @effects(releasenone)
   public init(seed: (UInt64, UInt64)) {
+    self.init(_rawSeed: (Hasher._seed.0 ^ seed.0, Hasher._seed.1 ^ seed.1))
+  }
+
+  // NOT @inlinable
+  @effects(releasenone)
+  public // @testable
+  init(_rawSeed seed: (UInt64, UInt64)) {
     self._core = Core(key: seed)
   }
 
@@ -252,39 +259,39 @@ public struct _Hasher {
 
   @inlinable
   @inline(__always)
-  public mutating func append<H: Hashable>(_ value: H) {
-    value._hash(into: &self)
+  public mutating func combine<H: Hashable>(_ value: H) {
+    value.hash(into: &self)
   }
 
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: UInt) {
+  public mutating func combine(bits: UInt) {
     _core.append(bits)
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: UInt32) {
+  public mutating func combine(bits: UInt32) {
     _core.append(bits)
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: UInt64) {
+  public mutating func combine(bits: UInt64) {
     _core.append(bits)
   }
 
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: Int) {
+  public mutating func combine(bits: Int) {
     _core.append(UInt(bitPattern: bits))
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: Int32) {
+  public mutating func combine(bits: Int32) {
     _core.append(UInt32(bitPattern: bits))
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: Int64) {
+  public mutating func combine(bits: Int64) {
     _core.append(UInt64(bitPattern: bits))
   }
 
