@@ -544,7 +544,7 @@ PrintTests.test("Printable_Float") {
   // Every power of 10 should print with only a single digit '1'
   for power in -45 ... 38 {
     let s: String
-    if power < -4 || power > 5 { // Exponential form
+    if power < -4 || power > 7 { // Exponential form
       s = exponentialPowerOfTen(power)
     } else if power < 0 { // Fractional decimal form
       s = "0." + String(repeating: "0", count: -power - 1) + "1"
@@ -562,8 +562,14 @@ PrintTests.test("Printable_Float") {
     expectAccurateDescription(f.nextUp)
   }
 
-  // Check that the formatter chooses exponential
-  // format when it should:
+  // Float can represent all integers -(2^24)...(2^24)
+  let maxDecimalForm = Float(1 << 24)
+  expectDescription("16777216.0", maxDecimalForm)
+  expectDescription("-16777216.0", -maxDecimalForm)
+  // Outside of that range, use exponential form
+  expectDescription("1.6777218e+07", maxDecimalForm.nextUp)
+  expectDescription("-1.6777218e+07", -maxDecimalForm.nextUp)
+
   expectDescription("1.00001", asFloat32(1.00001))
   expectDescription("1.25e+17", asFloat32(125000000000000000.0))
   expectDescription("1.25e+16", asFloat32(12500000000000000.0))
@@ -575,8 +581,8 @@ PrintTests.test("Printable_Float") {
   expectDescription("1.25e+10", asFloat32(12500000000.0))
   expectDescription("1.25e+09", asFloat32(1250000000.0))
   expectDescription("1.25e+08", asFloat32(125000000.0))
-  expectDescription("1.25e+07", asFloat32(12500000.0))
-  expectDescription("1.25e+06", asFloat32(1250000.0))
+  expectDescription("12500000.0", asFloat32(12500000.0))
+  expectDescription("1250000.0", asFloat32(1250000.0))
   expectDescription("125000.0", asFloat32(125000.0))
   expectDescription("12500.0",  asFloat32(12500.0))
   expectDescription("1250.0",   asFloat32(1250.0))
@@ -660,7 +666,7 @@ PrintTests.test("Printable_Double") {
   // We know how every power of 10 should print
   for power in -323 ... 308 {
     let s: String
-    if power < -4 || power > 14 { // Exponential form
+    if power < -4 || power > 15 { // Exponential form
       s = exponentialPowerOfTen(power)
     } else if power < 0 { // Fractional decimal form
       s = "0." + String(repeating: "0", count: -power - 1) + "1"
@@ -687,12 +693,18 @@ PrintTests.test("Printable_Double") {
     }
   }
 
-  // Check that the formatter chooses exponential
-  // format when it should:
+  // Double can represent all integers -(2^53)...(2^53)
+  let maxDecimalForm = Double(1 << 53)
+  expectDescription("9007199254740992.0", maxDecimalForm)
+  expectDescription("-9007199254740992.0", -maxDecimalForm)
+  // Outside of that range, we use exponential form:
+  expectDescription("9.007199254740994e+15", maxDecimalForm.nextUp)
+  expectDescription("-9.007199254740994e+15", -maxDecimalForm.nextUp)
+
   expectDescription("1.00000000000001", asFloat64(1.00000000000001))
   expectDescription("1.25e+17", asFloat64(125000000000000000.0))
   expectDescription("1.25e+16", asFloat64(12500000000000000.0))
-  expectDescription("1.25e+15", asFloat64(1250000000000000.0))
+  expectDescription("1250000000000000.0", asFloat64(1250000000000000.0))
   expectDescription("125000000000000.0", asFloat64(125000000000000.0))
   expectDescription("12500000000000.0", asFloat64(12500000000000.0))
   expectDescription("1250000000000.0", asFloat64(1250000000000.0))
@@ -769,7 +781,7 @@ PrintTests.test("Printable_Float80") {
   // We know how every power of 10 should print
   for power in -4950 ... 4932 {
     let s: String
-    if power < -4 || power > 17 { // Exponential form
+    if power < -4 || power > 19 { // Exponential form
       s = exponentialPowerOfTen(power)
     } else if power < 0 { // Fractional decimal form
       s = "0." + String(repeating: "0", count: -power - 1) + "1"
@@ -794,11 +806,19 @@ PrintTests.test("Printable_Float80") {
     }
   }
 
-  // Check that the formatter chooses exponential
-  // format when it should:
+  // Float80 can represent all integers -(2^64)...(2^64):
+  let maxDecimalForm = Float80(UInt64.max) + 1.0
+  expectDescription("18446744073709551616.0", maxDecimalForm)
+  expectDescription("-18446744073709551616.0", -maxDecimalForm)
+  // Outside of that range, use exponential form
+  expectDescription("1.8446744073709551618e+19", maxDecimalForm.nextUp)
+  expectDescription("-1.8446744073709551618e+19", -maxDecimalForm.nextUp)
+
   expectDescription("1.00000000000000001", asFloat80(1.00000000000000001))
-  expectDescription("1.25e+19", asFloat80(12500000000000000000.0))
-  expectDescription("1.25e+18", asFloat80(1250000000000000000.0))
+  expectDescription("1.25e+21", asFloat80(1250000000000000000000.0))
+  expectDescription("1.25e+20", asFloat80(125000000000000000000.0))
+  expectDescription("12500000000000000000.0", asFloat80(12500000000000000000.0))
+  expectDescription("1250000000000000000.0", asFloat80(1250000000000000000.0))
   expectDescription("125000000000000000.0", asFloat80(125000000000000000.0))
   expectDescription("12500000000000000.0", asFloat80(12500000000000000.0))
   expectDescription("1250000000000000.0", asFloat80(1250000000000000.0))
