@@ -1832,10 +1832,6 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
     SILFunction *Func = entry.getMethodWitness().Witness;
     llvm::Constant *witness;
     if (Func) {
-      // Force the thunk to be emitted in the current translation unit
-      // when in multi-threaded mode.
-      IGM.IRGen.forceLocalEmitOfLazyFunction(Func);
-
       witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
     } else {
       // The method is removed by dead method elimination.
@@ -2044,6 +2040,21 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   IGF.Builder.CreateRetVoid();
 
   return fn;
+}
+
+void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
+  // Only resilient conformances use relative pointers for witness methods.
+  if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
+      !isResilientConformance(wt.getConformance()))
+    return;
+
+  for (auto &entry : wt.getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method)
+      continue;
+    auto *witness = entry.getMethodWitness().Witness;
+    if (witness)
+      IRGen.forceLocalEmitOfLazyFunction(witness);
+  }
 }
 
 /// Do a memoized witness-table layout for a protocol.
