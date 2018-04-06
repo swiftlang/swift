@@ -218,19 +218,21 @@ bool swift::immediate::IRGenImportedModules(
     AllLinkLibraries.push_back(linkLib);
   };
 
+  // Contains those libraries for which we have already collected
+  // autolink libraries.
+  llvm::DenseSet<ModuleDecl *> collectedLinkLibraries;
+
   M->forAllVisibleModules({}, /*includePrivateTopLevelImports=*/true,
                           [&](ModuleDecl::ImportedModule import) {
-    import.second->collectLinkLibraries(addLinkLibrary);
+    if (collectedLinkLibraries.insert(import.second).second)
+      import.second->collectLinkLibraries(addLinkLibrary);
   });
 
   // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::ModuleDecl *prev = nullptr;
   for (auto external : CI.getASTContext().ExternalDefinitions) {
-    swift::ModuleDecl *next = external->getModuleContext();
-    if (next == prev)
-      continue;
-    next->collectLinkLibraries(addLinkLibrary);
-    prev = next;
+    swift::ModuleDecl *module = external->getModuleContext();
+    if (collectedLinkLibraries.insert(module).second)
+      module->collectLinkLibraries(addLinkLibrary);
   }
 
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
