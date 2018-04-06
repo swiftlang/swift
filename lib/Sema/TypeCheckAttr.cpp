@@ -1959,13 +1959,14 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // FIXME: Once protocols can contain nominal types, do we want to allow
   // these nominal types to have access control (and also @usableFromInline)?
   if (isa<ProtocolDecl>(VD->getDeclContext())) {
-    diagnoseAndRemoveAttr(attr, diag::versioned_attr_in_protocol);
+    diagnoseAndRemoveAttr(attr, diag::usable_from_inline_attr_in_protocol);
     return;
   }
 
   // @usableFromInline can only be applied to internal declarations.
   if (VD->getFormalAccess() != AccessLevel::Internal) {
-    diagnoseAndRemoveAttr(attr, diag::versioned_attr_with_explicit_access,
+    diagnoseAndRemoveAttr(attr,
+                          diag::usable_from_inline_attr_with_explicit_access,
                           VD->getFullName(),
                           VD->getFormalAccess());
     return;
@@ -1974,7 +1975,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
   // Symbols of dynamically-dispatched declarations are never referenced
   // directly, so marking them as @usableFromInline does not make sense.
   if (VD->isDynamic()) {
-    diagnoseAndRemoveAttr(attr, diag::versioned_dynamic_not_supported);
+    diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
     return;
   }
 }

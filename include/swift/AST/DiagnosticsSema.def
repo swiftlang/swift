@@ -3736,15 +3736,15 @@ ERROR(fixed_layout_attr_on_internal_type,
       "%select{private|fileprivate|internal|%error|%error}1",
       (DeclName, AccessLevel))
 
-ERROR(versioned_attr_with_explicit_access,
+ERROR(usable_from_inline_attr_with_explicit_access,
       none, "'@usableFromInline' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
       (DeclName, AccessLevel))
 
-ERROR(versioned_attr_in_protocol,none,
+ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
 
-ERROR(versioned_dynamic_not_supported,none,
+ERROR(usable_from_inline_dynamic_not_supported,none,
       "'@usableFromInline' attribute cannot be applied to 'dynamic' declarations", ())
 
 #define FRAGILE_FUNC_KIND \
