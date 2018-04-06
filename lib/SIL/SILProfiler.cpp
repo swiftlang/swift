@@ -99,19 +99,21 @@ static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
   }
 }
 
+/// Check that the input AST has at least been type-checked.
+static bool hasASTBeenTypeChecked(ASTNode N) {
+  DeclContext *DC = N.getAsDeclContext();
+  assert(DC && "Invalid AST node for profiling");
+  SourceFile *SF = DC->getParentSourceFile();
+  return !SF || SF->ASTStage >= SourceFile::TypeChecked;
+}
+
 SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
                                  ASTNode N) {
   // Avoid generating profiling state for declarations.
   if (!forDefinition)
     return nullptr;
 
-  // Assert that the input AST has at least been type-checked.
-  assert([&] {
-    DeclContext *DC = N.getAsDeclContext();
-    assert(DC && "Invalid AST node for profiling");
-    SourceFile *SF = DC->getParentSourceFile();
-    return !SF || SF->ASTStage >= SourceFile::TypeChecked;
-  }() && "Cannot use this AST for code coverage");
+  assert(hasASTBeenTypeChecked(N) && "Cannot use this AST for code coverage");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
     assert(isa<AbstractFunctionDecl>(D) ||
