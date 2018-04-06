@@ -115,20 +115,23 @@ extension Unicode.Scalar {
     var utf16 = _utf16CodeUnits
     var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
     let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
-      return withUnsafePointer(to: &utf16.0) { utf16Pointer in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = u_strTo(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(bufPtr.count),
-          utf16Pointer,
-          Int32(utf16Length),
-          "",
-          &err)
-        guard err.isSuccess ||
-              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-          fatalError("Unexpected error case-converting Unicode scalar.")
+      return withUnsafePointer(to: &utf16) { tuplePtr in
+        return tuplePtr.withMemoryRebound(to: UInt16.self, capacity: 2) {
+          utf16Pointer in
+          var err = __swift_stdlib_U_ZERO_ERROR
+          let correctSize = u_strTo(
+            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(bufPtr.count),
+            utf16Pointer,
+            Int32(utf16Length),
+            "",
+            &err)
+          guard err.isSuccess ||
+                err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
+            fatalError("Unexpected error case-converting Unicode scalar.")
+          }
+          return Int(correctSize)
         }
-        return Int(correctSize)
       }
     }
     if _fastPath(count <= scratchBuffer.count) {
@@ -137,19 +140,22 @@ extension Unicode.Scalar {
     }
     var array = Array<UInt16>(repeating: 0, count: count)
     array.withUnsafeMutableBufferPointer { bufPtr in
-      withUnsafePointer(to: &utf16.0) { utf16Pointer in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = u_strTo(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(bufPtr.count),
-          utf16Pointer,
-          Int32(utf16Length),
-          "",
-          &err)
-        guard err.isSuccess else {
-          fatalError("Unexpected error case-converting Unicode scalar.")
+      withUnsafePointer(to: &utf16) { tuplePtr in
+        tuplePtr.withMemoryRebound(to: UInt16.self, capacity: 2) {
+          utf16Pointer in
+          var err = __swift_stdlib_U_ZERO_ERROR
+          let correctSize = u_strTo(
+            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+            Int32(bufPtr.count),
+            utf16Pointer,
+            Int32(utf16Length),
+            "",
+            &err)
+          guard err.isSuccess else {
+            fatalError("Unexpected error case-converting Unicode scalar.")
+          }
+          _sanityCheck(count == correctSize, "inconsistent ICU behavior")
         }
-        _sanityCheck(count == correctSize, "inconsistent ICU behavior")
       }
     }
     return String._fromWellFormedUTF16CodeUnits(array[..<count])
@@ -796,11 +802,14 @@ extension Unicode.Scalar.Properties {
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
   public var age: Unicode.Version? {
     var versionInfo: __swift_stdlib_UVersionInfo = (0, 0, 0, 0)
-    withUnsafeMutablePointer(to: &versionInfo.0) { versionInfoPointer in
-      __swift_stdlib_u_charAge(_value, versionInfoPointer)
+    withUnsafeMutablePointer(to: &versionInfo) { tuplePtr in
+      tuplePtr.withMemoryRebound(to: UInt8.self, capacity: 4) {
+        versionInfoPtr in
+        __swift_stdlib_u_charAge(_value, versionInfoPtr)
+      }
     }
     guard versionInfo.0 != 0 else { return nil }
-    return (major: Int(versionInfo.0), Int(versionInfo.1))
+    return (major: Int(versionInfo.0), minor: Int(versionInfo.1))
   }
 }
 
