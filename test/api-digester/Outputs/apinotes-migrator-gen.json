@@ -46,6 +46,50 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "AnimalAttributeName",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "OptionalDictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "AnimalAttributeName",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "AnimalAttributeName",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "OptionalDictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "AnimalAttributeName",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "GetterToProperty",
     "ChildIndex": "0",
     "LeftUsr": "c:objc(pl)TypeWithMethod(im)getPropertyA",

@@ -75,6 +75,7 @@ NODE_ANNOTATION(NowMutating)
 NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
 NODE_ANNOTATION(DictionaryKeyUpdate)
+NODE_ANNOTATION(OptionalDictionaryKeyUpdate)
 
 DECL_ATTR(deprecated)
 DECL_ATTR(fixedLayout)
