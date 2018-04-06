@@ -19,6 +19,7 @@
 #include "ConstraintSystem.h"
 #include "GenericTypeResolver.h"
 #include "TypeChecker.h"
+#include "TypoCorrection.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -448,12 +449,6 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     // one, but we should also try to propagate labels into this.
     DeclNameLoc nameLoc = UDRE->getNameLoc();
 
-    performTypoCorrection(DC, UDRE->getRefKind(), Type(), Name, Loc,
-                          lookupOptions, Lookup);
-
-    diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
-      .highlight(UDRE->getSourceRange());
-
     Identifier simpleName = Name.getBaseIdentifier();
     const char *buffer = simpleName.get();
     llvm::SmallString<64> expectedIdentifier;
@@ -477,16 +472,34 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       offset += length;
     }
 
-    if (isConfused) {
+    auto emitBasicError = [&] {
+      diagnose(Loc, diag::use_unresolved_identifier, Name, Name.isOperator())
+        .highlight(UDRE->getSourceRange());
+    };
+
+    bool claimed = false;
+    if (!isConfused) {
+      TypoCorrectionResults corrections(*this, Name, nameLoc);
+      performTypoCorrection(DC, UDRE->getRefKind(), Type(),
+                            lookupOptions, corrections);
+
+      if (auto typo = corrections.claimUniqueCorrection()) {
+        auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
+                             Name, Name.isOperator(), typo->CorrectedName);
+        diag.highlight(UDRE->getSourceRange());
+        typo->addFixits(diag);
+      } else {
+        emitBasicError();
+      }
+
+      corrections.noteAllCandidates();
+    } else {
+      emitBasicError();
+
       diagnose(Loc, diag::confusable_character,
                UDRE->getName().isOperator(), simpleName.str(),
                expectedIdentifier)
         .fixItReplace(Loc, expectedIdentifier);
-    } else {
-      // Note all the correction candidates.
-      for (auto &result : Lookup) {
-        noteTypoCorrection(Name, nameLoc, result.getValueDecl());
-      }
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress

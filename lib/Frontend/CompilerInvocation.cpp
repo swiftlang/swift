@@ -920,12 +920,11 @@ static std::string getScriptFileName(StringRef name, bool isSwiftVersion3) {
   return (Twine(name) + langVer + ".json").str();
 }
 
-bool ParseMigratorArgs(MigratorOptions &Opts,
-                       const FrontendOptions &FrontendOpts,
-                       const llvm::Triple &Triple,
-                       const bool isSwiftVersion3,
-                       StringRef ResourcePath, const ArgList &Args,
-                       DiagnosticEngine &Diags) {
+static bool ParseMigratorArgs(MigratorOptions &Opts,
+                              LangOptions &LangOpts,
+                              const FrontendOptions &FrontendOpts,
+                              StringRef ResourcePath, const ArgList &Args,
+                              DiagnosticEngine &Diags) {
   using namespace options;
 
   Opts.KeepObjcVisibility |= Args.hasArg(OPT_migrate_keep_objc_visibility);
@@ -950,9 +949,13 @@ bool ParseMigratorArgs(MigratorOptions &Opts,
   if (auto DataPath = Args.getLastArg(OPT_api_diff_data_file)) {
     Opts.APIDigesterDataStorePaths.push_back(DataPath->getValue());
   } else {
+    auto &Triple = LangOpts.Target;
+    bool isSwiftVersion3 = LangOpts.isSwiftVersion3();
+
     bool Supported = true;
     llvm::SmallString<128> dataPath(ResourcePath);
     llvm::sys::path::append(dataPath, "migrator");
+
     if (Triple.isMacOSX())
       llvm::sys::path::append(dataPath,
                               getScriptFileName("macos", isSwiftVersion3));
@@ -991,6 +994,9 @@ bool ParseMigratorArgs(MigratorOptions &Opts,
     // supplementary output for the whole compilation instead of one per input,
     // so it's probably not worth it.
     FrontendOpts.InputsAndOutputs.assertMustNotBeMoreThanOnePrimaryInput();
+
+    // Always disable typo-correction in the migrator.
+    LangOpts.TypoCorrectionLimit = 0;
   }
 
   return false;
@@ -1061,8 +1067,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseMigratorArgs(MigratorOpts, FrontendOpts, LangOpts.Target,
-                        LangOpts.isSwiftVersion3(),
+  if (ParseMigratorArgs(MigratorOpts, LangOpts, FrontendOpts,
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }

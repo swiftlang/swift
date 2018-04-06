@@ -316,8 +316,8 @@ func enumElementSyntaxOnTuple() {
 
 // sr-176
 enum Whatever { case Thing }
-func f0(values: [Whatever]) { // expected-note {{did you mean 'values'?}}
-    switch value { // expected-error {{use of unresolved identifier 'value'}}
+func f0(values: [Whatever]) { // expected-note {{'values' declared here}}
+    switch value { // expected-error {{use of unresolved identifier 'value'; did you mean 'values'?}}
     case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
         break
     }

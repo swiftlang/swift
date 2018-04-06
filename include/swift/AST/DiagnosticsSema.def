@@ -42,6 +42,8 @@ NOTE(type_declared_here,none,
      "type declared here", ())
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
+NOTE(implicit_member_declared_here,none,
+     "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
@@ -64,8 +66,14 @@ ERROR(could_not_find_tuple_member,none,
 
 ERROR(could_not_find_value_member,none,
       "value of type %0 has no member %1", (Type, DeclName))
+ERROR(could_not_find_value_member_corrected,none,
+      "value of type %0 has no member %1; did you mean %2?",
+      (Type, DeclName, DeclName))
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
+ERROR(could_not_find_type_member_corrected,none,
+      "type %0 has no member %1; did you mean %2?",
+      (Type, DeclName, DeclName))
 
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2", (Type, DeclName, DeclName))
@@ -654,6 +662,9 @@ ERROR(unspaced_unary_operator,none,
 
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
+ERROR(use_unresolved_identifier_corrected,none,
+      "use of unresolved %select{identifier|operator}1 %0; did you mean %2?",
+      (DeclName, bool, DeclName))
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
