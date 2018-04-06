@@ -20,14 +20,9 @@ using namespace swift;
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILLinking(SILModule *M, bool LinkAll) {
-  auto LinkMode = LinkAll? SILModule::LinkingMode::LinkAll :
-    SILModule::LinkingMode::LinkNormal;
+void swift::performSILLinking(SILModule *M) {
   for (auto &Fn : *M)
-    M->linkFunction(&Fn, LinkMode);
-
-  if (!LinkAll)
-    return;
+    M->linkFunction(&Fn, SILModule::LinkingMode::LinkAll);
 
   M->linkAllWitnessTables();
   M->linkAllVTables();

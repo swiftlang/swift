@@ -984,7 +984,7 @@ static bool performCompile(CompilerInstance &Instance,
 static void linkAllIfNeeded(const CompilerInvocation &Invocation,
                             SILModule *SM) {
   if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-    performSILLinking(SM, true);
+    performSILLinking(SM);
 }
 
 /// Perform "stable" optimizations that are invariant across compiler versions.

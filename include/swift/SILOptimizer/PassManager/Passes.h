@@ -59,8 +59,7 @@ namespace swift {
   /// serialized modules.
   ///
   /// \param M the SILModule on which to operate
-  /// \param LinkAll when true, always link. For testing purposes.
-  void performSILLinking(SILModule *M, bool LinkAll = false);
+  void performSILLinking(SILModule *M);
 
   /// \brief Convert SIL to a lowered form suitable for IRGen.
   void runSILLoweringPasses(SILModule &M);
