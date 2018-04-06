@@ -1081,8 +1081,8 @@ class InstructionBaseWithTrailingOperands
 protected:
   friend llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
 
-  typedef llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>
-      TrailingObjects;
+  using TrailingObjects =
+      llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
 
   using TrailingObjects::totalSizeToAlloc;
 
@@ -1158,8 +1158,9 @@ protected:
   friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
                                              OtherTrailingTypes...>;
 
-  typedef InstructionBaseWithTrailingOperands<
-      Kind, Derived, Operand, OtherTrailingTypes...> TrailingObjects;
+  using TrailingObjects =
+      InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                          OtherTrailingTypes...>;
 
 public:
   template <typename... Args>
