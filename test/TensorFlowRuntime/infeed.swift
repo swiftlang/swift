@@ -40,7 +40,7 @@ InfeedTests.testTPU("JustDataset") {
     batchSize: 1,
     outputShapes: [TensorShape()])
   // 1 is the magic output currently hard-coded.
-  expectEqual(result.array.scalars[0], 42.0)
+  expectEqual(42.0, result.array.scalars[0])
 }
 
 InfeedTests.testTPU("DatasetWithOtherNodes") {
@@ -54,7 +54,7 @@ InfeedTests.testTPU("DatasetWithOtherNodes") {
     batchSize: 1,
     outputShapes: [TensorShape()])
   let result = x + 1
-  expectEqual(result.array.scalars[0], 43.0)
+  expectEqual(43.0, result.array.scalars[0])
 }
 
 InfeedTests.testTPU("DatasetWithMnist") {

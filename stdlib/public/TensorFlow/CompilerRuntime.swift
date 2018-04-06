@@ -181,6 +181,22 @@ private func configureRuntimeFromEnvironment() {
   }
 }
 
+/// Initialize the TPU system.
+/// - Note: This should be called only once.
+/// - Precondition: The given session must contain the given graph.
+// TODO(b/77572335): Reassess how to reset TPU after execution error.
+private func initializeTPU(withSession session: CTFSession, graph: CTFGraph,
+                           status: CTFStatus) {
+  let configOp = TF_GraphOperationByName(graph, "ConfigureDistributedTPU")
+  internalConsistencyCheck(configOp != nil)
+  var configNode = TF_Output(oper: configOp, index: 0)
+  var dummyOutput: CTensor?
+  TF_SessionRun(session, nil, nil, nil, 0, &configNode, &dummyOutput, 1, nil,
+                0, nil, status)
+  checkOk(status)
+  TF_DeleteTensor(dummyOutput)
+}
+
 /// The host of any tensor computation.
 @_fixed_layout
 public final class _ExecutionContext {
@@ -200,8 +216,10 @@ public final class _ExecutionContext {
   /// The set of all loaded programs indexed by their unique address.
   /// Used when _RuntimeConfig.usesTFEagerAPI is true.
   private var loadedTFEPrograms: Set<UnsafeRawPointer> = []
+
   /// Used when _RuntimeConfig.usesTFEagerAPI is false.
-  private var loadedTFPrograms: [UnsafeRawPointer : CTFGraph] = [:]
+  internal typealias ProgramInstance = (graph: CTFGraph, session: CTFSession)
+  private var loadedTFPrograms: [UnsafeRawPointer : ProgramInstance] = [:]
 
   /// The status for checking TensorFlow errors.
   private let status: CTFStatus = TF_NewStatus()
@@ -269,32 +287,16 @@ public final class _ExecutionContext {
 
   deinit {
     debugLog("De-initializing global context.")
-
-    for (_, graph) in loadedTFPrograms {
+    // Delete all loaded programs.
+    for (graph, session) in loadedTFPrograms.values {
+      TF_DeleteSession(session, status)
+      checkOk(status)
       TF_DeleteGraph(graph)
     }
     TFE_DeleteContext(cContext, status)
     checkOk(status)
     TF_DeleteStatus(status)
     pthread_mutex_destroy(&mutex)
-  }
-}
-
-public extension _ExecutionContext {
-  /// Remove all cached TensorFlow programs.
-  /// - FIXME: This is temporarily added so that runtime tests can pass while
-  ///   still using the old protobufs with "the_function" as the name of the
-  ///   entry function.
-  func reset() {
-    sync { [unowned self] in
-      // Delete the current context and create a new context.
-      TFE_DeleteContext(self.cContext, self.status)
-      checkOk(self.status)
-      let opts = TFE_NewContextOptions()
-      self.cContext = TFE_NewContext(opts, self.status)
-      TFE_DeleteContextOptions(opts)
-      checkOk(self.status)
-    }
   }
 }
 
@@ -380,51 +382,60 @@ fileprivate extension _ExecutionContext {
     }
   }
 
-  /// Load a serialized TensorFlow program in binary proto format, and return
-  /// the resulting TF_Graph. If the program has already been loaded, return the
-  /// memoized copy.
-  /// - Parameters:
-  ///   - address: The address of the serialized program in memory.
-  ///   - count: The size of the program in bytes.
-  func loadGraphInBytes(_ address: UnsafeRawPointer, count: Int) -> CTFGraph {
-    // NOTE: Code is intentionally duplicated with the above version of
-    // `loadGraphInBytes`, as the above one is expected to go away soon (due to
-    // challenges in XLA support). *Please do not refactor for Swiftiness*.
-    debugLog("Loading a program.")
-
-    // If the program is already loaded, do nothing.
-    var graph: CTFGraph?
-    sync { [unowned self] in
-      graph = self.loadedTFPrograms[address]
-    }
-    if let graph = graph {
-      debugLog("Already loaded before.")
-      return graph
-    }
-
-    // Load the program as a TF_Graph
-    debugLog("Loading graph functions.")
-    graph = TF_NewGraph()
-    // TensorFlow loads things through TF_Buffer.  Create one that avoids
-    // redundantly copying the program bytes.
-    var programBuf = TF_Buffer(data: address, length: count,
-      data_deallocator: nil)
-    let graphDefOptions = TF_NewImportGraphDefOptions()
-    TF_GraphImportGraphDef(graph, &programBuf, graphDefOptions, self.status)
-    TF_DeleteImportGraphDefOptions(graphDefOptions)
-    checkOk(self.status)
-
-    // Memorize the loaded program by address.
-    sync {
-      // In TPU mode, the graph will be rewritten before each execution, so do
-      // not use the cache in that case.
-      if case .tpu = _RuntimeConfig.executionMode {
-      } else {
-        loadedTFPrograms[address] = graph
+  /// Returns a cached session along with its graph if it exists, or creates a
+  /// new one and caches it.
+  func session(
+    forProgram programByteAddress: UnsafeRawPointer,
+    programByteCount: Int
+  ) -> ProgramInstance {
+    return sync {
+      // If a program instance for this program is already cached, use that.
+      if let instance = loadedTFPrograms[programByteAddress] {
+        return instance
       }
+
+      // Otherwise, load the graph, create a session, and cache them.
+      debugLog("Loading a tensor program as a TF graph.")
+      let newGraph = TF_NewGraph()!
+      // TensorFlow loads things through TF_Buffer.  Create one that avoids
+      // redundantly copying the program bytes.
+      var programBuf = TF_Buffer(data: programByteAddress,
+                                 length: programByteCount,
+                                 data_deallocator: nil)
+      let graphDefOptions = TF_NewImportGraphDefOptions()
+      TF_GraphImportGraphDef(newGraph, &programBuf, graphDefOptions, status)
+      TF_DeleteImportGraphDefOptions(graphDefOptions)
+      checkOk(status)
+      debugLog("Done loading a new program.")
+
+      // Prepare session options for initializing a session.
+      let sessionOptions = TF_NewSessionOptions()
+      // If needed, enable XLA compilation in session options.
+      if _RuntimeConfig.executionMode == .xla {
+        debugLog("Enable XLA execution.")
+        TF_EnableXLACompilation(sessionOptions, 1)
+      }
+      // If needed, enable remote execution in session options.
+      if case .remote(let grpcAddress) = _RuntimeConfig.session {
+        debugLog("Set TensorFlow server to \(grpcAddress).")
+        TF_SetTarget(sessionOptions, grpcAddress)
+      }
+      // Create a new session using the session options above.
+      let maybeNewSession = TF_NewSession(newGraph, sessionOptions, status)
+      checkOk(status)
+      let newSession = maybeNewSession!
+      TF_DeleteSessionOptions(sessionOptions)
+      // If this is the first session in TPU mode, make sure TPU is
+      // reset/initialized.
+      if loadedTFPrograms.isEmpty, _RuntimeConfig.executionMode.isTPU {
+        initializeTPU(withSession: newSession, graph: newGraph, status: status)
+      }
+
+      // Cache the session.
+      let newInstance = (graph: newGraph, session: newSession)
+      loadedTFPrograms[programByteAddress] = newInstance
+      return newInstance
     }
-    debugLog("Done loading a new program.")
-    return graph!
   }
 }
 
@@ -482,28 +493,13 @@ private class TFState {
   /// The input tensors.
   var inputTensors: [CTensor?] = []
 
-  init(_ programByteAddress: UnsafeRawPointer,
-       programByteCount: Int) {
-    // Make sure the program is loaded to the context.
-    graph = _ExecutionContext.global.loadGraphInBytes(programByteAddress,
-                                                      count: programByteCount)
-    let opts = TF_NewSessionOptions()
-    if _RuntimeConfig.executionMode == .xla {
-      debugLog("Enable XLA execution.")
-      TF_EnableXLACompilation(opts, 1)
-    }
-    if case .remote(let grpcAddress) = _RuntimeConfig.session {
-      debugLog("Set TensorFlow server to \(grpcAddress).")
-      TF_SetTarget(opts, grpcAddress)
-    }
-    cSession = TF_NewSession(graph, opts, status)
-    checkOk(status)
-    TF_DeleteSessionOptions(opts)
+  init(_ programByteAddress: UnsafeRawPointer, programByteCount: Int) {
+    let context = _ExecutionContext.global
+    (graph, cSession) = context.session(forProgram: programByteAddress,
+                                        programByteCount: programByteCount)
   }
 
   deinit {
-    TF_DeleteSession(cSession, status)
-    checkOk(status)
     TF_DeleteStatus(status)
   }
 }
@@ -553,14 +549,11 @@ extension TFState {
       debugLog("Calling TF_SessionRun on function \(entryFuncName).")
       if _RuntimeConfig.executionMode.isTPU {
         debugLog("Enable TPU execution.")
-        debugLog("Rewriting graph and initializing TPU.")
-        TF_InitializeTPU(cSession, status)
-        checkOk(status)
         // When infeed is enabled, run it along with the output tensor nodes
         // below.
         var infeedEnqueueNode = TF_GraphOperationByName(graph,
                                                         "InfeedEnqueueTuple")
-        let numTargets: Int32 = infeedEnqueueNode == nil ? 0 : 1;
+        let numTargets: Int32 = infeedEnqueueNode == nil ? 0 : 1
         if numTargets > 0 {
           debugLog("Running enqueue with \(inputTensors.count) input tensors.")
         }
@@ -574,10 +567,6 @@ extension TFState {
           /*targets*/&infeedEnqueueNode, numTargets,
           /*run_metadata*/nil, status
         )
-        checkOk(status)
-
-        debugLog("Shutting down TPU.")
-        TF_ShutdownTPU(cSession, status)
         checkOk(status)
       } else {
         TF_SessionRun(
@@ -690,7 +679,7 @@ public final class _TensorComputation {
     debugLog("""
       Creating a new op with func name \
       \(String(cString: entryFunctionNameAddress)).
-      """);
+      """)
     if _RuntimeConfig.usesTFEagerAPI {
       self.stateTFE = TFEState(programByteAddress,
         programByteCount: programByteCount,

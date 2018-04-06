@@ -1769,15 +1769,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
     auto *desc = TF_NewOperation(resultGraph, "ConfigureDistributedTPU",
                                  "ConfigureDistributedTPU");
     TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
-    TF_FinishOperation(desc, status);
-    if (checkStatus(SILFn.getLocation()))
-      return true;
-  }
-
-  {
-    auto *desc = TF_NewOperation(resultGraph, "ShutdownDistributedTPU",
-                                 "ShutdownDistributedTPU");
-    TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
+    TF_SetAttrBool(desc, "is_global_init", true);
     TF_FinishOperation(desc, status);
     if (checkStatus(SILFn.getLocation()))
       return true;
