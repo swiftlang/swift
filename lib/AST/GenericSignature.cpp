@@ -271,7 +271,7 @@ GenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
     auto prevProto =
       prevReqt.getSecondType()->castTo<ProtocolType>()->getDecl();
     auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-    assert(ProtocolType::compareProtocols(&prevProto, &proto) < 0 &&
+    assert(TypeDecl::compare(prevProto, proto) < 0 &&
            "Out-of-order conformance requirements");
   }
 #endif

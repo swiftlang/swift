@@ -1110,7 +1110,7 @@ int ConformanceLookupTable::compareProtocolConformances(
   // Otherwise, sort by protocol.
   ProtocolDecl *lhsProto = lhs->getProtocol();
   ProtocolDecl *rhsProto = rhs->getProtocol();
-  return ProtocolType::compareProtocols(&lhsProto, &rhsProto);
+  return TypeDecl::compare(lhsProto, rhsProto);
 }
 
 void ConformanceLookupTable::getAllConformances(
