@@ -499,6 +499,52 @@ func sr6744() {
     _ = get(for: \.value)
 }
 
+struct VisibilityTesting {
+  private(set) var x: Int
+  fileprivate(set) var y: Int
+  let z: Int
+
+  // Key path exprs should not get special dispensation to write to lets
+  // in init contexts
+  init() {
+    var xRef = \VisibilityTesting.x
+    var yRef = \VisibilityTesting.y
+    var zRef = \VisibilityTesting.z
+    expect(&xRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&yRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&zRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+  }
+
+  func inPrivateContext() {
+    var xRef = \VisibilityTesting.x
+    var yRef = \VisibilityTesting.y
+    var zRef = \VisibilityTesting.z
+    expect(&xRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&yRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&zRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+  }
+}
+
+struct VisibilityTesting2 {
+  func inFilePrivateContext() {
+    var xRef = \VisibilityTesting.x
+    var yRef = \VisibilityTesting.y
+    var zRef = \VisibilityTesting.z
+    expect(&xRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+    expect(&yRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&zRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+  }
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;
