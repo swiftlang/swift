@@ -27,6 +27,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
@@ -218,21 +219,15 @@ bool swift::immediate::IRGenImportedModules(
     AllLinkLibraries.push_back(linkLib);
   };
 
-  // Contains those libraries for which we have already collected
-  // autolink libraries.
-  llvm::DenseSet<ModuleDecl *> collectedLinkLibraries;
-
   M->forAllVisibleModules({}, /*includePrivateTopLevelImports=*/true,
                           [&](ModuleDecl::ImportedModule import) {
-    if (collectedLinkLibraries.insert(import.second).second)
-      import.second->collectLinkLibraries(addLinkLibrary);
+    import.second->collectLinkLibraries(addLinkLibrary);
   });
 
   // Hack to handle thunks eagerly synthesized by the Clang importer.
-  for (auto external : CI.getASTContext().ExternalDefinitions) {
-    swift::ModuleDecl *module = external->getModuleContext();
-    if (collectedLinkLibraries.insert(module).second)
-      module->collectLinkLibraries(addLinkLibrary);
+  for (const auto &linkLib :
+          irgen::collectLinkLibrariesFromExternals(CI.getASTContext())) {
+    addLinkLibrary(linkLib);
   }
 
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,

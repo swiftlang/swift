@@ -792,20 +792,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     });
 
     // Hack to handle thunks eagerly synthesized by the Clang importer.
-    swift::ModuleDecl *prev = nullptr;
-    for (auto external : Ctx.ExternalDefinitions) {
-      swift::ModuleDecl *next = external->getModuleContext();
-      if (next == prev)
-        continue;
-      prev = next;
-
-      if (next->getName() == M->getName())
-        continue;
-
-      next->collectLinkLibraries([&](LinkLibrary linkLib) {
-        IGM.addLinkLibrary(linkLib);
-      });
-    }
+    for (const auto &linkLib : collectLinkLibrariesFromExternals(Ctx))
+      IGM.addLinkLibrary(linkLib);
 
     if (!IGM.finalize())
       return nullptr;
@@ -977,21 +965,9 @@ static void performParallelIRGeneration(
                 });
   
   // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::ModuleDecl *prev = nullptr;
-  for (auto external : Ctx.ExternalDefinitions) {
-    swift::ModuleDecl *next = external->getModuleContext();
-    if (next == prev)
-      continue;
-    prev = next;
-    
-    if (next->getName() == M->getName())
-      continue;
-    
-    next->collectLinkLibraries([&](LinkLibrary linkLib) {
-      PrimaryGM->addLinkLibrary(linkLib);
-    });
-  }
-  
+  for (const auto &linkLib : collectLinkLibrariesFromExternals(Ctx))
+    PrimaryGM->addLinkLibrary(linkLib);
+
   llvm::StringSet<> referencedGlobals;
 
   for (auto it = irgen.begin(); it != irgen.end(); ++it) {
@@ -1171,4 +1147,21 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                     OutputFilename, Stats))
     return true;
   return false;
+}
+
+SmallVector<LinkLibrary, 4> irgen::collectLinkLibrariesFromExternals(
+                                                           ASTContext &ctx) {
+  SmallVector<LinkLibrary, 4> result;
+  auto addLinkLibrary = [&](LinkLibrary linkLib) {
+    result.push_back(linkLib);
+  };
+
+  llvm::SmallPtrSet<ModuleDecl *, 8> known;
+  for (auto external : ctx.ExternalDefinitions) {
+    swift::ModuleDecl *module = external->getModuleContext();
+    if (known.insert(module).second)
+      module->collectLinkLibraries(addLinkLibrary);
+  }
+
+  return result;
 }
