@@ -2804,13 +2804,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
-                # Handle test subdirectory clause
+                # Optionally specify a test subdirectory and category filters.
+                # Watchpoint testing is currently disabled: see rdar://38566150.
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
-                    LLDB_TEST_CATEGORIES="--skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
+                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
                 else
                     LLDB_TEST_SUBDIR_CLAUSE=""
-                    LLDB_TEST_CATEGORIES=""
+                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
                 fi
 
                 # figure out which C/C++ compiler we should use for building test inferiors.
