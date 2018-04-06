@@ -134,7 +134,7 @@ struct ASTContext::Implementation {
   /// The AnyObject type.
   CanType AnyObjectType;
 
-#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+#define KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownStdlibTypes.def"
@@ -188,12 +188,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _combineHashValues(Int, Int) -> Int
-  FuncDecl *CombineHashValuesDecl = nullptr;
+  /// func _hashValue<H: Hashable>(for: H) -> Int
+  FuncDecl *HashValueForDecl = nullptr;
 
-  /// func _mixInt(Int) -> Int
-  FuncDecl *MixIntDecl = nullptr;
-  
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -616,11 +613,11 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
   return Impl.PlusFunctionOnString;
 }
 
-#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+#define KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS) \
   DECL_CLASS *ASTContext::get##NAME##Decl() const { \
     if (!Impl.NAME##Decl) \
       Impl.NAME##Decl = dyn_cast_or_null<DECL_CLASS>( \
-        findStdlibType(*this, #NAME, NUM_GENERIC_PARAMS)); \
+        findStdlibType(*this, IDSTR, NUM_GENERIC_PARAMS)); \
     return Impl.NAME##Decl; \
   }
 #include "swift/AST/KnownStdlibTypes.def"
@@ -989,44 +986,29 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getCombineHashValuesDecl() const {
-  if (Impl.CombineHashValuesDecl)
-    return Impl.CombineHashValuesDecl;
+FuncDecl *ASTContext::getHashValueForDecl() const {
+  if (Impl.HashValueForDecl)
+    return Impl.HashValueForDecl;
 
-  auto resolver = getLazyResolver();
-  auto intType = getIntDecl()->getDeclaredType();
-
-  auto callback = [&](Type inputType, Type resultType) {
-    // Look for the signature (Int, Int) -> Int
-    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
-    assert(tupleType);
-    return tupleType->getNumElements() == 2 &&
-        tupleType->getElementType(0)->isEqual(intType) &&
-        tupleType->getElementType(1)->isEqual(intType) &&
-        resultType->isEqual(intType);
-  };
-
-  auto decl = lookupLibraryIntrinsicFunc(
-      *this, "_combineHashValues", resolver, callback);
-  Impl.CombineHashValuesDecl = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getMixIntDecl() const {
-  if (Impl.MixIntDecl)
-    return Impl.MixIntDecl;
-
-  auto resolver = getLazyResolver();
-  auto intType = getIntDecl()->getDeclaredType();
-
-  auto callback = [&](Type inputType, Type resultType) {
-    // Look for the signature (Int) -> Int
-    return inputType->isEqual(intType) && resultType->isEqual(intType);
-  };
-
-  auto decl = lookupLibraryIntrinsicFunc(*this, "_mixInt", resolver, callback);
-  Impl.MixIntDecl = decl;
-  return decl;
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("_hashValue", results);
+  for (auto result : results) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    auto paramLists = fd->getParameterLists();
+    if (paramLists.size() != 1 || paramLists[0]->size() != 1)
+      continue;
+    auto paramDecl = paramLists[0]->get(0);
+    if (paramDecl->getArgumentName() != Id_for)
+      continue;
+    auto genericParams = fd->getGenericParams();
+    if (!genericParams || genericParams->size() != 1)
+      continue;
+    Impl.HashValueForDecl = fd;
+    return fd;
+  }
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getArrayAppendElementDecl() const {

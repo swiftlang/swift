@@ -110,21 +110,17 @@ public protocol Hashable : Equatable {
   var hashValue: Int { get }
 
   /// Feed bits to be hashed into the hash function represented by `hasher`.
-  func _hash(into hasher: inout _Hasher)
-}
-
-extension Hashable {
-  @inline(__always)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(self.hashValue)
-  }
+  ///
+  /// If this requirement is not explicitly implemented, the compiler
+  /// automatically synthesizes an implementation for it.
+  func hash(into hasher: inout Hasher)
 }
 
 // Called by synthesized `hashValue` implementations.
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
-  var hasher = _Hasher()
-  hasher.append(value)
+  var hasher = Hasher()
+  hasher.combine(value)
   return hasher.finalize()
 }
 

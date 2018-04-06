@@ -400,8 +400,8 @@ public:
   ProtocolDecl *getErrorDecl() const;
   CanType getExceptionType() const;
   
-#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
-  /** Retrieve the declaration of Swift.NAME. */ \
+#define KNOWN_STDLIB_TYPE_DECL_WITH_NAME(NAME, IDSTR, DECL_CLASS, NUM_GENERIC_PARAMS) \
+  /** Retrieve the declaration of Swift.IDSTR. */ \
   DECL_CLASS *get##NAME##Decl() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
@@ -471,12 +471,8 @@ public:
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
 
-  /// Retrieve the declaration of
-  /// Swift._combineHashValues(Int, Int) -> Int.
-  FuncDecl *getCombineHashValuesDecl() const;
-
-  /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
-  FuncDecl *getMixIntDecl() const;
+  /// Retrieve the declaration of Swift._hashValue<H>(for: H) -> Int.
+  FuncDecl *getHashValueForDecl() const;
 
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;

@@ -174,13 +174,13 @@ where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
-      hasher.append(0 as Int8)
-      hasher.append(value)
+      hasher.combine(0 as Int8)
+      hasher.combine(value)
     case .pastEnd:
-      hasher.append(1 as Int8)
+      hasher.combine(1 as Int8)
     }
   }
 }
@@ -395,9 +395,9 @@ extension ClosedRange: Hashable where Bound: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(lowerBound)
-    hasher.append(upperBound)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(lowerBound)
+    hasher.combine(upperBound)
   }
 }
 

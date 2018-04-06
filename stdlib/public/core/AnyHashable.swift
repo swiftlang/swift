@@ -48,7 +48,7 @@ internal protocol _AnyHashableBox {
   ///   no comparison is possible. Otherwise, contains the result of `==`.
   func _isEqual(to: _AnyHashableBox) -> Bool?
   var _hashValue: Int { get }
-  func _hash(_into hasher: inout _Hasher)
+  func _hash(into hasher: inout Hasher)
 
   var _base: Any { get }
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool
@@ -96,8 +96,8 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
 
   @inlinable // FIXME(sil-serialize-all)
   @usableFromInline // FIXME(sil-serialize-all)
-  func _hash(_into hasher: inout _Hasher) {
-    _baseHashable._hash(into: &hasher)
+  func _hash(into hasher: inout Hasher) {
+    _baseHashable.hash(into: &hasher)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -304,8 +304,8 @@ extension AnyHashable : Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    _box._hash(_into: &hasher)
+  public func hash(into hasher: inout Hasher) {
+    _box._hash(into: &hasher)
   }
 }
 

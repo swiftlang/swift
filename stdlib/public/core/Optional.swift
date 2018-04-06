@@ -422,13 +422,13 @@ extension Optional: Hashable where Wrapped: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:
-      hasher.append(0 as UInt8)
+      hasher.combine(0 as UInt8)
     case .some(let wrapped):
-      hasher.append(1 as UInt8)
-      hasher.append(wrapped)
+      hasher.combine(1 as UInt8)
+      hasher.combine(wrapped)
     }
   }
 }
