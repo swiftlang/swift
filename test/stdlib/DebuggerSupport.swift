@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 
 import StdlibUnittest
 
@@ -112,10 +113,18 @@ class RefCountedObj {
 let RefcountTests = TestSuite("RefCount")
 RefcountTests.test("Basic") {
   var Obj = RefCountedObj(47);
-  expectEqual(_getRetainCount(Obj), 2);
-  expectEqual(_getWeakRetainCount(Obj), 1);
-  expectEqual(_getUnownedRetainCount(Obj), 1);
-  let _ = Obj.f() // try to keep the object live here.
+
+  // Counters for live objects should be always positive.
+  // We try to be a little bit more lax here because optimizations
+  // or different stdlib versions might impact the exact value of
+  // refcounting, and we're just interested in testing whether the
+  // stub works properly.
+  expectGT(_getRetainCount(Obj), 0);
+  expectGT(_getWeakRetainCount(Obj), 0);
+  expectGT(_getUnownedRetainCount(Obj), 0);
+
+  // Try to keep the object live here.
+  let _ = Obj.f()
 }
 
 runAllTests()
