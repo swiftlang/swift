@@ -865,9 +865,16 @@ ClangImporter::create(ASTContext &ctx,
     }
   }
 
+  // Create a new Clang compiler invocation.
   {
-    // Unfortunately these can't be controlled from the command line, because
-    // they're used to /parse/ the command line.
+    // Set up a temporary diagnostic client to report errors from parsing the
+    // command line, which may be important for Swift clients if, for example,
+    // they're using -Xcc options. Unfortunately this diagnostic engine has to
+    // use the default options because the /actual/ options haven't been parsed
+    // yet.
+    //
+    // The long-term client for Clang diagnostics is set up below, after the
+    // clang::CompilerInstance is created.
     llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> tempDiagOpts{
       new clang::DiagnosticOptions
     };
@@ -879,7 +886,6 @@ ClangImporter::create(ASTContext &ctx,
                                                    &tempDiagClient,
                                                    /*owned*/false);
 
-    // Create a new Clang compiler invocation.
     importer->Impl.Invocation =
         clang::createInvocationFromCommandLine(invocationArgs, tempClangDiags);
     if (!importer->Impl.Invocation)
@@ -922,6 +928,8 @@ ClangImporter::create(ASTContext &ctx,
     instance.addDependencyCollector(tracker->getClangCollector());
 
   {
+    // Now set up the real client for Clang diagnostics---configured with proper
+    // options---as opposed to the temporary one we made above.
     auto actualDiagClient = llvm::make_unique<ClangDiagnosticConsumer>(
         importer->Impl, instance.getDiagnosticOpts(),
         importerOpts.DumpClangDiagnostics);
