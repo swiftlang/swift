@@ -4084,17 +4084,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       P.diagnose(TyLoc, diag::sil_witness_method_not_protocol);
       return true;
     }
-    ProtocolConformanceRef Conformance(proto);
-    if (!isa<ArchetypeType>(LookupTy)) {
-      auto lookup = P.SF.getParentModule()->lookupConformance(LookupTy, proto);
-      if (!lookup) {
-        P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
-        return true;
-      }
-      Conformance = ProtocolConformanceRef(*lookup);
+    auto conformance = P.SF.getParentModule()->lookupConformance(LookupTy, proto);
+    if (!conformance) {
+      P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
+      return true;
     }
-    
-    ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
+
+    ResultVal = B.createWitnessMethod(InstLoc, LookupTy, *conformance, Member,
                                       MethodTy);
     break;
   }

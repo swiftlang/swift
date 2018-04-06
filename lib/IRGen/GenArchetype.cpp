@@ -173,19 +173,6 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
   if (wtable) return wtable;
 
-  // It can happen with class constraints that Sema will consider a
-  // constraint to be abstract, but the minimized signature will
-  // eliminate it as concrete.  Handle this by performing a concrete
-  // lookup.
-  // TODO: maybe Sema shouldn't ever do this?
-  if (Type classBound = archetype->getSuperclass()) {
-    auto conformance =
-      IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol);
-    if (conformance && conformance->isConcrete()) {
-      return emitWitnessTableRef(IGF, archetype, *conformance);
-    }
-  }
-
   // If we don't have an environment, this must be an implied witness table
   // reference.
   // FIXME: eliminate this path when opened types have generic environments.
