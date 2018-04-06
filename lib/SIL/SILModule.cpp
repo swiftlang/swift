@@ -186,6 +186,18 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   if (wtable->isDefinition())
     return wtable;
 
+  // If the module is at or past the Lowered stage, then we can't do any
+  // further deserialization, since pre-IRGen SIL lowering changes the types
+  // of definitions to make them incompatible with canonical serialized SIL.
+  switch (getStage()) {
+  case SILStage::Canonical:
+  case SILStage::Raw:
+    break;
+    
+  case SILStage::Lowered:
+    return wtable;
+  }
+
   // Otherwise try to deserialize it. If we succeed return the deserialized
   // function.
   //
