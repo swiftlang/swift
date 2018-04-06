@@ -480,8 +480,7 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
-    TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/true);
-    TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);
+    TC.typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
     TC.typeCheckExpression(theCall, DC);
@@ -836,8 +835,7 @@ public:
     // the list of raw cases.
     for (auto node : S->getRawCases()) {
       if (!node.is<Decl*>()) continue;
-      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/true);
-      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/false);
+      TC.typeCheckDecl(node.get<Decl*>());
     }
 
     auto cases = S->getCases();
@@ -1356,8 +1354,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
       break;
 
-    TC.typeCheckDecl(SubDecl, /*isFirstPass*/true);
-    TC.typeCheckDecl(SubDecl, /*isFirstPass*/false);
+    TC.typeCheckDecl(SubDecl);
   }
   
   return BS;

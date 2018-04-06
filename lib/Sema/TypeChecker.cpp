@@ -442,6 +442,18 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
+    // Type check conformance contexts.
+    for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
+      auto decl = TC.ConformanceContexts[i];
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+        TC.checkConformancesInContext(ext, ext);
+      else {
+        auto *ntd = cast<NominalTypeDecl>(decl);
+        TC.checkConformancesInContext(ntd, ntd);
+      }
+    }
+    TC.ConformanceContexts.clear();
+
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
@@ -460,6 +472,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
         TC.typeCheckAbstractFunctionBody(AFD);
+        TC.checkFunctionErrorHandling(AFD);
         continue;
       }
       if (isa<NominalTypeDecl>(decl)) {
@@ -498,8 +511,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
          currentSynthesizedDecl != n;
          ++currentSynthesizedDecl) {
       auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
-      TC.typeCheckDecl(decl, /*isFirstPass*/true);
-      TC.typeCheckDecl(decl, /*isFirstPass*/false);
+      TC.typeCheckDecl(decl);
     }
 
     // Ensure that the requirements of the given conformance are
@@ -522,6 +534,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            !TC.DeclsToFinalize.empty() ||
+           !TC.ConformanceContexts.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
            !TC.UsedConformances.empty() ||
            !TC.PartiallyCheckedConformances.empty());
@@ -558,11 +571,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   // bodies having been type-checked.
   for (AbstractFunctionDecl *FD : TC.definedFunctions) {
     TC.checkFunctionErrorHandling(FD);
-  }
-  for (auto decl : TC.Context.ExternalDefinitions) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-      TC.checkFunctionErrorHandling(fn);
-    }
   }
 }
 
@@ -654,22 +662,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       }
     });
 
-    // FIXME: Check for cycles in class inheritance here?
-    
     // Type check the top-level elements of the source file.
-    for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-      if (isa<TopLevelCodeDecl>(D))
-        continue;
-
-      TC.typeCheckDecl(D, /*isFirstPass*/true);
-    }
-
-    // At this point, we can perform general name lookup into any type.
-
-    // We don't know the types of all the global declarations in the first
-    // pass, which means we can't completely analyze everything. Perform the
-    // second pass now.
-
     bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -677,7 +670,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
       } else {
-        TC.typeCheckDecl(D, /*isFirstPass*/false);
+        TC.typeCheckDecl(D);
       }
     }
 
@@ -811,7 +804,7 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   if (auto ext = dyn_cast<ExtensionDecl>(D))
     TC.validateExtension(ext);
   else
-    TC.typeCheckDecl(D, true);
+    TC.typeCheckDecl(D);
   return true;
 }
 
