@@ -627,7 +627,9 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
     llvm::Value *instanceRef = getParameter(paramIndex);
     SILType instanceType = SILType::getPrimitiveObjectType(paramType);
     llvm::Value *metadata =
-    emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
+    emitDynamicTypeOfHeapObject(IGF, instanceRef,
+                                MetatypeRepresentation::Thick,
+                                instanceType);
     IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                           MetadataState::Complete);
     return;
@@ -686,7 +688,9 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
   llvm::Value *instanceRef = nativeParam.getAll()[0];
   SILType instanceType = SILType::getPrimitiveObjectType(paramType);
   llvm::Value *metadata =
-    emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
+    emitDynamicTypeOfHeapObject(IGF, instanceRef,
+                                MetatypeRepresentation::Thick,
+                                instanceType);
   IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                         MetadataState::Complete);
 }
