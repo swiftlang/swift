@@ -1051,6 +1051,8 @@ bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
                                         bool *isSetter) {
   *isSetter = false;
 
+  // Compute the intersection of the conforming type's access scope
+  // and the protocol's access scope.
   auto scopeIntersection =
     requiredAccessScope.intersectWith(Proto->getFormalAccessScope(DC));
   assert(scopeIntersection.hasValue());
@@ -1058,7 +1060,12 @@ bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
   requiredAccessScope = *scopeIntersection;
 
   AccessScope actualScopeToCheck = requiredAccessScope;
-  if (!witness->isAccessibleFrom(actualScopeToCheck.getDeclContext())) {
+
+  // Setting the 'forConformance' flag means that we admit witnesses in
+  // protocol extensions that we can see, but are not necessarily as
+  // visible as the conforming type and protocol.
+  if (!witness->isAccessibleFrom(actualScopeToCheck.getDeclContext(),
+                                 /*forConformance=*/true)) {
     // Special case: if we have `@testable import` of the witness's module,
     // allow the witness to match if it would have matched for just this file.
     // That is, if '@testable' allows us to see the witness here, it should
@@ -1081,7 +1088,10 @@ bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
     *isSetter = true;
 
     auto ASD = cast<AbstractStorageDecl>(witness);
-    if (!ASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext()))
+
+    // See above about the forConformance flag.
+    if (!ASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext(),
+                                     /*forConformance=*/true))
       return true;
   }
 

@@ -1507,12 +1507,36 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
-                        AccessLevel access) {
+AccessLevel
+ValueDecl::adjustAccessLevelForProtocolExtension(AccessLevel access) const {
+  if (auto *ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
+    if (auto *protocol = ext->getAsProtocolOrProtocolExtensionContext()) {
+      // Note: it gets worse. The standard library has public methods
+      // in protocol extensions of a @usableFromInline internal protocol,
+      // and expects these extension methods to witness public protocol
+      // requirements. Which works at the ABI level, so let's keep
+      // supporting that here by passing 'isUsageFromInline'.
+      auto protoAccess = protocol->getFormalAccess(/*useDC=*/nullptr,
+                                                   /*isUsageFromInline=*/true);
+      if (protoAccess == AccessLevel::Private)
+        protoAccess = AccessLevel::FilePrivate;
+      access = std::min(access, protoAccess);
+    }
+  }
+
+  return access;
+}
+
+static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
+                        AccessLevel access, bool forConformance) {
   if (!useDC)
     return access >= AccessLevel::Public;
 
-  assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
+  auto *sourceDC = VD->getDeclContext();
+
+  if (!forConformance)
+    access = VD->adjustAccessLevelForProtocolExtension(access);
+
   switch (access) {
   case AccessLevel::Private:
     return (useDC == sourceDC ||
@@ -1536,11 +1560,14 @@ static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
   llvm_unreachable("bad access level");
 }
 
-bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  return checkAccess(DC, getDeclContext(), getFormalAccess());
+bool ValueDecl::isAccessibleFrom(const DeclContext *DC,
+                                 bool forConformance) const {
+  auto access = getFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
 }
 
-bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
+bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
+                                                 bool forConformance) const {
   assert(isSettable(DC));
 
   // If a stored property does not have a setter, it is still settable from the
@@ -1552,7 +1579,8 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   if (isa<ParamDecl>(this))
     return true;
 
-  return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
+  auto access = getSetterFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
 }
 
 Type AbstractStorageDecl::getStorageInterfaceType() const {

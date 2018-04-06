@@ -1546,8 +1546,15 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     case MemberLookupResult::UR_Inaccessible: {
       auto decl = result.UnviableCandidates[0].first.getDecl();
       // FIXME: What if the unviable candidates have different levels of access?
+      //
+      // If we found an inaccessible member of a protocol extension, it might
+      // be declared 'public'. This can only happen if the protocol is not
+      // visible to us, but the conforming type is. In this case, we need to
+      // clamp the formal access for diagnostics purposes to the formal access
+      // of the protocol itself.
       diagnose(nameLoc, diag::candidate_inaccessible, decl->getBaseName(),
-               decl->getFormalAccess());
+               decl->adjustAccessLevelForProtocolExtension(
+                 decl->getFormalAccess()));
       for (auto cand : result.UnviableCandidates)
         diagnose(cand.first.getDecl(), diag::decl_declared_here, memberName);
         
