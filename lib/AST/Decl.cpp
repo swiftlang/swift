@@ -2140,8 +2140,9 @@ static AccessLevel getTestableAccess(const ValueDecl *decl) {
 }
 
 AccessLevel ValueDecl::getEffectiveAccess() const {
-  auto effectiveAccess = getFormalAccess(/*useDC=*/nullptr,
-                                         /*respectVersionedAttr=*/true);
+  auto effectiveAccess =
+    getFormalAccess(/*useDC=*/nullptr,
+                    /*treatUsableFromInlineAsPublic=*/true);
 
   // Handle @testable.
   switch (effectiveAccess) {

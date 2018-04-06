@@ -3765,10 +3765,10 @@ ERROR(resilience_decl_unavailable,
 
 #undef FRAGILE_FUNC_KIND
 
-NOTE(resilience_decl_declared_here,
+NOTE(resilience_decl_declared_here_public,
      none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
 
-NOTE(resilience_decl_declared_here_versioned,
+NOTE(resilience_decl_declared_here,
      none, "%0 %1 is not '@usableFromInline' or public", (DescriptiveDeclKind, DeclName))
 
 ERROR(class_designated_init_inlinable_resilient,none,

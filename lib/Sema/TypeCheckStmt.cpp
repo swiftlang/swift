@@ -1397,28 +1397,26 @@ static void checkDefaultArguments(TypeChecker &tc,
 /// Check the default arguments that occur within this pattern.
 void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
                                         ValueDecl *VD) {
+  auto access =
+    VD->getFormalAccessScope(/*useDC=*/nullptr,
+                             /*treatUsableFromInlineAsPublic=*/true);
+
   // In Swift 4 mode, default argument bodies are inlined into the
   // caller.
   if (auto *func = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto expansion = func->getResilienceExpansion();
-    if (!Context.isSwiftVersion3() &&
-        func->getFormalAccessScope(/*useDC=*/nullptr,
-                                   /*respectVersionedAttr=*/true).isPublic())
+    if (!Context.isSwiftVersion3() && access.isPublic())
       expansion = ResilienceExpansion::Minimal;
 
     func->setDefaultArgumentResilienceExpansion(expansion);
   } else {
     auto *EED = cast<EnumElementDecl>(VD);
-    auto expansion = EED->getParentEnum()->getResilienceExpansion();
-    // Enum payloads parameter lists may have default arguments as of Swift 5.
-    if (Context.isSwiftVersionAtLeast(5) &&
-        EED->getFormalAccessScope(/*useDC=*/nullptr,
-                                  /*respectVersionedAttr=*/true).isPublic())
+    auto expansion = ResilienceExpansion::Maximal;
+    if (access.isPublic())
       expansion = ResilienceExpansion::Minimal;
 
     EED->setDefaultArgumentResilienceExpansion(expansion);
   }
-
 
   unsigned nextArgIndex = 0;
   for (auto *paramList : paramLists)
@@ -1671,9 +1669,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     // declarations.
     if (!isDelegating && ClassD->isResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      auto kind = getFragileFunctionKind(ctor);
       diagnose(ctor, diag::class_designated_init_inlinable_resilient,
                ClassD->getDeclaredInterfaceType(),
-               static_cast<unsigned>(getFragileFunctionKind(ctor)));
+               static_cast<unsigned>(kind.first));
     }
   }
 
