@@ -2265,6 +2265,18 @@ public:
     return result;
   }
 
+  /// If this declaration is a member of a protocol extension, return the
+  /// minimum of the given access level and the protocol's access level.
+  ///
+  /// Otherwise, return the given access level unmodified.
+  ///
+  /// This is used when checking name lookup visibility. Protocol extension
+  /// members can be found when performing name lookup on a concrete type;
+  /// if the concrete type is visible from the lookup context but the
+  /// protocol is not, we do not want the protocol extension members to be
+  /// visible.
+  AccessLevel adjustAccessLevelForProtocolExtension(AccessLevel access) const;
+
   /// Determine whether this Decl has either Private or FilePrivate access.
   bool isOutermostPrivateOrFilePrivateScope() const;
 
@@ -2325,7 +2337,14 @@ public:
   /// A public declaration is accessible everywhere.
   ///
   /// If \p DC is null, returns true only if this declaration is public.
-  bool isAccessibleFrom(const DeclContext *DC) const;
+  ///
+  /// If \p forConformance is true, we ignore the visibility of the protocol
+  /// when evaluating protocol extension members. This language rule allows a
+  /// protocol extension of a private protocol to provide default
+  /// implementations for the requirements of a public protocol, even when
+  /// the default implementations are not visible to name lookup.
+  bool isAccessibleFrom(const DeclContext *DC,
+                        bool forConformance = false) const;
 
   /// Retrieve the "interface" type of this value, which uses
   /// GenericTypeParamType if the declaration is generic. For a generic
@@ -4449,7 +4468,11 @@ public:
   /// context.
   ///
   /// If \p DC is null, returns true only if the setter is public.
-  bool isSetterAccessibleFrom(const DeclContext *DC) const;
+  ///
+  /// See \c isAccessibleFrom for a discussion of the \p forConformance
+  /// parameter.
+  bool isSetterAccessibleFrom(const DeclContext *DC,
+                              bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,

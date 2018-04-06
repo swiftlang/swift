@@ -163,6 +163,10 @@ SwiftVersion("swift-version",
 
 static llvm::cl::opt<bool>
 OutputInJson("json", llvm::cl::desc("Print output in JSON format."));
+
+static llvm::cl::opt<bool>
+AvoidLocation("avoid-location",
+              llvm::cl::desc("Avoid serializing the file paths of SDK nodes."));
 } // namespace options
 
 namespace {
@@ -1225,6 +1229,9 @@ static StringRef calculateUsr(SDKContext &Ctx, ValueDecl *VD) {
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, ValueDecl *VD) {
+  if (options::AvoidLocation) {
+    return StringRef();
+  }
   auto &Ctx = VD->getASTContext();
   auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
 
@@ -1483,7 +1490,7 @@ static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
   return Func;
 }
 
-static bool shouldIgnore(Decl *D) {
+static bool shouldIgnore(Decl *D, const Decl* Parent) {
   if (D->isPrivateStdlibDecl(false))
     return true;
   if (AvailableAttr::isUnavailable(D))
@@ -1517,6 +1524,13 @@ static bool shouldIgnore(Decl *D) {
     if (isa<clang::FieldDecl>(ClangD))
       return true;
     if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
+      return true;
+
+    // If this decl is a synthesized member from a conformed clang protocol, we
+    // should ignore this member to reduce redundancy.
+    if (Parent &&
+        !isa<swift::ProtocolDecl>(Parent) &&
+        isa<clang::ObjCProtocolDecl>(ClangD->getDeclContext()))
       return true;
   }
   return false;
@@ -1558,7 +1572,7 @@ static SDKNode *constructTypeAliasNode(SDKContext &Ctx,TypeAliasDecl *TAD) {
 static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
                              IterableDeclContext *Context) {
   for (auto *Member : Context->getMembers()) {
-    if (shouldIgnore(Member))
+    if (shouldIgnore(Member, Context->getDecl()))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
       Root->addChild(constructFunctionNode(Ctx, Func, SDKNodeKind::DeclFunction));
@@ -1648,7 +1662,7 @@ public:
   }
 
   void processDecl(ValueDecl *VD) {
-    if (shouldIgnore(VD))
+    if (shouldIgnore(VD, nullptr))
       return;
 
     if (auto FD = dyn_cast<FuncDecl>(VD)) {
