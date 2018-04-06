@@ -217,7 +217,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   visitNominalTypeDecl(CD);
 
   // The below symbols are only emitted if the class is resilient.
-  if (!CD->isResilient(SwiftModule, ResilienceExpansion::Minimal))
+  if (!CD->isResilient())
     return;
 
   addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
@@ -271,7 +271,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    if (PD->isResilient(SwiftModule, ResilienceExpansion::Minimal)) {
+    if (PD->isResilient()) {
       for (auto *member : PD->getMembers()) {
         if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
           addDispatchThunk(SILDeclRef(funcDecl));
@@ -300,7 +300,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 }
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
-  if (!ED->isResilient(SwiftModule, ResilienceExpansion::Minimal))
+  if (!ED->isResilient())
     return;
 
   // Emit resilient tags.
