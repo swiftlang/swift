@@ -1978,6 +1978,12 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
     return;
   }
+
+  // On internal declarations, @inlinable implies @usableFromInline.
+  if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
+    return;
+  }
 }
 
 void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
@@ -2004,11 +2010,9 @@ void AttributeChecker::visitInlinableAttr(InlinableAttr *attr) {
     return;
   }
 
-  // @inlinable can only be applied to public or @usableFromInline
-  // declarations.
-  auto access = VD->getFormalAccess(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-  if (access < AccessLevel::Public) {
+  // @inlinable can only be applied to public or internal declarations.
+  auto access = VD->getFormalAccess();
+  if (access < AccessLevel::Internal) {
     diagnoseAndRemoveAttr(attr, diag::inlinable_decl_not_public,
                           VD->getBaseName(),
                           access);

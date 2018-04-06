@@ -3741,6 +3741,9 @@ ERROR(usable_from_inline_attr_with_explicit_access,
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
       (DeclName, AccessLevel))
 
+WARNING(inlinable_implies_usable_from_inline,none,
+        "'@inlinable' declaration is already '@usableFromInline'",())
+
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
 

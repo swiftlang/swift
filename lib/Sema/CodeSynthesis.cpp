@@ -2025,7 +2025,8 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
                                       /*treatUsableFromInlineAsPublic=*/true)
         >= AccessLevel::Public) {
     if (access == AccessLevel::Internal &&
-        !superclassCtor->isDynamic()) {
+        !superclassCtor->isDynamic() &&
+        !ctor->getAttrs().hasAttribute<InlinableAttr>()) {
       auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
       ctor->getAttrs().add(clonedAttr);
     }
