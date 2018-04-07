@@ -119,6 +119,7 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
   return Args;
 }
 
+/// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
   if (Args.hasArgNoClaim(options::OPT_import_underlying_module) &&
       Args.hasArgNoClaim(options::OPT_import_objc_header)) {
@@ -198,6 +199,18 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
     else if (!Lexer::isIdentifier(name))
       diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
                      name);
+  }
+
+  if (auto *forceLoadArg = Args.getLastArg(options::OPT_autolink_force_load)) {
+    if (auto *incrementalArg = Args.getLastArg(options::OPT_incremental)) {
+      // Note: -incremental can itself be overridden by other arguments later
+      // on, but since -autolink-force-load is a rare and not-really-recommended
+      // option it's not worth modeling that complexity here (or moving the
+      // check somewhere else).
+      diags.diagnose(SourceLoc(), diag::error_option_not_supported,
+                     forceLoadArg->getSpelling(),
+                     incrementalArg->getSpelling());
+    }
   }
 }
 
