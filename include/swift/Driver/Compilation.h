@@ -143,14 +143,14 @@ private:
 
   /// The number of commands which this compilation should attempt to run in
   /// parallel.
-  unsigned NumberOfParallelCommands;
+  const unsigned NumberOfParallelCommands;
 
   /// Indicates whether this Compilation should use skip execution of
   /// subtasks during performJobs() by using a dummy TaskQueue.
   ///
   /// \note For testing purposes only; similar user-facing features should be
   /// implemented separately, as the dummy TaskQueue may provide faked output.
-  bool SkipTaskExecution;
+  const bool SkipTaskExecution;
 
   /// Indicates whether this Compilation should continue execution of subtasks
   /// even if they returned an error status.
@@ -172,22 +172,21 @@ private:
   /// Indicates whether groups of parallel frontend jobs should be merged
   /// together and run in composite "batch jobs" when possible, to reduce
   /// redundant work.
-  bool EnableBatchMode;
+  const bool EnableBatchMode;
 
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
-  unsigned BatchSeed;
+  const unsigned BatchSeed;
 
   /// In order to test repartitioning, set to true if
-  /// -driver-force-one-batch-repartition is present. This is cleared after the
-  /// forced repartition happens.
-  bool ForceOneBatchRepartition = false;
+  /// -driver-force-one-batch-repartition is present.
+  const bool ForceOneBatchRepartition = false;
 
   /// True if temporary files should not be deleted.
-  bool SaveTemps;
+  const bool SaveTemps;
 
   /// When true, dumps information on how long each compilation task took to
   /// execute.
-  bool ShowDriverTimeCompilation;
+  const bool ShowDriverTimeCompilation;
 
   /// When non-null, record various high-level counters to this.
   std::unique_ptr<UnifiedStatsReporter> Stats;
