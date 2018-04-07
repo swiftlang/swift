@@ -76,6 +76,8 @@ NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
 NODE_ANNOTATION(DictionaryKeyUpdate)
 NODE_ANNOTATION(OptionalDictionaryKeyUpdate)
+NODE_ANNOTATION(ArrayMemberUpdate)
+NODE_ANNOTATION(OptionalArrayMemberUpdate)
 
 DECL_ATTR(deprecated)
 DECL_ATTR(fixedLayout)
@@ -108,6 +110,7 @@ KNOWN_TYPE(Unmanaged)
 KNOWN_TYPE(Function)
 KNOWN_TYPE(Dictionary)
 KNOWN_TYPE(String)
+KNOWN_TYPE(Array)
 
 KNOWN_PROTOCOL(RawRepresentable)
 
