@@ -504,12 +504,6 @@ public:
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);
 
-  /// Link in all Witness Tables in the module.
-  void linkAllWitnessTables();
-
-  /// Link in all VTables in the module.
-  void linkAllVTables();
-
   /// Link all definitions in all segments that are logically part of
   /// the same AST module.
   void linkAllFromCurrentModule();

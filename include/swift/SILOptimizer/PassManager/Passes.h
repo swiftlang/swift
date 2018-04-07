@@ -55,12 +55,6 @@ namespace swift {
   /// \brief Remove dead functions from \p M.
   void performSILDeadFunctionElimination(SILModule *M);
 
-  /// \brief Link a SILFunction declaration to the actual definition in the
-  /// serialized modules.
-  ///
-  /// \param M the SILModule on which to operate
-  void performSILLinking(SILModule *M);
-
   /// \brief Convert SIL to a lowered form suitable for IRGen.
   void runSILLoweringPasses(SILModule &M);
 

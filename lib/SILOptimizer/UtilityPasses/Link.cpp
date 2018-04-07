@@ -20,15 +20,6 @@ using namespace swift;
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILLinking(SILModule *M) {
-  for (auto &Fn : *M)
-    M->linkFunction(&Fn, SILModule::LinkingMode::LinkAll);
-
-  M->linkAllWitnessTables();
-  M->linkAllVTables();
-}
-
-
 namespace {
 
 /// Copies code from the standard library into the user program to enable

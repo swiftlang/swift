@@ -561,14 +561,6 @@ void SILModule::linkAllFromCurrentModule() {
                                   /*PrimaryFile=*/nullptr);
 }
 
-void SILModule::linkAllWitnessTables() {
-  getSILLoader()->getAllWitnessTables();
-}
-
-void SILModule::linkAllVTables() {
-  getSILLoader()->getAllVTables();
-}
-
 void SILModule::invalidateSILLoaderCaches() {
   getSILLoader()->invalidateCaches();
 }
