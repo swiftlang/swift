@@ -34,6 +34,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "clang/Basic/Module.h"
@@ -1208,8 +1209,22 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-  for (auto importPair : Imports)
-    importPair.first.second->collectLinkLibraries(callback);
+  llvm::SmallPtrSet<ModuleDecl *, 8> knownModules;
+  (void)knownModules.insert(getParentModule());
+
+  auto visitModule = [&](ModuleDecl *module) {
+    if (knownModules.insert(module).second)
+      module->collectLinkLibraries(callback);
+  };
+
+  for (auto importPair : Imports) {
+    visitModule(importPair.first.second);
+  }
+
+  // Collect any libraries needed by used conformances.
+  for (auto conformance : UsedConformances) {
+    visitModule(conformance->getDeclContext()->getParentModule());
+  }
 }
 
 bool ModuleDecl::walk(ASTWalker &Walker) {
