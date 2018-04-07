@@ -64,6 +64,9 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   if(!Vtbl)
     return false;
 
+  if (!isLinkAll())
+    return false;
+
   // Ok we found our VTable. Visit each function referenced by the VTable. If
   // any of the functions are external declarations, add them to the worklist
   // for processing.
