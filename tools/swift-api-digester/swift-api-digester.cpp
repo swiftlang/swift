@@ -409,7 +409,7 @@ public:
   ArrayRef<SDKNode*> getChildren() const;
   bool hasSameChildren(const SDKNode &Other) const;
   unsigned getChildIndex(NodePtr Child) const;
-  const SDKNode* getOnlyChild() const;
+  SDKNode* getOnlyChild() const;
   SDKContext &getSDKContext() const { return Ctx; }
   SDKNodeRoot *getRootNode() const;
   template <typename T> const T *getAs() const;
@@ -575,7 +575,7 @@ unsigned SDKNode::getChildIndex(NodePtr Child) const {
   return std::find(Children.begin(), Children.end(), Child) - Children.begin();
 }
 
-const SDKNode* SDKNode::getOnlyChild() const {
+SDKNode* SDKNode::getOnlyChild() const {
   assert(Children.size() == 1 && "more that one child.");
   return *Children.begin();
 }
@@ -2693,12 +2693,11 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
     return false;
   }
 
-  bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
-    if (!IsVisitingLeft)
-      return false;
+  static StringRef detectDictionaryKeyChangeInternal(SDKNodeType *L,
+                                                     SDKNodeType *R) {
     if (L->getTypeKind() != KnownTypeKind::Dictionary ||
         R->getTypeKind() != KnownTypeKind::Dictionary)
-      return false;
+      return StringRef();
     auto *Left = dyn_cast<SDKNodeTypeNominal>(L);
     auto *Right = dyn_cast<SDKNodeTypeNominal>(R);
     assert(Left && Right);
@@ -2707,19 +2706,44 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
     auto* LKey = dyn_cast<SDKNodeTypeNominal>(*Left->getChildBegin());
     auto* RKey = dyn_cast<SDKNodeTypeNominal>(*Right->getChildBegin());
     if (!LKey || !RKey)
-      return false;
+      return StringRef();
     if (LKey->getTypeKind() != KnownTypeKind::String)
-      return false;
+      return StringRef();
     auto Results = RKey->getRootNode()->getDescendantsByUsr(RKey->getUsr());
     if (Results.empty())
-      return false;
+      return StringRef();
     if (auto DT = dyn_cast<SDKNodeDeclType>(Results.front())) {
       if (DT->isConformingTo(KnownProtocolKind::RawRepresentable)) {
-        L->annotate(NodeAnnotation::DictionaryKeyUpdate);
-        L->annotate(NodeAnnotation::TypeRewrittenRight,
-                    DT->getFullyQualifiedName());
-        return true;
+        return DT->getFullyQualifiedName();
       }
+    }
+    return StringRef();
+  }
+
+  bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
+    if (!IsVisitingLeft)
+      return false;
+
+    // We only care if this the top-level type node.
+    if (!isa<SDKNodeDecl>(L->getParent()) || !isa<SDKNodeDecl>(R->getParent()))
+      return false;
+    StringRef KeyChangedTo;
+    if (L->getTypeKind() == KnownTypeKind::Optional &&
+        R->getTypeKind() == KnownTypeKind::Optional) {
+      // Detect [String: Any]? to [StringRepresentableStruct: Any]? Chnage
+      KeyChangedTo =
+        detectDictionaryKeyChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
+                                          R->getOnlyChild()->getAs<SDKNodeType>());
+    } else {
+      // Detect [String: Any] to [StringRepresentableStruct: Any] Chnage
+      KeyChangedTo = detectDictionaryKeyChangeInternal(L, R);
+    }
+    if (!KeyChangedTo.empty()) {
+      L->annotate(L->getTypeKind() == KnownTypeKind::Optional ?
+                    NodeAnnotation::OptionalDictionaryKeyUpdate :
+                    NodeAnnotation::DictionaryKeyUpdate);
+      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+      return true;
     }
     return false;
   }
@@ -2864,6 +2888,7 @@ class DiffItemEmitter : public SDKNodeVisitor {
   static StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
     switch (Anno) {
       case NodeAnnotation::DictionaryKeyUpdate:
+      case NodeAnnotation::OptionalDictionaryKeyUpdate:
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
       case NodeAnnotation::ModernizeEnum:
@@ -2922,6 +2947,7 @@ class DiffItemEmitter : public SDKNodeVisitor {
                         NodeAnnotation::Rename,
                         NodeAnnotation::NowThrowing,
                         NodeAnnotation::DictionaryKeyUpdate,
+                        NodeAnnotation::OptionalDictionaryKeyUpdate,
                       });
   }
 
