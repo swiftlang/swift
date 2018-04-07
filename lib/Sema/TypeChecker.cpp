@@ -32,6 +32,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -73,6 +74,16 @@ void TypeChecker::handleExternalDecl(Decl *decl) {
   }
   if (auto ED = dyn_cast<EnumDecl>(decl)) {
     addImplicitEnumConformances(ED);
+  }
+
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (!isa<ProtocolDecl>(nominal) &&
+        isa<ClangModuleUnit>(nominal->getModuleScopeContext())) {
+      // For imported nominal declarations, mark their conformances as "used".
+      for (auto conformance : nominal->getLocalConformances()) {
+        markConformanceUsed(ProtocolConformanceRef(conformance));
+      }
+    }
   }
 }
 
@@ -478,11 +489,21 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     }
     TC.PartiallyCheckedConformances.clear();
 
-    // Complete any conformances that we used.
+    // Complete and mark as "used" any conformances that we used.
     for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
       auto conformance = TC.UsedConformances[i];
+
+      // Complete the conformance, if that hasn't happened yet.
       if (conformance->isIncomplete())
         TC.checkConformance(conformance);
+
+      // If this is the first time we've added this conformance to the
+      // source file, mark all of the conformances for the protocol's
+      // requirement signature as "used".
+      if (SF.addUsedConformance(conformance) && !conformance->isInvalid()) {
+        for (auto sigConformance : conformance->getSignatureConformances())
+          TC.markConformanceUsed(sigConformance);
+      }
     }
     TC.UsedConformances.clear();
 

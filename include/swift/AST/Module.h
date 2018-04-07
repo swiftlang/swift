@@ -947,8 +947,10 @@ public:
   virtual bool walk(ASTWalker &walker) override;
 
   /// Note that the given conformance was used by this source file.
-  void addUsedConformance(NormalProtocolConformance *conformance) {
-    UsedConformances.insert(conformance);
+  ///
+  /// \returns true if the conformance was newly discovered.
+  bool addUsedConformance(NormalProtocolConformance *conformance) {
+    return UsedConformances.insert(conformance);
   }
 
   /// Retrieve the set of conformances that were used in this source

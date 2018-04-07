@@ -97,8 +97,7 @@ public:
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
 
   /// Mark the given conformance as "used" from the given declaration context.
-  virtual void markConformanceUsed(ProtocolConformanceRef conformance,
-                                   DeclContext *dc) = 0;
+  virtual void markConformanceUsed(ProtocolConformanceRef conformance) = 0;
 };
 
 /// An implementation of LazyResolver that delegates to another.
@@ -160,9 +159,8 @@ public:
     Principal.resolveImplicitMember(nominal, member);
   }
 
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override {
-    return Principal.markConformanceUsed(conformance, dc);
+  void markConformanceUsed(ProtocolConformanceRef conformance) override {
+    return Principal.markConformanceUsed(conformance);
   }
 };
 

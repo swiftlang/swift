@@ -3521,7 +3521,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
   // If we're using this conformance, note that.
   if (options.contains(ConformanceCheckFlags::Used)) {
-    markConformanceUsed(*lookupResult, DC);
+    markConformanceUsed(*lookupResult);
   }
 
   // If we have a concrete conformance with conditional requirements that
@@ -3620,22 +3620,13 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                      : ConformsToProtocolResult::failure();
 }
 
-void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
-                                      DeclContext *dc) {
+void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance) {
   if (conformance.isAbstract()) return;
 
   auto normalConformance =
     conformance.getConcrete()->getRootNormalConformance();
 
-  // Make sure that the type checker completes this conformance.
-  if (normalConformance->isIncomplete())
-    UsedConformances.insert(normalConformance);
-
-  // Record the usage of this conformance in the enclosing source
-  // file.
-  if (auto sf = dc->getParentSourceFile()) {
-    sf->addUsedConformance(normalConformance);
-  }
+  UsedConformances.insert(normalConformance);
 }
 
 Optional<ProtocolConformanceRef>

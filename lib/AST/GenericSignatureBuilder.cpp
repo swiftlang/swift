@@ -3825,7 +3825,7 @@ GenericSignatureBuilder::lookupConformance(CanType dependentType,
   auto result = searchModule->lookupConformance(conformingReplacementType,
                                                 conformedProtocol->getDecl());
   if (result && getLazyResolver())
-    getLazyResolver()->markConformanceUsed(*result, searchModule);
+    getLazyResolver()->markConformanceUsed(*result);
 
   return result;
 }

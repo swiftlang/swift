@@ -8109,10 +8109,10 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     CD->addImplicitDestructor();
   }
 
-  // validateDeclForNameLookup will not trigger an immediate full
-  // validation of protocols, but clients will assume that things
-  // like the requirement signature have been set.
   if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
+    // validateDeclForNameLookup will not trigger an immediate full
+    // validation of protocols, but clients will assume that things
+    // like the requirement signature have been set.
     if (!PD->isRequirementSignatureComputed()) {
       TC.validateDecl(PD);
     }

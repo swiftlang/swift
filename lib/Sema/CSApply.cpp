@@ -8048,7 +8048,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
   // Mark any normal conformances used in this solution as "used".
   for (auto &e : solution.Conformances)
-    TC.markConformanceUsed(e.second, DC);
+    TC.markConformanceUsed(e.second);
 
   ExprRewriter rewriter(*this, solution, suppressDiagnostics);
   ExprWalker walker(rewriter);
