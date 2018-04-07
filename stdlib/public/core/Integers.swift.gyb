@@ -301,6 +301,7 @@ def operatorComment(operator, fixedWidth):
   ///     let x: UInt8 = 5          // 0b00000101
   ///     let y: UInt8 = 14         // 0b00001110
   ///     let z = x & y             // 0b00000100
+  ///     // z == 4
   ///
   /// - Parameters:
   ///   - lhs: An integer value.
@@ -317,6 +318,7 @@ def operatorComment(operator, fixedWidth):
   ///     let x: UInt8 = 5          // 0b00000101
   ///     let y: UInt8 = 14         // 0b00001110
   ///     let z = x | y             // 0b00001111
+  ///     // z == 15
   ///
   /// - Parameters:
   ///   - lhs: An integer value.
@@ -333,6 +335,7 @@ def operatorComment(operator, fixedWidth):
   ///     let x: UInt8 = 5          // 0b00000101
   ///     let y: UInt8 = 14         // 0b00001110
   ///     let z = x ^ y             // 0b00001011
+  ///     // z == 11
   ///
   /// - Parameters:
   ///   - lhs: An integer value.
@@ -343,9 +346,10 @@ def operatorComment(operator, fixedWidth):
   /// specified number of digits to the right, masking the shift amount to the
   /// type's bit width.
   ///
-  /// The masking right shift operator (`&>>`) performs a *masking shift*,
-  /// where the value passed as `rhs` is masked to produce a value in the
-  /// range `0..<lhs.bitWidth`. The shift is performed using this masked
+  /// Use the masking right shift operator (`&>>`) when you need to perform a
+  /// shift and are sure that the shift amount is in the range
+  /// `0..<lhs.bitWidth`. Before shifting, the masking right shift operator
+  /// masks the shift to this range. The shift is performed using this masked
   /// value.
   ///
   /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
@@ -356,11 +360,16 @@ def operatorComment(operator, fixedWidth):
   ///     let y = x &>> 2
   ///     // y == 7                         // 0b00000111
   ///
-  /// However, if you use `19` as `rhs`, the operation first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
+  /// However, if you use `8` as the shift amount, the method first masks the
+  /// shift amount to zero, and then performs the shift, resulting in no change
+  /// to the original value.
   ///
-  ///     let z = x &>> 19
-  ///     // z == 3                         // 0b00000011
+  ///     let z = x &>> 8
+  ///     // z == 30                        // 0b00011110
+  ///
+  /// If the bit width of the shifted integer type is a power of two, masking
+  /// is performed using a bitmask; otherwise, masking is performed using a
+  /// modulo operation.
   ///
   /// - Parameters:
   ///   - lhs: The value to shift.
@@ -373,9 +382,11 @@ def operatorComment(operator, fixedWidth):
   /// specified number of digits to the left, masking the shift amount to the
   /// type's bit width.
   ///
-  /// The masking left shift operator (`&<<`) performs a *masking shift*, where
-  /// the value used as `rhs` is masked to produce a value in the range
-  /// `0..<lhs.bitWidth`. The shift is performed using this masked value.
+  /// Use the masking left shift operator (`&<<`) when you need to perform a
+  /// shift and are sure that the shift amount is in the range
+  /// `0..<lhs.bitWidth`. Before shifting, the masking left shift operator
+  /// masks the shift to this range. The shift is performed using this masked
+  /// value.
   ///
   /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
   /// unsigned integer type. If you use `2` as the right-hand-side value in an
@@ -385,11 +396,16 @@ def operatorComment(operator, fixedWidth):
   ///     let y = x &<< 2
   ///     // y == 120                       // 0b01111000
   ///
-  /// However, if you pass `19` as `rhs`, the method first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
+  /// However, if you use `8` as the shift amount, the method first masks the
+  /// shift amount to zero, and then performs the shift, resulting in no change
+  /// to the original value.
   ///
-  ///     let z = x &<< 19
-  ///     // z == 240                       // 0b11110000
+  ///     let z = x &<< 8
+  ///     // z == 30                        // 0b00011110
+  ///
+  /// If the bit width of the shifted integer type is a power of two, masking
+  /// is performed using a bitmask; otherwise, masking is performed using a
+  /// modulo operation.
   ///
   /// - Parameters:
   ///   - lhs: The value to shift.
@@ -952,9 +968,14 @@ def unsafeOperationComment(operator):
   /// Returns the sum of this value and the given value without checking for
   /// arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to add to this value.
   /// - Returns: The sum of this value and `rhs`.
@@ -963,9 +984,14 @@ def unsafeOperationComment(operator):
   /// Returns the difference obtained by subtracting the given value from this
   /// value without checking for arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: The result of subtracting `rhs` from this value.
@@ -974,9 +1000,14 @@ def unsafeOperationComment(operator):
   /// Returns the product of this value and the given value without checking
   /// for arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: The product of this value and `rhs`.
@@ -985,9 +1016,14 @@ def unsafeOperationComment(operator):
   /// Returns the quotient obtained by dividing this value by the given value
   /// without checking for arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: The result of dividing this value by `rhs`.
@@ -2256,23 +2292,23 @@ ${overflowOperationComment(x.operator)}
   /// otherwise overflow. Unlike traditional truncating multiplication, the
   /// `multipliedFullWidth(by:)` method returns a tuple containing both the
   /// `high` and `low` parts of the product of this value and `other`. The
-  /// following example uses this method to multiply two `UInt8` values that
+  /// following example uses this method to multiply two `Int8` values that
   /// normally overflow when multiplied:
   ///
-  ///     let x: UInt8 = 100
-  ///     let y: UInt8 = 20
+  ///     let x: Int8 = 48
+  ///     let y: Int8 = -40
   ///     let result = x.multipliedFullWidth(by: y)
-  ///     // result.high == 0b00000111
-  ///     // result.low  == 0b11010000
+  ///     // result.high == -8
+  ///     // result.low  == 128
   ///
-  /// The product of `x` and `y` is 2000, which is too large to represent in a
-  /// `UInt8` instance. The `high` and `low` properties of the `result` value
-  /// represent 2000 when concatenated to form a double-width integer; that
+  /// The product of `x` and `y` is `-1920`, which is too large to represent in
+  /// an `Int8` instance. The `high` and `low` compnents of the `result` value
+  /// represent `-1920` when concatenated to form a double-width integer; that
   /// is, using `result.high` as the high byte and `result.low` as the low byte
-  /// of a `UInt16` instance.
+  /// of an `Int16` instance.
   ///
-  ///     let z = UInt16(result.high) << 8 | UInt16(result.low)
-  ///     // z == 2000
+  ///     let z = Int16(result.high) << 8 | Int16(result.low)
+  ///     // z == -1920
   ///
   /// - Parameter other: The value to multiply this value by.
   /// - Returns: A tuple containing the high and low parts of the result of
@@ -2285,6 +2321,18 @@ ${overflowOperationComment(x.operator)}
   /// The resulting quotient must be representable within the bounds of the
   /// type. If the quotient is too large to represent in the type, a runtime
   /// error may occur.
+  ///
+  /// The following example divides a value that is too large to be represented
+  /// using a single `Int` instance by another `Int` value. Because the quotient
+  /// is representable as an `Int`, the division succeeds.
+  ///
+  ///     // 'dividend' represents the value 0x506f70652053616e74612049494949
+  ///     let dividend = (22640526660490081, 7959093232766896457 as UInt)
+  ///     let divisor = 2241543570477705381
+  ///
+  ///     let (quotient, remainder) = divisor.dividingFullWidth(dividend)
+  ///     // quotient == 186319822866995413
+  ///     // remainder == 0
   ///
   /// - Parameter dividend: A tuple containing the high and low parts of a
   ///   double-width integer.
