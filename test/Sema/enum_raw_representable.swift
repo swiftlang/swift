@@ -106,7 +106,7 @@ func rdar32431736() {
 
 enum E_32431165 : String {
   case foo = "foo"
-  case bar = "bar" // expected-note {{did you mean 'bar'?}}
+  case bar = "bar" // expected-note {{'bar' declared here}}
 }
 
 func rdar32431165_1(_: E_32431165) {}
@@ -114,7 +114,7 @@ func rdar32431165_1(_: Int) {}
 func rdar32431165_1(_: Int, _: E_32431165) {}
 
 rdar32431165_1(E_32431165.baz)
-// expected-error@-1 {{type 'E_32431165' has no member 'baz'}}
+// expected-error@-1 {{type 'E_32431165' has no member 'baz'; did you mean 'bar'?}}
 
 rdar32431165_1(.baz)
 // expected-error@-1 {{reference to member 'baz' cannot be resolved without a contextual type}}

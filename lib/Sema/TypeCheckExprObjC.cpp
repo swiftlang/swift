@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "TypoCorrection.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
@@ -248,11 +249,12 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // If we didn't find anything, try to apply typo-correction.
     bool resultsAreFromTypoCorrection = false;
     if (!lookup) {
+      TypoCorrectionResults corrections(*this, componentName,
+                                        DeclNameLoc(componentNameLoc));
       performTypoCorrection(dc, DeclRefKind::Ordinary, lookupType,
-                            componentName, componentNameLoc,
                             (lookupType ? defaultMemberTypeLookupOptions
                                         : defaultUnqualifiedLookupOptions),
-                            lookup);
+                            corrections);
 
       if (currentType)
         diagnose(componentNameLoc, diag::could_not_find_type_member,
@@ -262,10 +264,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                  componentName, false);
 
       // Note all the correction candidates.
-      for (auto &result : lookup) {
-        noteTypoCorrection(componentName, DeclNameLoc(componentNameLoc),
-                           result.getValueDecl());
-      }
+      corrections.noteAllCandidates();
+      corrections.addAllCandidatesToLookup(lookup);
 
       isInvalid = true;
       if (!lookup) break;
