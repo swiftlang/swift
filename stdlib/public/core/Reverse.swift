@@ -49,8 +49,6 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// * `c.reversed()` does not create new storage
 /// * `c.reversed().map(f)` maps eagerly and returns a new array
 /// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
-///
-/// - See also: `ReversedRandomAccessCollection`
 @_fixed_layout
 public struct ReversedCollection<Base: BidirectionalCollection> {
   public let _base: Base
@@ -84,7 +82,7 @@ extension ReversedCollection {
     }
   }
 }
- 
+
 extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
   
@@ -252,6 +250,17 @@ extension ReversedCollection: BidirectionalCollection {
 }
 
 extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }
+
+extension ReversedCollection {
+  /// Reversing a reversed collection returns the original collection.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  @available(swift, introduced: 4.2)
+  public func reversed() -> Base {
+    return _base
+  }
+}
 
 extension BidirectionalCollection {
   /// Returns a view presenting the elements of the collection in reverse
