@@ -20,4 +20,5 @@ typedef NSString * AnimalAttributeName NS_STRING_ENUM;
 
 @interface AnimalStatusDescriptor
 - (nonnull AnimalStatusDescriptor *)animalStatusDescriptorByAddingAttributes:(nonnull NSDictionary<AnimalAttributeName, id> *)attributes;
+- (nonnull AnimalStatusDescriptor *)animalStatusDescriptorByAddingOptionalAttributes:(nullable NSDictionary<AnimalAttributeName, id> *)attributes;
 @end

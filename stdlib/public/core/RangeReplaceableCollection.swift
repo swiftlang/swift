@@ -353,6 +353,15 @@ public protocol RangeReplaceableCollection : Collection
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
 
+  /// Removes from the collection all elements that satisfy the given predicate.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be removed from the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows
+
   // FIXME(ABI): Associated type inference requires this.
   subscript(bounds: Index) -> Element { get }
 
@@ -1073,5 +1082,49 @@ extension RangeReplaceableCollection {
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Self {
     return try Self(self.lazy.filter(isIncluded))
+  }
+}
+
+extension RangeReplaceableCollection where Self: MutableCollection {
+  /// Removes from the collection all elements that satisfy the given predicate.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be removed from the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @_inlineable
+  public mutating func removeAll(
+    where predicate: (Element) throws -> Bool
+  ) rethrows {
+    if var i = try index(where: predicate) {
+      var j = index(after: i)
+      while j != endIndex {
+        if try !predicate(self[j]) {
+          swapAt(i, j)
+          formIndex(after: &i)
+        }
+        formIndex(after: &j)
+      }
+      removeSubrange(i...)
+    }
+  }
+}
+
+extension RangeReplaceableCollection {
+  /// Removes from the collection all elements that satisfy the given predicate.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be removed from the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @_inlineable
+  public mutating func removeAll(
+    where predicate: (Element) throws -> Bool
+  ) rethrows {
+    // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
+    // self = try filter { try !predicate($0) }
+    self = try Self(self.lazy.filter { try !predicate($0) })
   }
 }
