@@ -13,7 +13,7 @@ add_swift_library(swiftParse STATIC
   Scope.cpp
   SyntaxParsingContext.cpp
   LINK_LIBRARIES
-    swiftAST
     swiftSyntax
 )
 
+target_link_libraries(swiftParse INTERFACE swiftAST)

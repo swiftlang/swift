@@ -8,9 +8,9 @@ add_swift_unittest(SwiftASTTests
 
 target_link_libraries(SwiftASTTests
    PRIVATE
-   swiftAST
    # FIXME: Circular dependencies.
    swiftParse
+   swiftAST # Ordering matters, swiftAST needs to be after swiftParse
    swiftSema
    swiftSIL
 )
