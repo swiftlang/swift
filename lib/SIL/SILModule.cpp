@@ -154,31 +154,26 @@ SILModule::lookUpWitnessTable(ProtocolConformanceRef C,
 }
 
 SILWitnessTable *
-SILModule::lookUpWitnessTable(const ProtocolConformance *C,
+SILModule::lookUpWitnessTable(ProtocolConformance *C,
                               bool deserializeLazily) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
+  SILWitnessTable *wtable = nullptr;
   const NormalProtocolConformance *NormalC = C->getRootNormalConformance();
+
   // Attempt to lookup the witness table from the table.
   auto found = WitnessTableMap.find(NormalC);
   if (found == WitnessTableMap.end()) {
-#ifndef NDEBUG
-    // Make sure that all witness tables are in the witness table lookup
-    // cache.
-    //
-    // This code should not be hit normally since we add witness tables to the
-    // lookup cache when we create them. We don't just assert here since there
-    // is the potential for a conformance without a witness table to be passed
-    // to this function.
-    for (SILWitnessTable &WT : witnessTables)
-      assert(WT.getConformance() != NormalC &&
-             "Found witness table that is not"
-             " in the witness table lookup cache.");
-#endif
-    return nullptr;
+    if (!deserializeLazily)
+      return nullptr;
+
+    wtable = createWitnessTableDeclaration(
+      C, getLinkageForProtocolConformance(
+        NormalC, NotForDefinition));
+  } else {
+    wtable = found->second;
   }
 
-  SILWitnessTable *wtable = found->second;
   assert(wtable != nullptr && "Should never map a conformance to a null witness"
                           " table.");
 

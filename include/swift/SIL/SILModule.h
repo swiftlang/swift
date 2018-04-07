@@ -564,7 +564,7 @@ public:
   SILWitnessTable *
   lookUpWitnessTable(ProtocolConformanceRef C, bool deserializeLazily=true);
   SILWitnessTable *
-  lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
+  lookUpWitnessTable(ProtocolConformance *C, bool deserializeLazily=true);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
   std::pair<SILFunction *, SILWitnessTable *>
