@@ -18,6 +18,7 @@
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
 #include "MiscDiagnostics.h"
+#include "TypoCorrection.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -1330,25 +1331,20 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 /// lower case counterparts are identical.
 ///   - DeclName is valid when such a correct case is found; invalid otherwise.
 static DeclName
-findCorrectEnumCaseName(Type Ty, LookupResult &Result,
+findCorrectEnumCaseName(Type Ty, TypoCorrectionResults &corrections,
                         DeclName memberName) {
   if (!memberName.isSimpleName())
     return DeclName();
   if (!Ty->is<EnumType>() &&
       !Ty->is<BoundGenericEnumType>())
     return DeclName();
-  llvm::SmallVector<DeclName, 4> candidates;
-  for (auto &correction : Result) {
-    DeclName correctName = correction.getValueDecl()->getFullName();
-    if (!isa<EnumElementDecl>(correction.getValueDecl()))
-      continue;
-    if (correctName.getBaseIdentifier().str().equals_lower(
-            memberName.getBaseIdentifier().str()))
-      candidates.push_back(correctName.getBaseName());
-  }
-  if (candidates.size() == 1)
-    return candidates.front();
-  return DeclName();
+  auto candidate =
+    corrections.getUniqueCandidateMatching([&](ValueDecl *candidate) {
+      return (isa<EnumElementDecl>(candidate) &&
+              candidate->getFullName().getBaseIdentifier().str()
+                .equals_lower(memberName.getBaseIdentifier().str()));
+    });
+  return (candidate ? candidate->getFullName() : DeclName());
 }
 
 /// Given a result of name lookup that had no viable results, diagnose the
@@ -1362,12 +1358,10 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
-    LookupResult correctionResults;
+    TypoCorrectionResults corrections(CS.TC, memberName, nameLoc);
     auto tryTypoCorrection = [&] {
       CS.TC.performTypoCorrection(CS.DC, DeclRefKind::Ordinary, baseObjTy,
-                                  memberName, nameLoc.getBaseNameLoc(),
-                                  defaultMemberLookupOptions,
-                                  correctionResults);
+                                  defaultMemberLookupOptions, corrections);
     };
 
     // TODO: This should handle tuple member lookups, like x.1231 as well.
@@ -1382,7 +1376,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       tryTypoCorrection();
 
       if (DeclName rightName = findCorrectEnumCaseName(instanceTy,
-                                                       correctionResults,
+                                                       corrections,
                                                        memberName)) {
         diagnose(loc, diag::could_not_find_enum_case, instanceTy,
                  memberName, rightName)
@@ -1390,8 +1384,17 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
                         rightName.getBaseIdentifier().str());
         return;
       }
-      diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
+
+      if (auto correction = corrections.claimUniqueCorrection()) {
+        auto diagnostic =
+          diagnose(loc, diag::could_not_find_type_member_corrected,
+                   instanceTy, memberName, correction->CorrectedName);
+        diagnostic.highlight(baseRange).highlight(nameLoc.getSourceRange());
+        correction->addFixits(diagnostic);
+      } else {
+        diagnose(loc, diag::could_not_find_type_member, instanceTy, memberName)
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      }
     } else if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
       diagnose(baseExpr->getLoc(), diag::no_member_of_module,
                moduleTy->getModule()->getName(), memberName)
@@ -1399,31 +1402,43 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           .highlight(nameLoc.getSourceRange());
       return;
     } else {
-      diagnose(loc, diag::could_not_find_value_member,
-               baseObjTy, memberName)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      tryTypoCorrection();
+      auto emitBasicError = [&] {
+        diagnose(loc, diag::could_not_find_value_member,
+                 baseObjTy, memberName)
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+      };
       
       // Check for a few common cases that can cause missing members.
       if (baseObjTy->is<EnumType>() && memberName.isSimpleName("rawValue")) {
         auto loc = baseObjTy->castTo<EnumType>()->getDecl()->getNameLoc();
         if (loc.isValid()) {
+          emitBasicError();
           diagnose(loc, diag::did_you_mean_raw_type);
-          return; // Always prefer this over typo corrections.
+          return;
         }
       } else if (baseObjTy->isAny()) {
+        emitBasicError();
         diagnose(loc, diag::any_as_anyobject_fixit)
           .fixItInsert(baseExpr->getStartLoc(), "(")
           .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
         return;
       }
+
+      tryTypoCorrection();
+
+      if (auto correction = corrections.claimUniqueCorrection()) {
+        auto diagnostic =
+          diagnose(loc, diag::could_not_find_value_member_corrected,
+                   baseObjTy, memberName, correction->CorrectedName);
+        diagnostic.highlight(baseRange).highlight(nameLoc.getSourceRange());
+        correction->addFixits(diagnostic);
+      } else {
+        emitBasicError();
+      }
     }
 
     // Note all the correction candidates.
-    for (auto &correction : correctionResults) {
-      CS.TC.noteTypoCorrection(memberName, nameLoc,
-                               correction.getValueDecl());
-    }
+    corrections.noteAllCandidates();
 
     // TODO: recover?
     return;
@@ -6803,11 +6818,13 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
     // If we didn't find anything, try to apply typo-correction.
     bool resultsAreFromTypoCorrection = false;
     if (!lookup) {
+      TypoCorrectionResults corrections(TC, componentName,
+                                        DeclNameLoc(componentNameLoc));
+
       TC.performTypoCorrection(CS.DC, DeclRefKind::Ordinary, lookupType,
-                               componentName, componentNameLoc,
                                (lookupType ? defaultMemberTypeLookupOptions
                                            : defaultUnqualifiedLookupOptions),
-                               lookup);
+                               corrections);
 
       if (currentType)
         TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
@@ -6817,10 +6834,8 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                     componentName, false);
 
       // Note all the correction candidates.
-      for (auto &result : lookup) {
-        TC.noteTypoCorrection(componentName, DeclNameLoc(componentNameLoc),
-                              result.getValueDecl());
-      }
+      corrections.noteAllCandidates();
+      corrections.addAllCandidatesToLookup(lookup);
 
       isInvalid = true;
       if (!lookup)

@@ -89,7 +89,7 @@ class C1 {
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{use of unresolved identifier 'Self'}} expected-note {{did you mean 'self'?}}
+    return Self() // expected-error{{use of unresolved identifier 'Self'; did you mean 'self'?}}
   }
 
   // This used to crash because metatype construction went down a

@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "TypoCorrection.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -497,28 +498,30 @@ enum : unsigned {
   MaxCallEditDistanceFromBestCandidate = 1
 };
 
-static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
+static unsigned getCallEditDistance(DeclName writtenName,
+                                    DeclName correctedName,
                                     unsigned maxEditDistance) {
   // TODO: consider arguments.
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?
   // TODO: word-based rather than character-based?
-  if (argName.getBaseName().getKind() != paramName.getBaseName().getKind()) {
+  if (writtenName.getBaseName().getKind() !=
+        correctedName.getBaseName().getKind()) {
     return UnreasonableCallEditDistance;
   }
 
-  if (argName.getBaseName().getKind() != DeclBaseName::Kind::Normal) {
+  if (writtenName.getBaseName().getKind() != DeclBaseName::Kind::Normal) {
     return 0;
   }
-  assert(argName.getBaseName().getKind() == DeclBaseName::Kind::Normal);
 
-  StringRef argBase = argName.getBaseName().userFacingName();
-  StringRef paramBase = paramName.getBaseName().userFacingName();
+  StringRef writtenBase = writtenName.getBaseName().userFacingName();
+  StringRef correctedBase = correctedName.getBaseName().userFacingName();
 
-  unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
+  unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 
   // Bound the distance to UnreasonableCallEditDistance.
-  if (distance >= maxEditDistance || distance > (paramBase.size() + 2) / 3) {
+  if (distance >= maxEditDistance ||
+      distance > (correctedBase.size() + 2) / 3) {
     return UnreasonableCallEditDistance;
   }
 
@@ -554,10 +557,8 @@ static bool isLocInVarInit(TypeChecker &TC, VarDecl *var, SourceLoc loc) {
 
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
-                                        DeclName targetDeclName,
-                                        SourceLoc nameLoc,
                                         NameLookupOptions lookupOptions,
-                                        LookupResult &result,
+                                        TypoCorrectionResults &corrections,
                                         GenericSignatureBuilder *gsb,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway or if
@@ -570,19 +571,21 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   ++NumTypoCorrections;
 
   // Fill in a collection of the most reasonable entries.
-  TopCollection<unsigned, ValueDecl*> entries(maxResults);
+  TopCollection<unsigned, ValueDecl *> entries(maxResults);
   auto consumer = makeDeclConsumer([&](ValueDecl *decl,
                                        DeclVisibilityKind reason) {
     // Never match an operator with an identifier or vice-versa; this is
     // not a plausible typo.
-    if (!isPlausibleTypo(refKind, targetDeclName, decl))
+    if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
 
     // Don't suggest a variable within its own initializer.
     if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (isLocInVarInit(*this, var, nameLoc))
+      if (isLocInVarInit(*this, var, corrections.Loc.getBaseNameLoc()))
         return;
     }
+
+    auto candidateName = decl->getFullName();
 
     // Don't waste time computing edit distances that are more than
     // the worst in our collection.
@@ -590,7 +593,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
       entries.getMinUninterestingScore(UnreasonableCallEditDistance);
 
     unsigned distance =
-      getCallEditDistance(targetDeclName, decl->getFullName(), maxDistance);
+      getCallEditDistance(corrections.WrittenName, candidateName,
+                          maxDistance);
 
     // Ignore values that are further than a reasonable distance.
     if (distance >= UnreasonableCallEditDistance)
@@ -603,55 +607,125 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, this,
                              /*include instance members*/ true, gsb);
   } else {
-    lookupVisibleDecls(consumer, DC, this, /*top level*/ true, nameLoc);
+    lookupVisibleDecls(consumer, DC, this, /*top level*/ true,
+                       corrections.Loc.getBaseNameLoc());
   }
 
   // Impose a maximum distance from the best score.
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
 
   for (auto &entry : entries)
-    result.add(LookupResultEntry(entry.Value));
+    corrections.Candidates.push_back(entry.Value);
 }
 
-static InFlightDiagnostic
-diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    // Suggest 'self' at the use point instead of pointing at the start
-    // of the function.
-    if (var->isSelfParameter())
-      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         var->getName().str());
-  }
+void
+TypoCorrectionResults::addAllCandidatesToLookup(LookupResult &lookup) const {
+  for (auto candidate : Candidates)
+    lookup.add(LookupResultEntry(candidate));
+}
 
+static Decl *findExplicitParentForImplicitDecl(ValueDecl *decl) {
   if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
     Decl *parentDecl = dyn_cast<ExtensionDecl>(decl->getDeclContext());
     if (!parentDecl) parentDecl = cast<NominalTypeDecl>(decl->getDeclContext());
+    if (parentDecl->getLoc().isValid())
+      return parentDecl;
+  }
 
-    if (parentDecl->getLoc().isValid()) {
-      StringRef kind = (isa<VarDecl>(decl) ? "property" :
-                        isa<ConstructorDecl>(decl) ? "initializer" :
-                        isa<FuncDecl>(decl) ? "method" :
-                        "member");
+  return nullptr;
+}
 
-      return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
-                         decl->getBaseName().userFacingName(), kind);
+static InFlightDiagnostic
+noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
+                   bool wasClaimed) {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Suggest 'self' at the use point instead of pointing at the start
+    // of the function.
+    if (var->isSelfParameter()) {
+      if (wasClaimed) {
+        // We don't need an extra note for this case because the programmer
+        // knows what 'self' refers to.
+        return InFlightDiagnostic();
+      }
+
+      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
+                         var->getName().str());
     }
   }
 
-  return tc.diagnose(decl, diag::note_typo_candidate,
-                     decl->getBaseName().userFacingName());
+  if (Decl *parentDecl = findExplicitParentForImplicitDecl(decl)) {
+    StringRef kind = (isa<VarDecl>(decl) ? "property" :
+                      isa<ConstructorDecl>(decl) ? "initializer" :
+                      isa<FuncDecl>(decl) ? "method" :
+                      "member");
+
+    return tc.diagnose(parentDecl,
+                       wasClaimed ? diag::implicit_member_declared_here
+                                  : diag::note_typo_candidate_implicit_member,
+                       decl->getBaseName().userFacingName(), kind);
+  }
+
+  if (wasClaimed) {
+    return tc.diagnose(decl, diag::decl_declared_here, decl->getBaseName());
+  } else {
+    return tc.diagnose(decl, diag::note_typo_candidate,
+                       decl->getBaseName().userFacingName());
+  }
 }
 
-void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
-                                     ValueDecl *decl) {
-  auto &&diagnostic = diagnoseTypoCorrection(*this, loc, decl);
+void TypoCorrectionResults::noteAllCandidates() const {
+  for (auto candidate : Candidates) {
+    auto &&diagnostic =
+      noteTypoCorrection(TC, Loc, candidate, ClaimedCorrection);
 
-  DeclName declName = decl->getFullName();
+    // Don't add fix-its if we claimed the correction for the primary
+    // diagnostic.
+    if (!ClaimedCorrection) {
+      SyntacticTypoCorrection correction(WrittenName, Loc,
+                                         candidate->getFullName());
+      correction.addFixits(diagnostic);
+    }
+  }
+}
 
-  if (writtenName.getBaseName() != declName.getBaseName())
-    diagnostic.fixItReplace(loc.getBaseNameLoc(),
-                            declName.getBaseName().userFacingName());
+void SyntacticTypoCorrection::addFixits(InFlightDiagnostic &diagnostic) const {
+  if (WrittenName.getBaseName() != CorrectedName.getBaseName())
+    diagnostic.fixItReplace(Loc.getBaseNameLoc(),
+                            CorrectedName.getBaseName().userFacingName());
 
   // TODO: add fix-its for typo'ed argument labels.  This is trickier
   // because of the reordering rules.
+}
+
+Optional<SyntacticTypoCorrection>
+TypoCorrectionResults::claimUniqueCorrection() {
+  // Look for a unique base name.  We ignore the rest of the name for now
+  // because we don't actually typo-correct any of that.
+  DeclBaseName uniqueCorrectedName;
+  for (auto candidate : Candidates) {
+    auto candidateName = candidate->getBaseName();
+
+    // If this is the first name, record it.
+    if (uniqueCorrectedName.empty())
+      uniqueCorrectedName = candidateName;
+
+    // If this is a different name from the last candidate, we don't have
+    // a unique correction.
+    else if (uniqueCorrectedName != candidateName)
+      return None;
+  }
+
+  // If we didn't find any candidates, we're done.
+  if (uniqueCorrectedName.empty())
+    return None;
+
+  // If the corrected name doesn't differ from the written name in its base
+  // name, it's not simple enough for this (for now).
+  if (WrittenName.getBaseName() == uniqueCorrectedName)
+    return None;
+
+  // Flag that we've claimed the correction.
+  ClaimedCorrection = true;
+
+  return SyntacticTypoCorrection(WrittenName, Loc, uniqueCorrectedName);
 }
