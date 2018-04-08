@@ -200,9 +200,6 @@ bool canSpecializeFunction(SILFunction *F,
                            const CallerAnalysis::FunctionInfo *FuncInfo,
                            bool OptForPartialApply);
 
-/// Return true if this argument is used in a non-trivial way.
-bool hasNonTrivialNonDebugUse(SILArgument *Arg);
-
 } // end namespace swift
 
 #endif
