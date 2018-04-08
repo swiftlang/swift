@@ -4429,8 +4429,9 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// Verify differentiation attribute.
-  void verifyDifferentiableAttr(SILFunction *F, SILDifferentiableAttr &Attr) {
+  /// Verify the [reverse_differentiable] attribute.
+  void verifyReverseDifferentiableAttr(SILFunction *F,
+                                       SILReverseDifferentiableAttr &Attr) {
     // Verify if specified argument indices are valid.
     auto numParams = F->getLoweredFunctionType()->getNumParameters();
     int lastIndex = -1;
@@ -4440,8 +4441,9 @@ public:
       require(currentIdx > lastIndex, "Argument indices not ascending.");
       lastIndex = currentIdx;
     }
-    // TODO: Verify if the specified adjoint function has the right signature.
-    // SIL function verification runs right after a function is parsed.
+    // TODO: Verify if the specified primal/adjoint/gradient function has the
+    // right signature. SIL function verification runs right after a function
+    // is parsed.
     // However, the adjoint function may come after the this function.  Without
     // changing the compiler too much, is there a way to verify this at a module
     // level, after everything is parsed?
@@ -4805,8 +4807,8 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    if (auto *DiffAttr = F->getDifferentiableAttr())
-      verifyDifferentiableAttr(F, *DiffAttr);
+    if (auto *RDiffAttr = F->getReverseDifferentiableAttr())
+      verifyReverseDifferentiableAttr(F, *RDiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())

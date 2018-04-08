@@ -886,8 +886,9 @@ void SILParser::convertRequirements(SILFunction *F,
 /// SWIFT_ENABLE_TENSORFLOW
 /// Parse an adjoint attribute, e.g. `[differentiable wrt 0, 1 adjoint @other]`.
 /// Returns true on error.
-static bool parseDifferentiableAttr(Optional<SILDifferentiableAttr *> &DA,
-                                    SILParser &SP) {
+static bool
+parseReverseDifferentiableAttr(Optional<SILReverseDifferentiableAttr *> &DA,
+                               SILParser &SP) {
   auto &P = SP.P;
   SourceLoc LastLoc = P.getEndOfPreviousLoc();
   // Parse 'wrt'.
@@ -912,21 +913,46 @@ static bool parseDifferentiableAttr(Optional<SILDifferentiableAttr *> &DA,
   while (P.consumeIf(tok::comma))
     if (parseArg())
       return true;
+
+  // Parse a SIL function name, e.g. '@foo'.
+  auto parseFnName = [&P, &LastLoc](Identifier &id) -> bool {
+    return P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+      P.parseIdentifier(id, LastLoc, diag::expected_sil_function_name);
+  };
+
+  // Parse optional 'primal'.
+  Identifier PrimName;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "primal") {
+    P.consumeToken();
+    if (parseFnName(PrimName)) return true;
+  }
   // Parse 'adjoint'.
   Identifier AdjName;
   if (P.parseSpecificIdentifier("adjoint", LastLoc,
-        diag::sil_attr_differentiable_expected_adjoint_identifier))
+        diag::sil_attr_differentiable_expected_adjoint_identifier) ||
+      parseFnName(AdjName))
     return true;
-  /// Parse primal function name, e.g. '@foo'.
-  if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-      P.parseIdentifier(AdjName, LastLoc, diag::expected_sil_function_name))
-    return true;
-  /// Parse ']'.
+  // Parse optional 'gradient'.
+  Identifier GradName;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "gradient") {
+    P.consumeToken();
+    if (parseFnName(GradName)) return true;
+  }
+  // Parse ']'.
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
-  /// Create an AdjointAttr and we are done.
-  DA = SILDifferentiableAttr::create(SP.SILMod, AdjName.get(), ArgIndices);
+  // Convert an Identifier to an Optional<StringRef>.
+  auto toMaybeStringRef = [](Identifier id) -> Optional<StringRef> {
+    if (id.empty()) return None;
+    return id.str();
+  };
+  // Create an AdjointAttr and we are done.
+  DA = SILReverseDifferentiableAttr::create(SP.SILMod,
+                                            toMaybeStringRef(PrimName),
+                                            AdjName.str(),
+                                            toMaybeStringRef(GradName),
+                                            ArgIndices);
   return false;
 }
 
@@ -940,7 +966,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  // SWIFT_ENABLE_TENSORFLOW
-                                 Optional<SILDifferentiableAttr *> *DiffAttr,
+                            Optional<SILReverseDifferentiableAttr *> *RDiffAttr,
                                  ValueDecl **ClangDecl,
                                  EffectsKind *MRK, SILParser &SP) {
   while (SP.P.consumeIf(tok::l_square)) {
@@ -1030,9 +1056,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       continue;
     }
     // SWIFT_ENABLE_TENSORFLOW
-    else if (DiffAttr && SP.P.Tok.getText() == "differentiable") {
+    else if (RDiffAttr && SP.P.Tok.getText() == "reverse_differentiable") {
       SP.P.consumeToken(tok::identifier);
-      if (parseDifferentiableAttr(*DiffAttr, SP))
+      if (parseReverseDifferentiableAttr(*RDiffAttr, SP))
         return true;
       continue;
     }
@@ -5364,7 +5390,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   SmallVector<std::string, 1> Semantics;
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   // SWIFT_ENABLE_TENSORFLOW
-  Optional<SILDifferentiableAttr *> DiffAttr;
+  Optional<SILReverseDifferentiableAttr *> RDiffAttr;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, P) ||
@@ -5373,7 +5399,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
                            &inlineStrategy, &optimizationMode, nullptr,
                            &isWeakLinked, &Semantics, &SpecAttrs,
                            // SWIFT_ENABLE_TENSORFLOW
-                           &DiffAttr,
+                           &RDiffAttr,
                            &ClangDecl, &MRK, FunctionState) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5404,8 +5430,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     // SWIFT_ENABLE_TENSORFLOW
-    if (DiffAttr)
-      FunctionState.F->setDifferentiableAttr(*DiffAttr);
+    if (RDiffAttr)
+      FunctionState.F->setReverseDifferentiableAttr(*RDiffAttr);
     FunctionState.F->setEffectsKind(MRK);
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);

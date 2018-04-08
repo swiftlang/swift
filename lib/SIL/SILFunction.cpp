@@ -57,24 +57,34 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-SILDifferentiableAttr::SILDifferentiableAttr(StringRef adjointName,
-                                             ArrayRef<unsigned> argIndices)
-  : AdjointName(adjointName), NumArgIndices(argIndices.size()) {
+SILReverseDifferentiableAttr::
+SILReverseDifferentiableAttr(Optional<StringRef> primalName,
+                             StringRef adjointName,
+                             Optional<StringRef> gradientName,
+                             ArrayRef<unsigned> argIndices)
+  : PrimalName(primalName), AdjointName(adjointName),
+    GradientName(gradientName), NumArgIndices(argIndices.size()) {
   std::copy(argIndices.begin(), argIndices.end(), getArgIndicesData());
 }
 
-SILDifferentiableAttr *
-SILDifferentiableAttr::create(SILModule &M, StringRef adjointName,
-                              ArrayRef<unsigned> argIndices) {
+SILReverseDifferentiableAttr *
+SILReverseDifferentiableAttr::create(SILModule &M,
+                                     Optional<StringRef> primalName,
+                                     StringRef adjointName,
+                                     Optional<StringRef> gradientName,
+                                     ArrayRef<unsigned> argIndices) {
   size_t size =
-    sizeof(SILDifferentiableAttr) + argIndices.size() * sizeof(unsigned);
-  void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
-  return ::new (mem) SILDifferentiableAttr(adjointName, argIndices);
+    sizeof(SILReverseDifferentiableAttr) + argIndices.size() * sizeof(unsigned);
+  void *mem = M.allocate(size, alignof(SILReverseDifferentiableAttr));
+  return ::new (mem) SILReverseDifferentiableAttr(primalName, adjointName,
+                                                  gradientName, argIndices);
 }
 
-ArrayRef<unsigned> SILDifferentiableAttr::getArgIndices() const {
-  return { const_cast<SILDifferentiableAttr *>(this)->getArgIndicesData(),
-           NumArgIndices };
+ArrayRef<unsigned> SILReverseDifferentiableAttr::getArgIndices() const {
+  return {
+    const_cast<SILReverseDifferentiableAttr *>(this)->getArgIndicesData(),
+    NumArgIndices
+  };
 }
 
 SILFunction *SILFunction::create(
