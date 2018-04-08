@@ -716,21 +716,21 @@ ERROR(gradient_expr_not_a_function,none,
       (Type))
 ERROR(gradient_expr_primal_func_decl_unresolved,none,
       "primal function declaration could not be resolved", ())
-ERROR(gradient_expr_argument_self_not_first,none,
-      "the 'self' argument must be the first in the argument list", ())
-ERROR(gradient_expr_argument_self_not_in_instance_context,none,
-      "a 'self' argument can only be used in an instance declaration context "
+ERROR(gradient_expr_parameter_self_not_first,none,
+      "the 'self' parameter must be the first in the parameter list", ())
+ERROR(gradient_expr_parameter_self_not_in_instance_context,none,
+      "a 'self' parameter can only be used in an instance declaration context "
       "where the function being differentiated is also located", ())
-ERROR(gradient_expr_argument_indices_not_ascending,none,
-      "argument indices must be ascending", ())
-ERROR(gradient_expr_argument_index_out_of_bounds,none,
-      "the argument index is out of bounds for type %0, which has %1 arguments",
-      (Type, unsigned))
-ERROR(gradient_expr_argument_not_value_type,none,
-      "the argument referred to has non-value type %0 and thus cannot be an "
-      "argument for differentiation", (Type))
-ERROR(gradient_expr_argument_not_differentiable,none,
-      "gradient argument has non-differentiable type %0", (Type))
+ERROR(gradient_expr_parameter_indices_not_ascending,none,
+      "parameter indices must be ascending", ())
+ERROR(gradient_expr_parameter_index_out_of_bounds,none,
+      "the parameter index is out of bounds for type %0, which has %1"
+      "parameters", (Type, unsigned))
+ERROR(gradient_expr_parameter_not_value_type,none,
+      "gradient parameter has non-value type %0 and thus cannot be a "
+      "differentiation parameter", (Type))
+ERROR(gradient_expr_parameter_not_differentiable,none,
+      "gradient parameter has non-differentiable type %0", (Type))
 ERROR(gradient_expr_incompatible_contextual_type,none,
       "cannot convert gradient expression to incompatible contextual type %0",
       (Type))
@@ -2466,26 +2466,28 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
       (DeclName, DeclName))
 
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(differentiable_attr_no_arguments,none,
-      "%0 has no arguments to differentiate with respect to", (DeclName))
+ERROR(differentiable_attr_no_parameters,none,
+      "%0 has no parameters to differentiate with respect to", (DeclName))
 ERROR(differentiable_attr_gradient_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_wrt_self_must_be_first,none,
-      "'self' argument must come first in the argument list", ())
+      "'self' parameter must come first in the parameter list", ())
 ERROR(differentiable_attr_wrt_indices_must_be_ascending,none,
-      "argument indices must be ascending", ())
+      "parameter indices must be ascending", ())
 ERROR(differentiable_attr_wrt_index_out_of_bounds,none,
-      "argument index out of bounds", ())
+      "parameter index out of bounds", ())
 ERROR(differentiable_attr_wrt_self_instance_method_only,none,
-      "'self' argument is only applicable to instance methods", ())
+      "'self' parameter is only applicable to instance methods", ())
 ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,
-      "class objects and protocol existentials (%0) cannot be differentiated with respect to", (Type))
+      "class objects and protocol existentials (%0) cannot be differentiated "
+      "with respect to", (Type))
 ERROR(differentiable_attr_adjoint_not_same_type_context,none,
       "%0 is not defined in the current declaration context", (DeclName))
 ERROR(differentiable_attr_specified_adjoint_not_function,none,
       "%0 is not a function to be used as adjoint", (DeclName))
 ERROR(differentiable_attr_ambiguous_adjoint_identifier,none,
-      "ambiguous or overloaded identifier %0 cannot be used in @differentiable attribute", (DeclName))
+      "ambiguous or overloaded identifier %0 cannot be used in @differentiable "
+      "attribute", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions

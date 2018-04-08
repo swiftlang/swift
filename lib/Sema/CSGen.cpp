@@ -1297,54 +1297,54 @@ namespace {
       // Compute the gradient type.
       auto primalParams = primalTy->getParams();
       auto *genSig = primalTy->getOptGenericSignature();
-      // Collect differentiation argument types.
-      SmallVector<TupleTypeElt, 8> diffArgTypes;
-      // If no arguments are given, then differentiation is done with respect to
-      // all arguments (except self). The gradient's result type is all of the
+      // Collect differentiation parameter types.
+      SmallVector<TupleTypeElt, 8> diffParamTypes;
+      // If no parameters are given, then differentiation is done with respect to
+      // all parameters (except self). The gradient's result type is all of the
       // primal parameters' types.
-      if (GE->getArguments().empty())
+      if (GE->getParameters().empty())
         for (auto &primalParam : primalParams)
-          diffArgTypes.push_back(primalParam.getType());
-      // If arguments are specified, collect and type-check those arguments.
+          diffParamTypes.push_back(primalParam.getType());
+      // If parameters are specified, collect and type-check those parameters.
       else {
         int lastIndex = -1;
-        for (auto &arg : GE->getArguments()) {
-          switch (arg.getKind()) {
-          case AutoDiffArgument::Kind::Index: {
-            auto index = arg.getIndex();
+        for (auto &param : GE->getParameters()) {
+          switch (param.getKind()) {
+          case AutoDiffParameter::Kind::Index: {
+            auto index = param.getIndex();
             // Indices must be ascending.
             if (lastIndex >= (int)index) {
-              TC.diagnose(arg.getLoc(),
-                          diag::gradient_expr_argument_indices_not_ascending);
+              TC.diagnose(param.getLoc(),
+                          diag::gradient_expr_parameter_indices_not_ascending);
               return nullptr;
             }
-            // Indices cannot exceed the number of arguments in the primal
+            // Indices cannot exceed the number of parameters in the primal
             // function.
             if (index >= primalParams.size()) {
-              TC.diagnose(arg.getLoc(),
-                          diag::gradient_expr_argument_index_out_of_bounds,
+              TC.diagnose(param.getLoc(),
+                          diag::gradient_expr_parameter_index_out_of_bounds,
                           primalTy, primalParams.size());
               return nullptr;
             }
-            // The argument cannot be a reference object or a protocol
+            // The parameter cannot be a reference object or a protocol
             // existential.
             auto paramTy = primalParams[index].getType();
             if (paramTy->isAnyClassReferenceType() ||
                 paramTy->isExistentialType()) {
-              TC.diagnose(arg.getLoc(),
-                          diag::gradient_expr_argument_not_value_type,
+              TC.diagnose(param.getLoc(),
+                          diag::gradient_expr_parameter_not_value_type,
                           paramTy);
               return nullptr;
             }
             lastIndex = index;
-            diffArgTypes.push_back(paramTy);
+            diffParamTypes.push_back(paramTy);
             break;
           }
-          case AutoDiffArgument::Kind::Self: {
-            // Self must come first in the argument list.
+          case AutoDiffParameter::Kind::Self: {
+            // Self must come first in the parameter list.
             if (lastIndex != -1) {
-              TC.diagnose(arg.getLoc(),
-                          diag::gradient_expr_argument_self_not_first);
+              TC.diagnose(param.getLoc(),
+                          diag::gradient_expr_parameter_self_not_first);
               return nullptr;
             }
             // To use 'self', #gradient must be located in an instance type
@@ -1352,8 +1352,8 @@ namespace {
             auto *method = CurDC->getInnermostMethodContext();
             // Must be within an instance method to use 'self'.
             if (!method || !method->isInstanceMember()) {
-              TC.diagnose(arg.getLoc(),
-                     diag::gradient_expr_argument_self_not_in_instance_context);
+              TC.diagnose(param.getLoc(),
+                    diag::gradient_expr_parameter_self_not_in_instance_context);
               return nullptr;
             }
             // 'self' cannot be a reference or existential type.
@@ -1361,52 +1361,52 @@ namespace {
             auto selfTy = selfDecl->getType();
             if (selfTy->isAnyClassReferenceType() ||
                 selfTy->isExistentialType()) {
-              TC.diagnose(arg.getLoc(),
-                        diag::gradient_expr_argument_not_value_type, selfTy);
+              TC.diagnose(param.getLoc(),
+                        diag::gradient_expr_parameter_not_value_type, selfTy);
               return nullptr;
             }
             // 'self' type must conform to either FloatingPoint or
             // Differentiable.
             if (!CS.TC.isConvertibleTo(selfTy, diffProtoTy, CurDC)) {
-              TC.diagnose(arg.getLoc(),
-                          diag::gradient_expr_argument_not_differentiable,
+              TC.diagnose(param.getLoc(),
+                          diag::gradient_expr_parameter_not_differentiable,
                           selfTy);
               return nullptr;
             }
             // Collect the type.
-            diffArgTypes.push_back(selfTy);
+            diffParamTypes.push_back(selfTy);
             break;
           }
           }
         }
       }
 
-      // Differentiation argument types must conform to Differentiable.
+      // Differentiation parameter types must conform to Differentiable.
       // TODO: consider generalizing to aggregate types of Differentiable.
-      for (auto &arg : diffArgTypes) {
-        auto argTy = arg.getType();
-        // If diff arg type does not have type variables, it must conform to
-        // Differentiable.
-        // NOTE: It is intentional that diff arg types with type variables are
-        // not constrained to Differentiable. Instead, conformance to
+      for (auto &param : diffParamTypes) {
+        auto paramTy = param.getType();
+        // If diff parameter type does not have type variables, it must conform
+        // to Differentiable.
+        // NOTE: It is intentional that diff parameter types with type variables
+        // are not constrained to Differentiable. Instead, conformance to
         // Differentiable is checked in CSApply to produce better diagnostics
         // about specific non-differentiable types.
-        if (!argTy->hasTypeVariable() &&
-            !CS.TC.isConvertibleTo(argTy, diffProtoTy, CurDC)) {
+        if (!paramTy->hasTypeVariable() &&
+            !CS.TC.isConvertibleTo(paramTy, diffProtoTy, CurDC)) {
           TC.diagnose(GE->getLoc(),
-                      diag::gradient_expr_argument_not_differentiable, argTy);
+                      diag::gradient_expr_parameter_not_differentiable, paramTy);
           return nullptr;
         }
       }
 
       // Create a type for the gradient. The gradient has the same generic
       // signature as the primal function. The gradient's result types are
-      // what we collected in `diffArgTypes`.
-      Type gradResult = diffArgTypes.size() == 1
-        ? diffArgTypes.front().getType()
-        : TupleType::get(diffArgTypes, TC.Context);
+      // what we collected in `diffParamTypes`.
+      Type gradResult = diffParamTypes.size() == 1
+        ? diffParamTypes.front().getType()
+        : TupleType::get(diffParamTypes, TC.Context);
       // If preserving primal result, then the gradient's result type is a tuple
-      // of the primal result type with label "value" and `diffArgTypes` with
+      // of the primal result type with label "value" and `diffParamTypes` with
       // label "gradient".
       if (preservingPrimalResult) {
         gradResult = TupleType::get({

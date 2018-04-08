@@ -789,7 +789,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   }
 
   // Parse optional 'withRespectTo:' label.
-  SmallVector<AutoDiffArgument, 8> args;
+  SmallVector<AutoDiffParameter, 8> params;
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
@@ -799,41 +799,41 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     }
     SourceLoc leftLoc;
     if (parseToken(tok::l_paren, leftLoc,
-                   diag::attr_differentiable_expected_argument_list)) {
+                   diag::attr_differentiable_expected_parameter_list)) {
       return errorAndSkipToEnd();
     }
-    // Function that parses an argument into `args`. Returns true if error
+    // Function that parses a parameter into `params`. Returns true if error
     // occurred.
-    auto parseArg = [&]() -> bool {
-      SourceLoc argLoc;
+    auto parseParam = [&]() -> bool {
+      SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::period_prefix:
         consumeToken(tok::period_prefix);
         unsigned index;
-        if (parseUnsignedInteger(index, argLoc,
-                                 diag::attr_differentiable_expected_argument))
+        if (parseUnsignedInteger(index, paramLoc,
+                                 diag::attr_differentiable_expected_parameter))
           return true;
-        args.push_back(
-          AutoDiffArgument::getIndexArgument(argLoc, index));
+        params.push_back(
+          AutoDiffParameter::getIndexParameter(paramLoc, index));
         break;
       case tok::kw_self:
-        argLoc = consumeToken(tok::kw_self);
-        args.push_back(AutoDiffArgument::getSelfArgument(argLoc));
+        paramLoc = consumeToken(tok::kw_self);
+        params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
         break;
       default:
-        diagnose(Tok, diag::attr_differentiable_expected_argument);
+        diagnose(Tok, diag::attr_differentiable_expected_parameter);
         return true;
       }
       return false;
     };
-    // Parse first argument.
-    if (parseArg())
+    // Parse first parameter.
+    if (parseParam())
       return errorAndSkipToEnd(2);
-    // Parse rest arguments until ')'.
+    // Parse remaining parameters until ')'.
     while (!consumeIf(tok::r_paren)) {
       if (parseToken(tok::comma, diag::attr_expected_comma,
                      "differentiable", /*isDeclModifier=*/false) ||
-          parseArg()) {
+          parseParam()) {
         return errorAndSkipToEnd(2);
       }
     }
@@ -885,7 +885,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
-                               args, gradFuncName, gradFuncNameLoc,
+                               params, gradFuncName, gradFuncNameLoc,
                                whereClause));
 }
 

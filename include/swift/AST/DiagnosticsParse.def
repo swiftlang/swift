@@ -1457,25 +1457,25 @@ ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a qualified function to differentiate", ())
 
 ERROR(attr_differentiable_missing_lsquare,PointsToFirstBadToken,
-      "missing '[' for argument index list", ())
+      "missing '[' for parameter index list", ())
 
 ERROR(attr_differentiable_missing_rsquare,PointsToFirstBadToken,
-      "missing ']' for argument index list", ())
+      "missing ']' for parameter index list", ())
 
-ERROR(attr_differentiable_expected_argument_list,PointsToFirstBadToken,
-      "expected a list of arguments to differentiate with respect to, e.g. (.0, w, b)", ())
+ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
+      "expected a list of parameters to differentiate with respect to, e.g. (.0, w, b)", ())
 
-ERROR(attr_differentiable_expected_argument,PointsToFirstBadToken,
-      "expected an argument, which can be the index of a function argument with a leading dot (e.g. '.0'), or 'self'", ())
+ERROR(attr_differentiable_expected_parameter,PointsToFirstBadToken,
+      "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
 
-ERROR(attr_differentiable_argument_index_must_be_positive_integer,PointsToFirstBadToken,
-      "gradient argument index must be a positive integer", ())
+ERROR(attr_differentiable_parameter_index_must_be_positive_integer,PointsToFirstBadToken,
+      "gradient parameter index must be a positive integer", ())
 
 ERROR(attr_differentiable_nondifferentiable_function,none,
       "function '%0' is not differentiable", (StringRef))
 
-ERROR(attr_differentiable_invalid_argument_indices,none,
-      "gradient argument indices '%0' are invalid", (StringRef))
+ERROR(attr_differentiable_invalid_parameter_indices,none,
+      "gradient parameter indices '%0' are invalid", (StringRef))
 
 ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after label '%0' in 'gradient' attribute", (StringRef))
@@ -1499,15 +1499,15 @@ ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
 ERROR(sil_attr_differentiable_expected_adjoint_identifier,PointsToFirstBadToken,
       "expected the identifier of an adjoint function", ())
 
-ERROR(sil_attr_differentiable_expected_argument_list,PointsToFirstBadToken,
-      "expected an comma-separated list of argument indices, e.g. (0, 1)", ())
+ERROR(sil_attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
+      "expected an comma-separated list of parameter indices, e.g. (0, 1)", ())
 
 ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
       "expected ']' to end 'differentiable' attribute", ())
 
 // SIL autodiff
-ERROR(sil_reverse_autodiff_expected_argument_index,PointsToFirstBadToken,
-      "expected the index of an argument to differentiate with respect to", ())
+ERROR(sil_reverse_autodiff_expected_parameter_index,PointsToFirstBadToken,
+      "expected the index of a parameter to differentiate with respect to", ())
 
 ERROR(sil_gradient_invalid_seed_type,PointsToFirstBadToken,
       "expected seed '%0' to have type %1", (StringRef, Type))
@@ -1660,8 +1660,8 @@ ERROR(gradient_expr_expected_label,none,
       "expected label '%0' in '#gradient' expression", (StringRef))
 ERROR(gradient_expr_expected_expression,none,
       "expected an expression representing the function to be differentiated", ())
-ERROR(gradient_expr_expected_argument,none,
-      "expected an argument, which can be the index of a function argument with a leading dot (e.g. '.0'), or 'self'", ())
+ERROR(gradient_expr_expected_parameter,none,
+      "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

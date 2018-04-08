@@ -895,23 +895,23 @@ parseReverseDifferentiableAttr(Optional<SILReverseDifferentiableAttr *> &DA,
   if (P.parseSpecificIdentifier(
         "wrt", diag::sil_attr_differentiable_expected_keyword, "wrt"))
     return true;
-  // Parse argument index list.
-  SmallVector<unsigned, 8> ArgIndices;
-  // Function that parses an index into `Indices`. Returns true on error.
-  auto parseArg = [&]() -> bool {
+  // Parse parameter index list.
+  SmallVector<unsigned, 8> ParamIndices;
+  // Function that parses an index into `ParamIndices`. Returns true on error.
+  auto parseParam = [&]() -> bool {
     unsigned Index;
     if (P.parseUnsignedInteger(Index, LastLoc,
-          diag::sil_reverse_autodiff_expected_argument_index))
+          diag::sil_reverse_autodiff_expected_parameter_index))
       return true;
-    ArgIndices.push_back(Index);
+    ParamIndices.push_back(Index);
     return false;
   };
   // Parse first.
-  if (parseArg())
+  if (parseParam())
     return true;
   // Parse rest.
   while (P.consumeIf(tok::comma))
-    if (parseArg())
+    if (parseParam())
       return true;
 
   // Parse a SIL function name, e.g. '@foo'.
@@ -952,7 +952,7 @@ parseReverseDifferentiableAttr(Optional<SILReverseDifferentiableAttr *> &DA,
                                             toMaybeStringRef(PrimName),
                                             AdjName.str(),
                                             toMaybeStringRef(GradName),
-                                            ArgIndices);
+                                            ParamIndices);
   return false;
 }
 
@@ -2642,16 +2642,16 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::AutoDiffReverseInst: {
     // Parse optional [wrt ...].
-    SmallVector<unsigned, 8> argIndices;
+    SmallVector<unsigned, 8> paramIndices;
     if (P.consumeIf(tok::l_square)) {
       if (parseVerbatim("wrt")) return true;
       auto parseIndex = [&] {
         unsigned index;
         SourceLoc indexLoc;
         if (P.parseUnsignedInteger(index, indexLoc,
-              diag::sil_reverse_autodiff_expected_argument_index))
+              diag::sil_reverse_autodiff_expected_parameter_index))
           return true;
-        argIndices.push_back(index);
+        paramIndices.push_back(index);
         return false;
       };
       if (parseIndex())
@@ -2685,7 +2685,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createAutoDiffReverse(
-      InstLoc, primalFn, argIndices, seedable, preservingResult);
+      InstLoc, primalFn, paramIndices, seedable, preservingResult);
     break;
   }
 
@@ -2699,7 +2699,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         unsigned index;
         SourceLoc indexLoc;
         if (P.parseUnsignedInteger(index, indexLoc,
-              diag::sil_reverse_autodiff_expected_argument_index))
+              diag::sil_reverse_autodiff_expected_parameter_index))
           return true;
         paramIndices.push_back(index);
         return false;

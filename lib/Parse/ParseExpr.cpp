@@ -3632,11 +3632,11 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///   expr-gradient-body:
 ///     '('
 ///       'of' ':' expr
-///       (',' 'withRespectTo' ':' expr-gradient-arg-list)?
+///       (',' 'withRespectTo' ':' expr-gradient-param-list)?
 ///     ')'
-///   expr-gradient-args:
-///     expr-gradient-arg-index (',' expr-gradient-arg-index)*
-///   expr-gradient-arg-index:
+///   expr-gradient-param-list:
+///     expr-gradient-param-index (',' expr-gradient-param-index)*
+///   expr-gradient-param-index:
 ///     'self' | '.' [0-9]+
 ///
 ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
@@ -3667,7 +3667,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
   if (primalParseResult.isParseError())
     return errorAndSkipToEnd();
   // If found comma, parse 'withRespectTo:'.
-  SmallVector<AutoDiffArgument, 8> args;
+  SmallVector<AutoDiffParameter, 8> params;
   if (consumeIf(tok::comma)) {
     // Parse 'withRespectTo' ':'.
     if (parseSpecificIdentifier("withRespectTo",
@@ -3675,35 +3675,35 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
                                 "withRespectTo:") ||
         parseToken(tok::colon, diag::expected_parameter_colon))
       return errorAndSkipToEnd();
-    // Function that parses one argument.
-    auto parseArg = [&]() -> bool {
-      SourceLoc argLoc;
+    // Function that parses one parameter.
+    auto parseParam = [&]() -> bool {
+      SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::period_prefix:
         consumeToken(tok::period_prefix);
         unsigned index;
-        if (parseUnsignedInteger(index, argLoc,
-                                 diag::gradient_expr_expected_argument))
+        if (parseUnsignedInteger(index, paramLoc,
+                                 diag::gradient_expr_expected_parameter))
           return true;
-        args.push_back(
-          AutoDiffArgument::getIndexArgument(argLoc, index));
+        params.push_back(
+          AutoDiffParameter::getIndexParameter(paramLoc, index));
         break;
       case tok::kw_self:
-        argLoc = consumeToken(tok::kw_self);
-        args.push_back(AutoDiffArgument::getSelfArgument(argLoc));
+        paramLoc = consumeToken(tok::kw_self);
+        params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
         break;
       default:
-        diagnose(Tok, diag::gradient_expr_expected_argument);
+        diagnose(Tok, diag::gradient_expr_expected_parameter);
         return true;
       }
       return false;
     };
-    // Parse first argument.
-    if (parseArg())
+    // Parse first parameter.
+    if (parseParam())
       return errorAndSkipToEnd();
-    // Parse the rest of arguments, ending with ')'.
+    // Parse the remaining parameters, ending with ')'.
     while (consumeIf(tok::comma))
-      if (parseArg())
+      if (parseParam())
         return errorAndSkipToEnd();
   }
   // Parse the closing ')'.
@@ -3714,9 +3714,9 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
   // Successfully parsed a #gradient expression.
   Expr *result = isValueAndGradient
     ? (Expr *)ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
-                                           primalParseResult.get(), args,
+                                           primalParseResult.get(), params,
                                            rParenLoc)
     : (Expr *)GradientExpr::create(Context, poundGradLoc, lParenLoc,
-                                   primalParseResult.get(), args, rParenLoc);
+                                   primalParseResult.get(), params, rParenLoc);
   return makeParserResult<Expr>(result);
 }
