@@ -17,5 +17,7 @@ APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) h
 APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [String] to [AnimalAttributeName]
 APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [String : Any]? to [AnimalAttributeName : Any]?
 APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributesArray(_:) has parameter 0 type change from [String]? to [AnimalAttributeName]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleAttribute(_:) has parameter 0 type change from String to AnimalAttributeName
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleOptionalAttribute(_:) has parameter 0 type change from String? to AnimalAttributeName?
 
 /* Decl Attribute changes */

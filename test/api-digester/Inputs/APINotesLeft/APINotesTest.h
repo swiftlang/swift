@@ -23,4 +23,6 @@ extern int ANTGlobalValue;
 - (nonnull AnimalStatusDescriptor *)animalStatusDescriptorByAddingOptionalAttributes:(nullable NSDictionary<NSString*, id> *)attributes;
 - (nonnull AnimalStatusDescriptor *)animalStatusDescriptorByAddingAttributesArray:(nonnull NSArray<NSString*> *)attributes;
 - (nonnull AnimalStatusDescriptor *)animalStatusDescriptorByAddingOptionalAttributesArray:(nullable NSArray<NSString*> *)attributes;
++ (nonnull AnimalStatusDescriptor *)animalStatusSingleOptionalAttribute:(nullable NSString *)attributes;
++ (nonnull AnimalStatusDescriptor *)animalStatusSingleAttribute:(nonnull NSString *)attributes;
 @end
