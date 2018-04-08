@@ -933,21 +933,21 @@ public:
     auto primalFn = ADRI->getPrimalFunction();
     auto primalTy = primalFn->getLoweredFunctionType();
     auto config = ADRI->getConfiguration();
-    SmallVector<unsigned, 8> allArgIndices;
-    ArrayRef<unsigned> argIndices = config.argumentIndices;
-    // If no differentiation arguments are specified, all of primal's arguments
-    // are bring differentiated with respect to. For simplicity, we add all
-    // argument indices to a temporary.
-    if (config.argumentIndices.empty()) {
+    SmallVector<unsigned, 8> allParamIndices;
+    ArrayRef<unsigned> paramIndices = config.parameterIndices;
+    // If no differentiation parameters are specified, differentiation is done
+    // with respect to all of original's parameters. For simplicity, we add all
+    // parameter indices to a temporary.
+    if (config.parameterIndices.empty()) {
       for (unsigned i = 0, n = primalTy->getNumParameters(); i != n; ++i)
-        allArgIndices.push_back(i);
-      argIndices = allArgIndices;
+        allParamIndices.push_back(i);
+      paramIndices = allParamIndices;
     }
-    // Verify differentiation arguments.
+    // Verify differentiation parameters.
     int lastIndex = -1;
-    for (unsigned i = 0, n = argIndices.size(); i != n; ++i) {
-      auto index = argIndices[i];
-      require((int)index > lastIndex, "Argument indices must be ascending");
+    for (unsigned i = 0, n = paramIndices.size(); i != n; ++i) {
+      auto index = paramIndices[i];
+      require((int)index > lastIndex, "Parameter indices must be ascending");
       auto paramTy = primalTy->getParameters()[index].getType();
       require(!(paramTy.isAnyClassReferenceType() ||
                 paramTy.isAnyExistentialType()),
@@ -968,24 +968,21 @@ public:
     require(origFnTy, "Original function value must have function type");
     SILFunction *F = GI->getFunction();
     auto config = GI->getConfiguration();
-    SmallVector<unsigned, 8> allArgIndices;
-    ArrayRef<unsigned> argIndices = config.argumentIndices;
-    // If no differentiation arguments are specified, all of original's
-    // arguments are bring differentiated with respect to. For simplicity, we
-    // add all argument indices to a temporary.
-    // If no differentiation arguments are specified, differentiation is done
-    // with respect to all of original's arguments. For simplicity, we add all
+    SmallVector<unsigned, 8> allParamIndices;
+    ArrayRef<unsigned> paramIndices = config.parameterIndices;
+    // If no differentiation parameters are specified, differentiation is done
+    // with respect to all of original's parameters. For simplicity, we add all
     // parameter indices to a temporary.
-    if (config.argumentIndices.empty()) {
+    if (config.parameterIndices.empty()) {
       for (unsigned i = 0, n = origFnTy->getNumParameters(); i != n; ++i)
-        allArgIndices.push_back(i);
-      argIndices = allArgIndices;
+        allParamIndices.push_back(i);
+      paramIndices = allParamIndices;
     }
-    // Verify differentiation arguments.
+    // Verify differentiation parameters.
     int lastIndex = -1;
-    for (unsigned i = 0, n = argIndices.size(); i != n; ++i) {
-      auto index = argIndices[i];
-      require((int)index > lastIndex, "Argument indices must be ascending");
+    for (unsigned i = 0, n = paramIndices.size(); i != n; ++i) {
+      auto index = paramIndices[i];
+      require((int)index > lastIndex, "Parameter indices must be ascending");
       auto paramTy = origFnTy->getParameters()[index].getType();
       require(!(paramTy.isAnyClassReferenceType() ||
                 paramTy.isAnyExistentialType()),
@@ -4297,13 +4294,13 @@ public:
   /// Verify the [reverse_differentiable] attribute.
   void verifyReverseDifferentiableAttr(SILFunction *F,
                                        SILReverseDifferentiableAttr &Attr) {
-    // Verify if specified argument indices are valid.
+    // Verify if specified parameter indices are valid.
     auto numParams = F->getLoweredFunctionType()->getNumParameters();
     int lastIndex = -1;
-    for (auto argIdx : Attr.getArgIndices()) {
-      require(argIdx < numParams, "Argument index out of bounds.");
-      auto currentIdx = (int)argIdx;
-      require(currentIdx > lastIndex, "Argument indices not ascending.");
+    for (auto paramIdx : Attr.getParamIndices()) {
+      require(paramIdx < numParams, "Parameter index out of bounds.");
+      auto currentIdx = (int)paramIdx;
+      require(currentIdx > lastIndex, "Parameter indices not ascending.");
       lastIndex = currentIdx;
     }
     // TODO: Verify if the specified primal/adjoint/gradient function has the

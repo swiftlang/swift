@@ -60,10 +60,10 @@ SILReverseDifferentiableAttr::
 SILReverseDifferentiableAttr(Optional<StringRef> primalName,
                              StringRef adjointName,
                              Optional<StringRef> gradientName,
-                             ArrayRef<unsigned> argIndices)
+                             ArrayRef<unsigned> paramIndices)
   : PrimalName(primalName), AdjointName(adjointName),
-    GradientName(gradientName), NumArgIndices(argIndices.size()) {
-  std::copy(argIndices.begin(), argIndices.end(), getArgIndicesData());
+    GradientName(gradientName), NumParamIndices(paramIndices.size()) {
+  std::copy(paramIndices.begin(), paramIndices.end(), getParamIndicesData());
 }
 
 SILReverseDifferentiableAttr *
@@ -71,18 +71,18 @@ SILReverseDifferentiableAttr::create(SILModule &M,
                                      Optional<StringRef> primalName,
                                      StringRef adjointName,
                                      Optional<StringRef> gradientName,
-                                     ArrayRef<unsigned> argIndices) {
+                                     ArrayRef<unsigned> paramIndices) {
   size_t size =
-    sizeof(SILReverseDifferentiableAttr) + argIndices.size() * sizeof(unsigned);
+    sizeof(SILReverseDifferentiableAttr) + paramIndices.size() * sizeof(unsigned);
   void *mem = M.allocate(size, alignof(SILReverseDifferentiableAttr));
   return ::new (mem) SILReverseDifferentiableAttr(primalName, adjointName,
-                                                  gradientName, argIndices);
+                                                  gradientName, paramIndices);
 }
 
-ArrayRef<unsigned> SILReverseDifferentiableAttr::getArgIndices() const {
+ArrayRef<unsigned> SILReverseDifferentiableAttr::getParamIndices() const {
   return {
-    const_cast<SILReverseDifferentiableAttr *>(this)->getArgIndicesData(),
-    NumArgIndices
+    const_cast<SILReverseDifferentiableAttr *>(this)->getParamIndicesData(),
+    NumParamIndices
   };
 }
 

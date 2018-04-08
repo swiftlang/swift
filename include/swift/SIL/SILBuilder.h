@@ -403,12 +403,12 @@ public:
   /// SWIFT_ENABLE_TENSORFLOW
   AutoDiffReverseInst *createAutoDiffReverse(SILLocation loc,
                                              SILFunction *primal,
-                                             ArrayRef<unsigned> argIndices,
+                                             ArrayRef<unsigned> paramIndices,
                                              bool seedable,
                                              bool preservingResult) {
     return insert(AutoDiffReverseInst::create(getModule(),
                                               getSILDebugLocation(loc),
-                                              primal, argIndices, seedable,
+                                              primal, paramIndices, seedable,
                                               preservingResult));
   }
 

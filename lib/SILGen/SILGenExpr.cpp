@@ -2974,26 +2974,26 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
   // Compute SIL gradient type.
   auto primalTy = primalFn.getLoweredFunctionType();
 
-  // If differentiation arguments are specified, lower them to SIL argument
+  // If differentiation parameters are specified, lower them to SIL parameter
   // indices.
-  SmallVector<unsigned, 8> loweredArgIndices;
+  SmallVector<unsigned, 8> loweredParamIndices;
   gradName += '_';
-  if (!E->getArguments().empty()) {
-    interleave(E->getArguments(), [&](AutoDiffArgument arg) {
-      switch (arg.getKind()) {
-      case swift::AutoDiffArgument::Kind::Index: {
+  if (!E->getParameters().empty()) {
+    interleave(E->getParameters(), [&](AutoDiffParameter param) {
+      switch (param.getKind()) {
+      case swift::AutoDiffParameter::Kind::Index: {
         auto silParamIndices =
-          SGF.SGM.getLoweredFunctionParameterIndex(arg.getIndex(), primalDecl);
+          SGF.SGM.getLoweredFunctionParameterIndex(param.getIndex(), primalDecl);
         for (auto idx : silParamIndices) {
-          loweredArgIndices.push_back(idx);
+          loweredParamIndices.push_back(idx);
           gradName += std::to_string(idx);
         }
         break;
       }
-      case swift::AutoDiffArgument::Kind::Self:
-        // `self` is the last argument of the SIL function.
+      case swift::AutoDiffParameter::Kind::Self:
+        // `self` is the last parameter of the SIL function.
         auto selfIdx = primalTy->getNumParameters() - 1;
-        loweredArgIndices.push_back(selfIdx);
+        loweredParamIndices.push_back(selfIdx);
         gradName += std::to_string(selfIdx);
         break;
       }
@@ -3010,7 +3010,7 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
   // Find the gradient function. If the gradient has been emitted, just use
   // that. Otherwise, create a new function containing an `autodiff_reverse`.
   SILAutoDiffConfiguration config {
-    loweredArgIndices,
+    loweredParamIndices,
     /*seedable*/false,
     /*preservingResult*/false
   };
@@ -3038,7 +3038,7 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
     createEntryArguments(gradFn);
     
     gradSGF.B.createAutoDiffReverse(SILLocation(E), &primalFn,
-                                    loweredArgIndices, config.seedable,
+                                    loweredParamIndices, config.seedable,
                                     config.preservingResult);
     gradSGF.B.clearInsertionPoint();
     // Cache this gradient for this primal function and this autodiff

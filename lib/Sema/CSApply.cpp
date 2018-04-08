@@ -2430,27 +2430,28 @@ namespace {
       Type diffProtoTy = ctx.getProtocol(KnownProtocolKind::Differentiable)
         ->getDeclaredInterfaceType();
 
-      // Verify that diff arguments conform to Differentiable.
+      // Verify that differentiation parameters conform to Differentiable.
       auto primalType = cs.getType(primalExpr)->getAs<AnyFunctionType>();
       assert(primalType && "Primal should have function type");
       auto gradParams = gradFnType->getParams();
       assert(gradFnType->getNumParams() == primalType->getNumParams() &&
-             "Gradient expression should have same param count as primal");
-      SmallVector<Type, 8> diffArgTypes;
-      if (expr->getArguments().empty()) {
+             "Gradient expression should have same parameter count as primal");
+      SmallVector<Type, 8> diffParamTypes;
+      if (expr->getParameters().empty()) {
         for (auto &gradParam : gradParams)
-          diffArgTypes.push_back(gradParam.getType());
+          diffParamTypes.push_back(gradParam.getType());
       } else {
-        // Check only index arguments. 'self' arguments are already checked in
+        // Check only index parameters. 'self' parameters are already checked in
         // CSGen.
-        for (auto &arg : expr->getArguments())
-          if (arg.getKind() == AutoDiffArgument::Kind::Index)
-            diffArgTypes.push_back(gradParams[arg.getIndex()].getType());
+        for (auto &param : expr->getParameters())
+          if (param.getKind() == AutoDiffParameter::Kind::Index)
+            diffParamTypes.push_back(gradParams[param.getIndex()].getType());
       }
-      for (auto &argTy : diffArgTypes) {
-        if (! TC.isConvertibleTo(argTy, diffProtoTy, dc)) {
+      for (auto &paramTy : diffParamTypes) {
+        if (! TC.isConvertibleTo(paramTy, diffProtoTy, dc)) {
           TC.diagnose(expr->getLoc(),
-                      diag::gradient_expr_argument_not_differentiable, argTy);
+                      diag::gradient_expr_parameter_not_differentiable,
+                      paramTy);
           return nullptr;
         }
       }

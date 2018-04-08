@@ -655,7 +655,7 @@ SILCloner<ImplClass>::visitAutoDiffReverseInst(AutoDiffReverseInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createAutoDiffReverse(getOpLocation(Inst->getLoc()),
-                                       OpFunction, Inst->getArgumentIndices(),
+                                       OpFunction, Inst->getParameterIndices(),
                                        Inst->isSeedable(),
                                        Inst->isPreservingResult()));
 }

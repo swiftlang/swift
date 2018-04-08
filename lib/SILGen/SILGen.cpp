@@ -711,7 +711,7 @@ getLoweredFunctionParameterIndex(unsigned paramIndex,
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// Given a @differentiable attribute and the function declaration that holds
-/// this attribute, this function returns the lowered (SIL) argument indices
+/// this attribute, this function returns the lowered (SIL) parameter indices
 /// to differentiate with respect to.
 static SmallVector<unsigned, 8>
 getLoweredDifferentiationIndices(SILGenModule &SGM,
@@ -722,35 +722,35 @@ getLoweredDifferentiationIndices(SILGenModule &SGM,
   auto conv = F->getConventions();
   auto declParamList =
     AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
-  // If no arguments are specified, it's differentiating wrt all parameters.
-  if (DA->getArguments().empty()) {
+  // If no parameters are specified, differentiation is done wrt all parameters.
+  if (DA->getParameters().empty()) {
     unsigned numParams = declParamList->size();
     // We don't diff wrt `self` unless it is explicitly specified, therefore
-    // dropping the last SIL argument if it's a method.
+    // dropping the last SIL parameter if it's a method.
     for (unsigned i = 0; i < numParams; ++i)
       for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, AFD))
         indices.push_back(paramIdx);
     return indices;
   }
-  // Otherwise, convert differentiation arguments.
+  // Otherwise, convert differentiation parameters.
   bool hasSelf = false;
-  for (auto arg : DA->getArguments()) {
-    switch (arg.getKind()) {
-    // Normal index maps directly to a SIL argument index.
-    case AutoDiffArgument::Kind::Index: {
-      auto idx = arg.getIndex();
+  for (auto param : DA->getParameters()) {
+    switch (param.getKind()) {
+    // Normal index maps directly to a SIL parameter index.
+    case AutoDiffParameter::Kind::Index: {
+      auto idx = param.getIndex();
       auto paramIdxRange = SGM.getLoweredFunctionParameterIndex(idx, AFD);
       indices.append(paramIdxRange.begin(), paramIdxRange.end());
       break;
     }
-    // 'self' is always the last SIL argument.
-    case AutoDiffArgument::Kind::Self:
+    // 'self' is always the last SIL parameter.
+    case AutoDiffParameter::Kind::Self:
       // Sema guarantees this case to occur at most once.
       hasSelf = true;
       break;
     }
   }
-  // The last SIL argument is `self`, if needed.
+  // The last SIL parameter is `self`, if needed.
   if (hasSelf)
     indices.push_back((unsigned)declParamList->size());
   return indices;
