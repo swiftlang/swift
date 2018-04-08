@@ -884,6 +884,10 @@ public:
   void visitAutoDiffReverseInst(AutoDiffReverseInst *i) {
     llvm_unreachable("autodiff_reverse is not valid in canonical SIL");
   }
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitGradientInst(GradientInst *i) {
+    llvm_unreachable("gradient is not valid in canonical SIL");
+  }
 
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitAllocGlobalInst(AllocGlobalInst *i);

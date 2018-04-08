@@ -5291,9 +5291,16 @@ destination (if it returns with ``throw``).
 
 The rules on generic substitutions are identical to those of ``apply``.
 
-SWIFT_ENABLE_TENSORFLOW
+Automatic Differentiation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These instructions perform automatic differentiation on functions. Currently,
+only reverse-mode differentiation is implemented, but eventually instructions
+for forward-mode differentiation may be added as well.
+
+.. SWIFT_ENABLE_TENSORFLOW
 autodiff_reverse
-`````````````````
+````````````````
 ::
 
   sil-instruction ::= 'autodiff_reverse' sil-autodiff-arg-indices?
@@ -5306,11 +5313,35 @@ autodiff_reverse
   autodiff_reverse [wrt 0, 1] [seedable] [preserving_result]
     @foo : $@convention(thin) (Float, Float) -> Float
 
-Marks a function to be the result of automatic differentiation of another
-function. This instruction effectively acts like an attribute, except that it
-guarantees the function has a body.
+Marks the function containing the instruction to be the result of reverse-mode
+automatic differentiation of another function. This instruction effectively acts
+like an attribute, except that it guarantees the containing function has a body.
 
 When used, this instruction must be the only instruction in the parent function.
+This instruction is only valid in raw SIL and is rewritten by the automatic
+differentiation pass.
+
+.. SWIFT_ENABLE_TENSORFLOW
+gradient
+````````
+::
+
+  sil-instruction ::= 'gradient' sil-autodiff-arg-indices?
+                      sil-autodiff-seedable? sil-autodiff-preserving-result?
+                      sil-value ':' sil-type
+  sil-autodiff-arg-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
+  sil-autodiff-seedable ::= '[' 'seedable' ']'
+  sil-autodiff-preserving-result ::= '[' 'preserving_result' ']'
+
+  %original = function_ref @original : $(Float, Float) -> Float
+  %original_grad = gradient [wrt 0, 1] [preserving_result]
+    %original : $(Float, Float) -> Float
+
+Computes the gradient function of a value ``%original`` using reverse-mode
+automatic differentiation.
+
+``%original`` must have function type and be differentiable.
+
 This instruction is only valid in raw SIL and is rewritten by the automatic
 differentiation pass.
 

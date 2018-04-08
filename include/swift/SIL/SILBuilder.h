@@ -412,6 +412,15 @@ public:
                                               preservingResult));
   }
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  GradientInst *createGradient(SILLocation loc, SILValue original,
+                               ArrayRef<unsigned> paramIndices, bool seedable,
+                               bool preservingResult) {
+    return insert(GradientInst::create(getModule(), getSILDebugLocation(loc),
+                                       original, paramIndices, seedable,
+                                       preservingResult));
+  }
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionList Subs,
                              ArrayRef<SILValue> Args) {

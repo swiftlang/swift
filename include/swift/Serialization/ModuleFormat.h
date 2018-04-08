@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 403; // SWIFT_ENABLE_TENSORFLOW: autodiff.
+const uint16_t VERSION_MINOR = 404; // SWIFT_ENABLE_TENSORFLOW: gradient.
 
 using DeclIDField = BCFixed<31>;
 

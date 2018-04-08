@@ -1143,10 +1143,10 @@ public:
     if (!ADRI->getArgumentIndices().empty()) {
       *this << "[wrt ";
       interleave(ADRI->getArgumentIndices(), [&](unsigned idx) {
-          *this << idx;
-        }, [&]{
-          *this << ", ";
-        });
+        *this << idx;
+      }, [&]{
+        *this << ", ";
+      });
       *this << "] ";
     }
     if (ADRI->isSeedable())
@@ -1155,6 +1155,24 @@ public:
       *this << "[preserving_result] ";
     ADRI->getPrimalFunction()->printName(PrintState.OS);
     *this << " : " << ADRI->getPrimalFunction()->getLoweredType();
+  }
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  void visitGradientInst(GradientInst *GI) {
+    if (!GI->getParameterIndices().empty()) {
+      *this << "[wrt ";
+      interleave(GI->getParameterIndices(), [&](unsigned idx) {
+        *this << idx;
+      }, [&]{
+        *this << ", ";
+      });
+      *this << "] ";
+    }
+    if (GI->isSeedable())
+      *this << "[seedable] ";
+    if (GI->isPreservingResult())
+      *this << "[preserving_result] ";
+    *this << getIDAndType(GI->getOriginal());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {

@@ -2618,8 +2618,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::AutoDiffReverseInst: {
-    SmallVector<unsigned, 8> argIndices;
     // Parse optional [wrt ...].
+    SmallVector<unsigned, 8> argIndices;
     if (P.consumeIf(tok::l_square)) {
       if (parseVerbatim("wrt")) return true;
       auto parseIndex = [&] {
@@ -2639,16 +2639,18 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
         return true;
     }
-    // Parse optional [seedable].
+    // Parse optional [seedable] and optional [preserving_result].
     bool seedable = false;
-    if (P.consumeIf(tok::l_square)) {
-      if (parseVerbatim("seedable") ||
-          P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-        return true;
-      seedable = true;
-    }
-    // Parse optional [preserving_result].
     bool preservingResult = false;
+    if (P.peekToken().getText() != "preserving_result" &&
+        P.consumeIf(tok::l_square)) {
+      if (P.Tok.getText() != "preserving_result") {
+        if (parseVerbatim("seedable") ||
+            P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+          return true;
+        seedable = true;
+      }
+    }
     if (P.consumeIf(tok::l_square)) {
       if (parseVerbatim("preserving_result") ||
           P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
@@ -2661,6 +2663,69 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     ResultVal = B.createAutoDiffReverse(
       InstLoc, primalFn, argIndices, seedable, preservingResult);
+    break;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::GradientInst: {
+    // Parse optional [wrt ...].
+    SmallVector<unsigned, 8> paramIndices;
+    if (P.consumeIf(tok::l_square)) {
+      if (parseVerbatim("wrt")) return true;
+      auto parseIndex = [&] {
+        unsigned index;
+        SourceLoc indexLoc;
+        if (P.parseUnsignedInteger(index, indexLoc,
+              diag::sil_reverse_autodiff_expected_argument_index))
+          return true;
+        paramIndices.push_back(index);
+        return false;
+      };
+      if (parseIndex())
+        return true;
+      while (P.consumeIf(tok::comma))
+        if (parseIndex())
+          return true;
+      if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+        return true;
+    }
+    // Parse optional [seedable] and optional [preserving_result].
+    bool seedable = false;
+    bool preservingResult = false;
+    if (P.peekToken().getText() != "preserving_result" &&
+        P.consumeIf(tok::l_square)) {
+      if (P.Tok.getText() != "preserving_result") {
+        if (parseVerbatim("seedable") ||
+            P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+          return true;
+        seedable = true;
+      }
+    }
+    if (P.consumeIf(tok::l_square)) {
+      if (parseVerbatim("preserving_result") ||
+          P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+        return true;
+      preservingResult = true;
+    }
+    // Parse original function value.
+    UnresolvedValueName originalName;
+    SILType originalTy;
+    SourceLoc originalTyLoc;
+    if (parseValueName(originalName) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(originalTy, originalTyLoc))
+      return true;
+    auto originalFnTy = originalTy.getAs<SILFunctionType>();
+    if (!originalFnTy) {
+      P.diagnose(originalTyLoc, diag::expected_sil_type_kind, "be a function");
+      return true;
+    }
+    SILValue original = getLocalValue(originalName, originalTy, InstLoc, B);
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createGradient(
+      InstLoc, original, paramIndices, seedable, preservingResult);
     break;
   }
 

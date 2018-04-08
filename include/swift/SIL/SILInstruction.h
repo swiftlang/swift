@@ -7836,6 +7836,77 @@ public:
   }
 };
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// GradientInst - Represents the gradient of another SIL function.
+class GradientInst final
+  : public InstructionBase<SILInstructionKind::GradientInst,
+                           SingleValueInstruction> {
+private:
+  friend SILBuilder;
+
+  /// The number of parameters of the original function to differentiate with
+  /// respect to.
+  unsigned NumParamIndices;
+  /// Whether the gradient function is seedable, i.e. able to take a
+  /// back-propagated adjoint value as the last argument.
+  bool Seedable;
+  /// Whether the gradient function is preserving the result of the original
+  /// function.
+  bool PreservingResult;
+  /// Space for 1 operand: the original function to be differentiated.
+  FixedOperandList<1> Operands;
+
+  GradientInst(SILModule &module, SILDebugLocation debugLoc, SILValue original,
+               ArrayRef<unsigned> paramIndices, bool seedable,
+               bool preservingResult);
+
+  /// A utility function for computing the SIL type of the gradient of a
+  /// function, given the specified differentiation configuration options.
+  static SILType getGradientSILType(SILModule &module, SILValue original,
+                                    ArrayRef<unsigned> paramIndices,
+                                    bool seedable, bool preservingResult);
+
+public:
+  ~GradientInst() {};
+
+  static GradientInst *create(SILModule &M, SILDebugLocation debugLoc,
+                              SILValue original,
+                              ArrayRef<unsigned> paramIndices,
+                              bool seedable, bool preservingResult);
+
+  SILValue getOriginal() const { return Operands[0].get(); }
+
+  CanSILFunctionType getOriginalType() const {
+    return getOriginal()->getType().getAs<SILFunctionType>();
+  }
+
+  unsigned *getParameterIndicesData() {
+    return reinterpret_cast<unsigned *>(this+1);
+  }
+
+  ArrayRef<unsigned> getParameterIndices() const;
+
+  bool isSeedable() const { return Seedable; }
+
+  bool isPreservingResult() const { return PreservingResult; }
+
+  SILAutoDiffConfiguration getConfiguration() const {
+    return { getParameterIndices(), Seedable, PreservingResult };
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return Operands.asArray();
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return Operands.asArray();
+  }
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::GradientInst;
+  }
+};
+
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of
 // ApplyInstBase, so we can not place ApplyInstBase after it.
