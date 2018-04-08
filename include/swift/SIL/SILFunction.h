@@ -92,33 +92,46 @@ private:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Differentiable attribute - @differentiable attribute lowered to SIL.
-/// This attribute is used by the automatic differentiation pass to find the
-/// defined adjoint of a function.
-class SILDifferentiableAttr final {
+/// Reverse-mode differentiable attribute - @differentiable attribute lowered to
+/// SIL. This attribute is used by the automatic differentiation pass to find
+/// the defined adjoint of a function.
+/// Example:
+///   sil [reverse_differentiable primal @foo_primal adjoint @foo_adjoint
+///     gradient @dfoo] @foo : $(Float) -> Float { ... }
+class SILReverseDifferentiableAttr final {
   friend SILFunction;
 
 private:
-  /// Name of the function to differentiate.
+  /// The name of the primal function.
+  Optional<StringRef> PrimalName;
+  /// The name of the adjoint function.
   StringRef AdjointName;
-  /// Arguments of the primal to differentiate with respect to.
+  /// The name of the gradient function.
+  Optional<StringRef> GradientName;
+  /// The number of parameters to differentiate with respect to.
   unsigned NumArgIndices;
   /// Constructor, copying argument indices to the trailing buffer.
-  SILDifferentiableAttr(StringRef adjointName, ArrayRef<unsigned> argIndices);
+  SILReverseDifferentiableAttr(Optional<StringRef> primalName,
+                               StringRef adjointName,
+                               Optional<StringRef> gradientName,
+                               ArrayRef<unsigned> argIndices);
 
 public:
-  static SILDifferentiableAttr *create(SILModule &M, StringRef adjointName,
-                                       ArrayRef<unsigned> argIndices);
+  static SILReverseDifferentiableAttr *create(SILModule &M,
+                                              Optional<StringRef> primalName,
+                                              StringRef adjointName,
+                                              Optional<StringRef> gradientName,
+                                              ArrayRef<unsigned> argIndices);
 
-  StringRef getAdjointName() const {
-    return AdjointName;
-  }
+  Optional<StringRef> getPrimalName() const { return PrimalName; }
+  void setPrimalName(Optional<StringRef> name) { PrimalName = name; }
+  StringRef getAdjointName() const { return AdjointName; }
+  void setAdjointName(StringRef name) { AdjointName = name; }
+  Optional<StringRef> getGradientName() const { return GradientName; }
+  void setGradientName(Optional<StringRef> name) { GradientName = name; }
 
   ArrayRef<unsigned> getArgIndices() const;
-
-  unsigned *getArgIndicesData() {
-    return reinterpret_cast<unsigned *>(this+1);
-  }
+  unsigned *getArgIndicesData() { return reinterpret_cast<unsigned *>(this+1); }
 
   void print(llvm::raw_ostream &OS) const;
 };
@@ -225,7 +238,7 @@ private:
 
   /// SWIFT_ENABLE_TENSORFLOW
   /// The function's differentiable attribute.
-  SILDifferentiableAttr *DifferentiableAttr = nullptr;
+  SILReverseDifferentiableAttr *ReverseDifferentiableAttr = nullptr;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -555,14 +568,14 @@ public:
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// \returns the 'differentiable' attribute, or nullptr if it doesn't exist.
-  SILDifferentiableAttr *getDifferentiableAttr() const {
-    return DifferentiableAttr;
+  /// \returns the 'reverse_differentiable' attribute, or nullptr if it doesn't exist.
+  SILReverseDifferentiableAttr *getReverseDifferentiableAttr() const {
+    return ReverseDifferentiableAttr;
   }
 
-  /// Set the 'differentiable' attribute.
-  void setDifferentiableAttr(SILDifferentiableAttr *attr) {
-    DifferentiableAttr = attr;
+  /// Set the 'reverse_differentiable' attribute.
+  void setReverseDifferentiableAttr(SILReverseDifferentiableAttr *attr) {
+    ReverseDifferentiableAttr = attr;
   }
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
