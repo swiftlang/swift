@@ -804,8 +804,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     auto silAdjFn = getFunction(SILDeclRef(adjointFn), ForDefinition);
     auto indices = getLoweredDifferentiationIndices(*this, AFD, silPrimalFn,
                                                     diffAttr);
-    silPrimalFn->setDifferentiableAttr(
-      SILDifferentiableAttr::create(M, silAdjFn->getName(), indices));
+    silPrimalFn->setReverseDifferentiableAttr(
+      SILReverseDifferentiableAttr::create(M, None, silAdjFn->getName(), None,
+                                           indices));
   }
 }
 
