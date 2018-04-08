@@ -1407,6 +1407,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     llvm_unreachable("not supported");
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::GradientInst: {
+    llvm_unreachable("not supported");
+  }
+
   case SILInstructionKind::DeallocPartialRefInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
