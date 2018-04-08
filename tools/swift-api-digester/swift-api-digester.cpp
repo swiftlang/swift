@@ -516,6 +516,7 @@ public:
   // When the type node represents a function parameter, this function returns
   // whether the parameter has a default value.
   bool hasDefaultArgument() const { return HasDefaultArg; }
+  bool isTopLevelType() const { return !isa<SDKNodeType>(getParent()); }
   static bool classof(const SDKNode *N);
 };
 
@@ -2730,7 +2731,7 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
       return false;
 
     // We only care if this the top-level type node.
-    if (!isa<SDKNodeDecl>(L->getParent()) || !isa<SDKNodeDecl>(R->getParent()))
+    if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
     if (L->getTypeKind() == KnownTypeKind::Optional &&
@@ -2771,7 +2772,7 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
     if (!IsVisitingLeft)
       return false;
     // We only care if this the top-level type node.
-    if (!isa<SDKNodeDecl>(L->getParent()) || !isa<SDKNodeDecl>(R->getParent()))
+    if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
     if (L->getTypeKind() == KnownTypeKind::Optional &&
@@ -2789,6 +2790,35 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
                     NodeAnnotation::OptionalArrayMemberUpdate :
                     NodeAnnotation::ArrayMemberUpdate);
       L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+      return true;
+    }
+    return false;
+  }
+
+  bool detectSimpleStringRepresentableUpdate(SDKNodeType *L, SDKNodeType *R) {
+    if (!IsVisitingLeft)
+      return false;
+    if (!L->isTopLevelType() || !R->isTopLevelType())
+      return false;
+    StringRef KeyChangedTo;
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+        R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
+      // Detect String? changes to StringRepresentableStruct? change.
+      KeyChangedTo =
+        getStringRepresentableChange(L->getOnlyChild()->getAs<SDKNodeType>(),
+                                     R->getOnlyChild()->getAs<SDKNodeType>());
+    } else {
+      // Detect String changes to StringRepresentableStruct change.
+      KeyChangedTo = getStringRepresentableChange(L, R);
+    }
+    if (!KeyChangedTo.empty()) {
+      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+      if (HasOptional) {
+        L->annotate(NodeAnnotation::SimpleOptionalStringRepresentableUpdate);
+      } else {
+        L->annotate(NodeAnnotation::SimpleStringRepresentableUpdate);
+      }
       return true;
     }
     return false;
@@ -2826,6 +2856,7 @@ public:
                   detectUnmanagedUpdate(Node, Counter)||
                   detectDictionaryKeyChange(Node, Counter) ||
                   detectArrayMemberChange(Node, Counter) ||
+                  detectSimpleStringRepresentableUpdate(Node, Counter) ||
                   detectTypeRewritten(Node, Counter);
     (void) Result;
     return;
@@ -2938,6 +2969,8 @@ class DiffItemEmitter : public SDKNodeVisitor {
       case NodeAnnotation::OptionalArrayMemberUpdate:
       case NodeAnnotation::DictionaryKeyUpdate:
       case NodeAnnotation::OptionalDictionaryKeyUpdate:
+      case NodeAnnotation::SimpleStringRepresentableUpdate:
+      case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
       case NodeAnnotation::ModernizeEnum:
@@ -2999,6 +3032,8 @@ class DiffItemEmitter : public SDKNodeVisitor {
                         NodeAnnotation::OptionalDictionaryKeyUpdate,
                         NodeAnnotation::ArrayMemberUpdate,
                         NodeAnnotation::OptionalArrayMemberUpdate,
+                        NodeAnnotation::SimpleStringRepresentableUpdate,
+                        NodeAnnotation::SimpleOptionalStringRepresentableUpdate,
                       });
   }
 
