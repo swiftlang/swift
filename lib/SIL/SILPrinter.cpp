@@ -1140,9 +1140,9 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   void visitAutoDiffReverseInst(AutoDiffReverseInst *ADRI) {
-    if (!ADRI->getArgumentIndices().empty()) {
+    if (!ADRI->getParameterIndices().empty()) {
       *this << "[wrt ";
-      interleave(ADRI->getArgumentIndices(), [&](unsigned idx) {
+      interleave(ADRI->getParameterIndices(), [&](unsigned idx) {
         *this << idx;
       }, [&]{
         *this << ", ";
@@ -3083,7 +3083,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 /// SWIFT_ENABLE_TENSORFLOW
 void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   OS << "wrt ";
-  interleave(getArgIndices(),
+  interleave(getParamIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
   if (PrimalName) OS << " primal @" << *PrimalName;

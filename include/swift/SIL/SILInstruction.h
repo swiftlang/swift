@@ -7936,18 +7936,18 @@ private:
 
   /// The primal function to be differentiated.
   SILFunction *Primal;
-  /// The number of arguments of the primal function to differentiate with
+  /// The number of parameters of the primal function to differentiate with
   /// respect to.
-  unsigned NumArgIndices;
-  /// Whether the derivative function is seedable, i.e. able to take
-  /// back-propagated adjoint as the last argument.
+  unsigned NumParamIndices;
+  /// Whether the gradient function is seedable, i.e. able to take a
+  /// back-propagated adjoint as the last parameter.
   bool Seedable;
-  /// Whether the derivative function is preserving the result of the original
+  /// Whether the gradient function is preserving the result of the original
   /// function.
   bool PreservingResult;
 
   AutoDiffReverseInst(SILDebugLocation debugLoc, SILFunction *primal,
-                      ArrayRef<unsigned> argIndices, bool seedable,
+                      ArrayRef<unsigned> paramIndices, bool seedable,
                       bool preservingResult);
 
 public:
@@ -7956,7 +7956,7 @@ public:
   static AutoDiffReverseInst *create(SILModule &M,
                                      SILDebugLocation debugLoc,
                                      SILFunction *primal,
-                                     ArrayRef<unsigned> argIndices,
+                                     ArrayRef<unsigned> paramIndices,
                                      bool seedable,
                                      bool preservingResult);
 
@@ -7964,18 +7964,18 @@ public:
 
   void dropReferencedPrimalFunction();
 
-  unsigned *getArgumentIndicesData() {
+  unsigned *getParameterIndicesData() {
     return reinterpret_cast<unsigned *>(this+1);
   }
 
-  ArrayRef<unsigned> getArgumentIndices() const;
+  ArrayRef<unsigned> getParameterIndices() const;
 
   bool isSeedable() const { return Seedable; }
 
   bool isPreservingResult() const { return PreservingResult; }
 
   SILAutoDiffConfiguration getConfiguration() const {
-    return { getArgumentIndices(), Seedable, PreservingResult };
+    return { getParameterIndices(), Seedable, PreservingResult };
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -8003,7 +8003,7 @@ private:
   /// respect to.
   unsigned NumParamIndices;
   /// Whether the gradient function is seedable, i.e. able to take a
-  /// back-propagated adjoint value as the last argument.
+  /// back-propagated adjoint value as the last parameter.
   bool Seedable;
   /// Whether the gradient function is preserving the result of the original
   /// function.

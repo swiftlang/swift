@@ -1306,9 +1306,9 @@ public:
 ///   @differentiable(withRespectTo: (self, .0, .1), gradient: bar(_:_:_:seed:))
 class DifferentiableAttr : public DeclAttribute {
 private:
-  /// The number of arguments specified in 'withRespectTo:'.
-  unsigned NumArguments;
-  /// The name of the function which the declared function differentiates.
+  /// The number of parameters specified in 'withRespectTo:'.
+  unsigned NumParameters;
+  /// The name of the function which differentiates the declared function.
   DeclName GradFuncName;
   DeclNameLoc GradFuncNameLoc;
   /// The constraint clauses for generic types.
@@ -1317,7 +1317,7 @@ private:
   FuncDecl *adjointFunction = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                              ArrayRef<AutoDiffArgument> arguments,
+                              ArrayRef<AutoDiffParameter> parameters,
                               DeclName gradFuncName,
                               DeclNameLoc gradFuncNameLoc,
                               TrailingWhereClause *clause);
@@ -1325,7 +1325,7 @@ private:
 public:
   static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
                                     SourceRange baseRange,
-                                    ArrayRef<AutoDiffArgument> arguments,
+                                    ArrayRef<AutoDiffParameter> parameters,
                                     DeclName gradFuncName,
                                     DeclNameLoc gradFuncNameLoc,
                                     TrailingWhereClause *clause);
@@ -1342,16 +1342,16 @@ public:
     return WhereClause;
   }
 
-  AutoDiffArgument *getArgumentsData() {
-    return reinterpret_cast<AutoDiffArgument *>(this+1);
+  AutoDiffParameter *getParametersData() {
+    return reinterpret_cast<AutoDiffParameter *>(this+1);
   }
 
-  /// The list of arguments marking that the function is only differentiable
-  /// with respect to specific arguments.
-  ArrayRef<AutoDiffArgument> getArguments() const;
+  /// The differentiation parameters, i.e. the list of parameters specified in
+  /// 'withRespectTo:'.
+  ArrayRef<AutoDiffParameter> getParameters() const;
 
-  MutableArrayRef<AutoDiffArgument> getArguments() {
-    return { getArgumentsData(), NumArguments };
+  MutableArrayRef<AutoDiffParameter> getParameters() {
+    return { getParametersData(), NumParameters };
   }
 
   FuncDecl *getAdjointFunction() const {

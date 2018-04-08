@@ -29,7 +29,7 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(withRespectTo: (1), gradient: foo(_:_:)) // expected-error {{expected an argument, which can be the index of a function argument with a leading dot (e.g. '.0'), or 'self'}}
+@differentiable(withRespectTo: (1), gradient: foo(_:_:)) // expected-error {{expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }

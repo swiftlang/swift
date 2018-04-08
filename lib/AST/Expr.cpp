@@ -1268,22 +1268,22 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
 // SWIFT_ENABLE_TENSORFLOW
 ReverseAutoDiffExpr::ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,
                                          SourceLoc lParenLoc, Expr *primalExpr,
-                                         ArrayRef<AutoDiffArgument> arguments,
+                                         ArrayRef<AutoDiffParameter> parameters,
                                          SourceLoc rParenLoc)
   : Expr(kind, /*Implicit=*/false), Loc(loc), LParenLoc(lParenLoc),
-    PrimalExpr(primalExpr), NumArguments(arguments.size()),
+    PrimalExpr(primalExpr), NumParameters(parameters.size()),
     RParenLoc(rParenLoc) {
-  std::copy(arguments.begin(), arguments.end(), getArgumentsData());
+  std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
 GradientExpr *GradientExpr::create(ASTContext &ctx, SourceLoc loc,
                                    SourceLoc lParenLoc, Expr *primalExpr,
-                                   ArrayRef<AutoDiffArgument> arguments,
+                                   ArrayRef<AutoDiffParameter> parameters,
                                    SourceLoc rParenLoc) {
-  unsigned numArgs = arguments.size();
-  unsigned size = sizeof(GradientExpr) + numArgs * sizeof(AutoDiffArgument);
+  unsigned numParams = parameters.size();
+  unsigned size = sizeof(GradientExpr) + numParams * sizeof(AutoDiffParameter);
   void *memory = ctx.Allocate(size, alignof(GradientExpr));
-  return new (memory) GradientExpr(loc, lParenLoc, primalExpr, arguments,
+  return new (memory) GradientExpr(loc, lParenLoc, primalExpr, parameters,
                                    rParenLoc);
 }
 
@@ -1291,14 +1291,14 @@ GradientExpr *GradientExpr::create(ASTContext &ctx, SourceLoc loc,
 ValueAndGradientExpr *
 ValueAndGradientExpr::create(ASTContext &ctx, SourceLoc loc,
                              SourceLoc lParenLoc, Expr *primalExpr,
-                             ArrayRef<AutoDiffArgument> arguments,
+                             ArrayRef<AutoDiffParameter> parameters,
                              SourceLoc rParenLoc) {
-  unsigned numArgs = arguments.size();
+  unsigned numParams = parameters.size();
   unsigned size =
-    sizeof(ValueAndGradientExpr) + numArgs * sizeof(AutoDiffArgument);
+    sizeof(ValueAndGradientExpr) + numParams * sizeof(AutoDiffParameter);
   void *memory = ctx.Allocate(size, alignof(ValueAndGradientExpr));
   return new (memory) ValueAndGradientExpr(loc, lParenLoc, primalExpr,
-                                           arguments, rParenLoc);
+                                           parameters, rParenLoc);
 }
 
 ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,

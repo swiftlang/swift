@@ -1802,15 +1802,15 @@ public:
   void printReverseAutoDiffExpr(ReverseAutoDiffExpr *E) {
     OS << " primal=";
     E->getPrimalExpr()->dump(OS);
-    auto arguments = E->getArguments();
-    if (!arguments.empty()) {
+    auto parameters = E->getParameters();
+    if (!parameters.empty()) {
       OS << " wrt=(";
-      interleave(arguments, [&](const AutoDiffArgument &arg) {
-        switch (arg.getKind()) {
-        case AutoDiffArgument::Kind::Index:
-          OS << '.' << arg.getIndex();
+      interleave(parameters, [&](const AutoDiffParameter &param) {
+        switch (param.getKind()) {
+        case AutoDiffParameter::Kind::Index:
+          OS << '.' << param.getIndex();
           break;
-        case AutoDiffArgument::Kind::Self:
+        case AutoDiffParameter::Kind::Self:
           OS << "self";
           break;
         }

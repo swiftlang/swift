@@ -583,13 +583,13 @@ TryApplyInst *TryApplyInst::create(
 /// SWIFT_ENABLE_TENSORFLOW
 AutoDiffReverseInst::AutoDiffReverseInst(SILDebugLocation debugLoc,
                                          SILFunction *primal,
-                                         ArrayRef<unsigned> argIndices,
+                                         ArrayRef<unsigned> paramIndices,
                                          bool seedable, bool preservingResult)
   : InstructionBase(debugLoc), Primal(primal),
-    NumArgIndices(argIndices.size()), Seedable(seedable),
+    NumParamIndices(paramIndices.size()), Seedable(seedable),
     PreservingResult(preservingResult) {
   Primal->incrementRefCount();
-  std::copy(argIndices.begin(), argIndices.end(), getArgumentIndicesData());
+  std::copy(paramIndices.begin(), paramIndices.end(), getParameterIndicesData());
 }
 
 AutoDiffReverseInst::~AutoDiffReverseInst() {
@@ -599,19 +599,20 @@ AutoDiffReverseInst::~AutoDiffReverseInst() {
 
 AutoDiffReverseInst *
 AutoDiffReverseInst::create(SILModule &M, SILDebugLocation debugLoc,
-                            SILFunction *primal, ArrayRef<unsigned> argIndices,
-                            bool seedable, bool preservingResult) {
+                            SILFunction *primal,
+                            ArrayRef<unsigned> paramIndices, bool seedable,
+                            bool preservingResult) {
   unsigned size =
-    sizeof(AutoDiffReverseInst) + argIndices.size() * sizeof(unsigned);
+    sizeof(AutoDiffReverseInst) + paramIndices.size() * sizeof(unsigned);
   void *buffer = M.allocateInst(size, alignof(AutoDiffReverseInst));
-  return ::new (buffer) AutoDiffReverseInst(debugLoc, primal, argIndices,
+  return ::new (buffer) AutoDiffReverseInst(debugLoc, primal, paramIndices,
                                             seedable, preservingResult);
 }
 
-ArrayRef<unsigned> AutoDiffReverseInst::getArgumentIndices() const {
+ArrayRef<unsigned> AutoDiffReverseInst::getParameterIndices() const {
   return {
-    const_cast<AutoDiffReverseInst *>(this)->getArgumentIndicesData(),
-    NumArgIndices
+    const_cast<AutoDiffReverseInst *>(this)->getParameterIndicesData(),
+    NumParamIndices
   };
 }
 

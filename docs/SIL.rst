@@ -5330,10 +5330,10 @@ autodiff_reverse
 ````````````````
 ::
 
-  sil-instruction ::= 'autodiff_reverse' sil-autodiff-arg-indices?
+  sil-instruction ::= 'autodiff_reverse' sil-autodiff-param-indices?
                       sil-autodiff-seedable? sil-autodiff-preserving-result?
                       sil-function-name ':' sil-type
-  sil-autodiff-arg-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
+  sil-autodiff-param-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
   sil-autodiff-seedable ::= '[' 'seedable' ']'
   sil-autodiff-preserving-result ::= '[' 'preserving_result' ']'
 
@@ -5353,10 +5353,10 @@ gradient
 ````````
 ::
 
-  sil-instruction ::= 'gradient' sil-autodiff-arg-indices?
+  sil-instruction ::= 'gradient' sil-autodiff-param-indices?
                       sil-autodiff-seedable? sil-autodiff-preserving-result?
                       sil-value ':' sil-type
-  sil-autodiff-arg-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
+  sil-autodiff-param-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
   sil-autodiff-seedable ::= '[' 'seedable' ']'
   sil-autodiff-preserving-result ::= '[' 'preserving_result' ']'
 

@@ -103,31 +103,31 @@ CanType SILFunctionType::getSelfInstanceType() const {
 CanSILFunctionType
 SILFunctionType::getGradientType(SILAutoDiffConfiguration config,
                                  SILModule &M) {
-  auto primalGenSig = getGenericSignature();
-  auto primalCanGenSig = primalGenSig
-    ? primalGenSig->getCanonicalSignature()
+  auto originalGenSig = getGenericSignature();
+  auto originalCanGenSig = originalGenSig
+    ? originalGenSig->getCanonicalSignature()
     : CanGenericSignature();
-  auto primalParams = getParameters();
-  auto primalResults = getResults();
-  // The primal's result as a single type, i.e. a tuple of results if they are
+  auto originalParams = getParameters();
+  auto originalResults = getResults();
+  // The original's result as a single type, i.e. a tuple of results if they are
   // more than one, or just one result.
-  CanType primalSingleResultTy;
-  if (primalResults.size() == 1) {
-    primalSingleResultTy = primalResults.front().getType();
+  CanType originalSingleResultTy;
+  if (originalResults.size() == 1) {
+    originalSingleResultTy = originalResults.front().getType();
   } else {
     SmallVector<TupleTypeElt, 8> tupleElts;
-    for (auto &primalResult : primalResults)
-      tupleElts.push_back(primalResult.getType());
+    for (auto &originalResult : originalResults)
+      tupleElts.push_back(originalResult.getType());
     Type tupleTy =
       TupleType::get(tupleElts, getASTContext());
-    primalSingleResultTy = tupleTy->getCanonicalType();
+    originalSingleResultTy = tupleTy->getCanonicalType();
   }
 
   // Function that returns the parameter convention for a SIL object type.
   auto getParamConvention = [&](CanType ty) -> ParameterConvention {
     auto silTy = SILType::getPrimitiveObjectType(ty);
     if (silTy.isFormallyPassedIndirectly(
-          ty, M, primalCanGenSig,
+          ty, M, originalCanGenSig,
           ResilienceExpansion::Last_ResilienceExpansion))
       return ParameterConvention::Indirect_In;
     return silTy.isTrivial(M)
@@ -142,29 +142,29 @@ SILFunctionType::getGradientType(SILAutoDiffConfiguration config,
       ? ResultConvention::Unowned : ResultConvention::Owned;
   };
 
-  SmallVector<unsigned, 8> allArgIndices;
-  ArrayRef<unsigned> argIndices = config.argumentIndices;
+  SmallVector<unsigned, 8> allParamIndices;
+  ArrayRef<unsigned> paramIndices = config.parameterIndices;
   SmallVector<SILParameterInfo, 8> expectedGradParams;
   SmallVector<SILResultInfo, 8> expectedGradResults;
-  // Collect primal arguments to gradient parameters.
-  for (auto &primalParam : primalParams)
-    expectedGradParams.push_back(primalParam);
+  // Collect original parameters to gradient parameters.
+  for (auto &originalParam : originalParams)
+    expectedGradParams.push_back(originalParam);
   if (config.seedable)
     expectedGradParams.push_back({
-      primalSingleResultTy,
-      getParamConvention(primalSingleResultTy)
+      originalSingleResultTy,
+      getParamConvention(originalSingleResultTy)
     });
-  // If no differentiation arguments are specified, all of primal's arguments
-  // are bring differentiated with respect to. For simplicity, we add all
-  // argument indices to a temporary.
-  if (config.argumentIndices.empty()) {
-    for (unsigned i = 0; i < primalParams.size(); i++)
-      allArgIndices.push_back(i);
-    argIndices = allArgIndices;
+  // If no differentiation parameters are specified, differentiation is done
+  // with respect to all of original's parameters. For simplicity, we add all
+  // parameter indices to a temporary.
+  if (config.parameterIndices.empty()) {
+    for (unsigned i = 0; i < originalParams.size(); i++)
+      allParamIndices.push_back(i);
+    paramIndices = allParamIndices;
   }
-  // Collect differentiation arguments to gradient results.
-  for (auto index : argIndices) {
-    auto paramTy = primalParams[index].getType();
+  // Collect differentiation parameters to gradient results.
+  for (auto index : paramIndices) {
+    auto paramTy = originalParams[index].getType();
     expectedGradResults.push_back({
       paramTy, getResultConvention(paramTy)
     });
@@ -172,11 +172,11 @@ SILFunctionType::getGradientType(SILAutoDiffConfiguration config,
   // If preserving result, the original result will be the last result.
   if (config.preservingResult)
     expectedGradResults.push_back({
-      primalSingleResultTy,
-      getResultConvention(primalSingleResultTy)
+      originalSingleResultTy,
+      getResultConvention(originalSingleResultTy)
     });
   // Create an expected function type.
-  return SILFunctionType::get(primalGenSig, getExtInfo(),
+  return SILFunctionType::get(originalGenSig, getExtInfo(),
                               getCoroutineKind(),
                               getCalleeConvention(),
                               expectedGradParams, getYields(),

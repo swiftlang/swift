@@ -2116,25 +2116,25 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto isInstanceMethod = primal->isInstanceMember();
   auto selfDecl = primal->getImplicitSelfDecl();
 
-  // If the primal has no arguments, there's nothing to differentiate with
+  // If the primal has no parameters, there's nothing to differentiate with
   // respect to.
   auto &primalParams =
     *primal->getParameterList(selfDecl ? 1 : 0);
   if (!isInstanceMethod && primalParams.size() == 0) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_arguments,
+    TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
                 primal->getName())
       .highlight(primal->getSourceRange());
     return;
   }
 
   // Compute the return type of the adjoint function.
-  auto wrtArgs = attr->getArguments();
+  auto wrtParams = attr->getParameters();
   Type retTy;
   // When 'withRespectTo:' is not specified, the adjoint's return type is the
-  // type of all of primal's arguments.
-  if (wrtArgs.empty()) {
+  // type of all of primal's parameters.
+  if (wrtParams.empty()) {
     if (primalParams.size() > 1) {
-      // It is a tuple if there is more than 1 argument.
+      // It is a tuple if there is more than 1 parameter.
       SmallVector<TupleTypeElt, 8> retElts;
       for (auto *param : primalParams)
         retElts.push_back(param->getInterfaceType());
@@ -2147,31 +2147,31 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // corresponding adjoint return type.
   else {
     SmallVector<TupleTypeElt, 8> retElts;
-    // This helps determine if the argument indices are ascending.
+    // This helps determine if the parameter indices are ascending.
     int lastIndex = -1;
-    // Verify each argument in 'withRespectTo:' list and collect return types
+    // Verify each parameter in 'withRespectTo:' list and collect return types
     // to `retElts`.
-    for (size_t i = 0; i < wrtArgs.size(); i++) {
-      auto argLoc = wrtArgs[i].getLoc();
-      switch (wrtArgs[i].getKind()) {
-      case AutoDiffArgument::Kind::Index: {
-        unsigned index = wrtArgs[i].getIndex();
+    for (size_t i = 0; i < wrtParams.size(); i++) {
+      auto paramLoc = wrtParams[i].getLoc();
+      switch (wrtParams[i].getKind()) {
+      case AutoDiffParameter::Kind::Index: {
+        unsigned index = wrtParams[i].getIndex();
         if ((int)index <= lastIndex) {
-          TC.diagnose(argLoc,
+          TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_indices_must_be_ascending);
           return;
         }
-        // Argument index cannot exceed bounds.
+        // Parameter index cannot exceed bounds.
         if (index >= primalParams.size()) {
-          TC.diagnose(argLoc,
+          TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_index_out_of_bounds);
           return;
         }
         auto param = primalParams[index];
-        // Argument type cannot be a reference type or an existential type.
+        // Parameter type cannot be a reference type or an existential type.
         if (param->getType()->isAnyClassReferenceType() ||
             param->getType()->isExistentialType()) {
-          TC.diagnose(argLoc,
+          TC.diagnose(paramLoc,
               diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
                       param->getType());
           return;
@@ -2180,16 +2180,16 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         retElts.push_back(param->getInterfaceType());
         break;
       }
-      case AutoDiffArgument::Kind::Self: {
+      case AutoDiffParameter::Kind::Self: {
         // 'self' is only applicable to instance methods.
         if (!isInstanceMethod) {
-          TC.diagnose(argLoc,
+          TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_self_instance_method_only);
           return;
         }
         // 'self' can only be the first in the list.
         if (i > 0) {
-          TC.diagnose(argLoc,
+          TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_self_must_be_first);
           return;
         }
@@ -2198,7 +2198,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         auto selfTy = primal->getParent()->getSelfTypeInContext();
         auto selfInterfaceTy = primal->getParent()->getSelfInterfaceType();
         if (selfTy->isAnyClassReferenceType() || selfTy->isExistentialType()) {
-          TC.diagnose(argLoc,
+          TC.diagnose(paramLoc,
               diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
                       selfTy);
           return;
@@ -2218,15 +2218,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Compute parameters of the adjoint function.
-  SmallVector<FunctionType::Param, 8> argTypes;
-  // The first few arguments are the same as those of the primal function.
+  SmallVector<FunctionType::Param, 8> paramTypes;
+  // The first parameters are the same as those of the primal function.
   for (auto *param : primalParams)
-    argTypes.push_back(FunctionType::Param(param->getInterfaceType()));
+    paramTypes.push_back(FunctionType::Param(param->getInterfaceType()));
 
-  // The rest are the partial and the seed, both of the same type
-  // as the primal result.
+  // The remaining two are the partial and the seed, both of which have the same
+  // type as the primal result.
   FunctionType::Param seedTy(primal->getResultInterfaceType());
-  argTypes.append(2, seedTy);
+  paramTypes.append(2, seedTy);
 
   // Compute the expected adjoint function type, using the same generic
   // signature as the primal function.
@@ -2243,10 +2243,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   auto primalGenSig = primal->getGenericSignature();
   if (!selfDecl) {
-    expectedAdjointFnTy = getFunctionType(primalGenSig, argTypes, retTy);
+    expectedAdjointFnTy = getFunctionType(primalGenSig, paramTypes, retTy);
   } else {
     expectedAdjointFnTy =
-      FunctionType::get(argTypes, retTy, FunctionType::ExtInfo());
+      FunctionType::get(paramTypes, retTy, FunctionType::ExtInfo());
     FunctionType::Param selfParam(selfDecl->getInterfaceType());
     expectedAdjointFnTy = getFunctionType(primalGenSig, { selfParam },
                                           expectedAdjointFnTy);
