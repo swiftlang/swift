@@ -621,6 +621,45 @@ void AutoDiffReverseInst::dropReferencedPrimalFunction() {
   Primal = nullptr;
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
+                           SILValue original, ArrayRef<unsigned> paramIndices,
+                           bool seedable, bool preservingResult)
+  : InstructionBase(debugLoc, getGradientSILType(module, original, paramIndices,
+                                                 seedable, preservingResult)),
+    NumParamIndices(paramIndices.size()), Seedable(seedable),
+    PreservingResult(preservingResult), Operands(this, original) {
+  std::copy(paramIndices.begin(), paramIndices.end(),
+            getParameterIndicesData());
+}
+
+SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
+                                         ArrayRef<unsigned> paramIndices,
+                                         bool seedable,
+                                         bool preservingResult) {
+  SILAutoDiffConfiguration config =
+    { paramIndices, seedable, preservingResult };
+  auto origFnTy = original->getType().getAs<SILFunctionType>();
+  auto gradFnTy = origFnTy->getGradientType(config, module);
+  return SILType::getPrimitiveObjectType(gradFnTy->getCanonicalType());
+}
+
+GradientInst *
+GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
+                     SILValue original, ArrayRef<unsigned> paramIndices,
+                     bool seedable, bool preservingResult) {
+  unsigned size = sizeof(GradientInst) + paramIndices.size() * sizeof(unsigned);
+  void *buffer = M.allocateInst(size, alignof(GradientInst));
+  return ::new (buffer) GradientInst(M, debugLoc, original, paramIndices,
+                                     seedable, preservingResult);
+}
+
+ArrayRef<unsigned> GradientInst::getParameterIndices() const {
+  return {
+    const_cast<GradientInst *>(this)->getParameterIndicesData(), NumParamIndices
+  };
+}
+
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
     : InstructionBase(Loc, F->getLoweredType()),
       Function(F) {

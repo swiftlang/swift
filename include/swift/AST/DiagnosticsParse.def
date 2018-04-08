@@ -1510,6 +1510,9 @@ ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
 ERROR(sil_reverse_autodiff_expected_argument_index,PointsToFirstBadToken,
       "expected the index of an argument to differentiate with respect to", ())
 
+ERROR(sil_gradient_invalid_seed_type,PointsToFirstBadToken,
+      "expected seed '%0' to have type %1", (StringRef, Type))
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

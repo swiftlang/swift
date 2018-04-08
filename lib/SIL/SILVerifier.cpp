@@ -1247,8 +1247,8 @@ public:
     require(F->getEntryBlock() == BB && F->size() == 1,
             "autodiff_reverse must be the only instruction in the function");
     require(ADRI->getPrimalFunction()->isDefinition(),
-            "autodiff_reverse can only differentiate a function defined in this "
-            "module");
+            "autodiff_reverse can only differentiate a function defined in "
+            "this module");
     auto primalFn = ADRI->getPrimalFunction();
     auto primalTy = primalFn->getLoweredFunctionType();
     auto config = ADRI->getConfiguration();
@@ -1279,6 +1279,38 @@ public:
     require(F->getLoweredFunctionType()->isEqual(expectedTy),
             "The parent function type doesn't match what autodiff_reverse "
             "expects");
+  }
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  void checkGradientInst(GradientInst *GI) {
+    CanSILFunctionType origFnTy = GI->getOriginalType();
+    require(origFnTy, "Original function value must have function type");
+    SILFunction *F = GI->getFunction();
+    auto config = GI->getConfiguration();
+    SmallVector<unsigned, 8> allArgIndices;
+    ArrayRef<unsigned> argIndices = config.argumentIndices;
+    // If no differentiation arguments are specified, all of original's
+    // arguments are bring differentiated with respect to. For simplicity, we
+    // add all argument indices to a temporary.
+    // If no differentiation arguments are specified, differentiation is done
+    // with respect to all of original's arguments. For simplicity, we add all
+    // parameter indices to a temporary.
+    if (config.argumentIndices.empty()) {
+      for (unsigned i = 0, n = origFnTy->getNumParameters(); i != n; ++i)
+        allArgIndices.push_back(i);
+      argIndices = allArgIndices;
+    }
+    // Verify differentiation arguments.
+    int lastIndex = -1;
+    for (unsigned i = 0, n = argIndices.size(); i != n; ++i) {
+      auto index = argIndices[i];
+      require((int)index > lastIndex, "Argument indices must be ascending");
+      auto paramTy = origFnTy->getParameters()[index].getType();
+      require(!(paramTy.isAnyClassReferenceType() ||
+                paramTy.isAnyExistentialType()),
+              "Cannot differentiate with respect to reference type or "
+              "existential type");
+    }
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
