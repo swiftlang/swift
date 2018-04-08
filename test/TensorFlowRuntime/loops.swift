@@ -13,49 +13,26 @@ import StdlibUnittest
 
 var LoopsTests = TestSuite("Loops")
 
-LoopsTests.testAllBackends("simpleCounterLoop") {
-  guard shouldDoLoopTest() else { return }
+// Compute 1 << 10 == 1024
+LoopsTests.testAllBackends("simpleCounterLoop_a") {
+  let maxCount = 10
+  // a cannot be an integer tensor due to a TensorFlow Eigen bug (b/77737504).
+  var a = Tensor<Float>(1)
+  var count = 1
 
-  let maxCount = 100
-  var a = Tensor<Int32>(0)
-  let b = Tensor<Int32>(1)
-  var count = 0
-
-  a -= b
   while count < maxCount {
-    a += b
+    a += a
     count += 1
   }
-  a -= b
-  expectEqual(98, a.scalar)
+  a += a
+  expectNearlyEqual(1024.0, a.array.scalars[0])
 }
 
-// Explicitly use Int64 everywhere.
-LoopsTests.testAllBackends("simpleCounterLoop_Int64") {
-  guard shouldDoLoopTest() else { return }
-
+LoopsTests.testAllBackends("simpleCounterLoop_ab") {
   let maxCount = 100
-  var a = Tensor<Int64>(0)
-  let b = Tensor<Int64>(1)
+  var a = Tensor<Float>(0)
+  let b = Tensor<Float>(1)
   var count = 0
-
-  a -= b
-  while count < maxCount {
-    a += b
-    count += 1
-  }
-  a -= b
-  expectEqual(98, a.scalar)
-}
-
-// Explicitly use Int32 everywhere.
-LoopsTests.testAllBackends("simpleCounterLoop_Int32") {
-  guard shouldDoLoopTest() else { return }
-
-  let maxCount: Int32 = 100
-  var a = Tensor<Int32>(0)
-  let b = Tensor<Int32>(1)
-  var count: Int32 = 0
 
   a -= b
   while count < maxCount {

@@ -27,9 +27,6 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
   return
 #endif
 
-  // Enable runtime support for loops.
-  guard shouldDoLoopTest() else { return }
-
   // Hyper-parameters
   let iterationCount = 2000
   let learningRate: Float = 0.2
@@ -90,9 +87,6 @@ ModelTests.testAllBackends("XORClassifierTraining") {
 #if CUDA
   return
 #endif
-
-  // Enable runtime support for loops.
-  guard shouldDoLoopTest() else { return }
 
   // The classifier struct.
   struct MLPClassifier {
