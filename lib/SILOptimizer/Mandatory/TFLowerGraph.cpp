@@ -1276,6 +1276,24 @@ static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
   return { result, 0 };
 }
 
+/// Given a boolean value, create a 'cast' operation to convert it to int32.
+static TF_Output castBoolToInt32(TF_Output input, SILDebugLocation loc,
+                                 TFGraphLowering &lowering) {
+  auto opLocString = lowering.getUniqueName(loc, "cast");
+  auto &graphFn = lowering.getCurrentGraphFunction();
+  auto *op = TF_NewOperation(graphFn.getGraph(), "Cast",
+                             opLocString.c_str());
+  TF_AddInput(op, input);
+  TF_SetAttrType(op, "SrcT", TF_BOOL);
+  TF_SetAttrType(op, "DstT", TF_INT32);
+
+  auto *result = graphFn.finishOp(op, /*side effects*/ false,
+                                  /*isEligibleForTPU*/ true, lowering.status);
+  if (lowering.checkStatus(loc.getLocation()))
+    return { nullptr, 0 };
+  return { result, 0 };
+}
+
 /// Get the SILType for the specified SILOpResult.
 static SILType getOpResultType(SILOpResult r) {
   if (auto *inst = dyn_cast<SILInstruction>((SILNode *)r.first))
@@ -1407,6 +1425,16 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     if (headerBr->getTrueBB() == r->getExit()) {
       condValue = createNotOp(condValue, headerBr->getDebugLocation(), *this);
       if (!condValue.oper) return;   // Error occurred.
+    }
+
+    // For non TPU/XLA case, cast the boolean value to int32, a workaround as
+    // needed to get while loop to run on GPU (b/65752372).
+    if (!configuration.isTPUEnabled) {
+      // FIXME: this added cast may not work for XlaWhile. Revisit whether/how
+      // to support loops in XLA GPU.
+      condValue =
+          castBoolToInt32(condValue, headerBr->getDebugLocation(), *this);
+      if (!condValue.oper) return;  // Error occurred.
     }
 
     // The result of the function is our condition value.

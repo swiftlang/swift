@@ -96,23 +96,6 @@ extension TestSuite {
   }
 }
 
-/// Loops can run on these backends:
-/// 1. TF interpreter with CPU (not covered in the testing here, for
-/// simplicity)
-/// 2. XLA (CPU or GPU)
-/// 3. TPU
-public func shouldDoLoopTest() -> Bool {
-  if _RuntimeConfig.usesTFEagerAPI &&
-     _ExecutionContext.global.gpuDeviceName != nil {
-    print("Loop tests are skipped in Eager + GPU mode.")
-    return false
-  }
-  if !_RuntimeConfig.executionMode.isTPU {
-    _RuntimeConfig.executionMode = .xla
-  }
-  return true
-}
-
 public func runAllTestsWithRemoteSession() {
   let status = TF_NewStatus()
   let cluster_handle = TF_NewClusterHandle()
