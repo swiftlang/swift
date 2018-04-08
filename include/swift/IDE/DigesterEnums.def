@@ -78,6 +78,8 @@ NODE_ANNOTATION(DictionaryKeyUpdate)
 NODE_ANNOTATION(OptionalDictionaryKeyUpdate)
 NODE_ANNOTATION(ArrayMemberUpdate)
 NODE_ANNOTATION(OptionalArrayMemberUpdate)
+NODE_ANNOTATION(SimpleStringRepresentableUpdate)
+NODE_ANNOTATION(SimpleOptionalStringRepresentableUpdate)
 
 DECL_ATTR(deprecated)
 DECL_ATTR(fixedLayout)
