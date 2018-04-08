@@ -15,13 +15,13 @@ let _: (Float, Float) -> (value: Float, gradient: (Float, Float)) = valueAndGrad
 let _: (Float, Float) -> Float = #gradient(of: foo, withRespectTo: .0) // ok
 let _: (Float, Float) -> (value: Float, gradient: Float)
   = #valueAndGradient(of: foo, withRespectTo: .0) // ok
-let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: self, .0) // expected-error {{a 'self' argument can only be used in an instance declaration}}
-let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: self, .0) // expected-error {{a 'self' argument can only be used in an instance declaration}}
-let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: .0, self) // expected-error {{the 'self' argument must be the first}}
+let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: self, .0) // expected-error {{a 'self' parameter can only be used in an instance declaration}}
+let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: self, .0) // expected-error {{a 'self' parameter can only be used in an instance declaration}}
+let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: .0, self) // expected-error {{the 'self' parameter must be the first}}
 let _: (Float, Float) -> (Float, Float) = #gradient(of: foo, withRespectTo: .0, .1) // ok
-let _: (Float, Float) -> (Float, Float, Float) = #gradient(of: foo, withRespectTo: .0, .1, .2) // expected-error {{the argument index is out of bounds for type}}
+let _: (Float, Float) -> (Float, Float, Float) = #gradient(of: foo, withRespectTo: .0, .1, .2) // expected-error {{the parameter index is out of bounds for type}}
 
-// S is not a valid differentiation argument because it does not conform to FloatingPoint.
+// S is not a valid differentiation parameter because it does not conform to FloatingPoint.
 struct S {
   func a(_ x: Float) -> Float {}
 
@@ -32,13 +32,13 @@ struct S {
 
   func b() {
     let _: (Float) -> Float = #gradient(of: a) // ok
-    let _: (Float) -> S = #gradient(of: a, withRespectTo: self) // expected-error {{gradient argument has non-differentiable type 'S'}}
+    let _: (Float) -> S = #gradient(of: a, withRespectTo: self) // expected-error {{gradient parameter has non-differentiable type 'S'}}
   }
 
   static func c(_ x: Float) -> Float {}
 
   static func d() -> Float {
-    let _: (Float) -> S = #gradient(of: c, withRespectTo: self) // expected-error {{a 'self' argument can only be used in an instance declaration context}}
+    let _: (Float) -> S = #gradient(of: c, withRespectTo: self) // expected-error {{a 'self' parameter can only be used in an instance declaration context}}
   }
 }
 
@@ -61,8 +61,8 @@ let _: (Float) -> (Float, Float) = #valueAndGradient(of: e)
 let _: (Double) -> (Double, Double) = #valueAndGradient(of: e)
 
 let _: (Float) -> (Float, Float, Float) = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
-let _: ((Float, Float)) -> (Float, Float) = #gradient(of: e) // expected-error {{gradient argument has non-differentiable type '(Float, Float)'}}
-let _: (Int) -> (Int) = #gradient(of: e) // expected-error {{gradient argument has non-differentiable type 'Int'}}
+let _: ((Float, Float)) -> (Float, Float) = #gradient(of: e) // expected-error {{gradient parameter has non-differentiable type '(Float, Float)'}}
+let _: (Int) -> (Int) = #gradient(of: e) // expected-error {{gradient parameter has non-differentiable type 'Int'}}
 let _: (Float) -> Double = #gradient(of: e) // expected-error {{cannot convert gradient expression to incompatible contextual type}}
 
 // Complex type inference.
@@ -82,7 +82,7 @@ func addNumeric<T : Numeric>(_ x: T, _ y: T) -> T {
   return x + y
 }
 func daddNumeric<T : Numeric>(_ x: T, _ y: T) -> (T, T) {
-  return #gradient(of: addNumeric)(x, y) // expected-error {{gradient argument has non-differentiable type 'T'}}
+  return #gradient(of: addNumeric)(x, y) // expected-error {{gradient parameter has non-differentiable type 'T'}}
 }
 // Ok because the constraint on daddNumeric is FloatingPoint, not Numeric.
 func daddFloatingPoint<T : FloatingPoint>(_ x: T, _ y: T) -> (T, T) {

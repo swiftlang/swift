@@ -510,16 +510,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Differentiable: {
     Printer.printAttrName("@differentiable");
     auto *attr = cast<DifferentiableAttr>(this);
-    auto args = attr->getArguments();
-    // Print differentiation arguments if any.
-    if (!args.empty()) {
+    auto params = attr->getParameters();
+    // Print differentiation parameters, if any.
+    if (!params.empty()) {
       Printer << '(';
-      interleave(args, [&](const AutoDiffArgument &arg) {
-        switch (arg.getKind()) {
-        case AutoDiffArgument::Kind::Index:
-          Printer << '.' << arg.getIndex();
+      interleave(params, [&](const AutoDiffParameter &param) {
+        switch (param.getKind()) {
+        case AutoDiffParameter::Kind::Index:
+          Printer << '.' << param.getIndex();
           break;
-        case AutoDiffArgument::Kind::Self:
+        case AutoDiffParameter::Kind::Self:
           Printer << "self";
           break;
         }
@@ -961,35 +961,36 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                                       ArrayRef<AutoDiffArgument> arguments,
+                                       ArrayRef<AutoDiffParameter> parameters,
                                        DeclName gradFuncName,
                                        DeclNameLoc gradFuncNameLoc,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
-    NumArguments(arguments.size()), GradFuncName(gradFuncName),
+    NumParameters(parameters.size()), GradFuncName(gradFuncName),
     GradFuncNameLoc(gradFuncNameLoc), WhereClause(clause) {
-  std::copy(arguments.begin(), arguments.end(), getArgumentsData());
+  std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context,
                            SourceLoc atLoc,
                            SourceRange baseRange,
-                           ArrayRef<AutoDiffArgument> arguments,
+                           ArrayRef<AutoDiffParameter> parameters,
                            DeclName gradFuncName,
                            DeclNameLoc gradFuncNameLoc,
                            TrailingWhereClause *clause) {
-  unsigned numArgs = arguments.size();
-  unsigned size = sizeof(DifferentiableAttr) + numArgs * sizeof(AutoDiffArgument);
+  unsigned numParams = parameters.size();
+  unsigned size = sizeof(DifferentiableAttr) +
+    numParams * sizeof(AutoDiffParameter);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(atLoc, baseRange, arguments,
+  return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
                                       gradFuncName, gradFuncNameLoc,
                                       clause);
 }
 
-ArrayRef<AutoDiffArgument>
-DifferentiableAttr::getArguments() const {
-  return const_cast<DifferentiableAttr *>(this)->getArguments();
+ArrayRef<AutoDiffParameter>
+DifferentiableAttr::getParameters() const {
+  return const_cast<DifferentiableAttr *>(this)->getParameters();
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

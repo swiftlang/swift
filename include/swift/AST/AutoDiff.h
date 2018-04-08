@@ -22,7 +22,7 @@
 
 namespace swift {
 
-class AutoDiffArgument {
+class AutoDiffParameter {
 public:
   enum class Kind { Index, Self };
 
@@ -37,14 +37,14 @@ private:
   } V;
 
 public:
-  AutoDiffArgument(SourceLoc loc, enum Kind kind, Value value)
+  AutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
 
-  static AutoDiffArgument getIndexArgument(SourceLoc loc, unsigned index) {
+  static AutoDiffParameter getIndexParameter(SourceLoc loc, unsigned index) {
     return { loc, Kind::Index, { index } };
   }
 
-  static AutoDiffArgument getSelfArgument(SourceLoc loc) {
+  static AutoDiffParameter getSelfParameter(SourceLoc loc) {
     return { loc, Kind::Self, {} };
   }
 
@@ -61,7 +61,7 @@ public:
     return Loc;
   }
 
-  bool isEqual(AutoDiffArgument other) const {
+  bool isEqual(AutoDiffParameter other) const {
     if (getKind() == other.getKind() && getKind() == Kind::Index)
       return getIndex() == other.getIndex();
     return getKind() == other.getKind() && getKind() == Kind::Self;
@@ -70,7 +70,7 @@ public:
 
 /// SIL-level automatic differentiation configuration.
 struct SILAutoDiffConfiguration {
-  ArrayRef<unsigned> argumentIndices;
+  ArrayRef<unsigned> parameterIndices;
   bool seedable;
   bool preservingResult;
 };
@@ -93,11 +93,12 @@ template<> struct DenseMapInfo<SILAutoDiffConfiguration> {
   }
 
   static unsigned getHashValue(SILAutoDiffConfiguration Val) {
-    unsigned argHash = ~1U;
-    for (auto i : Val.argumentIndices)
-      argHash = hash_combine(argHash, DenseMapInfo<unsigned>::getHashValue(i));
+    unsigned paramHash = ~1U;
+    for (auto i : Val.parameterIndices)
+      paramHash = hash_combine(paramHash,
+                               DenseMapInfo<unsigned>::getHashValue(i));
     return hash_combine(
-      argHash,
+      paramHash,
       DenseMapInfo<unsigned>::getHashValue(Val.seedable),
       DenseMapInfo<unsigned>::getHashValue(Val.preservingResult)
     );
@@ -105,11 +106,11 @@ template<> struct DenseMapInfo<SILAutoDiffConfiguration> {
 
   static bool isEqual(SILAutoDiffConfiguration LHS,
                       SILAutoDiffConfiguration RHS) {
-    auto numArgs = LHS.argumentIndices.size();
-    if (numArgs != RHS.argumentIndices.size())
+    auto numParams = LHS.parameterIndices.size();
+    if (numParams != RHS.parameterIndices.size())
       return false;
-    for (unsigned i = 0; i < numArgs; i++)
-      if (LHS.argumentIndices[i] != RHS.argumentIndices[i])
+    for (unsigned i = 0; i < numParams; i++)
+      if (LHS.parameterIndices[i] != RHS.parameterIndices[i])
         return false;
     return LHS.seedable == RHS.seedable &&
            LHS.preservingResult == LHS.preservingResult;

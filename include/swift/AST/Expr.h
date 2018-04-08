@@ -3846,14 +3846,14 @@ public:
     PrimalExpr = newPrimal;
   }
 
-  AutoDiffArgument *getArgumentsData() {
-    return reinterpret_cast<AutoDiffArgument *>(this+1);
+  AutoDiffParameter *getParametersData() {
+    return reinterpret_cast<AutoDiffParameter *>(this+1);
   }
 
-  ArrayRef<AutoDiffArgument> getArguments() const;
+  ArrayRef<AutoDiffParameter> getParameters() const;
 
-  MutableArrayRef<AutoDiffArgument> getArguments() {
-    return { getArgumentsData(), NumArguments };
+  MutableArrayRef<AutoDiffParameter> getParameters() {
+    return { getParametersData(), NumParameters };
   }
 
   SourceRange getSourceRange() const {
@@ -3880,8 +3880,8 @@ private:
   SourceLoc LParenLoc;
   /// The expression representing the function to differentiate.
   Expr *PrimalExpr;
-  /// The number of arguments in the argument list.
-  unsigned NumArguments;
+  /// The number of parameters in the parameter list.
+  unsigned NumParameters;
   /// The location of ')'.
   SourceLoc RParenLoc;
   /// Primal declaration, to be resolved by Sema.
@@ -3891,13 +3891,13 @@ protected:
   explicit ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,
                                SourceLoc lParenLoc,
                                Expr *primalExpr,
-                               ArrayRef<AutoDiffArgument> arguments,
+                               ArrayRef<AutoDiffParameter> parameters,
                                SourceLoc rParenLoc);
 };
 
 /// Gradient expression - An expression that produces the automatically
 /// differentiated function that computes the gradient (or vector-Jacobian
-/// products) with respect to specified arguments.
+/// products) with respect to specified parameters.
 /// Examples:
 ///   #gradient(of: baz)
 ///   #gradient(of: bar, withRespectTo: .0, .1)
@@ -3907,7 +3907,7 @@ class GradientExpr : public ReverseAutoDiffExpr {
 public:
   static GradientExpr *create(ASTContext &ctx, SourceLoc loc,
                               SourceLoc lParenLoc, Expr *primalExpr,
-                              ArrayRef<AutoDiffArgument> arguments,
+                              ArrayRef<AutoDiffParameter> parameters,
                               SourceLoc rParenLoc);
 
   static bool classof(const Expr *E) {
@@ -3916,15 +3916,15 @@ public:
 
 private:
   explicit GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *primalExpr,
-                        ArrayRef<AutoDiffArgument> args, SourceLoc rParenLoc)
-    : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, primalExpr, args,
-                          rParenLoc) {}
+                        ArrayRef<AutoDiffParameter> params, SourceLoc rParenLoc)
+    : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, primalExpr,
+                          params, rParenLoc) {}
 };
 
 /// ValueAndGradient expression - An expression that produces an automatically
 /// differentiated function that returns the result of the original function and
 /// the gradient (or vector-Jacobian products) with respect to specified
-/// arguments.
+/// parameters.
 /// Examples:
 ///   #valueAndGradient(of: baz)
 ///   #valueAndGradient(of: bar, withRespectTo: .0, .1)
@@ -3934,7 +3934,7 @@ class ValueAndGradientExpr : public ReverseAutoDiffExpr {
 public:
   static ValueAndGradientExpr *create(ASTContext &ctx, SourceLoc loc,
                                       SourceLoc lParenLoc, Expr *primalExpr,
-                                      ArrayRef<AutoDiffArgument> arguments,
+                                      ArrayRef<AutoDiffParameter> parameters,
                                       SourceLoc rParenLoc);
 
   static bool classof(const Expr *E) {
@@ -3944,10 +3944,10 @@ public:
 private:
   explicit ValueAndGradientExpr(SourceLoc loc, SourceLoc lParenLoc,
                                 Expr *primalExpr,
-                                ArrayRef<AutoDiffArgument> args,
+                                ArrayRef<AutoDiffParameter> params,
                                 SourceLoc rParenLoc)
     : ReverseAutoDiffExpr(ExprKind::ValueAndGradient, loc, lParenLoc,
-                          primalExpr, args, rParenLoc) {}
+                          primalExpr, params, rParenLoc) {}
 };
 
 /// An expression referring to an opaque object of a fixed type.

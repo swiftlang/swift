@@ -109,20 +109,21 @@ private:
   StringRef AdjointName;
   /// The name of the gradient function.
   Optional<StringRef> GradientName;
-  /// The number of parameters to differentiate with respect to.
-  unsigned NumArgIndices;
-  /// Constructor, copying argument indices to the trailing buffer.
+  /// The number of parameters of the original function to differentiate with
+  /// respect to.
+  unsigned NumParamIndices;
+  /// Constructor, copying parameter indices to the trailing buffer.
   SILReverseDifferentiableAttr(Optional<StringRef> primalName,
                                StringRef adjointName,
                                Optional<StringRef> gradientName,
-                               ArrayRef<unsigned> argIndices);
+                               ArrayRef<unsigned> paramIndices);
 
 public:
   static SILReverseDifferentiableAttr *create(SILModule &M,
                                               Optional<StringRef> primalName,
                                               StringRef adjointName,
                                               Optional<StringRef> gradientName,
-                                              ArrayRef<unsigned> argIndices);
+                                              ArrayRef<unsigned> paramIndices);
 
   Optional<StringRef> getPrimalName() const { return PrimalName; }
   void setPrimalName(Optional<StringRef> name) { PrimalName = name; }
@@ -131,8 +132,8 @@ public:
   Optional<StringRef> getGradientName() const { return GradientName; }
   void setGradientName(Optional<StringRef> name) { GradientName = name; }
 
-  ArrayRef<unsigned> getArgIndices() const;
-  unsigned *getArgIndicesData() { return reinterpret_cast<unsigned *>(this+1); }
+  ArrayRef<unsigned> getParamIndices() const;
+  unsigned *getParamIndicesData() { return reinterpret_cast<unsigned *>(this+1); }
 
   void print(llvm::raw_ostream &OS) const;
 };
