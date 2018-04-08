@@ -316,6 +316,8 @@ protected:
   );
 
   UIWTDOB_BITFIELD_EMPTY(ConvertFunctionInst, ConversionInst);
+  // SWIFT_ENABLE_TENSORFLOW
+  UIWTDOB_BITFIELD_EMPTY(GradientInst, SingleValueInstruction);
   UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);

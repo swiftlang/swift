@@ -103,6 +103,9 @@ CanSILFunctionType
 SILFunctionType::getGradientType(SILAutoDiffConfiguration config,
                                  SILModule &M) {
   auto primalGenSig = getGenericSignature();
+  auto primalCanGenSig = primalGenSig
+    ? primalGenSig->getCanonicalSignature()
+    : CanGenericSignature();
   auto primalParams = getParameters();
   auto primalResults = getResults();
   // The primal's result as a single type, i.e. a tuple of results if they are
@@ -123,8 +126,8 @@ SILFunctionType::getGradientType(SILAutoDiffConfiguration config,
   auto getParamConvention = [&](CanType ty) -> ParameterConvention {
     auto silTy = SILType::getPrimitiveObjectType(ty);
     if (silTy.isFormallyPassedIndirectly(
-          ty, M, primalGenSig->getCanonicalSignature(),
-            ResilienceExpansion::Last_ResilienceExpansion))
+          ty, M, primalCanGenSig,
+          ResilienceExpansion::Last_ResilienceExpansion))
       return ParameterConvention::Indirect_In;
     return silTy.isTrivial(M)
       ? ParameterConvention::Direct_Unowned
