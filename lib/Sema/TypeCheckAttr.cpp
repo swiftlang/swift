@@ -2255,9 +2255,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolved adjoint function.
   FuncDecl *resolvedAdjoint = nullptr;
   // Look up the specified adjoint function.
-  UnresolvedDeclRefExpr UDRE(attr->getGradFuncName(),
+  UnresolvedDeclRefExpr UDRE(attr->getAdjoint().Name,
                              DeclRefKind::Ordinary,
-                             attr->getGradFuncNameLoc());
+                             attr->getAdjoint().Loc);
   auto expr = TC.resolveDeclRefExpr(&UDRE, primal->getInnermostDeclContext());
   // If it's an unresolved dot expression, this must be a class method or an
   // instance method.
@@ -2265,7 +2265,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // Look up the function directly in the current type context.
     auto typeCtx = primal->getInnermostTypeContext();
     auto lookup = TC.lookupMember(typeCtx, typeCtx->getDeclaredInterfaceType(),
-                                  attr->getGradFuncName());
+                                  attr->getAdjoint().Name);
     // Declare error flags.
     bool exprIsNotFunction = false;
     bool gradientOverloadNotFound = false;
@@ -2286,9 +2286,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       // If more than one lookup result has the expected adjoint type, then
       // the adjoint is ambgiuous.
       if (resolvedAdjoint) {
-        TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+        TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                     diag::differentiable_attr_ambiguous_adjoint_identifier,
-                    attr->getGradFuncName());
+                    attr->getAdjoint().Name);
         return;
       }
       // Resolve the adjoint function.
@@ -2297,33 +2297,33 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // If the adjoint function could not be resolved, check error flags.
     if (!resolvedAdjoint) {
       if (gradientOverloadNotFound) {
-        TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+        TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                     diag::differentiable_attr_gradient_overload_not_found,
-                    attr->getGradFuncName(),
+                    attr->getAdjoint().Name,
                     expectedAdjointFnTy->getRValueType());
         return;
       }
       assert(exprIsNotFunction && "Adjoint function could not be resolved");
-      TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+      TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                   diag::differentiable_attr_specified_adjoint_not_function,
-                  attr->getGradFuncName());
+                  attr->getAdjoint().Name);
       return;
     }
   }
   // If it's resolved to a type, it's not what we want.
   else if (isa<TypeExpr>(expr))
-    TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+    TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                 diag::differentiable_attr_specified_adjoint_not_function,
-                attr->getGradFuncName());
+                attr->getAdjoint().Name);
   // If it's directly resolved to a concrete declaration, it must be a free
   // function in the module context.
   else if (auto declRefExpr = dyn_cast<DeclRefExpr>(expr)) {
     auto funcDecl = dyn_cast<FuncDecl>(declRefExpr->getDecl());
     // If the candidate is not a function, then it's an error.
     if (!funcDecl) {
-      TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+      TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                   diag::differentiable_attr_specified_adjoint_not_function,
-                  attr->getGradFuncName());
+                  attr->getAdjoint().Name);
       return;
     }
     // If the primal and the adjoint have different parents, or if they both
@@ -2339,9 +2339,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     };
 
     if (!inCompatibleContexts(primal, funcDecl)) {
-      TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+      TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                   diag::differentiable_attr_adjoint_not_same_type_context,
-                  attr->getGradFuncName());
+                  attr->getAdjoint().Name);
       return;
     }
     // Otherwise, the primal and the adjoint are declared in the same
@@ -2351,9 +2351,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Overloaded names are not supported.
   // FIXME: Resolve using the expected adjoint type.
   else if (isa<OverloadedDeclRefExpr>(expr)) {
-    TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+    TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                 diag::differentiable_attr_ambiguous_adjoint_identifier,
-                attr->getGradFuncName());
+                attr->getAdjoint().Name);
     return;
   }
   // Error expressions have been handled already.
@@ -2369,9 +2369,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto adjointType = resolvedAdjoint->getInterfaceType()
     ->getUnlabeledType(primal->getASTContext());
   if (!adjointType->isEqual(expectedAdjointFnTy)) {
-    TC.diagnose(attr->getGradFuncNameLoc().getBaseNameLoc(),
+    TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                 diag::differentiable_attr_gradient_overload_not_found,
-                attr->getGradFuncName(), expectedAdjointFnTy->getRValueType());
+                attr->getAdjoint().Name, expectedAdjointFnTy->getRValueType());
     return;
   }
 

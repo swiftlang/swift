@@ -3931,7 +3931,7 @@ public:
   CanType getSelfInstanceType() const;
 
   /// SWIFT_ENABLE_TENSORFLOW
-  CanSILFunctionType getGradientType(SILAutoDiffConfiguration config,
+  CanSILFunctionType getGradientType(SILReverseAutoDiffConfiguration config,
                                      SILModule &M);
 
   /// If this is a @convention(witness_method) function with a protocol

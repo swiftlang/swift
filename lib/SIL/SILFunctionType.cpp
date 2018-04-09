@@ -101,7 +101,7 @@ CanType SILFunctionType::getSelfInstanceType() const {
 
 /// SWIFT_ENABLE_TENSORFLOW
 CanSILFunctionType
-SILFunctionType::getGradientType(SILAutoDiffConfiguration config,
+SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
                                  SILModule &M) {
   auto originalGenSig = getGenericSignature();
   auto originalCanGenSig = originalGenSig

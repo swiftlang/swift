@@ -26,7 +26,7 @@
 //
 // Each function in this file is the adjoint of some corresponding function
 // defined in Ops.swift with respect to all of its parameters. The attribute
-// '@differentiable(gradient: ...)' is used to define the adjoint for a partial
+// '@differentiable(reverse, adjoint: ...)' is used to define the adjoint for a partial
 // function. The automatic differentiation pass will pick up these adjoints
 // and chain them together for arbitrary differentiable programs.
 //
@@ -293,8 +293,8 @@ extension Tensor where Scalar : FloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the input.
   @_inlineable @_versioned
   @differentiable(
-    withRespectTo: (.1, .2),
-    gradient: _adjointTFConv2DBackpropInput(_:_:_:_:_:_:_:)
+    reverse, withRespectTo: (.1, .2),
+    adjoint: _adjointTFConv2DBackpropInput(_:_:_:_:_:_:_:)
   )
   func _TFConv2DBackpropInput(
     shape: Tensor<Int32>,
@@ -311,8 +311,8 @@ extension Tensor where Scalar : FloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the filter.
   @_inlineable @_versioned
   @differentiable(
-    withRespectTo: (.0, .2),
-    gradient: _adjointTFConv2DBackpropFilter(_:_:_:_:_:_:_:)
+    reverse, withRespectTo: (.0, .2),
+    adjoint: _adjointTFConv2DBackpropFilter(_:_:_:_:_:_:_:)
   )
   func _TFConv2DBackpropFilter(
     input: Tensor,
