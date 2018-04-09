@@ -393,9 +393,6 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
 def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
   HelpText<"Merge SIL from all partial swiftmodules into the final module">;
 
-def sil_link_all : Flag<["-"], "sil-link-all">,
-  HelpText<"Link all SIL functions">;
-
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
 

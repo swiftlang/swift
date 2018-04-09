@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_always_inline.swift
 // RUN: llvm-bcanalyzer %t/def_always_inline.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-sil -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 
@@ -11,7 +11,7 @@ import def_always_inline
 // SIL: [[RAW:%.+]] = global_addr @$S13always_inline3rawSbvp : $*Bool
 // SIL: [[FUNC:%.+]] = function_ref @$S17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
-// SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
+// SIL: store [[RESULT]] to [[RAW]] : $*Bool
 var raw = testAlwaysInline(x: false)
 
 // SIL: [[FUNC2:%.+]] = function_ref @$S17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct
@@ -19,7 +19,7 @@ var raw = testAlwaysInline(x: false)
 
 var a = AlwaysInlineInitStruct(x: false)
 
-// SIL-LABEL: [always_inline] [canonical] @$S17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
+// SIL-LABEL: [always_inline] @$S17def_always_inline16testAlwaysInline1xS2b_tF : $@convention(thin) (Bool) -> Bool
 
-// SIL-LABEL: sil public_external [serialized] [always_inline] [canonical] @$S17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [always_inline] @$S17def_always_inline22AlwaysInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin AlwaysInlineInitStruct.Type) -> AlwaysInlineInitStruct {
 

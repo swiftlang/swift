@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module -Xfrontend -disable-diagnostic-passes -force-single-frontend-invocation -o %t/sil_box_types.swiftmodule %s
-// RUN: %target-build-swift -emit-sil -Xfrontend -sil-link-all -I %t %s | %FileCheck %s
+// RUN: %target-build-swift -emit-sil -I %t %s | %FileCheck %s
 
 import Builtin
 
