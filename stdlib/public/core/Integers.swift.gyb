@@ -1531,13 +1531,12 @@ public protocol BinaryInteger :
   /// - Parameter source: An integer to convert to this type.
   init<T : BinaryInteger>(clamping source: T)
 
-  // FIXME: Should be `Words : Collection where Words.Element == UInt`
-  // See <rdar://problem/31798916> for why it isn't.
   /// A type that represents the words of a binary integer.
   ///
   /// The `Words` type must conform to the `Collection` protocol with an
   /// `Element` type of `UInt`.
-  associatedtype Words : Sequence where Words.Element == UInt
+  associatedtype Words : Collection where Words.Element == UInt,
+                                          Words.Index : FixedWidthInteger
 
   /// A collection containing the words of this value's binary
   /// representation, in order from the least significant to most significant.
@@ -3373,10 +3372,9 @@ ${assignmentOperatorComment(x.operator, True)}
       )._lowWord._value)
   }
 
-  // FIXME should be RandomAccessCollection
   /// A type that represents the words of this integer.
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Words : BidirectionalCollection {
+  public struct Words : RandomAccessCollection {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
