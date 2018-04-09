@@ -1576,7 +1576,7 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
 
   PrettyStackTraceSILFunction stackTrace("emitting IR", f);
   llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile);
-  if (auto dc = f->getDeclContext()) {
+  if (auto dc = f->getModule().getAssociatedContext()) {
     if (auto sf = dc->getParentSourceFile()) {
       CurSourceFile = sf;
     }
