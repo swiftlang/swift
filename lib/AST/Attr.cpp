@@ -528,8 +528,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       });
       Printer << "), ";
     }
-    // Print gradient function name.
+    // Print primal function name if any.
+    if (auto primal = attr->getPrimal())
+      Printer << "primal: " << primal->Name << ", ";
+    // Print adjoint function name.
     Printer << "adjoint: " << attr->getAdjoint().Name;
+    // Print gradient function name if any.
+    if (auto gradient = attr->getGradient())
+      Printer << ", gradient: " << gradient->Name;
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
