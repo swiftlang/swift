@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_default_args %s | %FileCheck %s
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_default_args.closureInArgs(f: (Swift.Int) -> Swift.Int) -> ()
-// CHECK-NEXT: [[@LINE+4]]:59 -> [[@LINE+6]]:2 : 0
+// CHECK-NEXT: [[@LINE+5]]:59 -> [[@LINE+7]]:2 : 0
+// CHECK-NOT: [[@LINE+4]]:59 -> [[@LINE+6]]:2 : 0
 
 // CHECK-LABEL: sil_coverage_map {{.*}}// closure #1 (Swift.Int) -> Swift.Int in default argument 0 of coverage_default_args.closureInArgs(f: (Swift.Int) -> Swift.Int) -> ()
 // CHECK-NEXT: [[@LINE+1]]:41 -> [[@LINE+1]]:57 : 0

@@ -483,6 +483,10 @@ static bool hasSILBody(FuncDecl *fd) {
   return fd->getBody(/*canSynthesize=*/false);
 }
 
+static bool haveProfiledAssociatedFuncDecl(SILDeclRef constant) {
+  return constant.isDefaultArgGenerator() || constant.isForeign;
+}
+
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it (potentially preparing it
@@ -496,7 +500,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                   constant, forDefinition);
 
   ASTNode profiledNode;
-  if (constant.hasDecl()) {
+  if (constant.hasDecl() && !haveProfiledAssociatedFuncDecl(constant)) {
     if (auto *fd = constant.getFuncDecl()) {
       if (hasSILBody(fd)) {
         // Set up the function for profiling instrumentation.
