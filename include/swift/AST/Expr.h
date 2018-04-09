@@ -2353,11 +2353,16 @@ class UnresolvedDotExpr : public Expr {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
+  ArrayRef<ValueDecl *> OuterAlternatives;
+
 public:
-  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, DeclName name,
-                    DeclNameLoc nameloc, bool Implicit)
-    : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
-      NameLoc(nameloc), Name(name) {
+  UnresolvedDotExpr(
+      Expr *subexpr, SourceLoc dotloc, DeclName name, DeclNameLoc nameloc,
+      bool Implicit,
+      ArrayRef<ValueDecl *> outerAlternatives = ArrayRef<ValueDecl *>())
+      : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr),
+        DotLoc(dotloc), NameLoc(nameloc), Name(name),
+        OuterAlternatives(outerAlternatives) {
     Bits.UnresolvedDotExpr.FunctionRefKind =
       static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefKind::Compound
                                                  : FunctionRefKind::Unapplied);
@@ -2379,6 +2384,10 @@ public:
 
   DeclName getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
+
+  ArrayRef<ValueDecl *> getOuterAlternatives() const {
+    return OuterAlternatives;
+  }
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {
