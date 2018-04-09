@@ -2073,7 +2073,7 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
   // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
   auto proto1 = assocType1->getProtocol();
   auto proto2 = assocType2->getProtocol();
-  if (int compareProtocols = ProtocolType::compareProtocols(&proto1, &proto2))
+  if (int compareProtocols = TypeDecl::compare(proto1, proto2))
     return compareProtocols;
 
   // Error case: if we have two associated types with the same name in the
@@ -7286,7 +7286,7 @@ void GenericSignatureBuilder::enumerateRequirements(
 
     // Sort the protocols in canonical order.
     llvm::array_pod_sort(protocols.begin(), protocols.end(), 
-                         ProtocolType::compareProtocols);
+                         TypeDecl::compare);
 
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {

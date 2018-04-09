@@ -1962,24 +1962,14 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
         break;
 
       DeclAttrKind Kind = llvm::StringSwitch<DeclAttrKind>(Tok.getText())
-                              .Case("open", DAK_AccessControl)
-                              .Case("weak", DAK_ReferenceOwnership)
-                              .Case("unowned", DAK_ReferenceOwnership)
-                              .Case("optional", DAK_Optional)
-                              .Case("required", DAK_Required)
-                              .Case("lazy", DAK_Lazy)
-                              .Case("final", DAK_Final)
-                              .Case("dynamic", DAK_Dynamic)
-                              .Case("prefix", DAK_Prefix)
-                              .Case("postfix", DAK_Postfix)
-                              .Case("indirect", DAK_Indirect)
-                              .Case("infix", DAK_Infix)
-                              .Case("override", DAK_Override)
-                              .Case("mutating", DAK_Mutating)
-                              .Case("nonmutating", DAK_NonMutating)
-                              .Case("__consuming", DAK_Consuming)
-                              .Case("convenience", DAK_Convenience)
-                              .Default(DAK_Count);
+#define CONTEXTUAL_CASE(KW, CLASS) .Case(#KW, DAK_##CLASS)
+#define CONTEXTUAL_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(KW, CLASS) CONTEXTUAL_CASE(KW, CLASS)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
+#include <swift/AST/Attr.def>
+#undef CONTEXTUAL_CASE
+        .Default(DAK_Count);
+
       if (Kind == DAK_Count)
         break;
 

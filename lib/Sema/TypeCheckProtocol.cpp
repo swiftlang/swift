@@ -4890,8 +4890,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
                          = cast<ProtocolDecl>(lhs->getDeclContext());
                        ProtocolDecl *rhsProto
                          = cast<ProtocolDecl>(rhs->getDeclContext());
-                       return ProtocolType::compareProtocols(&lhsProto,
-                                                             &rhsProto) < 0;
+                       return TypeDecl::compare(lhsProto, rhsProto) < 0;
                      });
   }
   return result;

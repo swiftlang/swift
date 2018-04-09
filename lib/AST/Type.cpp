@@ -971,12 +971,6 @@ static void addMinimumProtocols(Type T,
   }
 }
 
-/// \brief Compare two protocols to establish an ordering between them.
-int ProtocolType::compareProtocols(ProtocolDecl * const* PP1,
-                                   ProtocolDecl * const* PP2) {
-  return TypeDecl::compare(*PP1, *PP2);
-}
-
 bool ProtocolType::visitAllProtocols(
                                  ArrayRef<ProtocolDecl *> protocols,
                                  llvm::function_ref<bool(ProtocolDecl *)> fn) {
@@ -1052,7 +1046,7 @@ void ProtocolType::canonicalizeProtocols(
 
   // Sort the set of protocols by module + name, to give a stable
   // ordering.
-  llvm::array_pod_sort(protocols.begin(), protocols.end(), compareProtocols);
+  llvm::array_pod_sort(protocols.begin(), protocols.end(), TypeDecl::compare);
 }
 
 static Type

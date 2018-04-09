@@ -4852,20 +4852,14 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
   auto AddCSKeyword = [&](StringRef Name) {
     AddKeyword(Name, CodeCompletionKeywordKind::None);
   };
-  AddCSKeyword("weak");
-  AddCSKeyword("unowned");
-  AddCSKeyword("optional");
-  AddCSKeyword("required");
-  AddCSKeyword("lazy");
-  AddCSKeyword("final");
-  AddCSKeyword("dynamic");
-  AddCSKeyword("prefix");
-  AddCSKeyword("postfix");
-  AddCSKeyword("infix");
-  AddCSKeyword("override");
-  AddCSKeyword("mutating");
-  AddCSKeyword("nonmutating");
-  AddCSKeyword("convenience");
+
+#define CONTEXTUAL_CASE(KW) AddCSKeyword(#KW);
+#define CONTEXTUAL_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#include <swift/AST/Attr.def>
+#undef CONTEXTUAL_CASE
+
 }
 
 static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) {

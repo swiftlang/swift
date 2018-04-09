@@ -2695,6 +2695,10 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
     return nullptr;
   CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
 
+  if (CE->hasTrailingClosure())
+    // Call expression already has a trailing closure.
+    return nullptr;
+
   // The last arugment is a closure?
   Expr *Args = CE->getArg();
   if (!Args)

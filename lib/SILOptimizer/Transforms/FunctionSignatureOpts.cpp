@@ -837,7 +837,7 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
     }
 
     // Check whether argument is dead.
-    if (!hasNonTrivialNonDebugUse(Args[i])) {
+    if (!hasNonTrivialNonDebugTransitiveUsers(Args[i])) {
       A.IsEntirelyDead = true;
       SignatureOptimize = true;
       if (Args[i]->isSelf())

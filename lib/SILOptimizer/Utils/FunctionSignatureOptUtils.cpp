@@ -28,35 +28,6 @@ llvm::cl::opt<bool> FSOEnableGenerics(
     llvm::cl::desc("Support function signature optimization "
                    "of generic functions"));
 
-bool swift::hasNonTrivialNonDebugUse(SILArgument *Arg) {
-  llvm::SmallVector<SILInstruction *, 8> Worklist;
-  llvm::SmallPtrSet<SILInstruction *, 8> SeenInsts;
-
-  for (Operand *I : getNonDebugUses(SILValue(Arg)))
-    Worklist.push_back(I->getUser());
-
-  while (!Worklist.empty()) {
-    SILInstruction *U = Worklist.pop_back_val();
-    if (!SeenInsts.insert(U).second)
-      continue;
-
-    // If U is a terminator inst, return false.
-    if (isa<TermInst>(U))
-      return true;
-
-    // If U has side effects...
-    if (U->mayHaveSideEffects()) 
-      return true;
-
-    // Otherwise add all non-debug uses of I to the worklist.
-    for (auto result : U->getResults()) {
-      for (Operand *I : getNonDebugUses(result))
-        Worklist.push_back(I->getUser());
-    }
-  }
-  return false;
-}
-
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
   switch (Rep) {
