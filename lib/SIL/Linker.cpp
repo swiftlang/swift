@@ -112,6 +112,36 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 //                                  Visitors
 //===----------------------------------------------------------------------===//
 
+void SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
+  FunctionDeserializationWorklist.push_back(F);
+}
+
+static bool isFunctionBodyRequiredForEmission(SILFunction *F) {
+  return (F->getLinkage() == SILLinkage::Shared ||
+          F->getLinkage() == SILLinkage::SharedExternal ||
+          F->getLinkage() == SILLinkage::HiddenExternal ||
+          F->isTransparent());
+}
+
+bool SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
+  // Don't need to do anything if the function already has a body.
+  if (!F->isExternalDeclaration())
+    return false;
+
+  // - If we're linking everything (performance pipeline), so link the function.
+  // - If the function is shared, we need the body since it's not available
+  //   elsewhere, so link the function.
+  // - If the function has hidden_external linkage, it might be a deserialized
+  //   declaration of a PublicNonABI function, so link the function.
+  // - If the function is transparent, we need its body for the mandatory
+  //   pipeline, so link the function.
+  if (!isLinkAll() && !isFunctionBodyRequiredForEmission(F))
+    return false;
+
+  addFunctionToWorklist(F);
+  return true;
+}
+
 bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
   bool performFuncDeserialization = false;
   
@@ -119,17 +149,6 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
                    ->getGenericSignature()) {
     performFuncDeserialization |= visitApplySubstitutions(
       sig->getSubstitutionMap(AI->getSubstitutions()));
-  }
-  
-  // Ok we have a function ref inst, grab the callee.
-  SILFunction *Callee = AI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
   }
 
   return performFuncDeserialization;
@@ -144,16 +163,6 @@ bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
       sig->getSubstitutionMap(PAI->getSubstitutions()));
   }
 
-  SILFunction *Callee = PAI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
-  }
-
   return performFuncDeserialization;
 }
 
@@ -162,14 +171,7 @@ bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
   // behind as dead code. This shouldn't happen, but if it does don't get into
   // an inconsistent state.
   SILFunction *Callee = FRI->getReferencedFunction();
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(FRI->getReferencedFunction());
-    return true;
-  }
-
-  return false;
+  return maybeAddFunctionToWorklist(Callee);
 }
 
 // Eagerly visiting all used conformances leads to a large blowup

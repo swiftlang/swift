@@ -79,9 +79,11 @@ public:
 
 private:
   /// Add a function to our function worklist for processing.
-  void addFunctionToWorklist(SILFunction *F) {
-    FunctionDeserializationWorklist.push_back(F);
-  }
+  void addFunctionToWorklist(SILFunction *F);
+
+  /// Add a function to our function worklist for processing if it has
+  /// shared linkage or we are linking all functions.
+  bool maybeAddFunctionToWorklist(SILFunction *F);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
