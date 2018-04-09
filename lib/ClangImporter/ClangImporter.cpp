@@ -439,6 +439,11 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
   });
 
+  // Enable Position Independence.  `-fPIC` is not supported on Windows, which
+  // is implicitly position independent.
+  if (!triple.isOSWindows())
+    invocationArgStrs.insert(invocationArgStrs.end(), {"-fPIC"});
+
   // Enable modules.
   invocationArgStrs.insert(invocationArgStrs.end(), {
       "-fmodules",

@@ -1914,24 +1914,6 @@ static llvm::Value *getClassBaseValue(IRGenSILFunction &IGF,
   return e.claimNext();
 }
 
-static llvm::Value *getClassMetatype(IRGenFunction &IGF,
-                                     llvm::Value *baseValue,
-                                     MetatypeRepresentation repr,
-                                     SILType instanceType) {
-  switch (repr) {
-  case MetatypeRepresentation::Thin:
-    llvm_unreachable("Class metatypes are never thin");
-    
-  case MetatypeRepresentation::Thick:
-    return emitDynamicTypeOfHeapObject(IGF, baseValue, instanceType);
-      
-  case MetatypeRepresentation::ObjC:
-    return emitHeapMetadataRefForHeapObject(IGF, baseValue, instanceType);
-  }
-
-  llvm_unreachable("Not a valid MetatypeRepresentation.");
-}
-
 void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
   SILType instanceTy = i->getOperand()->getType();
   auto metaTy = i->getType().castTo<MetatypeType>();
@@ -1945,12 +1927,12 @@ void IRGenSILFunction::visitValueMetatypeInst(swift::ValueMetatypeInst *i) {
   Explosion e;
   
   if (instanceTy.getClassOrBoundGenericClass()) {
-    e.add(getClassMetatype(*this,
+    e.add(emitDynamicTypeOfHeapObject(*this,
                            getClassBaseValue(*this, i->getOperand()),
                            metaTy->getRepresentation(), instanceTy));
   } else if (auto arch = instanceTy.getAs<ArchetypeType>()) {
     if (arch->requiresClass()) {
-      e.add(getClassMetatype(*this,
+      e.add(emitDynamicTypeOfHeapObject(*this,
                              getClassBaseValue(*this, i->getOperand()),
                              metaTy->getRepresentation(), instanceTy));
     } else {

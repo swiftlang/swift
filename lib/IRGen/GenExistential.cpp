@@ -1881,15 +1881,8 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
   assert((IGF.IGM.ObjCInterop || repr != MetatypeRepresentation::ObjC) &&
          "Class metatypes should not have ObjC representation without runtime");
 
-  if (repr == MetatypeRepresentation::Thick) {
-    auto dynamicType = emitDynamicTypeOfOpaqueHeapObject(IGF, instance);
-    out.add(dynamicType);
-  } else if (repr == MetatypeRepresentation::ObjC) {
-    auto dynamicType = emitHeapMetadataRefForUnknownHeapObject(IGF, instance);
-    out.add(dynamicType);
-  } else {
-    llvm_unreachable("Unknown metatype representation");
-  }
+  auto dynamicType = emitDynamicTypeOfOpaqueHeapObject(IGF, instance, repr);
+  out.add(dynamicType);
 
   // Get the witness tables.
   out.add(tablesAndValue.first);
@@ -1926,7 +1919,8 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   ArrayRef<llvm::Value*> wtables;
   llvm::Value *value;
   std::tie(wtables, value) = baseTI.getWitnessTablesAndValue(base);
-  auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
+  auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
+                                                MetatypeRepresentation::Thick);
   IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
                     wtables);
 
@@ -2265,7 +2259,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
         IGF.getTypeInfo(existentialTy).as<ClassExistentialTypeInfo>();
     auto valueAddr = baseTI.projectValue(IGF, base);
     auto value = IGF.Builder.CreateLoad(valueAddr);
-    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
+    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
+                                                MetatypeRepresentation::Thick);
 
     // If we are projecting into an opened archetype, capture the
     // witness tables.
