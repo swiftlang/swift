@@ -1879,9 +1879,8 @@ extension FloatingPoint {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, 
-    withRespectTo: (self, .0, .1),
-    adjoint: _adjointAddingProduct
+  @differentiable(
+    reverse, withRespectTo: (self, .0, .1), adjoint: _adjointAddingProduct
   )
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
