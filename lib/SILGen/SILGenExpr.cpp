@@ -3004,14 +3004,14 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
 
   // Find the gradient function. If the gradient has been emitted, just use
   // that. Otherwise, create a new function containing an `autodiff_reverse`.
-  SILAutoDiffConfiguration config {
+  SILReverseAutoDiffConfiguration config {
     loweredParamIndices,
     /*seedable*/false,
     /*preservingResult*/false
   };
   SILFunction *gradFn;
-  std::pair<SILFunction *, SILAutoDiffConfiguration> gradKey = { &primalFn,
-                                                                 config };
+  std::pair<SILFunction *,
+            SILReverseAutoDiffConfiguration> gradKey = { &primalFn, config };
   if (auto *emittedGrad = SGF.SGM.emittedGradients.lookup(gradKey))
     gradFn = emittedGrad;
   else {

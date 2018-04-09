@@ -793,20 +793,39 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // If the declaration has a @differentiable attribute, turn it into a SIL
-  // [differentiable] attribute with lowered adjoint function name and lowered
-  // differentiation argument indices.
+  // If the declaration has a @differentiable(reverse) attribute, turn it into a
+  // SIL [reverse_differentiable] attribute with lowered adjoint function name
+  // and lowered differentiation argument indices.
   if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
         AFD->getAttrs().getAttribute(DeclAttrKind::DAK_Differentiable))) {
-    auto silPrimalFn = getFunction(SILDeclRef(AFD), ForDefinition);
-    auto *adjointFn = diffAttr->getAdjointFunction();
-    assert(adjointFn && "Adjoint should've been type-checked and resolved.");
-    auto silAdjFn = getFunction(SILDeclRef(adjointFn), ForDefinition);
-    auto indices = getLoweredDifferentiationIndices(*this, AFD, silPrimalFn,
-                                                    diffAttr);
-    silPrimalFn->setReverseDifferentiableAttr(
-      SILReverseDifferentiableAttr::create(M, None, silAdjFn->getName(), None,
-                                           indices));
+    switch (diffAttr->getMode()) {
+    case AutoDiffMode::Forward:
+      // TODO: Handle forward mode once [forward_differentiable] is implemented.
+      llvm_unreachable("Unimplemented");
+      break;
+    case AutoDiffMode::Reverse: {
+      auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
+      // If primal exists, get primal's name.
+      Optional<StringRef> primName;
+      if (auto *primFn = diffAttr->getPrimalFunction())
+        primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
+      // Get adjoint's name.
+      auto *adjointFn = diffAttr->getAdjointFunction();
+      assert(adjointFn && "Adjoint should've been type-checked and resolved.");
+      StringRef adjName =
+        getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+      // If gradient exists, get gradient's name.
+      Optional<StringRef> gradName;
+      if (auto *gradFn = diffAttr->getGradientFunction())
+        gradName = getFunction(SILDeclRef(gradFn), ForDefinition)->getName();
+      auto indices = getLoweredDifferentiationIndices(*this, AFD, silOriginalFn,
+                                                      diffAttr);
+      silOriginalFn->setReverseDifferentiableAttr(
+        SILReverseDifferentiableAttr::create(M, primName, adjName, gradName,
+                                             indices));
+      break;
+    }
+    }
   }
 }
 

@@ -1732,7 +1732,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(gradient: _adjointAdd)
+  @differentiable(reverse, adjoint: _adjointAdd)
   public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs += rhs
@@ -1742,7 +1742,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(gradient: _adjointSubtract)
+  @differentiable(reverse, adjoint: _adjointSubtract)
   public static func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs -= rhs
@@ -1752,7 +1752,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(gradient: _adjointMultiply)
+  @differentiable(reverse, adjoint: _adjointMultiply)
   public static func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs *= rhs
@@ -1762,7 +1762,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(gradient: _adjointDivide)
+  @differentiable(reverse, adjoint: _adjointDivide)
   public static func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs /= rhs
