@@ -89,6 +89,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
   P.addOwnershipModelEliminator();
+  P.addMandatorySILLinker();
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
 
@@ -314,7 +315,7 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Performance Debug Serialization");
-  P.addSILLinker();
+  P.addPerformanceSILLinker();
 }
 
 static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
@@ -324,7 +325,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
   // Start by cloning functions from stdlib.
-  P.addSILLinker();
+  P.addPerformanceSILLinker();
 
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
@@ -344,7 +345,7 @@ static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
 static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidModulePasses+StackPromote");
   P.addDeadFunctionElimination();
-  P.addSILLinker();
+  P.addPerformanceSILLinker();
   P.addDeadObjectElimination();
   P.addGlobalPropertyOpt();
 
