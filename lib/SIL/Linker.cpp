@@ -355,6 +355,9 @@ bool SILLinkerVisitor::visitInitExistentialRefInst(
 }
 
 bool SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
+  if (!isLinkAll())
+    return false;
+
   // Grab the class decl from the alloc ref inst.
   ClassDecl *D = ARI->getType().getClassOrBoundGenericClass();
   if (!D)
@@ -364,6 +367,9 @@ bool SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
 }
 
 bool SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
+  if (!isLinkAll())
+    return false;
+
   CanType instTy = MI->getType().castTo<MetatypeType>().getInstanceType();
   ClassDecl *C = instTy.getClassOrBoundGenericClass();
   if (!C)
