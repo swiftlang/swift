@@ -1111,6 +1111,68 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   }
 }
 
+
+extension RangeReplaceableCollection 
+  where Self: BidirectionalCollection, Element: Equatable 
+{
+  public mutating func removeLast<C: BidirectionalCollection>(
+    occurrenceOf pattern: C) where C.Element == Element 
+  {
+    guard let range: Range<Self.Index> = lastRange(of: pattern) else { return }
+    self.replaceSubrange(range, with: EmptyCollection())
+  }
+
+  public mutating func replaceLast<C: BidirectionalCollection, R: Collection>(
+    occurrenceOf pattern: C, with replacement: R
+  ) where C.Element == Element, R.Element == Element 
+  {
+    guard let range: Range<Self.Index> = lastRange(of: pattern) else { return }
+    replaceSubrange(range, with: replacement)
+  }
+}
+
+extension RangeReplaceableCollection where Element: Equatable {
+  public mutating func removeFirst<C: BidirectionalCollection>(
+    occurrenceOf pattern: C) where C.Element == Element 
+  {
+    guard let range: Range<Self.Index> = firstRange(of: pattern) else { return }
+    self.replaceSubrange(range, with: EmptyCollection())
+  }
+
+  public mutating func removeAll<C: BidirectionalCollection>(
+    occurrencesOf pattern: C) where C.Element == Element 
+  {
+    var next = startIndex
+    while let range = _firstRange(of: pattern, startingAt: next) {
+      replaceSubrange(range, with: EmptyCollection())
+      next = range.lowerBound
+    }
+  }
+
+  public mutating func replaceAll<C: BidirectionalCollection, R: Collection>(
+    occurrencesOf pattern: C, with replacement: R
+  ) where C.Element == Element, R.Element == Element 
+  {
+    var next = startIndex
+    let distance = replacement.count
+    while let range = _firstRange(of: pattern, startingAt: next) {
+      replaceSubrange(range, with: replacement)
+      next = range.lowerBound
+      if formIndex(&next, offsetBy: distance, limitedBy: endIndex) == false {
+        break
+      }
+    }
+  }
+
+  public mutating func replaceFirst<C: BidirectionalCollection, R: Collection>(
+    occurrenceOf pattern: C, with replacement: R
+  ) where C.Element == Element, R.Element == Element 
+  {
+    guard let range: Range<Self.Index> = firstRange(of: pattern) else { return }
+    replaceSubrange(range, with: replacement)
+  }
+}
+
 extension RangeReplaceableCollection {
   /// Removes all the elements that satisfy the given predicate.
   ///

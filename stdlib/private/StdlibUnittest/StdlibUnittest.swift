@@ -260,6 +260,10 @@ public func expectationFailure(
   print(message, terminator: message == "" ? "" : "\n")
 }
 
+public func failTest(_ reason: String, ${TRACE}) {
+  expectationFailure(reason, trace: ${trace})
+}
+
 // Renamed to avoid collision with expectEqual(_, _, TRACE).
 // See <rdar://26058520> Generic type constraints incorrectly applied to
 // functions with the same name

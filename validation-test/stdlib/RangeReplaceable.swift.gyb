@@ -135,5 +135,421 @@ RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
   expectCustomizable(tester, tester.log.reserveCapacity)
 }
 
+//===----------------------------------------------------------------------===//
+// replaceAll tests
+//===----------------------------------------------------------------------===//
+
+struct ReplaceAllTestCase
+{
+  var original: String
+  var pattern: String
+  var replacement: String
+  var expected: String
+  var stringOnly: Bool
+
+  init(original: String, pattern: String, replacement: String, expected: String, stringOnly: Bool = false) {
+    self.original = original
+    self.pattern = pattern
+    self.replacement = replacement
+    self.expected = expected
+    self.stringOnly = stringOnly
+  }
+
+  func run() {
+    var o = original
+    o.replaceAll(occurrencesOf: pattern, with: replacement)
+    expectEqual(expected, o)
+
+    if !stringOnly {
+      var a = Array(original)
+      a.replaceAll(occurrencesOf: Array(pattern), with: Array(replacement))
+      expectEqual(Array(expected), a)
+    }
+  }
+}
+
+let replaceAllTestCases: [ReplaceAllTestCase] = [
+  ReplaceAllTestCase(
+    original: "--abcde--",
+    pattern: "--",
+    replacement: "*",
+    expected: "*abcde*"
+  ),
+  ReplaceAllTestCase(
+    original: "---abcde--",
+    pattern: "--",
+    replacement: "***",
+    expected: "***-abcde***"
+  ),
+  ReplaceAllTestCase(
+    original: "---ab-c-de--",
+    pattern: "--",
+    replacement: "**",
+    expected: "**-ab-c-de**"
+  ),
+  ReplaceAllTestCase(
+    original: "",
+    pattern: "-",
+    replacement: "**",
+    expected: ""
+  ),
+  ReplaceAllTestCase(
+    original: "---------", //9 dashes
+    pattern: "--",
+    replacement: "*",
+    expected: "****-"
+  ),
+  ReplaceAllTestCase(
+    original: "--",
+    pattern: "---",
+    replacement: "*",
+    expected: "--"
+  ),
+  ReplaceAllTestCase(
+    original: "aa",
+    pattern: "a",
+    replacement: "aaa",
+    expected: "aaaaaa"
+  ),
+  ReplaceAllTestCase(
+    original: "abcdefghi",
+    pattern: "f",
+    replacement: "\u{0301}",
+    expected: "abcdéghi",
+    stringOnly: true
+  ),
+]
+
+
+for test in replaceAllTestCases {
+  RangeReplaceableTestSuite.test("replaceAll/\(test.original)/\(test.pattern)/\(test.replacement)") {
+    test.run()
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// replaceFirst tests
+//===----------------------------------------------------------------------===//
+
+struct ReplaceFirstTestCase
+{
+  var original: String
+  var pattern: String
+  var replacement: String
+  var expected: String
+
+  func run() {
+    var o = original
+    o.replaceFirst(occurrenceOf: pattern, with: replacement)
+    expectEqual(expected, o)
+
+    var a = Array(original)
+    a.replaceFirst(occurrenceOf: Array(pattern), with: Array(replacement))
+    expectEqual(Array(expected), a)
+  }
+}
+
+let replaceFirstTestCases: [ReplaceFirstTestCase] = [
+  ReplaceFirstTestCase(
+    original: "--abcde--",
+    pattern: "--",
+    replacement: "*",
+    expected: "*abcde--"
+  ),
+  ReplaceFirstTestCase(
+    original: "-abcde--",
+    pattern: "--",
+    replacement: "*",
+    expected: "-abcde*"
+  ),
+  ReplaceFirstTestCase(
+    original: "---abcde--",
+    pattern: "--",
+    replacement: "***",
+    expected: "***-abcde--"
+  ),
+  ReplaceFirstTestCase(
+    original: "-ab-c-de--",
+    pattern: "--",
+    replacement: "**",
+    expected: "-ab-c-de**"
+  ),
+  ReplaceFirstTestCase(
+    original: "",
+    pattern: "-",
+    replacement: "**",
+    expected: ""
+  ),
+  ReplaceFirstTestCase(
+    original: "--",
+    pattern: "---",
+    replacement: "*",
+    expected: "--"
+  ),
+]
+
+
+for test in replaceFirstTestCases {
+  RangeReplaceableTestSuite.test("replaceFirst/\(test.original)/\(test.pattern)/\(test.replacement)") {
+    test.run()
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// replaceLast tests
+//===----------------------------------------------------------------------===//
+
+struct ReplaceLastTestCase
+{
+  var original: String
+  var pattern: String
+  var replacement: String
+  var expected: String
+
+  func run() {
+    var o = original
+    o.replaceLast(occurrenceOf: pattern, with: replacement)
+    expectEqual(expected, o)
+
+    var a = Array(original)
+    a.replaceLast(occurrenceOf: Array(pattern), with: Array(replacement))
+    expectEqual(Array(expected), a)
+  }
+}
+
+let replaceLastTestCases: [ReplaceLastTestCase] = [
+  ReplaceLastTestCase(
+    original: "--abcde--",
+    pattern: "--",
+    replacement: "*",
+    expected: "--abcde*"
+  ),
+  ReplaceLastTestCase(
+    original: "--abcde-",
+    pattern: "--",
+    replacement: "*",
+    expected: "*abcde-"
+  ),
+  ReplaceLastTestCase(
+    original: "--abcde---",
+    pattern: "--",
+    replacement: "***",
+    expected: "--abcde-***"
+  ),
+  ReplaceLastTestCase(
+    original: "--ab-c-de-",
+    pattern: "--",
+    replacement: "**",
+    expected: "**ab-c-de-"
+  ),
+  ReplaceLastTestCase(
+    original: "",
+    pattern: "-",
+    replacement: "**",
+    expected: ""
+  ),
+  ReplaceLastTestCase(
+    original: "--",
+    pattern: "---",
+    replacement: "*",
+    expected: "--"
+  ),
+]
+
+
+for test in replaceLastTestCases {
+  RangeReplaceableTestSuite.test("replaceLast/\(test.original)/\(test.pattern)/\(test.replacement)") {
+    test.run()
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// removeAll tests
+//===----------------------------------------------------------------------===//
+
+struct RemoveAllTestCase
+{
+  var original: String
+  var pattern: String
+  var expected: String
+
+  func run() {
+    var o = original
+    o.removeAll(occurrencesOf: pattern)
+    expectEqual(expected, o)
+
+    var a = Array(original)
+    a.removeAll(occurrencesOf: Array(pattern))
+    expectEqual(Array(expected), a)
+  }
+}
+
+let removeAllTestCases: [RemoveAllTestCase] = [
+  RemoveAllTestCase(
+    original: "--abcde--",
+    pattern: "--",
+    expected: "abcde"
+  ),
+  RemoveAllTestCase(
+    original: "---abcde--",
+    pattern: "--",
+    expected: "-abcde"
+  ),
+  RemoveAllTestCase(
+    original: "---ab-c-de--",
+    pattern: "--",
+    expected: "-ab-c-de"
+  ),
+  RemoveAllTestCase(
+    original: "",
+    pattern: "-",
+    expected: ""
+  ),
+  RemoveAllTestCase(
+    original: "---------", //9 dashes
+    pattern: "--",
+    expected: "-"
+  ),
+  RemoveAllTestCase(
+    original: "--",
+    pattern: "---",
+    expected: "--"
+  ),
+  RemoveAllTestCase(
+    original: "aaaa",
+    pattern: "aa",
+    expected: ""
+  ),
+]
+
+
+for test in removeAllTestCases {
+  RangeReplaceableTestSuite.test("removeAll/\(test.original)/\(test.pattern)") {
+    test.run()
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// removeFirst tests
+//===----------------------------------------------------------------------===//
+
+struct RemoveFirstTestCase
+{
+  var original: String
+  var pattern: String
+  var expected: String
+
+  func run() {
+    var o = original
+    o.removeFirst(occurrenceOf: pattern)
+    expectEqual(expected, o)
+
+    var a = Array(original)
+    a.removeFirst(occurrenceOf: Array(pattern))
+    expectEqual(Array(expected), a)
+  }
+}
+
+let removeFirstTestCases: [RemoveFirstTestCase] = [
+  RemoveFirstTestCase(
+    original: "--abcde--",
+    pattern: "--",
+    expected: "abcde--"
+  ),
+  RemoveFirstTestCase(
+    original: "-abcde--",
+    pattern: "--",
+    expected: "-abcde"
+  ),
+  RemoveFirstTestCase(
+    original: "---abcde--",
+    pattern: "--",
+    expected: "-abcde--"
+  ),
+  RemoveFirstTestCase(
+    original: "-ab-c-de--",
+    pattern: "--",
+    expected: "-ab-c-de"
+  ),
+  RemoveFirstTestCase(
+    original: "",
+    pattern: "-",
+    expected: ""
+  ),
+  RemoveFirstTestCase(
+    original: "--",
+    pattern: "---",
+    expected: "--"
+  ),
+]
+
+
+for test in removeFirstTestCases {
+  RangeReplaceableTestSuite.test("removeFirst/\(test.original)/\(test.pattern)") {
+    test.run()
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// removeLast tests
+//===----------------------------------------------------------------------===//
+
+struct RemoveLastTestCase
+{
+  var original: String
+  var pattern: String
+  var expected: String
+
+  func run() {
+    var o = original
+    o.removeLast(occurrenceOf: pattern)
+    expectEqual(expected, o)
+
+    var a = Array(original)
+    a.removeLast(occurrenceOf: Array(pattern))
+    expectEqual(Array(expected), a)
+  }
+}
+
+let removeLastTestCases: [RemoveLastTestCase] = [
+  RemoveLastTestCase(
+    original: "--abcde--",
+    pattern: "--",
+    expected: "--abcde"
+  ),
+  RemoveLastTestCase(
+    original: "--abcde-",
+    pattern: "--",
+    expected: "abcde-"
+  ),
+  RemoveLastTestCase(
+    original: "--abcde---",
+    pattern: "--",
+    expected: "--abcde-"
+  ),
+  RemoveLastTestCase(
+    original: "--ab-c-de-",
+    pattern: "--",
+    expected: "ab-c-de-"
+  ),
+  RemoveLastTestCase(
+    original: "",
+    pattern: "-",
+    expected: ""
+  ),
+  RemoveLastTestCase(
+    original: "--",
+    pattern: "---",
+    expected: "--"
+  ),
+]
+
+
+for test in removeLastTestCases {
+  RangeReplaceableTestSuite.test("removeLast/\(test.original)/\(test.pattern)") {
+    test.run()
+  }
+}
+
 runAllTests()
 

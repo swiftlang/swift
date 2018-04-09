@@ -790,6 +790,23 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// - Complexity: O(1).
   func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>)
+  
+  /// Finds the first range where the elements in self match the elements
+  /// in pattern.
+  ///
+  /// This is a customization point used by firstRange(of:) for collections to
+  /// provide a more efficient search algorithm.
+  ///
+  /// Note: the use of double optional on the return value is intentional, 
+  /// this allows implementers to differenciate between the default
+  /// implementation's return value and theirs.
+  /// returning nil means: "no search performed, use the default implementation"
+  /// returning .some(nil) means: "search was performed, no match found"
+  /// returning .some(Range<Index>) means: "search was performed, match found"
+  
+  func _customFirstRangeOfEquatableElements<C: BidirectionalCollection>(
+    _ pattern: C, _ start: Index
+  ) -> Range<Index>?? where C.Element == Element
 
   /// Returns the position immediately after the given index.
   ///
@@ -841,6 +858,14 @@ extension Collection {
   @inline(__always)
   public func formIndex(after i: inout Index) {
     i = index(after: i)
+  }
+  
+  @inlinable
+  public func _customFirstRangeOfEquatableElements<C: BidirectionalCollection>(
+    _ pattern: C, _ start: Index
+  ) -> Range<Index>?? where C.Element == Element
+   {
+    return nil
   }
 
   @inlinable
@@ -1793,6 +1818,114 @@ extension Collection where SubSequence == Self {
       "Can't remove more items from a collection than it contains")
     self = self[index(startIndex, offsetBy: n)..<endIndex]
   }
+}
+
+internal
+struct _RangeIterator
+    <Base: Collection, Other: BidirectionalCollection>: IteratorProtocol 
+    where Base.Element == Other.Element, Base.Element: Equatable 
+{
+  typealias Element = Range<Base.Index>
+  let base: Base
+  let pattern: Other
+  let overlapping: Bool
+  var offset: Base.Index
+  internal
+  init(_ base: Base, _ pattern: Other, overlapping: Bool) {
+    self.base = base
+    self.pattern = pattern
+    self.overlapping = overlapping
+    self.offset = base.startIndex
+  }
+  internal
+  mutating func next() -> Element? {
+    guard let range = base._firstRange(of: pattern, startingAt: offset) else { 
+      return nil 
+    }
+    if overlapping {
+      var index = range.lowerBound
+      base.formIndex(after: &index)
+      offset = index
+    } else {
+      offset = range.upperBound
+    }
+    return range
+  }
+}
+
+extension Collection where Element: Equatable {
+  public func countOccurrences<C: BidirectionalCollection>(
+      of pattern: C, allowingOverlaps: Bool = false
+    ) -> Int where C.Element == Element 
+  {
+    var result = 0
+    let iterator = _RangeIterator(self, pattern, overlapping: allowingOverlaps)
+    for _ in IteratorSequence(iterator) {
+      result += 1
+    }
+    return result
+  }
+
+  public func contains<C: BidirectionalCollection>(
+      occurrenceOf pattern: C
+    ) -> Bool where C.Element == Element 
+  {
+    return firstRange(of: pattern) != nil
+  }
+
+  internal func _firstRange<C: BidirectionalCollection>(
+      of pattern: C, startingAt index: Index
+    ) -> Range<Index>? where C.Element == Element 
+  {
+    if let result = _customFirstRangeOfEquatableElements(pattern, index) {
+      return result
+    } 
+    
+    if pattern.isEmpty || isEmpty {
+      return nil
+    }
+
+    var start = index
+    var cachedEndIndex = endIndex
+
+    func endOfMatchIfAny(_ subsequence: SubSequence) -> Index? {
+      let subIndices = subsequence.indices
+      let separatorIndices = pattern.indices
+
+      if subIndices.count < separatorIndices.count {
+        return nil
+      }
+
+      guard var lastIndex = subIndices.first else {
+        return nil
+      }
+      let zipped = zip(subIndices, separatorIndices)
+      for (subsequenceIndex, separatorIndex) in zipped {
+        if subsequence[subsequenceIndex] != pattern[separatorIndex] {
+          return nil
+        }
+        lastIndex = subsequenceIndex
+      }
+      formIndex(after: &lastIndex)
+      return lastIndex
+    }
+
+    while start != cachedEndIndex {
+      if let end = endOfMatchIfAny(self[start..<cachedEndIndex]) {
+        return start..<end
+      }
+      formIndex(after: &start)
+    }
+
+    return nil
+  }
+
+  public func firstRange<C: BidirectionalCollection>(of pattern: C) 
+    -> Range<Index>? where C.Element == Element 
+  {
+    return _firstRange(of: pattern, startingAt: startIndex)
+  }
+
 }
 
 extension Collection {
