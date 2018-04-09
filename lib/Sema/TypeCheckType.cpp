@@ -1300,10 +1300,9 @@ static Type resolveNestedIdentTypeComponent(
   // If the parent is a type parameter, the member is a dependent member,
   // and we skip much of the work below.
   if (parentTy->isTypeParameter()) {
-    auto memberType = resolver->resolveDependentMemberType(parentTy, DC,
-                                                      parentRange, comp);
-    assert(memberType && "Received null dependent member type");
-    return memberType;
+    if (auto memberType = resolver->resolveDependentMemberType(
+            parentTy, DC, parentRange, comp))
+      return memberType;
   }
 
   // Phase 2: If a declaration has already been bound, use it.
