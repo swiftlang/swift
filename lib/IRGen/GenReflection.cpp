@@ -273,6 +273,8 @@ protected:
 
     IGM.addUsedGlobal(var);
 
+    disableAddressSanitizer(IGM, var);
+
     return var;
   }
 
