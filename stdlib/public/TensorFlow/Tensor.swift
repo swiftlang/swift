@@ -621,8 +621,8 @@ public extension Tensor {
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
   @differentiable(
-    withRespectTo: (self),
-    gradient: _adjointReshaped(toShape:partial:seed:)
+    reverse, withRespectTo: (self),
+    adjoint: _adjointReshaped(toShape:partial:seed:)
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return #tfop("Reshape", handle, newShape)
@@ -645,8 +645,8 @@ public extension Tensor {
   /// specified shape index.
   @_inlineable @inline(__always)
   @differentiable(
-    withRespectTo: (self),
-    gradient: _adjointExpandingShape(at:partial:seed:)
+    reverse, withRespectTo: (self),
+    adjoint: _adjointExpandingShape(at:partial:seed:)
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),

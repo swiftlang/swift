@@ -635,7 +635,7 @@ SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
                                          ArrayRef<unsigned> paramIndices,
                                          bool seedable,
                                          bool preservingResult) {
-  SILAutoDiffConfiguration config =
+  SILReverseAutoDiffConfiguration config =
     { paramIndices, seedable, preservingResult };
   auto origFnTy = original->getType().getAs<SILFunctionType>();
   auto gradFnTy = origFnTy->getGradientType(config, module);

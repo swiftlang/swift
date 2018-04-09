@@ -788,6 +788,26 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     return errorAndSkipToEnd();
   }
 
+  // Parse 'forward' or 'reverse'.
+  if (!Tok.is(tok::identifier)) {
+    diagnose(Tok, diag::attr_differentiable_expected_mode);
+    return errorAndSkipToEnd();
+  }
+  auto modeText = Tok.getText();
+  AutoDiffMode mode;
+  if (modeText == "forward")
+    mode = AutoDiffMode::Forward;
+  else if (modeText == "reverse")
+    mode = AutoDiffMode::Reverse;
+  else {
+    diagnose(Tok, diag::attr_differentiable_expected_mode);
+    return errorAndSkipToEnd();
+  }
+  consumeToken(tok::identifier); // 'forward' or 'reverse'.
+  // Parse comma.
+  parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+             /*isDeclModifier=*/false);
+
   // Parse optional 'withRespectTo:' label.
   SmallVector<AutoDiffParameter, 8> params;
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
@@ -807,7 +827,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     auto parseParam = [&]() -> bool {
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
-      case tok::period_prefix:
+      case tok::period_prefix: {
         consumeToken(tok::period_prefix);
         unsigned index;
         if (parseUnsignedInteger(index, paramLoc,
@@ -816,10 +836,12 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
         params.push_back(
           AutoDiffParameter::getIndexParameter(paramLoc, index));
         break;
-      case tok::kw_self:
+      }
+      case tok::kw_self: {
         paramLoc = consumeToken(tok::kw_self);
         params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
         break;
+      }
       default:
         diagnose(Tok, diag::attr_differentiable_expected_parameter);
         return true;
@@ -843,25 +865,38 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                /*isDeclModifier=*/false);
   }
 
-  // Parse 'gradient:' label.
-  SourceLoc gradientLabelLoc;
-  if (parseSpecificIdentifier("gradient", gradientLabelLoc,
-                              diag::attr_differentiable_missing_gradient_label))
-    return errorAndSkipToEnd();
-  if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
-             "gradient");
-    return errorAndSkipToEnd();
+  using FuncSpec = DifferentiableAttr::FunctionSpecifier;
+  // Function that parses a label and a function specifier,
+  // e.g. 'primal: foo(_:)'.
+  auto parseFuncSpec = [&](StringRef label, FuncSpec &result) -> bool {
+    // Parse label.
+    if (parseSpecificIdentifier(label,
+          diag::attr_differentiable_missing_label, label) ||
+        parseToken(tok::colon,
+          diag::attr_differentiable_expected_colon_after_label, label))
+      return true;
+    // Parse the name of the adjoint function.
+    result.Name =
+      parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
+                              diag::attr_implements_expected_member_name,
+                              /*allowOperators=*/true,
+                              /*allowZeroArgCompoundNames=*/true);
+    return !result.Name;
+  };
+
+  // Parse 'primal: <func_name>' (optional).
+  Optional<FuncSpec> primalSpec;
+  if (Tok.is(tok::identifier) && Tok.getText() == "primal") {
+    primalSpec = FuncSpec();
+    if (parseFuncSpec("primal", *primalSpec)) return errorAndSkipToEnd();
+    // Parse comma.
+    parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+               /*isDeclModifier=*/false);
   }
 
-  // Parse the name of the adjoint function.
-  DeclNameLoc gradFuncNameLoc;
-  DeclName gradFuncName =
-    parseUnqualifiedDeclName(/*afterDot=*/false, gradFuncNameLoc,
-                            diag::attr_implements_expected_member_name,
-                            /*allowOperators=*/true,
-                            /*allowZeroArgCompoundNames=*/true);
-  if (!gradFuncName)
+  // Parse 'adjoint: <func_name>'.
+  FuncSpec adjointSpec;
+  if (parseFuncSpec("adjoint", adjointSpec))
     return errorAndSkipToEnd();
 
   // Parse a trailing 'where' clause if any.
@@ -885,8 +920,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
-                               params, gradFuncName, gradFuncNameLoc,
-                               whereClause));
+                               mode, params, primalSpec, adjointSpec,
+                               /*gradient*/None, whereClause));
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,

@@ -22,6 +22,10 @@
 
 namespace swift {
 
+enum class AutoDiffMode {
+  Forward, Reverse
+};
+
 class AutoDiffParameter {
 public:
   enum class Kind { Index, Self };
@@ -69,7 +73,7 @@ public:
 };
 
 /// SIL-level automatic differentiation configuration.
-struct SILAutoDiffConfiguration {
+struct SILReverseAutoDiffConfiguration {
   ArrayRef<unsigned> parameterIndices;
   bool seedable;
   bool preservingResult;
@@ -79,20 +83,20 @@ struct SILAutoDiffConfiguration {
 
 namespace llvm {
 
-using swift::SILAutoDiffConfiguration;
+using swift::SILReverseAutoDiffConfiguration;
 
 template<typename T> struct DenseMapInfo;
 
-template<> struct DenseMapInfo<SILAutoDiffConfiguration> {
-  static SILAutoDiffConfiguration getEmptyKey() {
+template<> struct DenseMapInfo<SILReverseAutoDiffConfiguration> {
+  static SILReverseAutoDiffConfiguration getEmptyKey() {
     return { {}, false, false };
   }
 
-  static SILAutoDiffConfiguration getTombstoneKey() {
+  static SILReverseAutoDiffConfiguration getTombstoneKey() {
     return { {}, true, true };
   }
 
-  static unsigned getHashValue(SILAutoDiffConfiguration Val) {
+  static unsigned getHashValue(SILReverseAutoDiffConfiguration Val) {
     unsigned paramHash = ~1U;
     for (auto i : Val.parameterIndices)
       paramHash = hash_combine(paramHash,
@@ -104,8 +108,8 @@ template<> struct DenseMapInfo<SILAutoDiffConfiguration> {
     );
   }
 
-  static bool isEqual(SILAutoDiffConfiguration LHS,
-                      SILAutoDiffConfiguration RHS) {
+  static bool isEqual(SILReverseAutoDiffConfiguration LHS,
+                      SILReverseAutoDiffConfiguration RHS) {
     auto numParams = LHS.parameterIndices.size();
     if (numParams != RHS.parameterIndices.size())
       return false;
