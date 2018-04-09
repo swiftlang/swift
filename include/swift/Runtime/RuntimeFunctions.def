@@ -869,6 +869,12 @@ FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// Metadata *swift_getObjCClassFromObject(id object);
+FUNCTION(GetObjCClassFromObject, swift_getObjCClassFromObject, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // MetadataResponse swift_getTupleTypeMetadata(MetadataRequest request,
 //                                             TupleTypeFlags flags,
 //                                             Metadata * const *elts,

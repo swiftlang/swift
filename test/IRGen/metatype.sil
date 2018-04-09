@@ -67,7 +67,7 @@ entry:
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc %objc_class* @existential_objc_metatype(%objc_object*) {{.*}} {
 // CHECK: entry:
-// CHECK-NEXT: [[METATYPE:%.*]] = call %objc_class* @object_getClass(%objc_object* %0) {{#[0-9]+}}
+// CHECK-NEXT: [[METATYPE:%.*]] = call %objc_class* @swift_getObjCClassFromObject(%objc_object* %0) {{#[0-9]+}}
 // CHECK-NEXT: ret %objc_class* [[METATYPE]]
 // CHECK-NEXT: }
 sil @existential_objc_metatype : $@convention(thin) (AnyObject) -> (@objc_metatype AnyObject.Type) {

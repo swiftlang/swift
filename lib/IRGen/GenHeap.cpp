@@ -1796,7 +1796,8 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   case ObjCMetatype:
     return emitObjCMetadataRefForMetadata(*this, LocalSelf);
   case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
+    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
+                                             MetatypeRepresentation::Thick);
   }
 
   llvm_unreachable("Not a valid LocalSelfKind.");
@@ -1916,11 +1917,26 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 /// Given an opaque class instance pointer, produce the type metadata reference
 /// as a %type*.
 llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
-                                                      llvm::Value *object) {
+                                                  llvm::Value *object,
+                                                  MetatypeRepresentation repr) {
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
-  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
-                                         object,
-                                         object->getName() + ".Type");
+  llvm::CallInst *metadata;
+  
+  switch (repr) {
+  case MetatypeRepresentation::ObjC:
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassFromObjectFn(),
+                                      object,
+                                      object->getName() + ".Type");
+    break;
+  case MetatypeRepresentation::Thick:
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
+                                      object,
+                                      object->getName() + ".Type");
+    break;
+  case MetatypeRepresentation::Thin:
+    llvm_unreachable("class metadata can't be thin");
+  }
+  
   metadata->setDoesNotThrow();
   metadata->setOnlyReadsMemory();
   return metadata;
@@ -1944,18 +1960,18 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
 /// as a %type*.
 llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 llvm::Value *object,
+                                                MetatypeRepresentation repr,
                                                 SILType objectType,
                                                 bool suppressCast) {
-  // If it is known to have swift metadata, just load.
+  // If it is known to have swift metadata, just load. A swift class is both
+  // heap metadata and type metadata.
   if (hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType())) {
     return emitLoadOfHeapMetadataRef(IGF, object,
                 getIsaEncodingForType(IGF.IGM, objectType.getSwiftRValueType()),
                 suppressCast);
   }
 
-  // Okay, ask the runtime for the type metadata of this
-  // potentially-ObjC object.
-  return emitDynamicTypeOfOpaqueHeapObject(IGF, object);
+  return emitDynamicTypeOfOpaqueHeapObject(IGF, object, repr);
 }
 
 static ClassDecl *getRootClass(ClassDecl *theClass) {
