@@ -1502,6 +1502,18 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
       nestedType = nestedType.getNominalParent();
     }
+
+    // Also, the same applies for Obj-C protocols. We could, in theory,
+    // front-load the requirement checking to generic-instantiation time (rather
+    // than conformance-lookup/construction time) and register the conformance
+    // with the Obj-C runtime when they're satisfied.
+    if (Proto->isObjC()) {
+      TC.diagnose(ComplainLoc,
+                  diag::objc_protocol_cannot_have_conditional_conformance,
+                  T, ProtoType);
+      conformance->setInvalid();
+      return conformance;
+    }
   }
 
   // If the protocol contains missing requirements, it can't be conformed to
