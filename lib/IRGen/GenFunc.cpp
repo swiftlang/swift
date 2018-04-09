@@ -1050,6 +1050,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       if (RetainableValue->getType() != subIGF.IGM.RefCountedPtrTy)
         RetainableValue = subIGF.Builder.CreateBitCast(
             RetainableValue, subIGF.IGM.RefCountedPtrTy);
+      needsAllocas = true;
       auto temporary = subIGF.createAlloca(RetainableValue->getType(),
                                            subIGF.IGM.getPointerAlignment(),
                                            "partial-apply.context");

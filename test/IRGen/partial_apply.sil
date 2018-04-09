@@ -131,7 +131,7 @@ sil public_external @indirect_consumed_captured_class_param : $@convention(thin)
 // CHECK-NOT:     load
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
-// CHECK:         [[RESULT:%.*]] = tail call swiftcc i64 @indirect_consumed_captured_class_param(i64 %0, %T13partial_apply10SwiftClassC** noalias nocapture dereferenceable({{.*}}) [[X_CAST]])
+// CHECK:         [[RESULT:%.*]] = call swiftcc i64 @indirect_consumed_captured_class_param(i64 %0, %T13partial_apply10SwiftClassC** noalias nocapture dereferenceable({{.*}}) [[X_CAST]])
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
 // CHECK:         ret i64 [[RESULT]]
