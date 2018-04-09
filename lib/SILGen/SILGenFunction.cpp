@@ -407,7 +407,6 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
-    emitProfilerIncrement(ce);
     emitStmt(ce->getBody());
   } else {
     auto *autoclosure = cast<AutoClosureExpr>(ace);

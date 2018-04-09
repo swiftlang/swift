@@ -505,22 +505,20 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       }
     }
   } else if (auto *ace = constant.getAbstractClosureExpr()) {
-    // Closures inherit profiling metadata and counters from their parent, if
-    // one exists. If not, they receive a fresh profiler.
-    if (auto *parentDecl = dyn_cast_or_null<ValueDecl>(
-            ace->getInnermostDeclarationDeclContext())) {
-      SILDeclRef parentConstant(parentDecl, SILDeclRef::Kind::Func);
-      auto parentIt = emittedFunctions.find(parentConstant);
-      if (parentIt != emittedFunctions.end()) {
-        F->setProfiler(parentIt->second->getProfiler());
-        profiledNode = ace;
-      }
-    }
-
-    if (!profiledNode) {
-      if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
-        F->createProfiler(ce, forDefinition);
-        profiledNode = ce;
+    // Regular closures receive fresh profilers.
+    if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
+      F->createProfiler(ce, forDefinition);
+      profiledNode = ce;
+    } else if (auto *autoCe = dyn_cast<AutoClosureExpr>(ace)) {
+      // Autoclosures inherit their profiling metadata and counters.
+      if (auto *parentDecl = dyn_cast_or_null<ValueDecl>(
+              autoCe->getInnermostDeclarationDeclContext())) {
+        SILDeclRef parentConstant(parentDecl, SILDeclRef::Kind::Func);
+        auto parentIt = emittedFunctions.find(parentConstant);
+        if (parentIt != emittedFunctions.end()) {
+          F->setProfiler(parentIt->second->getProfiler());
+          profiledNode = autoCe;
+        }
       }
     }
   }

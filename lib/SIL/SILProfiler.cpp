@@ -137,6 +137,21 @@ SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
 
 namespace {
 
+/// Special logic for handling ClosureExpr visitation.
+///
+/// To prevent a ClosureExpr from being mapped twice, avoid recursively
+/// walking into one unless the closure's function definition is being profiled.
+///
+/// Apply \p Func if the closure can be visited.
+template <typename F>
+std::pair<bool, Expr *> visitClosureExpr(ASTWalker &Walker, ClosureExpr *CE,
+                                         F Func) {
+  if (!Walker.Parent.isNull())
+    return {false, CE};
+  Func();
+  return {true, CE};
+}
+
 /// An ASTWalker that maps ASTNodes to profiling counters.
 struct MapRegionCounters : public ASTWalker {
   /// The next counter value to assign.
@@ -185,8 +200,11 @@ struct MapRegionCounters : public ASTWalker {
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterMap[IE->getThenExpr()] = NextCounter++;
-    } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
+    } else if (isa<AutoClosureExpr>(E)) {
       CounterMap[E] = NextCounter++;
+    } else if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+      return visitClosureExpr(*this, CE,
+                              [&] { CounterMap[CE] = NextCounter++; });
     }
     return {true, E};
   }
@@ -495,10 +513,16 @@ struct PGOMapping : public ASTWalker {
         }
       }
       LoadedCounterMap[elseExpr] = subtract(count, thenCount);
-    } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
+    } else if (isa<AutoClosureExpr>(E)) {
       CounterMap[E] = NextCounter++;
       auto eCount = loadExecutionCount(E);
       LoadedCounterMap[E] = eCount;
+    } else if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+      return visitClosureExpr(*this, CE, [&] {
+        CounterMap[E] = NextCounter++;
+        auto eCount = loadExecutionCount(E);
+        LoadedCounterMap[E] = eCount;
+      });
     }
     return {true, E};
   }
@@ -868,8 +892,8 @@ public:
       // those expressions.
       if (!RegionStack.empty())
         assignCounter(E);
-    } else if (isa<ClosureExpr>(E)) {
-      assignCounter(E);
+    } else if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+      visitClosureExpr(*this, CE, [&] { assignCounter(CE); });
     } else if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
       if (RegionStack.empty())
