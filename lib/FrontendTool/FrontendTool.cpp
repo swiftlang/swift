@@ -980,13 +980,6 @@ static bool performCompile(CompilerInstance &Instance,
   return false;
 }
 
-/// If we are asked to link all, link all.
-static void linkAllIfNeeded(const CompilerInvocation &Invocation,
-                            SILModule *SM) {
-  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-    performSILLinking(SM, true);
-}
-
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM,
@@ -1007,8 +1000,6 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
     if (runSILOwnershipEliminatorPass(*SM))
       return true;
   }
-
-  linkAllIfNeeded(Invocation, SM);
 
   if (Invocation.getSILOptions().MergePartialModules)
     SM->linkAllFromCurrentModule();
@@ -1211,12 +1202,10 @@ static bool performCompileStepsPostSILGen(
 
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSILGen) {
-    linkAllIfNeeded(Invocation, SM.get());
     return writeSIL(*SM, PSPs, Instance, Invocation);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
-    linkAllIfNeeded(Invocation, SM.get());
     serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
     return Context.hadError();
   }
