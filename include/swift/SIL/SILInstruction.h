@@ -7819,7 +7819,7 @@ public:
 
   bool isPreservingResult() const { return PreservingResult; }
 
-  SILAutoDiffConfiguration getConfiguration() const {
+  SILReverseAutoDiffConfiguration getConfiguration() const {
     return { getParameterIndices(), Seedable, PreservingResult };
   }
 
@@ -7890,7 +7890,7 @@ public:
 
   bool isPreservingResult() const { return PreservingResult; }
 
-  SILAutoDiffConfiguration getConfiguration() const {
+  SILReverseAutoDiffConfiguration getConfiguration() const {
     return { getParameterIndices(), Seedable, PreservingResult };
   }
 

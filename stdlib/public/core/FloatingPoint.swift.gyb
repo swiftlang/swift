@@ -1824,7 +1824,7 @@ extension FloatingPoint {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(withRespectTo: (self), gradient: _adjointSquareRoot)
+  @differentiable(reverse, withRespectTo: (self), adjoint: _adjointSquareRoot)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )
@@ -1855,9 +1855,9 @@ extension FloatingPoint {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(
+  @differentiable(reverse, 
     withRespectTo: (self, .0, .1),
-    gradient: _adjointAddingProduct
+    adjoint: _adjointAddingProduct
   )
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self

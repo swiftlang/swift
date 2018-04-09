@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo")
-@differentiable(gradient: dfoo(_:_:partial:seed:))
+@differentiable(reverse, adjoint: dfoo(_:_:partial:seed:))
 public func foo(_ x: Float, _ y: Float) -> Float {
   return 1
 }
@@ -25,7 +25,7 @@ public func dfoo(_ x: Float, _ y: Float, partial: Float, seed: Float) -> (Float,
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo_indir_ret")
-@differentiable(gradient: dfoo_indir_ret(_:_:_:_:))
+@differentiable(reverse, adjoint: dfoo_indir_ret(_:_:_:_:))
 public func foo_indir_ret<T>(_ x: Float, _ y: T) -> T {
   return y
 }
@@ -46,7 +46,7 @@ public func dfoo_indir_ret<T>(_ x: Float, _ y: T, _ partial: T, _ seed: T) -> (F
 //===----------------------------------------------------------------------===//
 
 @_silgen_name("foo_tuple")
-@differentiable(gradient: dfoo_tuple(_:_:partial:seed:))
+@differentiable(reverse, adjoint: dfoo_tuple(_:_:partial:seed:))
 public func foo_tuple(_ x: ((Float, (Float, Float)), Float, ((Float))), _ y: Float) -> Float {
   return 1
 }

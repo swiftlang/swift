@@ -529,7 +529,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "), ";
     }
     // Print gradient function name.
-    Printer << "gradient: " << attr->getGradFuncName();
+    Printer << "adjoint: " << attr->getAdjoint().Name;
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
@@ -958,31 +958,33 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+                                       AutoDiffMode mode,
                                        ArrayRef<AutoDiffParameter> parameters,
-                                       DeclName gradFuncName,
-                                       DeclNameLoc gradFuncNameLoc,
+                                       Optional<FunctionSpecifier> primal,
+                                       FunctionSpecifier adjoint,
+                                       Optional<FunctionSpecifier> gradient,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
-    NumParameters(parameters.size()), GradFuncName(gradFuncName),
-    GradFuncNameLoc(gradFuncNameLoc), WhereClause(clause) {
+    Mode(mode), NumParameters(parameters.size()), Primal(std::move(primal)),
+    Adjoint(adjoint), Gradient(std::move(gradient)), WhereClause(clause) {
   std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(ASTContext &context,
-                           SourceLoc atLoc,
-                           SourceRange baseRange,
+DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
+                           SourceRange baseRange, AutoDiffMode mode,
                            ArrayRef<AutoDiffParameter> parameters,
-                           DeclName gradFuncName,
-                           DeclNameLoc gradFuncNameLoc,
+                           Optional<FunctionSpecifier> primal,
+                           FunctionSpecifier adjoint,
+                           Optional<FunctionSpecifier> gradient,
                            TrailingWhereClause *clause) {
   unsigned numParams = parameters.size();
   unsigned size = sizeof(DifferentiableAttr) +
     numParams * sizeof(AutoDiffParameter);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(atLoc, baseRange, parameters,
-                                      gradFuncName, gradFuncNameLoc,
-                                      clause);
+  return new (mem) DifferentiableAttr(atLoc, baseRange, mode, parameters,
+                                      std::move(primal), adjoint,
+                                      std::move(gradient), clause);
 }
 
 ArrayRef<AutoDiffParameter>

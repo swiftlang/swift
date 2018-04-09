@@ -1270,45 +1270,60 @@ public:
 /// SWIFT_ENABLE_TENSORFLOW
 /// Attribute that marks a function differentiable and specifies the adjoint
 /// of the function. For example:
-///   @differentiable(gradient: foo(_:_:seed:) where T : FloatingPoint)
-///   @differentiable(withRespectTo: (self, .0, .1), gradient: bar(_:_:_:seed:))
+///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)
+///   @differentiable(reverse, withRespectTo: (self, .0, .1),
+///                   gradient: bar(_:_:_:seed:))
 class DifferentiableAttr : public DeclAttribute {
+public:
+  struct FunctionSpecifier {
+    DeclName Name;
+    DeclNameLoc Loc;
+  };
 private:
+  /// Differentiation mode (forward or reverse).
+  AutoDiffMode Mode;
   /// The number of parameters specified in 'withRespectTo:'.
   unsigned NumParameters;
-  /// The name of the function which differentiates the declared function.
-  DeclName GradFuncName;
-  DeclNameLoc GradFuncNameLoc;
+  /// The primal function.
+  Optional<FunctionSpecifier> Primal;
+  /// The adjoint function.
+  FunctionSpecifier Adjoint;
+  /// The gradient function.
+  Optional<FunctionSpecifier> Gradient;
   /// The constraint clauses for generic types.
   TrailingWhereClause *WhereClause;
+  /// The primal function (optional), to be resolved by the type checker if
+  /// specified.
+  FuncDecl *PrimalFunction = nullptr;
   /// The adjoint function, to be resolved by the type checker.
-  FuncDecl *adjointFunction = nullptr;
+  FuncDecl *AdjointFunction = nullptr;
+  /// The gradient function (optional), to be resolved by the type checker if
+  /// specified.
+  FuncDecl *GradientFunction = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
+                              AutoDiffMode mode,
                               ArrayRef<AutoDiffParameter> parameters,
-                              DeclName gradFuncName,
-                              DeclNameLoc gradFuncNameLoc,
+                              Optional<FunctionSpecifier> primal,
+                              FunctionSpecifier adjoint,
+                              Optional<FunctionSpecifier> gradient,
                               TrailingWhereClause *clause);
 
 public:
   static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
-                                    SourceRange baseRange,
+                                    SourceRange baseRange, AutoDiffMode mode,
                                     ArrayRef<AutoDiffParameter> parameters,
-                                    DeclName gradFuncName,
-                                    DeclNameLoc gradFuncNameLoc,
+                                    Optional<FunctionSpecifier> primal,
+                                    FunctionSpecifier adjoint,
+                                    Optional<FunctionSpecifier> gradient,
                                     TrailingWhereClause *clause);
 
-  DeclName getGradFuncName() const {
-    return GradFuncName;
-  }
+  AutoDiffMode getMode() const { return Mode; }
+  Optional<FunctionSpecifier> getPrimal() const { return Primal; }
+  FunctionSpecifier getAdjoint() const { return Adjoint; }
+  Optional<FunctionSpecifier> getGradient() const { return Gradient; }
 
-  DeclNameLoc getGradFuncNameLoc() const {
-    return GradFuncNameLoc;
-  }
-
-  TrailingWhereClause *getWhereClause() const {
-    return WhereClause;
-  }
+  TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
   AutoDiffParameter *getParametersData() {
     return reinterpret_cast<AutoDiffParameter *>(this+1);
@@ -1317,18 +1332,16 @@ public:
   /// The differentiation parameters, i.e. the list of parameters specified in
   /// 'withRespectTo:'.
   ArrayRef<AutoDiffParameter> getParameters() const;
-
   MutableArrayRef<AutoDiffParameter> getParameters() {
     return { getParametersData(), NumParameters };
   }
 
-  FuncDecl *getAdjointFunction() const {
-    return adjointFunction;
-  }
-
-  void setAdjointFunction(FuncDecl *decl) {
-    adjointFunction = decl;
-  }
+  FuncDecl *getPrimalFunction() const { return PrimalFunction; }
+  void setPrimalFunction(FuncDecl *decl) { AdjointFunction = decl; }
+  FuncDecl *getAdjointFunction() const { return AdjointFunction; }
+  void setAdjointFunction(FuncDecl *decl) { AdjointFunction = decl; }
+  FuncDecl *getGradientFunction() const { return GradientFunction; }
+  void setGradientFunction(FuncDecl *decl) { GradientFunction = decl; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;

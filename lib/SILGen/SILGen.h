@@ -62,7 +62,7 @@ public:
   llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
   /// Mapping from reverse-mode AD configuration to gradient functions.
   llvm::DenseMap<std::pair<SILFunction*,
-                           SILAutoDiffConfiguration>, SILFunction*>
+                           SILReverseAutoDiffConfiguration>, SILFunction*>
     emittedGradients;
 
   struct DelayedFunction {

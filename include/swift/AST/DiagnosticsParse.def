@@ -1454,28 +1454,22 @@ ERROR(attr_differentiable_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
 
 ERROR(attr_differentiable_parameter_index_must_be_positive_integer,PointsToFirstBadToken,
-      "gradient parameter index must be a positive integer", ())
+      "parameter index must be a positive integer", ())
 
 ERROR(attr_differentiable_nondifferentiable_function,none,
       "function '%0' is not differentiable", (StringRef))
 
-ERROR(attr_differentiable_invalid_parameter_indices,none,
-      "gradient parameter indices '%0' are invalid", (StringRef))
-
-ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
-      "expected a colon ':' after label '%0' in 'gradient' attribute", (StringRef))
-
-ERROR(attr_differentiable_expected_config_label,PointsToFirstBadToken,
-      "expected a gradient configuration label: 'wrt:', 'keeping:', or 'seedable:'", ())
-
-ERROR(attr_differentiable_expected_bool_value,PointsToFirstBadToken,
-      "expected a boolean true or false value in option '%0'", (StringRef))
-
 ERROR(attr_differentiable_duplicate_config_option,PointsToFirstBadToken,
       "duplicated gradient configuration option '%0'", (StringRef))
 
-ERROR(attr_differentiable_missing_gradient_label,PointsToFirstBadToken,
-      "missing label 'gradient:' in '@differentiable' attribute", ())
+ERROR(attr_differentiable_expected_mode,PointsToFirstBadToken,
+      "expected a differentiation mode ('forward' or 'reverse')", ())
+
+ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@differentiable' attribute", (StringRef))
+
+ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
+      "expected a colon ':' after '%0'", (StringRef))
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
