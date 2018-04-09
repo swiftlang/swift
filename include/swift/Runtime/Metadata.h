@@ -4154,6 +4154,10 @@ swift_getObjCClassMetadata(const ClassMetadata *theClass);
 SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_getObjCClassFromMetadata(const Metadata *theClass);
+
+SWIFT_RUNTIME_EXPORT
+const ClassMetadata *
+swift_getObjCClassFromObject(HeapObject *object);
 #endif
 
 /// \brief Fetch a unique type metadata object for a foreign type.
