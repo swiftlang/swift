@@ -121,11 +121,6 @@ module CPython [system] [extern_c] {
     export *
   }
 
-  explicit module pymactoolbox {
-    header "include/pymactoolbox.h"
-    export *
-  }
-
   explicit module pythread {
     header "include/pythread.h"
     export *
