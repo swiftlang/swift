@@ -655,7 +655,7 @@ SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAutoDiffReverseInst(AutoDiffReverseInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getPrimalFunction());
+  SILFunction *OpFunction = getOpFunction(Inst->getOriginalFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
     getBuilder().createAutoDiffReverse(getOpLocation(Inst->getLoc()),

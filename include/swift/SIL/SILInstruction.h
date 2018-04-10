@@ -7916,9 +7916,9 @@ class AutoDiffReverseInst final
 private:
   friend SILBuilder;
 
-  /// The primal function to be differentiated.
-  SILFunction *Primal;
-  /// The number of parameters of the primal function to differentiate with
+  /// The original function to be differentiated.
+  SILFunction *Original;
+  /// The number of parameters of the original function to differentiate with
   /// respect to.
   unsigned NumParamIndices;
   /// Whether the gradient function is seedable, i.e. able to take a
@@ -7928,7 +7928,7 @@ private:
   /// function.
   bool PreservingResult;
 
-  AutoDiffReverseInst(SILDebugLocation debugLoc, SILFunction *primal,
+  AutoDiffReverseInst(SILDebugLocation debugLoc, SILFunction *original,
                       ArrayRef<unsigned> paramIndices, bool seedable,
                       bool preservingResult);
 
@@ -7937,14 +7937,14 @@ public:
 
   static AutoDiffReverseInst *create(SILModule &M,
                                      SILDebugLocation debugLoc,
-                                     SILFunction *primal,
+                                     SILFunction *original,
                                      ArrayRef<unsigned> paramIndices,
                                      bool seedable,
                                      bool preservingResult);
 
-  SILFunction *getPrimalFunction() const { return Primal; }
+  SILFunction *getOriginalFunction() const { return Original; }
 
-  void dropReferencedPrimalFunction();
+  void dropReferencedOriginalFunction();
 
   unsigned *getParameterIndicesData() {
     return reinterpret_cast<unsigned *>(this+1);

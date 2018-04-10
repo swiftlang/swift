@@ -2945,105 +2945,37 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Create arguments in the entry block based on the function type.
-static void createEntryArguments(SILFunction *f) {
-  auto &entry = *f->getEntryBlock();
-  auto conv = f->getConventions();
-  assert(entry.getNumArguments() == 0 &&
-         conv.getNumSILArguments() > 0 &&
-         "Entry already has arguments?!");
-  for (auto indResultTy : conv.getIndirectSILResultTypes())
-    entry.createFunctionArgument(indResultTy.getAddressType());
-  for (auto paramTy : conv.getParameterSILTypes())
-    entry.createFunctionArgument(paramTy);
-}
-
 RValue RValueEmitter::
 visitGradientExpr(GradientExpr *E, SGFContext C) {
-  FuncDecl *primalDecl = E->getResolvedPrimal();
-  assert(primalDecl && "Primal decl not resolved?");
-  SILFunction &primalFn =
-    *SGF.SGM.getFunction(SILDeclRef(primalDecl), ForDefinition);
-
-  std::string gradName = primalFn.getName().str() + "__grad";
-  // Compute SIL gradient type.
-  auto primalTy = primalFn.getLoweredFunctionType();
-
-  // If differentiation parameters are specified, lower them to SIL parameter
-  // indices.
+  SILLocation loc(E);
+  auto *origExpr = E->getOriginalExpr();
+  auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
+  ManagedValue origVal = visit(origExpr, C).getAsSingleValue(SGF, loc);
+  auto origSILTy = origVal.getType().getAs<SILFunctionType>();
+  // Lower Swift parameter indices to SIL parameter indices.
   SmallVector<unsigned, 8> loweredParamIndices;
-  gradName += '_';
-  if (!E->getParameters().empty()) {
-    interleave(E->getParameters(), [&](AutoDiffParameter param) {
-      switch (param.getKind()) {
-      case swift::AutoDiffParameter::Kind::Index: {
-        auto silParamIndices =
-          SGF.SGM.getLoweredFunctionParameterIndex(param.getIndex(), primalDecl);
-        for (auto idx : silParamIndices) {
-          loweredParamIndices.push_back(idx);
-          gradName += std::to_string(idx);
-        }
-        break;
-      }
-      case swift::AutoDiffParameter::Kind::Self:
-        // `self` is the last parameter of the SIL function.
-        auto selfIdx = primalTy->getNumParameters() - 1;
-        loweredParamIndices.push_back(selfIdx);
-        gradName += std::to_string(selfIdx);
-        break;
-      }
-    }, [&] {
-      gradName += '_';
-    });
-  } else {
-    gradName += "all";
+  for (auto param : E->getParameters()) {
+    switch (param.getKind()) {
+    case swift::AutoDiffParameter::Kind::Index: {
+      auto silParamIndices =
+        SGF.SGM.getLoweredFunctionParameterIndex(param.getIndex(), origTy);
+      for (auto idx : silParamIndices)
+        loweredParamIndices.push_back(idx);
+      break;
+    }
+    case swift::AutoDiffParameter::Kind::Self: {
+      // `self` is the last parameter of the SIL function.
+      auto selfIdx = origSILTy->getNumParameters() - 1;
+      loweredParamIndices.push_back(selfIdx);
+      break;
+    }
+    }
   }
-  // TODO: Currently #gradient doesn't support `seed:` or `preservingResult:`.
-  // When those are added to the syntax, they need to be encoded in the function
-  // name of the gradient.
-
-  // Find the gradient function. If the gradient has been emitted, just use
-  // that. Otherwise, create a new function containing an `autodiff_reverse`.
-  SILReverseAutoDiffConfiguration config {
-    loweredParamIndices,
-    /*seedable*/false,
-    /*preservingResult*/false
-  };
-  SILFunction *gradFn;
-  std::pair<SILFunction *,
-            SILReverseAutoDiffConfiguration> gradKey = { &primalFn, config };
-  if (auto *emittedGrad = SGF.SGM.emittedGradients.lookup(gradKey))
-    gradFn = emittedGrad;
-  else {
-    auto gradTy = primalTy->getGradientType(config, SGF.SGM.M);
-    SILLocation loc(E);
-    gradFn = SGF.SGM.M.createFunction(primalFn.getLinkage(), gradName, gradTy,
-                                      primalFn.getGenericEnvironment(),
-                                      loc, primalFn.isBare(),
-                                      primalFn.isTransparent(),
-                                      primalFn.isSerialized(),
-                                      ProfileCounter(), IsNotThunk,
-                                      SubclassScope::NotApplicable,
-                                      InlineDefault,
-                                      primalFn.getEffectsKind(),
-                                      /*InsertBefore*/nullptr,
-                                      /*DebugScope*/nullptr);
-    gradFn->setDebugScope(new (SGF.SGM.M) SILDebugScope(loc, gradFn));
-    SILGenFunction gradSGF(SGF.SGM, *gradFn);
-    createEntryArguments(gradFn);
-    
-    gradSGF.B.createAutoDiffReverse(SILLocation(E), &primalFn,
-                                    loweredParamIndices, config.seedable,
-                                    config.preservingResult);
-    gradSGF.B.clearInsertionPoint();
-    // Cache this gradient for this primal function and this autodiff
-    // configuration.
-    SGF.SGM.emittedGradients.insert({ gradKey, gradFn });
-  }
-
-  // Create a function_ref to the gradient function.
-  auto gradFnRef = SGF.B.createFunctionRef(primalFn.getLocation(), gradFn);
-  ManagedValue v = SGF.emitManagedRValueWithCleanup(gradFnRef);
+  auto gradInst =
+    SGF.B.createGradient(loc, origVal.forward(SGF), loweredParamIndices,
+                         /*seedable*/ false,
+                         /*preservingResult*/ false);
+  ManagedValue v = SGF.emitManagedRValueWithCleanup(gradInst);
   return RValue(SGF, E, v);
 }
 

@@ -579,30 +579,30 @@ TryApplyInst *TryApplyInst::create(
 
 /// SWIFT_ENABLE_TENSORFLOW
 AutoDiffReverseInst::AutoDiffReverseInst(SILDebugLocation debugLoc,
-                                         SILFunction *primal,
+                                         SILFunction *original,
                                          ArrayRef<unsigned> paramIndices,
                                          bool seedable, bool preservingResult)
-  : InstructionBase(debugLoc), Primal(primal),
+  : InstructionBase(debugLoc), Original(original),
     NumParamIndices(paramIndices.size()), Seedable(seedable),
     PreservingResult(preservingResult) {
-  Primal->incrementRefCount();
+  Original->incrementRefCount();
   std::copy(paramIndices.begin(), paramIndices.end(), getParameterIndicesData());
 }
 
 AutoDiffReverseInst::~AutoDiffReverseInst() {
-  if (Primal)
-    Primal->decrementRefCount();
+  if (Original)
+    Original->decrementRefCount();
 }
 
 AutoDiffReverseInst *
 AutoDiffReverseInst::create(SILModule &M, SILDebugLocation debugLoc,
-                            SILFunction *primal,
+                            SILFunction *original,
                             ArrayRef<unsigned> paramIndices, bool seedable,
                             bool preservingResult) {
   unsigned size =
     sizeof(AutoDiffReverseInst) + paramIndices.size() * sizeof(unsigned);
   void *buffer = M.allocateInst(size, alignof(AutoDiffReverseInst));
-  return ::new (buffer) AutoDiffReverseInst(debugLoc, primal, paramIndices,
+  return ::new (buffer) AutoDiffReverseInst(debugLoc, original, paramIndices,
                                             seedable, preservingResult);
 }
 
@@ -613,10 +613,10 @@ ArrayRef<unsigned> AutoDiffReverseInst::getParameterIndices() const {
   };
 }
 
-void AutoDiffReverseInst::dropReferencedPrimalFunction() {
-  if (Primal)
-    Primal->decrementRefCount();
-  Primal = nullptr;
+void AutoDiffReverseInst::dropReferencedOriginalFunction() {
+  if (Original)
+    Original->decrementRefCount();
+  Original = nullptr;
 }
 
 /// SWIFT_ENABLE_TENSORFLOW

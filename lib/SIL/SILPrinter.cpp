@@ -1162,8 +1162,8 @@ public:
       *this << "[seedable] ";
     if (ADRI->isPreservingResult())
       *this << "[preserving_result] ";
-    ADRI->getPrimalFunction()->printName(PrintState.OS);
-    *this << " : " << ADRI->getPrimalFunction()->getLoweredType();
+    ADRI->getOriginalFunction()->printName(PrintState.OS);
+    *this << " : " << ADRI->getOriginalFunction()->getLoweredType();
   }
 
   /// SWIFT_ENABLE_TENSORFLOW

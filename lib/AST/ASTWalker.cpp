@@ -455,9 +455,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   // SWIFT_ENABLE_TENSORFLOW
   Expr *visitReverseAutoDiffExpr(ReverseAutoDiffExpr *E) {
-    Expr *primalExpr = doIt(E->getPrimalExpr());
-    if (!primalExpr) return nullptr;
-    E->setPrimalExpr(primalExpr);
+    Expr *originalExpr = doIt(E->getOriginalExpr());
+    if (!originalExpr) return nullptr;
+    E->setOriginalExpr(originalExpr);
     return E;
   }
 
