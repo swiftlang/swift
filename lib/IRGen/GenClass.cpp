@@ -141,6 +141,10 @@ namespace {
 
     unsigned NumInherited = 0;
 
+    // If the class has @objc ancestry, we lay out resiliently-typed fields
+    // as if they were fragile.
+    bool CompletelyFragileLayout = false;
+
     // Does the class metadata require dynamic initialization above and
     // beyond what the runtime can automatically achieve?
     //
@@ -245,6 +249,10 @@ namespace {
         }
 
         if (superclass->hasClangNode()) {
+          // Perform fragile layout if the class has @objc ancestry.
+          if (!IGM.IRGen.Opts.EnableClassResilience)
+            CompletelyFragileLayout = true;
+
           // If the superclass was imported from Objective-C, its size is
           // not known at compile time. However, since the field offset
           // vector only stores offsets of stored properties defined in
@@ -329,9 +337,10 @@ namespace {
         // instead.
         Optional<CompletelyFragileScope> generateStaticLayoutRAII;
 
-        if (!IGM.IRGen.Opts.EnableClassResilience &&
-            !isa<FixedTypeInfo>(eltTypeForAccess))
+        if (CompletelyFragileLayout &&
+            !isa<FixedTypeInfo>(eltTypeForAccess)) {
           generateStaticLayoutRAII.emplace(IGM);
+        }
 
         auto &eltTypeForLayout = IGM.getTypeInfo(type);
 

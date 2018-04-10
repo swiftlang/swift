@@ -184,8 +184,9 @@ public:
         EmitStackPromotionChecks(false), PrintInlineTree(false),
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
-        EnableReflectionNames(true), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
+        EnableReflectionNames(true), EnableClassResilience(false),
+        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
+        GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
 
   // Get a hash of all options which influence the llvm compilation but are not
