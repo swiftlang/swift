@@ -32,3 +32,5 @@ tests.test("Double reverse type/Collection/\(swiftVersion)") {
   }
   backwardCompatible(Array(0..<10))
 }
+
+runAllTests()
