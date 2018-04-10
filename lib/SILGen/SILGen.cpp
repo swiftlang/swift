@@ -483,8 +483,9 @@ static bool hasSILBody(FuncDecl *fd) {
   return fd->getBody(/*canSynthesize=*/false);
 }
 
-static bool haveProfiledAssociatedFuncDecl(SILDeclRef constant) {
-  return constant.isDefaultArgGenerator() || constant.isForeign;
+static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
+  return constant.isDefaultArgGenerator() || constant.isForeign ||
+         constant.isCurried;
 }
 
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
@@ -501,20 +502,22 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   // Set up the function for profiling instrumentation.
   ASTNode profiledNode;
-  if (constant.hasDecl() && !haveProfiledAssociatedFuncDecl(constant)) {
-    if (auto *fd = constant.getFuncDecl()) {
-      if (hasSILBody(fd)) {
-        F->createProfiler(fd, forDefinition);
-        profiledNode = fd->getBody(/*canSynthesize=*/false);
+  if (!haveProfiledAssociatedFunction(constant)) {
+    if (constant.hasDecl()) {
+      if (auto *fd = constant.getFuncDecl()) {
+        if (hasSILBody(fd)) {
+          F->createProfiler(fd, forDefinition);
+          profiledNode = fd->getBody(/*canSynthesize=*/false);
+        }
       }
+    } else if (auto *ace = constant.getAbstractClosureExpr()) {
+      F->createProfiler(ace, forDefinition);
+      profiledNode = ace;
     }
-  } else if (auto *ace = constant.getAbstractClosureExpr()) {
-    F->createProfiler(ace, forDefinition);
-    profiledNode = ace;
+    // Set the function entry count for PGO.
+    if (SILProfiler *SP = F->getProfiler())
+      F->setEntryCount(SP->getExecutionCount(profiledNode));
   }
-  // Set the function entry count for PGO.
-  if (SILProfiler *SP = F->getProfiler())
-    F->setEntryCount(SP->getExecutionCount(profiledNode));
 
   assert(F && "SILFunction should have been defined");
 
