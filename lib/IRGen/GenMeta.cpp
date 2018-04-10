@@ -3389,7 +3389,8 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   if (auto enclosing = type->getNominalParent()) {
     auto canonicalEnclosing = enclosing->getCanonicalType();
     if (requiresForeignTypeMetadata(canonicalEnclosing)) {
-      getAddrOfForeignTypeMetadataCandidate(canonicalEnclosing);
+      (void)getTypeMetadataAccessFunction(*this, canonicalEnclosing,
+                                          ForDefinition);
     }
   }
 
