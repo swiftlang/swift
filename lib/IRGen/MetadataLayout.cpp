@@ -111,7 +111,7 @@ MetadataLayout &IRGenModule::getMetadataLayout(NominalTypeDecl *decl) {
   auto &entry = MetadataLayouts[decl];
   if (!entry) {
     if (auto theClass = dyn_cast<ClassDecl>(decl)) {
-      if (theClass->isForeign())
+      if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
         entry = new ForeignClassMetadataLayout(*this, theClass);
       else
         entry = new ClassMetadataLayout(*this, theClass);
@@ -452,7 +452,7 @@ ClassMetadataLayout::getFieldOffsetVectorOffset(IRGenFunction &IGF) const {
 
 Size irgen::getClassFieldOffsetOffset(IRGenModule &IGM, ClassDecl *theClass,
                                       VarDecl *field) {
-  if (theClass->isForeign())
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return Size();
 
   return IGM.getClassMetadataLayout(theClass).getStaticFieldOffset(field);
@@ -594,7 +594,8 @@ StructMetadataLayout::getFieldOffsetVectorOffset() const {
 ForeignClassMetadataLayout::ForeignClassMetadataLayout(IRGenModule &IGM,
                                                        ClassDecl *theClass)
     : MetadataLayout(Kind::ForeignClass), Class(theClass) {
-  assert(theClass->isForeign() && "Not a foreign class");
+  assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+         "Not a foreign class");
 
   struct Scanner : LayoutScanner<Scanner, ForeignClassMetadataScanner> {
     using super = LayoutScanner;
