@@ -2188,7 +2188,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
   if (requiresForeignTypeMetadata(conformingType))
-    (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
+    (void)getTypeMetadataAccessFunction(*this, conformingType,
+                                        ForDefinition);
 }
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
