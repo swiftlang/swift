@@ -1947,6 +1947,9 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   if (ShouldPrint) {
     Printer << " = ";
     printTypeLoc(decl->getUnderlyingTypeLoc());
+    if (decl->isGeneric())
+      if (auto *genericSig = decl->getGenericSignature())
+        printGenericSignature(genericSig, PrintRequirements | InnermostOnly);
   }
 }
 
