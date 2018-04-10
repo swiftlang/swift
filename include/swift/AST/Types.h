@@ -1766,6 +1766,10 @@ public:
     return value.toRaw() == other.value.toRaw();
   }
 
+  bool operator!=(const ParameterTypeFlags &other) const {
+    return value.toRaw() != other.value.toRaw();
+  }
+
   uint8_t toRaw() const { return value.toRaw(); }
 };
 
@@ -2654,6 +2658,11 @@ public:
 
     /// Whether the parameter is marked 'owned'
     bool isOwned() const { return Flags.isOwned(); }
+
+    bool operator!=(Param const &b) const {
+      return Label != b.Label || !getType()->isEqual(b.getType()) ||
+             Flags != b.Flags;
+    }
   };
 
   class CanParam : public Param {
@@ -2840,6 +2849,14 @@ public:
                            bool canonicalVararg) {
     return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
   }
+
+  /// \brief Given two arrays of parameters determine if they are equal.
+  static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
+                          ArrayRef<AnyFunctionType::Param> b);
+
+  /// \brief Given an array of parameters and a composed parameter
+  /// type determine if they are equal.
+  static bool equalParams(ArrayRef<AnyFunctionType::Param> a, Type b);
 
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }

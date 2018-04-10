@@ -712,8 +712,9 @@ namespace {
       if (value->getDeclContext()->isTypeContext()) {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
-      
-      Type paramTy = fnTy->getInput();
+
+      Type paramTy = FunctionType::composeInput(CS.getASTContext(),
+                                                fnTy->getParams(), false);
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
@@ -787,8 +788,8 @@ namespace {
             }
           }
         }
-        Type paramTy = fnTy->getInput();
-        return favoredTy->isEqual(paramTy);
+
+        return AnyFunctionType::equalParams(fnTy->getParams(), favoredTy);
       };
 
       // This is a hack to ensure we always consider the protocol requirement
@@ -884,15 +885,14 @@ namespace {
       if (value->getDeclContext()->isTypeContext()) {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
-      
-      Type paramTy = fnTy->getInput();
-      auto paramTupleTy = paramTy->getAs<TupleType>();
-      if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
+
+      auto params = fnTy->getParams();
+      if (params.size() != 2)
         return false;
-      
-      auto firstParamTy = paramTupleTy->getElement(0).getType();
-      auto secondParamTy = paramTupleTy->getElement(1).getType();
-      
+
+      auto firstParamTy = params[0].getType();
+      auto secondParamTy = params[1].getType();
+
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
