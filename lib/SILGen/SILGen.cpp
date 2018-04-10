@@ -483,6 +483,11 @@ static bool hasSILBody(FuncDecl *fd) {
   return fd->getBody(/*canSynthesize=*/false);
 }
 
+static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
+  return constant.isDefaultArgGenerator() || constant.isForeign ||
+         constant.isCurried;
+}
+
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it (potentially preparing it
@@ -495,38 +500,24 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                                      : (Decl *)nullptr,
                                   constant, forDefinition);
 
+  // Set up the function for profiling instrumentation.
   ASTNode profiledNode;
-  if (constant.hasDecl()) {
-    if (auto *fd = constant.getFuncDecl()) {
-      if (hasSILBody(fd)) {
-        // Set up the function for profiling instrumentation.
-        F->createProfiler(fd, forDefinition);
-        profiledNode = fd->getBody(/*canSynthesize=*/false);
+  if (!haveProfiledAssociatedFunction(constant)) {
+    if (constant.hasDecl()) {
+      if (auto *fd = constant.getFuncDecl()) {
+        if (hasSILBody(fd)) {
+          F->createProfiler(fd, forDefinition);
+          profiledNode = fd->getBody(/*canSynthesize=*/false);
+        }
       }
+    } else if (auto *ace = constant.getAbstractClosureExpr()) {
+      F->createProfiler(ace, forDefinition);
+      profiledNode = ace;
     }
-  } else if (auto *ace = constant.getAbstractClosureExpr()) {
-    // Closures inherit profiling metadata and counters from their parent, if
-    // one exists. If not, they receive a fresh profiler.
-    if (auto *parentDecl = dyn_cast_or_null<ValueDecl>(
-            ace->getInnermostDeclarationDeclContext())) {
-      SILDeclRef parentConstant(parentDecl, SILDeclRef::Kind::Func);
-      auto parentIt = emittedFunctions.find(parentConstant);
-      if (parentIt != emittedFunctions.end()) {
-        F->setProfiler(parentIt->second->getProfiler());
-        profiledNode = ace;
-      }
-    }
-
-    if (!profiledNode) {
-      if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
-        F->createProfiler(ce, forDefinition);
-        profiledNode = ce;
-      }
-    }
+    // Set the function entry count for PGO.
+    if (SILProfiler *SP = F->getProfiler())
+      F->setEntryCount(SP->getExecutionCount(profiledNode));
   }
-  // Set the function entry count for PGO.
-  if (SILProfiler *SP = F->getProfiler())
-    F->setEntryCount(SP->getExecutionCount(profiledNode));
 
   assert(F && "SILFunction should have been defined");
 
