@@ -3017,23 +3017,8 @@ class DiffItemEmitter : public SDKNodeVisitor {
     handleAnnotations(Node, Parent,
                       isa<SDKNodeType>(Node) ? getIndexString(Node) : "0",
                       {
-                        NodeAnnotation::WrapOptional,
-                        NodeAnnotation::UnwrapOptional,
-                        NodeAnnotation::ImplicitOptionalToOptional,
-                        NodeAnnotation::OptionalToImplicitOptional,
-                        NodeAnnotation::UnwrapUnmanaged,
-                        NodeAnnotation::TypeRewritten,
-                        NodeAnnotation::SetterToProperty,
-                        NodeAnnotation::GetterToProperty,
-                        NodeAnnotation::ModernizeEnum,
-                        NodeAnnotation::Rename,
-                        NodeAnnotation::NowThrowing,
-                        NodeAnnotation::DictionaryKeyUpdate,
-                        NodeAnnotation::OptionalDictionaryKeyUpdate,
-                        NodeAnnotation::ArrayMemberUpdate,
-                        NodeAnnotation::OptionalArrayMemberUpdate,
-                        NodeAnnotation::SimpleStringRepresentableUpdate,
-                        NodeAnnotation::SimpleOptionalStringRepresentableUpdate,
+#define NODE_ANNOTATION_CHANGE_KIND(NAME) NodeAnnotation::NAME,
+#include "swift/IDE/DigesterEnums.def"
                       });
   }
 
