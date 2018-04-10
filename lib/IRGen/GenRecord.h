@@ -45,7 +45,7 @@ template <class FieldImpl> class RecordField {
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
-    : Layout(ElementLayout::getIncomplete(elementTI)) {}
+    : Layout(ElementLayout::getIncomplete(elementTI, elementTI)) {}
 
   explicit RecordField(const ElementLayout &layout,
                        unsigned begin, unsigned end)
@@ -55,7 +55,7 @@ protected:
     return static_cast<const FieldImpl*>(this);
   }
 public:
-  const TypeInfo &getTypeInfo() const { return Layout.getType(); }
+  const TypeInfo &getTypeInfo() const { return Layout.getTypeForLayout(); }
 
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
