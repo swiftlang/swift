@@ -359,6 +359,7 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
   @inlinable
+  @_transparent
   public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     switch (lhs, rhs) {
     case let (l?, r?):
@@ -404,6 +405,7 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
   @inlinable
+  @_transparent
   public static func !=(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     return !(lhs == rhs)
   }
@@ -417,11 +419,13 @@ extension Optional: Hashable where Wrapped: Hashable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   public var hashValue: Int {
     return _hashValue(for: self)
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   public func _hash(into hasher: inout _Hasher) {
     switch self {
     case .none:
