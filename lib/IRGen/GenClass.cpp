@@ -321,9 +321,21 @@ namespace {
                                   const ClassLayout *abstractLayout) {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
-        auto &eltType = IGM.getTypeInfo(type);
+        auto &eltTypeForAccess = IGM.getTypeInfo(type);
 
-        if (!eltType.isFixedSize()) {
+        // For now, the Objective-C runtime cannot support dynamic layout of
+        // classes that contain resilient value types, so we just look through
+        // the resilience boundary and assume fragile layout for class ivars
+        // instead.
+        Optional<CompletelyFragileScope> generateStaticLayoutRAII;
+
+        if (!IGM.IRGen.Opts.EnableClassResilience &&
+            !isa<FixedTypeInfo>(eltTypeForAccess))
+          generateStaticLayoutRAII.emplace(IGM);
+
+        auto &eltTypeForLayout = IGM.getTypeInfo(type);
+
+        if (!eltTypeForLayout.isFixedSize()) {
           ClassMetadataRequiresDynamicInitialization = true;
           ClassHasFixedSize = false;
 
@@ -335,7 +347,8 @@ namespace {
         assert(!abstractLayout ||
                abstractLayout->getFieldIndex(var) == fieldIndex);
 
-        Elements.push_back(ElementLayout::getIncomplete(eltType, eltType));
+        Elements.push_back(ElementLayout::getIncomplete(eltTypeForLayout,
+                                                        eltTypeForAccess));
         AllStoredProperties.push_back(var);
         AllFieldAccesses.push_back(getFieldAccess(abstractLayout, fieldIndex));
       }
