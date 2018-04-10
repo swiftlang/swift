@@ -6,6 +6,10 @@
 #define NODE_ANNOTATION(NAME)
 #endif
 
+#ifndef NODE_ANNOTATION_CHANGE_KIND
+#define NODE_ANNOTATION_CHANGE_KIND(NAME) NODE_ANNOTATION(NAME)
+#endif
+
 #ifndef DECL_ATTR
 #define DECL_ATTR(NAME)
 #endif
@@ -49,37 +53,35 @@ NODE_KIND(DeclTypeAlias, TypeAlias)
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
 NODE_ANNOTATION(Updated)
-NODE_ANNOTATION(RemovingErrorParam)
-NODE_ANNOTATION(ImplicitOptionalToOptional)
-NODE_ANNOTATION(OptionalToImplicitOptional)
-NODE_ANNOTATION(WrapOptional)
-NODE_ANNOTATION(WrapImplicitOptional)
-NODE_ANNOTATION(UnwrapOptional)
-NODE_ANNOTATION(GenericParamUpCast)
-NODE_ANNOTATION(GenericParamDownCast)
-NODE_ANNOTATION(TypeAliasChangeFromInt)
-NODE_ANNOTATION(GetterToProperty)
-NODE_ANNOTATION(SetterToProperty)
 NODE_ANNOTATION(PropertyName)
-NODE_ANNOTATION(TypeRewritten)
 NODE_ANNOTATION(TypeRewrittenLeft)
 NODE_ANNOTATION(TypeRewrittenRight)
-NODE_ANNOTATION(ModernizeEnum)
-NODE_ANNOTATION(UnwrapUnmanaged)
 NODE_ANNOTATION(RemovedDecl)
-NODE_ANNOTATION(Rename)
 NODE_ANNOTATION(RenameOldName)
 NODE_ANNOTATION(RenameNewName)
 NODE_ANNOTATION(NowThrowing)
 NODE_ANNOTATION(NowMutating)
 NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
-NODE_ANNOTATION(DictionaryKeyUpdate)
-NODE_ANNOTATION(OptionalDictionaryKeyUpdate)
-NODE_ANNOTATION(ArrayMemberUpdate)
-NODE_ANNOTATION(OptionalArrayMemberUpdate)
-NODE_ANNOTATION(SimpleStringRepresentableUpdate)
-NODE_ANNOTATION(SimpleOptionalStringRepresentableUpdate)
+
+NODE_ANNOTATION_CHANGE_KIND(ImplicitOptionalToOptional)
+NODE_ANNOTATION_CHANGE_KIND(OptionalToImplicitOptional)
+NODE_ANNOTATION_CHANGE_KIND(WrapOptional)
+NODE_ANNOTATION_CHANGE_KIND(WrapImplicitOptional)
+NODE_ANNOTATION_CHANGE_KIND(UnwrapOptional)
+NODE_ANNOTATION_CHANGE_KIND(GetterToProperty)
+NODE_ANNOTATION_CHANGE_KIND(SetterToProperty)
+NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
+NODE_ANNOTATION_CHANGE_KIND(ModernizeEnum)
+NODE_ANNOTATION_CHANGE_KIND(UnwrapUnmanaged)
+NODE_ANNOTATION_CHANGE_KIND(Rename)
+NODE_ANNOTATION_CHANGE_KIND(DictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(OptionalDictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(ArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(OptionalArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(SimpleStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(SimpleOptionalStringRepresentableUpdate)
+
 
 DECL_ATTR(deprecated)
 DECL_ATTR(fixedLayout)
@@ -167,5 +169,6 @@ SPECIAL_CASE_ID(ToUIntMax)
 #undef KNOWN_PROTOCOL
 #undef KEY
 #undef DECL_ATTR
+#undef NODE_ANNOTATION_CHANGE_KIND
 #undef NODE_ANNOTATION
 #undef NODE_KIND

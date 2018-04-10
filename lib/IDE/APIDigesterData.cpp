@@ -46,7 +46,7 @@ SDKNodeKind swift::ide::api::parseSDKNodeKind(StringRef Content) {
 
 NodeAnnotation swift::ide::api::parseSDKNodeAnnotation(StringRef Content) {
   return llvm::StringSwitch<NodeAnnotation>(Content)
-#define NODE_ANNOTATION(NAME) .Case(#NAME, NodeAnnotation::NAME)
+#define NODE_ANNOTATION_CHANGE_KIND(NAME) .Case(#NAME, NodeAnnotation::NAME)
 #include "swift/IDE/DigesterEnums.def"
   ;
 }
