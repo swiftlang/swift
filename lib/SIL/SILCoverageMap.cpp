@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/STLExtras.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILModule.h"
 
@@ -39,6 +40,13 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   // rather than relying on the flexible array trick.
   CM->MappedRegions = M.allocateCopy(MappedRegions);
   CM->Expressions = M.allocateCopy(Expressions);
+
+  // Assert that this coverage map is unique.
+  assert(llvm::none_of(M.coverageMaps,
+                       [&](const SILCoverageMap &OtherCM) {
+                         return OtherCM.PGOFuncName == CM->PGOFuncName;
+                       }) &&
+         "Duplicate coverage mapping for function");
 
   M.coverageMaps.push_back(CM);
   return CM;
