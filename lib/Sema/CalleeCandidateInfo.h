@@ -109,6 +109,15 @@ namespace swift {
         return funcTy->getInput();
       return Type();
     }
+
+    bool hasParameters() const {
+      return getUncurriedFunctionType();
+    }
+
+    ArrayRef<AnyFunctionType::Param> getParameters() const {
+      assert(hasParameters());
+      return getUncurriedFunctionType()->getParams();
+    }
     
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to

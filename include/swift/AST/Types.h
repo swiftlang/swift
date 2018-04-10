@@ -3002,7 +3002,8 @@ decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 /// Break the parameter list into an array of booleans describing whether
 /// the argument type at each index has a default argument associated with
 /// it.
-void computeDefaultMap(Type type, const ValueDecl *paramOwner, unsigned level,
+void computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
+                       const ValueDecl *paramOwner, unsigned level,
                        SmallVectorImpl<bool> &outDefaultMap);
   
 /// Turn a param list into a symbolic and printable representation that does not

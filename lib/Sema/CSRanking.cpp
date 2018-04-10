@@ -597,8 +597,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         auto params1 = funcTy1->getParams();
         auto params2 = funcTy2->getParams();
         SmallVector<bool, 4> defaultMapType2;
-        computeDefaultMap(funcTy2->getInput(), decl2,
-                          outerDC2->isTypeContext(),
+        computeDefaultMap(params2, decl2, outerDC2->isTypeContext(),
                           defaultMapType2);
 
         unsigned numParams1 = params1.size();

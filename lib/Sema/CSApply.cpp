@@ -5783,7 +5783,7 @@ Expr *ExprRewriter::coerceCallArguments(
   // Determine the parameter bindings.
   auto params = funcType->getParams();
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(paramType, callee.getDecl(), level, defaultMap);
+  computeDefaultMap(params, callee.getDecl(), level, defaultMap);
   auto args = decomposeArgType(cs.getType(arg), argLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.

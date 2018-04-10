@@ -316,11 +316,14 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   auto *dc = candidate.getDecl()
   ? candidate.getDecl()->getInnermostDeclContext()
   : nullptr;
-  
-  auto candArgs = candidate.getUncurriedFunctionType()->getParams();
+
+  if (!candidate.hasParameters())
+    return {CC_GeneralMismatch, {}};
+
+  auto candArgs = candidate.getParameters();
   SmallVector<bool, 4> candDefaultMap;
-  computeDefaultMap(candidate.getArgumentType(), candidate.getDecl(),
-                    candidate.level, candDefaultMap);
+  computeDefaultMap(candArgs, candidate.getDecl(), candidate.level,
+                    candDefaultMap);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
