@@ -3660,11 +3660,11 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
    || parseToken(tok::colon, diag::expected_parameter_colon)) {
     return errorAndSkipToEnd();
   }
-  // Parse an expression, hopefully a DeclRefExpr. Sema will check this.
-  auto primalParseResult = parseExpr(diag::gradient_expr_expected_expression);
-  if (primalParseResult.hasCodeCompletion())
+  // Parse an expression that represents the function to be differentiated.
+  auto originalFnParseResult = parseExpr(diag::gradient_expr_expected_expression);
+  if (originalFnParseResult.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
-  if (primalParseResult.isParseError())
+  if (originalFnParseResult.isParseError())
     return errorAndSkipToEnd();
   // If found comma, parse 'withRespectTo:'.
   SmallVector<AutoDiffParameter, 8> params;
@@ -3714,9 +3714,9 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
   // Successfully parsed a #gradient expression.
   Expr *result = isValueAndGradient
     ? (Expr *)ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
-                                           primalParseResult.get(), params,
+                                           originalFnParseResult.get(), params,
                                            rParenLoc)
     : (Expr *)GradientExpr::create(Context, poundGradLoc, lParenLoc,
-                                   primalParseResult.get(), params, rParenLoc);
+                                   originalFnParseResult.get(), params, rParenLoc);
   return makeParserResult<Expr>(result);
 }

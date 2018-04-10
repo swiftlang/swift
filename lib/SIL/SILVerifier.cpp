@@ -1273,11 +1273,11 @@ public:
     SILFunction *F = BB->getParent();
     require(F->getEntryBlock() == BB && F->size() == 1,
             "autodiff_reverse must be the only instruction in the function");
-    require(ADRI->getPrimalFunction()->isDefinition(),
+    require(ADRI->getOriginalFunction()->isDefinition(),
             "autodiff_reverse can only differentiate a function defined in "
             "this module");
-    auto primalFn = ADRI->getPrimalFunction();
-    auto primalTy = primalFn->getLoweredFunctionType();
+    auto originalFn = ADRI->getOriginalFunction();
+    auto originalTy = originalFn->getLoweredFunctionType();
     auto config = ADRI->getConfiguration();
     SmallVector<unsigned, 8> allParamIndices;
     ArrayRef<unsigned> paramIndices = config.parameterIndices;
@@ -1285,7 +1285,7 @@ public:
     // with respect to all of original's parameters. For simplicity, we add all
     // parameter indices to a temporary.
     if (config.parameterIndices.empty()) {
-      for (unsigned i = 0, n = primalTy->getNumParameters(); i != n; ++i)
+      for (unsigned i = 0, n = originalTy->getNumParameters(); i != n; ++i)
         allParamIndices.push_back(i);
       paramIndices = allParamIndices;
     }
@@ -1294,14 +1294,14 @@ public:
     for (unsigned i = 0, n = paramIndices.size(); i != n; ++i) {
       auto index = paramIndices[i];
       require((int)index > lastIndex, "Parameter indices must be ascending");
-      auto paramTy = primalTy->getParameters()[index].getType();
+      auto paramTy = originalTy->getParameters()[index].getType();
       require(!(paramTy.isAnyClassReferenceType() ||
                 paramTy.isAnyExistentialType()),
               "Cannot differentiate with respect to reference type or "
               "existential type");
     }
     // Create an expected function type.
-    auto expectedTy = primalFn->getLoweredFunctionType()
+    auto expectedTy = originalFn->getLoweredFunctionType()
       ->getGradientType(config, F->getModule());
     require(F->getLoweredFunctionType()->isEqual(expectedTy),
             "The parent function type doesn't match what autodiff_reverse "

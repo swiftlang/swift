@@ -2424,7 +2424,7 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     Expr *handleReverseAutoDiffExpr(ReverseAutoDiffExpr *expr,
-                                    bool preservingPrimalResult) {
+                                    bool preservingOriginalResult) {
       auto &TC = cs.getTypeChecker();
       auto gradType = simplifyType(cs.getType(expr));
       auto gradFnType = gradType->getAs<AnyFunctionType>();
@@ -2433,29 +2433,29 @@ namespace {
       cs.setType(expr, gradType);
       cs.cacheExprTypes(expr);
 
-      // Resolve primal expression to a func decl.
-      // NOTE: Only primal expression cases in the test have been handled. More
+      // Resolve original expression to a func decl.
+      // NOTE: Only original expression cases in the test have been handled. More
       // cases should be handled as they arise.
-      auto *primalExpr = expr->getPrimalExpr();
-      FuncDecl *primalDecl = nullptr;
-      // If primal expression already has a referenced decl, check if it's a
-      // func decl and set resolved primal to it.
-      if (auto referencedDecl = primalExpr->getReferencedDecl()) {
+      auto *originalExpr = expr->getOriginalExpr();
+      FuncDecl *originalDecl = nullptr;
+      // If original expression already has a referenced decl, check if it's a
+      // func decl and set resolved original to it.
+      if (auto referencedDecl = originalExpr->getReferencedDecl()) {
         if (auto funcDecl = dyn_cast<FuncDecl>(referencedDecl.getDecl()))
-          primalDecl = funcDecl;
+          originalDecl = funcDecl;
       }
-      // If primal expression is an dot syntax call expr, it must be a class
+      // If original expression is an dot syntax call expr, it must be a class
       // method or instance method.
-      else if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(primalExpr))
+      else if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(originalExpr))
         if (auto funcDecl = dyn_cast<FuncDecl>(dotExpr->getCalledValue()))
-          primalDecl = funcDecl;
-      // Emit error if primal func decl could not be resolved.
-      if (!primalDecl) {
-        TC.diagnose(primalExpr->getLoc(),
-                    diag::gradient_expr_primal_func_decl_unresolved);
+          originalDecl = funcDecl;
+      // Emit error if original func decl could not be resolved.
+      if (!originalDecl) {
+        TC.diagnose(originalExpr->getLoc(),
+                    diag::gradient_expr_original_func_decl_unresolved);
         return nullptr;
       }
-      expr->setResolvedPrimal(primalDecl);
+      expr->setResolvedOriginal(originalDecl);
 
       // Get Differentiable protocol type.
       auto &ctx = cs.getASTContext();
@@ -2463,11 +2463,11 @@ namespace {
         ->getDeclaredInterfaceType();
 
       // Verify that differentiation parameters conform to Differentiable.
-      auto primalType = cs.getType(primalExpr)->getAs<AnyFunctionType>();
-      assert(primalType && "Primal should have function type");
+      auto originalType = cs.getType(originalExpr)->getAs<AnyFunctionType>();
+      assert(originalType && "Original should have function type");
       auto gradParams = gradFnType->getParams();
-      assert(gradFnType->getNumParams() == primalType->getNumParams() &&
-             "Gradient expression should have same parameter count as primal");
+      assert(gradFnType->getNumParams() == originalType->getNumParams() &&
+             "Gradient expression should have same parameter count as original");
       SmallVector<Type, 8> diffParamTypes;
       if (expr->getParameters().empty()) {
         for (auto &gradParam : gradParams)
@@ -2492,11 +2492,11 @@ namespace {
     }
 
     Expr *visitGradientExpr(GradientExpr *expr) {
-      return handleReverseAutoDiffExpr(expr, /*preservingPrimalResult=*/false);
+      return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/false);
     }
 
     Expr *visitValueAndGradientExpr(ValueAndGradientExpr *expr) {
-      return handleReverseAutoDiffExpr(expr, /*preservingPrimalResult=*/true);
+      return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/true);
     }
 
     // SWIFT_ENABLE_TENSORFLOW

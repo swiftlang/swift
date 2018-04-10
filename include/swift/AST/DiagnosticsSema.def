@@ -714,8 +714,8 @@ ERROR(gradient_expr_function_not_differentiable,none,
 ERROR(gradient_expr_not_a_function,none,
       "only functions can be differentiated, but this expression has type %0",
       (Type))
-ERROR(gradient_expr_primal_func_decl_unresolved,none,
-      "primal function declaration could not be resolved", ())
+ERROR(gradient_expr_original_func_decl_unresolved,none,
+      "original function declaration could not be resolved", ())
 ERROR(gradient_expr_parameter_self_not_first,none,
       "the 'self' parameter must be the first in the parameter list", ())
 ERROR(gradient_expr_parameter_self_not_in_instance_context,none,
