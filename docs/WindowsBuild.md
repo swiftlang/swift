@@ -142,9 +142,9 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DSWIFT_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
  -DSWIFT_PATH_TO_CLANG_SOURCE="%swift_source_dir%/llvm/tools/clang"^
  -DSWIFT_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
- -DICU_UC_INCLUDE_DIRS="%swift_source_dir%/icu/include"^
+ -DICU_UC_INCLUDE_DIR="%swift_source_dir%/icu/include"^
  -DICU_UC_LIBRARY_DIRS="%swift_source_dir%/icu/lib64"^
- -DICU_I18N_INCLUDE_DIRS="%swift_source_dir%/icu/include"^
+ -DICU_I18N_INCLUDE_DIR="%swift_source_dir%/icu/include"^
  -DICU_I18N_LIBRARY_DIRS="%swift_source_dir%/icu/lib64"^
  -DICU_UC_LIB_NAME="icuuc"^
  -DICU_I18N_LIB_NAME="icuin"^
