@@ -33,4 +33,25 @@ tests.test("Double reverse type/Collection/\(swiftVersion)") {
   backwardCompatible(Array(0..<10))
 }
 
+tests.test("Double reverse type/LazyCollection/\(swiftVersion)") {
+  func reverse<C : BidirectionalCollection>(_ xs: C) {
+    var result = xs.lazy.reversed().reversed()
+    #if swift(>=4.2)
+    expectType(LazyCollection<C>.self, &result)
+    #else
+    expectType(
+    LazyCollection<ReversedCollection<ReversedCollection<C>>>.self,
+    &result)
+    #endif
+  }
+  reverse(Array(0..<10).lazy)
+
+  func backwardCompatible<C : BidirectionalCollection>(_ xs: C) {
+    typealias ExpectedType =
+      LazyCollection<ReversedCollection<ReversedCollection<C>>>
+    var result: ExpectedType = xs.lazy.reversed().reversed()
+    expectType(ExpectedType.self, &result)
+  }
+  backwardCompatible(Array(0..<10).lazy)
+}
 runAllTests()
