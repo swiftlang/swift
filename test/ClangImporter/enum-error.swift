@@ -88,13 +88,13 @@ func testError() {
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch must be exhaustive
-  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: do you want to add a default clause?
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: handle unknown values using "@unknown default"
 
   // FIXME: This should still be an error because there are /known/ cases that
   // aren't covered.
   switch (terr) { case .TENone, .TEOne: break }
-  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch must be exhaustive
-  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: do you want to add a default clause?
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'
 
   let _ = TestError.Code(rawValue: 2)!
 
@@ -105,7 +105,8 @@ func testError() {
 
   // Allow exhaustive error codes as well.
   let eerr = getExhaustiveErr()
-  switch eerr { case .EENone, .EEOne, .EETwo: break } // ok
+  switch eerr { case .EENone, .EEOne, .EETwo: break }
+  // EXHAUSTIVE-NOT: [[@LINE-1]]:{{.+}}: {{error|warning|note}}
 
   switch eerr { case .EENone, .EEOne: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive

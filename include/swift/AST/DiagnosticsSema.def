@@ -2962,6 +2962,15 @@ ERROR(type_mismatch_multiple_pattern_list,none,
 ERROR(type_mismatch_fallthrough_pattern_list,none,
       "pattern variable bound to type %0, fallthrough case bound to type %1", (Type, Type))
 
+ERROR(unknown_case_must_be_catchall,none,
+      "'@unknown' is only supported for catch-all cases (\"case _\")", ())
+ERROR(unknown_case_where_clause,none,
+      "'where' cannot be used with '@unknown'", ())
+ERROR(unknown_case_multiple_patterns,none,
+      "'@unknown' cannot be applied to multiple patterns", ())
+ERROR(unknown_case_must_be_last,none,
+      "'@unknown' can only be applied to the last case in a switch", ())
+
 WARNING(where_on_one_item, none,
         "'where' only applies to the second pattern match in this case", ())
 
@@ -3913,6 +3922,8 @@ NOTE(missing_several_cases,none,
      "do you want to add "
      "%select{missing cases|a default clause}0"
      "?", (bool))
+NOTE(missing_unknown_case,none,
+     "handle unknown values using \"@unknown default\"", ())
 
 NOTE(missing_particular_case,none,
      "add missing case: '%0'", (StringRef))
@@ -3924,9 +3935,7 @@ WARNING(redundant_particular_literal_case,none,
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
-// HACK: Downgrades the above to warnings if any of the cases is marked
-// @_downgrade_exhaustivity_check.
-WARNING(non_exhaustive_switch_warn_swift3,none, "switch must be exhaustive", ())
+WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

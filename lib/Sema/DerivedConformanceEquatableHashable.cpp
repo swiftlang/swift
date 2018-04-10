@@ -235,8 +235,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
 
-    auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
-                                   nullptr);
+    auto labelItem = CaseLabelItem(pat);
 
     // generate: indexVar = <index>
     llvm::SmallString<8> indexVal;
@@ -253,7 +252,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
-                                     /*HasBoundDecls=*/false,
+                                     /*HasBoundDecls=*/false, SourceLoc(),
                                      SourceLoc(), body));
   }
 
@@ -418,8 +417,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
                                                  SourceLoc());
     caseTuplePattern->setImplicit();
 
-    auto labelItem = CaseLabelItem(/*IsDefault*/ false, caseTuplePattern,
-                                   SourceLoc(), nullptr);
+    auto labelItem = CaseLabelItem(caseTuplePattern);
 
     // Generate a guard statement for each associated value in the payload,
     // breaking out early if any pair is unequal. (This is done to avoid
@@ -448,7 +446,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
     auto body = BraceStmt::create(C, SourceLoc(), statementsInCase,
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
-                                     SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body));
   }
 
   // default: result = false
@@ -458,8 +456,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
   if (elementCount > 1) {
     auto defaultPattern = new (C) AnyPattern(SourceLoc());
     defaultPattern->setImplicit();
-    auto defaultItem = CaseLabelItem(/*IsDefault*/ true, defaultPattern,
-                                     SourceLoc(), nullptr);
+    auto defaultItem = CaseLabelItem::getDefault(defaultPattern);
     auto falseExpr = new (C) BooleanLiteralExpr(false, SourceLoc(),
                                                 /*implicit*/ true);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
@@ -467,7 +464,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl) {
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), defaultItem,
                                      /*HasBoundDecls*/ false,
-                                     SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body));
   }
 
   // switch (a, b) { <case statements> }
@@ -809,8 +806,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
                                           elt->getName(), elt, payloadPattern);
     pat->setImplicit();
 
-    auto labelItem = CaseLabelItem(/*IsDefault*/ false, pat, SourceLoc(),
-                                   nullptr);
+    auto labelItem = CaseLabelItem(pat);
 
     // If the enum has no associated values, we use the ordinal alone as the
     // hash value, because that is sufficient for a good distribution. If any
@@ -844,7 +840,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
     auto hasBoundDecls = !payloadVars.empty();
     auto body = BraceStmt::create(C, SourceLoc(), combineExprs, SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
-                                     SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body));
   }
 
   // generate: switch enumVar { }
