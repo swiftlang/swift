@@ -268,8 +268,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
                                              Identifier(), elt, nullptr);
       pat->setImplicit();
 
-      auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
-                                     nullptr);
+      auto labelItem = CaseLabelItem(pat);
 
       auto *caseValue = new (C) StringLiteralExpr(elt->getNameStr(),
                                                   SourceRange(),
@@ -279,7 +278,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
                                          SourceLoc());
       cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                        /*HasBoundDecls=*/false, SourceLoc(),
-                                       caseBody));
+                                       SourceLoc(), caseBody));
     }
 
     auto *selfRef = createSelfDeclRef(strValDecl);
@@ -334,8 +333,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
                                        nullptr);
     litPat->setImplicit();
 
-    auto labelItem = CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(),
-                                   nullptr);
+    auto labelItem = CaseLabelItem(litPat);
 
     auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*Implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(enumType, C);
@@ -348,20 +346,19 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
                                    SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     body));
+                                     SourceLoc(), body));
   }
 
   auto *anyPat = new (C) AnyPattern(SourceLoc());
   anyPat->setImplicit();
-  auto dfltLabelItem = CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(),
-                                     nullptr);
+  auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto *dfltBody = BraceStmt::create(C, SourceLoc(), ASTNode(dfltReturnStmt),
                                      SourceLoc());
   cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
                                    /*HasBoundDecls=*/false, SourceLoc(),
-                                   dfltBody));
+                                   SourceLoc(), dfltBody));
 
   auto *stringValueDecl = initDecl->getParameterList(1)->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),

@@ -381,6 +381,27 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
 #endif</IfConfigDecl><SwitchCase><SwitchDefaultLabel>
     default:</SwitchDefaultLabel><BreakStmt>
       break</BreakStmt></SwitchCase>
+  }</SwitchStmt><SwitchStmt>
+
+  switch <IdentifierExpr>foo </IdentifierExpr>{<SwitchCase><SwitchCaseLabel>
+  case <CaseItem><ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>2</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>3</IntegerLiteralExpr></ExpressionPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><SwitchDefaultLabel>
+  default: </SwitchDefaultLabel><BreakStmt>break</BreakStmt></SwitchCase>
+  }</SwitchStmt><SwitchStmt>
+
+  switch <IdentifierExpr>foo </IdentifierExpr>{<SwitchCase><SwitchCaseLabel>
+  case <CaseItem><ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>2</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>3</IntegerLiteralExpr></ExpressionPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><Attribute>
+  @unknown </Attribute><SwitchDefaultLabel>default: </SwitchDefaultLabel><BreakStmt>break</BreakStmt></SwitchCase>
+  }</SwitchStmt><SwitchStmt>
+
+  switch <IdentifierExpr>foo </IdentifierExpr>{<SwitchCase><SwitchCaseLabel>
+  case <CaseItem><ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>2</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>3</IntegerLiteralExpr></ExpressionPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><Attribute>
+  @unknown </Attribute><SwitchCaseLabel>case <CaseItem><ExpressionPattern><DiscardAssignmentExpr>_</DiscardAssignmentExpr></ExpressionPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase>
+  }</SwitchStmt><SwitchStmt>
+
+  switch <IdentifierExpr>foo </IdentifierExpr>{<SwitchCase><SwitchCaseLabel>
+  case <CaseItem><ExpressionPattern><IntegerLiteralExpr>1</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>2</IntegerLiteralExpr></ExpressionPattern>, </CaseItem><CaseItem><ExpressionPattern><IntegerLiteralExpr>3</IntegerLiteralExpr></ExpressionPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><Attribute>
+  // This is rejected in Sema, but should be preserved by Syntax.
+  @unknown </Attribute><SwitchCaseLabel>case <CaseItem><ExpressionPattern><TupleExpr>(<TupleElement><IntegerLiteralExpr>42</IntegerLiteralExpr>, </TupleElement><TupleElement><PrefixOperatorExpr>-<IntegerLiteralExpr>42</IntegerLiteralExpr></PrefixOperatorExpr></TupleElement>) </TupleExpr></ExpressionPattern><WhereClause>where <SequenceExpr><IntegerLiteralExpr>1 </IntegerLiteralExpr><BinaryOperatorExpr>== </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr></WhereClause></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase>
   }</SwitchStmt>
 }</CodeBlock></FunctionDecl><ExtensionDecl>
 

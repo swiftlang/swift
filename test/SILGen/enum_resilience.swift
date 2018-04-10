@@ -51,6 +51,60 @@ func resilientSwitch(_ m: Medium) {
   }
 }
 
+// CHECK-LABEL: sil hidden @$S15enum_resilience22resilientSwitchDefaultys5Int32V0c1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> Int32 {
+func resilientSwitchDefault(_ m: Medium) -> Int32 {
+  // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], default [[DEFAULT:[^ ]+]]
+  switch m {
+  // CHECK: [[PAPER]]:
+  // CHECK: integer_literal $Builtin.Int2048, 0
+  case .Paper: return 0
+  // CHECK: [[CANVAS]]:
+  // CHECK: integer_literal $Builtin.Int2048, 1
+  case .Canvas: return 1
+  // CHECK: [[DEFAULT]]:
+  // CHECK: integer_literal $Builtin.Int2048, -1
+  default: return -1
+  }
+} // CHECK: end sil function '$S15enum_resilience22resilientSwitchDefaultys5Int32V0c1_A06MediumOF'
+
+// CHECK-LABEL: sil hidden @$S15enum_resilience26resilientSwitchUnknownCaseys5Int32V0c1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> Int32 {
+func resilientSwitchUnknownCase(_ m: Medium) -> Int32 {
+  // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], default [[DEFAULT:[^ ]+]]
+  switch m {
+  // CHECK: [[PAPER]]:
+  // CHECK: integer_literal $Builtin.Int2048, 0
+  case .Paper: return 0
+  // CHECK: [[CANVAS]]:
+  // CHECK: integer_literal $Builtin.Int2048, 1
+  case .Canvas: return 1
+  // CHECK: [[DEFAULT]]:
+  // CHECK: integer_literal $Builtin.Int2048, -1
+  @unknown case _: return -1
+  }
+} // CHECK: end sil function '$S15enum_resilience26resilientSwitchUnknownCaseys5Int32V0c1_A06MediumOF'
+
+// CHECK-LABEL: sil hidden @$S15enum_resilience36resilientSwitchUnknownCaseExhaustiveys5Int32V0c1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> Int32 {
+func resilientSwitchUnknownCaseExhaustive(_ m: Medium) -> Int32 {
+  // CHECK: switch_enum_addr %2 : $*Medium, case #Medium.Paper!enumelt: [[PAPER:[^ ]+]], case #Medium.Canvas!enumelt: [[CANVAS:[^ ]+]], case #Medium.Pamphlet!enumelt.1: [[PAMPHLET:[^ ]+]], case #Medium.Postcard!enumelt.1: [[POSTCARD:[^ ]+]], default [[DEFAULT:[^ ]+]]
+  switch m {
+  // CHECK: [[PAPER]]:
+  // CHECK: integer_literal $Builtin.Int2048, 0
+  case .Paper: return 0
+  // CHECK: [[CANVAS]]:
+  // CHECK: integer_literal $Builtin.Int2048, 1
+  case .Canvas: return 1
+  // CHECK: [[PAMPHLET]]:
+  // CHECK: integer_literal $Builtin.Int2048, 2
+  case .Pamphlet: return 2
+  // CHECK: [[POSTCARD]]:
+  // CHECK: integer_literal $Builtin.Int2048, 3
+  case .Postcard: return 3
+  // CHECK: [[DEFAULT]]:
+  // CHECK: integer_literal $Builtin.Int2048, -1
+  @unknown case _: return -1
+  }
+}
+
 // Indirect enums are still address-only, because the discriminator is stored
 // as part of the value, so we cannot resiliently make assumptions about the
 // enum's size

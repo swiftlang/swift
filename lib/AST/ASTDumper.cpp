@@ -1556,11 +1556,15 @@ public:
   }
   void visitCaseStmt(CaseStmt *S) {
     printCommon(S, "case_stmt");
+    if (S->hasUnknownAttr())
+      OS << " @unknown";
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       OS.indent(Indent + 2);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_label_item";
+      if (LabelItem.isDefault())
+        OS << " default";
       if (auto *CasePattern = LabelItem.getPattern()) {
         OS << '\n';
         printRec(CasePattern);
