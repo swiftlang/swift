@@ -2959,6 +2959,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
         return objc_retain(protocolObj);
       }
     }
+  // Handle bridgable types.
   } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =
@@ -2969,6 +2970,12 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
       srcType->vw_destroy(src);
 
     return (id)srcBridgedObject;
+  // Handle Errors.
+  } else if (auto srcErrorWitness = findErrorWitness(srcType)) {
+    // Bridge the source value to an NSError.
+    auto box = swift_allocError(srcType, srcErrorWitness, src, consume)
+      .object;
+    return _swift_stdlib_bridgeErrorToNSError((SwiftError*)box);
   }
 
   // Fall back to boxing.
