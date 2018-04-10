@@ -1762,14 +1762,23 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public struct Iterator : IteratorProtocol {
-        private let _data: Data
+        // Both _data and _endIdx should be 'let' rather than 'var'.
+        // They are 'var' so that the stored properties can be read
+        // independently of the other contents of the struct. This prevents
+        // an exclusivity violation when reading '_endIdx' and '_data'
+        // while simultaneously mutating '_buffer' with the call to
+        // withUnsafeMutablePointer(). Once we support accessing struct
+        // let properties independently we should make these variables
+        // 'let' again.
+
+        private var _data: Data
         private var _buffer: (
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
         private var _idx: Data.Index
-        private let _endIdx: Data.Index
+        private var _endIdx: Data.Index
         
         fileprivate init(_ data: Data) {
             _data = data
