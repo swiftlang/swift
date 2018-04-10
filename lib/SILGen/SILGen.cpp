@@ -499,32 +499,18 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                                      : (Decl *)nullptr,
                                   constant, forDefinition);
 
+  // Set up the function for profiling instrumentation.
   ASTNode profiledNode;
   if (constant.hasDecl() && !haveProfiledAssociatedFuncDecl(constant)) {
     if (auto *fd = constant.getFuncDecl()) {
       if (hasSILBody(fd)) {
-        // Set up the function for profiling instrumentation.
         F->createProfiler(fd, forDefinition);
         profiledNode = fd->getBody(/*canSynthesize=*/false);
       }
     }
   } else if (auto *ace = constant.getAbstractClosureExpr()) {
-    // Regular closures receive fresh profilers.
-    if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
-      F->createProfiler(ce, forDefinition);
-      profiledNode = ce;
-    } else if (auto *autoCe = dyn_cast<AutoClosureExpr>(ace)) {
-      // Autoclosures inherit their profiling metadata and counters.
-      if (auto *parentDecl = dyn_cast_or_null<ValueDecl>(
-              autoCe->getInnermostDeclarationDeclContext())) {
-        SILDeclRef parentConstant(parentDecl, SILDeclRef::Kind::Func);
-        auto parentIt = emittedFunctions.find(parentConstant);
-        if (parentIt != emittedFunctions.end()) {
-          F->setProfiler(parentIt->second->getProfiler());
-          profiledNode = autoCe;
-        }
-      }
-    }
+    F->createProfiler(ace, forDefinition);
+    profiledNode = ace;
   }
   // Set the function entry count for PGO.
   if (SILProfiler *SP = F->getProfiler())

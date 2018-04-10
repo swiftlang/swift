@@ -26,10 +26,19 @@
 
 using namespace swift;
 
+static bool isClosureWithBody(AbstractClosureExpr *ACE) {
+  if (auto *CE = dyn_cast<ClosureExpr>(ACE))
+    return CE->getBody();
+  if (auto *autoCE = dyn_cast<AutoClosureExpr>(ACE))
+    return autoCE->getBody();
+  return false;
+}
+
 static bool isUnmapped(ASTNode N) {
   if (auto *E = N.dyn_cast<Expr *>()) {
-    auto *CE = dyn_cast<ClosureExpr>(E);
-    return !CE || CE->isImplicit() || !CE->getBody();
+    auto *CE = dyn_cast<AbstractClosureExpr>(E);
+    return !CE || (!isa<AutoClosureExpr>(CE) && CE->isImplicit()) ||
+           !isClosureWithBody(CE);
   }
 
   auto *D = N.get<Decl *>();
@@ -96,7 +105,7 @@ static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
     else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
       TLCD->walk(Walker);
   } else if (auto *E = N.dyn_cast<Expr *>()) {
-    cast<ClosureExpr>(E)->walk(Walker);
+    cast<AbstractClosureExpr>(E)->walk(Walker);
   }
 }
 
@@ -137,15 +146,15 @@ SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
 
 namespace {
 
-/// Special logic for handling ClosureExpr visitation.
+/// Special logic for handling closure visitation.
 ///
-/// To prevent a ClosureExpr from being mapped twice, avoid recursively
-/// walking into one unless the closure's function definition is being profiled.
+/// To prevent a closure from being mapped twice, avoid recursively walking
+/// into one unless the closure's function definition is being profiled.
 ///
 /// Apply \p Func if the closure can be visited.
 template <typename F>
-std::pair<bool, Expr *> visitClosureExpr(ASTWalker &Walker, ClosureExpr *CE,
-                                         F Func) {
+std::pair<bool, Expr *> visitClosureExpr(ASTWalker &Walker,
+                                         AbstractClosureExpr *CE, F Func) {
   if (!Walker.Parent.isNull())
     return {false, CE};
   Func();
@@ -204,11 +213,9 @@ struct MapRegionCounters : public ASTWalker {
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterMap[IE->getThenExpr()] = NextCounter++;
-    } else if (isa<AutoClosureExpr>(E)) {
-      CounterMap[E] = NextCounter++;
-    } else if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-      return visitClosureExpr(*this, CE,
-                              [&] { CounterMap[CE] = NextCounter++; });
+    } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
+      return visitClosureExpr(*this, ACE,
+                              [&] { CounterMap[ACE] = NextCounter++; });
     }
     return {true, E};
   }
@@ -517,12 +524,8 @@ struct PGOMapping : public ASTWalker {
         }
       }
       LoadedCounterMap[elseExpr] = subtract(count, thenCount);
-    } else if (isa<AutoClosureExpr>(E)) {
-      CounterMap[E] = NextCounter++;
-      auto eCount = loadExecutionCount(E);
-      LoadedCounterMap[E] = eCount;
-    } else if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-      return visitClosureExpr(*this, CE, [&] {
+    } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
+      return visitClosureExpr(*this, ACE, [&] {
         CounterMap[E] = NextCounter++;
         auto eCount = loadExecutionCount(E);
         LoadedCounterMap[E] = eCount;
@@ -892,16 +895,10 @@ public:
     if (!RegionStack.empty())
       extendRegion(E);
 
-    if (isa<AutoClosureExpr>(E)) {
-      // Autoclosures look strange if there isn't a region, since it looks like
-      // control flow starts partway through an expression. For now we skip
-      // these so we don't get odd behavior in default arguments and the like,
-      // but in the future we should consider creating appropriate regions for
-      // those expressions.
-      if (!RegionStack.empty())
-        assignCounter(E);
-    } else if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-      visitClosureExpr(*this, CE, [&] { assignCounter(CE); });
+    if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
+      auto Result = visitClosureExpr(*this, ACE, [&] { assignCounter(ACE); });
+      if (!Result.first)
+        return Result;
     } else if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
       if (RegionStack.empty())
@@ -971,7 +968,7 @@ void SILProfiler::assignRegionCounters() {
     }
   } else {
     auto *E = Root.get<Expr *>();
-    if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+    if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
       CurrentFuncName = SILDeclRef(CE).mangle();
       CurrentFuncLinkage = FormalLinkage::HiddenUnique;
     } else {

@@ -412,7 +412,6 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
     auto *autoclosure = cast<AutoClosureExpr>(ace);
     // Closure expressions implicitly return the result of their body
     // expression.
-    emitProfilerIncrement(autoclosure);
     emitReturnExpr(ImplicitReturnLocation(ace),
                    autoclosure->getSingleExpressionBody());
   }
