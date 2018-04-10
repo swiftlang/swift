@@ -30,6 +30,7 @@
 #include "swift/Subsystems.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -1584,6 +1585,77 @@ bool RefactoringActionMoveMembersToExtension::performChange() {
   EditConsumer.insertAfter(SM, CommonTypeDecl->getEndLoc(), Buffer);
   EditConsumer.remove(SM, RangeInfo.ContentRange);
 
+  return false;
+}
+
+namespace {
+// A SingleDecl range may not include all decls actually declared in that range:
+// a var decl has accessors that aren't included. This will find those missing
+// decls.
+class FindAllSubDecls : public SourceEntityWalker {
+  llvm::SmallPtrSetImpl<Decl *> &Found;
+  public:
+  FindAllSubDecls(llvm::SmallPtrSetImpl<Decl *> &found)
+    : Found(found) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange range) {
+    // Record this Decl, and skip its contents if we've already touched it.
+    if (!Found.insert(D).second)
+      return false;
+
+    if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      llvm::SmallVector<Decl *, 6> accessors;
+      ASD->getAllAccessorFunctions(accessors);
+      Found.insert(accessors.begin(), accessors.end());
+    }
+    return true;
+  }
+};
+}
+bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
+  ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  switch (Info.Kind) {
+  case RangeKind::SingleDecl:
+  case RangeKind::MultiTypeMemberDecl: {
+    llvm::SmallPtrSet<Decl *, 16> Found;
+    for (auto decl : Info.DeclaredDecls) {
+      FindAllSubDecls(Found).walk(decl.VD);
+    }
+    for (auto decl : Found) {
+      auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+      if (AFD && !AFD->isImplicit())
+        return true;
+    }
+
+    return false;
+ }
+  case RangeKind::SingleExpression:
+  case RangeKind::PartOfExpression:
+  case RangeKind::SingleStatement:
+  case RangeKind::MultiStatement:
+  case RangeKind::Invalid:
+    return false;
+  }
+}
+
+bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
+  const StringRef replacement = "{ fatalError() }";
+  llvm::SmallPtrSet<Decl *, 16> Found;
+  for (auto decl : RangeInfo.DeclaredDecls) {
+    FindAllSubDecls(Found).walk(decl.VD);
+  }
+  for (auto decl : Found) {
+    auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || AFD->isImplicit())
+      continue;
+
+    auto range = AFD->getBodySourceRange();
+    // If we're in replacement mode (i.e. have an edit consumer), we can
+    // rewrite the function body.
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+    EditConsumer.accept(SM, charRange, replacement);
+
+  }
   return false;
 }
 
