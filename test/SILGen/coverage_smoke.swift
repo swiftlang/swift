@@ -35,7 +35,7 @@ class Class1 {
   deinit {}
 }
 
-// CHECK-MAIN: Maximum function count: 1
+// CHECK-MAIN: Maximum function count: 3
 func main() {
 // CHECK-COV: {{ *}}[[@LINE+1]]|{{ *}}1{{.*}}f_public
   f_public()
@@ -79,10 +79,10 @@ func call_closure() { // CHECK-COV: {{ *}}[[@LINE]]|
 func call_auto_closure() {
   func use_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
     return x() && // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
-           x() || // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+           x() && // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
            x()    // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
   }
-  let _ = use_auto_closure(false || true) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  let _ = use_auto_closure(true) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}3
 }
 
 main() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
