@@ -762,6 +762,7 @@ private:
   void destroyMetadataLayoutMap();
 
   friend class GenericContextScope;
+  friend class CompletelyFragileScope;
   
 //--- Globals ---------------------------------------------------------------
 public:

@@ -199,7 +199,7 @@ namespace {
       Elements.push_back(Elt);
       if (!addField(Elements.back(), LayoutStrategy::Universal)) {
         // For empty tail allocated elements we still add 1 padding byte.
-        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
+        assert(cast<FixedTypeInfo>(Elt.getTypeForLayout()).getFixedStride() == Size(1) &&
                "empty elements should have stride 1");
         StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
         CurSize += Size(1);
@@ -321,9 +321,21 @@ namespace {
                                   const ClassLayout *abstractLayout) {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
-        auto &eltType = IGM.getTypeInfo(type);
+        auto &eltTypeForAccess = IGM.getTypeInfo(type);
 
-        if (!eltType.isFixedSize()) {
+        // For now, the Objective-C runtime cannot support dynamic layout of
+        // classes that contain resilient value types, so we just look through
+        // the resilience boundary and assume fragile layout for class ivars
+        // instead.
+        Optional<CompletelyFragileScope> generateStaticLayoutRAII;
+
+        if (!IGM.IRGen.Opts.EnableClassResilience &&
+            !isa<FixedTypeInfo>(eltTypeForAccess))
+          generateStaticLayoutRAII.emplace(IGM);
+
+        auto &eltTypeForLayout = IGM.getTypeInfo(type);
+
+        if (!eltTypeForLayout.isFixedSize()) {
           ClassMetadataRequiresDynamicInitialization = true;
           ClassHasFixedSize = false;
 
@@ -335,7 +347,8 @@ namespace {
         assert(!abstractLayout ||
                abstractLayout->getFieldIndex(var) == fieldIndex);
 
-        Elements.push_back(ElementLayout::getIncomplete(eltType));
+        Elements.push_back(ElementLayout::getIncomplete(eltTypeForLayout,
+                                                        eltTypeForAccess));
         AllStoredProperties.push_back(var);
         AllFieldAccesses.push_back(getFieldAccess(abstractLayout, fieldIndex));
       }
@@ -414,7 +427,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
   // Add the tail elements.
   for (SILType TailTy : tailTypes) {
     const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
-    builder.addTailElement(ElementLayout::getIncomplete(tailTI));
+    builder.addTailElement(ElementLayout::getIncomplete(tailTI, tailTI));
   }
 
   // Create a name for the new llvm type.

@@ -96,7 +96,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::InitialNonFixedSize:
         // Factor the non-fixed-size field's alignment into the total alignment.
         totalAlign = IGF.Builder.CreateOr(totalAlign,
-                                    elt.getType().getAlignmentMask(IGF, eltTy));
+                                    elt.getTypeForLayout().getAlignmentMask(IGF, eltTy));
         LLVM_FALLTHROUGH;
       case ElementLayout::Kind::Empty:
       case ElementLayout::Kind::Fixed:
@@ -108,7 +108,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
         if (i == 0) {
-          totalAlign = elt.getType().getAlignmentMask(IGF, eltTy);
+          totalAlign = elt.getTypeForLayout().getAlignmentMask(IGF, eltTy);
           offset = totalAlign;
           Offsets.push_back(totalAlign);
           break;
@@ -120,7 +120,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         // Start calculating offsets from the last fixed-offset field.
         if (!offset) {
           Size lastFixedOffset = layout.getElement(i-1).getByteOffset();
-          if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
+          if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getTypeForLayout())) {
             // If the last fixed-offset field is also fixed-size, we can
             // statically compute the end of the fixed-offset fields.
             auto fixedEnd = lastFixedOffset + fixedType->getFixedSize();
@@ -133,12 +133,12 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
               = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                        lastFixedOffset.getValue());
             offset = IGF.Builder.CreateAdd(offset,
-                                     prevElt.getType().getSize(IGF, prevType));
+                                     prevElt.getTypeForLayout().getSize(IGF, prevType));
           }
         }
         
         // Round up to alignment to get the offset.
-        auto alignMask = elt.getType().getAlignmentMask(IGF, eltTy);
+        auto alignMask = elt.getTypeForLayout().getAlignmentMask(IGF, eltTy);
         auto notAlignMask = IGF.Builder.CreateNot(alignMask);
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
@@ -147,7 +147,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         
         // Advance by the field's size to start the next field.
         offset = IGF.Builder.CreateAdd(offset,
-                                       elt.getType().getSize(IGF, eltTy));
+                                       elt.getTypeForLayout().getSize(IGF, eltTy));
         totalAlign = IGF.Builder.CreateOr(totalAlign, alignMask);
 
         break;
@@ -237,7 +237,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     if (field.isPOD())
       continue;
 
-    field.getType().destroy(
+    field.getTypeForAccess().destroy(
         IGF, field.project(IGF, structAddr, offsets), fieldTy,
         true /*Called from metadata constructors: must be outlined*/);
   }
