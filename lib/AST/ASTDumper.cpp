@@ -1800,8 +1800,8 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void printReverseAutoDiffExpr(ReverseAutoDiffExpr *E) {
-    OS << " primal=";
-    E->getPrimalExpr()->dump(OS);
+    OS << " original=";
+    E->getOriginalExpr()->dump(OS);
     auto parameters = E->getParameters();
     if (!parameters.empty()) {
       OS << " wrt=(";

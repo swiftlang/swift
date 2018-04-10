@@ -1238,15 +1238,15 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     Type handleReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
-                                   bool preservingPrimalResult) {
+                                   bool preservingOriginalResult) {
       auto &TC = CS.getTypeChecker();
-      auto *primalExpr = GE->getPrimalExpr();
-      auto *primalTy = CS.getType(primalExpr)->getAs<AnyFunctionType>();
+      auto *originalExpr = GE->getOriginalExpr();
+      auto *originalTy = CS.getType(originalExpr)->getAs<AnyFunctionType>();
       auto locator = CS.getConstraintLocator(GE);
-      // Primal type must be a function.
-      if (!primalTy) {
-        TC.diagnose(primalExpr->getLoc(),
-                    diag::gradient_expr_not_a_function, CS.getType(primalExpr));
+      // Original type must be a function.
+      if (!originalTy) {
+        TC.diagnose(originalExpr->getLoc(),
+                    diag::gradient_expr_not_a_function, CS.getType(originalExpr));
         return nullptr;
       }
 
@@ -1258,16 +1258,16 @@ namespace {
       Type diffProtoTy = diffProto->getDeclaredInterfaceType();
 
       // Compute the gradient type.
-      auto primalParams = primalTy->getParams();
-      auto *genSig = primalTy->getOptGenericSignature();
+      auto originalParams = originalTy->getParams();
+      auto *genSig = originalTy->getOptGenericSignature();
       // Collect differentiation parameter types.
       SmallVector<TupleTypeElt, 8> diffParamTypes;
       // If no parameters are given, then differentiation is done with respect to
       // all parameters (except self). The gradient's result type is all of the
-      // primal parameters' types.
+      // original parameters' types.
       if (GE->getParameters().empty())
-        for (auto &primalParam : primalParams)
-          diffParamTypes.push_back(primalParam.getType());
+        for (auto &originalParam : originalParams)
+          diffParamTypes.push_back(originalParam.getType());
       // If parameters are specified, collect and type-check those parameters.
       else {
         int lastIndex = -1;
@@ -1281,17 +1281,17 @@ namespace {
                           diag::gradient_expr_parameter_indices_not_ascending);
               return nullptr;
             }
-            // Indices cannot exceed the number of parameters in the primal
+            // Indices cannot exceed the number of parameters in the original
             // function.
-            if (index >= primalParams.size()) {
+            if (index >= originalParams.size()) {
               TC.diagnose(param.getLoc(),
                           diag::gradient_expr_parameter_index_out_of_bounds,
-                          primalTy, primalParams.size());
+                          originalTy, originalParams.size());
               return nullptr;
             }
             // The parameter cannot be a reference object or a protocol
             // existential.
-            auto paramTy = primalParams[index].getType();
+            auto paramTy = originalParams[index].getType();
             if (paramTy->isAnyClassReferenceType() ||
                 paramTy->isExistentialType()) {
               TC.diagnose(param.getLoc(),
@@ -1363,32 +1363,32 @@ namespace {
       }
 
       // Create a type for the gradient. The gradient has the same generic
-      // signature as the primal function. The gradient's result types are
+      // signature as the original function. The gradient's result types are
       // what we collected in `diffParamTypes`.
       Type gradResult = diffParamTypes.size() == 1
         ? diffParamTypes.front().getType()
         : TupleType::get(diffParamTypes, TC.Context);
-      // If preserving primal result, then the gradient's result type is a tuple
-      // of the primal result type with label "value" and `diffParamTypes` with
+      // If preserving original result, then the gradient's result type is a tuple
+      // of the original result type with label "value" and `diffParamTypes` with
       // label "gradient".
-      if (preservingPrimalResult) {
+      if (preservingOriginalResult) {
         gradResult = TupleType::get({
-          TupleTypeElt(primalTy->getResult(),
+          TupleTypeElt(originalTy->getResult(),
                        TC.Context.getIdentifier("value")),
           TupleTypeElt(gradResult, TC.Context.getIdentifier("gradient"))
         }, TC.Context);
       }
       AnyFunctionType *gradTy;
       if (genSig)
-        gradTy = GenericFunctionType::get(genSig, primalParams,
-                                          gradResult, primalTy->getExtInfo());
+        gradTy = GenericFunctionType::get(genSig, originalParams,
+                                          gradResult, originalTy->getExtInfo());
       else
-        gradTy = FunctionType::get(primalParams, gradResult,
-                                   primalTy->getExtInfo());
+        gradTy = FunctionType::get(originalParams, gradResult,
+                                   originalTy->getExtInfo());
 
-      // Gradient expressions with generic primals must have a type that is
+      // Gradient expressions with generic originals must have a type that is
       // convertible to the contextual type.
-      if (primalTy->hasTypeVariable())
+      if (originalTy->hasTypeVariable())
         if (auto contextualTy = CS.getContextualType(GE))
           if (auto contextualGradTy = contextualTy->getAs<AnyFunctionType>())
             CS.addConstraint(ConstraintKind::Conversion, contextualGradTy,
@@ -1398,11 +1398,11 @@ namespace {
     }
 
     Type visitGradientExpr(GradientExpr *GE) {
-      return handleReverseAutoDiffExpr(GE, /*preservingPrimalResult=*/false);
+      return handleReverseAutoDiffExpr(GE, /*preservingOriginalResult=*/false);
     }
 
     Type visitValueAndGradientExpr(ValueAndGradientExpr *VGE) {
-      return handleReverseAutoDiffExpr(VGE, /*preservingPrimalResult=*/true);
+      return handleReverseAutoDiffExpr(VGE, /*preservingOriginalResult=*/true);
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
