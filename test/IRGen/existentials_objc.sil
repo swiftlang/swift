@@ -189,3 +189,46 @@ bb3:
  %4 = tuple()
  return %4 : $()
 }
+
+protocol TestP : AnyObject {}
+
+class NSObject {}
+
+class TestC {
+  @sil_stored unowned final let t: @sil_unowned NSObject & TestP
+  init(t: NSObject & TestP)
+}
+
+// CHECK-LABEL: define {{.*}}@test_load_unowned
+// CHECK: [[REF:%.*]] = load %swift.refcounted*, %swift.refcounted**
+// CHECK: [[CAST:%.*]] = bitcast %swift.refcounted* [[REF]] to %T17existentials_objc8NSObjectC
+// CHECK: swift_unownedRetainStrong
+// CHECK: [[EXIST0:%.*]] = insertvalue { %T17existentials_objc8NSObjectC*, i8** } undef, %T17existentials_objc8NSObjectC* [[CAST]], 0
+// CHECK: [[EXIST:%.*]] = insertvalue { %T17existentials_objc8NSObjectC*, i8** } [[EXIST0]], i8** {{.*}}, 1
+// CHECK:  ret { %T17existentials_objc8NSObjectC*, i8** } [[EXIST]]
+
+sil @test_load_unowned : $@convention(method) (@guaranteed TestC) -> @owned NSObject & TestP {
+bb0(%0 : $TestC):
+  %2 = ref_element_addr %0 : $TestC, #TestC.t
+  %3 = load_unowned %2 : $*@sil_unowned NSObject & TestP
+  return %3 : $NSObject & TestP
+}
+
+// CHECK-LABEL: define {{.*}}@test_load_take_unowned
+// CHECK: [[REF:%.*]] = load %swift.refcounted*, %swift.refcounted**
+// CHECK: [[CAST:%.*]] = bitcast %swift.refcounted* [[REF]] to %T17existentials_objc8NSObjectC
+// CHECK: swift_unownedRetainStrongAndRelease
+// CHECK: [[EXIST0:%.*]] = insertvalue { %T17existentials_objc8NSObjectC*, i8** } undef, %T17existentials_objc8NSObjectC* [[CAST]], 0
+// CHECK: [[EXIST:%.*]] = insertvalue { %T17existentials_objc8NSObjectC*, i8** } [[EXIST0]], i8** {{.*}}, 1
+// CHECK:  ret { %T17existentials_objc8NSObjectC*, i8** } [[EXIST]]
+
+sil @test_load_take_unowned : $@convention(method) (@guaranteed TestC) -> @owned NSObject & TestP {
+bb0(%0 : $TestC):
+  %2 = ref_element_addr %0 : $TestC, #TestC.t
+  %3 = load_unowned [take] %2 : $*@sil_unowned NSObject & TestP
+  return %3 : $NSObject & TestP
+}
+
+sil_vtable TestC { }
+
+sil_vtable NSObject { }
