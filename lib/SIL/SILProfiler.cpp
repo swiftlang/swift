@@ -166,8 +166,12 @@ struct MapRegionCounters : public ASTWalker {
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
       return false;
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-      CounterMap[AFD->getBody()] = NextCounter++;
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      bool FirstDecl = Parent.isNull();
+      if (FirstDecl)
+        CounterMap[AFD->getBody()] = NextCounter++;
+      return FirstDecl;
+    }
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
       CounterMap[TLCD->getBody()] = NextCounter++;
     return true;
@@ -749,8 +753,12 @@ public:
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
       return false;
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-      assignCounter(AFD->getBody());
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      bool FirstDecl = Parent.isNull();
+      if (FirstDecl)
+        assignCounter(AFD->getBody());
+      return FirstDecl;
+    }
     else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
       assignCounter(TLCD->getBody());
     return true;
