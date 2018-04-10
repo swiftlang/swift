@@ -52,8 +52,16 @@ using namespace swift;
 using namespace irgen;
 
 llvm::DenseMap<TypeBase*, TypeCacheEntry> &
-TypeConverter::Types_t::getCacheFor(TypeBase *t) {
-  return t->hasTypeParameter() ? DependentCache : IndependentCache;
+TypeConverter::Types_t::getCacheFor(bool isDependent, bool completelyFragile) {
+  if (completelyFragile) {
+    return (isDependent
+            ? FragileDependentCache
+            : FragileIndependentCache);
+  }
+
+  return (isDependent
+          ? DependentCache
+          : IndependentCache);
 }
 
 void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
@@ -1083,7 +1091,8 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
 
   // Clear the dependent type info cache since we have a new active signature
   // now.
-  Types.DependentCache.clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
@@ -1093,7 +1102,8 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   // Pop the SIL TypeConverter's generic context too.
   IGM.getSILTypes().popGenericContext(signature);
   
-  Types.DependentCache.clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
@@ -1110,8 +1120,9 @@ GenericEnvironment *IRGenModule::getGenericEnvironment() {
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
   assert(key->isCanonical());
   assert(!key->hasTypeParameter());
-  assert(!Types.IndependentCache.count(key) && "entry already exists for type!");
-  Types.IndependentCache.insert(std::make_pair(key, type));
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+  assert(!Cache.count(key) && "entry already exists for type!");
+  Cache.insert(std::make_pair(key, type));
 }
 
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
@@ -1402,9 +1413,20 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   }
 }
 
+void TypeConverter::pushCompletelyFragile() {
+  assert(!CompletelyFragile);
+  CompletelyFragile = true;
+}
+
+void TypeConverter::popCompletelyFragile() {
+  assert(CompletelyFragile);
+  CompletelyFragile = false;
+}
+
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
-  auto &Cache = Types.getCacheFor(canonicalTy.getPointer());
+  auto &Cache = Types.getCacheFor(canonicalTy->hasTypeParameter(),
+                                  CompletelyFragile);
 
   {
     auto it = Cache.find(canonicalTy.getPointer());
@@ -1430,8 +1452,9 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != canonicalTy) {
-    auto it = Types.IndependentCache.find(exemplarTy.getPointer());
-    if (it != Types.IndependentCache.end()) {
+    auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+    auto it = Cache.find(exemplarTy.getPointer());
+    if (it != Cache.end()) {
       // Record the object under the original type.
       auto result = it->second;
       Cache[canonicalTy.getPointer()] = result;
@@ -1459,8 +1482,11 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
     entry = convertedTI;
   };
   insertEntry(Cache[canonicalTy.getPointer()]);
-  if (canonicalTy != exemplarTy)
-    insertEntry(Types.IndependentCache[exemplarTy.getPointer()]);
+  if (canonicalTy != exemplarTy) {
+    auto &IndependentCache = Types.getCacheFor(/*isDependent*/ false,
+                                               CompletelyFragile);
+    insertEntry(IndependentCache[exemplarTy.getPointer()]);
+  }
   
   // If the type info hasn't been added to the list of types, do so.
   if (!convertedTI->NextConverted) {
@@ -1855,7 +1881,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->hasUnboundGenericType());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto &Cache = Types.IndependentCache;
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
   auto entry = Cache.find(key);
   if (entry != Cache.end())
     return entry->second;
