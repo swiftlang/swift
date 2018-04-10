@@ -80,6 +80,7 @@ class ResilienceTest(object):
             compiler_flags = ['-emit-library', '-emit-module',
                               '-swift-version', '4',
                               '-Xfrontend', '-enable-resilience',
+                              '-Xfrontend', '-enable-class-resilience',
                               '-D', config,
                               self.lib_src,
                               '-o', output_dylib]
@@ -103,8 +104,10 @@ class ResilienceTest(object):
     def compile_main(self):
         for config in self.config_dir_map:
             output_obj = os.path.join(self.config_dir_map[config], 'main.o')
-            compiler_flags = ['-D', config, '-c', self.test_src, '-I',
-                              self.config_dir_map[config], '-o', output_obj]
+            compiler_flags = ['-D', config, '-c', self.test_src,
+                              '-Xfrontend', '-enable-class-resilience',
+                              '-I', self.config_dir_map[config],
+                              '-o', output_obj]
             command = self.target_build_swift + compiler_flags
             verbose_print_command(command)
             returncode = subprocess.call(command)

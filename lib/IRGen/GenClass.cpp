@@ -141,6 +141,10 @@ namespace {
 
     unsigned NumInherited = 0;
 
+    // If the class has @objc ancestry, we lay out resiliently-typed fields
+    // as if they were fragile.
+    bool CompletelyFragileLayout = false;
+
     // Does the class metadata require dynamic initialization above and
     // beyond what the runtime can automatically achieve?
     //
@@ -199,7 +203,7 @@ namespace {
       Elements.push_back(Elt);
       if (!addField(Elements.back(), LayoutStrategy::Universal)) {
         // For empty tail allocated elements we still add 1 padding byte.
-        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
+        assert(cast<FixedTypeInfo>(Elt.getTypeForLayout()).getFixedStride() == Size(1) &&
                "empty elements should have stride 1");
         StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
         CurSize += Size(1);
@@ -245,6 +249,10 @@ namespace {
         }
 
         if (superclass->hasClangNode()) {
+          // Perform fragile layout if the class has @objc ancestry.
+          if (!IGM.IRGen.Opts.EnableClassResilience)
+            CompletelyFragileLayout = true;
+
           // If the superclass was imported from Objective-C, its size is
           // not known at compile time. However, since the field offset
           // vector only stores offsets of stored properties defined in
@@ -321,9 +329,22 @@ namespace {
                                   const ClassLayout *abstractLayout) {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
-        auto &eltType = IGM.getTypeInfo(type);
+        auto &eltTypeForAccess = IGM.getTypeInfo(type);
 
-        if (!eltType.isFixedSize()) {
+        // For now, the Objective-C runtime cannot support dynamic layout of
+        // classes that contain resilient value types, so we just look through
+        // the resilience boundary and assume fragile layout for class ivars
+        // instead.
+        Optional<CompletelyFragileScope> generateStaticLayoutRAII;
+
+        if (CompletelyFragileLayout &&
+            !isa<FixedTypeInfo>(eltTypeForAccess)) {
+          generateStaticLayoutRAII.emplace(IGM);
+        }
+
+        auto &eltTypeForLayout = IGM.getTypeInfo(type);
+
+        if (!eltTypeForLayout.isFixedSize()) {
           ClassMetadataRequiresDynamicInitialization = true;
           ClassHasFixedSize = false;
 
@@ -335,7 +356,8 @@ namespace {
         assert(!abstractLayout ||
                abstractLayout->getFieldIndex(var) == fieldIndex);
 
-        Elements.push_back(ElementLayout::getIncomplete(eltType));
+        Elements.push_back(ElementLayout::getIncomplete(eltTypeForLayout,
+                                                        eltTypeForAccess));
         AllStoredProperties.push_back(var);
         AllFieldAccesses.push_back(getFieldAccess(abstractLayout, fieldIndex));
       }
@@ -414,7 +436,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
   // Add the tail elements.
   for (SILType TailTy : tailTypes) {
     const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
-    builder.addTailElement(ElementLayout::getIncomplete(tailTI));
+    builder.addTailElement(ElementLayout::getIncomplete(tailTI, tailTI));
   }
 
   // Create a name for the new llvm type.
