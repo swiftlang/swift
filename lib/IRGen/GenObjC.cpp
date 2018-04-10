@@ -934,8 +934,8 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
   Explosion selfParams;
   selfParams.add(self);
-  fieldLayout.getType().initializeFromParams(IGF, selfParams, fieldAddr,
-                                             fieldType, false);
+  fieldLayout.getTypeForAccess().initializeFromParams(IGF, selfParams, fieldAddr,
+                                                      fieldType, false);
 
   // Create the forwarding stub.
   llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,

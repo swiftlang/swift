@@ -149,6 +149,9 @@ public:
   /// Emit names of struct stored properties and enum cases.
   unsigned EnableReflectionNames : 1;
 
+  /// Enables resilient class layout.
+  unsigned EnableClassResilience : 1;
+
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?
   ///
@@ -181,8 +184,9 @@ public:
         EmitStackPromotionChecks(false), PrintInlineTree(false),
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
-        EnableReflectionNames(true), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
+        EnableReflectionNames(true), EnableClassResilience(false),
+        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
+        GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
 
   // Get a hash of all options which influence the llvm compilation but are not

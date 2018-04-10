@@ -477,7 +477,6 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         .highlight(UDRE->getSourceRange());
     };
 
-    bool claimed = false;
     if (!isConfused) {
       TypoCorrectionResults corrections(*this, Name, nameLoc);
       performTypoCorrection(DC, UDRE->getRefKind(), Type(),
