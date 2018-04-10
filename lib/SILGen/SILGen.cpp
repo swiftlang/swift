@@ -678,8 +678,7 @@ emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
 
 /// SWIFT_ENABLE_TENSORFLOW
 IntRange<unsigned> SILGenModule::
-getLoweredFunctionParameterIndex(unsigned paramIndex,
-                                 const AbstractFunctionDecl *AFD) {
+getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
   // Returns the number of types the given type will be flattened into as a
   // function parameter during SILGen.
   std::function<unsigned(Type)> getNumFlattenedTypes;
@@ -696,16 +695,16 @@ getLoweredFunctionParameterIndex(unsigned paramIndex,
   // we find the first corresponding argument index for the given function
   // parameter index.
   unsigned startIndex = 0;
-  auto *paramList = AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
-  assert(paramIndex < paramList->size() && "Parameter index out of bounds!");
+  auto params = ty->getParams();
+  assert(paramIndex < params.size() && "Parameter index out of bounds!");
   for (unsigned i = 0; i != paramIndex; ++i) {
-    auto *PD = paramList->get(i);
-    startIndex += getNumFlattenedTypes(PD->getType()->getCanonicalType());
+    auto paramTy = params[i].getType()->getCanonicalType();
+    startIndex += getNumFlattenedTypes(paramTy);
   }
   // Compute the offset from the given parameter's first corresponding argument
   // index to the last corresponding argument index.
-  unsigned offset = getNumFlattenedTypes(
-    paramList->get(paramIndex)->getType()->getCanonicalType());
+  unsigned offset =
+    getNumFlattenedTypes(params[paramIndex].getType()->getCanonicalType());
   return range(startIndex, startIndex + offset);
 }
 
@@ -720,15 +719,17 @@ getLoweredDifferentiationIndices(SILGenModule &SGM,
                                  const DifferentiableAttr *DA) {
   SmallVector<unsigned, 8> indices;
   auto conv = F->getConventions();
-  auto declParamList =
-    AFD->getParameterList(AFD->getImplicitSelfDecl() ? 1 : 0);
+  auto fnTy = AFD->getInterfaceType()->getCanonicalType()
+    ->getAs<AnyFunctionType>();
+  if (AFD->getImplicitSelfDecl())
+    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
   // If no parameters are specified, differentiation is done wrt all parameters.
   if (DA->getParameters().empty()) {
-    unsigned numParams = declParamList->size();
+    unsigned numParams = fnTy->getNumParams();
     // We don't diff wrt `self` unless it is explicitly specified, therefore
     // dropping the last SIL parameter if it's a method.
     for (unsigned i = 0; i < numParams; ++i)
-      for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, AFD))
+      for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, fnTy))
         indices.push_back(paramIdx);
     return indices;
   }
@@ -739,7 +740,7 @@ getLoweredDifferentiationIndices(SILGenModule &SGM,
     // Normal index maps directly to a SIL parameter index.
     case AutoDiffParameter::Kind::Index: {
       auto idx = param.getIndex();
-      auto paramIdxRange = SGM.getLoweredFunctionParameterIndex(idx, AFD);
+      auto paramIdxRange = SGM.getLoweredFunctionParameterIndex(idx, fnTy);
       indices.append(paramIdxRange.begin(), paramIdxRange.end());
       break;
     }
@@ -752,7 +753,7 @@ getLoweredDifferentiationIndices(SILGenModule &SGM,
   }
   // The last SIL parameter is `self`, if needed.
   if (hasSelf)
-    indices.push_back((unsigned)declParamList->size());
+    indices.push_back(fnTy->getNumParams());
   return indices;
 }
 

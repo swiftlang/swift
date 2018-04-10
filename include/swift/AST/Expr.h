@@ -3826,12 +3826,12 @@ public:
 /// Base class for #gradient and #valueAndGradient expressions.
 class ReverseAutoDiffExpr : public Expr {
 public:
-  Expr *getPrimalExpr() const {
-    return PrimalExpr;
+  Expr *getOriginalExpr() const {
+    return OriginalExpr;
   }
 
-  void setPrimalExpr(Expr *newPrimal) {
-    PrimalExpr = newPrimal;
+  void setOriginalExpr(Expr *newOriginal) {
+    OriginalExpr = newOriginal;
   }
 
   AutoDiffParameter *getParametersData() {
@@ -3848,12 +3848,12 @@ public:
     return SourceRange(Loc, RParenLoc);
   }
 
-  FuncDecl *getResolvedPrimal() const {
-    return ResolvedPrimal;
+  FuncDecl *getResolvedOriginal() const {
+    return ResolvedOriginal;
   }
 
-  void setResolvedPrimal(FuncDecl *RP) {
-    ResolvedPrimal = RP;
+  void setResolvedOriginal(FuncDecl *RP) {
+    ResolvedOriginal = RP;
   }
 
   static bool classof(const Expr *E) {
@@ -3866,19 +3866,19 @@ private:
   SourceLoc Loc;
   /// The location of '(' right after '#gradient'.
   SourceLoc LParenLoc;
-  /// The expression representing the function to differentiate.
-  Expr *PrimalExpr;
+  /// The expression representing the function to be differentiated.
+  Expr *OriginalExpr;
   /// The number of parameters in the parameter list.
   unsigned NumParameters;
   /// The location of ')'.
   SourceLoc RParenLoc;
-  /// Primal declaration, to be resolved by Sema.
-  FuncDecl *ResolvedPrimal = nullptr;
+  /// Original function declaration, to be resolved by Sema.
+  FuncDecl *ResolvedOriginal = nullptr;
 
 protected:
   explicit ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,
                                SourceLoc lParenLoc,
-                               Expr *primalExpr,
+                               Expr *originalExpr,
                                ArrayRef<AutoDiffParameter> parameters,
                                SourceLoc rParenLoc);
 };
@@ -3894,7 +3894,7 @@ protected:
 class GradientExpr : public ReverseAutoDiffExpr {
 public:
   static GradientExpr *create(ASTContext &ctx, SourceLoc loc,
-                              SourceLoc lParenLoc, Expr *primalExpr,
+                              SourceLoc lParenLoc, Expr *originalExpr,
                               ArrayRef<AutoDiffParameter> parameters,
                               SourceLoc rParenLoc);
 
@@ -3903,9 +3903,9 @@ public:
   }
 
 private:
-  explicit GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *primalExpr,
+  explicit GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *originalExpr,
                         ArrayRef<AutoDiffParameter> params, SourceLoc rParenLoc)
-    : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, primalExpr,
+    : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, originalExpr,
                           params, rParenLoc) {}
 };
 
@@ -3921,7 +3921,7 @@ private:
 class ValueAndGradientExpr : public ReverseAutoDiffExpr {
 public:
   static ValueAndGradientExpr *create(ASTContext &ctx, SourceLoc loc,
-                                      SourceLoc lParenLoc, Expr *primalExpr,
+                                      SourceLoc lParenLoc, Expr *originalExpr,
                                       ArrayRef<AutoDiffParameter> parameters,
                                       SourceLoc rParenLoc);
 
@@ -3931,11 +3931,11 @@ public:
 
 private:
   explicit ValueAndGradientExpr(SourceLoc loc, SourceLoc lParenLoc,
-                                Expr *primalExpr,
+                                Expr *originalExpr,
                                 ArrayRef<AutoDiffParameter> params,
                                 SourceLoc rParenLoc)
     : ReverseAutoDiffExpr(ExprKind::ValueAndGradient, loc, lParenLoc,
-                          primalExpr, params, rParenLoc) {}
+                          originalExpr, params, rParenLoc) {}
 };
 
 /// An expression referring to an opaque object of a fixed type.

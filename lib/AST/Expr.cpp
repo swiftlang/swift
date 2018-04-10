@@ -1262,37 +1262,38 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
 
 // SWIFT_ENABLE_TENSORFLOW
 ReverseAutoDiffExpr::ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,
-                                         SourceLoc lParenLoc, Expr *primalExpr,
+                                         SourceLoc lParenLoc,
+                                         Expr *originalExpr,
                                          ArrayRef<AutoDiffParameter> parameters,
                                          SourceLoc rParenLoc)
   : Expr(kind, /*Implicit=*/false), Loc(loc), LParenLoc(lParenLoc),
-    PrimalExpr(primalExpr), NumParameters(parameters.size()),
+    OriginalExpr(originalExpr), NumParameters(parameters.size()),
     RParenLoc(rParenLoc) {
   std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
 GradientExpr *GradientExpr::create(ASTContext &ctx, SourceLoc loc,
-                                   SourceLoc lParenLoc, Expr *primalExpr,
+                                   SourceLoc lParenLoc, Expr *originalExpr,
                                    ArrayRef<AutoDiffParameter> parameters,
                                    SourceLoc rParenLoc) {
   unsigned numParams = parameters.size();
   unsigned size = sizeof(GradientExpr) + numParams * sizeof(AutoDiffParameter);
   void *memory = ctx.Allocate(size, alignof(GradientExpr));
-  return new (memory) GradientExpr(loc, lParenLoc, primalExpr, parameters,
+  return new (memory) GradientExpr(loc, lParenLoc, originalExpr, parameters,
                                    rParenLoc);
 }
 
 
 ValueAndGradientExpr *
 ValueAndGradientExpr::create(ASTContext &ctx, SourceLoc loc,
-                             SourceLoc lParenLoc, Expr *primalExpr,
+                             SourceLoc lParenLoc, Expr *originalExpr,
                              ArrayRef<AutoDiffParameter> parameters,
                              SourceLoc rParenLoc) {
   unsigned numParams = parameters.size();
   unsigned size =
     sizeof(ValueAndGradientExpr) + numParams * sizeof(AutoDiffParameter);
   void *memory = ctx.Allocate(size, alignof(ValueAndGradientExpr));
-  return new (memory) ValueAndGradientExpr(loc, lParenLoc, primalExpr,
+  return new (memory) ValueAndGradientExpr(loc, lParenLoc, originalExpr,
                                            parameters, rParenLoc);
 }
 

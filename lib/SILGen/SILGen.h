@@ -60,10 +60,6 @@ public:
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
   llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
-  /// Mapping from reverse-mode AD configuration to gradient functions.
-  llvm::DenseMap<std::pair<SILFunction*,
-                           SILReverseAutoDiffConfiguration>, SILFunction*>
-    emittedGradients;
 
   struct DelayedFunction {
     /// Insert the entity after the given function when it's emitted.
@@ -453,8 +449,7 @@ public:
   ///                                  ^      ^ 
   ///                                  corresponding indices 0...1
   IntRange<unsigned>
-  getLoweredFunctionParameterIndex(unsigned paramIndex,
-                                   const AbstractFunctionDecl *AFD);
+  getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty);
   
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
