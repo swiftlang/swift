@@ -527,16 +527,22 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       // Extract the self types from the declarations, if they have them.
+      auto getSelfType = [](AnyFunctionType *fnType) -> Type {
+        auto params = fnType->getParams();
+        assert(params.size() == 1);
+        return params.front().getType()->getRValueInstanceType();
+      };
+
       Type selfTy1;
       Type selfTy2;
       if (outerDC1->isTypeContext()) {
         auto funcTy1 = openedType1->castTo<FunctionType>();
-        selfTy1 = funcTy1->getInput()->getRValueInstanceType();
+        selfTy1 = getSelfType(funcTy1);
         openedType1 = funcTy1->getResult();
       }
       if (outerDC2->isTypeContext()) {
         auto funcTy2 = openedType2->castTo<FunctionType>();
-        selfTy2 = funcTy2->getInput()->getRValueInstanceType();
+        selfTy2 = getSelfType(funcTy2);
         openedType2 = funcTy2->getResult();
       }
       
@@ -990,15 +996,18 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
         // Check that the standard library hasn't added another overload of
         // the ?? operator.
-        auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
-        auto inputTypes = inputTupleTy->getElementTypes();
-        assert(inputTypes.size() == 2);
-        assert(inputTypes[0]->getOptionalObjectType());
-        auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
-        assert(autoclosure->isAutoClosure());
-        auto secondParamTy = autoclosure->getResult();
-        assert(secondParamTy->getOptionalObjectType());
-        (void)secondParamTy;
+        auto params = fnTy->getParams();
+        assert(params.size() == 2);
+
+        auto param1 = params[0].getType();
+        auto param2 = params[1].getType()->castTo<AnyFunctionType>();
+
+        assert(param1->getOptionalObjectType());
+        assert(param2->isAutoClosure());
+        assert(param2->getResult()->getOptionalObjectType());
+
+        (void) param1;
+        (void) param2;
 
         return true;
       };
