@@ -1093,7 +1093,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto &fieldTy = layout->getElementTypes()[nextCapturedField];
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
-      auto &fieldTI = fieldLayout.getType();
+      auto &fieldTI = fieldLayout.getTypeForAccess();
       auto fieldSchema = fieldTI.getSchema();
       
       Explosion param;
@@ -1575,9 +1575,9 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
-        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
-                                                 isOutlined);
+        auto addr = fieldLayout.getTypeForAccess().getAddressForPointer(args.claimNext());
+        fieldLayout.getTypeForAccess().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
+                                                          isOutlined);
         break;
       }
       // Take direct value arguments and inout pointers by value.
@@ -1586,7 +1586,7 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
-        cast<LoadableTypeInfo>(fieldLayout.getType())
+        cast<LoadableTypeInfo>(fieldLayout.getTypeForAccess())
             .initialize(IGF, args, fieldAddr, isOutlined);
         break;
       }
