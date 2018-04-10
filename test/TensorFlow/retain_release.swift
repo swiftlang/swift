@@ -106,3 +106,33 @@ public func testAddsWithIntermediateTensorMultiUses(x: Tensor<Int32>) {
 // This final release balances the original instruction that generated H.
 // CHECK: strong_release [[H]] : $TensorHandle<Int32>
 // CHECK-LABEL: ---
+
+
+public func testBalancedRetainReleases() {
+  let t1 = Tensor<Float>(1.2)
+  let _ = t1 + t1
+  let _ = t1.array
+}
+
+// CHECK-LABEL: --- TFPartition Host Result: {{.*}}testBalancedRetainReleases{{.*}}
+// CHECK: sil @{{.*}}testBalancedRetainReleases{{.*}} : $@convention(thin)
+//
+// CHECK: function_ref @_swift_tfc_FinishTensorComputation
+// CHECK: [[H:%.*]] = alloc_ref $TensorHandle<Float>
+//
+// TFPartition pass generates these 2 strong_retain's to balance retain/releases.
+// CHECK: strong_retain [[H]] : $TensorHandle<Float>
+// CHECK: strong_retain [[H]] : $TensorHandle<Float>
+//
+// CHECK: strong_release [[H]] : $TensorHandle<Float>
+// CHECK: strong_release [[H]] : $TensorHandle<Float>
+//
+// CHECK: strong_retain [[H]] : $TensorHandle<Float>
+// CHECK: strong_retain [[H]] : $TensorHandle<Float>
+//
+// CHECK: strong_release [[H]] : $TensorHandle<Float>
+// __tf_receive is called here
+// CHECK: apply {{.*}}<Float>([[H]])
+//
+// CHECK: strong_release [[H]] : $TensorHandle<Float>
+// CHECK-LABEL: ---

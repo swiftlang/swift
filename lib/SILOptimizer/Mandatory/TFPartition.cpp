@@ -2933,27 +2933,49 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     B.createStore(result.getLoc(), newValue, fieldAddress,
                   storeOwnership);
 
-    // FIXME: We are emitting an extra retain because we aren't tracking the
-    // use counts outside of the region properly.  This needs to be fixed
-    // correctly.
-    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
-    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
-    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
-    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
-    B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
-
+    // After moving the program region between tensor start and end points to
+    // the accelerator, we'll want to restore the retain/release balance of
+    // `result` in the host program at the tensor end point. This is done by
+    // emitting 0 or more strong_retain's.
+    int retainReleaseBalance = 0;
     // Manually walk the use list in a custom way to avoid invalidating the
     // iterator as we potentially change it.
     for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE; ) {
       auto *operand = *UI++;
       auto user = operand->getUser();
 
-      // Users may be either inside (e.g. another tensor op, or a non-tensor
-      // op that causes a copy back to the host) or outside the tensor
-      // program.  If it is after the tensor op, we can replace the use with
-      // the corresponding result value.  If inside, we'll nuke it later.
-      if (DI.dominates(tensorEndPoint, user))
+      // Users may be either inside (e.g. another tensor op, or a non-tensor op
+      // that causes a copy back to the host) or outside the tensor program.  If
+      // it is after the tensor op, we can replace the use with the
+      // corresponding result value.  If inside, we'll track its retain/release
+      // balance, and then nuke it later.
+      if (DI.dominates(tensorEndPoint, user)) {
         operand->set(newTH);
+        continue;
+      }
+
+      if (isa<StrongRetainInst>(user)) {
+        ++retainReleaseBalance;
+      } else if (isa<StrongReleaseInst>(user) || tensorOpsSet.count(user)) {
+        --retainReleaseBalance;
+      } else {
+        // FIXME: Handle uses across multiple basic blocks.
+        retainReleaseBalance += 5;
+
+        if (!isa<BranchInst>(user)) {
+          llvm::errs() << "Unhandled instruction type:\n";
+          result->print(llvm::errs());
+          assert(false);
+        }
+      }
+    }
+
+    DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
+                       << " retains for result tensor :\n");
+    DEBUG(result->print(llvm::dbgs()));
+    assert(retainReleaseBalance >= 0);
+    for (int i = 0; i < retainReleaseBalance; ++i) {
+      B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
     }
   }
 
