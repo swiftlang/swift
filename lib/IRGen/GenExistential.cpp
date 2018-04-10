@@ -1163,7 +1163,7 @@ public:
                          Explosion &out) const override {
     Address valueAddr = projectValue(IGF, existential);
     out.add(IGF.emitUnownedLoadStrong(valueAddr,
-                                      IGF.IGM.getReferenceType(Refcounting),
+                                      getPayloadType(),
                                       Refcounting));
     emitLoadOfTables(IGF, existential, out);
   }
@@ -1172,7 +1172,7 @@ public:
                          Explosion &out) const override {
     Address valueAddr = projectValue(IGF, existential);
     out.add(IGF.emitUnownedTakeStrong(valueAddr,
-                                      IGF.IGM.getReferenceType(Refcounting),
+                                      getPayloadType(),
                                       Refcounting));
     emitLoadOfTables(IGF, existential, out);
   }
