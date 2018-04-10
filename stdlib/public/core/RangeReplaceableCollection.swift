@@ -1093,7 +1093,7 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @_inlineable
+  @inlinable
   public mutating func removeAll(
     where predicate: (Element) throws -> Bool
   ) rethrows {
@@ -1119,7 +1119,7 @@ extension RangeReplaceableCollection {
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  @_inlineable
+  @inlinable
   public mutating func removeAll(
     where predicate: (Element) throws -> Bool
   ) rethrows {
