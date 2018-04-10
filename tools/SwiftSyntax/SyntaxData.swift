@@ -65,10 +65,10 @@ final class SyntaxData: Equatable {
   }
 
   var position: AbsolutePosition {
-    return positionCache.value { return calculatePosition(UTF8Position()) }
+    return positionCache.value { return calculatePosition(AbsolutePosition()) }
   }
 
-  var positionAfterSkippingLeadingTrivia: AbsolutePosition {
+  var positionBeforeLeadingTrivia: AbsolutePosition {
     let result = position.copy()
     _ = raw.accumulateLeadingTrivia(result)
     return result
@@ -261,78 +261,57 @@ final class SyntaxData: Equatable {
 
 /// An absolute position in a source file as text - the absolute byteOffset from
 /// the start, line, and column.
-public class AbsolutePosition {
+public final class AbsolutePosition {
   public fileprivate(set) var byteOffset: Int
   public fileprivate(set) var line: Int
   public fileprivate(set) var column: Int
+  public let encoding: Encoding
 
-  required public init(line: Int = 1, column: Int = 1, byteOffset: Int = 0) {
+  public enum Encoding {
+    case utf8
+    case utf16
+  }
+
+  public init(line: Int = 1, column: Int = 1, byteOffset: Int = 0,
+              encoding: Encoding = .utf8) {
     self.line = line
     self.column = column
     self.byteOffset = byteOffset
+    self.encoding = encoding
   }
 
-  internal func add(text: String) {
-     preconditionFailure("this function must be overridden")
-  }
-
-  internal func copy() -> Self {
-    return type(of: self).init(line: line, column: column, byteOffset: byteOffset)
-  }
-}
-
-extension AbsolutePosition {
-
-  /// Add some number of columns to the position.
   internal func add(columns: Int) {
-    column += columns
-    byteOffset += columns
+    self.column += columns
   }
 
-  /// Add some number of newlines to the position, resetting the column.
-  /// Size is byte size of newline char.
-  /// '\n' and '\r' are 1, '\r\n' is 2.
   internal func add(lines: Int, size: Int) {
-    line += lines
-    column = 1
-    byteOffset += lines * size
+    self.line += lines * size
+    self.column = 1
   }
 
   /// Use some text as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
-  fileprivate func add<C: BidirectionalCollection>(text chars: C)
-      where C.Element: UnsignedInteger  {
-    let cr: C.Element = 13
-    let nl: C.Element = 10
-    var idx = chars.startIndex
-    while idx != chars.endIndex {
-      let c = chars[idx]
-      idx = chars.index(after: idx)
-      switch c {
-      case cr:
-        if chars[idx] == nl {
-          add(lines: 1, size: 2)
-          idx = chars.index(after: idx)
-        } else {
-          add(lines: 1, size: 1)
-        }
-      case nl:
-        add(lines: 1, size: 1)
+  internal func add(text: String) {
+    for char in text {
+      switch char {
+      case "\n", "\r\n":
+        line += 1
+        column = 1
       default:
-        add(columns: 1)
+        column += 1
+      }
+
+      switch encoding {
+      case .utf8:
+        byteOffset += String(char).utf8.count
+      case .utf16:
+        byteOffset += String(char).utf16.count * 2
       }
     }
   }
-}
 
-class UTF8Position: AbsolutePosition {
-  internal override func add(text: String) {
-    add(text: text.utf8)
-  }
-}
-
-class UTF16Position: AbsolutePosition {
-  internal override func add(text: String) {
-    add(text: text.utf16)
+  internal func copy() -> Self {
+    return type(of: self).init(line: line, column: column,
+      byteOffset: byteOffset)
   }
 }

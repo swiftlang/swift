@@ -30,7 +30,6 @@ public struct SourceLocation: Codable {
   public let file: String
 
   public init(file: String, position: AbsolutePosition) {
-    assert(position is UTF8Position, "must be utf8 position")
     self.init(line: position.line, column: position.column,
               offset: position.byteOffset, file: file)
   }
@@ -88,7 +87,7 @@ public enum FixIt: Codable {
       let string = try container.decode(String.self, forKey: .string)
       let loc = try container.decode(SourceLocation.self, forKey: .location)
       self = .insert(loc, string)
-    case "replace": 
+    case "replace":
       let string = try container.decode(String.self, forKey: .string)
       let range = try container.decode(SourceRange.self, forKey: .range)
       self = .replace(range, string)
@@ -202,7 +201,7 @@ public struct Diagnostic: Codable {
   /// An array of possible FixIts to apply to this diagnostic.
   public let fixIts: [FixIt]
 
-  /// A diagnostic builder that 
+  /// A diagnostic builder that
   public struct Builder {
     /// An in-flight array of notes.
     internal var notes = [Note]()
@@ -225,7 +224,7 @@ public struct Diagnostic: Codable {
     ///   - fixIts: Any FixIts that should be attached to this note.
     public mutating func note(_ message: Message,
                               location: SourceLocation? = nil,
-                              highlights: [SourceRange] = [], 
+                              highlights: [SourceRange] = [],
                               fixIts: [FixIt] = []) {
       self.notes.append(Note(message: message, location: location,
                              highlights: highlights, fixIts: fixIts))
@@ -252,7 +251,7 @@ public struct Diagnostic: Codable {
 
     /// Adds a FixIt to replace the contents of the source file corresponding
     /// to the provided SourceRange with the provided text.
-    public mutating 
+    public mutating
     func fixItReplace(_ sourceRange: SourceRange, with text: String) {
       fixIts.append(.replace(sourceRange, text))
     }
