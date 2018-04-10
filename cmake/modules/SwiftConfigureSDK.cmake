@@ -143,27 +143,28 @@ macro(configure_sdk_darwin
 endmacro()
 
 macro(configure_sdk_unix
-    prefix name lib_subdir triple_name arch triple sdkpath)
+    prefix name lib_subdir triple_name architectures triple sdkpath)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
-  # Todo: this only supports building an SDK for one target arch only.
   set(SWIFT_SDK_${prefix}_NAME "${name}")
-  set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${lib_subdir}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
-  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${arch}")
+  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   if("${prefix}" STREQUAL "CYGWIN")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
   else()
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "ELF")
   endif()
 
-  set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+  foreach(arch ${architectures})
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+  endforeach()
 
   # Add this to the list of known SDKs.
   list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")
