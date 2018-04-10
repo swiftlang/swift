@@ -1177,9 +1177,9 @@ size_t swift_format_float80(long double d, char *dest, size_t length)
         swift_decompose_float80(d, digits, sizeof(digits), &decimalExponent);
     // People use long double to model integers <= 2^64, so we use that
     // as a cutoff for decimal vs. exponential format.
-    // The constant is written out in full here since it can't be
-    // expressed as a 64-bit integer.
-    if (decimalExponent < -3 || fabsl(d) > 18446744073709551616.0L) {
+    // The constant is written out as a float80 (aka "long double") literal
+    // here since it can't be expressed as a 64-bit integer.
+    if (decimalExponent < -3 || fabsl(d) > 0x1.0p64L) {
         return swift_format_exponential(dest, length, signbit(d),
                  digits, digitCount, decimalExponent);
     } else {
