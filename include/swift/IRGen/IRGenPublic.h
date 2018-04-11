@@ -43,6 +43,10 @@ void deleteIRGenModule(std::pair<IRGenerator *, IRGenModule *> &Module);
 /// fact that we can end up referencing something via an external definition
 /// (e.g., an imported Clang declaration) indirectly via the Clang importer
 /// that would not be visible directly. In such cases, we would fail to
+/// link against the shared library that defines the entity or an overlay that
+/// is needed as part of its import from Clang (e.g., the Foundation overlay
+/// is needed when bridging NSString, even if there is no other mention of
+/// an entity from the Foundation overlay).
 llvm::SmallVector<LinkLibrary, 4> collectLinkLibrariesFromExternals(
                                                            ASTContext &ctx);
 
