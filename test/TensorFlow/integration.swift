@@ -287,7 +287,7 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
   let y = x.scalar! + 2.0 // expected-note {{value used here}}
   // expected-warning @-1 {{value implicitly copied to the accelerator}}
 
-  let z = Tensor<Float>(y)  // expected-note {{value used here}}
+  let z = Tensor<Float>(y)
   return z+z
 }
 
@@ -302,10 +302,14 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 
 // CHECK-NEXT:  %6 = builtin "__tfop_Add,$in,$in"(%1 : $TensorHandle<Float>, %5 : $TensorHandle<Float>) : $TensorHandle<Float>
 // CHECK-NEXT:  %7 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%6 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:  %8 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>()
-// CHECK-NEXT:  %9 = unchecked_ref_cast %8 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK-NEXT:  %10 = builtin "__tfop_Add,$in,$in"(%9 : $TensorHandle<Float>, %9 : $TensorHandle<Float>)
-// CHECK-NEXT:  return %10 : $TensorHandle<Float>
+// CHECK-NEXT:  %8 = float_literal $Builtin.FPIEEE32, 0x40000000
+// CHECK-NEXT:  %9 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  %10 = builtin "__tfop_Const,dtype$dtype,value$tensor"(%9 : $Builtin.Int32, %8 : $Builtin.FPIEEE32) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %11 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %12 = builtin "__tfop_Add,$in,$in"(%11 : $TensorHandle<Builtin.FPIEEE32>, %10 : $TensorHandle<Builtin.FPIEEE32>) : $TensorHandle<Builtin.FPIEEE32>
+// CHECK-NEXT:  %13 = unchecked_ref_cast %12 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+// CHECK-NEXT:  %14 = builtin "__tfop_Add,$in,$in"(%13 : $TensorHandle<Float>, %13 : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK-NEXT:  return %14 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
 
@@ -490,3 +494,17 @@ public func testNoInlineUser() {
 // CHECK:  strong_release %26 : $TensorHandle<Float>
 // CHECK:  strong_release %26 : $TensorHandle<Float>
 // CHECK-LABEL: } // end sil function{{.*}}testNoInlineUser
+
+
+// b/77437755
+public func test77437755(_ hiddenSize: Float) {
+  let stddev = 1.0 / hiddenSize  // expected-warning {{method result implicitly copied to the accelerator}}
+  let t1 = Tensor<Float>(shape: [5], scalars: [1.0, 2.0, 3.0, 4.0, 5.0])
+  _ = t1 * stddev  // expected-note {{value used here}}
+}
+
+// CHECK-LABEL: ---- INPUT FUNCTION {{.*}}test77437755{{.*}} ----------
+// CHECK: [[STDDEV:%.*]] = builtin "fdiv_FPIEEE32"
+// CHECK: [[STDDEVT:%.*]] = builtin "__tfop_tfc.scalarToTensor,$in"([[STDDEV]] : $Builtin.FPIEEE32) : $TensorHandle<Float>
+// CHECK:  builtin "__tfop_Mul,$in,$in"({{.*}} : $TensorHandle<Float>, [[STDDEVT]] : $TensorHandle<Float>)
+// CHECK-LABEL: ---- END OF INPUT FUNCTION ----------

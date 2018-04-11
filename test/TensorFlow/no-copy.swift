@@ -207,6 +207,7 @@ struct Classifier {
 
 public func mnist() {
   // Training data
+  // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator, use .toDevice}}
   let images = Tensor<Float>(randomNormal: [10, 784])
   let labels = Tensor<Float>(randomNormal: [10, 10])
   var classifier = Classifier()
