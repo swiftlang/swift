@@ -11,8 +11,11 @@
 //
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestData
+// RUN: %target-build-swift %s -enforce-exclusivity=none -DNOEXCLUSIVITY -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestDataNoExclusivity
 
 // RUN: %target-run %t/TestData
+// RUN: %target-run %t/TestDataNoExclusivity
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -257,7 +260,16 @@ class TestData : TestDataSuper {
             // Mutate it
             bytes.pointee = 0x67
             expectEqual(bytes.pointee, 0x67, "First byte should be 0x67")
+
+#if NOEXCLUSIVITY
+            // Accessing mutatingHello while it is being mutated via
+            // withUnsafe violates Swift's rules about exclusive access and
+            // causes a diagnostic to be emitted at compile time. Once we
+            // we remove the capability of turning these diagnostics off
+            // this portion of the test can safely be removed because the
+            // compiler will reject this code.
             expectEqual(mutatingHello[0], 0x67, "First byte accessed via other method should still be 0x67")
+#endif
             
             // Verify that the first data is still correct
             expectEqual(hello[0], 0x68, "The first byte should still be 0x68")
@@ -283,7 +295,9 @@ class TestData : TestDataSuper {
             // Mutate the second data
             bytes.pointee = 0
             expectEqual(bytes.pointee, 0, "First byte should be 0")
+#if NOEXCLUSIVITY
             expectEqual(allOnesCopyToMutate[0], 0, "First byte accessed via other method should still be 0")
+#endif
             
             // Verify that the first data is still 1
             expectEqual(allOnesData[0], 1, "The first byte should still be 1")
