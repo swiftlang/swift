@@ -2663,6 +2663,8 @@ public:
       return Label != b.Label || !getType()->isEqual(b.getType()) ||
              Flags != b.Flags;
     }
+
+    Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
   };
 
   class CanParam : public Param {
