@@ -1980,6 +1980,18 @@ bool ConstraintSystem::solveSimplified(
       auto locator = disjunction->getLocator();
       assert(locator && "remembered disjunction doesn't have a locator?");
       DisjunctionChoices.push_back({locator, index});
+
+      // Implicit unwraps of optionals are worse solutions than those
+      // not involving implicit unwraps.
+      if (!locator->getPath().empty()) {
+        auto kind = locator->getPath().back().getKind();
+        if (kind == ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+            kind == ConstraintLocator::DynamicLookupResult) {
+          assert(index == 0 || index == 1);
+          if (index == 1)
+            increaseScore(SK_ForceUnchecked);
+        }
+      }
     }
 
     if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {

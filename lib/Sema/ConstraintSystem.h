@@ -2414,6 +2414,13 @@ public:
   void
   buildDisjunctionForOptionalVsUnderlying(Type boundTy, Type type,
                                           ConstraintLocator *locator) {
+    // NOTE: If we use other locator kinds for these disjunctions, we
+    // need to account for it in solution scores for forced-unwraps.
+    assert(locator->getPath().back().getKind() ==
+               ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+           locator->getPath().back().getKind() ==
+               ConstraintLocator::DynamicLookupResult);
+
     // Create the constraint to bind to the optional type and make it
     // the favored choice.
     auto *bindToOptional =
