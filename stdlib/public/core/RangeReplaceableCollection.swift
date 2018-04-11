@@ -553,7 +553,7 @@ extension RangeReplaceableCollection {
   /// Removes the elements in the specified subrange from the collection.
   ///
   /// All the elements following the specified position are moved to close the
-  /// gap. This example removes two elements from the middle of an array of
+  /// gap. This example removes three elements from the middle of an array of
   /// measurements.
   ///
   ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]
@@ -754,7 +754,7 @@ extension RangeReplaceableCollection {
   /// Removes the elements in the specified subrange from the collection.
   ///
   /// All the elements following the specified position are moved to close the
-  /// gap. This example removes two elements from the middle of an array of
+  /// gap. This example removes three elements from the middle of an array of
   /// measurements.
   ///
   ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]

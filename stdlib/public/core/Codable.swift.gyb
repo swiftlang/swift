@@ -1767,7 +1767,8 @@ extension ${type} : Codable {
 }
 
 extension RawRepresentable where RawValue == ${type}, Self : Encodable {
-  /// Encodes this value into the given encoder.
+  /// Encodes this value into the given encoder, when the type's `RawValue`
+  /// is `${type}`.
   ///
   /// This function throws an error if any values are invalid for the given
   /// encoder's format.
@@ -1781,7 +1782,8 @@ extension RawRepresentable where RawValue == ${type}, Self : Encodable {
 }
 
 extension RawRepresentable where RawValue == ${type}, Self : Decodable {
-  /// Creates a new instance by decoding from the given decoder.
+  /// Creates a new instance by decoding from the given decoder, when the
+  /// type's `RawValue` is `${type}`.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
   /// if the data read is corrupted or otherwise invalid.
