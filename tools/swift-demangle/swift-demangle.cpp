@@ -174,7 +174,6 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
 static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   // This doesn't handle Unicode symbols, but maybe that's okay.
   // Also accept the future mangling prefix.
-  // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
   llvm::Regex maybeSymbol("(_T|_?\\$[Ss])[_a-zA-Z0-9$.]+");
 
   swift::Demangle::Context DCtx;
