@@ -2432,37 +2432,13 @@ namespace {
              "Gradient expression should've been assigned a function type");
       cs.setType(expr, gradType);
       cs.cacheExprTypes(expr);
-
-      // Resolve original expression to a func decl.
-      // NOTE: Only original expression cases in the test have been handled. More
-      // cases should be handled as they arise.
-      auto *originalExpr = expr->getOriginalExpr();
-      FuncDecl *originalDecl = nullptr;
-      // If original expression already has a referenced decl, check if it's a
-      // func decl and set resolved original to it.
-      if (auto referencedDecl = originalExpr->getReferencedDecl()) {
-        if (auto funcDecl = dyn_cast<FuncDecl>(referencedDecl.getDecl()))
-          originalDecl = funcDecl;
-      }
-      // If original expression is an dot syntax call expr, it must be a class
-      // method or instance method.
-      else if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(originalExpr))
-        if (auto funcDecl = dyn_cast<FuncDecl>(dotExpr->getCalledValue()))
-          originalDecl = funcDecl;
-      // Emit error if original func decl could not be resolved.
-      if (!originalDecl) {
-        TC.diagnose(originalExpr->getLoc(),
-                    diag::gradient_expr_original_func_decl_unresolved);
-        return nullptr;
-      }
-      expr->setResolvedOriginal(originalDecl);
-
       // Get Differentiable protocol type.
       auto &ctx = cs.getASTContext();
       Type diffProtoTy = ctx.getProtocol(KnownProtocolKind::Differentiable)
         ->getDeclaredInterfaceType();
 
       // Verify that differentiation parameters conform to Differentiable.
+      auto *originalExpr = expr->getOriginalExpr();
       auto originalType = cs.getType(originalExpr)->getAs<AnyFunctionType>();
       assert(originalType && "Original should have function type");
       auto gradParams = gradFnType->getParams();
