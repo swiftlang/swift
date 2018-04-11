@@ -847,6 +847,7 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 
   entry = createStringConstant(Name, /*willBeRelativelyAddressed*/ true,
                                getReflectionStringsSectionName());
+  disableAddressSanitizer(*this, entry.first);
   return entry.second;
 }
 
