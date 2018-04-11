@@ -275,8 +275,8 @@ bool swift::isEndOfScopeMarker(SILInstruction *user) {
 }
 
 bool swift::isIncidentalUse(SILInstruction *user) {
-  return isEndOfScopeMarker(user) || isDebugInst(user)
-         || isa<FixLifetimeInst>(user);
+  return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
+         isa<FixLifetimeInst>(user);
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
