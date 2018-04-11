@@ -1534,6 +1534,9 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
                                      const ValueDecl *renamedDecl,
                                      const AvailableAttr *attr,
                                      const ApplyExpr *call) {
+  if (isa<AccessorDecl>(renamedDecl))
+    return;
+
   ParsedDeclName parsed = swift::parseDeclName(attr->Rename);
   if (!parsed)
     return;
@@ -2456,8 +2459,18 @@ private:
       return;
     }
 
-    // Make sure not to diagnose an accessor if we already complained about
-    // the property/subscript.
+    // If the property/subscript is unconditionally unavailable, don't bother
+    // with any of the rest of this.
+    if (AvailableAttr::isUnavailable(D->getStorage()))
+      return;
+
+    if (TC.diagnoseExplicitUnavailability(D, ReferenceRange, ReferenceDC,
+                                          /*call*/nullptr)) {
+      return;
+    }
+
+    // Make sure not to diagnose an accessor's deprecation if we already
+    // complained about the property/subscript.
     if (!TypeChecker::getDeprecated(D->getStorage()))
       TC.diagnoseIfDeprecated(ReferenceRange, ReferenceDC, D, /*call*/nullptr);
 
