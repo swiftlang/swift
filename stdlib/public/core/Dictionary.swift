@@ -399,16 +399,16 @@ public struct Dictionary<Key: Hashable, Value> {
     self = Dictionary<Key, Value>(_nativeBuffer: _NativeBuffer())
   }
 
-  /// Creates a dictionary with at least the given number of elements worth of
-  /// buffer.
+  /// Creates an empty dictionary with preallocated space for at least the
+  /// specified number of elements.
   ///
-  /// Use this initializer to avoid intermediate reallocations when you know
-  /// how many key-value pairs you are adding to a dictionary. The actual
-  /// capacity of the created dictionary is the smallest power of 2 that
-  /// is greater than or equal to `minimumCapacity`.
+  /// Use this initializer to avoid intermediate reallocations of a dictionary's
+  /// storage buffer when you know how many key-value pairs you are adding to a
+  /// dictionary after creation.
   ///
-  /// - Parameter minimumCapacity: The minimum number of key-value pairs to
-  ///   allocate buffer for in the new dictionary.
+  /// - Parameter minimumCapacity: The minimum number of key-value pairs that
+  ///   the newly created dictionary should be able to store without
+  //    reallocating its storage buffer.
   @inlinable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
     _variantBuffer = .native(_NativeBuffer(minimumCapacity: minimumCapacity))
