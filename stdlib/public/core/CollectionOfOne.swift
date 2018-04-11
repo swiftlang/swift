@@ -45,10 +45,10 @@ extension IteratorOverOne: IteratorProtocol, Sequence {
 
 /// A collection containing a single element.
 ///
-/// You can use a `CollectionOfOne` instance to efficiently represent a
-/// collection with only one element. For example, you can add a single element
-/// to an array by using a `CollectionOfOne` instance with the concatenation
-/// operator (`+`):
+/// You can use a `CollectionOfOne` instance when you need to efficiently
+/// represent a single value as a collection. For example, you can add a
+/// single element to an array by using a `CollectionOfOne` instance with the
+/// concatenation operator (`+`):
 ///
 ///     let a = [1, 2, 3, 4]
 ///     let toAdd = 100
@@ -59,7 +59,9 @@ public struct CollectionOfOne<Element> {
   @usableFromInline // FIXME(sil-serialize-all)
   internal var _element: Element
 
-  /// Creates an instance containing just `element`.
+  /// Creates an instance containing just the given element.
+  ///
+  /// - Parameter element: The element to store in the collection.
   @inlinable // FIXME(sil-serialize-all)
   public init(_ element: Element) {
     self._element = element
@@ -90,8 +92,7 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   
   /// Returns the position immediately after the given index.
   ///
-  /// - Parameter i: A valid index of the collection. `i` must be less than
-  ///   `endIndex`.
+  /// - Parameter i: A valid index of the collection. `i` must be `0`.
   /// - Returns: The index value immediately after `i`.
   @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Int) -> Int {
@@ -101,8 +102,7 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 
   /// Returns the position immediately before the given index.
   ///
-  /// - Parameter i: A valid index of the collection. `i` must be greater than
-  ///   `startIndex`.
+  /// - Parameter i: A valid index of the collection. `i` must be `1`.
   /// - Returns: The index value immediately before `i`.
   @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Int) -> Int {
@@ -118,9 +118,10 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
     return IteratorOverOne(_elements: _element)
   }
 
-  /// Accesses the element at `position`.
+  /// Accesses the element at the specified position.
   ///
-  /// The only valid position in a `CollectionOfOne` instance is `0`.
+  /// - Parameter position: The position of the element to access. The only
+  ///   valid position in a `CollectionOfOne` instance is `0`.
   @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Int) -> Element {
     get {

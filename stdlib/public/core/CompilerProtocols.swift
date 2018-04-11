@@ -197,17 +197,21 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
 ///     // Prints "There are 4 directions."
 ///     let caseList = CompassDirection.allCases
 ///                                    .map({ "\($0)" })
-///                                    .joined(separator: ", "))
+///                                    .joined(separator: ", ")
 ///     // caseList == "north, south, east, west"
 ///
 /// Conforming to the CaseIterable Protocol
 /// =======================================
 ///
 /// The compiler can automatically provide an implementation of the
-/// `CaseIterable` requirements for any enumeration without associated values.
-/// To take advantage of this automatic synthesis when defining your own custom
-/// enumeration, specify conformance to the `CaseIterable` protocol in the
-/// original declaration.
+/// `CaseIterable` requirements for any enumeration without associated values
+/// or `@available` attributes on its cases. The synthesized `allCases`
+/// collection provides the cases in order of their declaration.
+///
+/// You can take advantage of this compiler support when defining your own
+/// custom enumeration by declaring conformance to `CaseIterable` in the
+/// enumeration's original declaration. The `CompassDirection` example above
+/// demonstrates this automatic implementation.
 public protocol CaseIterable {
   /// A type that can represent a collection of all values of this type.
   associatedtype AllCases: Collection
