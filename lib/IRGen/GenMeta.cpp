@@ -101,6 +101,8 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 }
 
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
+  disableAddressSanitizer(*this, var);
+  
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
@@ -3718,6 +3720,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   auto var = cast<llvm::GlobalVariable>(
           getAddrOfProtocolDescriptor(protocol, init.finishAndCreateFuture()));
   var->setConstant(true);
+  disableAddressSanitizer(*this, var);
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);
