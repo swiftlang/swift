@@ -865,10 +865,12 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
   inst->replaceAllUsesPairwiseWith(newInst);
   inst->eraseFromParent();
 
+
+  B.setInsertionPoint(newInst);
   // We are dropping a reference to the element and shape array initializers, so
   // we need to remove the arrays themselves or at least release them.
-  removeOrDestroyArrayValue(scalarV, inst->getLoc(), B);
-  removeOrDestroyArrayValue(shapeV, inst->getLoc(), B);
+  removeOrDestroyArrayValue(scalarV, newInst->getLoc(), B);
+  removeOrDestroyArrayValue(shapeV, newInst->getLoc(), B);
   return newInst;
 }
 
@@ -945,7 +947,7 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars1D(ApplyInst *inst) {
   // creating the replacement builtin, so that element initializers aren't
   // dropped.
   B.setInsertionPoint(newInst);
-  removeOrDestroyArrayValue(arrayValue, inst->getLoc(), B);
+  removeOrDestroyArrayValue(arrayValue, newInst->getLoc(), B);
 
   return newInst;
 }
@@ -1376,7 +1378,7 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   for (auto array : arrayOperands) {
     // Try to remove the arrays entirely if it is dead, otherwise emit a
     // release of them, since we've dropped a consuming use of it.
-    removeOrDestroyArrayValue(array, inst->getLoc(), B);
+    removeOrDestroyArrayValue(array, newInst->getLoc(), B);
   }
 
 
