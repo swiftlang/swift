@@ -27,6 +27,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
@@ -224,13 +225,9 @@ bool swift::immediate::IRGenImportedModules(
   });
 
   // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::ModuleDecl *prev = nullptr;
-  for (auto external : CI.getASTContext().ExternalDefinitions) {
-    swift::ModuleDecl *next = external->getModuleContext();
-    if (next == prev)
-      continue;
-    next->collectLinkLibraries(addLinkLibrary);
-    prev = next;
+  for (const auto &linkLib :
+          irgen::collectLinkLibrariesFromExternals(CI.getASTContext())) {
+    addLinkLibrary(linkLib);
   }
 
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,

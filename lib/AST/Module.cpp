@@ -1208,8 +1208,14 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-  for (auto importPair : Imports)
-    importPair.first.second->collectLinkLibraries(callback);
+
+  const_cast<SourceFile *>(this)->forAllVisibleModules([&](swift::ModuleDecl::ImportedModule import) {
+    swift::ModuleDecl *next = import.second;
+    if (next->getName() == getParentModule()->getName())
+      return;
+
+    next->collectLinkLibraries(callback);
+  });
 }
 
 bool ModuleDecl::walk(ASTWalker &Walker) {
