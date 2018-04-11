@@ -1422,18 +1422,6 @@ propagateTensorOperand(SILValue v,
       continue;
     }
 
-    // Look through standard LLVM arithmetic operations.  We often see silly
-    // allocas in the way of them.
-    // FIXME: This is only necessary because we don't have a constexpr model.
-    // When that is in place and working well, this should be removed.
-    if (auto builtin = dyn_cast<BuiltinInst>(inst)) {
-      if (isSimpleBuiltinArithmeticOp(builtin) &&
-          inst->getOperand(0)->getType() == builtin->getType()) {
-        v = inst->getOperand(0);
-        continue;
-      }
-    }
-
     // Constructions provide values to extract from if we have an access inside
     // of it.
     if (!accessPath.empty()) {
