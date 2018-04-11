@@ -943,7 +943,7 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
 }
 
 void IRGenModule::addLazyConformances(NominalTypeDecl *Nominal) {
-  for (const ProtocolConformance *Conf : Nominal->getAllConformances()) {
+  for (ProtocolConformance *Conf : Nominal->getAllConformances()) {
     IRGen.addLazyWitnessTable(Conf);
   }
 }

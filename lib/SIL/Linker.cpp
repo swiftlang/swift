@@ -58,41 +58,13 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
   return true;
 }
 
-/// Deserialize the VTable mapped to C if it exists and all SIL the VTable
-/// transitively references.
-///
-/// This method assumes that the caller made sure that no vtable existed in
-/// Mod.
-SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
-  // If we are not linking anything, bail.
-  if (Mode == LinkingMode::LinkNone)
-    return nullptr;
-
-  // Attempt to load the VTable from the SerializedSILLoader. If we
-  // fail... bail...
-  SILVTable *Vtbl = Loader->lookupVTable(C);
-  if (!Vtbl)
-    return nullptr;
-
-  // Otherwise, add all the vtable functions in Vtbl to the function
-  // processing list...
-  for (auto &E : Vtbl->getEntries())
-    Worklist.push_back(E.Implementation);
-
-  // And then transitively deserialize all SIL referenced by those functions.
-  process();
-
-  // Return the deserialized Vtbl.
-  return Vtbl;
-}
-
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
+  if(!Vtbl)
+    return false;
 
-  // If the SILModule does not have the VTable, attempt to deserialize the
-  // VTable. If we fail to do that as well, bail.
-  if (!Vtbl || !(Vtbl = Loader->lookupVTable(D->getName())))
+  if (!isLinkAll())
     return false;
 
   // Ok we found our VTable. Visit each function referenced by the VTable. If
@@ -112,6 +84,36 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 //                                  Visitors
 //===----------------------------------------------------------------------===//
 
+void SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
+  FunctionDeserializationWorklist.push_back(F);
+}
+
+static bool isFunctionBodyRequiredForEmission(SILFunction *F) {
+  return (F->getLinkage() == SILLinkage::Shared ||
+          F->getLinkage() == SILLinkage::SharedExternal ||
+          F->getLinkage() == SILLinkage::HiddenExternal ||
+          F->isTransparent());
+}
+
+bool SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
+  // Don't need to do anything if the function already has a body.
+  if (!F->isExternalDeclaration())
+    return false;
+
+  // - If we're linking everything (performance pipeline), so link the function.
+  // - If the function is shared, we need the body since it's not available
+  //   elsewhere, so link the function.
+  // - If the function has hidden_external linkage, it might be a deserialized
+  //   declaration of a PublicNonABI function, so link the function.
+  // - If the function is transparent, we need its body for the mandatory
+  //   pipeline, so link the function.
+  if (!isLinkAll() && !isFunctionBodyRequiredForEmission(F))
+    return false;
+
+  addFunctionToWorklist(F);
+  return true;
+}
+
 bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
   bool performFuncDeserialization = false;
   
@@ -119,17 +121,6 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
                    ->getGenericSignature()) {
     performFuncDeserialization |= visitApplySubstitutions(
       sig->getSubstitutionMap(AI->getSubstitutions()));
-  }
-  
-  // Ok we have a function ref inst, grab the callee.
-  SILFunction *Callee = AI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
   }
 
   return performFuncDeserialization;
@@ -144,16 +135,6 @@ bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
       sig->getSubstitutionMap(PAI->getSubstitutions()));
   }
 
-  SILFunction *Callee = PAI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
-  }
-
   return performFuncDeserialization;
 }
 
@@ -162,14 +143,7 @@ bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
   // behind as dead code. This shouldn't happen, but if it does don't get into
   // an inconsistent state.
   SILFunction *Callee = FRI->getReferencedFunction();
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(FRI->getReferencedFunction());
-    return true;
-  }
-
-  return false;
+  return maybeAddFunctionToWorklist(Callee);
 }
 
 // Eagerly visiting all used conformances leads to a large blowup
@@ -201,29 +175,19 @@ bool SILLinkerVisitor::visitProtocolConformance(
   if (!VisitedConformances.insert(C).second)
     return false;
   
-  SILWitnessTable *WT = Mod.lookUpWitnessTable(C, true);
+  SILWitnessTable *WT = Mod.lookUpWitnessTable(C, mustDeserialize);
 
   // If we don't find any witness table for the conformance, bail and return
   // false.
-  if (!WT) {
-    Mod.createWitnessTableDeclaration(
-        C, getLinkageForProtocolConformance(
-               C->getRootNormalConformance(), NotForDefinition));
-
-    // Adding the declaration may allow us to now deserialize the body.
-    // Force the body if we must deserialize this witness table.
-    if (mustDeserialize) {
-      WT = Mod.lookUpWitnessTable(C, true);
-      assert(WT && WT->isDefinition()
-             && "unable to deserialize witness table when we must?!");
-    } else {
-      return false;
-    }
-  }
+  if (!WT)
+    return false;
 
   // If the looked up witness table is a declaration, there is nothing we can
   // do here. Just bail and return false.
   if (WT->isDeclaration())
+    return false;
+
+  if (!isLinkAll())
     return false;
 
   bool performFuncDeserialization = false;
@@ -353,6 +317,9 @@ bool SILLinkerVisitor::visitInitExistentialRefInst(
 }
 
 bool SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
+  if (!isLinkAll())
+    return false;
+
   // Grab the class decl from the alloc ref inst.
   ClassDecl *D = ARI->getType().getClassOrBoundGenericClass();
   if (!D)
@@ -362,6 +329,9 @@ bool SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
 }
 
 bool SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
+  if (!isLinkAll())
+    return false;
+
   CanType instTy = MI->getType().castTo<MetatypeType>().getInstanceType();
   ClassDecl *C = instTy.getClassOrBoundGenericClass();
   if (!C)

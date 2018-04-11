@@ -251,8 +251,9 @@ protected:
 
   /// Marks a witness table as alive if it is not alive yet.
   void ensureAliveConformance(const ProtocolConformance *C) {
-    SILWitnessTable *WT = Module->lookUpWitnessTable(C,
-                                                 /*deserializeLazily*/ false);
+    SILWitnessTable *WT = Module->lookUpWitnessTable(
+        const_cast<ProtocolConformance *>(C),
+        /*deserializeLazily*/ false);
     if (!WT || isAlive(WT))
       return;
     makeAlive(WT);

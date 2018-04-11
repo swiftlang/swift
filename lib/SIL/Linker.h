@@ -53,13 +53,6 @@ public:
   /// Process F, recursively deserializing any thing F may reference.
   bool processFunction(SILFunction *F);
 
-  /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
-  /// transitively references.
-  ///
-  /// This method assumes that the caller made sure that no vtable existed in
-  /// Mod.
-  SILVTable *processClassDecl(const ClassDecl *C);
-
   /// We do not want to visit callee functions if we just have a value base.
   bool visitSILInstruction(SILInstruction *I) { return false; }
 
@@ -79,9 +72,11 @@ public:
 
 private:
   /// Add a function to our function worklist for processing.
-  void addFunctionToWorklist(SILFunction *F) {
-    FunctionDeserializationWorklist.push_back(F);
-  }
+  void addFunctionToWorklist(SILFunction *F);
+
+  /// Add a function to our function worklist for processing if it has
+  /// shared linkage or we are linking all functions.
+  bool maybeAddFunctionToWorklist(SILFunction *F);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
