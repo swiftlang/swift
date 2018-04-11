@@ -3348,7 +3348,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   if (auto classType = dyn_cast<ClassType>(type)) {
     assert(!classType.getParent());
     auto classDecl = classType->getDecl();
-    assert(classDecl->isForeign());
+    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
 
     ForeignClassMetadataBuilder builder(*this, classDecl, init);
     builder.layout();
@@ -3389,7 +3389,8 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   if (auto enclosing = type->getNominalParent()) {
     auto canonicalEnclosing = enclosing->getCanonicalType();
     if (requiresForeignTypeMetadata(canonicalEnclosing)) {
-      getAddrOfForeignTypeMetadataCandidate(canonicalEnclosing);
+      (void)getTypeMetadataAccessFunction(*this, canonicalEnclosing,
+                                          ForDefinition);
     }
   }
 
