@@ -2589,17 +2589,17 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
 
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
-                     const SILModule::CoverageMapListType &CoverageMaps) {
+                     const SILModule::CoverageMapCollectionType &CoverageMaps) {
   if (!Ctx.sortSIL()) {
-    for (const SILCoverageMap &M : CoverageMaps)
-      M.print(Ctx);
+    for (const auto &M : CoverageMaps)
+      M.second->print(Ctx);
     return;
   }
 
   std::vector<const SILCoverageMap *> Maps;
   Maps.reserve(CoverageMaps.size());
-  for (const SILCoverageMap &M : CoverageMaps)
-    Maps.push_back(&M);
+  for (const auto &M : CoverageMaps)
+    Maps.push_back(M.second);
   std::sort(Maps.begin(), Maps.end(),
             [](const SILCoverageMap *LHS, const SILCoverageMap *RHS) -> bool {
               return LHS->getName().compare(RHS->getName()) == -1;
@@ -2696,7 +2696,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
-  printSILCoverageMaps(PrintCtx, getCoverageMapList());
+  printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   
   OS << "\n\n";

@@ -41,14 +41,11 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   CM->MappedRegions = M.allocateCopy(MappedRegions);
   CM->Expressions = M.allocateCopy(Expressions);
 
-  // Assert that this coverage map is unique.
-  assert(llvm::none_of(M.coverageMaps,
-                       [&](const SILCoverageMap &OtherCM) {
-                         return OtherCM.PGOFuncName == CM->PGOFuncName;
-                       }) &&
-         "Duplicate coverage mapping for function");
+  auto result = M.coverageMaps.insert({CM->PGOFuncName, CM});
 
-  M.coverageMaps.push_back(CM);
+  // Assert that this coverage map is unique.
+  assert(result.second && "Duplicate coverage mapping for function");
+
   return CM;
 }
 
