@@ -274,13 +274,6 @@ STMT_NODES = [
              Child('Colon', kind='ColonToken'),
          ]),
 
-    # switch-unknown-label -> 'unknown' ':'
-    Node('SwitchUnknownLabel', kind='Syntax',
-         children=[
-             Child('UnknownKeyword', kind='Token'),
-             Child('Colon', kind='ColonToken'),
-         ]),
-
     # case-item -> pattern where-clause? ','?
     Node('CaseItem', kind='Syntax',
          traits=['WithTrailingComma'],
