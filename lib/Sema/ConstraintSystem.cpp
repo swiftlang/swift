@@ -1675,31 +1675,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                              choice.getFunctionRefKind(), locator);
     }
 
-    if (!isRequirementOrWitness(locator) &&
-        choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
-        !isa<SubscriptDecl>(choice.getDecl())) {
-      // For a non-subscript declaration that is an optional
-      // requirement in a protocol, strip off the lvalue-ness (FIXME:
-      // one cannot assign to such declarations for now) and make a
-      // reference to that declaration be optional.
-      //
-      // Subscript declarations are handled within
-      // getTypeOfMemberReference(); their result types are optional.
-
-      // Deal with values declared as implicitly unwrapped, or
-      // functions with return types that are implicitly unwrapped.
-      if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
-        // Build the disjunction to attempt binding both T? and T (or
-        // function returning T? and function returning T).
-        Type ty = createTypeVariable(locator);
-        buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType,
-                                                       locator);
-        addConstraint(ConstraintKind::Bind, boundType,
-                      OptionalType::get(ty->getRValueType()), locator);
-        bindConstraintCreated = true;
-      }
-      refType = OptionalType::get(refType->getRValueType());
-    }
     // For a non-subscript declaration found via dynamic lookup, strip
     // off the lvalue-ness (FIXME: as a temporary hack. We eventually
     // want this to work) and make a reference to that declaration be
@@ -1708,7 +1683,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // Subscript declarations are handled within
     // getTypeOfMemberReference(); their result types are unchecked
     // optional.
-    else if (isDynamicResult) {
+    if (isDynamicResult) {
       if (isa<SubscriptDecl>(choice.getDecl())) {
         // We always expect function type for subscripts.
         auto fnTy = refType->castTo<AnyFunctionType>();
@@ -1773,8 +1748,31 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
 
       bindConstraintCreated = true;
-    }
+    } else if (!isRequirementOrWitness(locator) &&
+               choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
+               !isa<SubscriptDecl>(choice.getDecl())) {
+      // For a non-subscript declaration that is an optional
+      // requirement in a protocol, strip off the lvalue-ness (FIXME:
+      // one cannot assign to such declarations for now) and make a
+      // reference to that declaration be optional.
+      //
+      // Subscript declarations are handled within
+      // getTypeOfMemberReference(); their result types are optional.
 
+      // Deal with values declared as implicitly unwrapped, or
+      // functions with return types that are implicitly unwrapped.
+      if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+        // Build the disjunction to attempt binding both T? and T (or
+        // function returning T? and function returning T).
+        Type ty = createTypeVariable(locator);
+        buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType, locator);
+        addConstraint(ConstraintKind::Bind, boundType,
+                      OptionalType::get(ty->getRValueType()), locator);
+        bindConstraintCreated = true;
+      }
+
+      refType = OptionalType::get(refType->getRValueType());
+    }
     // If the declaration is unavailable, note that in the score.
     if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
       increaseScore(SK_Unavailable);
