@@ -160,17 +160,16 @@ public struct Set<Element: Hashable> {
 }
 
 extension Set {
-  /// Creates a new, empty set with at least the specified number of elements'
-  /// worth of buffer.
+  /// Creates an empty set with preallocated space for at least the specified
+  /// number of elements.
   ///
-  /// Use this initializer to avoid repeated reallocations of a set's buffer
-  /// if you know you'll be adding elements to the set after creation. The
-  /// actual capacity of the created set will be the smallest power of 2 that
-  /// is greater than or equal to `minimumCapacity`.
+  /// Use this initializer to avoid intermediate reallocations of a set's
+  /// storage buffer when you know how many elements you'll insert into the set
+  /// after creation.
   ///
   /// - Parameter minimumCapacity: The minimum number of elements that the
   ///   newly created set should be able to store without reallocating its
-  ///   buffer.
+  ///   storage buffer.
   @inlinable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
     _variantBuffer =
