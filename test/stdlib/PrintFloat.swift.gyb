@@ -694,7 +694,7 @@ PrintTests.test("Printable_Double") {
   }
 
   // Double can represent all integers -(2^53)...(2^53)
-  let maxDecimalForm = Double(1 << 53)
+  let maxDecimalForm = Double((1 as Int64) << 53)
   expectDescription("9007199254740992.0", maxDecimalForm)
   expectDescription("-9007199254740992.0", -maxDecimalForm)
   // Outside of that range, we use exponential form:
