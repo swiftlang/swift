@@ -3848,14 +3848,6 @@ public:
     return SourceRange(Loc, RParenLoc);
   }
 
-  FuncDecl *getResolvedOriginal() const {
-    return ResolvedOriginal;
-  }
-
-  void setResolvedOriginal(FuncDecl *RP) {
-    ResolvedOriginal = RP;
-  }
-
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Gradient ||
            E->getKind() == ExprKind::ValueAndGradient;
@@ -3872,8 +3864,6 @@ private:
   unsigned NumParameters;
   /// The location of ')'.
   SourceLoc RParenLoc;
-  /// Original function declaration, to be resolved by Sema.
-  FuncDecl *ResolvedOriginal = nullptr;
 
 protected:
   explicit ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,
