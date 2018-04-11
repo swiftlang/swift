@@ -16,12 +16,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Statistic.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
 
 using llvm::coverage::CounterExpression;
+
+#define DEBUG_TYPE "silcoverage"
+
+STATISTIC(CoverageMappingsEmitted, "Number of coverage mappings emitted");
 
 SILCoverageMap *
 SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
@@ -46,6 +51,7 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   // Assert that this coverage map is unique.
   assert(result.second && "Duplicate coverage mapping for function");
 
+  CoverageMappingsEmitted++;
   return CM;
 }
 

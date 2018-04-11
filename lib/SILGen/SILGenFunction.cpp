@@ -21,9 +21,14 @@
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
+#include "llvm/ADT/Statistic.h"
 
 using namespace swift;
 using namespace Lowering;
+
+#define DEBUG_TYPE "silgenfunction"
+
+STATISTIC(ProfileCounterUpdatesEmitted, "Number of profile counter updates");
 
 //===----------------------------------------------------------------------===//
 // SILGenFunction Class implementation
@@ -658,6 +663,7 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
   B.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                   SGM.Types.getEmptyTupleType(), {}, Args);
   SP->recordCounterUpdate();
+  ProfileCounterUpdatesEmitted++;
 }
 
 ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {
