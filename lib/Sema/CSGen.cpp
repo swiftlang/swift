@@ -789,7 +789,8 @@ namespace {
           }
         }
 
-        return AnyFunctionType::equalParams(fnTy->getParams(), favoredTy);
+        return AnyFunctionType::equalParams(CS.getASTContext(),
+                                            fnTy->getParams(), favoredTy);
       };
 
       // This is a hack to ensure we always consider the protocol requirement

@@ -3692,11 +3692,11 @@ bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
   return true;
 }
 
-bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
+bool AnyFunctionType::equalParams(ASTContext &ctx,
+                                  ArrayRef<AnyFunctionType::Param> a,
                                   Type composedB) {
-  llvm::SmallVector<AnyFunctionType::Param, 4> b;
-  AnyFunctionType::decomposeInput(composedB, b);
-  return equalParams(a, b);
+  auto composedA = AnyFunctionType::composeInput(ctx, a, false);
+  return composedA->isEqual(composedB);
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
