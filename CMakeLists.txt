@@ -311,6 +311,12 @@ option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
   FALSE)
 
+set(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING TRUE)
+message(STATUS "DO NOT COMMIT THIS!!!! THIS IS A HACK!!!! Or is it.")
+#option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
+#  "Build stdlibCore with exclusivity checking enabled"
+#  FALSE)
+
 #
 # End of user-configurable options.
 #
