@@ -3357,7 +3357,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // identify operators that have implicit inout arguments.
   Type exampleInputType;
   if (!candidates.empty()) {
-    exampleInputType = candidates[0].getArgumentType();
+    exampleInputType = candidates[0].getArgumentType(CS.getASTContext());
 
     // If we found a single candidate, and have no contextually known argument
     // type information, use that one candidate as the type information for
@@ -3366,7 +3366,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // TODO: If all candidates have the same type for some argument, we could
     // pass down partial information.
     if (candidates.size() == 1 && !argType)
-      argType = candidates[0].getArgumentType();
+      argType = candidates[0].getArgumentType(CS.getASTContext());
   }
   
   // If our candidates are instance members at curry level #0, then the argument
@@ -4031,12 +4031,11 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
 }
 
 static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
-                                           Type paramType, Type argType,
-                                           Expr *fnExpr, Expr *argExpr,
+                                           ArrayRef<FunctionType::Param> params,
+                                           Type argType, Expr *fnExpr,
+                                           Expr *argExpr,
                                            bool isTopLevel = true) {
-  llvm::SmallVector<AnyFunctionType::Param, 4> params, args;
-
-  FunctionType::decomposeInput(paramType, params);
+  llvm::SmallVector<AnyFunctionType::Param, 4> args;
   FunctionType::decomposeInput(argType, args);
 
   return diagnoseTupleParameterMismatch(CCI, params, args, fnExpr, argExpr,
@@ -4399,9 +4398,8 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     }
   }
 
-  if (diagnoseTupleParameterMismatch(CCI, candidate.getArgumentType(),
-                                     CCI.CS.getType(argExpr), fnExpr,
-                                     argExpr))
+  if (diagnoseTupleParameterMismatch(CCI, candidate.getParameters(),
+                                     CCI.CS.getType(argExpr), fnExpr, argExpr))
     return true;
 
   // We only handle structural errors here.
@@ -7360,7 +7358,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     }
 
     auto *argExpr = E->getArgument();
-    auto candidateArgTy = candidateInfo[0].getArgumentType();
+    auto candidateArgTy = candidateInfo[0].getArgumentType(CS.getASTContext());
 
     // Depending on how we matched, produce tailored diagnostics.
     switch (candidateInfo.closeness) {

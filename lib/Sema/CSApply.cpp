@@ -5761,7 +5761,6 @@ Expr *ExprRewriter::coerceCallArguments(
     }
   }
 
-  auto origFunc = funcType;
   // If you value your sanity, ignore the body of this 'if' statement.
   if (cs.getASTContext().isSwiftVersion3() && params.size() == 1) {
     const auto &param = params.front();
