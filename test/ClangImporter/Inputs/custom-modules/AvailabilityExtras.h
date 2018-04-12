@@ -107,3 +107,18 @@ typedef NS_ENUM(NSInteger, NSEnumAddedCasesIn2017) {
 @property (class) int setterDeprecatedClass;
 + (void)setSetterDeprecatedClass:(int)setterDeprecated __attribute__((deprecated));
 @end
+
+
+@interface UnavailableAccessors: NSObject
+@property NSInteger fullyUnavailable __attribute__((unavailable));
+
+@property NSInteger getterUnavailable;
+- (NSInteger)getterUnavailable __attribute__((unavailable));
+@property (class) NSInteger getterUnavailableClass;
++ (NSInteger)getterUnavailableClass __attribute__((unavailable));
+
+@property NSInteger setterUnavailable;
+- (void)setSetterUnavailable:(NSInteger)setterUnavailable __attribute__((unavailable));
+@property (class) NSInteger setterUnavailableClass;
++ (void)setSetterUnavailableClass:(NSInteger)setterUnavailable __attribute__((unavailable));
+@end

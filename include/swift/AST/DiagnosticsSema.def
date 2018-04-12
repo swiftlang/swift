@@ -3622,38 +3622,45 @@ ERROR(dynamic_requires_objc,none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, none,
-  "%0 is unavailable", (DeclName))
+      "%select{getter for |setter for |}0%1 is unavailable",
+      (unsigned, DeclName))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
-      "%0 has been %select{renamed to|replaced by}1"
-      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3'",
-      (DeclName, bool, unsigned, StringRef))
+      "%select{getter for |setter for |}0%1 has been "
+      "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
+      "'%4'",
+      (unsigned, DeclName, bool, unsigned, StringRef))
 
 ERROR(availability_decl_unavailable_rename_msg, none,
-      "%0 has been %select{renamed to|replaced by}1"
-      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3': %4",
-      (DeclName, bool, unsigned, StringRef, StringRef))
+      "%select{getter for |setter for |}0%1 has been "
+      "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
+      "'%4': %5",
+      (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 ERROR(availability_decl_unavailable_msg, none,
-  "%0 is unavailable: %1", (DeclName, StringRef))
+      "%select{getter for |setter for |}0%1 is unavailable: %2",
+      (unsigned, DeclName, StringRef))
 
 ERROR(availability_decl_unavailable_in_swift, none,
-  "%0 is unavailable in Swift", (DeclName))
+      "%select{getter for |setter for |}0%1 is unavailable in Swift",
+      (unsigned, DeclName))
 
 ERROR(availability_decl_unavailable_in_swift_msg, none,
-  "%0 is unavailable in Swift: %1", (DeclName, StringRef))
+      "%select{getter for |setter for |}0%1 is unavailable in Swift: %2",
+      (unsigned, DeclName, StringRef))
 
 NOTE(availability_marked_unavailable, none,
-  "%0 has been explicitly marked unavailable here", (DeclName))
+     "%select{getter for |setter for |}0%1 has been explicitly marked "
+     "unavailable here", (unsigned, DeclName))
 
 NOTE(availability_introduced_in_swift, none,
-     "%0 was introduced in Swift %1",
-    (DeclName, clang::VersionTuple))
+     "%select{getter for |setter for |}0%1 was introduced in Swift %2",
+     (unsigned, DeclName, clang::VersionTuple))
 
 NOTE(availability_obsoleted, none,
-     "%0 was obsoleted in %1 %2",
-    (DeclName, StringRef, clang::VersionTuple))
+     "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",
+     (unsigned, DeclName, StringRef, clang::VersionTuple))
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
