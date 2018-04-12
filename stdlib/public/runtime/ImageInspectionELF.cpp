@@ -111,7 +111,7 @@ void swift_addNewDSOImage(const void *addr) {
 
   record(sections);
 
-  const auto &protocols_section = sections->swift4_protocol_conformances;
+  const auto &protocols_section = sections->swift4_protocols;
   const void *protocols =
       reinterpret_cast<void *>(protocols_section.start);
   if (protocols_section.length)
