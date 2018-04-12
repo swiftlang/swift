@@ -440,6 +440,15 @@ func keypath<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<MemberAccessExpr>.a.b</MemberAccessExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ObjcKeyPathExpr>#keyPath(<ObjcNamePiece>a.</ObjcNamePiece><ObjcNamePiece>b.</ObjcNamePiece><ObjcNamePiece>c</ObjcNamePiece>)</ObjcKeyPathExpr></SequenceExpr>
 }</CodeBlock></FunctionDecl><FunctionDecl>
+func objcSelector<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ArrayExpr>[<ArrayElement><ObjcSelectorExpr>
+    #selector(getter: <MemberAccessExpr><IdentifierExpr>Foo</IdentifierExpr>.bar</MemberAccessExpr>)</ObjcSelectorExpr>,</ArrayElement><ArrayElement><ObjcSelectorExpr>
+    #selector(setter: <MemberAccessExpr><MemberAccessExpr><IdentifierExpr>Foo</IdentifierExpr>.Bar</MemberAccessExpr>.baz</MemberAccessExpr>)</ObjcSelectorExpr>,</ArrayElement><ArrayElement><ObjcSelectorExpr>
+    #selector(<MemberAccessExpr><IdentifierExpr>Foo</IdentifierExpr>.method<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></MemberAccessExpr>)</ObjcSelectorExpr>,</ArrayElement><ArrayElement><ObjcSelectorExpr>
+    #selector(<FunctionCallExpr><MemberAccessExpr><SubscriptExpr><IdentifierExpr>foo</IdentifierExpr>[<FunctionCallArgument><IntegerLiteralExpr>42</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr>.bar</MemberAccessExpr>(<FunctionCallArgument><IdentifierExpr>x</IdentifierExpr></FunctionCallArgument>)</FunctionCallExpr>)</ObjcSelectorExpr>,</ArrayElement><ArrayElement><ObjcSelectorExpr>
+    #selector(<ClosureExpr>{ <ClosureSignature><ClosureCaptureSignature>[<ClosureCaptureItem><IdentifierExpr>x</IdentifierExpr></ClosureCaptureItem>] </ClosureCaptureSignature>in </ClosureSignature><ReturnStmt>return <NilLiteralExpr>nil </NilLiteralExpr></ReturnStmt>}</ClosureExpr>)</ObjcSelectorExpr></ArrayElement>
+  ]</ArrayExpr></SequenceExpr>
+}</CodeBlock></FunctionDecl><FunctionDecl>
 
 func objectLiterals<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ObjectLiteralExpr>
   #fileLiteral(<FunctionCallArgument><IdentifierExpr>a</IdentifierExpr></FunctionCallArgument>)</ObjectLiteralExpr><ObjectLiteralExpr>

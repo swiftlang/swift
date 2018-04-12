@@ -43,8 +43,6 @@
   * IsExpr
   * AsExpr
   * ArrowExpr
-
-### Not-started (UnknownExpr):
   * ObjCSelectorExpr
 
 ## Declaration

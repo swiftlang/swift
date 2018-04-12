@@ -440,6 +440,15 @@ func keypath() {
   _ = \.a.b
   _ = #keyPath(a.b.c)
 }
+func objcSelector() {
+  _ = [
+    #selector(getter: Foo.bar),
+    #selector(setter: Foo.Bar.baz),
+    #selector(Foo.method(x:y:)),
+    #selector(foo[42].bar(x)),
+    #selector({ [x] in return nil })
+  ]
+}
 
 func objectLiterals() {
   #fileLiteral(a)
