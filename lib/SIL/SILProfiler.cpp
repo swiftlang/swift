@@ -109,6 +109,12 @@ static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
   }
 }
 
+namespace swift {
+bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
+  return M.getOptions().GenerateProfile && !isUnmapped(N);
+}
+} // namespace swift
+
 /// Check that the input AST has at least been type-checked.
 static bool hasASTBeenTypeChecked(ASTNode N) {
   DeclContext *DC = N.getAsDeclContext();
@@ -135,7 +141,7 @@ SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
   }
 
   const auto &Opts = M.getOptions();
-  if ((!Opts.GenerateProfile && Opts.UseProfile.empty()) || isUnmapped(N))
+  if (!doesASTRequireProfiling(M, N) && Opts.UseProfile.empty())
     return nullptr;
 
   auto *Buf = M.allocate<SILProfiler>(1);

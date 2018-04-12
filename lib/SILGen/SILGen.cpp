@@ -700,7 +700,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
     SILDeclRef constant(decl);
 
-    bool ForCoverageMapping = M.getOptions().EmitProfileCoverageMapping;
+    bool ForCoverageMapping = doesASTRequireProfiling(M, fd);
 
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
@@ -738,19 +738,17 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   SILDeclRef constant(decl);
 
-  ForDefinition_t ForCoverageMapping = M.getOptions().EmitProfileCoverageMapping
-                                           ? ForDefinition
-                                           : NotForDefinition;
+  bool ForCoverageMapping = doesASTRequireProfiling(M, decl);
 
   if (decl->getDeclContext()->getAsClassOrClassExtensionContext()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
     emitOrDelayFunction(
         *this, constant,
-        [this, constant, decl, ForCoverageMapping](SILFunction *f) {
+        [this, constant, decl](SILFunction *f) {
           preEmitFunction(constant, decl, f, decl);
           PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-          f->createProfiler(decl, ForCoverageMapping);
+          f->createProfiler(decl, ForDefinition);
           SILGenFunction(*this, *f).emitClassConstructorAllocator(decl);
           postEmitFunction(constant, f);
         },
@@ -771,15 +769,13 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   } else {
     // Struct and enum constructors do everything in a single function.
     emitOrDelayFunction(
-        *this, constant,
-        [this, constant, decl, ForCoverageMapping](SILFunction *f) {
+        *this, constant, [this, constant, decl](SILFunction *f) {
           preEmitFunction(constant, decl, f, decl);
           PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-          f->createProfiler(decl, ForCoverageMapping);
+          f->createProfiler(decl, ForDefinition);
           SILGenFunction(*this, *f).emitValueConstructor(decl);
           postEmitFunction(constant, f);
-        },
-        /*forceEmission=*/ForCoverageMapping);
+        });
   }
 }
 
