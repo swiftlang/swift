@@ -58,41 +58,11 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
   return true;
 }
 
-/// Deserialize the VTable mapped to C if it exists and all SIL the VTable
-/// transitively references.
-///
-/// This method assumes that the caller made sure that no vtable existed in
-/// Mod.
-SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
-  // If we are not linking anything, bail.
-  if (Mode == LinkingMode::LinkNone)
-    return nullptr;
-
-  // Attempt to load the VTable from the SerializedSILLoader. If we
-  // fail... bail...
-  SILVTable *Vtbl = Loader->lookupVTable(C);
-  if (!Vtbl)
-    return nullptr;
-
-  // Otherwise, add all the vtable functions in Vtbl to the function
-  // processing list...
-  for (auto &E : Vtbl->getEntries())
-    Worklist.push_back(E.Implementation);
-
-  // And then transitively deserialize all SIL referenced by those functions.
-  process();
-
-  // Return the deserialized Vtbl.
-  return Vtbl;
-}
-
+/// Deserialize the given VTable all SIL the VTable transitively references.
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
-
-  // If the SILModule does not have the VTable, attempt to deserialize the
-  // VTable. If we fail to do that as well, bail.
-  if (!Vtbl || !(Vtbl = Loader->lookupVTable(D->getName())))
+  if (!Vtbl)
     return false;
 
   // Ok we found our VTable. Visit each function referenced by the VTable. If
@@ -120,16 +90,17 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
     performFuncDeserialization |= visitApplySubstitutions(
       sig->getSubstitutionMap(AI->getSubstitutions()));
   }
-  
-  // Ok we have a function ref inst, grab the callee.
-  SILFunction *Callee = AI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
 
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
+  return performFuncDeserialization;
+}
+
+bool SILLinkerVisitor::visitTryApplyInst(TryApplyInst *TAI) {
+  bool performFuncDeserialization = false;
+
+  if (auto sig = TAI->getCallee()->getType().castTo<SILFunctionType>()
+                   ->getGenericSignature()) {
+    performFuncDeserialization |= visitApplySubstitutions(
+      sig->getSubstitutionMap(TAI->getSubstitutions()));
   }
 
   return performFuncDeserialization;
@@ -142,16 +113,6 @@ bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
                     ->getGenericSignature()) {
     performFuncDeserialization |= visitApplySubstitutions(
       sig->getSubstitutionMap(PAI->getSubstitutions()));
-  }
-
-  SILFunction *Callee = PAI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
   }
 
   return performFuncDeserialization;
@@ -353,6 +314,9 @@ bool SILLinkerVisitor::visitInitExistentialRefInst(
 }
 
 bool SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
+  if (!isLinkAll())
+    return false;
+
   // Grab the class decl from the alloc ref inst.
   ClassDecl *D = ARI->getType().getClassOrBoundGenericClass();
   if (!D)
@@ -362,6 +326,9 @@ bool SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
 }
 
 bool SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
+  if (!isLinkAll())
+    return false;
+
   CanType instTy = MI->getType().castTo<MetatypeType>().getInstanceType();
   ClassDecl *C = instTy.getClassOrBoundGenericClass();
   if (!C)

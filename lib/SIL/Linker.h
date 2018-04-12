@@ -64,6 +64,7 @@ public:
   bool visitSILInstruction(SILInstruction *I) { return false; }
 
   bool visitApplyInst(ApplyInst *AI);
+  bool visitTryApplyInst(TryApplyInst *TAI);
   bool visitPartialApplyInst(PartialApplyInst *PAI);
   bool visitFunctionRefInst(FunctionRefInst *FRI);
   bool visitProtocolConformance(ProtocolConformanceRef C,
