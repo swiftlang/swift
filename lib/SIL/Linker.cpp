@@ -33,18 +33,37 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 //===----------------------------------------------------------------------===//
 
 bool SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
-  FunctionDeserializationWorklist.push_back(F);
-  return true;
+  assert(F->isExternalDeclaration());
+
+  DEBUG(llvm::dbgs() << "Imported function: "
+                     << F->getName() << "\n");
+  if (auto *NewFn = Loader->lookupSILFunction(F)) {
+    if (NewFn->isExternalDeclaration())
+      return false;
+
+    assert(NewFn == F && "This shouldn't happen");
+
+    NewFn->setBare(IsBare);
+    NewFn->verify();
+    Worklist.push_back(NewFn);
+    ++NumFuncLinked;
+
+    return true;
+  }
+
+  return false;
 }
 
+/// Deserialize a function and add it to the worklist for processing.
 bool SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
+  // Don't need to do anything if the function already has a body.
   if (!F->isExternalDeclaration())
     return false;
 
   if (isLinkAll() || hasSharedVisibility(F->getLinkage()))
     return addFunctionToWorklist(F);
 
-  return true;
+  return false;
 }
 
 /// Process F, recursively deserializing any thing F may reference.
@@ -370,33 +389,7 @@ bool SILLinkerVisitor::process() {
 
     for (auto &BB : *Fn) {
       for (auto &I : BB) {
-        // Should we try linking?
-        if (visit(&I)) {
-          for (auto *F : FunctionDeserializationWorklist) {
-
-            DEBUG(llvm::dbgs() << "Imported function: "
-                               << F->getName() << "\n");
-            F->setBare(IsBare);
-
-            if (F->isExternalDeclaration()) {
-              if (auto *NewFn = Loader->lookupSILFunction(F)) {
-                if (NewFn->isExternalDeclaration())
-                  continue;
-
-                NewFn->verify();
-                Worklist.push_back(NewFn);
-                Result = true;
-
-                ++NumFuncLinked;
-              }
-            }
-          }
-          FunctionDeserializationWorklist.clear();
-        } else {
-          assert(FunctionDeserializationWorklist.empty() &&
-                 "Worklist should "
-                 "always be empty if visit does not return true.");
-        }
+        Result |= visit(&I);
       }
     }
   }
