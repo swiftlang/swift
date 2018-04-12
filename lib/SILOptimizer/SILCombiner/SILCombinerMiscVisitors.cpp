@@ -415,7 +415,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(Op->getUser())) {
       for (auto *Op : OEAI->getUses()) {
         assert(isa<DestroyAddrInst>(Op->getUser()) ||
-               isDebugInst(Op->getUser()) && "Unexpected instruction");
+               Op->getUser()->isDebugInstruction() && "Unexpected instruction");
         ToDelete.insert(Op->getUser());
       }
     }
@@ -425,7 +425,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
            isa<DestroyAddrInst>(Op->getUser()) ||
            isa<DeallocStackInst>(Op->getUser()) ||
            isa<DeinitExistentialAddrInst>(Op->getUser()) ||
-           isDebugInst(Op->getUser()) && "Unexpected instruction");
+           Op->getUser()->isDebugInstruction() && "Unexpected instruction");
     ToDelete.insert(Op->getUser());
   }
 
@@ -920,7 +920,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       // we don't care about the dealloc stack instructions
       continue;
     }
-    if (isDebugInst(CurrUser) || isa<LoadInst>(CurrUser)) {
+    if (CurrUser->isDebugInstruction() || isa<LoadInst>(CurrUser)) {
       // These Instructions are a non-risky use we can ignore
       continue;
     }
