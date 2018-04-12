@@ -17,6 +17,7 @@
 #import <alloca.h>
 #import <stdlib.h>
 #import <malloc/malloc.h>
+#import <pthread.h>
 
 #import "FoundationShimSupport.h"
 #import "NSCalendarShims.h"
