@@ -23,12 +23,13 @@
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
 // CHECK-NOT: Swift;
-// CHECK-LABEL: @import Foundation;
-// CHECK-NEXT: @import CoreGraphics;
+// CHECK-LABEL: @import CompatibilityAlias;
 // CHECK-NEXT: @import CoreFoundation;
-// CHECK-NEXT: @import objc_generics;
-// CHECK-NEXT: @import CompatibilityAlias;
+// CHECK-NEXT: @import CoreGraphics;
+// CHECK-NEXT: @import Foundation;
+// CHECK-NEXT: @import ObjectiveC;
 // CHECK-NEXT: @import SingleGenericClass;
+// CHECK-NEXT: @import objc_generics;
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Swift;
 import Foundation
