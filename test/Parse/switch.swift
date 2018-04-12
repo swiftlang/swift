@@ -522,3 +522,20 @@ switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expect
 case _:
   break
 }
+
+switch x { // expected-error {{switch must be exhaustive}}
+case 1:
+  break
+@unknown case _: // expected-note {{remove '@unknown' to handle remaining values}} {{1-10=}}
+  break
+}
+
+switch x { // expected-error {{switch must be exhaustive}}
+@unknown case _: // expected-note {{remove '@unknown' to handle remaining values}} {{1-10=}}
+  break
+}
+
+switch x { // expected-error {{switch must be exhaustive}}
+@unknown default: // expected-note {{remove '@unknown' to handle remaining values}} {{1-10=}}
+  break
+}
