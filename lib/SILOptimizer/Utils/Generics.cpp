@@ -2340,7 +2340,7 @@ void swift::trySpecializeApplyOfGeneric(
       SILInstruction *User = Use->getUser();
       if (isa<RefCountingInst>(User))
         continue;
-      if (isDebugInst(User))
+      if (User->isDebugInstruction())
         continue;
 
       auto FAS = FullApplySite::isa(User);
