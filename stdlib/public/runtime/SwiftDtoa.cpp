@@ -1065,7 +1065,7 @@ size_t swift_format_float(float d, char *dest, size_t length)
         swift_decompose_float(d, digits, sizeof(digits), &decimalExponent);
     // People use float to model integers <= 2^24, so we use that
     // as a cutoff for decimal vs. exponential format.
-    if (decimalExponent < -3 || fabsf(d) > (float)(1 << 24)) {
+    if (decimalExponent < -3 || fabsf(d) > 0x1.0p24F) {
         return swift_format_exponential(dest, length, signbit(d),
                  digits, digitCount, decimalExponent);
     } else {
@@ -1121,7 +1121,7 @@ size_t swift_format_double(double d, char *dest, size_t length)
         swift_decompose_double(d, digits, sizeof(digits), &decimalExponent);
     // People use double to model integers <= 2^53, so we use that
     // as a cutoff for decimal vs. exponential format.
-    if (decimalExponent < -3 || fabs(d) > (double)((uint64_t)1 << 53)) {
+    if (decimalExponent < -3 || fabs(d) > 0x1.0p53) {
         return swift_format_exponential(dest, length, signbit(d),
                  digits, digitCount, decimalExponent);
     } else {
