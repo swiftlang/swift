@@ -21,7 +21,7 @@
 namespace swift {
 
 /// Visitor that knows how to link in dependencies of SILInstructions.
-class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
+class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, void> {
   using LinkingMode = SILModule::LinkingMode;
 
   /// The SILModule that we are loading from.
@@ -40,12 +40,16 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
   /// The current linking mode.
   LinkingMode Mode;
 
+  /// Whether any functions were deserialized.
+  bool Changed;
+
 public:
   SILLinkerVisitor(SILModule &M, SILModule::LinkingMode LinkingMode)
       : Mod(M), Worklist(), FunctionDeserializationWorklist(),
-        Mode(LinkingMode) {}
+        Mode(LinkingMode), Changed(false) {}
 
   /// Process F, recursively deserializing any thing F may reference.
+  /// Returns true if any deserialization was performed.
   bool processFunction(SILFunction *F);
 
   /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
@@ -56,40 +60,40 @@ public:
   SILVTable *processClassDecl(const ClassDecl *C);
 
   /// We do not want to visit callee functions if we just have a value base.
-  bool visitSILInstruction(SILInstruction *I) { return false; }
+  void visitSILInstruction(SILInstruction *I) { }
 
-  bool visitApplyInst(ApplyInst *AI);
-  bool visitTryApplyInst(TryApplyInst *TAI);
-  bool visitPartialApplyInst(PartialApplyInst *PAI);
-  bool visitFunctionRefInst(FunctionRefInst *FRI);
-  bool visitProtocolConformance(ProtocolConformanceRef C,
+  void visitApplyInst(ApplyInst *AI);
+  void visitTryApplyInst(TryApplyInst *TAI);
+  void visitPartialApplyInst(PartialApplyInst *PAI);
+  void visitFunctionRefInst(FunctionRefInst *FRI);
+  void visitProtocolConformance(ProtocolConformanceRef C,
                                 const Optional<SILDeclRef> &Member);
-  bool visitApplySubstitutions(const SubstitutionMap &subs);
-  bool visitWitnessMethodInst(WitnessMethodInst *WMI) {
-    return visitProtocolConformance(WMI->getConformance(), WMI->getMember());
+  void visitApplySubstitutions(const SubstitutionMap &subs);
+  void visitWitnessMethodInst(WitnessMethodInst *WMI) {
+    visitProtocolConformance(WMI->getConformance(), WMI->getMember());
   }
-  bool visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
-  bool visitInitExistentialRefInst(InitExistentialRefInst *IERI);
-  bool visitAllocRefInst(AllocRefInst *ARI);
-  bool visitMetatypeInst(MetatypeInst *MI);
+  void visitInitExistentialAddrInst(InitExistentialAddrInst *IEI);
+  void visitInitExistentialRefInst(InitExistentialRefInst *IERI);
+  void visitAllocRefInst(AllocRefInst *ARI);
+  void visitMetatypeInst(MetatypeInst *MI);
 
 private:
   /// Cause a function to be deserialized, and visit all other functions
   /// referenced from this function according to the linking mode.
-  bool addFunctionToWorklist(SILFunction *F);
+  void addFunctionToWorklist(SILFunction *F);
 
   /// Consider a function for deserialization if the current linking mode
   /// requires it.
-  bool maybeAddFunctionToWorklist(SILFunction *F);
+  void maybeAddFunctionToWorklist(SILFunction *F);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
   bool isLinkAll() const { return Mode == LinkingMode::LinkAll; }
 
-  bool linkInVTable(ClassDecl *D);
+  void linkInVTable(ClassDecl *D);
 
   // Main loop of the visitor. Called by one of the other *visit* methods.
-  bool process();
+  void process();
 };
 
 } // end namespace swift
