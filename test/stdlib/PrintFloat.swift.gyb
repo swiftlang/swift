@@ -400,8 +400,18 @@ fileprivate func expectAccurateDescription(_ object: ${FloatType}, ${TRACE}) {
 fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T: FloatingPoint & CustomDebugStringConvertible & CustomStringConvertible {
   // Regular description always returns "nan"
   expectEqual("nan", object.description, ${trace})
-  // Debug description returns a more detailed form:
+
+  // debugDescription prints full details about NaNs, which is tricky to test
+  // because NaNs often get truncated: various implementations force all NaNs
+  // quiet, discard payloads, or clear sign bits.  In some cases, just passing a
+  // NaN into a function (via an FP register) is enough to mangle the value.
+
+  // So we just skip the debugDescription check on most architectures,
+  // verifying it only on x86_64 (which has complete and well-documented
+  // NaN handling).
+#if arch(x86_64)
   expectEqual(expected, object.debugDescription, ${trace})
+#endif
 }
 
 // Foundation's String(format:) isn't available here, so
@@ -529,19 +539,13 @@ PrintTests.test("Printable_Float") {
   expectNaN("nan(0xffff)", Float(nan: 65535, signaling: false))
   expectNaN("nan(0x1fffff)", Float(bitPattern: 0x7fff_ffff))
   expectNaN("nan(0x1fffff)", Float(bitPattern: 0x7fdf_ffff))
-#if !arch(arm)
-  // ARM doesn't have negative Float nans
   expectNaN("-nan", -Float.nan)
-  expectNaN("-nan(0xffff)", -Float(nan: 65535, signaling: false)) // fail
-#endif
-#if !arch(i386) && !arch(arm)
-  // 32-bit i386 and ARM lack signaling Float nans
+  expectNaN("-nan(0xffff)", -Float(nan: 65535, signaling: false))
   expectNaN("snan", Float.signalingNaN)
   expectNaN("-snan", -Float.signalingNaN)
   expectNaN("snan(0xffff)", Float(nan: 65535, signaling: true))
   expectNaN("-snan(0xffff)", -Float(nan: 65535, signaling: true))
   expectNaN("snan(0x1fffff)", Float(bitPattern: 0x7fbf_ffff))
-#endif
 
   // Every power of 10 should print with only a single digit '1'
   for power in -45 ... 38 {
@@ -640,20 +644,6 @@ PrintTests.test("Printable_Double") {
   // Verify NaNs
   expectNaN("nan", Double.nan)
   expectNaN("-nan", -Double.nan)
-#if arch(i386)
-  expectNaN("nan", Double(nan: 65535, signaling: false))
-  expectNaN("nan", Float64(bitPattern: 0x7fff_ffff_ffff_ffff))
-  expectNaN("nan", Float64(bitPattern: 0x7ffb_ffff_ffff_ffff))
-  expectNaN("-nan", -Double(nan: 65535, signaling: false))
-  if _isDebugAssertConfiguration() {
-    expectNaN("nan", Double.signalingNaN)
-    expectNaN("-nan", -Double.signalingNaN)
-    expectNaN("nan", Double(nan: 65535, signaling: true))
-    expectNaN("-nan", -Double(nan: 65535, signaling: true))
-    expectNaN("nan", Float64(bitPattern: 0x7ff7_ffff_ffff_ffff))
-  }
-#else
-  // 32-bit i386 lacks signaling Double nans or payloads on NaNs
   expectNaN("nan(0xffff)", Double(nan: 65535, signaling: false))
   expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7fff_ffff_ffff_ffff))
   expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7ffb_ffff_ffff_ffff))
@@ -663,7 +653,6 @@ PrintTests.test("Printable_Double") {
   expectNaN("snan(0xffff)", Double(nan: 65535, signaling: true))
   expectNaN("-snan(0xffff)", -Double(nan: 65535, signaling: true))
   expectNaN("snan(0x3ffffffffffff)", Float64(bitPattern: 0x7ff7_ffff_ffff_ffff))
-#endif
 
   // We know how every power of 10 should print
   for power in -323 ... 308 {
