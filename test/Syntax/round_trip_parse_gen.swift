@@ -402,6 +402,8 @@ func statementTests() {
   case 1, 2, 3: break
   // This is rejected in Sema, but should be preserved by Syntax.
   @unknown case (42, -42) where 1 == 2: break
+  @garbage case 0: break
+  @garbage(foobar) case -1: break
   }
 }
 
