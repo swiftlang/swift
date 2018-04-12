@@ -135,6 +135,18 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
   return performFuncDeserialization;
 }
 
+bool SILLinkerVisitor::visitTryApplyInst(TryApplyInst *TAI) {
+  bool performFuncDeserialization = false;
+
+  if (auto sig = TAI->getCallee()->getType().castTo<SILFunctionType>()
+                   ->getGenericSignature()) {
+    performFuncDeserialization |= visitApplySubstitutions(
+      sig->getSubstitutionMap(TAI->getSubstitutions()));
+  }
+
+  return performFuncDeserialization;
+}
+
 bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
   bool performFuncDeserialization = false;
   
