@@ -593,3 +593,30 @@ bb11:
   %26 = tuple ()
   return %26 : $()
 }
+
+// CHECK-LABEL: sil @detect_escape_of_bbarg
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   strong_retain
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   strong_release
+sil @detect_escape_of_bbarg : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @use_C2 : $@convention(thin) (C2) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %a = alloc_ref $C2
+  br bb3(%a: $C2, %a: $C2)
+
+bb2:
+  %b = alloc_ref $C2
+  br bb3(%b: $C2, %b: $C2)
+
+bb3(%p1: $C2, %p2: $C2):
+  strong_retain %p1: $C2 // This retain must not be moved over the apply
+  %c = apply %f(%p2) : $@convention(thin) (C2) -> ()
+  strong_release %p2: $C2
+  %10 = tuple ()
+  return %10 : $()
+}
+
