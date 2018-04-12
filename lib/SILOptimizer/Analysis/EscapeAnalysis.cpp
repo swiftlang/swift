@@ -1822,39 +1822,7 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
     return true;
 
   // No hidden escapes: check if the Node is reachable from the UsePoint.
-  return ConGraph->isUsePoint(UsePoint, Node);
-}
-
-bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
-  // If it's not a local object we don't know anything about the value.
-  if (!pointsToLocalObject(V))
-    return true;
-  auto *ConGraph = getConnectionGraph(FAS.getFunction());
-  return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
-}
-
-static bool hasReferenceSemantics(SILType T) {
-  // Exclude address types.
-  return T.isObject() && T.hasReferenceSemantics();
-}
-
-bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
-  // If it's not a local object we don't know anything about the value.
-  if (!pointsToLocalObject(V))
-    return true;
-
-  auto *ConGraph = getConnectionGraph(FAS.getFunction());
-  CGNode *Node = ConGraph->getNodeOrNull(V, this);
-  if (!Node)
-    return true;
-
-  // First check if there are escape paths which we don't explicitly see
-  // in the graph.
-  if (Node->escapesInsideFunction(isNotAliasingArgument(V)))
-    return true;
-
   // Check if the object itself can escape to the called function.
-  SILInstruction *UsePoint = FAS.getInstruction();
   if (ConGraph->isUsePoint(UsePoint, Node))
     return true;
 
@@ -1876,6 +1844,19 @@ bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
       return true;
   }
   return false;
+}
+
+bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
+  // If it's not a local object we don't know anything about the value.
+  if (!pointsToLocalObject(V))
+    return true;
+  auto *ConGraph = getConnectionGraph(FAS.getFunction());
+  return canEscapeToUsePoint(V, FAS.getInstruction(), ConGraph);
+}
+
+static bool hasReferenceSemantics(SILType T) {
+  // Exclude address types.
+  return T.isObject() && T.hasReferenceSemantics();
 }
 
 bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {
