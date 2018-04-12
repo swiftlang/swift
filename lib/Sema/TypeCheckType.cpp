@@ -3399,24 +3399,18 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
       return true;
     }
 
-    // Check if any classes in the inheritance hierarchy have generic
+    // Check if any Swift classes in the inheritance hierarchy have generic
     // parameters.
     // FIXME: This is a current limitation, not inherent. We don't have
     // a concrete class to attach Objective-C category metadata to.
-    Type extendedTy = ED->getDeclaredInterfaceType();
-    while (!extendedTy.isNull()) {
-      const ClassDecl *CD = extendedTy->getClassOrBoundGenericClass();
-      if (!CD)
-        break;
-
-      if (!CD->hasClangNode() && CD->getGenericParams()) {
+    if (auto generic = ED->getDeclaredInterfaceType()
+                           ->getGenericAncestor()) {
+      if (!generic->getClassOrBoundGenericClass()->hasClangNode()) {
         if (diagnose) {
           tc.diagnose(value, diag::objc_in_generic_extension);
         }
         return true;
       }
-
-      extendedTy = CD->getSuperclass();
     }
   }
 

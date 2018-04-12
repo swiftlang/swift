@@ -1458,6 +1458,11 @@ ERROR(objc_protocol_cannot_have_conditional_conformance,none,
       "type %0 cannot conditionally conform to @objc protocol %1 because "
       "Objective-C does not support conditional conformances",
       (Type, Type))
+ERROR(objc_protocol_in_generic_extension,none,
+      "conformance of "
+      "%select{|subclass of a }2%select{class from generic context|generic class}3"
+      " %0 to @objc protocol %1 cannot be in an extension",
+      (Type, Type, bool, bool))
 ERROR(conditional_conformances_cannot_imply_conformances,none,
       "conditional conformance of type %0 to protocol %1 does not imply conformance to "
       "inherited protocol %2",
