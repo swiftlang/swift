@@ -252,7 +252,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case ImplicitlyUnwrappedDisjunctionChoice:
-      out << "implictly unwrapped disjunction choice";
+      out << "implicitly unwrapped disjunction choice";
       break;
 
     case DynamicLookupResult:
