@@ -2522,6 +2522,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
     DeclResult = parseDeclOperator(Flags, Attributes);
     break;
   case tok::kw_precedencegroup:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::PrecedenceGroupDecl);
     DeclResult = parseDeclPrecedenceGroup(Flags, Attributes);
     break;
   case tok::kw_protocol:
@@ -6414,6 +6415,14 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     diagnose(Tok, diag::expected_precedencegroup_lbrace);
     return createInvalid();
   }
+  // Empty body.
+  if (Tok.is(tok::r_brace)) {
+    // Create empty attribute list.
+    SyntaxParsingContext(SyntaxContext,
+                         SyntaxKind::PrecedenceGroupAttributeList);
+    rbraceLoc = consumeToken(tok::r_brace);
+    return makeParserResult(create());
+  }
 
   auto abortBody = [&] {
     skipUntilDeclRBrace();
@@ -6435,8 +6444,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     }
   };
 
+
   // Parse the attributes in the body.
-  while (!consumeIf(tok::r_brace, rbraceLoc)) {
+  while (!Tok.is(tok::r_brace)) {
     if (!Tok.is(tok::identifier)) {
       diagnose(Tok, diag::expected_precedencegroup_attribute);
       return abortBody();
@@ -6445,6 +6455,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     auto attrName = Tok.getText();
 
     if (attrName == "associativity") {
+      SyntaxParsingContext AttrCtxt(SyntaxContext,
+                                    SyntaxKind::PrecedenceGroupAssociativity);
       // "associativity" is considered as a contextual keyword.
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
@@ -6471,6 +6483,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     }
     
     if (attrName == "assignment") {
+      SyntaxParsingContext AttrCtxt(SyntaxContext,
+                                    SyntaxKind::PrecedenceGroupAssignment);
       parseAttributePrefix(assignmentKeywordLoc);
 
       // "assignment" is considered as a contextual keyword.
@@ -6490,6 +6504,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     bool isLowerThan = false;
     if (attrName == "higherThan" ||
         (isLowerThan = (attrName == "lowerThan"))) {
+      SyntaxParsingContext AttrCtxt(SyntaxContext,
+                                    SyntaxKind::PrecedenceGroupRelation);
       // "lowerThan" and "higherThan" are contextual keywords.
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
@@ -6498,6 +6514,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
       auto &relations = (isLowerThan ? lowerThan : higherThan);
 
       do {
+        SyntaxParsingContext NameCtxt(SyntaxContext,
+                                      SyntaxKind::PrecedenceGroupNameElement);
         if (!Tok.is(tok::identifier)) {
           diagnose(Tok, diag::expected_precedencegroup_relation, attrName);
           return abortBody();
@@ -6505,13 +6523,19 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
         auto name = Context.getIdentifier(Tok.getText());
         auto loc = consumeToken();
         relations.push_back({loc, name, nullptr});
-      } while (consumeIf(tok::comma));
+        if (!consumeIf(tok::comma))
+          break;
+      } while (true);
+      SyntaxContext->collectNodesInPlace(SyntaxKind::PrecedenceGroupNameList);
       continue;
     }
     
     diagnose(Tok, diag::unknown_precedencegroup_attribute, attrName);
     return abortBody();
   }
+  SyntaxContext->collectNodesInPlace(SyntaxKind::PrecedenceGroupAttributeList);
+  rbraceLoc = consumeToken(tok::r_brace);
+
 
   auto result = create();
   if (invalid) result->setInvalid();

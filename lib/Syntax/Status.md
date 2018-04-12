@@ -67,9 +67,9 @@
   * DestructorDecl
   * EnumDecl
   * EnumCaseDecl
+  * PrecedenceGroupDecl
 
 ### Not-started (UnknownDecl):
-  * PrecedenceGroupDecl
   * InfixOperatorDecl
   * PrefixOperatorDecl
   * PostfixOperatorDecl
