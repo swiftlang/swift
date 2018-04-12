@@ -2484,29 +2484,31 @@ ${assignmentOperatorComment(x.operator, False)}
 }
 
 % for Range in ['Range', 'ClosedRange']:
+%   exampleRange = '1..<100' if Range == 'Range' else '1...100'
 
 extension ${Range}
-where Bound: FixedWidthInteger,
-      Bound.Magnitude: UnsignedInteger {
+  where Bound: FixedWidthInteger, Bound.Stride : SignedInteger,
+  Bound.Magnitude: UnsignedInteger
+{
       
-  /// Returns a random element from this collection.
+  /// Returns a random element of the range, using the given generator as
+  /// a source for randomness.
   ///
-  /// - Parameter generator: The random number generator to use when getting
+  /// You can use this method to select a random element of a range when you
+  /// are using a custom random number generator. If you're generating a random
+  /// number, in most cases, you should prefer using the `random(in:using:)`
+  /// static method of the desired numeric type. That static method is available
+  /// for both integer and floating point types, and returns a non-optional
+  /// value.
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
   ///   a random element.
-  /// - Returns: A random element from this collection.
-  ///
-  /// A good example of this is getting a random greeting from an array:
-  ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random()
-  ///
-  /// If the collection is empty, the value of this function is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random() {
-  ///         print(randomNumber)
-  ///     }
-  ///     // Could print "20", perhaps
+  /// - Returns: A random element of the range.
+%   if 'Closed' not in Range:
+  ///   If the range is empty, the method returns `nil`.
+%   else:
+  ///   This method never returns `nil`.
+%   end
   @inlinable
   public func random<T: RandomNumberGenerator>(
     using generator: T
@@ -2552,26 +2554,26 @@ where Bound: FixedWidthInteger,
     }
   }
   
-  /// Returns a random element from this collection.
+  /// Returns a random element of the range, using the given generator as
+  /// a source for randomness.
   ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   a random element.
-  /// - Returns: A random element from this collection.
+  /// You can use this method to select a random element of a range when you
+  /// are using a custom random number generator. If you're generating a random
+  /// number, in most cases, you should prefer using the `random(in:)`
+  /// static method of the desired numeric type. That static method is available
+  /// for both integer and floating point types, and returns a non-optional
+  /// value.
   ///
-  /// A good example of this is getting a random greeting from an array:
+  /// This method uses the default random generator, `Random.default`. Calling
+  /// `(${exampleRange}).random()` is equivalent to calling
+  /// `(${exampleRange}).random(using: Random.default)`.
   ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random()
-  ///
-  /// If the collection is empty, the value of this function is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random() {
-  ///         print(randomNumber)
-  ///     }
-  ///     // Could print "20", perhaps
-  ///
-  /// This uses the standard library's default random number generator.
+  /// - Returns: A random element of the range.
+%   if 'Closed' not in Range:
+  ///   If the range is empty, the method returns `nil`.
+%   else:
+  ///   This method never returns `nil`.
+%   end
   @inlinable
   public func random() -> Element? {
     return self.random(using: Random.default)
@@ -2582,13 +2584,28 @@ extension FixedWidthInteger
 where Self.Stride : SignedInteger,
       Self.Magnitude : UnsignedInteger {
 
-  /// Returns a random representation of this integer within the range.
+  /// Returns a random value within the specified range, using the given
+  /// generator as a source for randomness.
   ///
-  /// - Parameter range: A ${Range} to determine the bounds to get a random value
-  ///   from.
-  /// - Parameter generator: The random number generator to use when getting
-  ///   the random integer.
-  /// - Returns: A random representation of this integer.
+  /// Use this method to generate an integer within a specific range when you
+  /// are using a custom random number generator. This example creates three
+  /// new values in the range `${exampleRange}`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Int.random(in: ${exampleRange}, using: myGenerator))
+  ///     }
+  ///     // Prints "7"
+  ///     // Prints "44"
+  ///     // Prints "21"
+  ///
+  /// - Parameters:
+  ///   - range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///     `range` must not be empty.
+%   end
+  ///   - generator: The random number generator to use when creating the
+  ///     new random value.
+  /// - Returns: A random value within the bounds of `range`.
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: ${Range}<Self>,
@@ -2603,15 +2620,27 @@ where Self.Stride : SignedInteger,
     return range.random(using: generator)!
   }
   
-  /// Returns a random representation of this integer within the range.
+  /// Returns a random value within the specified range.
   ///
-  /// - Parameter range: A ${Range} to determine the bounds to get a random value
-  ///   from.
-  /// - Parameter generator: The random number generator to use when getting
-  ///   the random integer.
-  /// - Returns: A random representation of this integer.
+  /// Use this method to generate an integer within a specific range. This
+  /// example creates three new values in the range `${exampleRange}`.
   ///
-  /// This uses the standard library's default random number generator.
+  ///     for _ in 1...3 {
+  ///         print(Int.random(in: ${exampleRange}))
+  ///     }
+  ///     // Prints "53"
+  ///     // Prints "64"
+  ///     // Prints "5"
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `Int.random(in: ${exampleRange})` above is equivalent to calling
+  /// `Int.random(in: ${exampleRange}, using: Random.default)`.
+  ///
+  /// - Parameter range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///   `range` must not be empty.
+%   end
+  /// - Returns: A random value within the bounds of `range`.
   @inlinable
   public static func random(in range: ${Range}<Self>) -> Self {
     return Self.random(in: range, using: Random.default)

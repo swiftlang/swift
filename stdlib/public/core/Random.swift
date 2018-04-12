@@ -12,40 +12,55 @@
 
 import SwiftShims
 
-/// A type that allows random number generators to be used throughout Swift to
-/// produce random aspects of Swift's types.
+/// A type that can provide uniformly distributed random data.
 ///
-/// The RandomNumberGenerator protocol is used for random number generator types
-/// that implement their own pseudo-random or cryptographically secure
-/// pseudo-random number generation. Using the RandomNumberGenerator protocol
-/// allows these types to be used with types with random methods, collections
-/// with .random(), and collections/sequences with
-/// .shuffle() and .shuffled()
+/// When you call methods that use random data, such as creating new random
+/// values or shuffling a collection, you can pass a `RandomNumberGenerator`
+/// type to be used as the source for randomness. When you don't pass a
+/// generator, the default `Random` type is used.
 ///
-/// Conforming to the RandomNumberGenerator protocol
-/// ==========================================
+/// When providing new APIs that use randomness, provide a version that accepts
+/// a generator conforming to the `RandomNumberGenerator` protocol as well as a
+/// version that uses the default generator. For example, this `Weekday`
+/// enumeration provides static methods that return a random day of the week:
 ///
-/// In order to conform to RandomNumberGenerator, types that implement this must be
-/// able to produce an unsigned integer.
+///     enum Weekday : CaseIterable {
+///         case sunday, monday, tuesday, wednesday, thursday, friday, saturday
 ///
-/// - Note: Types that implement RandomNumberGenerator should have a decent
-///   amount of documentation that clearly conveys whether or not the generator
-///   produces cryptographically secure numbers or deterministically generated
-///   numbers.
+///         static func randomWeekday<G: RandomNumberGenerator>(using generator: G) -> Weekday {
+///             return Weekday.allCases.random(using: generator)!
+///         }
+///
+///         static func randomWeekday() -> Weekday {
+///             return Weekday.randomWeekday(using: Random.default)
+///         }
+///     }
+///
+/// Conforming to the RandomNumberGenerator Protocol
+/// ================================================
+///
+/// A custom `RandomNumberGenerator` type can have different characteristics
+/// than the default `Random` type. For example, a seedable generator can be
+/// used to generate the same sequence of random values for testing purposes.
+///
+/// To make a custom type conform to the `RandomNumberGenerator` protocol,
+/// implement the required `next()` method. Each call to `next()` must produce
+/// a uniform and independent random value.
+///
+/// Types that conform to `RandomNumberGenerator` should specifically document
+/// the thread safety and quality of the generator.
 public protocol RandomNumberGenerator {
-  /// Produces the next randomly generated number
+  /// Returns a value from a uniform, independent distribution of binary data.
   ///
-  /// - Returns: A number that was randomly generated
+  /// - Returns: An unsigned 64-bit random value.
   func next() -> UInt64
 }
 
 extension RandomNumberGenerator {
-  /// Produces the next randomly generated number
+  /// Returns a value from a uniform, independent distribution of binary data.
   ///
-  /// - Returns: A number that was randomly generated
-  ///
-  /// This differs from next() as this function has the ability to transform the
-  /// generated number to any unsigned integer.
+  /// - Returns: A random value of `T`. Bits are randomly distributed so that
+  ///   every value of `T` is equally likely to be returned.
   @inlinable
   public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
     if T.bitWidth <= UInt64.bitWidth {
@@ -70,14 +85,11 @@ extension RandomNumberGenerator {
     return tmp
   }
 
-  /// Produces the next randomly generated number that is constricted by an
-  /// upperBound
+  /// Returns a random value that is less than the given upper bound.
   ///
-  /// - Parameter upperBound: The max number this can generate up to.
-  /// - Returns: A number that was randomly generated from 0 to upperBound
-  ///
-  /// By default, this uses the uniform distribution to form a random number
-  /// that is less than the upperBound.
+  /// - Parameter upperBound: The upper bound for the randomly generated value.
+  /// - Returns: A random value of `T` in the range `0..<upperBound`. Every
+  ///   value in the range `0..<upperBound` is equally likely to be returned.
   @inlinable
   public func next<T: FixedWidthInteger & UnsignedInteger>(upperBound: T) -> T {
     let tmp = (T.max % upperBound) + 1
@@ -92,47 +104,37 @@ extension RandomNumberGenerator {
   }
 }
 
-/// The provided default source of random numbers
+/// The default source of random data.
 ///
-/// All of the default provided random functions utilize this source of random.
-/// Using those functions should be preferred over using this directly. An
-/// example of calling this directly:
+/// When you generate random values, shuffle a collection, or perform another
+/// operation that depends on random data, this type's `default` property is
+/// the generator used by default. For example, the two method calls in this
+/// example are equivalent:
 ///
-///     let random: UInt8 = Random.default.next()
-///     let randomToTen: UInt32 = Random.default.next(upperBound: 10)
+///     let x = Int.random(in: 1...100)
+///     let y = Int.random(in: 1...100, using: Random.default)
 ///
-/// However, you should strive to use the random functions on the numeric types.
-/// Using the preferred way:
-///
-///     let random = UInt8.random(in: .min ... .max)
-///     let randomToTen = UInt32.random(in: 0 ..< 10)
-///
-/// - Note: The default implementation of randomness is cryptographically secure.
-///   It utilizes arc4random(3) on newer versions of macOS, iOS, etc. On older
-///   versions of these operating systems it uses SecRandomCopyBytes. For Linux,
-///   it tries to use the getrandom(2) system call on newer kernel versions. On
-///   older kernel versions, it reads from /dev/urandom.
+/// `Random.default` is safe to use in multiple threads, and uses a
+/// cryptographically secure algorithm whenever possible.
 public struct Random : RandomNumberGenerator {
-  /// The default random implementation
+  /// The shared, default instance of the `Range` random number generator.
   public static let `default` = Random()
 
   private init() {}
 
-  /// Produces the next randomly generated number
+  /// Returns a value from a uniform, independent distribution of binary data.
   ///
-  /// - Returns: A number that was randomly generated
+  /// - Returns: An unsigned 64-bit random value.
   public func next() -> UInt64 {
     var random: UInt64 = 0
     _stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
   }
   
-  /// Produces the next randomly generated number
+  /// Returns a value from a uniform, independent distribution of binary data.
   ///
-  /// - Returns: A number that was randomly generated
-  ///
-  /// This differs from next() as this function has the ability to transform the
-  /// generated number to any unsigned integer.
+  /// - Returns: A random value of `T`. Bits are randomly distributed so that
+  ///   every value of `T` is equally likely to be returned.
   public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
     var random: T = 0
     _stdlib_random(&random, MemoryLayout<T>.size)

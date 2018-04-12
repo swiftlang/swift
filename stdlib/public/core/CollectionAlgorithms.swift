@@ -265,11 +265,23 @@ extension MutableCollection where Self : BidirectionalCollection {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
-  /// Returns the elements of the sequence, shuffled.
+  /// Returns the elements of the sequence, shuffled using the given generator
+  /// as a source for randomness.
+  ///
+  /// You use this method to randomize the elements of a sequence when you
+  /// are using a custom random number generator. For example, you can shuffle
+  /// the numbers between `0` and `9` by calling the `shuffled(using:)` method
+  /// on that range:
+  ///
+  ///     let numbers = 0...9
+  ///     let shuffledNumbers = numbers.shuffled(using: myGenerator)
+  ///     // shuffledNumbers == [8, 9, 4, 3, 2, 6, 7, 0, 5, 1]
   ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the sequence.
-  /// - Returns: A shuffled array of this sequence's elements.
+  /// - Returns: An array of this sequence's elements in a shuffled order.
+  ///
+  /// - Complexity: O(*n*)
   @inlinable
   public func shuffled<T: RandomNumberGenerator>(
     using generator: T
@@ -281,11 +293,22 @@ extension Sequence {
   
   /// Returns the elements of the sequence, shuffled.
   ///
+  /// For example, you can shuffle the numbers between `0` and `9` by calling
+  /// the `shuffled()` method on that range:
+  ///
+  ///     let numbers = 0...9
+  ///     let shuffledNumbers = numbers.shuffled()
+  ///     // shuffledNumbers == [1, 7, 6, 2, 8, 9, 4, 3, 5, 0]
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `numbers.shuffled()` above is equivalent to calling
+  /// `numbers.shuffled(using: Random.default)`.
+  ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the sequence.
   /// - Returns: A shuffled array of this sequence's elements.
   ///
-  /// This uses the standard library's default random number generator.
+  /// - Complexity: O(*n*)
   @inlinable
   public func shuffled() -> [Element] {
     return shuffled(using: Random.default)
@@ -293,10 +316,21 @@ extension Sequence {
 }
 
 extension MutableCollection {
-  /// Shuffles the collection in place.
+  /// Shuffles the collection in place, using the given generator as a source
+  /// for randomness.
+  ///
+  /// You use this method to randomize the elements of a collection when you
+  /// are using a custom random number generator. For example, you can use the
+  /// `shuffle(using:)` method to randomly reorder the elements of an array.
+  ///
+  ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
+  ///     names.shuffle(using: myGenerator)
+  ///     // names == ["Sofía", "Alejandro", "Camila", "Luis", "Diego", "Luciana"]
   ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the collection.
+  ///
+  /// - Complexity: O(*n*)
   @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: T
@@ -317,10 +351,18 @@ extension MutableCollection {
   
   /// Shuffles the collection in place.
   ///
-  /// - Parameter generator: The random number generator to use when shuffling
-  ///   the collection.
+  /// Use the `shuffle()` method to randomly reorder the elements of an
+  /// array.
   ///
-  /// This uses the standard library's default random number generator.
+  ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
+  ///     names.shuffle(using: myGenerator)
+  ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `names.shuffle()` above is equivalent to calling
+  /// `names.shuffle(using: Random.default)`.
+  ///
+  /// - Complexity: O(*n*)
   @inlinable
   public mutating func shuffle() {
     shuffle(using: Random.default)
