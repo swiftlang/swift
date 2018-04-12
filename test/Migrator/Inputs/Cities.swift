@@ -33,3 +33,7 @@ public func globalCityFunc3(_ c : Cities, _ p : Int) -> Int { return 0 }
 public func globalCityFunc4(_ c : Cities, _ p : Int, _ q: Int) -> Int { return 0 }
 public func globalCityFunc5() -> Int { return 0 }
 public func globalCityPointerTaker(_ c : UnsafePointer<Cities>, _ p : Int, _ q: Int) -> Int { return 0 }
+
+public class Container {
+  public var Value: String = ""
+}

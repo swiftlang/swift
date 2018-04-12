@@ -1,0 +1,13 @@
+[
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "SimpleStringRepresentableUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC5ValueSSvp",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "NewAttribute",
+    "ModuleName": "Cities"
+  },
+]
