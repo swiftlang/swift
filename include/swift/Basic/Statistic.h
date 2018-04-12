@@ -205,16 +205,16 @@ public:
   /// entity type, and produce a tracer that's either active or inert depending
   /// on whether the provided \p Reporter is null (nullptr means "tracing is
   /// disabled").
-  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName);
-  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
                       const Decl *D);
-  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
                       const ProtocolConformance *P);
-  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
                       const clang::Decl *D);
-  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
                       const Expr *E);
-  FrontendStatsTracer(UnifiedStatsReporter *Reporter,  StringRef EventName,
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
                       const SILFunction *F);
 };
 
@@ -225,20 +225,61 @@ public:
 // for those entity types. If you want to trace those types, it's assumed you're
 // linking with the object files that define the tracer.
 
-template<> const UnifiedStatsReporter::TraceFormatter*
+template <>
+const UnifiedStatsReporter::TraceFormatter *
 FrontendStatsTracer::getTraceFormatter<const Decl *>();
 
-template<> const UnifiedStatsReporter::TraceFormatter*
+template <>
+const UnifiedStatsReporter::TraceFormatter *
 FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>();
 
-template<> const UnifiedStatsReporter::TraceFormatter*
+template <>
+const UnifiedStatsReporter::TraceFormatter *
 FrontendStatsTracer::getTraceFormatter<const clang::Decl *>();
 
-template<> const UnifiedStatsReporter::TraceFormatter*
+template <>
+const UnifiedStatsReporter::TraceFormatter *
 FrontendStatsTracer::getTraceFormatter<const Expr *>();
 
-template<> const UnifiedStatsReporter::TraceFormatter*
+template <>
+const UnifiedStatsReporter::TraceFormatter *
 FrontendStatsTracer::getTraceFormatter<const SILFunction *>();
 
-}
+// Provide inline definitions for the delegating constructors.  These avoid
+// introducing a circular dependency between libParse and libSIL.  They are
+// marked as `inline` explicitly to prevent ODR violations due to multiple
+// emissions.  We cannot force the inlining by defining them in the declaration
+// due to the explicit template specializations of the `getTraceFormatter`,
+// which is declared in the `FrontendStatsTracer` scope (the nested name
+// specifier scope cannot be used to declare them).
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S)
+    : FrontendStatsTracer(R, S, nullptr, nullptr) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S, const Decl *D)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const ProtocolConformance *P)
+    : FrontendStatsTracer(R, S, P,
+                          getTraceFormatter<const ProtocolConformance *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const clang::Decl *D)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const clang::Decl *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S, const Expr *E)
+    : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>()) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const SILFunction *F)
+    : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>()) {}
+
+} // namespace swift
 #endif // SWIFT_BASIC_STATISTIC_H
