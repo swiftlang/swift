@@ -1790,7 +1790,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         if (Prev != BB->end())
           DS = Prev->getDebugScope();
         // Use an artificial (line 0) location.
-        IGM.DebugInfo->setCurrentLoc(Builder, DS);
+        IGM.DebugInfo->setCurrentLoc(Builder, DS, None);
       }
 
       if (isa<TermInst>(&I))
