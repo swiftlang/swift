@@ -129,6 +129,20 @@ public:
     }
   }
 
+  bool isStringRepresentableChange() const {
+    switch(DiffKind) {
+    case NodeAnnotation::DictionaryKeyUpdate:
+    case NodeAnnotation::OptionalDictionaryKeyUpdate:
+    case NodeAnnotation::ArrayMemberUpdate:
+    case NodeAnnotation::OptionalArrayMemberUpdate:
+    case NodeAnnotation::SimpleStringRepresentableUpdate:
+    case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   StringRef getNewName() const { assert(isRename()); return RightComment; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;
