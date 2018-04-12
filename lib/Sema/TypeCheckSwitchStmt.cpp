@@ -1345,10 +1345,25 @@ namespace {
 
       // Decide whether we want an error or a warning.
       auto mainDiagType = diag::non_exhaustive_switch;
-      if (!uncovered.isEmpty() && unknownCase) {
-        assert(defaultReason == RequiresDefault::No);
-        mainDiagType = diag::non_exhaustive_switch_warn;
+      if (unknownCase) {
+        switch (defaultReason) {
+        case RequiresDefault::EmptySwitchBody:
+          llvm_unreachable("there's an @unknown case; the body can't be empty");
+        case RequiresDefault::No:
+          if (!uncovered.isEmpty())
+            mainDiagType = diag::non_exhaustive_switch_warn;
+          break;
+        case RequiresDefault::UncoveredSwitch:
+        case RequiresDefault::SpaceTooLarge:
+          TC.diagnose(startLoc, diag::non_exhaustive_switch);
+          TC.diagnose(unknownCase->getLoc(),
+                      diag::non_exhaustive_switch_drop_unknown)
+            .fixItRemoveChars(unknownCase->getStartLoc(),
+                              unknownCase->getLoc());
+          return;
+        }
       }
+
       switch (uncovered.checkDowngradeToWarning()) {
       case DowngradeToWarning::No:
         break;
