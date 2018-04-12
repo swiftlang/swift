@@ -2828,8 +2828,10 @@ namespace {
         if (!rootObjectTy || rootObjectTy->hasError())
           return Type();
         rootObjectTy = CS.openUnboundGenericType(rootObjectTy, locator);
-        CS.addConstraint(ConstraintKind::Bind, root, rootObjectTy,
-                         locator);
+        // Allow \Derived.property to be inferred as \Base.property to
+        // simulate a sort of covariant conversion from
+        // KeyPath<Derived, T> to KeyPath<Base, T>.
+        CS.addConstraint(ConstraintKind::Subtype, rootObjectTy, root, locator);
       }
       
       bool didOptionalChain = false;

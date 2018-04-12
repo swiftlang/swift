@@ -545,6 +545,18 @@ struct VisibilityTesting2 {
   }
 }
 
+protocol PP {}
+class Base : PP { var i: Int = 0 }
+class Derived : Base {}
+
+func testSubtypeKeypathClass(_ keyPath: ReferenceWritableKeyPath<Base, Int>) {
+  testSubtypeKeypathClass(\Derived.i)
+}
+
+func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
+  testSubtypeKeypathProtocol(\Base.i) // expected-error {{type 'PP' has no member 'i'}}
+}
+
 func testSyntaxErrors() { // expected-note{{}}
   _ = \.  ; // expected-error{{expected member name following '.'}}
   _ = \.a ;
