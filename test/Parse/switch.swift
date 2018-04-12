@@ -502,3 +502,23 @@ switch x {
 case _:
   @unknown let _ = 1 // expected-error {{unknown attribute 'unknown'}}
 }
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown(garbage) case _: // expected-error {{unexpected '(' in attribute 'unknown'}}
+  break
+}
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown // expected-note {{attribute already specified here}}
+@unknown // expected-error {{duplicate attribute}}
+case _:
+  break
+}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note {{add missing case: '.Thing'}}
+@unknown @garbage(foobar) // expected-error {{unknown attribute 'garbage'}}
+case _:
+  break
+}

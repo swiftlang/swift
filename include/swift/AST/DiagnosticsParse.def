@@ -1265,6 +1265,8 @@ ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
 ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
+ERROR(unexpected_lparen_in_attribute,none,
+      "unexpected '(' in attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,

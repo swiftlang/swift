@@ -2187,24 +2187,30 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SourceLoc UnknownAttrLoc;
   while (Tok.is(tok::at_sign)) {
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
-    UnknownAttrLoc = consumeToken(tok::at_sign);
 
-    if (Tok.isContextualKeyword("unknown")) {
+    if (peekToken().isContextualKeyword("unknown")) {
+      if (!UnknownAttrLoc.isValid()) {
+        UnknownAttrLoc = consumeToken(tok::at_sign);
+      } else {
+        diagnose(Tok, diag::duplicate_attribute, false);
+        diagnose(UnknownAttrLoc, diag::previous_attribute, false);
+        consumeToken(tok::at_sign);
+      }
       consumeIdentifier();
 
-      // Form an empty TokenList for the arguments of the 'Attribute' Syntax
-      // node.
-      SyntaxParsingContext(SyntaxContext, SyntaxKind::TokenList);
+      SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
+      if (Tok.is(tok::l_paren)) {
+        diagnose(Tok, diag::unexpected_lparen_in_attribute, "unknown");
+        skipSingle();
+      }
     } else {
-      UnknownAttrLoc = SourceLoc();
-
+      consumeToken(tok::at_sign);
       diagnose(Tok, diag::unknown_attribute, Tok.getText());
       consumeIdentifier();
 
-      if (Tok.is(tok::l_paren)) {
-        SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
+      SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
+      if (Tok.is(tok::l_paren))
         skipSingle();
-      }
     }
   }
 
@@ -2213,8 +2219,10 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   if (Tok.is(tok::kw_case)) {
     Status |=
         ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls, ColonLoc);
-  } else {
+  } else if (Tok.is(tok::kw_default)) {
     Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems, ColonLoc);
+  } else {
+    llvm_unreachable("isAtStartOfSwitchCase() lied.");
   }
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
