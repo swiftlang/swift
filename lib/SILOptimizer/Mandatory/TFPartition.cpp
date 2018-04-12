@@ -2778,8 +2778,11 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // to get this, we create an N-ary tuple on the stack and pass the address of
   // the first element.
 
-  // Note that the allocation becomes a scalar value when it has one value.
-  SmallVector<TupleTypeElt, 8> tupleEltTypes(tensorFnArguments.size(),
+  // Note that the allocation becomes a scalar value when it has one value,
+  // and we make sure to allocate space for at least one element to avoid
+  // passing an undef into the runtime.
+  size_t startAllocSize = std::max(tensorFnArguments.size(), size_t(1));
+  SmallVector<TupleTypeElt, 8> tupleEltTypes(startAllocSize,
                                              TupleTypeElt(cTensorHandleTy));
   auto tupleType = TupleType::get(tupleEltTypes, ctx)->getCanonicalType();
   // %0 = alloc_stack $(CTensorHandle, CTensorHandle)
@@ -2864,8 +2867,11 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // Start by creating an uninitialized buffer to receive the values into.
   B.setInsertionPoint(tensorEndPoint);
 
-  // Note that the allocation becomes a scalar value when it has one value.
-  tupleEltTypes = SmallVector<TupleTypeElt, 8>(resultValues.size(),
+  // Note that the allocation becomes a scalar value when it has one value,
+  // and we avoid allocating zero elements, because we don't want to pass in
+  // undef into the runtime.
+  size_t resultAllocSize = std::max(resultValues.size(), size_t(1));
+  tupleEltTypes = SmallVector<TupleTypeElt, 8>(resultAllocSize,
                                                TupleTypeElt(cTensorHandleTy));
   tupleType = TupleType::get(tupleEltTypes, ctx)->getCanonicalType();
 
