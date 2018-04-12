@@ -125,7 +125,7 @@ public:
   void finalize();
 
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
-                     Optional<SILLocation> Loc = None);
+                     Optional<SILLocation> Loc);
   void clearLoc(IRBuilder &Builder);
   void pushLoc();
   void popLoc();
