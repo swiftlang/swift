@@ -453,35 +453,6 @@ FrontendStatsTracer::FrontendStatsTracer(
 
 FrontendStatsTracer::FrontendStatsTracer() = default;
 
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S)
-    : FrontendStatsTracer(R, S, nullptr, nullptr)
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const Decl *D)
-    : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>())
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const ProtocolConformance *P)
-    : FrontendStatsTracer(R, S, P,
-                          getTraceFormatter<const ProtocolConformance *>()) {}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const Expr *E)
-    : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>())
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const clang::Decl *D)
-    : FrontendStatsTracer(R, S, D, getTraceFormatter<const clang::Decl *>())
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const SILFunction *F)
-    : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>())
-{}
-
 FrontendStatsTracer&
 FrontendStatsTracer::operator=(FrontendStatsTracer&& other)
 {
