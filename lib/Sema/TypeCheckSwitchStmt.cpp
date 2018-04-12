@@ -1216,7 +1216,7 @@ namespace {
       SmallVector<Space, 4> spaces;
       for (auto *caseBlock : Switch->getCases()) {
         if (caseBlock->hasUnknownAttr()) {
-          assert(unknownCase == nullptr);
+          assert(unknownCase == nullptr && "multiple unknown cases");
           unknownCase = caseBlock;
           continue;
         }
