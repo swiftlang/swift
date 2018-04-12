@@ -120,17 +120,6 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
     performFuncDeserialization |= visitApplySubstitutions(
       sig->getSubstitutionMap(AI->getSubstitutions()));
   }
-  
-  // Ok we have a function ref inst, grab the callee.
-  SILFunction *Callee = AI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
-  }
 
   return performFuncDeserialization;
 }
@@ -154,16 +143,6 @@ bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
                     ->getGenericSignature()) {
     performFuncDeserialization |= visitApplySubstitutions(
       sig->getSubstitutionMap(PAI->getSubstitutions()));
-  }
-
-  SILFunction *Callee = PAI->getReferencedFunction();
-  if (!Callee)
-    return performFuncDeserialization;
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(Callee);
-    return true;
   }
 
   return performFuncDeserialization;
