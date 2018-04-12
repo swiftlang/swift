@@ -32,6 +32,21 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 //                               Linker Helpers
 //===----------------------------------------------------------------------===//
 
+bool SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
+  FunctionDeserializationWorklist.push_back(F);
+  return true;
+}
+
+bool SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
+  if (!F->isExternalDeclaration())
+    return false;
+
+  if (isLinkAll() || hasSharedVisibility(F->getLinkage()))
+    return addFunctionToWorklist(F);
+
+  return true;
+}
+
 /// Process F, recursively deserializing any thing F may reference.
 bool SILLinkerVisitor::processFunction(SILFunction *F) {
   if (Mode == LinkingMode::LinkNone)
@@ -60,6 +75,13 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 
 /// Deserialize the given VTable all SIL the VTable transitively references.
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
+  // Devirtualization already deserializes vtables as needed in both the
+  // mandatory and performance pipelines, and we don't support specialized
+  // vtables that might have shared linkage yet, so this is only needed in
+  // the performance pipeline to deserialize more functions early, and expose
+  // optimization opportunities.
+  assert(isLinkAll());
+
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
   if (!Vtbl)
@@ -70,10 +92,9 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // for processing.
   bool Result = false;
   for (auto P : Vtbl->getEntries()) {
-    if (P.Implementation->isExternalDeclaration()) {
-      Result = true;
-      addFunctionToWorklist(P.Implementation);
-    }
+    // Deserialize and recursively walk any vtable entries that do not have
+    // bodies yet.
+    Result |= maybeAddFunctionToWorklist(P.Implementation);
   }
   return Result;
 }
@@ -119,18 +140,7 @@ bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
 }
 
 bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
-  // Needed to handle closures which are no longer applied, but are left
-  // behind as dead code. This shouldn't happen, but if it does don't get into
-  // an inconsistent state.
-  SILFunction *Callee = FRI->getReferencedFunction();
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(FRI->getReferencedFunction());
-    return true;
-  }
-
-  return false;
+  return maybeAddFunctionToWorklist(FRI->getReferencedFunction());
 }
 
 // Eagerly visiting all used conformances leads to a large blowup
@@ -214,11 +224,10 @@ bool SILLinkerVisitor::visitProtocolConformance(
       if (!E.getMethodWitness().Witness)
         continue;
 
-      // Otherwise if it is the requirement we are looking for or we just want
-      // to deserialize everything, add the function to the list of functions
-      // to deserialize.
+      // Otherwise, deserialize the witness if it has shared linkage, or if
+      // we were asked to deserialize everything.
       performFuncDeserialization = true;
-      addFunctionToWorklist(E.getMethodWitness().Witness);
+      maybeAddFunctionToWorklist(E.getMethodWitness().Witness);
       break;
     }
     

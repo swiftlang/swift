@@ -79,10 +79,13 @@ public:
   bool visitMetatypeInst(MetatypeInst *MI);
 
 private:
-  /// Add a function to our function worklist for processing.
-  void addFunctionToWorklist(SILFunction *F) {
-    FunctionDeserializationWorklist.push_back(F);
-  }
+  /// Cause a function to be deserialized, and visit all other functions
+  /// referenced from this function according to the linking mode.
+  bool addFunctionToWorklist(SILFunction *F);
+
+  /// Consider a function for deserialization if the current linking mode
+  /// requires it.
+  bool maybeAddFunctionToWorklist(SILFunction *F);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
