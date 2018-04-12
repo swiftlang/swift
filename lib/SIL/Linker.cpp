@@ -58,34 +58,7 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
   return true;
 }
 
-/// Deserialize the VTable mapped to C if it exists and all SIL the VTable
-/// transitively references.
-///
-/// This method assumes that the caller made sure that no vtable existed in
-/// Mod.
-SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
-  // If we are not linking anything, bail.
-  if (Mode == LinkingMode::LinkNone)
-    return nullptr;
-
-  // Attempt to load the VTable from the SerializedSILLoader. If we
-  // fail... bail...
-  SILVTable *Vtbl = Loader->lookupVTable(C);
-  if (!Vtbl)
-    return nullptr;
-
-  // Otherwise, add all the vtable functions in Vtbl to the function
-  // processing list...
-  for (auto &E : Vtbl->getEntries())
-    Worklist.push_back(E.Implementation);
-
-  // And then transitively deserialize all SIL referenced by those functions.
-  process();
-
-  // Return the deserialized Vtbl.
-  return Vtbl;
-}
-
+/// Deserialize the given VTable all SIL the VTable transitively references.
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
