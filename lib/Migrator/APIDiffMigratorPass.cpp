@@ -227,6 +227,18 @@ public:
   }
 };
 
+static ValueDecl* getReferencedDecl(Expr *E) {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+    return DRE->getDecl();
+  } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    return MRE->getMember().getDecl();
+  } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
+    return OtherCtorE->getDecl();
+  } else {
+    return nullptr;
+  }
+}
+
 struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   APIDiffItemStore DiffStore;
@@ -303,6 +315,24 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     walk(SF);
   }
 
+  bool updateStringRepresentableDeclRef(APIDiffItem *Diff,
+      CharSourceRange Range) {
+    auto *CD = dyn_cast<CommonDiffItem>(Diff);
+    if (!CD)
+      return false;
+    if (CD->NodeKind != SDKNodeKind::DeclVar)
+      return false;
+    if (!CD->isStringRepresentableChange())
+      return false;
+    switch(CD->DiffKind) {
+    case NodeAnnotation::SimpleStringRepresentableUpdate:
+      Editor.insert(Range.getEnd(), ".rawValue");
+      return true;
+    default:
+      return false;
+    }
+  }
+
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                           Type T, ReferenceMetaData Data) override {
@@ -310,6 +340,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       std::string RepText;
       if (isSimpleReplacement(Item, RepText)) {
         Editor.replace(Range, RepText);
+        return true;
+      }
+      if (updateStringRepresentableDeclRef(Item, Range)) {
         return true;
       }
     }
@@ -640,8 +673,34 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  bool handleAssignDestMigration(Expr *E) {
+    auto *ASE = dyn_cast<AssignExpr>(E);
+    if (!ASE || !ASE->getDest() || !ASE->getSrc())
+      return false;
+    auto *RD = getReferencedDecl(ASE->getDest());
+    if (!RD)
+      return false;
+    for (auto *Item: getRelatedDiffItems(RD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        switch(CI->DiffKind) {
+        case NodeAnnotation::SimpleStringRepresentableUpdate: {
+          Editor.insertBefore(ASE->getSrc()->getStartLoc(),
+            (Twine(CI->RightComment) + "(rawValue: ").str());
+          Editor.insertAfterToken(ASE->getSrc()->getEndLoc(), ")");
+          return true;
+        }
+        default:
+          continue;
+        }
+      }
+    }
+    return false;
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (handleQualifiedReplacement(E))
+      return false;
+    if (handleAssignDestMigration(E))
       return false;
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
