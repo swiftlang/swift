@@ -94,9 +94,9 @@ public struct Bool {
   /// - Returns: A random Boolean.
   @inlinable
   public static func random<T: RandomNumberGenerator>(
-    using generator: T
+    using generator: inout T
   ) -> Bool {
-    return generator.next() % 2 == 0
+    return (generator.next() >> 17) & 1 == 0
   }
   
   /// Returns a random Boolean
@@ -108,7 +108,7 @@ public struct Bool {
   /// This uses the standard library's default random number generator.
   @inlinable
   public static func random() -> Bool {
-    return Bool.random(using: Random.default)
+    return Bool.random(using: &Random.default)
   }
 }
 

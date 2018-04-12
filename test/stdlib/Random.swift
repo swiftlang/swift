@@ -34,7 +34,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(minOpenRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set(T.min ..< (T.min + 10)))
+  expectTrue(integerSet == Set(minOpenRange))
   integerSet.removeAll()
   
   // min closed range
@@ -44,7 +44,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(minClosedRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set(T.min ... (T.min + 10)))
+  expectTrue(integerSet == Set(minClosedRange))
   integerSet.removeAll()
   
   // max open range
@@ -54,7 +54,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(maxOpenRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set((T.max - 10) ..< T.max))
+  expectTrue(integerSet == Set(maxOpenRange))
   integerSet.removeAll()
   
   // max closed range
@@ -64,7 +64,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(maxClosedRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set((T.max - 10) ... T.max))
+  expectTrue(integerSet == Set(maxClosedRange))
 }
 
 RandomTests.test("random integers in ranges") {
@@ -113,7 +113,7 @@ RandomTests.test("random floating points in ranges") {
 RandomTests.test("random elements from collection") {
   let greetings = ["hello", "hi", "hey", "hola", "what's up"]
   for _ in 0 ..< 1_000 {
-    let randomGreeting = greetings.random()
+    let randomGreeting = greetings.randomElement()
     expectNotNil(randomGreeting)
     expectTrue(greetings.contains(randomGreeting!))
   }
@@ -134,7 +134,7 @@ RandomTests.test("shuffling") {
 
 // Different RNGS
 
-public class LCRNG: RandomNumberGenerator {
+public struct LCRNG: RandomNumberGenerator {
   private var state: UInt64
   private static let m: UInt64 = 1 << 48
   private static let a: UInt64 = 25214903917
@@ -144,12 +144,12 @@ public class LCRNG: RandomNumberGenerator {
     self.state = seed
   }
   
-  private func next() -> UInt32 {
+  private mutating func next() -> UInt32 {
     state = (LCRNG.a &* state &+ LCRNG.c) % LCRNG.m
     return UInt32(truncatingIfNeeded: state >> 15)
   }
   
-  public func next() -> UInt64 {
+  public mutating func next() -> UInt64 {
     return UInt64(next() as UInt32) << 32 | UInt64(next() as UInt32)
   }
 }
@@ -164,23 +164,23 @@ RandomTests.test("different random number generators") {
   
   for i in 0 ..< 2 {
     let seed: UInt64 = 1234567890
-    let rng = LCRNG(seed: seed)
+    var rng = LCRNG(seed: seed)
     
     for _ in 0 ..< 1_000 {
-      let randomInt = Int.random(in: 0 ... 100, using: rng)
+      let randomInt = Int.random(in: 0 ... 100, using: &rng)
       intPasses[i].append(randomInt)
       
-      let randomDouble = Double.random(in: 0 ..< 1, using: rng)
+      let randomDouble = Double.random(in: 0 ..< 1, using: &rng)
       doublePasses[i].append(randomDouble)
       
-      let randomBool = Bool.random(using: rng)
+      let randomBool = Bool.random(using: &rng)
       boolPasses[i].append(randomBool)
       
-      let randomIntFromCollection = Array(0 ... 100).random(using: rng)
+      let randomIntFromCollection = Array(0 ... 100).randomElement(using: &rng)
       expectNotNil(randomIntFromCollection)
       collectionPasses[i].append(randomIntFromCollection!)
       
-      let randomShuffledCollection = Array(0 ... 100).shuffled(using: rng)
+      let randomShuffledCollection = Array(0 ... 100).shuffled(using: &rng)
       shufflePasses[i].append(randomShuffledCollection)
     }
   }

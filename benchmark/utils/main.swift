@@ -110,6 +110,8 @@ import ProtocolDispatch2
 import Queue
 import RC4
 import RGBHistogram
+import RandomShuffle
+import RandomValues
 import RangeAssignment
 import RangeIteration
 import RangeReplaceableCollectionPlusDefault
@@ -264,6 +266,8 @@ registerBenchmark(QueueGeneric)
 registerBenchmark(QueueConcrete)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
+registerBenchmark(RandomShuffle)
+registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
