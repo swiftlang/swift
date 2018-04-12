@@ -459,4 +459,17 @@ enum E1 <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>String </S
   indirect </DeclModifier><DeclModifier>private </DeclModifier>enum E2<GenericParameterClause><<GenericParameter>T</GenericParameter>></GenericParameterClause><TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>String </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>T</SimpleTypeIdentifier>: <SimpleTypeIdentifier>SomeProtocol </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><MemberDeclBlock>{<EnumCaseDecl>
     case <EnumCaseElement>foo, </EnumCaseElement><EnumCaseElement>bar, </EnumCaseElement><EnumCaseElement>baz</EnumCaseElement></EnumCaseDecl>
   }</MemberDeclBlock></EnumDecl>
-}</MemberDeclBlock></EnumDecl>
+}</MemberDeclBlock></EnumDecl><PrecedenceGroupDecl>
+
+precedencegroup FooPrecedence {<PrecedenceGroupRelation>
+  higherThan: <PrecedenceGroupNameElement>DefaultPrecedence, </PrecedenceGroupNameElement><PrecedenceGroupNameElement>UnknownPrecedence</PrecedenceGroupNameElement></PrecedenceGroupRelation><PrecedenceGroupAssignment>
+  assignment: false</PrecedenceGroupAssignment><PrecedenceGroupAssociativity>
+  associativity: none</PrecedenceGroupAssociativity>
+}</PrecedenceGroupDecl><PrecedenceGroupDecl>
+precedencegroup BarPrecedence {}</PrecedenceGroupDecl><PrecedenceGroupDecl>
+precedencegroup BazPrecedence {<PrecedenceGroupAssociativity>
+  associativity: left</PrecedenceGroupAssociativity><PrecedenceGroupAssignment>
+  assignment: true</PrecedenceGroupAssignment><PrecedenceGroupAssociativity>
+  associativity: right</PrecedenceGroupAssociativity><PrecedenceGroupRelation>
+  lowerThan: <PrecedenceGroupNameElement>DefaultPrecedence</PrecedenceGroupNameElement></PrecedenceGroupRelation>
+}</PrecedenceGroupDecl>

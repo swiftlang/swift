@@ -460,3 +460,16 @@ enum E1 : String {
     case foo, bar, baz
   }
 }
+
+precedencegroup FooPrecedence {
+  higherThan: DefaultPrecedence, UnknownPrecedence
+  assignment: false
+  associativity: none
+}
+precedencegroup BarPrecedence {}
+precedencegroup BazPrecedence {
+  associativity: left
+  assignment: true
+  associativity: right
+  lowerThan: DefaultPrecedence
+}

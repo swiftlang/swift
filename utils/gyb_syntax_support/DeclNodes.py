@@ -591,4 +591,123 @@ DECL_NODES = [
                    The cases and other members of this enum.
                    ''')
          ]),
+
+    # precedence-group-decl -> attributes? modifiers? 'precedencegroup'
+    #                            identifier '{' precedence-group-attribute-list
+    #                            '}'
+    Node('PrecedenceGroupDecl', kind='Decl', traits=['IdentifiedDecl'],
+         description='A Swift `precedencegroup` declaration.',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True,
+                   description='''
+                   The attributes applied to the 'precedencegroup' declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the 'precedencegroup'
+                   declaration.
+                   '''),
+             Child('PrecedencegroupKeyword', kind='PrecedencegroupToken'),
+             Child('Identifier', kind='IdentifierToken',
+                   description='''
+                   The name of this precedence group.
+                   '''),
+             Child('LeftBrace', kind='LeftBraceToken'),
+             Child('GroupAttributes', kind='PrecedenceGroupAttributeList',
+                   description='''
+                   The characteristics of this precedence group.
+                   '''),
+             Child('RightBrace', kind='RightBraceToken'),
+         ]),
+
+    # precedence-group-attribute-list ->
+    #     (precedence-group-relation | precedence-group-assignment |
+    #      precedence-group-associativity )*
+    Node('PrecedenceGroupAttributeList', kind='SyntaxCollection',
+         element='Syntax',
+         element_choices=[
+             'PrecedenceGroupRelation',
+             'PrecedenceGroupAssignment',
+             'PrecedenceGroupAssociativity'
+         ]),
+
+    # precedence-group-relation ->
+    #     ('higherThan' | 'lowerThan') ':' precedence-group-name-list
+    Node('PrecedenceGroupRelation', kind='Syntax',
+         description='''
+         Specify the new precedence group's relation to existing precedence
+         groups.
+         ''',
+         children=[
+             Child('HigherThanOrLowerThan', kind='IdentifierToken',
+                   text_choices=[
+                      'higherThan', 'lowerThan',
+                   ],
+                   description='''
+                   The relation to specified other precedence groups.
+                   '''),
+             Child('Colon', kind='ColonToken'),
+             Child('OtherNames', kind='PrecedenceGroupNameList',
+                   description='''
+                   The name of other precedence group to which this precedence
+                   group relates.
+                   '''),
+         ]),
+
+    # precedence-group-name-list ->
+    #    identifier (',' identifier)*
+    Node('PrecedenceGroupNameList', kind='SyntaxCollection',
+         element='PrecedenceGroupNameElement'),
+    Node('PrecedenceGroupNameElement', kind='Syntax',
+         children=[
+             Child('Name', kind='IdentifierToken'),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+         ]),
+
+    # precedence-group-assignment ->
+    #     'assignment' ':' ('true' | 'false')
+    Node('PrecedenceGroupAssignment', kind='Syntax',
+         description='''
+         Specifies the precedence of an operator when used in an operation
+         that includes optional chaining.
+         ''',
+         children=[
+             Child('AssignmentKeyword', kind='IdentifierToken',
+                   text_choices=['assignment']),
+             Child('Colon', kind='ColonToken'),
+             Child('Flag', kind='Token',
+                   token_choices=[
+                       'TrueToken',
+                       'FalseToken',
+                   ],
+                   description='''
+                   When true, an operator in the corresponding precedence group
+                   uses the same grouping rules during optional chaining as the
+                   assignment operators from the standard library. Otherwise,
+                   operators in the precedence group follows the same optional
+                   chaining rules as operators that don't perform assignment.
+                   '''),
+         ]),
+
+    # precedence-group-associativity ->
+    #     'associativity' ':' ('left' | 'right' | 'none')
+    Node('PrecedenceGroupAssociativity', kind='Syntax',
+         description='''
+         Specifies how a sequence of operators with the same precedence level
+         are grouped together in the absence of grouping parentheses.
+         ''',
+         children=[
+             Child('AssociativityKeyword', kind='IdentifierToken',
+                   text_choices=['associativity']),
+             Child('Colon', kind='ColonToken'),
+             Child('Value', kind='IdentifierToken',
+                   text_choices=['left', 'right', 'none'],
+                   description='''
+                   Operators that are `left`-associative group left-to-right.
+                   Operators that are `right`-associative group right-to-left.
+                   Operators that are specified with an associativity of `none`
+                   don't associate at all
+                   '''),
+         ]),
 ]
