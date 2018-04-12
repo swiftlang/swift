@@ -1016,27 +1016,24 @@ extension Collection {
     return count
   }
 
-  /// Returns a random element from this collection.
+  /// Returns a random element of the collection, using the given generator as
+  /// a source for randomness.
   ///
-  /// - Parameter generator: The random number generator to use when getting
+  /// You use this method to select a random element from a collection when you
+  /// are using a custom random number generator. For example, call
+  /// `randomElement(using:)` to select a random element from an array of names.
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement(using: &myGenerator)!
+  ///     // randomName == "Amani" (maybe)
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
   ///   a random element.
-  /// - Returns: A random element from this collection.
-  ///
-  /// A good example of this is getting a random greeting from an array:
-  ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random()
-  ///
-  /// If the collection is empty, the value of this function is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random() {
-  ///         print(randomNumber)
-  ///     }
-  ///     // Could print "20", perhaps
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
   @inlinable
-  public func random<T: RandomNumberGenerator>(
-    using generator: T
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
   ) -> Element? {
     guard !isEmpty else { return nil }
     let random = generator.next(upperBound: UInt(count))
@@ -1048,29 +1045,24 @@ extension Collection {
     return self[index]
   }
 
-  /// Returns a random element from this collection.
+  /// Returns a random element of the collection.
   ///
-  /// - Parameter generator: The random number generator to use when getting
-  ///   a random element.
-  /// - Returns: A random element from this collection.
+  /// For example, call `randomElement()` to select a random element from an
+  /// array of names.
   ///
-  /// A good example of this is getting a random greeting from an array:
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement()!
+  ///     // randomName == "Amani" (perhaps)
   ///
-  ///     let greetings = ["hi", "hey", "hello", "hola"]
-  ///     let randomGreeting = greetings.random()
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `names.randomElement()` above is equivalent to calling
+  /// `names.randomElement(using: &Random.default)`.
   ///
-  /// If the collection is empty, the value of this function is `nil`.
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let randomNumber = numbers.random() {
-  ///         print(randomNumber)
-  ///     }
-  ///     // Could print "20", perhaps
-  ///
-  /// This uses the standard library's default random number generator.
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
   @inlinable
-  public func random() -> Element? {
-    return random(using: Random.default)
+  public func randomElement() -> Element? {
+    return randomElement(using: &Random.default)
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.
