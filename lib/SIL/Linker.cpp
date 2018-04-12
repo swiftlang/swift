@@ -62,10 +62,7 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
-
-  // If the SILModule does not have the VTable, attempt to deserialize the
-  // VTable. If we fail to do that as well, bail.
-  if (!Vtbl || !(Vtbl = Loader->lookupVTable(D->getName())))
+  if (!Vtbl)
     return false;
 
   // Ok we found our VTable. Visit each function referenced by the VTable. If
