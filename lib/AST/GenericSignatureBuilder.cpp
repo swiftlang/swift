@@ -1309,7 +1309,7 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
 
   case Concrete:
     return parent->withoutRedundantSubpath(builder, start, end)
-      ->viaParent(builder, getAssociatedType());
+      ->viaConcrete(builder, getProtocolConformance());
 
   case Derived:
     return parent->withoutRedundantSubpath(builder, start, end)
