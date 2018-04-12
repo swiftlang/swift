@@ -793,6 +793,23 @@ public:
   /// `A<Int, NSObject>`.
   Type getSuperclassForDecl(const ClassDecl *classDecl);
 
+  /// \brief Whether this type or its superclasses has some form of generic
+  /// context.
+  ///
+  /// For example, given
+  ///
+  /// class A<X> {}
+  /// class B : A<Int> {}
+  /// struct C<T> {
+  ///   struct Inner {}
+  /// }
+  /// class D {}
+  /// class E: D {}
+  ///
+  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
+  /// returns `C<T>.Inner`, but on `E` it returns null.
+  Type getGenericAncestor();
+
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
   ///

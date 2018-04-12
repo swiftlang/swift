@@ -1460,8 +1460,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     return conformance;
   }
 
-  // Foreign classes cannot conform to objc protocols.
   if (Proto->isObjC()) {
+    // Foreign classes cannot conform to objc protocols.
     if (auto clas = canT->getClassOrBoundGenericClass()) {
       Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
       diagKind;
@@ -1477,6 +1477,31 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       }
       if (diagKind) {
         TC.diagnose(ComplainLoc, diagKind.getValue(), T, ProtoType);
+        conformance->setInvalid();
+        return conformance;
+      }
+    }
+
+    // @objc protocols can't be conditionally-conformed to. We could, in theory,
+    // front-load the requirement checking to generic-instantiation time (rather
+    // than conformance-lookup/construction time) and register the conformance
+    // with the Obj-C runtime when they're satisfied, but we'd still have solve
+    // the problem with extensions that we check for below.
+    if (!conformance->getConditionalRequirements().empty()) {
+      TC.diagnose(ComplainLoc,
+                  diag::objc_protocol_cannot_have_conditional_conformance,
+                  T, ProtoType);
+      conformance->setInvalid();
+      return conformance;
+    }
+    // And... even if it isn't conditional, we still don't currently support
+    // @objc protocols in extensions.
+    if (isa<ExtensionDecl>(DC)) {
+      if (auto genericT = T->getGenericAncestor()) {
+        auto isSubclass = !genericT->isEqual(T);
+        auto genericTIsGeneric = (bool)genericT->getAnyGeneric()->getGenericParams();
+        TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension, T,
+                    ProtoType, isSubclass, genericTIsGeneric);
         conformance->setInvalid();
         return conformance;
       }
@@ -1501,18 +1526,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       }
 
       nestedType = nestedType.getNominalParent();
-    }
-
-    // Also, the same applies for Obj-C protocols. We could, in theory,
-    // front-load the requirement checking to generic-instantiation time (rather
-    // than conformance-lookup/construction time) and register the conformance
-    // with the Obj-C runtime when they're satisfied.
-    if (Proto->isObjC()) {
-      TC.diagnose(ComplainLoc,
-                  diag::objc_protocol_cannot_have_conditional_conformance,
-                  T, ProtoType);
-      conformance->setInvalid();
-      return conformance;
     }
   }
 

@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: %target-swift-frontend %s -typecheck -verify
 // REQUIRES: OS=macosx
 
 import Foundation
@@ -27,6 +27,7 @@ class Bar<T>: NSObject {
 
 @available(macOS 10.12, *)
 extension Bar: NSFetchedResultsControllerDelegate {
+    // expected-error@-1 {{conformance of generic class 'Bar<T>' to @objc protocol 'NSFetchedResultsControllerDelegate' cannot be in an extension}}
     @nonobjc func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
     }
 }

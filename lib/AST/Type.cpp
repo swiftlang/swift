@@ -3192,19 +3192,21 @@ const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
   return unresolvedDepMemTy;
 }
 
-
-Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
-  Type t(this);
-
+static Type getConcreteTypeForSuperclassTraversing(Type t) {
   if (!t->getAnyNominal()) {
     if (auto archetype = t->getAs<ArchetypeType>()) {
-      t = archetype->getSuperclass();
+      return archetype->getSuperclass();
     } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
-      t = dynamicSelfTy->getSelfType();
+      return dynamicSelfTy->getSelfType();
     } else if (auto compositionTy = t->getAs<ProtocolCompositionType>()) {
-      t = compositionTy->getExistentialLayout().superclass;
+      return compositionTy->getExistentialLayout().superclass;
     }
   }
+  return t;
+}
+
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
+  Type t = getConcreteTypeForSuperclassTraversing(this);
 
   while (t) {
     // If we have a class-constrained archetype or class-constrained
@@ -3219,6 +3221,24 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
     t = t->getSuperclass();
   }
   llvm_unreachable("no inheritance relationship between given classes");
+}
+
+Type TypeBase::getGenericAncestor() {
+  Type t = getConcreteTypeForSuperclassTraversing(this);
+
+  while (t && !t->hasError()) {
+    auto NTD = t->getAnyNominal();
+    assert(NTD && "expected nominal type in NTD");
+    if (!NTD)
+      return Type();
+
+    if (NTD->isGenericContext())
+      return t;
+
+    t = t->getSuperclass();
+  }
+
+  return Type();
 }
 
 TypeSubstitutionMap
