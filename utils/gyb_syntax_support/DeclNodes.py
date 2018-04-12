@@ -335,7 +335,6 @@ DECL_NODES = [
              Child('Identifier', kind='Token',
                    token_choices=[
                        'IdentifierToken',
-                       'OperatorToken',
                        'UnspacedBinaryOperatorToken',
                        'SpacedBinaryOperatorToken',
                        'PrefixOperatorToken',
@@ -590,6 +589,47 @@ DECL_NODES = [
                    description='''
                    The cases and other members of this enum.
                    ''')
+         ]),
+
+    # operator-decl -> attribute? modifiers? 'operator' operator 
+    Node('OperatorDecl', kind='Decl', traits=['IdentifiedDecl'],
+         description='A Swift `operator` declaration.',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True,
+                   description='''
+                   The attributes applied to the 'operator' declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the 'operator'
+                   declaration.
+                   '''),
+             Child('OperatorKeyword', kind='OperatorToken'),
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'UnspacedBinaryOperatorToken',
+                       'SpacedBinaryOperatorToken',
+                       'PrefixOperatorToken',
+                       'PostfixOperatorToken',
+                   ]),
+             Child('InfixOperatorGroup', kind='InfixOperatorGroup',
+                   description='''
+                   Optionally specifiy a precedence group
+                   ''',
+                   is_optional=True),
+         ]),
+
+    # infix-operator-group -> ':' identifier
+    Node('InfixOperatorGroup', kind='Syntax',
+         description='''
+         A clause to specify precedence group in infix operator declaration.
+         ''',
+         children=[
+             Child('Colon', kind='ColonToken'),
+             Child('PrecedenceGroupName', kind='IdentifierToken',
+                   description='''
+                   The name of the precedence group for the operator
+                   '''),
          ]),
 
     # precedence-group-decl -> attributes? modifiers? 'precedencegroup'

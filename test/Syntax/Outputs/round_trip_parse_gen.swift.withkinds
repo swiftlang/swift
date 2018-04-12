@@ -472,4 +472,8 @@ precedencegroup BazPrecedence {<PrecedenceGroupAssociativity>
   assignment: true</PrecedenceGroupAssignment><PrecedenceGroupAssociativity>
   associativity: right</PrecedenceGroupAssociativity><PrecedenceGroupRelation>
   lowerThan: <PrecedenceGroupNameElement>DefaultPrecedence</PrecedenceGroupNameElement></PrecedenceGroupRelation>
-}</PrecedenceGroupDecl>
+}</PrecedenceGroupDecl><OperatorDecl><DeclModifier>
+
+infix </DeclModifier>operator<++><InfixOperatorGroup>:FooPrecedence</InfixOperatorGroup></OperatorDecl><OperatorDecl><DeclModifier>
+prefix </DeclModifier>operator..<<</OperatorDecl><OperatorDecl><DeclModifier>
+postfix </DeclModifier>operator <-</OperatorDecl>

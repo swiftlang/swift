@@ -473,3 +473,7 @@ precedencegroup BazPrecedence {
   associativity: right
   lowerThan: DefaultPrecedence
 }
+
+infix operator<++>:FooPrecedence
+prefix operator..<<
+postfix operator <-
