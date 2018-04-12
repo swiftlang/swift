@@ -427,12 +427,12 @@ case .Thing: // expected-error{{additional 'case' blocks cannot appear after the
   break
 }
 
-switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+switch Whatever.Thing {
 @unknown case _, _: // expected-error {{'@unknown' cannot be applied to multiple patterns}}
   break
 }
 
-switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+switch Whatever.Thing {
 @unknown case _, _, _: // expected-error {{'@unknown' cannot be applied to multiple patterns}}
   break
 }
@@ -537,5 +537,75 @@ switch x { // expected-error {{switch must be exhaustive}}
 
 switch x { // expected-error {{switch must be exhaustive}}
 @unknown default: // expected-note {{remove '@unknown' to handle remaining values}} {{1-10=}}
+  break
+}
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown case _:
+  break
+}
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown default:
+  break
+}
+
+switch Whatever.Thing {
+case .Thing:
+  break
+@unknown default:
+  break
+@unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  break
+}
+
+switch Whatever.Thing {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown case _:
+  break
+}
+
+switch Whatever.Thing {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown default:
+  break
+}
+
+switch Whatever.Thing {
+@unknown default:
+  break
+@unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+  break
+}
+
+
+switch x {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown case _:
+  break
+}
+
+switch x {
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
+  break
+@unknown default:
+  break
+}
+
+switch x {
+@unknown default:
+  break
+@unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   break
 }
