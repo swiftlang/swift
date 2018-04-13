@@ -700,6 +700,16 @@ private:
   // Rewriting the host function.
   PartitionedTensorProgram
   insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues);
+
+  // `oldResult` is a tensor in the original host program which has some use
+  // beyond the tensor end point, and `newResult` is its correpsponding tensor
+  // in the rewritten host program.
+  //
+  // This function balances the retain/release count of `newResult` in the
+  // rewritten host program, by inserting 0 or more strong_retain's right after
+  // the tensor end point.
+  void balanceRetainReleaseCount(SILValue oldResult, SILValue newResult,
+                                 SILBuilder &B);
 };
 } // end anonymous namespace
 
@@ -2657,6 +2667,117 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
   return result;
 }
 
+// If there exists a CFG path from `srcBlock` to `destBlock`, picks an abitrary
+// one, appends the blocks on that path to `path`, and returns true. Otherwise
+// returns false without modifying `path`.
+// `visitedBlocks` is updated with the blocks visited in all cases.
+static bool gatherBBsOnCFGPathHelper(
+    SILBasicBlock *srcBlock, SILBasicBlock *destBlock,
+    llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+    llvm::SmallVectorImpl<SILBasicBlock *> &path) {
+  visitedBlocks.insert(srcBlock);
+
+  // Optimistically assume `srcBlock` is on a path to `destBlock`. If such a
+  // path is not found, this update to `path` will be reverted.
+  path.push_back(srcBlock);
+
+  if (srcBlock == destBlock) return true;  // Done with DFS!
+
+  for (SILBasicBlock *childBB : srcBlock->getSuccessors()) {
+    // When the CFG has loops, `childBB` may have been visited, in which case we
+    // do not visit it again.
+    if (!visitedBlocks.count(childBB) &&
+        gatherBBsOnCFGPathHelper(childBB, destBlock, visitedBlocks, path))
+      return true;
+  }
+
+  path.pop_back();
+  return false;
+}
+
+// Finds an arbitrary CFG path from `srcBlock` to `destBlock` (requires that such
+// a path exists), and sets `pathset` to the blocks on that path.
+static void gatherBBsOnCFGPath(
+    SILBasicBlock *srcBlock, SILBasicBlock *destBlock,
+    llvm::SmallPtrSetImpl<SILBasicBlock *> &pathSet) {
+  llvm::SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+  llvm::SmallVector<SILBasicBlock *, 4> path;
+  bool foundPath =
+      gatherBBsOnCFGPathHelper(srcBlock, destBlock, visitedBlocks, path);
+  assert(foundPath);
+  for (auto *block : path) {
+    pathSet.insert(block);
+  }
+}
+
+// This function balances the retain/release count of `newResult` in the
+// rewritten host program at the tensor end point. The algorithm is:
+//
+// 1. Find a CFG path from basic block that defines `oldResult` (referred to as
+// `defBlock`) to the basic block that contains the tensor end point (referred
+// to as `endBlock`).
+// 2. Look at all uses of `oldResult` along that path, and compute the
+// retain/release balance, denoted by K, of those uses.
+// 3. Emit K strong_retain's right after the tensor end point.
+//
+// For example, let the CFG be:
+//   bb0 -> bb1; bb1 -> {bb2, bb3}; bb2 -> bb1
+// Let `defBlock` be bb0, and `endBlock` be bb3. In this case, we only need to
+// look at uses along the path of bb0 -> bb1 -> bb3. Ignoring bb2 is fine, since
+// the retain/release count at the entry of bb2 is guaranteed to equal the count
+// at the entry of bb3 (as bb2 and bb3 are both successors of bb1), and the
+// count at the exit of bb2 is guaranteed to equal the count at the end of bb0
+// (as both bb0 and bb2 are predecessors of bb1).
+void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
+                                                    SILValue newResult,
+                                                    SILBuilder &B) {
+  auto *defBlock = oldResult->getDefiningInstruction()->getParent();
+  auto *endBlock = B.getInsertionBB();
+  llvm::SmallPtrSet<SILBasicBlock *, 4> relevantBlocks;
+  gatherBBsOnCFGPath(defBlock, endBlock, relevantBlocks);
+
+  int retainReleaseBalance = 0;
+  for (auto UI = oldResult->use_begin(), UE = oldResult->use_end(); UI != UE;) {
+    auto *operand = *UI++;
+    auto user = operand->getUser();
+
+    // Ignore uses outside the CFG path from `defBlock` to `endBlock`.
+    if (!relevantBlocks.count(user->getParent())) continue;
+
+    // Ignore uses outside the tensor program region.
+    if (DI.dominates(tensorEndPoint, user)) continue;
+
+    if (isa<StrongRetainInst>(user)) {
+      ++retainReleaseBalance;
+      continue;
+    }
+
+    // Recall that tensor ops take arguments as +1 values, and they decremental
+    // the use count just like a release-typed instruction.
+    if (isa<StrongReleaseInst>(user) || tensorOpsSet.count(user)) {
+      --retainReleaseBalance;
+      continue;
+    }
+
+    // FIXME: properly handle BranchInst.
+    if (isa<BranchInst>(user)) {
+      retainReleaseBalance += 5;
+      continue;
+    }
+
+    oldResult->print(llvm::errs());
+    llvm_unreachable("Unhandled instruction type");
+  }
+
+  DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
+                     << " retains for result tensor :\n");
+  DEBUG(oldResult->print(llvm::dbgs()));
+  assert(retainReleaseBalance >= 0);
+  for (int i = 0; i < retainReleaseBalance; ++i) {
+    B.createStrongRetain(oldResult.getLoc(), newResult, Atomicity::Atomic);
+  }
+}
+
 /// Rewrite the host program, inserting a call to _TFCStartTensorComputation at
 /// the start point of the tensor function, passing in the tensor program
 /// itself, input tensor arguments etc.
@@ -2940,10 +3061,10 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
                   storeOwnership);
 
     // After moving the program region between tensor start and end points to
-    // the accelerator, we'll want to restore the retain/release balance of
-    // `result` in the host program at the tensor end point. This is done by
-    // emitting 0 or more strong_retain's.
-    int retainReleaseBalance = 0;
+    // the accelerator, we want to restore the retain/release balance of
+    // `result` in the host program at the tensor end point.
+    balanceRetainReleaseCount(result, newTH, B);
+
     // Manually walk the use list in a custom way to avoid invalidating the
     // iterator as we potentially change it.
     for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE; ) {
@@ -2959,29 +3080,6 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
         operand->set(newTH);
         continue;
       }
-
-      if (isa<StrongRetainInst>(user)) {
-        ++retainReleaseBalance;
-      } else if (isa<StrongReleaseInst>(user) || tensorOpsSet.count(user)) {
-        --retainReleaseBalance;
-      } else {
-        // FIXME: Handle uses across multiple basic blocks.
-        retainReleaseBalance += 5;
-
-        if (!isa<BranchInst>(user)) {
-          llvm::errs() << "Unhandled instruction type:\n";
-          result->print(llvm::errs());
-          assert(false);
-        }
-      }
-    }
-
-    DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
-                       << " retains for result tensor :\n");
-    DEBUG(result->print(llvm::dbgs()));
-    assert(retainReleaseBalance >= 0);
-    for (int i = 0; i < retainReleaseBalance; ++i) {
-      B.createStrongRetain(result.getLoc(), newTH, Atomicity::Atomic);
     }
   }
 
@@ -2990,8 +3088,6 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
 
   // dealloc_stack %0 : $*(CTensorHandle, CTensorHandle)
   B.createDeallocStack(loc, stackAlloc);
-
-
 
   // tensorComputation is the return value of _TFCStartTensorComputation.  By
   // construction, it is known to dominate all abort points and the finish point
