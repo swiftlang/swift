@@ -14,8 +14,8 @@ func checkHash(
   expected: UInt64,
   file: String = #file, line: UInt = #line
 ) {
-  var hasher = _Hasher(seed: seed)
-  hasher.append(bits: value)
+  var hasher = _Hasher(_seed: seed)
+  hasher.combine(bits: value)
   let hash = hasher.finalize()
   expectEqual(
     hash, Int(truncatingIfNeeded: expected),
@@ -49,11 +49,11 @@ HashingTestSuite.test("_Hasher/DefaultKey") {
   let defaultHash = _hashValue(for: value)
 
   var defaultHasher = _Hasher()
-  defaultHasher.append(bits: value)
+  defaultHasher.combine(bits: value)
   expectEqual(defaultHasher.finalize(), defaultHash)
 
-  var customHasher = _Hasher(seed: _Hasher._seed)
-  customHasher.append(bits: value)
+  var customHasher = _Hasher(_seed: _Hasher._seed)
+  customHasher.combine(bits: value)
   expectEqual(customHasher.finalize(), defaultHash)
 }
 

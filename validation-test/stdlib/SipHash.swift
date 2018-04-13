@@ -330,7 +330,7 @@ SipHashTests.test("${Self}.append(${data_type})").forEach(in: ${tests}) {
   var startIndex = 0
   let endIndex = test.input.count - (test.input.count % chunkSize)
   while startIndex != endIndex {
-    hasher.append(
+    hasher.combine(
       loadUnaligned${data_type}(
         from: Array(
           test.input[startIndex..<(startIndex+chunkSize)])))

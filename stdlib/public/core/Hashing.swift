@@ -165,26 +165,26 @@ internal struct _LegacyHasher {
   }
 
   @inline(__always)
-  internal mutating func append(_ value: Int) {
+  internal mutating func combine(_ value: Int) {
     _hash = (_hash == 0 ? value : _combineHashValues(_hash, value))
   }
 
   @inline(__always)
-  internal mutating func append(_ value: UInt) {
-    append(Int(bitPattern: value))
+  internal mutating func combine(_ value: UInt) {
+    combine(Int(bitPattern: value))
   }
 
   @inline(__always)
-  internal mutating func append(_ value: UInt32) {
-    append(Int(truncatingIfNeeded: value))
+  internal mutating func combine(_ value: UInt32) {
+    combine(Int(truncatingIfNeeded: value))
   }
 
   @inline(__always)
-  internal mutating func append(_ value: UInt64) {
+  internal mutating func combine(_ value: UInt64) {
     if UInt64.bitWidth > Int.bitWidth {
-      append(Int(truncatingIfNeeded: value ^ (value &>> 32)))
+      combine(Int(truncatingIfNeeded: value ^ (value &>> 32)))
     } else {
-      append(Int(truncatingIfNeeded: value))
+      combine(Int(truncatingIfNeeded: value))
     }
   }
 
@@ -212,7 +212,7 @@ public struct _Hasher {
 
   // NOT @inlinable
   @effects(releasenone)
-  public init(seed: (UInt64, UInt64)) {
+  public init(_seed seed: (UInt64, UInt64)) {
     self._core = Core(key: seed)
   }
 
@@ -250,40 +250,40 @@ public struct _Hasher {
 
   @inlinable
   @inline(__always)
-  public mutating func append<H: Hashable>(_ value: H) {
+  public mutating func combine<H: Hashable>(_ value: H) {
     value._hash(into: &self)
   }
 
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: UInt) {
-    _core.append(bits)
+  public mutating func combine(bits: UInt) {
+    _core.combine(bits)
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: UInt32) {
-    _core.append(bits)
+  public mutating func combine(bits: UInt32) {
+    _core.combine(bits)
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: UInt64) {
-    _core.append(bits)
+  public mutating func combine(bits: UInt64) {
+    _core.combine(bits)
   }
 
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: Int) {
-    _core.append(UInt(bitPattern: bits))
+  public mutating func combine(bits: Int) {
+    _core.combine(UInt(bitPattern: bits))
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: Int32) {
-    _core.append(UInt32(bitPattern: bits))
+  public mutating func combine(bits: Int32) {
+    _core.combine(UInt32(bitPattern: bits))
   }
   // NOT @inlinable
   @effects(releasenone)
-  public mutating func append(bits: Int64) {
-    _core.append(UInt64(bitPattern: bits))
+  public mutating func combine(bits: Int64) {
+    _core.combine(UInt64(bitPattern: bits))
   }
 
   // NOT @inlinable

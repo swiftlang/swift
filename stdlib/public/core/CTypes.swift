@@ -186,7 +186,7 @@ extension OpaquePointer: Hashable {
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(Int(Builtin.ptrtoint_Word(_rawValue)))
+    hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
 

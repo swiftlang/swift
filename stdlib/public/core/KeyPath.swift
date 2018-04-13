@@ -57,9 +57,9 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
       var buffer = $0
       while true {
         let (component, type) = buffer.next()
-        hasher.append(component.value)
+        hasher.combine(component.value)
         if let type = type {
-          hasher.append(unsafeBitCast(type, to: Int.self))
+          hasher.combine(unsafeBitCast(type, to: Int.self))
         } else {
           break
         }
@@ -447,9 +447,9 @@ internal struct ComputedPropertyID: Hashable {
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(value)
-    hasher.append(isStoredProperty)
-    hasher.append(isTableOffset)
+    hasher.combine(value)
+    hasher.combine(isStoredProperty)
+    hasher.combine(isTableOffset)
   }
 }
 
@@ -592,34 +592,34 @@ internal enum KeyPathComponent: Hashable {
         // hash value of the overall key path.
         // FIXME(hasher): hash witness should just mutate hasher directly
         if hash != 0 {
-          hasher.append(hash)
+          hasher.combine(hash)
         }
       }
     }
     switch self {
     case .struct(offset: let a):
-      hasher.append(0)
-      hasher.append(a)
+      hasher.combine(0)
+      hasher.combine(a)
     case .class(offset: let b):
-      hasher.append(1)
-      hasher.append(b)
+      hasher.combine(1)
+      hasher.combine(b)
     case .optionalChain:
-      hasher.append(2)
+      hasher.combine(2)
     case .optionalForce:
-      hasher.append(3)
+      hasher.combine(3)
     case .optionalWrap:
-      hasher.append(4)
+      hasher.combine(4)
     case .get(id: let id, get: _, argument: let argument):
-      hasher.append(5)
-      hasher.append(id)
+      hasher.combine(5)
+      hasher.combine(id)
       appendHashFromArgument(argument)
     case .mutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hasher.append(6)
-      hasher.append(id)
+      hasher.combine(6)
+      hasher.combine(id)
       appendHashFromArgument(argument)
     case .nonmutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hasher.append(7)
-      hasher.append(id)
+      hasher.combine(7)
+      hasher.combine(id)
       appendHashFromArgument(argument)
     }
   }
