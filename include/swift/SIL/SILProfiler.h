@@ -32,6 +32,9 @@ class SILCoverageMap;
 class SILFunction;
 class SILModule;
 
+/// Returns whether the given AST node requires profiling instrumentation.
+bool doesASTRequireProfiling(SILModule &M, ASTNode N);
+
 /// SILProfiler - Maps AST nodes to profile counters.
 class SILProfiler : public SILAllocated<SILProfiler> {
 private:
