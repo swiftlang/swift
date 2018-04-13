@@ -244,9 +244,9 @@ FixedPoint.test("${Self}.hashValue") {
 
     var hasher = _SipHash13(key: _Hasher._seed)
 %     if prepare_bit_pattern(input, word_bits, self_ty.is_signed) == input:
-    hasher.append(${input} as ${"" if self_ty.is_signed else "U"}Int)
+    hasher.combine(${input} as ${"" if self_ty.is_signed else "U"}Int)
 %     else:
-    hasher.append(input)
+    hasher.combine(input)
 %     end
     let expected = getInt(Int(truncatingIfNeeded: hasher.finalize()))
     expectEqual(expected, output, "input: \(input)")

@@ -909,7 +909,7 @@ extension ${Self}: Hashable {
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(Int(bitPattern: self))
+    hasher.combine(Int(bitPattern: self))
   }
 }
 

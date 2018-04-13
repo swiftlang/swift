@@ -80,7 +80,7 @@ struct ${Self} {
   /// This value holds the byte count and the pending bytes that haven't been
   /// compressed yet, in the format that the finalization step needs. (The least
   /// significant 56 bits hold the trailing bytes, while the most significant 8
-  /// bits hold the count of bytes appended so far, mod 256.)
+  /// bits hold the count of bytes combined so far, mod 256.)
   @usableFromInline
   internal var tailAndByteCount: UInt64 = 0
 
@@ -119,28 +119,28 @@ struct ${Self} {
   }
 
   @inline(__always)
-  public mutating func append(_ value: Int) {
-    append(UInt(bitPattern: value))
+  public mutating func combine(_ value: Int) {
+    combine(UInt(bitPattern: value))
   }
 
   @inline(__always)
-  public mutating func append(_ value: UInt) {
+  public mutating func combine(_ value: UInt) {
     % if word_bits == 64:
-    append(UInt64(_truncatingBits: value._lowWord))
+    combine(UInt64(_truncatingBits: value._lowWord))
     % elif word_bits == 32:
-    append(UInt32(_truncatingBits: value._lowWord))
+    combine(UInt32(_truncatingBits: value._lowWord))
     % else:
     fatalError("Unsupported word width")
     % end
   }
 
   @inline(__always)
-  public mutating func append(_ value: Int32) {
-    append(UInt32(bitPattern: value))
+  public mutating func combine(_ value: Int32) {
+    combine(UInt32(bitPattern: value))
   }
 
   @inline(__always)
-  public mutating func append(_ value: UInt32) {
+  public mutating func combine(_ value: UInt32) {
     let m = UInt64(_truncatingBits: value._lowWord)
     if byteCount & 4 == 0 {
       _sanityCheck(byteCount & 7 == 0 && tail == 0)
@@ -153,12 +153,12 @@ struct ${Self} {
   }
 
   @inline(__always)
-  public mutating func append(_ value: Int64) {
-    append(UInt64(bitPattern: value))
+  public mutating func combine(_ value: Int64) {
+    combine(UInt64(bitPattern: value))
   }
 
   @inline(__always)
-  public mutating func append(_ m: UInt64) {
+  public mutating func combine(_ m: UInt64) {
     if byteCount & 4 == 0 {
       _sanityCheck(byteCount & 7 == 0 && tail == 0)
       _compress(m)

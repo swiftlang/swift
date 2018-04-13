@@ -3715,12 +3715,12 @@ extension ${Self} : Hashable {
     // this, we should introduce a custom AnyHashable box for integer values
     // that sign-extends values to 64 bits.
     % if bits <= word_bits:
-    hasher.append(bits: _lowWord)
+    hasher.combine(bits: _lowWord)
     % elif bits == 2 * word_bits:
     if let word = ${"" if signed else "U"}Int(exactly: self) {
-      hasher.append(bits: word._lowWord)
+      hasher.combine(bits: word._lowWord)
     } else {
-      hasher.append(bits: UInt64(_value))
+      hasher.combine(bits: UInt64(_value))
     }
     % else:
     fatalError("Unsupported integer width")
