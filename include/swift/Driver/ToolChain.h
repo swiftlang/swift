@@ -54,9 +54,6 @@ protected:
   private:
     Compilation &C;
 
-    /// The limit for passing a list of files on the command line.
-    static const size_t TOO_MANY_FILES = 128;
-
   public:
     ArrayRef<const Job *> Inputs;
     ArrayRef<const Action *> InputActions;

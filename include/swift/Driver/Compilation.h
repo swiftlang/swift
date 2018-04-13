@@ -72,6 +72,10 @@ enum class PreserveOnSignal : bool {
 
 class Compilation {
   friend class PerformJobsState;
+public:
+  /// The filelist threshold value to pass to ensure file lists are never used
+  static const size_t NEVER_USE_FILELIST = SIZE_MAX;
+
 private:
   /// The DiagnosticEngine to which this Compilation should emit diagnostics.
   DiagnosticEngine &Diags;
@@ -195,6 +199,10 @@ private:
   /// -emit-loaded-module-trace, so no other job needs to do it.
   bool PassedEmitLoadedModuleTraceToFrontendJob = false;
 
+  /// The limit for the number of files to pass on the command line. Beyond this
+  /// limit filelists will be used.
+  size_t FilelistThreshold;
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -212,6 +220,7 @@ public:
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+              size_t FilelistThreshold,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
@@ -303,6 +312,10 @@ public:
 
   void setLastBuildTime(llvm::sys::TimePoint<> time) {
     LastBuildTime = time;
+  }
+
+  size_t getFilelistThreshold() const {
+    return FilelistThreshold;
   }
 
   /// Requests the path to a file containing all input source files. This can
