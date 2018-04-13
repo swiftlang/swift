@@ -2993,7 +2993,7 @@ void extendLifetimeToEndOfFunction(SILFunction &Fn,
 
   SILBuilderWithScope B(Cvt);
   auto NewCvt = B.createConvertEscapeToNoEscape(
-      Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
+      Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
   Cvt->replaceAllUsesWith(NewCvt);
   Cvt->eraseFromParent();
   Cvt = NewCvt;
@@ -3099,7 +3099,7 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
   {
     SILBuilderWithScope B(Cvt);
     auto NewCvt = B.createConvertEscapeToNoEscape(
-        Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
+        Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
     Cvt->replaceAllUsesWith(NewCvt);
     Cvt->eraseFromParent();
     Cvt = NewCvt;

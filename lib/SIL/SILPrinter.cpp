@@ -1436,6 +1436,7 @@ public:
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
+          << (CI->isEscapedByUser() ? "[escaped] " : "")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
