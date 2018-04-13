@@ -16,7 +16,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include <functional>
 
 namespace swift {
@@ -27,9 +26,6 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
 
   /// The SILModule that we are loading from.
   SILModule &Mod;
-
-  /// The SILLoader that this visitor is using to link.
-  SerializedSILLoader *Loader;
 
   /// Break cycles visiting recursive protocol conformances.
   llvm::DenseSet<ProtocolConformance *> VisitedConformances;
@@ -45,9 +41,8 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
   LinkingMode Mode;
 
 public:
-  SILLinkerVisitor(SILModule &M, SerializedSILLoader *L,
-                   SILModule::LinkingMode LinkingMode)
-      : Mod(M), Loader(L), Worklist(), FunctionDeserializationWorklist(),
+  SILLinkerVisitor(SILModule &M, SILModule::LinkingMode LinkingMode)
+      : Mod(M), Worklist(), FunctionDeserializationWorklist(),
         Mode(LinkingMode) {}
 
   /// Process F, recursively deserializing any thing F may reference.
@@ -79,10 +74,13 @@ public:
   bool visitMetatypeInst(MetatypeInst *MI);
 
 private:
-  /// Add a function to our function worklist for processing.
-  void addFunctionToWorklist(SILFunction *F) {
-    FunctionDeserializationWorklist.push_back(F);
-  }
+  /// Cause a function to be deserialized, and visit all other functions
+  /// referenced from this function according to the linking mode.
+  bool addFunctionToWorklist(SILFunction *F);
+
+  /// Consider a function for deserialization if the current linking mode
+  /// requires it.
+  bool maybeAddFunctionToWorklist(SILFunction *F);
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
