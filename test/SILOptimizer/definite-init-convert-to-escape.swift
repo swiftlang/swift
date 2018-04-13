@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -disable-objc-attr-requires-foundation-module -enable-sil-ownership -Xllvm -sil-di-disable-convert-escape-to-noescape-switch-peephole %s | %FileCheck %s --check-prefix=NOPEEPHOLE
+// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -disable-objc-attr-requires-foundation-module -enable-sil-ownership -Xllvm -sil-disable-convert-escape-to-noescape-switch-peephole %s | %FileCheck %s --check-prefix=NOPEEPHOLE
 
 // REQUIRES: objc_interop
 
