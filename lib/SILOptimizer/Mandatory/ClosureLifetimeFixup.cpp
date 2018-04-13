@@ -65,8 +65,8 @@ static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *SEI) {
 
 /// Extend the lifetime of the convert_escape_to_noescape's operand to the end
 /// of the function.
-void extendLifetimeToEndOfFunction(SILFunction &Fn,
-                                   ConvertEscapeToNoEscapeInst *Cvt) {
+static void extendLifetimeToEndOfFunction(SILFunction &Fn,
+                                          ConvertEscapeToNoEscapeInst *Cvt) {
   auto EscapingClosure = Cvt->getOperand();
   auto EscapingClosureTy = EscapingClosure->getType();
   auto OptionalEscapingClosureTy = SILType::getOptionalType(EscapingClosureTy);
@@ -115,7 +115,7 @@ void extendLifetimeToEndOfFunction(SILFunction &Fn,
   }
 }
 
-SILInstruction *lookThroughRebastractionUsers(
+static SILInstruction *lookThroughRebastractionUsers(
     SILInstruction *Inst,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
 
@@ -158,7 +158,7 @@ SILInstruction *lookThroughRebastractionUsers(
                                  SingleNonDebugNonRefCountUser, Memoized));
 }
 
-bool tryExtendLifetimeToLastUse(
+static bool tryExtendLifetimeToLastUse(
     ConvertEscapeToNoEscapeInst *Cvt,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
   // Don't optimize converts that might have been escaped by the function call
