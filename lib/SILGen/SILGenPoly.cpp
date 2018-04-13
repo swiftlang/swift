@@ -2937,8 +2937,9 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
   // Handle the escaping to noescape conversion.
   assert(expectedType->isNoEscape());
-  return SGF.B.createConvertEscapeToNoEscape(loc, thunkedFn,
-                               SILType::getPrimitiveObjectType(expectedType));
+  return SGF.B.createConvertEscapeToNoEscape(
+      loc, thunkedFn, SILType::getPrimitiveObjectType(expectedType), false,
+      true);
 }
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
@@ -3105,7 +3106,7 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   } else if (newFnType != expectedFnType) {
     // Escaping to noescape conversion.
     SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
-    fn = SGF.B.createConvertEscapeToNoEscape(Loc, fn, resTy,
+    fn = SGF.B.createConvertEscapeToNoEscape(Loc, fn, resTy, false,
                                              postponeToNoEscapeCleanup);
   }
 
