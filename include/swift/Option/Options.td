@@ -103,7 +103,7 @@ def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
-  InternalDebugOpt, HelpText<"Pass input files as filelists if there are more than <n>">,
+  InternalDebugOpt, HelpText<"Pass input or output file names as filelists if there are more than <n>">,
   MetaVarName<"<n>">;
 def driver_filelist_threshold_EQ : Joined<["-"], "driver-filelist-threshold=">,
   Alias<driver_filelist_threshold>;
