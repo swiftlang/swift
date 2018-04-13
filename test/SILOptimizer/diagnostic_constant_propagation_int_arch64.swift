@@ -11,7 +11,7 @@
 //
 // FIXME: <rdar://problem/29937936> False negatives when using integer initializers
 //
-// FIXME: <rdar://problem/19623142> A false negative that happens only in REPL
+// FIXME: <rdar://problem/39193272> A false negative that happens only in REPL
 
 func testArithmeticOverflow_Int_64bit() {
   do {
@@ -28,7 +28,7 @@ func testArithmeticOverflow_Int_64bit() {
     var _: Int = -(-0x7fff_ffff_ffff_ffff) // OK
     var _: Int = -(-0x8000_0000_0000_0000) // expected-error {{arithmetic operation '0 - -9223372036854775808' (on signed 64-bit integer type) results in an overflow}}
     // FIXME: Missing diagnostic in REPL:
-    // <rdar://problem/19623142> Overflow in arithmetic negation is not detected
+    // <rdar://problem/39193272> Overflow in arithmetic negation is not detected
     // at compile time when running in REPL
   }
 
