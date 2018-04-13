@@ -32,6 +32,38 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 //                               Linker Helpers
 //===----------------------------------------------------------------------===//
 
+bool SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
+  assert(F->isExternalDeclaration());
+
+  DEBUG(llvm::dbgs() << "Imported function: "
+                     << F->getName() << "\n");
+  if (Mod.loadFunction(F)) {
+    if (F->isExternalDeclaration())
+      return false;
+
+    F->setBare(IsBare);
+    F->verify();
+    Worklist.push_back(F);
+    ++NumFuncLinked;
+
+    return true;
+  }
+
+  return false;
+}
+
+/// Deserialize a function and add it to the worklist for processing.
+bool SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
+  // Don't need to do anything if the function already has a body.
+  if (!F->isExternalDeclaration())
+    return false;
+
+  if (isLinkAll() || hasSharedVisibility(F->getLinkage()))
+    return addFunctionToWorklist(F);
+
+  return false;
+}
+
 /// Process F, recursively deserializing any thing F may reference.
 bool SILLinkerVisitor::processFunction(SILFunction *F) {
   if (Mode == LinkingMode::LinkNone)
@@ -39,27 +71,25 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 
   // If F is a declaration, first deserialize it.
   if (F->isExternalDeclaration()) {
-    auto *NewFn = Loader->lookupSILFunction(F);
-
-    if (!NewFn || NewFn->isExternalDeclaration())
+    if (!addFunctionToWorklist(F))
       return false;
-
-    F = NewFn;
+  } else {
+    Worklist.push_back(F);
   }
 
-  ++NumFuncLinked;
-
-  // Try to transitively deserialize everything referenced by this
-  // function.
-  Worklist.push_back(F);
   process();
-
-  // Since we successfully processed at least one function, return true.
   return true;
 }
 
 /// Deserialize the given VTable all SIL the VTable transitively references.
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
+  // Devirtualization already deserializes vtables as needed in both the
+  // mandatory and performance pipelines, and we don't support specialized
+  // vtables that might have shared linkage yet, so this is only needed in
+  // the performance pipeline to deserialize more functions early, and expose
+  // optimization opportunities.
+  assert(isLinkAll());
+
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
   if (!Vtbl)
@@ -70,10 +100,9 @@ bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // for processing.
   bool Result = false;
   for (auto P : Vtbl->getEntries()) {
-    if (P.Implementation->isExternalDeclaration()) {
-      Result = true;
-      addFunctionToWorklist(P.Implementation);
-    }
+    // Deserialize and recursively walk any vtable entries that do not have
+    // bodies yet.
+    Result |= maybeAddFunctionToWorklist(P.Implementation);
   }
   return Result;
 }
@@ -119,18 +148,7 @@ bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
 }
 
 bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
-  // Needed to handle closures which are no longer applied, but are left
-  // behind as dead code. This shouldn't happen, but if it does don't get into
-  // an inconsistent state.
-  SILFunction *Callee = FRI->getReferencedFunction();
-
-  if (isLinkAll() ||
-      hasSharedVisibility(Callee->getLinkage())) {
-    addFunctionToWorklist(FRI->getReferencedFunction());
-    return true;
-  }
-
-  return false;
+  return maybeAddFunctionToWorklist(FRI->getReferencedFunction());
 }
 
 // Eagerly visiting all used conformances leads to a large blowup
@@ -214,11 +232,10 @@ bool SILLinkerVisitor::visitProtocolConformance(
       if (!E.getMethodWitness().Witness)
         continue;
 
-      // Otherwise if it is the requirement we are looking for or we just want
-      // to deserialize everything, add the function to the list of functions
-      // to deserialize.
+      // Otherwise, deserialize the witness if it has shared linkage, or if
+      // we were asked to deserialize everything.
       performFuncDeserialization = true;
-      addFunctionToWorklist(E.getMethodWitness().Witness);
+      maybeAddFunctionToWorklist(E.getMethodWitness().Witness);
       break;
     }
     
@@ -361,33 +378,7 @@ bool SILLinkerVisitor::process() {
 
     for (auto &BB : *Fn) {
       for (auto &I : BB) {
-        // Should we try linking?
-        if (visit(&I)) {
-          for (auto *F : FunctionDeserializationWorklist) {
-
-            DEBUG(llvm::dbgs() << "Imported function: "
-                               << F->getName() << "\n");
-            F->setBare(IsBare);
-
-            if (F->isExternalDeclaration()) {
-              if (auto *NewFn = Loader->lookupSILFunction(F)) {
-                if (NewFn->isExternalDeclaration())
-                  continue;
-
-                NewFn->verify();
-                Worklist.push_back(NewFn);
-                Result = true;
-
-                ++NumFuncLinked;
-              }
-            }
-          }
-          FunctionDeserializationWorklist.clear();
-        } else {
-          assert(FunctionDeserializationWorklist.empty() &&
-                 "Worklist should "
-                 "always be empty if visit does not return true.");
-        }
+        Result |= visit(&I);
       }
     }
   }
