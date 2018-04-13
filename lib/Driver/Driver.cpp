@@ -2203,6 +2203,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   // 3. Determine the CommandOutput for the job.
   StringRef BaseInput;
   StringRef PrimaryInput;
+
   if (!InputActions.empty()) {
     // Use the first InputAction as our BaseInput and PrimaryInput.
     const InputAction *IA = cast<InputAction>(InputActions[0]);
@@ -2215,6 +2216,16 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     BaseInput = Out.getBaseInput(i);
     // Use the first Job's Primary Output as our PrimaryInput.
     PrimaryInput = Out.getPrimaryOutputFilenames()[i];
+  }
+
+  // With -index-file option, the primary input is the one passed with
+  // -index-file-path.
+  // FIXME: Figure out how this better fits within the driver infrastructure.
+  if (JA->getType() == file_types::TY_IndexData) {
+    if (Arg *A = C.getArgs().getLastArg(options::OPT_index_file_path)) {
+      BaseInput = A->getValue();
+      PrimaryInput = A->getValue();
+    }
   }
 
   const TypeToPathMap *OutputMap = nullptr;
