@@ -241,12 +241,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
   ArgumentScope argScope(SGF, loc);
-  PostponedCleanup postpone(SGF);
   RValue result =
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
                     ManagedValue::forUnmanaged(witnessRef), subs,
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
-                    calleeTypeInfo, ApplyOptions::None, context, postpone);
+                    calleeTypeInfo, ApplyOptions::None, context);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -941,8 +940,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
   return B.createConvertEscapeToNoEscape(
-      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy), false,
-      true);
+      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy), false);
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
@@ -1761,11 +1759,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
         *this, calleeTypeInfo, fd, context);
     ArgumentScope argScope(*this, fd);
-    PostponedCleanup postpone(*this);
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
-                  ApplyOptions::None, context, postpone)
+                  ApplyOptions::None, context)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {
