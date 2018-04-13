@@ -751,7 +751,7 @@ def index_store_path : Separate<["-"], "index-store-path">,
   HelpText<"Store indexing data to <path>">;
 
 def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[NoInteractiveOption]>,
   HelpText<"Avoid indexing system modules">;
 
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
