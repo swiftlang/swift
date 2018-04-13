@@ -37,15 +37,13 @@ bool SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
 
   DEBUG(llvm::dbgs() << "Imported function: "
                      << F->getName() << "\n");
-  if (auto *NewFn = Loader->lookupSILFunction(F)) {
-    if (NewFn->isExternalDeclaration())
+  if (Mod.loadFunction(F)) {
+    if (F->isExternalDeclaration())
       return false;
 
-    assert(NewFn == F && "This shouldn't happen");
-
-    NewFn->setBare(IsBare);
-    NewFn->verify();
-    Worklist.push_back(NewFn);
+    F->setBare(IsBare);
+    F->verify();
+    Worklist.push_back(F);
     ++NumFuncLinked;
 
     return true;

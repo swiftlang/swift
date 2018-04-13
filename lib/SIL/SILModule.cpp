@@ -495,7 +495,7 @@ bool SILModule::loadFunction(SILFunction *F) {
 }
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(F);
+  return SILLinkerVisitor(*this, Mode).processFunction(F);
 }
 
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
