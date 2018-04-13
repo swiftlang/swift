@@ -2183,7 +2183,6 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   // 3. Determine the CommandOutput for the job.
   StringRef BaseInput;
   StringRef PrimaryInput;
-
   if (!InputActions.empty()) {
     // Use the first InputAction as our BaseInput and PrimaryInput.
     const InputAction *IA = cast<InputAction>(InputActions[0]);
