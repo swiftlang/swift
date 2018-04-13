@@ -2519,6 +2519,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
     DeclResult = parseDeclDeinit(Flags, Attributes);
     break;
   case tok::kw_operator:
+    DeclParsingContext.setCreateSyntax(SyntaxKind::OperatorDecl);
     DeclResult = parseDeclOperator(Flags, Attributes);
     break;
   case tok::kw_precedencegroup:
@@ -6304,7 +6305,9 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   SourceLoc colonLoc;
   Identifier precedenceGroupName;
   SourceLoc precedenceGroupNameLoc;
-  if (consumeIf(tok::colon, colonLoc)) {
+  if (Tok.is(tok::colon)) {
+    SyntaxParsingContext GroupCtxt(SyntaxContext, SyntaxKind::InfixOperatorGroup);
+    colonLoc = consumeToken();
     if (Tok.is(tok::identifier)) {
       precedenceGroupName = Context.getIdentifier(Tok.getText());
       precedenceGroupNameLoc = consumeToken(tok::identifier);

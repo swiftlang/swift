@@ -518,6 +518,21 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
+    # e.g. "#selector(getter:Foo.bar)"
+    Node('ObjcSelectorExpr', kind='Expr',
+         traits=['Parenthesized'],
+         children=[
+             Child('PoundSelector', kind='PoundSelectorToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Kind', kind='ContextualKeywordToken',
+                   text_choices=['getter', 'setter'],
+                   is_optional=True),
+             Child('Colon', kind='ColonToken',
+                   is_optional=True),
+             Child('Name', kind='Expr'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
     # <#content#>
     Node('EditorPlaceholderExpr', kind='Expr',
          children=[

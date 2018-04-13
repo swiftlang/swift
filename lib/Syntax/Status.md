@@ -43,8 +43,6 @@
   * IsExpr
   * AsExpr
   * ArrowExpr
-
-### Not-started (UnknownExpr):
   * ObjCSelectorExpr
 
 ## Declaration
@@ -67,12 +65,8 @@
   * DestructorDecl
   * EnumDecl
   * EnumCaseDecl
+  * OperatorDecl
   * PrecedenceGroupDecl
-
-### Not-started (UnknownDecl):
-  * InfixOperatorDecl
-  * PrefixOperatorDecl
-  * PostfixOperatorDecl
 
 ## Statement
 ### Done:
