@@ -11,19 +11,15 @@ import vtable_deserialization_input
 Class.firstMethod()
 
 
-// For now, we also deserialize the body of firstMethod(), even though it
-// is not transparent.
-// CHECK-LABEL: sil public_external [serialized] @$S28vtable_deserialization_input5ClassC11firstMethodyyFZ : $@convention(method) (@thick Class.Type) -> () {
+// The methods should not be deserialized in the mandatory pipeline.
+
+// CHECK-LABEL: sil [serialized] @$S28vtable_deserialization_input5ClassC11firstMethodyyFZ : $@convention(method) (@thick Class.Type) -> (){{$}}
 // OPT-LABEL: sil public_external @$S28vtable_deserialization_input5ClassC11firstMethodyyFZ : $@convention(method) (@thick Class.Type) -> () {
 
-// The other two methods should not be deserialized in the mandatory
-// pipeline.
-
-// FIXME: Temporary regression
-// CHECK-LABEL: sil public_external [serialized] @$S28vtable_deserialization_input5ClassC12secondMethodyyFZ : $@convention(method) (@thick Class.Type) -> () {
+// CHECK-LABEL: sil [serialized] @$S28vtable_deserialization_input5ClassC12secondMethodyyFZ : $@convention(method) (@thick Class.Type) -> (){{$}}
 // OPT-LABEL: sil public_external @$S28vtable_deserialization_input5ClassC12secondMethodyyFZ : $@convention(method) (@thick Class.Type) -> () {
 
-// CHECK-LABEL: sil public_external [serialized] @$S28vtable_deserialization_input5ClassC11thirdMethodyyFZ : $@convention(method) (@thick Class.Type) -> () {
+// CHECK-LABEL: sil [serialized] @$S28vtable_deserialization_input5ClassC11thirdMethodyyFZ : $@convention(method) (@thick Class.Type) -> (){{$}}
 // OPT-LABEL: sil public_external @$S28vtable_deserialization_input5ClassC11thirdMethodyyFZ : $@convention(method) (@thick Class.Type) -> () {
 
 // Make sure we deserialized the vtable.
