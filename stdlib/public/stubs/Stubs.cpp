@@ -473,9 +473,9 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   ValueStream >> ParsedValue;
   *outResult = ParsedValue;
 
-  int pos = ValueStream.tellg();
+  std::streamoff pos = ValueStream.tellg();
   if (ValueStream.eof())
-    pos = strlen(nptr);
+    pos = static_cast<std::streamoff>(strlen(nptr));
   if (pos <= 0)
     return nullptr;
 
