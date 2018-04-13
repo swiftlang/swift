@@ -490,11 +490,15 @@ public:
   /// \return null if this module has no such function
   SILFunction *lookUpFunction(SILDeclRef fnRef);
 
+  /// Attempt to deserialize the SILFunction. Returns true if deserialization
+  /// succeeded, false otherwise.
+  bool loadFunction(SILFunction *F);
+
   /// Attempt to link the SILFunction. Returns true if linking succeeded, false
   /// otherwise.
   ///
   /// \return false if the linking failed.
-  bool linkFunction(SILFunction *Fun,
+  bool linkFunction(SILFunction *F,
                     LinkingMode LinkAll = LinkingMode::LinkNormal);
 
   /// Check if a given function exists in any of the modules with a
