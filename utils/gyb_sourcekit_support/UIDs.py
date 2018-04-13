@@ -125,7 +125,6 @@ UID_KEYS = [
     KEY('Names', 'key.names'),
     KEY('UIDs', 'key.uids'),
     KEY('SyntacticOnly', 'key.syntactic_only'),
-    KEY('Actionable', 'key.actionable'),
     KEY('ParentLoc', 'key.parent_loc'),
     KEY('IsTestCandidate', 'key.is_test_candidate'),
     KEY('Overrides', 'key.overrides'),
