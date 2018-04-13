@@ -468,49 +468,36 @@ internal enum _SubSequenceSubscriptOnRangeMode {
   }
 }
 
-%{
-  from gyb_stdlib_support import collectionForTraversal
-  def testConstraints(protocol):
-    return '''
-    C : %(protocol)s,
-    CollectionWithEquatableElement : %(protocol)s,
-    CollectionWithEquatableElement.Iterator.Element : Equatable
-  ''' % locals()
-
-  testParams = '''
-    _ testNamePrefix: String = "",
-    makeCollection: @escaping ([C.Iterator.Element]) -> C,
-    wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
-    extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
-
-    makeCollectionOfEquatable: @escaping (
-      [CollectionWithEquatableElement.Iterator.Element]
-    ) -> CollectionWithEquatableElement,
-
-    wrapValueIntoEquatable: @escaping (
-      MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
-
-    extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
-
-    resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1,
-    outOfBoundsSubscriptOffset: Int = 1,
-    collectionIsBidirectional: Bool
-  '''
-
-  import re
-  forwardTestArgs = ',\n    '.join(
-    [ x.group(1) + ': ' + x.group(1)
-      for x in re.finditer(r'([a-zA-Z0-9_]+):', testParams) ]
-  ).replace('testNamePrefix: ', '\n    ')
-}%
 extension TestSuite {
   public func addCollectionTests<
     C, CollectionWithEquatableElement
   >(
-    ${testParams} = false
+
+  _ testNamePrefix: String = "",
+  makeCollection: @escaping ([C.Iterator.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
+  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+
+  makeCollectionOfEquatable: @escaping (
+    [CollectionWithEquatableElement.Iterator.Element]
+  ) -> CollectionWithEquatableElement,
+
+  wrapValueIntoEquatable: @escaping (
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  outOfBoundsIndexOffset: Int = 1,
+  outOfBoundsSubscriptOffset: Int = 1,
+  collectionIsBidirectional: Bool
+ = false
   ) where
-    ${testConstraints('Collection')} {
+
+  C : Collection,
+  CollectionWithEquatableElement : Collection,
+  CollectionWithEquatableElement.Iterator.Element : Equatable
+ {
 
     var testNamePrefix = testNamePrefix
 
@@ -1166,15 +1153,49 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-    self.addCommonTests(${forwardTestArgs})
+    self.addCommonTests(
+    testNamePrefix,
+    makeCollection: makeCollection,
+    wrapValue: wrapValue,
+    extractValue: extractValue,
+    makeCollectionOfEquatable: makeCollectionOfEquatable,
+    wrapValueIntoEquatable: wrapValueIntoEquatable,
+    extractValueFromEquatable: extractValueFromEquatable,
+    resiliencyChecks: resiliencyChecks,
+    outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+    outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
+    collectionIsBidirectional: collectionIsBidirectional)
   } // addCollectionTests
 
   public func addBidirectionalCollectionTests<
     C, CollectionWithEquatableElement
   >(
-    ${testParams} = true
+
+  _ testNamePrefix: String = "",
+  makeCollection: @escaping ([C.Iterator.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
+  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+
+  makeCollectionOfEquatable: @escaping (
+    [CollectionWithEquatableElement.Iterator.Element]
+  ) -> CollectionWithEquatableElement,
+
+  wrapValueIntoEquatable: @escaping (
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  outOfBoundsIndexOffset: Int = 1,
+  outOfBoundsSubscriptOffset: Int = 1,
+  collectionIsBidirectional: Bool
+ = true
   ) where
-    ${testConstraints('BidirectionalCollection')} {
+
+  C : BidirectionalCollection,
+  CollectionWithEquatableElement : BidirectionalCollection,
+  CollectionWithEquatableElement.Iterator.Element : Equatable
+ {
 
     var testNamePrefix = testNamePrefix
 
@@ -1184,7 +1205,18 @@ extension TestSuite {
       return
     }
 
-    addCollectionTests(${forwardTestArgs})
+    addCollectionTests(
+    testNamePrefix,
+    makeCollection: makeCollection,
+    wrapValue: wrapValue,
+    extractValue: extractValue,
+    makeCollectionOfEquatable: makeCollectionOfEquatable,
+    wrapValueIntoEquatable: wrapValueIntoEquatable,
+    extractValueFromEquatable: extractValueFromEquatable,
+    resiliencyChecks: resiliencyChecks,
+    outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+    outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
+    collectionIsBidirectional: collectionIsBidirectional)
 
     func makeWrappedCollection(_ elements: [OpaqueValue<Int>]) -> C {
       return makeCollection(elements.map(wrapValue))
@@ -1484,15 +1516,49 @@ extension TestSuite {
 
     //===------------------------------------------------------------------===//
 
-    self.addCommonTests(${forwardTestArgs})
+    self.addCommonTests(
+    testNamePrefix,
+    makeCollection: makeCollection,
+    wrapValue: wrapValue,
+    extractValue: extractValue,
+    makeCollectionOfEquatable: makeCollectionOfEquatable,
+    wrapValueIntoEquatable: wrapValueIntoEquatable,
+    extractValueFromEquatable: extractValueFromEquatable,
+    resiliencyChecks: resiliencyChecks,
+    outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+    outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
+    collectionIsBidirectional: collectionIsBidirectional)
   } // addBidirectionalCollectionTests
 
   public func addRandomAccessCollectionTests<
     C, CollectionWithEquatableElement
   >(
-    ${testParams} = true
+
+  _ testNamePrefix: String = "",
+  makeCollection: @escaping ([C.Iterator.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
+  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+
+  makeCollectionOfEquatable: @escaping (
+    [CollectionWithEquatableElement.Iterator.Element]
+  ) -> CollectionWithEquatableElement,
+
+  wrapValueIntoEquatable: @escaping (
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  outOfBoundsIndexOffset: Int = 1,
+  outOfBoundsSubscriptOffset: Int = 1,
+  collectionIsBidirectional: Bool
+ = true
   ) where
-    ${testConstraints('RandomAccessCollection')} {
+
+  C : RandomAccessCollection,
+  CollectionWithEquatableElement : RandomAccessCollection,
+  CollectionWithEquatableElement.Iterator.Element : Equatable
+ {
 
     var testNamePrefix = testNamePrefix
 
@@ -1502,7 +1568,18 @@ extension TestSuite {
       return
     }
 
-    addBidirectionalCollectionTests(${forwardTestArgs})
+    addBidirectionalCollectionTests(
+    testNamePrefix,
+    makeCollection: makeCollection,
+    wrapValue: wrapValue,
+    extractValue: extractValue,
+    makeCollectionOfEquatable: makeCollectionOfEquatable,
+    wrapValueIntoEquatable: wrapValueIntoEquatable,
+    extractValueFromEquatable: extractValueFromEquatable,
+    resiliencyChecks: resiliencyChecks,
+    outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+    outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
+    collectionIsBidirectional: collectionIsBidirectional)
 
     testNamePrefix += String(describing: C.Type.self)
 
@@ -1539,16 +1616,49 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-    self.addCommonTests(${forwardTestArgs})
+    self.addCommonTests(
+    testNamePrefix,
+    makeCollection: makeCollection,
+    wrapValue: wrapValue,
+    extractValue: extractValue,
+    makeCollectionOfEquatable: makeCollectionOfEquatable,
+    wrapValueIntoEquatable: wrapValueIntoEquatable,
+    extractValueFromEquatable: extractValueFromEquatable,
+    resiliencyChecks: resiliencyChecks,
+    outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+    outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset,
+    collectionIsBidirectional: collectionIsBidirectional)
   } // addRandomAccessCollectionTests
 
-% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
   func addCommonTests<
     C, CollectionWithEquatableElement
   >(
-    ${testParams}
+
+  _ testNamePrefix: String = "",
+  makeCollection: @escaping ([C.Iterator.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
+  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+
+  makeCollectionOfEquatable: @escaping (
+    [CollectionWithEquatableElement.Iterator.Element]
+  ) -> CollectionWithEquatableElement,
+
+  wrapValueIntoEquatable: @escaping (
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  outOfBoundsIndexOffset: Int = 1,
+  outOfBoundsSubscriptOffset: Int = 1,
+  collectionIsBidirectional: Bool
+
   ) where
-    ${testConstraints(collectionForTraversal(Traversal))} {
+
+  C : Collection,
+  CollectionWithEquatableElement : Collection,
+  CollectionWithEquatableElement.Iterator.Element : Equatable
+ {
 
     if !checksAdded.insert(
         "\(testNamePrefix).\(C.self).\(#function)"
@@ -1560,8 +1670,7 @@ extension TestSuite {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
     }
 
-%   for function_name in ['index', 'formIndex']:
-    self.test("\(testNamePrefix).${function_name}(after:)/semantics") {
+    self.test("\(testNamePrefix).index(after:)/semantics") {
       for test in indexAfterTests {
         let c = toCollection(test.start..<test.end)
         var currentIndex = c.startIndex
@@ -1569,16 +1678,24 @@ extension TestSuite {
         repeat {
           expectEqual(counter, extractValue(c[currentIndex]).value,
             stackTrace: SourceLocStack().with(test.loc))
-%     if function_name is 'index':
           currentIndex = c.index(after: currentIndex)
-%     else:
-          c.formIndex(after: &currentIndex)
-%     end
           counter += 1
         } while counter < test.end
       }
     }
-%   end
+    self.test("\(testNamePrefix).formIndex(after:)/semantics") {
+      for test in indexAfterTests {
+        let c = toCollection(test.start..<test.end)
+        var currentIndex = c.startIndex
+        var counter = test.start
+        repeat {
+          expectEqual(counter, extractValue(c[currentIndex]).value,
+            stackTrace: SourceLocStack().with(test.loc))
+          c.formIndex(after: &currentIndex)
+          counter += 1
+        } while counter < test.end
+      }
+    }
 
     self.test("\(testNamePrefix)/distance(from:to:)/semantics")
       .forEach(in: distanceFromToTests) {
@@ -1637,31 +1754,36 @@ extension TestSuite {
         stackTrace: SourceLocStack().with(test.loc))
     }
 
-%   for function_name in ['index', 'formIndex']:
-    self.test("\(testNamePrefix)/${function_name}(_:offsetBy: -n)/semantics")
+    self.test("\(testNamePrefix)/index(_:offsetBy: -n)/semantics")
       .forEach(
         in: indexOffsetByTests.filter { $0.limit == nil && $0.distance < 0 }
       ) {
       test in
       let c = toCollection(0..<20)
-%     if function_name is 'index':
       let start = c.nthIndex(test.startOffset)
-%     else:
-      var new = c.nthIndex(test.startOffset)
-%     end
 
       if test.expectedOffset! < 0 || !collectionIsBidirectional {
         expectCrashLater()
       }
-%     if function_name is 'index':
       let new = c.index(start, offsetBy: numericCast(test.distance))
-%     else:
-      c.formIndex(&new, offsetBy: numericCast(test.distance))
-%     end
       expectEqual(test.expectedOffset!, extractValue(c[new]).value,
         stackTrace: SourceLocStack().with(test.loc))
     }
-%   end
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: -n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      var new = c.nthIndex(test.startOffset)
+
+      if test.expectedOffset! < 0 || !collectionIsBidirectional {
+        expectCrashLater()
+      }
+      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
 
     self.test("\(testNamePrefix)/index(_:offsetBy: n, limitedBy:)/semantics") {
       for test in indexOffsetByTests.filter(
@@ -1757,5 +1879,502 @@ extension TestSuite {
     }
 
   }
-% end
+  func addCommonTests<
+    C, CollectionWithEquatableElement
+  >(
+
+  _ testNamePrefix: String = "",
+  makeCollection: @escaping ([C.Iterator.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
+  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+
+  makeCollectionOfEquatable: @escaping (
+    [CollectionWithEquatableElement.Iterator.Element]
+  ) -> CollectionWithEquatableElement,
+
+  wrapValueIntoEquatable: @escaping (
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  outOfBoundsIndexOffset: Int = 1,
+  outOfBoundsSubscriptOffset: Int = 1,
+  collectionIsBidirectional: Bool
+
+  ) where
+
+  C : BidirectionalCollection,
+  CollectionWithEquatableElement : BidirectionalCollection,
+  CollectionWithEquatableElement.Iterator.Element : Equatable
+ {
+
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
+      return
+    }
+
+    func toCollection(_ r: Range<Int>) -> C {
+      return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
+    }
+
+    self.test("\(testNamePrefix).index(after:)/semantics") {
+      for test in indexAfterTests {
+        let c = toCollection(test.start..<test.end)
+        var currentIndex = c.startIndex
+        var counter = test.start
+        repeat {
+          expectEqual(counter, extractValue(c[currentIndex]).value,
+            stackTrace: SourceLocStack().with(test.loc))
+          currentIndex = c.index(after: currentIndex)
+          counter += 1
+        } while counter < test.end
+      }
+    }
+    self.test("\(testNamePrefix).formIndex(after:)/semantics") {
+      for test in indexAfterTests {
+        let c = toCollection(test.start..<test.end)
+        var currentIndex = c.startIndex
+        var counter = test.start
+        repeat {
+          expectEqual(counter, extractValue(c[currentIndex]).value,
+            stackTrace: SourceLocStack().with(test.loc))
+          c.formIndex(after: &currentIndex)
+          counter += 1
+        } while counter < test.end
+      }
+    }
+
+    self.test("\(testNamePrefix)/distance(from:to:)/semantics")
+      .forEach(in: distanceFromToTests) {
+      test in
+      let c = toCollection(0..<20)
+      let backwards = (test.startOffset > test.endOffset)
+      if backwards && !collectionIsBidirectional {
+        expectCrashLater()
+      }
+
+      let d = c.distance(
+        from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
+      expectEqual(
+        numericCast(test.expectedDistance),
+        d, stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance >= 0 }
+      ) {
+      test in
+      let max = 10
+      let c = toCollection(0..<max)
+
+      if test.expectedOffset! >= max {
+        expectCrashLater()
+      }
+      let new = c.index(
+        c.nthIndex(test.startOffset),
+        offsetBy: numericCast(test.distance))
+
+      // Since the `nthIndex(offset:)` method performs the same operation
+      // (i.e. advances `c.startIndex` by `test.distance`, it would be
+      // silly to compare index values. Luckily the underlying collection
+      // contains exactly index offsets.
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance >= 0 }
+      ) {
+      test in
+      let max = 10
+      let c = toCollection(0..<max)
+
+      var new = c.nthIndex(test.startOffset)
+
+      if test.expectedOffset! >= max {
+        expectCrashLater()
+      }
+      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: -n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      let start = c.nthIndex(test.startOffset)
+
+      if test.expectedOffset! < 0 || !collectionIsBidirectional {
+        expectCrashLater()
+      }
+      let new = c.index(start, offsetBy: numericCast(test.distance))
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: -n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      var new = c.nthIndex(test.startOffset)
+
+      if test.expectedOffset! < 0 || !collectionIsBidirectional {
+        expectCrashLater()
+      }
+      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: n, limitedBy:)/semantics") {
+      for test in indexOffsetByTests.filter(
+        {$0.limit != nil && $0.distance >= 0}
+      ) {
+        let c = toCollection(0..<20)
+        let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+        let new = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new!,
+            stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          expectNil(new)
+        }
+      }
+    }
+
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n, limitedBy:)/semantics") {
+      for test in indexOffsetByTests.filter(
+        {$0.limit != nil && $0.distance >= 0}
+      ) {
+        let c = toCollection(0..<20)
+        let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+        var new = c.nthIndex(test.startOffset)
+        let exact = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new,
+            stackTrace: SourceLocStack().with(test.loc))
+          expectTrue(exact, stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          // Clamped to the limit
+          expectEqual(limit, new, stackTrace: SourceLocStack().with(test.loc))
+          expectFalse(exact, stackTrace: SourceLocStack().with(test.loc))
+        }
+      }
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: -n, limitedBy:)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit != nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+      if collectionIsBidirectional {
+        let new = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new!,
+            stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          expectNil(new)
+        }
+      } else {
+        expectCrashLater()
+        _ = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+      }
+    }
+
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: -n, limitedBy:)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit != nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+      var new = c.nthIndex(test.startOffset)
+      if collectionIsBidirectional {
+        let exact = c.formIndex(
+          &new,
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new,
+            stackTrace: SourceLocStack().with(test.loc))
+          expectTrue(exact, stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          expectEqual(limit, new, stackTrace: SourceLocStack().with(test.loc))
+          expectFalse(exact, stackTrace: SourceLocStack().with(test.loc))
+        }
+      } else {
+        expectCrashLater()
+        _ = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+      }
+    }
+
+  }
+  func addCommonTests<
+    C, CollectionWithEquatableElement
+  >(
+
+  _ testNamePrefix: String = "",
+  makeCollection: @escaping ([C.Iterator.Element]) -> C,
+  wrapValue: @escaping (OpaqueValue<Int>) -> C.Iterator.Element,
+  extractValue: @escaping (C.Iterator.Element) -> OpaqueValue<Int>,
+
+  makeCollectionOfEquatable: @escaping (
+    [CollectionWithEquatableElement.Iterator.Element]
+  ) -> CollectionWithEquatableElement,
+
+  wrapValueIntoEquatable: @escaping (
+    MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+
+  extractValueFromEquatable: @escaping ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
+
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  outOfBoundsIndexOffset: Int = 1,
+  outOfBoundsSubscriptOffset: Int = 1,
+  collectionIsBidirectional: Bool
+
+  ) where
+
+  C : RandomAccessCollection,
+  CollectionWithEquatableElement : RandomAccessCollection,
+  CollectionWithEquatableElement.Iterator.Element : Equatable
+ {
+
+    if !checksAdded.insert(
+        "\(testNamePrefix).\(C.self).\(#function)"
+      ).inserted {
+      return
+    }
+
+    func toCollection(_ r: Range<Int>) -> C {
+      return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
+    }
+
+    self.test("\(testNamePrefix).index(after:)/semantics") {
+      for test in indexAfterTests {
+        let c = toCollection(test.start..<test.end)
+        var currentIndex = c.startIndex
+        var counter = test.start
+        repeat {
+          expectEqual(counter, extractValue(c[currentIndex]).value,
+            stackTrace: SourceLocStack().with(test.loc))
+          currentIndex = c.index(after: currentIndex)
+          counter += 1
+        } while counter < test.end
+      }
+    }
+    self.test("\(testNamePrefix).formIndex(after:)/semantics") {
+      for test in indexAfterTests {
+        let c = toCollection(test.start..<test.end)
+        var currentIndex = c.startIndex
+        var counter = test.start
+        repeat {
+          expectEqual(counter, extractValue(c[currentIndex]).value,
+            stackTrace: SourceLocStack().with(test.loc))
+          c.formIndex(after: &currentIndex)
+          counter += 1
+        } while counter < test.end
+      }
+    }
+
+    self.test("\(testNamePrefix)/distance(from:to:)/semantics")
+      .forEach(in: distanceFromToTests) {
+      test in
+      let c = toCollection(0..<20)
+      let backwards = (test.startOffset > test.endOffset)
+      if backwards && !collectionIsBidirectional {
+        expectCrashLater()
+      }
+
+      let d = c.distance(
+        from: c.nthIndex(test.startOffset), to: c.nthIndex(test.endOffset))
+      expectEqual(
+        numericCast(test.expectedDistance),
+        d, stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance >= 0 }
+      ) {
+      test in
+      let max = 10
+      let c = toCollection(0..<max)
+
+      if test.expectedOffset! >= max {
+        expectCrashLater()
+      }
+      let new = c.index(
+        c.nthIndex(test.startOffset),
+        offsetBy: numericCast(test.distance))
+
+      // Since the `nthIndex(offset:)` method performs the same operation
+      // (i.e. advances `c.startIndex` by `test.distance`, it would be
+      // silly to compare index values. Luckily the underlying collection
+      // contains exactly index offsets.
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance >= 0 }
+      ) {
+      test in
+      let max = 10
+      let c = toCollection(0..<max)
+
+      var new = c.nthIndex(test.startOffset)
+
+      if test.expectedOffset! >= max {
+        expectCrashLater()
+      }
+      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: -n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      let start = c.nthIndex(test.startOffset)
+
+      if test.expectedOffset! < 0 || !collectionIsBidirectional {
+        expectCrashLater()
+      }
+      let new = c.index(start, offsetBy: numericCast(test.distance))
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: -n)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit == nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      var new = c.nthIndex(test.startOffset)
+
+      if test.expectedOffset! < 0 || !collectionIsBidirectional {
+        expectCrashLater()
+      }
+      c.formIndex(&new, offsetBy: numericCast(test.distance))
+      expectEqual(test.expectedOffset!, extractValue(c[new]).value,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: n, limitedBy:)/semantics") {
+      for test in indexOffsetByTests.filter(
+        {$0.limit != nil && $0.distance >= 0}
+      ) {
+        let c = toCollection(0..<20)
+        let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+        let new = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new!,
+            stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          expectNil(new)
+        }
+      }
+    }
+
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: n, limitedBy:)/semantics") {
+      for test in indexOffsetByTests.filter(
+        {$0.limit != nil && $0.distance >= 0}
+      ) {
+        let c = toCollection(0..<20)
+        let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+        var new = c.nthIndex(test.startOffset)
+        let exact = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new,
+            stackTrace: SourceLocStack().with(test.loc))
+          expectTrue(exact, stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          // Clamped to the limit
+          expectEqual(limit, new, stackTrace: SourceLocStack().with(test.loc))
+          expectFalse(exact, stackTrace: SourceLocStack().with(test.loc))
+        }
+      }
+    }
+
+    self.test("\(testNamePrefix)/index(_:offsetBy: -n, limitedBy:)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit != nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+      if collectionIsBidirectional {
+        let new = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new!,
+            stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          expectNil(new)
+        }
+      } else {
+        expectCrashLater()
+        _ = c.index(
+          c.nthIndex(test.startOffset),
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+      }
+    }
+
+    self.test("\(testNamePrefix)/formIndex(_:offsetBy: -n, limitedBy:)/semantics")
+      .forEach(
+        in: indexOffsetByTests.filter { $0.limit != nil && $0.distance < 0 }
+      ) {
+      test in
+      let c = toCollection(0..<20)
+      let limit = c.nthIndex(test.limit.unsafelyUnwrapped)
+      var new = c.nthIndex(test.startOffset)
+      if collectionIsBidirectional {
+        let exact = c.formIndex(
+          &new,
+          offsetBy: numericCast(test.distance),
+          limitedBy: limit)
+        if let expectedOffset = test.expectedOffset {
+          expectEqual(c.nthIndex(expectedOffset), new,
+            stackTrace: SourceLocStack().with(test.loc))
+          expectTrue(exact, stackTrace: SourceLocStack().with(test.loc))
+        } else {
+          expectEqual(limit, new, stackTrace: SourceLocStack().with(test.loc))
+          expectFalse(exact, stackTrace: SourceLocStack().with(test.loc))
+        }
+      } else {
+        expectCrashLater()
+        _ = c.formIndex(&new, offsetBy: numericCast(test.distance), limitedBy: limit)
+      }
+    }
+
+  }
 }

@@ -47,7 +47,6 @@ func cast<T, U>(_ x: T, to result: U.Type) -> U? {
 }
 
 %{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 classKeys = ('Derived', 'Base')
 classValues = classKeys + ('AnyObject', 'Any')
 nonClassKeys = ('Int',)

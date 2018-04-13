@@ -4,10 +4,6 @@
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
-%{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
-}%
-
 import Swift
 import StdlibUnittest
 
@@ -64,14 +60,24 @@ extension Float80 {
 #if arch(i386) || arch(x86_64)
 %   end
 func expectBitwiseEqual(
-  _ expected: ${FloatTy}, _ actual: ${FloatTy}, ${TRACE}
+  _ expected: ${FloatTy}, _ actual: ${FloatTy},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
-  expectEqual(expected.bitPattern, actual.bitPattern, ${trace})
+  expectEqual(expected.bitPattern, actual.bitPattern, message(),
+  stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 func expectBitwiseEqual(
-  bitPattern expected: ${BitPatternTy}, _ actual: ${FloatTy}, ${TRACE}
+  bitPattern expected: ${BitPatternTy}, _ actual: ${FloatTy},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
-  expectBitwiseEqual(${FloatTy}(bitPattern: expected), actual, ${trace})
+  expectBitwiseEqual(${FloatTy}(bitPattern: expected), actual, message(),
+  stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 %   if FloatTy == 'Float80':
 #endif
