@@ -358,7 +358,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   if (context.Args.hasArg(options::OPT_index_store_path)) {
     context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
-    Arguments.push_back("-index-system-modules");
+    if (!context.Args.hasArg(options::OPT_index_ignore_system_modules))
+      Arguments.push_back("-index-system-modules");
   }
 
   return II;
