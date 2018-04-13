@@ -8,5 +8,18 @@ import Cities
 
 func foo(_ c: Container) -> String {
   c.Value = NewAttribute(rawValue: "")
+  c.addingAttributes(converToCitiesContainerAttributeDictionary(["a": "b", "a": "b", "a": "b"]))
+  c.addingAttributes(converToCitiesContainerAttributeDictionary(["a": "b", "a": "b", "a": "b"]))
+  c.adding(attributes: converToSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
   return c.Value.rawValue
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func converToCitiesContainerAttributeDictionary(_ input: [String: Any]) -> [Cities.Container.Attribute: Any] {
+	return Dictionary(uniqueKeysWithValues: input.map { key, value in (Cities.Container.Attribute(rawValue: key), value)})
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func converToSimpleAttributeDictionary(_ input: [String: Any]) -> [SimpleAttribute: Any] {
+	return Dictionary(uniqueKeysWithValues: input.map { key, value in (SimpleAttribute(rawValue: key), value)})
 }

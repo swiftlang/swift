@@ -8,5 +8,8 @@ import Cities
 
 func foo(_ c: Container) -> String {
   c.Value = ""
+  c.addingAttributes(["a": "b", "a": "b", "a": "b"])
+  c.addingAttributes(["a": "b", "a": "b", "a": "b"])
+  c.adding(attributes: ["a": 1, "a": 2, "a": 3])
   return c.Value
 }
