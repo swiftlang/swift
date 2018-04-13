@@ -55,7 +55,21 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
   if (!F->isExternalDeclaration())
     return;
 
-  if (isLinkAll() || hasSharedVisibility(F->getLinkage()))
+  // In the performance pipeline, we deserialize all reachable functions.
+  if (isLinkAll())
+    return addFunctionToWorklist(F);
+
+  // Otherwise, make sure to deserialize shared functions; we need to
+  // emit them into the client binary since they're not available
+  // externally.
+  if (hasSharedVisibility(F->getLinkage()))
+    return addFunctionToWorklist(F);
+
+  // Functions with PublicNonABI linkage are deserialized as having
+  // HiddenExternal linkage when they are declarations, then they
+  // become SharedExternal after the body has been deserialized.
+  // So try deserializing HiddenExternal functions too.
+  if (F->getLinkage() == SILLinkage::HiddenExternal)
     return addFunctionToWorklist(F);
 }
 
