@@ -157,3 +157,11 @@ public func dontCrash2(_ c: SomeGenericClass) -> Bool {
 
   return true
 }
+
+func dontCrash3() -> String? {
+  let bundle = Bundle.main
+  let resource = "common parameter"
+
+  return bundle.path(forResource: resource, ofType: "png")
+      ?? bundle.path(forResource: resource, ofType: "apng")
+}
