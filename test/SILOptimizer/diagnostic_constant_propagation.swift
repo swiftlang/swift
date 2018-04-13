@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
-// REQUIRES: PTRSIZE=64
-//
 // These are tests for diagnostics produced by constant propagation pass.
 // Due to the change in the implementation of Integer initializers some of the
 // tests here that must fail don't currently. Such tests have comments
@@ -9,9 +7,6 @@
 // to be addressed in the future.
 // References: <rdar://problem/29937936>, <rdar://problem/29939484>,
 // <https://bugs.swift.org/browse/SR-5964>, <rdar://problem/39120081>
-
-// FIXME: <rdar://problem/19508336> Extend
-// test/SILOptimizer/diagnostic_constant_propagation.swift to 32-bit platforms
 
 func testArithmeticOverflow() {
   let xu8 : UInt8 = 250
@@ -258,12 +253,6 @@ func testDivision() {
 }
 
 func testPostIncOverflow() {
-  var   s_max = Int.max
-  s_max += 1  // expected-error {{arithmetic operation '9223372036854775807 + 1' (on type 'Int') results in an overflow}}
-
-  var   u_max = UInt.max
-  u_max += 1 // expected-error {{arithmetic operation '18446744073709551615 + 1' (on type 'UInt') results in an overflow}}
-
   var  s8_max = Int8.max
   s8_max += 1 // expected-error {{arithmetic operation '127 + 1' (on type 'Int8') results in an overflow}}
 
@@ -290,12 +279,6 @@ func testPostIncOverflow() {
 }
 
 func testPostDecOverflow() {
-  var   s_min = Int.min
-  s_min -= 1  // expected-error {{arithmetic operation '-9223372036854775808 - 1' (on type 'Int') results in an overflow}}
-
-  var   u_min = UInt.min
-  u_min -= 1 // expected-error {{arithmetic operation '0 - 1' (on type 'UInt') results in an overflow}}
-
   var  s8_min = Int8.min
   s8_min -= 1 // expected-error {{arithmetic operation '-128 - 1' (on type 'Int8') results in an overflow}}
 
