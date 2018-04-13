@@ -107,6 +107,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          StringRef ArgsHash,
                          llvm::sys::TimePoint<> StartTime,
                          llvm::sys::TimePoint<> LastBuildTime,
+                         size_t FilelistThreshold,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
@@ -136,7 +137,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
-    Stats(std::move(StatsReporter)) {
+    Stats(std::move(StatsReporter)),
+    FilelistThreshold(FilelistThreshold) {
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,

@@ -39,33 +39,25 @@ using namespace swift::driver;
 using namespace llvm::opt;
 
 bool ToolChain::JobContext::shouldUseInputFileList() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return getTopLevelInputFiles().size() > TOO_MANY_FILES;
+  return getTopLevelInputFiles().size() > C.getFilelistThreshold();
 }
 
 bool ToolChain::JobContext::shouldUsePrimaryInputFileListInFrontendInvocation()
     const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return InputActions.size() > TOO_MANY_FILES;
+  return InputActions.size() > C.getFilelistThreshold();
 }
 
 bool ToolChain::JobContext::shouldUseMainOutputFileListInFrontendInvocation()
     const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
-  return Output.getPrimaryOutputFilenames().size() > TOO_MANY_FILES;
+  return Output.getPrimaryOutputFilenames().size() > C.getFilelistThreshold();
 }
 
 bool ToolChain::JobContext::
     shouldUseSupplementaryOutputFileMapInFrontendInvocation() const {
-  if (Args.hasArg(options::OPT_driver_use_filelists))
-    return true;
   static const unsigned UpperBoundOnSupplementaryOutputFileTypes =
       file_types::TY_INVALID;
   return InputActions.size() * UpperBoundOnSupplementaryOutputFileTypes >
-         TOO_MANY_FILES;
+         C.getFilelistThreshold();
 }
 
 bool ToolChain::JobContext::shouldFilterFrontendInputsByType() const {
@@ -460,6 +452,11 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
   const bool FilterInputsByType = shouldFilterFrontendInputsByType();
   const bool UseSupplementaryOutputFileList =
       shouldUseSupplementaryOutputFileMapInFrontendInvocation();
+
+  assert((C.getFilelistThreshold() != Compilation::NEVER_USE_FILELIST ||
+          !UseFileList && !UsePrimaryFileList &&
+          !UseSupplementaryOutputFileList) &&
+         "No filelists are used if FilelistThreshold=NEVER_USE_FILELIST");
 
   if (UseFileList) {
     Arguments.push_back("-filelist");
