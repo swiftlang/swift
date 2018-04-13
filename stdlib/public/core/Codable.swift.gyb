@@ -1916,7 +1916,7 @@ extension Set : Decodable where Element : Decodable {
   }
 }
 
-/// A wrapper for dictionary keys which are Strings or Ints.
+/// A wrapper for dictionary keys which conform to LosslessStringConvertible.
 @usableFromInline // FIXME(sil-serialize-all)
 @_fixed_layout // FIXME(sil-serialize-all)
 internal struct _DictionaryCodingKey : CodingKey {
@@ -1928,7 +1928,6 @@ internal struct _DictionaryCodingKey : CodingKey {
   @inlinable // FIXME(sil-serialize-all)
   internal init?(stringValue: String) {
     self.stringValue = stringValue
-    self.intValue = Int(stringValue)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -1941,7 +1940,7 @@ internal struct _DictionaryCodingKey : CodingKey {
 extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
   /// Encodes the contents of this dictionary into the given encoder.
   ///
-  /// If the dictionary uses `String` or `Int` keys, the contents are encoded
+  /// If the dictionary uses LosslessStringConvertible keys, the contents are encoded
   /// in a keyed container. Otherwise, the contents are encoded as alternating
   /// key-value pairs in an unkeyed container.
   ///
@@ -1951,22 +1950,16 @@ extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
   /// - Parameter encoder: The encoder to write data to.
   @inlinable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
-    if Key.self == String.self {
-      // Since the keys are already Strings, we can use them as keys directly.
+    if Key.self is LosslessStringConvertible.Type {
+      // Since the keys are convertible to String without any loss of information
+      // we can create coding keys from their .description values
       var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
       for (key, value) in self {
-        let codingKey = _DictionaryCodingKey(stringValue: key as! String)!
-        try container.encode(value, forKey: codingKey)
-      }
-    } else if Key.self == Int.self {
-      // Since the keys are already Ints, we can use them as keys directly.
-      var container = encoder.container(keyedBy: _DictionaryCodingKey.self)
-      for (key, value) in self {
-        let codingKey = _DictionaryCodingKey(intValue: key as! Int)!
+        let codingKey = _DictionaryCodingKey(stringValue: (key as! LosslessStringConvertible).description)!
         try container.encode(value, forKey: codingKey)
       }
     } else {
-      // Keys are Encodable but not Strings or Ints, so we cannot arbitrarily
+      // Keys are Encodable but not LosslessStringConvertible, so we cannot arbitrarily
       // convert to keys. We can encode as an array of alternating key-value
       // pairs, though.
       var container = encoder.unkeyedContainer()
@@ -1989,34 +1982,21 @@ extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
   public init(from decoder: Decoder) throws {
     self.init()
 
-    if Key.self == String.self {
-      // The keys are Strings, so we should be able to expect a keyed container.
-      let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
-      for key in container.allKeys {
-        let value = try container.decode(Value.self, forKey: key)
-        self[key.stringValue as! Key] = value
-      }
-    } else if Key.self == Int.self {
-      // The keys are Ints, so we should be able to expect a keyed container.
-      let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
-      for key in container.allKeys {
-        guard key.intValue != nil else {
-          // We provide stringValues for Int keys; if an encoder chooses not to
-          // use the actual intValues, we've encoded string keys.
-          // So on init, _DictionaryCodingKey tries to parse string keys as
-          // Ints. If that succeeds, then we would have had an intValue here.
-          // We don't, so this isn't a valid Int key.
-          var codingPath = decoder.codingPath
-          codingPath.append(key)
-          throw DecodingError.typeMismatch(
-            Int.self, DecodingError.Context(
-              codingPath: codingPath,
-              debugDescription: "Expected Int key but found String key instead."))
+    if Key.self is LosslessStringConvertible.Type {
+        let container = try decoder.container(keyedBy: _DictionaryCodingKey.self)
+        for codingKey in container.allKeys {
+            guard let convertedKey = (Key.self as! LosslessStringConvertible.Type).init(codingKey.stringValue) else {
+                var codingPath = decoder.codingPath
+                codingPath.append(codingKey)
+                throw DecodingError.typeMismatch(
+                  Int.self, DecodingError.Context(
+                    codingPath: codingPath,
+                    debugDescription: "Could not convert CodingKey's string value \(codingKey.stringValue) to \(Key.self). Expected convertible string value."))
+            }
+            
+            let value = try container.decode(Value.self, forKey: codingKey)
+            self[convertedKey] = value
         }
-
-        let value = try container.decode(Value.self, forKey: key)
-        self[key.intValue! as! Key] = value
-      }
     } else {
       // We should have encoded as an array of alternating key-value pairs.
       var container = try decoder.unkeyedContainer()
