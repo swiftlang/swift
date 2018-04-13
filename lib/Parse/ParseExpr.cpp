@@ -727,6 +727,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
 ///     '#selector' '(' 'setter' ':' expr ')'
 ///
 ParserResult<Expr> Parser::parseExprSelector() {
+  SyntaxParsingContext ExprCtxt(SyntaxContext, SyntaxKind::ObjcSelectorExpr);
   // Consume '#selector'.
   SourceLoc keywordLoc = consumeToken(tok::pound_selector);
 
@@ -750,7 +751,8 @@ ParserResult<Expr> Parser::parseExprSelector() {
     else
       selectorKind = ObjCSelectorExpr::Setter;
 
-    modifierLoc = consumeToken(tok::identifier);
+    Tok.setKind(tok::contextual_keyword);
+    modifierLoc = consumeToken();
     (void)consumeToken(tok::colon);
   } else {
     selectorKind = ObjCSelectorExpr::Method;

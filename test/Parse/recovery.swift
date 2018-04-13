@@ -624,6 +624,9 @@ struct InitializerWithName {
 
 struct InitializerWithNameAndParam {
   init a(b: Int) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? c(_ d: Int) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
+  init e<T>(f: T) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? g<T>(_: T) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
 }
 
 struct InitializerWithLabels {

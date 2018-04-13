@@ -612,27 +612,18 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
   if (!Tok.is(tok::l_paren)) {
     // If we don't have the leading '(', complain.
     Diag<> diagID;
-    bool skipIdentifier = false;
     switch (paramContext) {
     case ParameterContextKind::Function:
     case ParameterContextKind::Operator:
       diagID = diag::func_decl_without_paren;
       break;
-    case ParameterContextKind::EnumElement:
-      diagID = diag::enum_element_decl_without_paren;
-      break;
     case ParameterContextKind::Subscript:
-      skipIdentifier = Tok.is(tok::identifier) &&
-                       peekToken().is(tok::l_paren);
-      diagID = skipIdentifier ? diag::subscript_has_name
-                              : diag::expected_lparen_subscript;
+      diagID = diag::expected_lparen_subscript;
       break;
     case ParameterContextKind::Initializer:
-      skipIdentifier = Tok.is(tok::identifier) &&
-                       peekToken().is(tok::l_paren);
-      diagID = skipIdentifier ? diag::initializer_has_name
-                              : diag::expected_lparen_initializer;
+      diagID = diag::expected_lparen_initializer;
       break;
+    case ParameterContextKind::EnumElement:
     case ParameterContextKind::Closure:
     case ParameterContextKind::Curried:
       llvm_unreachable("should never be here");
@@ -642,17 +633,8 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
       auto diag = diagnose(Tok, diagID);
       if (Tok.isAny(tok::l_brace, tok::arrow, tok::kw_throws, tok::kw_rethrows))
         diag.fixItInsertAfter(PreviousLoc, "()");
-
-      if (skipIdentifier)
-        diag.fixItRemove(Tok.getLoc());
     }
 
-    // We might diagnose again down here, so make sure 'diag' is out of scope.
-    if (skipIdentifier) {
-      consumeToken();
-      skipSingle();
-    }
-    
     // Create an empty parameter list to recover.
     return makeParserErrorResult(
         ParameterList::createEmpty(Context, PreviousLoc, PreviousLoc));
