@@ -9,7 +9,7 @@
 // UNDERTHRESHOLD-NOT: -output-filelist
 
 
-// RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %t/a.swift %t/b.swift %S/../Inputs/empty.swift -module-name main -driver-filelist-threshold=0 | %FileCheck -check-prefix=OVERTHRESHOLD --input-file %t/out.txt %s
+// RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %t/a.swift %t/b.swift %S/../Inputs/empty.swift -module-name main -driver-filelist-threshold=0 | %FileCheck -check-prefix=OVERTHRESHOLD %s
 // RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %t/a.swift %t/b.swift %S/../Inputs/empty.swift -module-name main -driver-use-filelists > %t/out.txt 2>&1
 // RUN: %FileCheck -check-prefixes=OVERTHRESHOLD,DEPRECATED --input-file %t/out.txt %s
 
@@ -28,7 +28,7 @@
 // OVERTHRESHOLD: -output-filelist
 
 
-// RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %t/a.swift %t/b.swift %S/../Inputs/empty.swift -module-name main -driver-filelist-threshold=1 | %FileCheck -check-prefix=MIXEDTHRESHOLD --input-file %t/out.txt %s
+// RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %t/a.swift %t/b.swift %S/../Inputs/empty.swift -module-name main -driver-filelist-threshold=1 | %FileCheck -check-prefix=MIXEDTHRESHOLD %s
 
 // MIXEDTHRESHOLD: -filelist
 // MIXEDTHRESHOLD-NOT: -primary-filelist
