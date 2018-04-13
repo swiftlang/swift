@@ -406,12 +406,51 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T
   // quiet, discard payloads, or clear sign bits.  In some cases, just passing a
   // NaN into a function (via an FP register) is enough to mangle the value.
 
-  // So we just skip the debugDescription check on most architectures,
-  // verifying it only on x86_64 (which has complete and well-documented
-  // NaN handling).
 #if arch(x86_64)
+  // Verify the exact debugDescription value only on x86_64, where we
+  // know the exact expected String:
   expectEqual(expected, object.debugDescription, ${trace})
 #endif
+
+  // On all platforms, we verify that the generated debugDescription text
+  // follows the expected format, even when we can't verify the exact value.
+  var actual = object.debugDescription
+
+  // Optional leading "-"
+  if actual.hasPrefix("-") {
+    actual = String(actual.dropFirst())
+  }
+
+  // Optional leading "s"
+  if actual.hasPrefix("s") {
+    actual = String(actual.dropFirst())
+  }
+
+  // Fixed text "nan"
+  if actual.prefix(3) != "nan" {
+    expectationFailure("Badly formatted NaN debug description (expected 'nan'): \(object.debugDescription)", trace: ${trace})
+    return
+  }
+  actual = String(actual.dropFirst(3))
+
+  // Optional parenthesized payload after "nan"
+  if actual.hasPrefix("(0x") {
+    actual = String(actual.dropFirst(3))
+    while !actual.isEmpty {
+      if actual.hasPrefix(")") {
+        if actual != ")" {
+          expectationFailure("Malformed NaN: extra text after payload: \(object.debugDescription)", trace: ${trace})
+        }
+        return
+      } else {
+        // TODO: verify hex digit
+      }
+      actual = String(actual.dropFirst())
+    }
+    expectationFailure("Malformed NaN: no closing parenthesis after payload: \(object.debugDescription)", trace: ${trace})
+  } else if !actual.isEmpty {
+    expectationFailure("Badly formatted NaN debug description has invalid text after 'nan'.  Expected '(0x': \(object.debugDescription)", trace: ${trace})
+  }
 }
 
 // Foundation's String(format:) isn't available here, so
