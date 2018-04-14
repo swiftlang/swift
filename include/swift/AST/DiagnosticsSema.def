@@ -2476,6 +2476,8 @@ ERROR(differentiable_attr_specified_adjoint_not_function,none,
 ERROR(differentiable_attr_ambiguous_adjoint_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in @differentiable "
       "attribute", (DeclName))
+ERROR(differentiable_attr_forward_mode_unsupported,none,
+      "forward-mode automatic differentiation is not supported yet", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
