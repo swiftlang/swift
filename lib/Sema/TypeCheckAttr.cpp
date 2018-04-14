@@ -2100,19 +2100,31 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // '@differentiable' attribute is OnFunc only, rejected by the early checker.
-  auto *primal = cast<FuncDecl>(D);
-  auto isInstanceMethod = primal->isInstanceMember();
-  auto selfDecl = primal->getImplicitSelfDecl();
+  // Forward mode is unsupported.
+  if (attr->getMode() == AutoDiffMode::Forward) {
+    // TODO: Add location for mode in the AST node.
+    TC.diagnose(attr->getLocation(),
+                diag::differentiable_attr_forward_mode_unsupported);
+    return;
+  }
 
-  // If the primal has no parameters, there's nothing to differentiate with
-  // respect to.
-  auto &primalParams =
-    *primal->getParameterList(selfDecl ? 1 : 0);
-  if (!isInstanceMethod && primalParams.size() == 0) {
+  // '@differentiable' attribute is OnFunc only, rejected by the early checker.
+  auto *original = cast<FuncDecl>(D);
+  auto isInstanceMethod = original->isInstanceMember();
+  auto selfDecl = original->getImplicitSelfDecl();
+
+  // TODO: If primal is specified, resolve it using UDRE and get its return
+  // type (checkpoints). Then use its return type to construct the expected
+  // adjoint type. If not, the checkpoints type is the result type of the
+  // original function.
+
+  // If the original function has no parameters, there's nothing to
+  // differentiate with respect to.
+  auto &originalParams = *original->getParameterList(selfDecl ? 1 : 0);
+  if (!isInstanceMethod && originalParams.size() == 0) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
-                primal->getName())
-      .highlight(primal->getSourceRange());
+                original->getName())
+      .highlight(original->getSourceRange());
     return;
   }
 
@@ -2120,16 +2132,16 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto wrtParams = attr->getParameters();
   Type retTy;
   // When 'withRespectTo:' is not specified, the adjoint's return type is the
-  // type of all of primal's parameters.
+  // type of all of original's parameters.
   if (wrtParams.empty()) {
-    if (primalParams.size() > 1) {
+    if (originalParams.size() > 1) {
       // It is a tuple if there is more than 1 parameter.
       SmallVector<TupleTypeElt, 8> retElts;
-      for (auto *param : primalParams)
+      for (auto *param : originalParams)
         retElts.push_back(param->getInterfaceType());
-      retTy = TupleType::get(retElts, primal->getASTContext());
+      retTy = TupleType::get(retElts, original->getASTContext());
     } else {
-      retTy = primalParams[0]->getInterfaceType();
+      retTy = originalParams[0]->getInterfaceType();
     }
   }
   // If 'withRespectTo:' is specified, make sure it's valid and compute the
@@ -2151,12 +2163,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           return;
         }
         // Parameter index cannot exceed bounds.
-        if (index >= primalParams.size()) {
+        if (index >= originalParams.size()) {
           TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_index_out_of_bounds);
           return;
         }
-        auto param = primalParams[index];
+        auto param = originalParams[index];
         // Parameter type cannot be a reference type or an existential type.
         if (param->getType()->isAnyClassReferenceType() ||
             param->getType()->isExistentialType()) {
@@ -2184,8 +2196,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         }
         // The interface type of `self` must be used to construct the return
         // type, but `isAnyClassReferenceType` cannot be called on it.
-        auto selfTy = primal->getParent()->getSelfTypeInContext();
-        auto selfInterfaceTy = primal->getParent()->getSelfInterfaceType();
+        auto selfTy = original->getParent()->getSelfTypeInContext();
+        auto selfInterfaceTy = original->getParent()->getSelfInterfaceType();
         if (selfTy->isAnyClassReferenceType() || selfTy->isExistentialType()) {
           TC.diagnose(paramLoc,
               diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
@@ -2202,23 +2214,32 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // type.
     assert(retElts.size() > 0 && "There should be at least one return type");
     retTy = retElts.size() > 1
-      ? TupleType::get(retElts, primal->getASTContext())
+      ? TupleType::get(retElts, original->getASTContext())
       : retElts[0].getType();
   }
 
   // Compute parameters of the adjoint function.
   SmallVector<FunctionType::Param, 8> paramTypes;
-  // The first parameters are the same as those of the primal function.
-  for (auto *param : primalParams)
+  // The first parameters are the same as those of the original function.
+  for (auto *param : originalParams)
     paramTypes.push_back(FunctionType::Param(param->getInterfaceType()));
 
-  // The remaining two are the partial and the seed, both of which have the same
-  // type as the primal result.
-  FunctionType::Param seedTy(primal->getResultInterfaceType());
-  paramTypes.append(2, seedTy);
+  // The remaining two are the data structure for checkpoints and the seed, both
+  // of which have the same type as the original result.
+  Type checkpointsTy;
+  if (attr->getPrimal()) {
+    llvm_unreachable(
+      "@differentiable with explicitly specified primal is not handled yet");
+  } else {
+    checkpointsTy = original->getResultInterfaceType();
+  }
+  paramTypes.push_back(FunctionType::Param(checkpointsTy));
+
+  // The seed type is the same as the original return type.
+  paramTypes.push_back(FunctionType::Param(original->getResultInterfaceType()));
 
   // Compute the expected adjoint function type, using the same generic
-  // signature as the primal function.
+  // signature as the original function.
   AnyFunctionType *expectedAdjointFnTy = nullptr;
 
   auto getFunctionType = [&](GenericSignature *genSig,
@@ -2230,14 +2251,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return FunctionType::get(params, result, extInfo);
   };
 
-  auto primalGenSig = primal->getGenericSignature();
+  auto originalGenSig = original->getGenericSignature();
   if (!selfDecl) {
-    expectedAdjointFnTy = getFunctionType(primalGenSig, paramTypes, retTy);
+    expectedAdjointFnTy = getFunctionType(originalGenSig, paramTypes, retTy);
   } else {
     expectedAdjointFnTy =
       FunctionType::get(paramTypes, retTy, FunctionType::ExtInfo());
     FunctionType::Param selfParam(selfDecl->getInterfaceType());
-    expectedAdjointFnTy = getFunctionType(primalGenSig, { selfParam },
+    expectedAdjointFnTy = getFunctionType(originalGenSig, { selfParam },
                                           expectedAdjointFnTy);
   }
 
@@ -2247,12 +2268,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   UnresolvedDeclRefExpr UDRE(attr->getAdjoint().Name,
                              DeclRefKind::Ordinary,
                              attr->getAdjoint().Loc);
-  auto expr = TC.resolveDeclRefExpr(&UDRE, primal->getInnermostDeclContext());
+  auto expr = TC.resolveDeclRefExpr(&UDRE, original->getInnermostDeclContext());
   // If it's an unresolved dot expression, this must be a class method or an
   // instance method.
   if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(expr)) {
     // Look up the function directly in the current type context.
-    auto typeCtx = primal->getInnermostTypeContext();
+    auto typeCtx = original->getInnermostTypeContext();
     auto lookup = TC.lookupMember(typeCtx, typeCtx->getDeclaredInterfaceType(),
                                   attr->getAdjoint().Name);
     // Declare error flags.
@@ -2266,7 +2287,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         continue;
       }
       auto funcDeclType = funcDecl->getInterfaceType()
-        ->getUnlabeledType(primal->getASTContext());
+        ->getUnlabeledType(original->getASTContext());
       // Set flag if the lookup result does not have the expected adjoint type.
       if (!funcDeclType->isEqual(expectedAdjointFnTy)) {
         gradientOverloadNotFound = true;
@@ -2315,8 +2336,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                   attr->getAdjoint().Name);
       return;
     }
-    // If the primal and the adjoint have different parents, or if they both
-    // have no type context and are in different modules, then it's an error.
+    // If the original, primal and/or the adjoint have different parents, or
+    // if they both have no type context and are in different modules, then it's
+    // an error.
+    //
+    // TODO: Handle primal.
     auto inCompatibleContexts = [&](FuncDecl *decl1, FuncDecl *decl2) {
       if (!decl1->getInnermostTypeContext() &&
           !decl2->getInnermostTypeContext() &&
@@ -2327,13 +2351,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return false;
     };
 
-    if (!inCompatibleContexts(primal, funcDecl)) {
+    if (!inCompatibleContexts(original, funcDecl)) {
       TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                   diag::differentiable_attr_adjoint_not_same_type_context,
                   attr->getAdjoint().Name);
       return;
     }
-    // Otherwise, the primal and the adjoint are declared in the same
+    // Otherwise, the original and the adjoint are declared in the same
     // context. Save this candidate for further type checking.
     resolvedAdjoint = funcDecl;
   }
@@ -2356,7 +2380,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Get the interface type of the resolved adjoint. Verify that it's equal to
   // the expected adjoint type.
   auto adjointType = resolvedAdjoint->getInterfaceType()
-    ->getUnlabeledType(primal->getASTContext());
+    ->getUnlabeledType(original->getASTContext());
   if (!adjointType->isEqual(expectedAdjointFnTy)) {
     TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
                 diag::differentiable_attr_gradient_overload_not_found,
