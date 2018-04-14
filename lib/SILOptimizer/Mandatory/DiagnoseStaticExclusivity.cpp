@@ -1076,31 +1076,6 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
 }
 #endif
 
-// Check if the given memory instruction obviously initializes the memory
-// object at `root`. Initialization does not require exclusivity enforcement
-// because uninitialized variables can't be captured.
-static bool isSafeInitialization(SILInstruction *memInst, SILValue root) {
-  // Local variable initialization is already filtered out by the check for
-  // temporary buffer access. Handle globals.
-  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(root)) {
-    // There doesn't seem to be a better way to check for initialization than
-    // scanning for the preceding alloc_global.
-    SILGlobalVariable *var = globalAddr->getReferencedGlobal();
-    auto I = globalAddr->getIterator();
-    auto beginI = globalAddr->getParent()->begin();
-    while (I != beginI) {
-      --I;
-      if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(I)) {
-        if (allocGlobal->getReferencedGlobal() == var)
-          return true;
-      }
-      if (I->mayReadOrWriteMemory())
-        break;
-    }
-  }
-  return false;
-}
-
 // Check that the given address-type operand is guarded by begin/end access
 // markers.
 static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
@@ -1151,9 +1126,6 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
       && (isa<AllocStackInst>(base) || isa<AllocBoxInst>(base))) {
     return;
   }
-
-  if (isSafeInitialization(memInst, base))
-    return;
 
   // Otherwise, the address base should be an in-scope begin_access.
   if (auto *BAI = dyn_cast<BeginAccessInst>(base)) {

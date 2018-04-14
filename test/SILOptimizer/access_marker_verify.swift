@@ -610,8 +610,9 @@ var globalString2 = globalString1
 // CHECK: apply
 // CHECK: [[PTR:%.*]] = pointer_to_address
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[PTR]] : $*String
-// CHECK-NOT: begin_access
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[GA]] : $*String
+// CHECK: [[INIT:%.*]] = begin_access [modify] [unsafe] [[GA]] : $*String
+// CHECK: copy_addr [[ACCESS]] to [initialization] [[INIT]] : $*String
+// CHECK: end_access [[INIT]] : $*String
 // CHECK: end_access [[ACCESS]] : $*String
 // CHECK-NOT: end_access
 // CHECK-LABEL: } // end sil function 'globalinit_33_180BF7B9126DB0C8C6C26F15ACD01908_func1'
