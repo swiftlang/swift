@@ -3446,7 +3446,13 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
-  B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
+
+  UnenforcedAccess access;
+  SILValue accessAddress =
+    access.beginAccess(*this, loc, destAddr, SILAccessKind::Modify);
+  B.createCopyAddr(loc, srcAddr, accessAddress, IsNotTake, IsInitialization);
+  access.endAccess(*this);
+
   dest->finishInitialization(*this);
 }
 
