@@ -66,6 +66,7 @@ set(SWIFTLIB_ESSENTIAL
   AnyHashable.swift
   # END WORKAROUND
   HashedCollectionsAnyHashableExtensions.swift
+  Hasher.swift
   Hashing.swift
   HeapBuffer.swift
   ICU.swift
@@ -105,7 +106,7 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
-  SipHash.swift.gyb
+  SipHash.swift
   SentinelCollection.swift
   Sequence.swift
   SequenceAlgorithms.swift
