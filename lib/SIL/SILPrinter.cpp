@@ -2401,7 +2401,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (auto *Attr = getReverseDifferentiableAttr()) {
+  for (auto *Attr : getReverseDifferentiableAttrs()) {
     OS << "[reverse_differentiable "; Attr->print(OS); OS << "] ";
   }
 
@@ -3086,9 +3086,9 @@ void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   interleave(getParamIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
-  if (PrimalName) OS << " primal @" << *PrimalName;
-  OS << " adjoint @" << AdjointName;
-  if (GradientName) OS << " gradient @" << *GradientName;
+  if (!PrimalName.empty()) OS << " primal @" << PrimalName;
+  if (!AdjointName.empty()) OS << " adjoint @" << AdjointName;
+  if (!GradientName.empty()) OS << " gradient @" << GradientName;
 }
 
 //===----------------------------------------------------------------------===//
