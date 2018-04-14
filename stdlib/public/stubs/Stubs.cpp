@@ -171,10 +171,11 @@ static locale_t getCLocale() {
 }
 #endif
 
+#if !SWIFT_DTOA_FLOAT80_SUPPORT
 #if defined(__APPLE__)
 #define swift_snprintf_l snprintf_l
 #elif defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
-// In Cygwin, swift_snprintf_l() is not used.
+// swift_snprintf_l() is not used.
 #else
 static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
                             const char *Format, ...) {
@@ -194,7 +195,6 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 }
 #endif
 
-#if !SWIFT_DTOA_FLOAT80_SUPPORT
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
                                             T Value, const char *Format, 
