@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_generic.swift
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -linker -I %t %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -performance-linker -I %t %s | %FileCheck %s
 
 // Make sure that SILFunctionType with GenericSignature can match up with
 // SILFunctionType deserialized from module.
