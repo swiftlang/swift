@@ -60,6 +60,8 @@ RANGE_REFACTORING(ExpandTernaryExpr, "Expand Ternary Expression", expand.ternary
 
 RANGE_REFACTORING(ConvertToTernaryExpr, "Convert To Ternary Expression", convert.ternary.expr)
 
+RANGE_REFACTORING(ReplaceBodiesWithFatalError, "Replace function bodies with fatalError", replace.bodies.with.fatalError)
+
 #undef CURSOR_REFACTORING
 #undef RANGE_REFACTORING
 #undef SEMANTIC_REFACTORING
