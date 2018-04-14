@@ -4836,7 +4836,7 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    if (auto *RDiffAttr = F->getReverseDifferentiableAttr())
+    for (auto *RDiffAttr : F->getReverseDifferentiableAttrs())
       verifyReverseDifferentiableAttr(F, *RDiffAttr);
 
     if (F->isExternalDeclaration()) {

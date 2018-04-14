@@ -96,6 +96,13 @@ private:
 /// Reverse-mode differentiable attribute - @differentiable attribute lowered to
 /// SIL. This attribute is used by the automatic differentiation pass to find
 /// the defined adjoint of a function.
+///
+/// The attribute can be specified to one of the following levels, and the rest
+/// will be synthesized by the compiler.
+/// - Just adjoint
+/// - Primal and adjoint
+/// - Primal, adjoint and gradient
+///
 /// Example:
 ///   sil [reverse_differentiable primal @foo_primal adjoint @foo_adjoint
 ///     gradient @dfoo] @foo : $(Float) -> Float { ... }
@@ -104,36 +111,34 @@ class SILReverseDifferentiableAttr final {
 
 private:
   /// The name of the primal function.
-  Optional<StringRef> PrimalName;
-  /// The name of the adjoint function.
-  StringRef AdjointName;
-  /// The name of the gradient function.
-  Optional<StringRef> GradientName;
+  StringRef PrimalName, AdjointName, GradientName;
   /// The number of parameters of the original function to differentiate with
   /// respect to.
   unsigned NumParamIndices;
   /// Constructor, copying parameter indices to the trailing buffer.
-  SILReverseDifferentiableAttr(Optional<StringRef> primalName,
+  SILReverseDifferentiableAttr(ArrayRef<unsigned> paramIndices,
+                               StringRef primalName,
                                StringRef adjointName,
-                               Optional<StringRef> gradientName,
-                               ArrayRef<unsigned> paramIndices);
+                               StringRef gradientName);
 
 public:
-  static SILReverseDifferentiableAttr *create(SILModule &M,
-                                              Optional<StringRef> primalName,
-                                              StringRef adjointName,
-                                              Optional<StringRef> gradientName,
-                                              ArrayRef<unsigned> paramIndices);
+  static SILReverseDifferentiableAttr *create(
+    SILModule &M, ArrayRef<unsigned> paramIndices,
+    StringRef primalName = StringRef(),
+    StringRef adjointName = StringRef(),
+    StringRef gradientName = StringRef());
 
-  Optional<StringRef> getPrimalName() const { return PrimalName; }
-  void setPrimalName(Optional<StringRef> name) { PrimalName = name; }
+  StringRef getPrimalName() const { return PrimalName; }
+  void setPrimalName(StringRef name) { PrimalName = name; }
   StringRef getAdjointName() const { return AdjointName; }
   void setAdjointName(StringRef name) { AdjointName = name; }
-  Optional<StringRef> getGradientName() const { return GradientName; }
-  void setGradientName(Optional<StringRef> name) { GradientName = name; }
+  StringRef getGradientName() const { return GradientName; }
+  void setGradientName(StringRef name) { GradientName = name; }
 
   ArrayRef<unsigned> getParamIndices() const;
-  unsigned *getParamIndicesData() { return reinterpret_cast<unsigned *>(this+1); }
+  unsigned *getParamIndicesData() {
+    return reinterpret_cast<unsigned *>(this+1);
+  }
 
   void print(llvm::raw_ostream &OS) const;
 };
@@ -239,8 +244,9 @@ private:
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// The function's differentiable attribute.
-  SILReverseDifferentiableAttr *ReverseDifferentiableAttr = nullptr;
+  /// The function's `[reverse_differentiable]` attributes.
+  llvm::SmallVector<SILReverseDifferentiableAttr *, 4>
+    ReverseDifferentiableAttrs;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -567,14 +573,13 @@ public:
   void addSpecializeAttr(SILSpecializeAttr *Attr);
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// \returns the 'reverse_differentiable' attribute, or nullptr if it doesn't exist.
-  SILReverseDifferentiableAttr *getReverseDifferentiableAttr() const {
-    return ReverseDifferentiableAttr;
+  ArrayRef<SILReverseDifferentiableAttr *>
+  getReverseDifferentiableAttrs() const {
+    return ReverseDifferentiableAttrs;
   }
 
-  /// Set the 'reverse_differentiable' attribute.
-  void setReverseDifferentiableAttr(SILReverseDifferentiableAttr *attr) {
-    ReverseDifferentiableAttr = attr;
+  void addReverseDifferentiableAttr(SILReverseDifferentiableAttr *attr) {
+    ReverseDifferentiableAttrs.push_back(attr);
   }
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
