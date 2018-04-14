@@ -10,4 +10,26 @@
     "RightComment": "NewAttribute",
     "ModuleName": "Cities"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "DictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "s:6Cities9ContainerC16addingAttributesyys10DictionaryVySSypGF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "Cities.Container.Attribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "DictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "s:6Cities9ContainerC6adding10attributesys10DictionaryVySSypG_tF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
 ]

@@ -302,9 +302,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
+  SourceLoc FileEndLoc;
+  llvm::SmallSet<StringRef, 4> InsertedFunctions;
+
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                       const MigratorOptions &Opts)
-    : ASTMigratorPass(Editor, SF, Opts) {}
+    : ASTMigratorPass(Editor, SF, Opts),
+      FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {}
 
   void run() {
     if (Opts.APIDigesterDataStorePaths.empty())
@@ -697,6 +701,94 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
+  StringRef insertHelperFunction(NodeAnnotation Anno, StringRef NewType,
+                                 SmallString<256> &Buffer) {
+    llvm::raw_svector_ostream OS(Buffer);
+    OS << "\n";
+    OS << "// Helper function inserted by Swift 4.2 migrator.\n";
+    OS << "fileprivate func ";
+    unsigned FuncNameStart = Buffer.size();
+    OS << "converTo";
+    SmallVector<std::string, 8> Segs;
+    switch(Anno) {
+    case NodeAnnotation::OptionalArrayMemberUpdate:
+      Segs = {"Optional", "Array", "[String]?"};
+      Segs.push_back((Twine("[") + NewType +"]?").str());
+      Segs.push_back("// Not implemented");
+      break;
+    case NodeAnnotation::OptionalDictionaryKeyUpdate:
+      Segs = {"Optional", "Dictionary", "[String: Any]?"};
+      Segs.push_back((Twine("[") + NewType +": Any]?").str());
+      Segs.push_back("// Not implemented");
+      break;
+    case NodeAnnotation::ArrayMemberUpdate:
+      Segs = {"", "Array", "[String]"};
+      Segs.push_back((Twine("[") + NewType +"]").str());
+      Segs.push_back("// Not implemented");
+      break;
+    case NodeAnnotation::DictionaryKeyUpdate:
+      Segs = {"", "Dictionary", "[String: Any]"};
+      Segs.push_back((Twine("[") + NewType +": Any]").str());
+      Segs.push_back((Twine("\treturn Dictionary(uniqueKeysWithValues: input.map"
+        " { key, value in (") + NewType + "(rawValue: key), value)})").str());
+      break;
+    case NodeAnnotation::SimpleStringRepresentableUpdate:
+      Segs = {"", "", "String"};
+      Segs.push_back(NewType);
+      Segs.push_back("// Not implemented");
+      break;
+    case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      Segs = {"Optional", "", "String?"};
+      Segs.push_back((Twine(NewType) +"?").str());
+      Segs.push_back("// Not implemented");
+      break;
+    default:
+      llvm_unreachable("shouldn't handle this key.");
+    }
+    OS << Segs[0];
+    SmallVector<StringRef, 4> Parts;
+    NewType.split(Parts, '.');
+    for (auto P: Parts)
+      OS << P;
+    OS << Segs[1];
+    auto FuncName = Buffer.str().substr(FuncNameStart);
+    if (!InsertedFunctions.count(FuncName)) {
+      OS << "(_ input: " << Segs[2] << ") -> " << Segs[3] << " {\n";
+      OS << Segs[4] << "\n}\n";
+      Editor.insert(FileEndLoc, OS.str());
+      InsertedFunctions.insert(FuncName);
+    }
+    return FuncName;
+  }
+
+  void handleStringRepresentableArg(ValueDecl *FD, Expr *Arg) {
+    NodeAnnotation Kind;
+    StringRef NewAttributeType;
+    uint8_t ArgIdx;
+    for (auto Item: getRelatedDiffItems(FD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        if (CI->isStringRepresentableChange()) {
+          Kind = CI->DiffKind;
+          NewAttributeType = CI->RightComment;
+          assert(CI->getChildIndices().size() == 1);
+          ArgIdx = CI->getChildIndices().front();
+          break;
+        }
+      }
+    }
+    if (NewAttributeType.empty() || !ArgIdx)
+      return;
+    ArgIdx --;
+    auto AllArgs = getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
+    if (AllArgs.size() <= ArgIdx)
+      return;
+    SmallString<256> Buffer;
+    auto FuncName = insertHelperFunction(Kind, NewAttributeType, Buffer);
+    auto Exp = AllArgs[ArgIdx].ArgExp;
+    Editor.insert(Exp->getStartLoc(), (Twine(FuncName) + "(").str());
+    Editor.insertAfterToken(Exp->getEndLoc(), ")");
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (handleQualifiedReplacement(E))
       return false;
@@ -711,6 +803,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleFuncRename(FD, Fn, Args);
           handleTypeHoist(FD, CE, Args);
           handleSpecialCases(FD, CE, Args);
+          handleStringRepresentableArg(FD, Args);
         }
         break;
       }
@@ -720,13 +813,17 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleFuncRename(FD, DSC->getFn(), Args);
           handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
           handleSpecialCases(FD, CE, Args);
+          handleStringRepresentableArg(FD, Args);
         }
         break;
       }
       case ExprKind::ConstructorRefCall: {
         auto CCE = cast<ConstructorRefCallExpr>(Fn);
-        if (auto FD = CCE->getFn()->getReferencedDecl().getDecl())
-          handleFuncRename(FD, CCE->getFn(), Args);
+        if (auto FD = CCE->getFn()->getReferencedDecl().getDecl()) {
+          auto *CE = CCE->getFn();
+          handleFuncRename(FD, CE, Args);
+          handleStringRepresentableArg(FD, Args);
+        }
         break;
       }
       default:
