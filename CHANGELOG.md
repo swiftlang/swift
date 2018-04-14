@@ -33,7 +33,7 @@ Swift 5.0
   class Node {
     var children = [Node]()
 
-    var depth: Int {
+    var depth: Int = 0 {
       didSet {
         if depth < 0 {
           // Will not recursively call didSet, as setting depth on self (same
@@ -48,10 +48,6 @@ Swift 5.0
           child.depth = depth + 1
         }
       }
-    }
-
-    init(depth: Int) {
-      self.depth = depth
     }
   }
   ```
