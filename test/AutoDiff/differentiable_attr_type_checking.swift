@@ -24,6 +24,11 @@ func bar(_ x: Float, _ y: Float) -> Float {
   return x + y
 }
 
+@differentiable(forward, adjoint: dbar(_:_:primal:seed:)) // expected-error {{forward-mode automatic differentiation is not supported yet}}
+func bar_fwd(_ x: Float, _ y: Float) -> Float {
+  return x + y
+}
+
 func dfoo2_wrong_type(_ x: Float, primal: Float, seed: Double) -> Float {
   return 2 * x
 }
