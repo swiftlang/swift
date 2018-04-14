@@ -4294,6 +4294,9 @@ public:
   /// Verify the [reverse_differentiable] attribute.
   void verifyReverseDifferentiableAttr(SILFunction *F,
                                        SILReverseDifferentiableAttr &Attr) {
+    // Parameter indices must be specified.
+    require(!Attr.getParamIndices().empty(),
+            "Parameter indices cannot be empty");
     // Verify if specified parameter indices are valid.
     auto numParams = F->getLoweredFunctionType()->getNumParameters();
     int lastIndex = -1;

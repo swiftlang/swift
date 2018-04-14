@@ -712,9 +712,6 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
 /// Given a @differentiable attribute and the function declaration that holds
 /// this attribute, this function returns the lowered (SIL) parameter indices
 /// to differentiate with respect to.
-/// NOTE: If all indices are specified, then this function returns an empty
-/// array. Because the `[reverse_differentiable]` attribute treates empty
-/// indices as "all indices".
 static
 void getLoweredDifferentiationIndices(SILGenModule &SGM,
                                       const AbstractFunctionDecl *AFD,
@@ -724,14 +721,13 @@ void getLoweredDifferentiationIndices(SILGenModule &SGM,
   auto conv = F->getConventions();
   auto fnTy = AFD->getInterfaceType()->getCanonicalType()
     ->getAs<AnyFunctionType>();
+  // We don't diff wrt `self` unless it is explicitly specified, therefore
+  // dropping the last SIL parameter if it's a method.
   if (AFD->getImplicitSelfDecl())
     fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
-  // If no parameters are specified, differentiation is done wrt all parameters.
+  // If no parameters are specified, add all parameter indices.
   if (DA->getParameters().empty()) {
-    unsigned numParams = fnTy->getNumParams();
-    // We don't diff wrt `self` unless it is explicitly specified, therefore
-    // dropping the last SIL parameter if it's a method.
-    for (unsigned i = 0; i < numParams; ++i)
+    for (unsigned i = 0, n = fnTy->getNumParams(); i != n; ++i)
       for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, fnTy))
         indices.push_back(paramIdx);
     return;
