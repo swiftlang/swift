@@ -712,12 +712,15 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
 /// Given a @differentiable attribute and the function declaration that holds
 /// this attribute, this function returns the lowered (SIL) parameter indices
 /// to differentiate with respect to.
-static SmallVector<unsigned, 8>
-getLoweredDifferentiationIndices(SILGenModule &SGM,
-                                 const AbstractFunctionDecl *AFD,
-                                 const SILFunction *F,
-                                 const DifferentiableAttr *DA) {
-  SmallVector<unsigned, 8> indices;
+/// NOTE: If all indices are specified, then this function returns an empty
+/// array. Because the `[reverse_differentiable]` attribute treates empty
+/// indices as "all indices".
+static
+void getLoweredDifferentiationIndices(SILGenModule &SGM,
+                                      const AbstractFunctionDecl *AFD,
+                                      const SILFunction *F,
+                                      const DifferentiableAttr *DA,
+                                      SmallVectorImpl<unsigned> &indices) {
   auto conv = F->getConventions();
   auto fnTy = AFD->getInterfaceType()->getCanonicalType()
     ->getAs<AnyFunctionType>();
@@ -731,7 +734,7 @@ getLoweredDifferentiationIndices(SILGenModule &SGM,
     for (unsigned i = 0; i < numParams; ++i)
       for (unsigned paramIdx : SGM.getLoweredFunctionParameterIndex(i, fnTy))
         indices.push_back(paramIdx);
-    return indices;
+    return;
   }
   // Otherwise, convert differentiation parameters.
   bool hasSelf = false;
@@ -754,7 +757,6 @@ getLoweredDifferentiationIndices(SILGenModule &SGM,
   // The last SIL parameter is `self`, if needed.
   if (hasSelf)
     indices.push_back(fnTy->getNumParams());
-  return indices;
 }
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
@@ -786,6 +788,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // If the declaration has a @differentiable(reverse) attribute, turn it into a
   // SIL [reverse_differentiable] attribute with lowered adjoint function name
   // and lowered differentiation argument indices.
+  //
+  // FIXME: Handle multiple @differentiable attributes.
   if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
         AFD->getAttrs().getAttribute(DeclAttrKind::DAK_Differentiable))) {
     switch (diffAttr->getMode()) {
@@ -796,7 +800,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     case AutoDiffMode::Reverse: {
       auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
       // If primal exists, get primal's name.
-      Optional<StringRef> primName;
+      StringRef primName;
       if (auto *primFn = diffAttr->getPrimalFunction())
         primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
       // Get adjoint's name.
@@ -805,14 +809,16 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       StringRef adjName =
         getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
       // If gradient exists, get gradient's name.
-      Optional<StringRef> gradName;
+      StringRef gradName;
       if (auto *gradFn = diffAttr->getGradientFunction())
         gradName = getFunction(SILDeclRef(gradFn), ForDefinition)->getName();
-      auto indices = getLoweredDifferentiationIndices(*this, AFD, silOriginalFn,
-                                                      diffAttr);
-      silOriginalFn->setReverseDifferentiableAttr(
-        SILReverseDifferentiableAttr::create(M, primName, adjName, gradName,
-                                             indices));
+      // Otherwise, create an attribute with lowered argument indices.
+      SmallVector<unsigned, 8> indices;
+      getLoweredDifferentiationIndices(*this, AFD, silOriginalFn, diffAttr,
+                                       indices);
+      silOriginalFn->addReverseDifferentiableAttr(
+        SILReverseDifferentiableAttr::create(M, indices, primName, adjName,
+                                             gradName));
       break;
     }
     }

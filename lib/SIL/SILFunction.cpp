@@ -57,10 +57,10 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 
 /// SWIFT_ENABLE_TENSORFLOW
 SILReverseDifferentiableAttr::
-SILReverseDifferentiableAttr(Optional<StringRef> primalName,
+SILReverseDifferentiableAttr(ArrayRef<unsigned> paramIndices,
+                             StringRef primalName,
                              StringRef adjointName,
-                             Optional<StringRef> gradientName,
-                             ArrayRef<unsigned> paramIndices)
+                             StringRef gradientName)
   : PrimalName(primalName), AdjointName(adjointName),
     GradientName(gradientName), NumParamIndices(paramIndices.size()) {
   std::copy(paramIndices.begin(), paramIndices.end(), getParamIndicesData());
@@ -68,15 +68,15 @@ SILReverseDifferentiableAttr(Optional<StringRef> primalName,
 
 SILReverseDifferentiableAttr *
 SILReverseDifferentiableAttr::create(SILModule &M,
-                                     Optional<StringRef> primalName,
+                                     ArrayRef<unsigned> paramIndices,
+                                     StringRef primalName,
                                      StringRef adjointName,
-                                     Optional<StringRef> gradientName,
-                                     ArrayRef<unsigned> paramIndices) {
-  size_t size =
-    sizeof(SILReverseDifferentiableAttr) + paramIndices.size() * sizeof(unsigned);
+                                     StringRef gradientName) {
+  size_t size = sizeof(SILReverseDifferentiableAttr)
+    + paramIndices.size() * sizeof(unsigned);
   void *mem = M.allocate(size, alignof(SILReverseDifferentiableAttr));
-  return ::new (mem) SILReverseDifferentiableAttr(primalName, adjointName,
-                                                  gradientName, paramIndices);
+  return ::new (mem) SILReverseDifferentiableAttr(paramIndices, primalName,
+                                                  adjointName, gradientName);
 }
 
 ArrayRef<unsigned> SILReverseDifferentiableAttr::getParamIndices() const {

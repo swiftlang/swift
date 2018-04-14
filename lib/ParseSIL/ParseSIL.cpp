@@ -888,9 +888,8 @@ void SILParser::convertRequirements(SILFunction *F,
 /// SWIFT_ENABLE_TENSORFLOW
 /// Parse an adjoint attribute, e.g. `[differentiable wrt 0, 1 adjoint @other]`.
 /// Returns true on error.
-static bool
-parseReverseDifferentiableAttr(Optional<SILReverseDifferentiableAttr *> &DA,
-                               SILParser &SP) {
+static bool parseReverseDifferentiableAttr(
+  SmallVectorImpl<SILReverseDifferentiableAttr *> &DAs, SILParser &SP) {
   auto &P = SP.P;
   SourceLoc LastLoc = P.getEndOfPreviousLoc();
   // Parse 'wrt'.
@@ -944,17 +943,12 @@ parseReverseDifferentiableAttr(Optional<SILReverseDifferentiableAttr *> &DA,
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
-  // Convert an Identifier to an Optional<StringRef>.
-  auto toMaybeStringRef = [](Identifier id) -> Optional<StringRef> {
-    if (id.empty()) return None;
-    return id.str();
-  };
   // Create an AdjointAttr and we are done.
-  DA = SILReverseDifferentiableAttr::create(SP.SILMod,
-                                            toMaybeStringRef(PrimName),
-                                            AdjName.str(),
-                                            toMaybeStringRef(GradName),
-                                            ParamIndices);
+  auto *Attr =
+    SILReverseDifferentiableAttr::create(SP.SILMod, ParamIndices,
+                                         PrimName.str(), AdjName.str(),
+                                         GradName.str());
+  DAs.push_back(Attr);
   return false;
 }
 
@@ -968,7 +962,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  // SWIFT_ENABLE_TENSORFLOW
-                            Optional<SILReverseDifferentiableAttr *> *RDiffAttr,
+                    SmallVectorImpl<SILReverseDifferentiableAttr *> *RDiffAttrs,
                                  ValueDecl **ClangDecl,
                                  EffectsKind *MRK, SILParser &SP) {
   while (SP.P.consumeIf(tok::l_square)) {
@@ -1058,9 +1052,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       continue;
     }
     // SWIFT_ENABLE_TENSORFLOW
-    else if (RDiffAttr && SP.P.Tok.getText() == "reverse_differentiable") {
+    else if (RDiffAttrs && SP.P.Tok.getText() == "reverse_differentiable") {
       SP.P.consumeToken(tok::identifier);
-      if (parseReverseDifferentiableAttr(*RDiffAttr, SP))
+      if (parseReverseDifferentiableAttr(*RDiffAttrs, SP))
         return true;
       continue;
     }
@@ -5368,7 +5362,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   SmallVector<std::string, 1> Semantics;
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   // SWIFT_ENABLE_TENSORFLOW
-  Optional<SILReverseDifferentiableAttr *> RDiffAttr;
+  SmallVector<SILReverseDifferentiableAttr *, 4> RDiffAttrs;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, P) ||
@@ -5377,7 +5371,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
                            &inlineStrategy, &optimizationMode, nullptr,
                            &isWeakLinked, &Semantics, &SpecAttrs,
                            // SWIFT_ENABLE_TENSORFLOW
-                           &RDiffAttr,
+                           &RDiffAttrs,
                            &ClangDecl, &MRK, FunctionState) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5408,8 +5402,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     // SWIFT_ENABLE_TENSORFLOW
-    if (RDiffAttr)
-      FunctionState.F->setReverseDifferentiableAttr(*RDiffAttr);
+    for (auto &Attr : RDiffAttrs)
+      FunctionState.F->addReverseDifferentiableAttr(Attr);
     FunctionState.F->setEffectsKind(MRK);
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);
