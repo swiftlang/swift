@@ -404,20 +404,15 @@ static SILFunction *getCalleeFunction(
     return nullptr;
   }
 
+  // If CalleeFunction is a declaration, see if we can load it. If we fail to
+  // load it, bail.
+  if (CalleeFunction->empty()
+      && !AI.getModule().linkFunction(CalleeFunction, Mode))
+    return nullptr;
+
   // If the CalleeFunction is a not-transparent definition, we can not process
   // it.
   if (CalleeFunction->isTransparent() == IsNotTransparent)
-    return nullptr;
-
-  // If CalleeFunction is a declaration, see if we can load it.
-  if (CalleeFunction->empty()) {
-    // FIXME: Remove 'Mode'
-    if (Mode != SILOptions::LinkingMode::LinkNone)
-      AI.getModule().loadFunction(CalleeFunction);
-  }
-
-  // If we fail to load it, bail.
-  if (CalleeFunction->empty())
     return nullptr;
 
   if (F->isSerialized() &&
@@ -658,6 +653,15 @@ class MandatoryInlining : public SILModuleTransform {
                                SetFactory, SetFactory.getEmptySet(), CHA);
     }
 
+    // Make sure that we de-serialize all transparent functions,
+    // even if we didn't inline them for some reason.
+    // Transparent functions are not available externally, so we
+    // have to generate code for them.
+    for (auto &F : *M) {
+      if (F.isTransparent())
+        M->linkFunction(&F, Mode);
+    }
+    
     if (!ShouldCleanup)
       return;
 
