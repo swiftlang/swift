@@ -3726,6 +3726,26 @@ extension ${Self} : Hashable {
     fatalError("Unsupported integer width")
     % end
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
+    // `AnyHashable`-boxed integers, all integer values are currently required
+    // to hash exactly the same way as the corresponding (U)Int64 value.  To fix
+    // this, we should introduce a custom AnyHashable box for integer values
+    // that sign-extends values to 64 bits.
+    % if bits <= word_bits:
+    return _Hasher._hash(seed: seed, _lowWord)
+    % elif bits == 2 * word_bits:
+    if let word = ${"" if signed else "U"}Int(exactly: self) {
+      return _Hasher._hash(seed: seed, _lowWord)
+    }
+    return _Hasher._hash(seed: seed, UInt64(truncatingIfNeeded: _value))
+    % else:
+    fatalError("Unsupported integer width")
+    % end
+  }
+
 }
 
 

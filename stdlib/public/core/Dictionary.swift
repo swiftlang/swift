@@ -1448,16 +1448,21 @@ extension Dictionary: Hashable where Value: Hashable {
     return _unsafeHashValue()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  // not @inlinable
   public func _hash(into hasher: inout _Hasher) {
+    hasher.combine(_unsafeHashValue(seed: hasher._core._generateSeed()))
+  }
+
+  // not @inlinable
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
     var commutativeHash = 0
     for (k, v) in self {
-      var elementHasher = _Hasher()
+      var elementHasher = _Hasher(_seed: seed)
       elementHasher.combine(k)
       elementHasher.combine(v)
       commutativeHash ^= elementHasher.finalize()
     }
-    hasher.combine(commutativeHash)
+    return commutativeHash
   }
 }
 

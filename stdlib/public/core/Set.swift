@@ -487,13 +487,18 @@ extension Set: Hashable {
     return _unsafeHashValue()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  // NOT @inlinable
   public func _hash(into hasher: inout _Hasher) {
+    hasher.combine(_unsafeHashValue(seed: hasher._core._generateSeed()))
+  }
+
+  // NOT @inlinable
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
     var hash = 0
     for member in self {
-      hash ^= member._unsafeHashValue()
+      hash ^= member._unsafeHashValue(seed: seed)
     }
-    hasher.combine(hash)
+    return hash
   }
 }
 

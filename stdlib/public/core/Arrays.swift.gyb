@@ -2275,6 +2275,15 @@ extension ${Self}: Hashable where Element: Hashable {
       hasher.combine(element)
     }
   }
+
+  // not @inlinable
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    var hasher = _Hasher(_seed: seed)
+    for element in self {
+      hasher.combine(element)
+    }
+    return hasher.finalize()
+  }
 }
 
 extension ${Self} {
