@@ -6,6 +6,7 @@ add_swift_library(swiftSIL STATIC
   Dominance.cpp
   DynamicCasts.cpp
   InstructionUtils.cpp
+  MemAccessUtils.cpp
   Linker.cpp
   LoopInfo.cpp
   OptimizationRemark.cpp
