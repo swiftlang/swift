@@ -181,7 +181,7 @@ extension OpaquePointer: Hashable {
   /// program runs.
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)

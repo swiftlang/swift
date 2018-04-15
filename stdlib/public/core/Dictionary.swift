@@ -1445,7 +1445,7 @@ extension Dictionary: Equatable where Value: Equatable {
 extension Dictionary: Hashable where Value: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2436,9 +2436,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher.finalize() & _bucketMask
+    return k._unsafeHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)

@@ -62,6 +62,11 @@ private struct _SipHashState {
   fileprivate func _extract() -> UInt64 {
     return v0 ^ v1 ^ v2 ^ v3
   }
+
+  @inline(__always)
+  fileprivate func _generateSeed() -> (UInt64, UInt64) {
+    return (v0 &+ v1, v2 ^ v3)
+  }
 }
 
 internal struct _SipHash13Core: _HasherCore {
@@ -87,6 +92,11 @@ internal struct _SipHash13Core: _HasherCore {
       _state._round()
     }
     return _state._extract()
+  }
+
+  @inline(__always)
+  internal func _generateSeed() -> (UInt64, UInt64) {
+    return _state._generateSeed()
   }
 }
 
@@ -115,6 +125,11 @@ internal struct _SipHash24Core: _HasherCore {
       _state._round()
     }
     return _state._extract()
+  }
+
+  @inline(__always)
+  internal func _generateSeed() -> (UInt64, UInt64) {
+    return _state._generateSeed()
   }
 }
 

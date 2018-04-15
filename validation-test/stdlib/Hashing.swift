@@ -46,7 +46,13 @@ HashingTestSuite.test("_Hasher/CustomKeys") {
 HashingTestSuite.test("_Hasher/DefaultKey") {
   let value: UInt64 = 0x0102030405060708
 
-  let defaultHash = _hashValue(for: value)
+  let defaultHash = value._unsafeHashValue()
+
+  var customHash = value._unsafeHashValue(seed: _Hasher._seed)
+  expectEqual(customHash, defaultHash)
+
+  var oneShotHash = _Hasher._hash(seed: _Hasher._seed, value)
+  expectEqual(oneShotHash, defaultHash)
 
   var defaultHasher = _Hasher()
   defaultHasher._combine(value)

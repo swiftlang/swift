@@ -20,6 +20,16 @@ internal protocol _HasherCore {
   init(seed: (UInt64, UInt64))
   mutating func compress(_ value: UInt64)
   mutating func finalize(tailAndByteCount: UInt64) -> UInt64
+
+  /// Generate a seed value from the current state of this hasher.
+  ///
+  /// Note that the returned value is not same as the seed that was used to
+  /// initialize the hasher.
+  ///
+  /// This comes handy when type's _hash(into:) implementation needs to perform
+  /// one-shot hashing for some of its components. (E.g., for commutative
+  /// hashing.)
+  func _generateSeed() -> (UInt64, UInt64)
 }
 
 @inline(__always)
@@ -237,6 +247,12 @@ internal struct _BufferingHasher<Core: _HasherCore> {
     }
   }
 
+  // Generate a seed value from the current state of this hasher.
+  @inline(__always)
+  internal mutating func _generateSeed() -> (UInt64, UInt64) {
+    return _core._generateSeed()
+  }
+
   @inline(__always)
   internal mutating func finalize() -> UInt64 {
     precondition(!_buffer.isFinalized)
@@ -344,5 +360,38 @@ public struct _Hasher {
   @effects(releasenone)
   public mutating func finalize() -> Int {
     return Int(truncatingIfNeeded: _core.finalize())
+  }
+
+  @effects(releasenone)
+  public static func _hash(seed: (UInt64, UInt64), _ value: UInt64) -> Int {
+    var core = Core(seed: seed)
+    core.combine(value)
+    return Int(truncatingIfNeeded: core.finalize())
+  }
+
+  @effects(releasenone)
+  public static func _hash(seed: (UInt64, UInt64), _ value: UInt) -> Int {
+    var core = Core(seed: seed)
+    core.combine(value)
+    return Int(truncatingIfNeeded: core.finalize())
+  }
+
+  @effects(releasenone)
+  public static func _hash(
+    seed: (UInt64, UInt64),
+    bytes value: UInt64,
+    count: Int) -> Int {
+    var core = Core(seed: seed)
+    core.combine(bytes: value, count: count)
+    return Int(truncatingIfNeeded: core.finalize())
+  }
+
+  @effects(releasenone)
+  public static func _hash(
+    seed: (UInt64, UInt64),
+    bytes: UnsafeRawBufferPointer) -> Int {
+    var core = Core(seed: seed)
+    core.combine(bytes: bytes)
+    return Int(truncatingIfNeeded: core.finalize())
   }
 }

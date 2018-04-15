@@ -128,7 +128,7 @@ extension String : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @inlinable
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable
@@ -140,7 +140,7 @@ extension String : Hashable {
 extension StringProtocol {
   @inlinable
   public var hashValue : Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable

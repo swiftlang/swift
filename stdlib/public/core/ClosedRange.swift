@@ -170,7 +170,7 @@ extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -391,7 +391,7 @@ extension ClosedRange: Equatable {
 extension ClosedRange: Hashable where Bound: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)

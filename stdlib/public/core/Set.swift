@@ -484,15 +484,14 @@ extension Set: Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
     var hash = 0
     for member in self {
-      hash ^= _hashValue(for: member)
+      hash ^= member._unsafeHashValue()
     }
     hasher.combine(hash)
   }
@@ -2041,9 +2040,7 @@ extension _NativeSetBuffer where Element: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher.finalize() & _bucketMask
+    return k._unsafeHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)

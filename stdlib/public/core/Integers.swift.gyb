@@ -3703,7 +3703,7 @@ extension ${Self} : Hashable {
   public var hashValue: Int {
     @inline(__always)
     get {
-      return _hashValue(for: self)
+      return _unsafeHashValue()
     }
   }
 

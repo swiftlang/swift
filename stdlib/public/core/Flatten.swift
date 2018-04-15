@@ -231,7 +231,7 @@ extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)

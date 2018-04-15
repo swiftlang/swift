@@ -111,6 +111,8 @@ public protocol Hashable : Equatable {
 
   /// Feed bits to be hashed into the hash function represented by `hasher`.
   func _hash(into hasher: inout _Hasher)
+
+  func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int
 }
 
 extension Hashable {
@@ -119,15 +121,21 @@ extension Hashable {
   public func _hash(into hasher: inout _Hasher) {
     hasher.combine(self.hashValue)
   }
-}
 
-// Called by synthesized `hashValue` implementations.
-@inlinable
-@inline(__always)
-public func _hashValue<H: Hashable>(for value: H) -> Int {
-  var hasher = _Hasher()
-  hasher.combine(value)
-  return hasher.finalize()
+  @inlinable
+  @inline(__always)
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    var hasher = _Hasher(_seed: seed)
+    hasher.combine(self)
+    return hasher.finalize()
+  }
+
+  // Called by synthesized `hashValue` implementations.
+  @inlinable
+  @inline(__always)
+  public func _unsafeHashValue() -> Int {
+    return self._unsafeHashValue(seed: _Hasher._seed)
+  }
 }
 
 // Called by the SwiftValue implementation.

@@ -418,7 +418,7 @@ extension Optional: Hashable where Wrapped: Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
