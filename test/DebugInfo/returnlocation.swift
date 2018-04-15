@@ -178,18 +178,3 @@ public func cleanup_simple_complex(_ a: NSString) -> Int64 {
 }
 
 // ---------------------------------------------------------------------
-
-// RUN: %FileCheck %s --check-prefix=CHECK_INIT < %t.ll
-// CHECK_INIT: define {{.*}}$S4main6Class1CACSgycfc
-public class Class1 {
-  public required init?() {
-    print("hello")
-    // CHECK_INIT: call {{.*}}@"$Ss5print_9separator10terminatoryypd_S2StF"{{.*}}, !dbg [[printLoc:![0-9]+]]
-    // CHECK_INIT-NEXT: call void @swift_bridgeObjectRelease{{.*}}, !dbg [[retnLoc:![0-9]+]]
-    // CHECK_INIT: br label {{.*}}, !dbg [[retnLoc]]
-
-    // CHECK_INIT: [[printLoc]] = !DILocation(line: [[@LINE-5]]
-    // CHECK_INIT: [[retnLoc]] = !DILocation(line: [[@LINE+1]]
-    return nil
-  }
-}
