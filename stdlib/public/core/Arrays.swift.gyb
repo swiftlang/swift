@@ -2268,8 +2268,9 @@ extension ${Self}: Hashable where Element: Hashable {
     return _hashValue(for: self)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  // not @inlinable
   public func _hash(into hasher: inout _Hasher) {
+    hasher.combine(count) // discriminator
     for element in self {
       hasher.combine(element)
     }
