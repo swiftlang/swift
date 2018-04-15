@@ -81,18 +81,6 @@ function(add_sourcekit_default_compiler_flags target)
     add_dependencies(${target} BlocksRuntime)
   endif()
 
-  # SWIFT_ENABLE_TENSORFLOW
-  if(SWIFT_ENABLE_TENSORFLOW)
-    # FIXME: This is a hack: adding rpaths with many `..` that jump across
-    # frameworks is bad practice. It would be cleaner/more robust to copy
-    # the TensorFlow libraries to sourcekitd.framework.
-    list(APPEND link_flags
-      "-Xlinker" "-rpath"
-      "-Xlinker" "@loader_path/../../../swift/${SOURCEKIT_DEPLOYMENT_OS}"
-      "-Xlinker" "-rpath"
-      "-Xlinker" "@loader_path/../../../../../../../swift/${SOURCEKIT_DEPLOYMENT_OS}")
-  endif()
-
   # Convert variables to space-separated strings.
   _list_escape_for_shell("${c_compile_flags}" c_compile_flags)
   _list_escape_for_shell("${link_flags}" link_flags)
