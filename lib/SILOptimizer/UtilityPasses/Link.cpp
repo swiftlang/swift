@@ -25,15 +25,11 @@ namespace {
 /// Copies code from the standard library into the user program to enable
 /// optimizations.
 class SILLinker : public SILModuleTransform {
-  SILModule::LinkingMode LinkMode;
-
-public:
-  explicit SILLinker(SILModule::LinkingMode LinkMode) : LinkMode(LinkMode) {}
 
   void run() override {
     SILModule &M = *getModule();
     for (auto &Fn : M)
-      if (M.linkFunction(&Fn, LinkMode))
+      if (M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll))
         invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::Everything);
   }
 
@@ -41,10 +37,6 @@ public:
 } // end anonymous namespace
 
 
-SILTransform *swift::createMandatorySILLinker() {
-  return new SILLinker(SILModule::LinkingMode::LinkNormal);
-}
-
-SILTransform *swift::createPerformanceSILLinker() {
-  return new SILLinker(SILModule::LinkingMode::LinkAll);
+SILTransform *swift::createSILLinker() {
+  return new SILLinker();
 }
