@@ -250,7 +250,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 public struct _Hasher {
   internal typealias Core = _BufferingHasher<_SipHash13Core>
 
-  private var _core: Core
+  internal var _core: Core
 
   @effects(releasenone)
   public init() {
