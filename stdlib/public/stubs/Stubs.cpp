@@ -45,25 +45,28 @@
 #include <sstream>
 #include <cmath>
 #elif defined(__ANDROID__)
-// Android's libc implementation Bionic currently only supports the "C" locale
-// (https://android.googlesource.com/platform/bionic/+/ndk-r11c/libc/bionic/locale.cpp#40).
-// As such, we have no choice but to map functions like strtod_l, which should
-// respect the given locale_t parameter, to functions like strtod, which do not.
 #include <locale.h>
+
+#include <android/api-level.h>
+
+#if __ANDROID_API__ < 21 // Introduced in Android API 21 - L
+static inline long double swift_strtold_l(const char *nptr, char **endptr,
+                                          locale_t) {
+  return strtod(nptr, endptr);
+}
+#define strtold_l swift_strtold_l
+#endif
+
+#if __ANDROID_API__ < 26 // Introduced in Android API 26 - O
 static double swift_strtod_l(const char *nptr, char **endptr, locale_t loc) {
   return strtod(nptr, endptr);
 }
 static float swift_strtof_l(const char *nptr, char **endptr, locale_t loc) {
   return strtof(nptr, endptr);
 }
-static long double swift_strtold_l(const char *nptr,
-                                   char **endptr,
-                                   locale_t loc) {
-  return strtod(nptr, endptr);
-}
 #define strtod_l swift_strtod_l
 #define strtof_l swift_strtof_l
-#define strtold_l swift_strtold_l
+#endif
 #elif defined(__linux__)
 #include <locale.h>
 #else
@@ -168,10 +171,11 @@ static locale_t getCLocale() {
 }
 #endif
 
+#if !SWIFT_DTOA_FLOAT80_SUPPORT
 #if defined(__APPLE__)
 #define swift_snprintf_l snprintf_l
 #elif defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
-// In Cygwin, swift_snprintf_l() is not used.
+// swift_snprintf_l() is not used.
 #else
 static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
                             const char *Format, ...) {
@@ -191,7 +195,6 @@ static int swift_snprintf_l(char *Str, size_t StrSize, locale_t Locale,
 }
 #endif
 
-#if !SWIFT_DTOA_FLOAT80_SUPPORT
 template <typename T>
 static uint64_t swift_floatingPointToString(char *Buffer, size_t BufferLength,
                                             T Value, const char *Format, 
