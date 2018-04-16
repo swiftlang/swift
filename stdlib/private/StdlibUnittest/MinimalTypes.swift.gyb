@@ -110,7 +110,7 @@ public func < (
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public ${decl_keyword} ${Self} : Equatable, Hashable {
+public ${decl_keyword} ${Self} : Equatable, Hashable, CustomStringConvertible {
   public static var timesEqualEqualWasCalled: Int = 0
   public static var timesHashIntoWasCalled: Int = 0
 
@@ -142,6 +142,10 @@ public ${decl_keyword} ${Self} : Equatable, Hashable {
     ${Self}.timesHashIntoWasCalled += 1
     ${Self}.hashIntoImpl.value(value, &hasher)
   }
+
+  public var description: String {
+    return "${Self}(value: \(value), identity: \(identity))"
+  }
 }
 
 public func == (
@@ -170,7 +174,8 @@ public var ${Self}_hashIntoImpl = ResettableValue<(Any, inout _Hasher) -> Void>(
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public ${decl_keyword} ${Self}<Wrapped> : Equatable, Hashable {
+public ${decl_keyword} ${Self}<Wrapped>
+  : Equatable, Hashable, CustomStringConvertible {
   public var value: Wrapped
   public var identity: Int
 
@@ -192,6 +197,10 @@ public ${decl_keyword} ${Self}<Wrapped> : Equatable, Hashable {
   public func _hash(into hasher: inout _Hasher) {
     ${Self}_timesHashIntoWasCalled += 1
     return ${Self}_hashIntoImpl.value(value, &hasher)
+  }
+
+  public var description: String {
+    return "${Self}(value: \(value), identity: \(identity))"
   }
 }
 
