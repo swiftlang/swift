@@ -573,7 +573,7 @@ SequenceTypeTests.test("Set<T>.contains/CustomImplementation/${dispatch}") {
     let s = Set<MinimalHashableValue>(
       test.sequence.map { MinimalHashableValue($0.value) })
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectEqual(
       test.expected != nil,
       call${dispatch}Contains(s, MinimalHashableValue(test.element.value)),
@@ -583,11 +583,11 @@ SequenceTypeTests.test("Set<T>.contains/CustomImplementation/${dispatch}") {
         0, MinimalHashableValue.timesEqualEqualWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
-        0, MinimalHashableValue.timesHashValueWasCalled,
+        0, MinimalHashableValue.timesHashIntoWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
       expectNotEqual(
-        0, MinimalHashableValue.timesHashValueWasCalled,
+        0, MinimalHashableValue.timesHashIntoWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
     }
     if test.expected != nil {
