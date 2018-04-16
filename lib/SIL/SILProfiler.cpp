@@ -100,8 +100,6 @@ static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
   if (auto *D = N.dyn_cast<Decl *>()) {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
       walkFunctionForProfiling(AFD, Walker);
-    else if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
-      walkPatternForProfiling(PBD, Walker);
     else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
       TLCD->walk(Walker);
   } else if (auto *E = N.dyn_cast<Expr *>()) {
