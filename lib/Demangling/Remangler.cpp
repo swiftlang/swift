@@ -585,15 +585,6 @@ void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
   mangleAnyNominalType(node);
 }
 
-template <size_t N>
-static bool stripPrefix(StringRef &string, const char (&data)[N]) {
-  constexpr size_t prefixLength = N - 1;
-  if (!string.startswith(StringRef(data, prefixLength)))
-    return false;
-  string = string.drop_front(prefixLength);
-  return true;
-}
-
 void Remangler::mangleBuiltinTypeName(Node *node) {
   Buffer << 'B';
   StringRef text = node->getText();
@@ -612,17 +603,17 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_WORD) {
     Buffer << 'w';
-  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_INT)) {
+  } else if (text.consume_front(BUILTIN_TYPE_NAME_INT)) {
     Buffer << 'i' << text << '_';
-  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_FLOAT)) {
+  } else if (text.consume_front(BUILTIN_TYPE_NAME_FLOAT)) {
     Buffer << 'f' << text << '_';
-  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_VEC)) {
+  } else if (text.consume_front(BUILTIN_TYPE_NAME_VEC)) {
     auto split = text.split('x');
     if (split.second == "RawPointer") {
       Buffer << 'p';
-    } else if (stripPrefix(split.second, "Float")) {
+    } else if (split.second.consume_front("Float")) {
       Buffer << 'f' << split.second << '_';
-    } else if (stripPrefix(split.second, "Int")) {
+    } else if (split.second.consume_front("Int")) {
       Buffer << 'i' << split.second << '_';
     } else {
       unreachable("unexpected builtin vector type");
