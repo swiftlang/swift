@@ -23,12 +23,15 @@ internal protocol _HasherCore {
 
   /// Generate a seed value from the current state of this hasher.
   ///
-  /// Note that the returned value is not same as the seed that was used to
-  /// initialize the hasher.
-  ///
   /// This comes handy when type's _hash(into:) implementation needs to perform
-  /// one-shot hashing for some of its components. (E.g., for commutative
+  /// one-shot hashing on some of its components. (E.g., for commutative
   /// hashing.)
+  ///
+  /// Note that the returned value is not same as the seed that was used to
+  /// initialize the hasher.  However, when _generateSeed() is called on a newly
+  /// created _Hasher, the return valued does contains information about the
+  /// original seed (This seems fine for the intended use case (commutative
+  /// one-shot hashing), but we should be careful about adding more.)
   func _generateSeed() -> (UInt64, UInt64)
 }
 

@@ -489,16 +489,12 @@ extension Set: Hashable {
 
   // NOT @inlinable
   public func _hash(into hasher: inout _Hasher) {
-    hasher.combine(_unsafeHashValue(seed: hasher._core._generateSeed()))
-  }
-
-  // NOT @inlinable
-  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
     var hash = 0
+    let seed = hasher._core._generateSeed()
     for member in self {
       hash ^= member._unsafeHashValue(seed: seed)
     }
-    return hash
+    hasher.combine(hash)
   }
 }
 
