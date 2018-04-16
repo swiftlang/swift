@@ -302,18 +302,37 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   return false;
 }
 
-/// Determine whether one protocol extension is at least as specialized as
-/// another.
-static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
-                                               DeclContext *dc1,
-                                               DeclContext *dc2) {
-  assert(dc1->getAsProtocolExtensionContext());
-  assert(dc2->getAsProtocolExtensionContext());
+/// Determine whether one protocol and/or protocol extension is at least
+/// as specialized as another.
+static bool isProtocolOrProtocolExtensionAsSpecializedAs(TypeChecker &tc,
+                                                         DeclContext *dc1,
+                                                         DeclContext *dc2) {
+  assert(dc1->getAsProtocolOrProtocolExtensionContext());
+  assert(dc2->getAsProtocolOrProtocolExtensionContext());
+
+  bool inProtocolExtension1 = dc1->getAsProtocolExtensionContext();
+  bool inProtocolExtension2 = dc2->getAsProtocolExtensionContext();
+
+  // If one declaration comes from protocol and another from
+  // protocol extension, it's only interesting if such extension
+  // is constrained, otherwise always prefer protocol.
+  if (inProtocolExtension1 != inProtocolExtension2) {
+    auto *ext1 = dyn_cast<ExtensionDecl>(dc1->getAsDeclOrDeclExtensionContext());
+    auto *ext2 = dyn_cast<ExtensionDecl>(dc2->getAsDeclOrDeclExtensionContext());
+    if (inProtocolExtension1 && !ext1->isConstrainedExtension())
+      return false;
+
+    if (inProtocolExtension2 && !ext2->isConstrainedExtension())
+      return true;
+  }
 
   // If one of the protocols being extended inherits the other, prefer the
   // more specialized protocol.
-  auto proto1 = dc1->getAsProtocolExtensionContext();
-  auto proto2 = dc2->getAsProtocolExtensionContext();
+  auto proto1 = dc1->getAsProtocolOrProtocolExtensionContext();
+  auto proto2 = dc2->getAsProtocolOrProtocolExtensionContext();
+
+  // Only do the inheritance check if both declarations come
+  // from the same context, either extension or protocol.
   if (proto1 != proto2) {
     if (proto1->inheritsFrom(proto2))
       return true;
@@ -321,13 +340,12 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
       return false;
   }
 
-
   // If the two generic signatures are identical, neither is as specialized
   // as the other.
   GenericSignature *sig1 = dc1->getGenericSignatureOfContext();
   GenericSignature *sig2 = dc2->getGenericSignatureOfContext();
   if (sig1->getCanonicalSignature() == sig2->getCanonicalSignature())
-    return false;
+    return dc2->getAsProtocolExtensionContext();
 
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
@@ -338,8 +356,8 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
                  ConstraintLocatorBuilder(nullptr),
                  replacements);
 
-  // Bind the 'Self' type from the first extension to the type parameter from
-  // opening 'Self' of the second extension.
+  // Bind the 'Self' type from the first declaration to the type parameter from
+  // opening 'Self' of the second declaration.
   Type selfType1 = sig1->getGenericParams()[0];
   Type selfType2 = sig2->getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
@@ -347,8 +365,8 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
                    dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
-  // Solve the system. If the first extension is at least as specialized as the
-  // second, we're done.
+  // Solve the system. If the first declaration is at least as specialized as
+  // the second, we're done.
   return cs.solveSingle().hasValue();
 }
 
@@ -423,23 +441,24 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       // Members of protocol extensions have special overloading rules.
-      ProtocolDecl *inProtocolExtension1 = outerDC1
-                                             ->getAsProtocolExtensionContext();
-      ProtocolDecl *inProtocolExtension2 = outerDC2
-                                             ->getAsProtocolExtensionContext();
-      if (inProtocolExtension1 && inProtocolExtension2) {
-        // Both members are in protocol extensions.
-        // Determine whether the 'Self' type from the first protocol extension
-        // satisfies all of the requirements of the second protocol extension.
-        bool better1 = isProtocolExtensionAsSpecializedAs(tc, outerDC1, outerDC2);
-        bool better2 = isProtocolExtensionAsSpecializedAs(tc, outerDC2, outerDC1);
-        if (better1 != better2) {
+      bool inProtocolOrProtocolExtension1 =
+          outerDC1->getAsProtocolOrProtocolExtensionContext();
+      bool inProtocolOrProtocolExtension2 =
+          outerDC2->getAsProtocolOrProtocolExtensionContext();
+      // Both are either protocol or protocol extension
+      if (inProtocolOrProtocolExtension1 && inProtocolOrProtocolExtension2) {
+        bool better1 = isProtocolOrProtocolExtensionAsSpecializedAs(
+            tc, outerDC1, outerDC2);
+        bool better2 = isProtocolOrProtocolExtensionAsSpecializedAs(
+            tc, outerDC2, outerDC1);
+        if (better1 != better2)
           return better1;
-        }
-      } else if (inProtocolExtension1 || inProtocolExtension2) {
-        // One member is in a protocol extension, the other is in a concrete type.
-        // Prefer the member in the concrete type.
-        return inProtocolExtension2;
+      } else if (inProtocolOrProtocolExtension1 ||
+                 inProtocolOrProtocolExtension2) {
+        // One member is in a protocol or protocol extension,
+        // the other is in a concrete type. Prefer the member
+        // in the concrete type.
+        return inProtocolOrProtocolExtension2;
       }
 
       Type type1 = decl1->getInterfaceType();
