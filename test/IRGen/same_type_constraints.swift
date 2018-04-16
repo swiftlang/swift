@@ -62,3 +62,40 @@ where Self : CodingType,
 
 // OSIZE: define internal swiftcc i8** @"$S21same_type_constraints12GenericKlazzCyxq_GAA1EAA4Data_AA0F4TypePWT"(%swift.type* %"GenericKlazz<T, R>.Data", %swift.type* nocapture readonly %"GenericKlazz<T, R>", i8** nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline
+
+// Check that same-typing two generic parameters together lowers correctly.
+
+protocol P1 {}
+protocol P2 {}
+protocol P3 {}
+struct ConformsToP1: P1 {}
+struct ConformsToP2: P2 {}
+struct ConformsToP3: P3 {}
+
+struct SG11<T: P1, U: P2> {}
+
+struct ConformsToP1AndP2 : P1, P2 { }
+
+extension SG11 where U == T {
+  struct InnerTEqualsU<V: P3> { }
+}
+
+extension SG11 where T == ConformsToP1 {
+  struct InnerTEqualsConformsToP1<V: P3> { }
+}
+
+extension SG11 where U == ConformsToP2 {
+  struct InnerUEqualsConformsToP2<V: P3> { }
+}
+
+func inner1() -> Any.Type {
+  return SG11<ConformsToP1AndP2, ConformsToP1AndP2>.InnerTEqualsU<ConformsToP3>.self
+}
+
+func inner2() -> Any.Type {
+  return SG11<ConformsToP1, ConformsToP2>.InnerTEqualsConformsToP1<ConformsToP3>.self
+}
+
+func inner3() -> Any.Type {
+  return SG11<ConformsToP1, ConformsToP2>.InnerTEqualsConformsToP1<ConformsToP3>.self
+}
