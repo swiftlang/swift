@@ -3099,9 +3099,14 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
                          Range.getEnd(SF->getASTContext().SourceMgr));
   ResolvedRangeInfo Result = Resolver.resolve();
 
+  bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
+
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
   if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
     Scratch.push_back(RefactoringKind::KIND);
+#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID)                            \
+  if (enableInternalRefactoring)                                              \
+    RANGE_REFACTORING(KIND, NAME, ID)
 #include "swift/IDE/RefactoringKinds.def"
 
   RangeStartMayNeedRename = rangeStartMayNeedRename(Result);
