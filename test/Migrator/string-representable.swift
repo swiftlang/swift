@@ -13,5 +13,7 @@ func foo(_ c: Container) -> String {
   c.adding(attributes: ["a": 1, "a": 2, "a": 3])
   c.adding(optionalAttributes: ["a": 1, "a": 2, "a": 3])
   _ = Container(optionalAttributes: nil)
+  _ = Container(optionalAttrArray: nil)
+  c.adding(attrArray: ["key1", "key2"])
   return c.Value
 }
