@@ -190,6 +190,12 @@ void SourceLookupCache::doPopulateCache(Range decls,
       }
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
       doPopulateCache(NTD->getMembers(), true);
+
+    // Avoid populating the cache with the members of invalid extension
+    // declarations.  These members can be used to point validation inside of
+    // a malformed context.
+    if (D->isInvalid()) continue;
+
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
       doPopulateCache(ED->getMembers(), true);
   }
