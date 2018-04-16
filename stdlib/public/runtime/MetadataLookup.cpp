@@ -1030,7 +1030,7 @@ swift::_getTypeByMangledName(StringRef typeName,
       // Call the associated type access function.
       // TODO: can we just request abstract metadata?  If so, do we have
       //   a responsibility to try to finish it later?
-      return ((const AssociatedTypeAccessFunction * const *)witnessTable)[*assocTypeReqIndex]
+      return ((AssociatedTypeAccessFunction * const *)witnessTable)[*assocTypeReqIndex]
                 (MetadataState::Complete, base, witnessTable).Value;
     });
 
