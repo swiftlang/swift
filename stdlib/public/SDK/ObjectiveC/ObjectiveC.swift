@@ -211,8 +211,18 @@ extension NSObject : Equatable, Hashable {
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   @objc
-  open var hashValue: Int {
+  open // FIXME: should be @nonobjc public.
+  var hashValue: Int {
     return hash
+  }
+
+  public final func _hash(into hasher: inout _Hasher) {
+    // FIXME(hasher): We should call self.hash here; however, that would cause
+    // compatibility issues with code that mistakenly overrides hashValue rather
+    // than hash. (Types that do this break Foundation's hashing, but as long as
+    // they correctly override isEqual, they may still conform to Swift's
+    // Hashable.)
+    hasher.combine(self.hashValue)
   }
 }
 
