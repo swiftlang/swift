@@ -38,4 +38,6 @@ public class Container {
   public var Value: String = ""
   public func addingAttributes(_ input: [String: Any]) {}
   public func adding(attributes: [String: Any]) {}
+  public func adding(optionalAttributes: [String: Any]?) {}
+  public init(optionalAttributes: [String: Any]?) {}
 }

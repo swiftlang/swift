@@ -719,7 +719,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     case NodeAnnotation::OptionalDictionaryKeyUpdate:
       Segs = {"Optional", "Dictionary", "[String: Any]?"};
       Segs.push_back((Twine("[") + NewType +": Any]?").str());
-      Segs.push_back("// Not implemented");
+      Segs.push_back((Twine("\tguard let input = input else { return nil }\n"
+                            "\treturn Dictionary(uniqueKeysWithValues: input.map"
+        " { key, value in (") + NewType + "(rawValue: key), value)})").str());
       break;
     case NodeAnnotation::ArrayMemberUpdate:
       Segs = {"", "Array", "[String]"};

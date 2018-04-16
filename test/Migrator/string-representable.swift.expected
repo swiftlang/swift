@@ -11,6 +11,8 @@ func foo(_ c: Container) -> String {
   c.addingAttributes(converToCitiesContainerAttributeDictionary(["a": "b", "a": "b", "a": "b"]))
   c.addingAttributes(converToCitiesContainerAttributeDictionary(["a": "b", "a": "b", "a": "b"]))
   c.adding(attributes: converToSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
+  c.adding(optionalAttributes: converToOptionalSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
+  _ = Container(optionalAttributes: converToOptionalSimpleAttributeDictionary(nil))
   return c.Value.rawValue
 }
 
@@ -21,5 +23,11 @@ fileprivate func converToCitiesContainerAttributeDictionary(_ input: [String: An
 
 // Helper function inserted by Swift 4.2 migrator.
 fileprivate func converToSimpleAttributeDictionary(_ input: [String: Any]) -> [SimpleAttribute: Any] {
+	return Dictionary(uniqueKeysWithValues: input.map { key, value in (SimpleAttribute(rawValue: key), value)})
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func converToOptionalSimpleAttributeDictionary(_ input: [String: Any]?) -> [SimpleAttribute: Any]? {
+	guard let input = input else { return nil }
 	return Dictionary(uniqueKeysWithValues: input.map { key, value in (SimpleAttribute(rawValue: key), value)})
 }
