@@ -442,13 +442,13 @@ SetTestSuite.test("COW.Fast.ContainsDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectFalse(s2.contains(MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -488,13 +488,13 @@ SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate")
   do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectFalse(s2.contains(MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -619,13 +619,13 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(s2.index(of: MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -655,13 +655,13 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectNil(s2.index(of: MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 

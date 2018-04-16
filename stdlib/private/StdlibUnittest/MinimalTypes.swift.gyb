@@ -112,12 +112,12 @@ public func < (
 /// other conformances.
 public ${decl_keyword} ${Self} : Equatable, Hashable {
   public static var timesEqualEqualWasCalled: Int = 0
-  public static var timesHashValueWasCalled: Int = 0
+  public static var timesHashIntoWasCalled: Int = 0
 
   public static var equalImpl =
     ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
-  public static var hashValueImpl =
-    ResettableValue<(Int) -> Int>({ $0.hashValue })
+  public static var hashIntoImpl =
+    ResettableValue<(Int, inout _Hasher) -> Void>({ $1.combine($0) })
 
   public var value: Int
   public var identity: Int
@@ -133,8 +133,14 @@ public ${decl_keyword} ${Self} : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    ${Self}.timesHashValueWasCalled += 1
-    return ${Self}.hashValueImpl.value(value)
+    var hasher = _Hasher()
+    _hash(into: &hasher)
+    return hasher.finalize()
+  }
+
+  public func _hash(into hasher: inout _Hasher) {
+    ${Self}.timesHashIntoWasCalled += 1
+    ${Self}.hashIntoImpl.value(value, &hasher)
   }
 }
 
@@ -152,12 +158,13 @@ public func == (
 %   Self = 'GenericMinimalHashable%s' % kind
 
 public var ${Self}_timesEqualEqualWasCalled: Int = 0
+public var ${Self}_timesHashIntoWasCalled: Int = 0
 public var ${Self}_timesHashValueWasCalled: Int = 0
 
 public var ${Self}_equalImpl = ResettableValue<(Any, Any) -> Bool>(
   { _, _ in fatalError("${Self}_equalImpl is not set yet"); () })
-public var ${Self}_hashValueImpl = ResettableValue<(Any) -> Int>(
-  { _ in fatalError("${Self}_hashValueImpl is not set yet"); () })
+public var ${Self}_hashIntoImpl = ResettableValue<(Any, inout _Hasher) -> Void>(
+  { _ in fatalError("${Self}_hashIntoImpl is not set yet"); () })
 
 /// A type that conforms only to `Equatable` and `Hashable`.
 ///
@@ -179,7 +186,12 @@ public ${decl_keyword} ${Self}<Wrapped> : Equatable, Hashable {
 
   public var hashValue: Int {
     ${Self}_timesHashValueWasCalled += 1
-    return ${Self}_hashValueImpl.value(value)
+    return _unsafeHashValue()
+  }
+
+  public func _hash(into hasher: inout _Hasher) {
+    ${Self}_timesHashIntoWasCalled += 1
+    return ${Self}_hashIntoImpl.value(value, &hasher)
   }
 }
 

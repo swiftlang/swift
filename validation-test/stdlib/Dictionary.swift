@@ -274,13 +274,13 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
   do {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(d2[MinimalHashableValue(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -330,14 +330,14 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
   do {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
 
     expectNil(d2[MinimalHashableClass(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -864,13 +864,13 @@ DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   do {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(d2.index(forKey: MinimalHashableValue(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -901,13 +901,13 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
   do {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectNil(d2.index(forKey: MinimalHashableClass(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -1713,13 +1713,13 @@ DictionaryTestSuite.test("mapValues(_:)") {
       uniqueKeysWithValues: d1.lazy.map { (MinimalHashableValue($0), $1) })
     expectEqual(d3.count, 3)
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
 
     // Calling mapValues shouldn't ever recalculate any hashes.
     let d4 = d3.mapValues(String.init)
     expectEqual(d4.count, d3.count)
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
