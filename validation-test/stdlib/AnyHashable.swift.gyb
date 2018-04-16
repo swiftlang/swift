@@ -443,18 +443,20 @@ class ${hashable_base.full_name} : ${', '.join([b.full_name for b in bases])} {
   init(_ value: Int) {
     self.value = value
   }
-  ${'override' if 'ObjC' in prefix else ''} var hashValue: Int {
+%   if 'ObjC' in prefix:
+  override var hash: Int {
     return value
   }
-%   if 'ObjC' in prefix:
   override func isEqual(_ object: Any?) -> Bool {
     guard let rhs = object as? ${hashable_base.full_name} else {
       return false
     }
     return self.value == rhs.value
   }
-%   end
-%   if not 'ObjC' in prefix:
+%   else:
+  var hashValue: Int {
+    return value
+  }
   static func == ${hashable_base.generic_parameters_decl} (
     lhs: ${hashable_base.full_name},
     rhs: ${hashable_base.full_name}
