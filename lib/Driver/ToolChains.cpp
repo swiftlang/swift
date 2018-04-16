@@ -1139,6 +1139,13 @@ getSanitizerRuntimeLibNameForDarwin(StringRef Sanitizer,
 }
 
 static std::string
+getSanitizerRuntimeLibNameForWindows(StringRef Sanitizer,
+                                     const llvm::Triple &Triple) {
+  return (Twine("clang_rt.") + Sanitizer + "-" + Triple.getArchName() + ".lib")
+      .str();
+}
+
+static std::string
 getSanitizerRuntimeLibNameForLinux(StringRef Sanitizer, const llvm::Triple &Triple) {
   return (Twine("libclang_rt.") + Sanitizer + "-" +
                        Triple.getArchName() + ".a").str();
@@ -1151,6 +1158,17 @@ bool toolchains::Darwin::sanitizerRuntimeLibExists(
   llvm::sys::path::append(sanitizerLibPath,
                           getSanitizerRuntimeLibNameForDarwin(
                               sanitizer, this->getTriple(), shared));
+  return llvm::sys::fs::exists(sanitizerLibPath.str());
+}
+
+bool toolchains::Windows::sanitizerRuntimeLibExists(const ArgList &args,
+                                                    StringRef sanitizer,
+                                                    bool shared) const {
+  SmallString<128> sanitizerLibPath;
+  getClangLibraryPath(*this, args, sanitizerLibPath);
+  llvm::sys::path::append(
+      sanitizerLibPath,
+      getSanitizerRuntimeLibNameForWindows(sanitizer, this->getTriple()));
   return llvm::sys::fs::exists(sanitizerLibPath.str());
 }
 
@@ -1196,16 +1214,22 @@ addLinkRuntimeLibForDarwin(const ArgList &Args, ArgStringList &Arguments,
   }
 }
 
+static void addLinkRuntimeLibForWindows(const ArgList &Args,
+                                        ArgStringList &Arguments,
+                                        StringRef WindowsLibName,
+                                        const ToolChain &TC) {
+  SmallString<128> P;
+  getClangLibraryPath(TC, Args, P);
+  llvm::sys::path::append(P, WindowsLibName);
+  Arguments.push_back(Args.MakeArgString(P));
+}
+
 static void
 addLinkRuntimeLibForLinux(const ArgList &Args, ArgStringList &Arguments,
                            StringRef LinuxLibName,
                            const ToolChain &TC) {
-  SmallString<128> Dir;
-  getRuntimeLibraryPath(Dir, Args, TC, /*Shared=*/ true);
-  // Remove platform name.
-  llvm::sys::path::remove_filename(Dir);
-  llvm::sys::path::append(Dir, "clang", "lib", "linux");
-  SmallString<128> P(Dir);
+  SmallString<128> P;
+  getClangLibraryPath(TC, Args, P);
   llvm::sys::path::append(P, LinuxLibName);
   Arguments.push_back(Args.MakeArgString(P));
 }
@@ -1228,11 +1252,21 @@ addLinkSanitizerLibArgsForDarwin(const ArgList &Args,
       /*AddRPath=*/ shared, TC);
 }
 
-static void
-addLinkSanitizerLibArgsForLinux(const ArgList &Args,
-                                 ArgStringList &Arguments,
-                                 StringRef Sanitizer, const ToolChain &TC) {
-  addLinkRuntimeLibForLinux(Args, Arguments,
+static void addLinkSanitizerLibArgsForWindows(const ArgList &Args,
+                                              ArgStringList &Arguments,
+                                              StringRef Sanitizer,
+                                              const ToolChain &TC) {
+  addLinkRuntimeLibForWindows(
+      Args, Arguments,
+      getSanitizerRuntimeLibNameForWindows(Sanitizer, TC.getTriple()), TC);
+}
+
+static void addLinkSanitizerLibArgsForLinux(const ArgList &Args,
+                                            ArgStringList &Arguments,
+                                            StringRef Sanitizer,
+                                            const ToolChain &TC) {
+  addLinkRuntimeLibForLinux(
+      Args, Arguments,
       getSanitizerRuntimeLibNameForLinux(Sanitizer, TC.getTriple()), TC);
 
   // Code taken from
@@ -1511,12 +1545,138 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 }
 
 ToolChain::InvocationInfo
+toolchains::Windows::constructInvocation(const LinkJobAction &job,
+                                         const JobContext &context) const {
+  assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  ArgStringList Arguments;
+
+  switch (job.getKind()) {
+  case LinkKind::None:
+    llvm_unreachable("invalid link kind");
+  case LinkKind::Executable:
+    // Default case, nothing extra needed.
+    break;
+  case LinkKind::DynamicLibrary:
+    Arguments.push_back("-shared");
+    break;
+  }
+
+  // Select the linker to use.
+  std::string Linker;
+  if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
+    Linker = A->getValue();
+  }
+  if (!Linker.empty())
+    Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
+
+  // Configure the toolchain.
+  // By default, use the system clang++ to link.
+  const char *Clang = nullptr;
+  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
+    StringRef toolchainPath(A->getValue());
+
+    // If there is a clang in the toolchain folder, use that instead.
+    if (auto toolchainClang =
+            llvm::sys::findProgramByName("clang++", {toolchainPath}))
+      Clang = context.Args.MakeArgString(toolchainClang.get());
+  }
+  if (Clang == nullptr) {
+    if (auto pathClang = llvm::sys::findProgramByName("clang++", None))
+      Clang = context.Args.MakeArgString(pathClang.get());
+  }
+  assert(Clang &&
+         "clang++ was not found in the toolchain directory or system path.");
+
+  std::string Target = getTriple().str();
+  if (!Target.empty()) {
+    Arguments.push_back("-target");
+    Arguments.push_back(context.Args.MakeArgString(Target));
+  }
+
+  SmallString<128> SharedRuntimeLibPath;
+  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, *this,
+                        /*Shared=*/true);
+
+  // Link the standard library.
+  Arguments.push_back("-L");
+  if (context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false)) {
+    SmallString<128> StaticRuntimeLibPath;
+    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, *this,
+                          /*Shared=*/false);
+
+    // Since Windows has separate libraries per architecture, link against the
+    // architecture specific version of the static library.
+    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath + "/" +
+                                                   getTriple().getArchName()));
+  } else {
+    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath + "/" +
+                                                   getTriple().getArchName()));
+  }
+
+  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  llvm::sys::path::append(swiftrtPath,
+                          swift::getMajorArchitectureName(getTriple()));
+  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  for (const Arg *arg :
+       context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
+    if (arg->getOption().matches(options::OPT_Fsystem))
+      Arguments.push_back("-iframework");
+    else
+      Arguments.push_back(context.Args.MakeArgString(arg->getSpelling()));
+    Arguments.push_back(arg->getValue());
+  }
+
+  if (!context.OI.SDKPath.empty()) {
+    Arguments.push_back("-I");
+    Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
+  }
+
+  if (job.getKind() == LinkKind::Executable) {
+    if (context.OI.SelectedSanitizers & SanitizerKind::Address)
+      addLinkSanitizerLibArgsForWindows(context.Args, Arguments, "asan", *this);
+  }
+
+  if (context.Args.hasArg(options::OPT_profile_generate)) {
+    SmallString<128> LibProfile(SharedRuntimeLibPath);
+    llvm::sys::path::remove_filename(LibProfile); // remove platform name
+    llvm::sys::path::append(LibProfile, "clang", "lib");
+
+    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
+                            Twine("clang_rt.profile-") +
+                                getTriple().getArchName() + ".lib");
+    Arguments.push_back(context.Args.MakeArgString(LibProfile));
+    Arguments.push_back(context.Args.MakeArgString(
+        Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
+  }
+
+  context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
+  context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+
+  // This should be the last option, for convenience in checking output.
+  Arguments.push_back("-o");
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return {Clang, Arguments};
+}
+
+ToolChain::InvocationInfo
 toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
                                              const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
   SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this, /*Shared=*/ true);
+  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, *this,
+                        /*Shared=*/true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
@@ -1524,10 +1684,8 @@ toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
   return II;
 }
 
-
-ToolChain::InvocationInfo
-toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job,
-                                             const JobContext &context) const {
+ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
+    const AutolinkExtractJobAction &job, const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_AutolinkFile);
 
   ArgStringList Arguments;
@@ -1536,14 +1694,14 @@ toolchains::GenericUnix::constructInvocation(const AutolinkExtractJobAction &job
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
 
   Arguments.push_back("-o");
-  Arguments.push_back(context.Args.MakeArgString(
-      context.Output.getPrimaryOutputFilename()));
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   return {"swift-autolink-extract", Arguments};
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  switch(getTriple().getArch()) {
+  switch (getTriple().getArch()) {
   case llvm::Triple::arm:
   case llvm::Triple::armeb:
   case llvm::Triple::thumb:
