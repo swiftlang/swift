@@ -905,6 +905,7 @@ void ObjCMethodCall::clearState() {
   BridgedCall = nullptr;
   BridgedArguments.clear();
   OutlinedName.clear();
+  IsBridgedArgument.clear();
 }
 
 std::pair<SILFunction *, SILBasicBlock::iterator>
