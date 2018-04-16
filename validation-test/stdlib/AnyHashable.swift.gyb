@@ -58,7 +58,7 @@ import Foundation
 let AnyHashableTests = TestSuite("AnyHashableTests")
 
 AnyHashableTests.test("CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable") {
-  var v = AnyHashable(CustomPrintableValue(1))
+  let v = AnyHashable(CustomPrintableValue(1))
   expectPrinted("(value: 1).description", v)
   expectDebugPrinted("AnyHashable((value: 1).debugDescription)", v)
   expectDumped(
@@ -117,8 +117,8 @@ AnyHashableTests.test("AnyHashable(${wrapped}<OpaqueValue<Int>>)/Hashable") {
   ${wrapped}_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
-  ${wrapped}_hashValueImpl.value = {
-    ($0 as! ${payload}).value
+  ${wrapped}_hashIntoImpl.value = {
+    $1.combine(($0 as! ${payload}).value)
   }
   let xs = (0...5).flatMap {
     [ ${wrapped}(${payload}($0), identity: 0),
@@ -142,7 +142,7 @@ AnyHashableTests.test("AnyHashable(mixed minimal hashables)/Hashable") {
   var xs: [AnyHashable] = []
 
 % for wrapped in ['MinimalHashableValue', 'MinimalHashableClass']:
-  xs += (0...5).flatMap {
+  xs += (0..<6).flatMap {
     [ ${wrapped}($0, identity: 0),
       ${wrapped}($0, identity: 1) ].map(AnyHashable.init)
   }
@@ -157,18 +157,18 @@ AnyHashableTests.test("AnyHashable(mixed minimal hashables)/Hashable") {
     }
     return (lhs as! LifetimeTracked) == (rhs as! LifetimeTracked)
   }
-  ${wrapped}_hashValueImpl.value = {
-    payload in
+  ${wrapped}_hashIntoImpl.value = { payload, hasher in
     if let x = payload as? OpaqueValue<Int> {
-      return x.value
+      hasher.combine(x.value)
+      return
     }
-    return (payload as! LifetimeTracked).value
+    hasher.combine((payload as! LifetimeTracked).value)
   }
 % end
 
 % for wrapped in ['GenericMinimalHashableValue', 'GenericMinimalHashableClass']:
 %   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
-  xs += (0...5).flatMap {
+  xs += (0..<6).flatMap {
     [ ${wrapped}(${payload}($0), identity: 0),
       ${wrapped}(${payload}($0), identity: 1) ].map(AnyHashable.init)
   }
@@ -311,8 +311,8 @@ AnyHashableTests.test("AnyHashable(${genericWrapped}<${payload}>)/Hashable") {
   GenericMinimalHashableValue_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
-  GenericMinimalHashableValue_hashValueImpl.value = {
-    ($0 as! ${payload}).value
+  GenericMinimalHashableValue_hashIntoImpl.value = { v, hasher in
+    hasher.combine((v as! ${payload}).value)
   }
   let xs = (-2...2).flatMap {
     [ ${genericWrapped}(
@@ -379,8 +379,8 @@ AnyHashableTests.test("AnyHashable containing values with recursive custom repre
   GenericMinimalHashableValue_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
-  GenericMinimalHashableValue_hashValueImpl.value = {
-    ($0 as! ${payload}).value
+  GenericMinimalHashableValue_hashIntoImpl.value = { v, hasher in
+    hasher.combine((v as! ${payload}).value)
   }
   // If the custom representation has its own custom representation,
   // we ignore it.
