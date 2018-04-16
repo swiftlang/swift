@@ -11,5 +11,7 @@ func foo(_ c: Container) -> String {
   c.addingAttributes(["a": "b", "a": "b", "a": "b"])
   c.addingAttributes(["a": "b", "a": "b", "a": "b"])
   c.adding(attributes: ["a": 1, "a": 2, "a": 3])
+  c.adding(optionalAttributes: ["a": 1, "a": 2, "a": 3])
+  _ = Container(optionalAttributes: nil)
   return c.Value
 }
