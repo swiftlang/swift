@@ -175,7 +175,13 @@ AnyHashableTests.test("AnyHashable(mixed minimal hashables)/Hashable") {
 %   end
 % end
 
-  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs,
+    equalityOracle: { $0 / 2 == $1 / 2 },
+    // FIXME: Types that hash the same way will produce hash collisions when
+    // converted to AnyHashable. Arguably, the type id should be used as a hash
+    // discriminator.
+    hashEqualityOracle: { $0 / 2 % 6 == $1 / 2 % 6 })
 }
 
 % for (kw, name) in [
@@ -575,18 +581,27 @@ let interestingBitVectorArrays: [[UInt8]] = [
 AnyHashableTests.test("AnyHashable(CFBitVector)/Hashable, .base") {
   let bitVectors: [CFBitVector] =
     interestingBitVectorArrays.map(CFBitVector.makeImmutable)
+  let hashEqualityOracle: (Int, Int) -> Bool = {
+    // CFBitVector returns its count as the hash.
+    interestingBitVectorArrays[$0].count == interestingBitVectorArrays[$1].count
+  }
   let arrays = bitVectors.map { $0.asArray }
   func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
     return zip(lhs, rhs).map { $0 == $1 }.reduce(true, { $0 && $1 })
   }
   expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
-  checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+  checkHashable(
+    bitVectors,
+    equalityOracle: { $0 == $1 },
+    hashEqualityOracle: hashEqualityOracle)
 
   do {
     expectEqual(.foreignClass, SwiftRuntime.metadataKind(of: bitVectors.first!))
 
     let anyHashables = bitVectors.map(AnyHashable.init)
-    checkHashable(anyHashables, equalityOracle: { $0 == $1 })
+    checkHashable(anyHashables,
+      equalityOracle: { $0 == $1 },
+      hashEqualityOracle: hashEqualityOracle)
 
     let v = anyHashables.first!.base
     expectTrue(type(of: v) is CFBitVector.Type)
@@ -600,7 +615,9 @@ AnyHashableTests.test("AnyHashable(CFBitVector)/Hashable, .base") {
       SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
 
     let anyHashables = bitVectorsAsAnyObjects.map(AnyHashable.init)
-    checkHashable(anyHashables, equalityOracle: { $0 == $1 })
+    checkHashable(anyHashables,
+      equalityOracle: { $0 == $1 },
+      hashEqualityOracle: hashEqualityOracle)
 
     let v = anyHashables.first!.base
     expectTrue(type(of: v) is CFBitVector.Type)
@@ -612,12 +629,19 @@ AnyHashableTests.test("AnyHashable(CFMutableBitVector)/Hashable, .base") {
   // CFBitVector.
   let bitVectors: [CFMutableBitVector] =
     interestingBitVectorArrays.map(CFMutableBitVector.makeMutable)
+  let hashEqualityOracle: (Int, Int) -> Bool = {
+    // CFBitVector returns its count as the hash.
+    interestingBitVectorArrays[$0].count == interestingBitVectorArrays[$1].count
+  }
   let arrays = bitVectors.map { $0.asArray }
   func isEq(_ lhs: [[UInt8]], _ rhs: [[UInt8]]) -> Bool {
     return zip(lhs, rhs).map { $0 == $1 }.reduce(true, { $0 && $1 })
   }
   expectEqualTest(interestingBitVectorArrays, arrays, sameValue: isEq)
-  checkHashable(bitVectors, equalityOracle: { $0 == $1 })
+  checkHashable(
+    bitVectors,
+    equalityOracle: { $0 == $1 },
+    hashEqualityOracle: hashEqualityOracle)
 
   do {
     expectEqual(
@@ -625,7 +649,10 @@ AnyHashableTests.test("AnyHashable(CFMutableBitVector)/Hashable, .base") {
       SwiftRuntime.metadataKind(of: bitVectors.first!))
 
     let anyHashables = bitVectors.map(AnyHashable.init)
-    checkHashable(anyHashables, equalityOracle: { $0 == $1 })
+    checkHashable(
+      anyHashables,
+      equalityOracle: { $0 == $1 },
+      hashEqualityOracle: hashEqualityOracle)
 
     let v = anyHashables.first!.base
     expectTrue(type(of: v) is CFMutableBitVector.Type)
@@ -634,14 +661,20 @@ AnyHashableTests.test("AnyHashable(CFMutableBitVector)/Hashable, .base") {
     let bitVectorsAsAnyObjects: [NSObject] = bitVectors.map {
       ($0 as AnyObject) as! NSObject
     }
-    checkHashable(bitVectorsAsAnyObjects, equalityOracle: { $0 == $1 })
+    checkHashable(
+      bitVectorsAsAnyObjects,
+      equalityOracle: { $0 == $1 },
+      hashEqualityOracle: hashEqualityOracle)
 
     expectEqual(
       .objCClassWrapper,
       SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
 
     let anyHashables = bitVectorsAsAnyObjects.map(AnyHashable.init)
-    checkHashable(anyHashables, equalityOracle: { $0 == $1 })
+    checkHashable(
+      anyHashables,
+      equalityOracle: { $0 == $1 },
+      hashEqualityOracle: hashEqualityOracle)
 
     let v = anyHashables.first!.base
     expectTrue(type(of: v) is CFMutableBitVector.Type)
@@ -717,10 +750,14 @@ AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError)/Hashable") {
     .caseC(LifetimeTracked(2)), .caseC(LifetimeTracked(2)),
   ]
   expectEqual(.enum, SwiftRuntime.metadataKind(of: xs.first!))
-  checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
+  checkHashable(
+    xs,
+    equalityOracle: { $0 / 2 == $1 / 2 },
+    hashEqualityOracle: { $0 / 4 == $1 / 4 })
   checkHashable(
     xs.map(AnyHashable.init),
-    equalityOracle: { $0 / 2 == $1 / 2 })
+    equalityOracle: { $0 / 2 == $1 / 2 },
+    hashEqualityOracle: { $0 / 4 == $1 / 4 })
 }
 
 AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError).base") {
@@ -763,8 +800,16 @@ AnyHashableTests.test("AnyHashable(Wrappers)/Hashable") {
     return lhs == rhs
   }
 
-  checkHashable(values, equalityOracle: equalityOracle,
-                allowBrokenTransitivity: true)
+  func hashEqualityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    // Elements in [0, 3] hash the same, as do elements in [4, 7].
+    return lhs / 4 == rhs / 4
+  }
+
+  checkHashable(
+    values,
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: hashEqualityOracle,
+    allowBrokenTransitivity: true)
 }
 
 AnyHashableTests.test("AnyHashable(Set)/Hashable") {
@@ -789,8 +834,10 @@ AnyHashableTests.test("AnyHashable(Set)/Hashable") {
     }
   }
 
-  checkHashable(values, equalityOracle: equalityOracle,
-                allowBrokenTransitivity: true)
+  checkHashable(
+    values,
+    equalityOracle: equalityOracle,
+    allowBrokenTransitivity: true)
 }
 
 AnyHashableTests.test("AnyHashable(Array)/Hashable") {
@@ -902,6 +949,12 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftErr
     .caseC(LifetimeTracked(1)), .caseC(LifetimeTracked(1)),
     .caseC(LifetimeTracked(2)), .caseC(LifetimeTracked(2)),
   ]
+  checkHashable(
+    swiftErrors,
+    equalityOracle: { $0 / 2 == $1 / 2 },
+    hashEqualityOracle: { $0 / 4 == $1 / 4 },
+    allowBrokenTransitivity: false)
+
   let nsErrors: [NSError] = swiftErrors.flatMap {
     swiftError -> [NSError] in
     let bridgedNSError = swiftError as NSError
@@ -938,16 +991,23 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftErr
     return false
   }
 
+  func hashEqualityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    // Every NSError that has the same domain and code hash the same way.
+    return lhs / 8 == rhs / 8
+  }
+
   // FIXME: transitivity is broken because pure `NSError`s can compare equal to
   // Swift errors with payloads just based on the domain and code, and Swift
   // errors with payloads don't compare equal when payloads differ.
   checkHashable(
     nsErrors,
     equalityOracle: equalityOracle,
+    hashEqualityOracle: hashEqualityOracle,
     allowBrokenTransitivity: true)
   checkHashable(
     nsErrors.map(AnyHashable.init),
     equalityOracle: equalityOracle,
+    hashEqualityOracle: hashEqualityOracle,
     allowBrokenTransitivity: true)
 
   // FIXME(id-as-any): run `checkHashable` on an array of mixed
