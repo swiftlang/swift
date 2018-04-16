@@ -1827,36 +1827,47 @@ public:
 
   void addImportModuleNames() {
     // FIXME: Add user-defined swift modules
-    SmallVector<clang::Module*, 20> Modules;
-    Ctx.getVisibleTopLevelClangModules(Modules);
-    std::sort(Modules.begin(), Modules.end(),
-              [](clang::Module* LHS , clang::Module* RHS) {
-                return LHS->getTopLevelModuleName().compare_lower(
-                  RHS->getTopLevelModuleName()) < 0;
+    SmallVector<StringRef, 20> ModuleNames;
+
+    // Collect clang module names.
+    {
+      SmallVector<clang::Module*, 20> ClangModules;
+      Ctx.getVisibleTopLevelClangModules(ClangModules);
+      for (auto *M : ClangModules) {
+        if (!M->isAvailable())
+          continue;
+        if (M->getTopLevelModuleName().startswith("_"))
+          continue;
+        if (M->getTopLevelModuleName() == Ctx.SwiftShimsModuleName.str())
+          continue;
+
+        ModuleNames.push_back(M->getTopLevelModuleName());
+      }
+    }
+
+    std::sort(ModuleNames.begin(), ModuleNames.end(),
+              [](StringRef LHS, StringRef RHS) {
+                return LHS.compare_lower(RHS) < 0;
               });
+
     llvm::StringSet<> ImportedModules;
     collectImportedModules(ImportedModules);
-    for (auto *M : Modules) {
-      if (M->isAvailable() &&
-          !M->getTopLevelModuleName().startswith("_") &&
-          M->getTopLevelModuleName() != CurrDeclContext->getASTContext().
-            SwiftShimsModuleName.str()) {
-        auto MD = ModuleDecl::create(Ctx.getIdentifier(M->getTopLevelModuleName()),
-                                     Ctx);
-        CodeCompletionResultBuilder Builder(Sink,
-                                            CodeCompletionResult::ResultKind::
-                                              Declaration,
-                                            SemanticContextKind::OtherModule,
-                                            ExpectedTypes);
-        Builder.setAssociatedDecl(MD);
-        Builder.addTextChunk(MD->getNameStr());
-        Builder.addTypeAnnotation("Module");
 
-        // Imported modules are not recommended.
-        if (ImportedModules.count(MD->getNameStr()) != 0)
-          Builder.setNotRecommended(CodeCompletionResult::NotRecommendedReason::
-                                      Redundant);
-      }
+    for (auto ModuleName : ModuleNames) {
+      auto MD = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+      CodeCompletionResultBuilder Builder(
+          Sink,
+          CodeCompletionResult::ResultKind::Declaration,
+          SemanticContextKind::OtherModule,
+          ExpectedTypes);
+      Builder.setAssociatedDecl(MD);
+      Builder.addTextChunk(MD->getNameStr());
+      Builder.addTypeAnnotation("Module");
+
+      // Imported modules are not recommended.
+      if (ImportedModules.count(MD->getNameStr()) != 0)
+        Builder.setNotRecommended(
+            CodeCompletionResult::NotRecommendedReason::Redundant);
     }
   }
 
