@@ -4655,7 +4655,7 @@ be run to ensure the lifetime of ``%opd``` for the conversion's uses.
 
 A ``convert_escape_to_noescape [escaped]`` indiciates that the result was
 passed to a function (materializeForSet) which escapes the closure in a way not
-expresseed by the convert's users. The mandatory pass must ensure the lifetime
+expressed by the convert's users. The mandatory pass must ensure the lifetime
 in a conservative way.
 
 thin_function_to_pointer
