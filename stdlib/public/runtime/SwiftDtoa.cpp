@@ -1092,7 +1092,7 @@ size_t swift_format_double(double d, char *dest, size_t length)
             uint64_t raw = bitPatternForDouble(d);
             const char *sign = signbit(d) ? "-" : "";
             const char *signaling = ((raw >> (significandBitCount - 1)) & 1) ? "" : "s";
-            uint64_t payload = raw & ((1L << (significandBitCount - 2)) - 1);
+            uint64_t payload = raw & ((1ull << (significandBitCount - 2)) - 1);
             char buff[32];
             if (payload != 0) {
                 snprintf(buff, sizeof(buff), "%s%snan(0x%llx)",
