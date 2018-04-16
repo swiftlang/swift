@@ -16,7 +16,9 @@ func generic<T>(_: T) -> Int {
 class Foo {
     var foo: Int
 
-    var bar: Int { fatalError() }
+    var bar: Int {
+fatalError()
+}
 
     var baz: Int {
         get { return 0 }

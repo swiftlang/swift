@@ -1639,7 +1639,7 @@ bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
 }
 
 bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
-  const StringRef replacement = "{ fatalError() }";
+  const StringRef replacement = "{\nfatalError()\n}";
   llvm::SmallPtrSet<Decl *, 16> Found;
   for (auto decl : RangeInfo.DeclaredDecls) {
     FindAllSubDecls(Found).walk(decl.VD);

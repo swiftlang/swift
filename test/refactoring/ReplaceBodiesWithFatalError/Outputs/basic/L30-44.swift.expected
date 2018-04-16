@@ -27,14 +27,22 @@ class Foo {
 
     var qux: Int {
         willSet { print("hi") }
-        didSet { fatalError() }
+        didSet {
+fatalError()
+}
     }
 
-    init() { fatalError() }
+    init() {
+fatalError()
+}
 
-    func nonGeneric() -> Int { fatalError() }
+    func nonGeneric() -> Int {
+fatalError()
+}
 
-    func generic<T>(_: T) -> Int { fatalError() }
+    func generic<T>(_: T) -> Int {
+fatalError()
+}
 
     deinit {
         print("bye")

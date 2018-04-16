@@ -5,7 +5,9 @@ var bar: Int {
 }
 
 var qux: Int = 0 {
-    willSet { fatalError() }
+    willSet {
+fatalError()
+}
     didSet { print("bye") }
 }
 
