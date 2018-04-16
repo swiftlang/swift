@@ -770,25 +770,13 @@ static void checkForViolationsInNoEscapeClosureArguments(
     if (!Callee || Callee->empty())
       continue;
 
-    // For source compatibility reasons, treat conflicts found by
-    // looking through reabstraction thunks as warnings. A future compiler
-    // will upgrade these to errors;
-    DiagnoseAsWarning |= result.isReabstructionThunk;
-
-    // For source compatibility reasons, treat conflicts found by
-    // looking through noescape blocks as warnings. A future compiler
-    // will upgrade these to errors.
-    DiagnoseAsWarning |=
-        (getSILFunctionTypeForValue(Argument)->getRepresentation()
-         == SILFunctionTypeRepresentation::Block);
-
     // Check the closure's captures, which are a suffix of the closure's
     // parameters.
     unsigned StartIndex =
         Callee->getArguments().size() - result.PAI->getNumArguments();
     checkForViolationWithCall(Accesses, Callee, StartIndex,
                               result.PAI->getArguments(), ASA,
-                              DiagnoseAsWarning, ConflictingAccesses);
+                              /*DiagnoseAsWarning=*/false, ConflictingAccesses);
   }
 }
 
