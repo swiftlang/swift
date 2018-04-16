@@ -139,7 +139,7 @@ public:
 
   bool isInputPrimary(StringRef file) const;
 
-  unsigned numberOfPrimaryInputsEndingWith(const char *extension) const;
+  unsigned numberOfPrimaryInputsEndingWith(StringRef extension) const;
 
   // Multi-facet readers
 
