@@ -13,6 +13,8 @@ func foo(_ c: Container) -> String {
   c.adding(attributes: converToSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
   c.adding(optionalAttributes: converToOptionalSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
   _ = Container(optionalAttributes: converToOptionalSimpleAttributeDictionary(nil))
+  _ = Container(optionalAttrArray: converToOptionalSimpleAttributeArray(nil))
+  c.adding(attrArray: converToSimpleAttributeArray(["key1", "key2"]))
   return c.Value.rawValue
 }
 
@@ -30,4 +32,15 @@ fileprivate func converToSimpleAttributeDictionary(_ input: [String: Any]) -> [S
 fileprivate func converToOptionalSimpleAttributeDictionary(_ input: [String: Any]?) -> [SimpleAttribute: Any]? {
 	guard let input = input else { return nil }
 	return Dictionary(uniqueKeysWithValues: input.map { key, value in (SimpleAttribute(rawValue: key), value)})
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func converToOptionalSimpleAttributeArray(_ input: [String]?) -> [SimpleAttribute]? {
+	guard let input = input else { return nil }
+	return input.map { key in SimpleAttribute(key) }
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func converToSimpleAttributeArray(_ input: [String]) -> [SimpleAttribute] {
+	return input.map { key in SimpleAttribute(key) }
 }
