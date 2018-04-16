@@ -708,7 +708,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     OS << "// Helper function inserted by Swift 4.2 migrator.\n";
     OS << "fileprivate func ";
     unsigned FuncNameStart = Buffer.size();
-    OS << "converTo";
+    OS << "convertTo";
     SmallVector<std::string, 8> Segs;
     switch(Anno) {
     case NodeAnnotation::OptionalArrayMemberUpdate:
