@@ -40,4 +40,6 @@ public class Container {
   public func adding(attributes: [String: Any]) {}
   public func adding(optionalAttributes: [String: Any]?) {}
   public init(optionalAttributes: [String: Any]?) {}
+  public func adding(attrArray: [String]) {}
+  public init(optionalAttrArray: [String]?) {}
 }

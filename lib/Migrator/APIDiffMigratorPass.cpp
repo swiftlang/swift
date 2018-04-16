@@ -708,13 +708,14 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     OS << "// Helper function inserted by Swift 4.2 migrator.\n";
     OS << "fileprivate func ";
     unsigned FuncNameStart = Buffer.size();
-    OS << "converTo";
+    OS << "convertTo";
     SmallVector<std::string, 8> Segs;
     switch(Anno) {
     case NodeAnnotation::OptionalArrayMemberUpdate:
       Segs = {"Optional", "Array", "[String]?"};
       Segs.push_back((Twine("[") + NewType +"]?").str());
-      Segs.push_back("// Not implemented");
+      Segs.push_back(Twine("\tguard let input = input else { return nil }\n"
+                           "\treturn input.map { key in " + NewType +"(key) }").str());
       break;
     case NodeAnnotation::OptionalDictionaryKeyUpdate:
       Segs = {"Optional", "Dictionary", "[String: Any]?"};
@@ -726,7 +727,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     case NodeAnnotation::ArrayMemberUpdate:
       Segs = {"", "Array", "[String]"};
       Segs.push_back((Twine("[") + NewType +"]").str());
-      Segs.push_back("// Not implemented");
+      Segs.push_back(Twine("\treturn input.map { key in " + NewType +"(key) }").str());
       break;
     case NodeAnnotation::DictionaryKeyUpdate:
       Segs = {"", "Dictionary", "[String: Any]"};
@@ -778,17 +779,21 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         }
       }
     }
-    if (NewAttributeType.empty() || !ArgIdx)
+    if (NewAttributeType.empty())
       return;
-    ArgIdx --;
-    auto AllArgs = getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
-    if (AllArgs.size() <= ArgIdx)
-      return;
-    SmallString<256> Buffer;
-    auto FuncName = insertHelperFunction(Kind, NewAttributeType, Buffer);
-    auto Exp = AllArgs[ArgIdx].ArgExp;
-    Editor.insert(Exp->getStartLoc(), (Twine(FuncName) + "(").str());
-    Editor.insertAfterToken(Exp->getEndLoc(), ")");
+    if (ArgIdx) {
+      ArgIdx --;
+      auto AllArgs = getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
+      if (AllArgs.size() <= ArgIdx)
+        return;
+      SmallString<256> Buffer;
+      auto FuncName = insertHelperFunction(Kind, NewAttributeType, Buffer);
+      auto Exp = AllArgs[ArgIdx].ArgExp;
+      Editor.insert(Exp->getStartLoc(), (Twine(FuncName) + "(").str());
+      Editor.insertAfterToken(Exp->getEndLoc(), ")");
+    } else {
+      // FIXME: return value migration.
+    }
   }
 
   bool walkToExprPre(Expr *E) override {
