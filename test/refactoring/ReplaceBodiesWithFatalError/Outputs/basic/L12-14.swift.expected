@@ -9,7 +9,9 @@ var qux: Int = 0 {
     didSet { print("bye") }
 }
 
-func generic<T>(_: T) -> Int { fatalError() }
+func generic<T>(_: T) -> Int {
+fatalError()
+}
 
 class Foo {
     var foo: Int
