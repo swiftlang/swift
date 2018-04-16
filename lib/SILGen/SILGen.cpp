@@ -744,27 +744,28 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     // Class constructors have separate entry points for allocation and
     // initialization.
     emitOrDelayFunction(
-        *this, constant,
-        [this, constant, decl](SILFunction *f) {
+        *this, constant, [this, constant, decl](SILFunction *f) {
           preEmitFunction(constant, decl, f, decl);
           PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-          f->createProfiler(decl, ForDefinition);
           SILGenFunction(*this, *f).emitClassConstructorAllocator(decl);
           postEmitFunction(constant, f);
-        },
-        /*forceEmission=*/ForCoverageMapping);
+        });
 
     // If this constructor was imported, we don't need the initializing
     // constructor to be emitted.
     if (!decl->hasClangNode()) {
       SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
-      emitOrDelayFunction(*this, initConstant,
-                          [this,initConstant,decl](SILFunction *initF){
-        preEmitFunction(initConstant, decl, initF, decl);
-        PrettyStackTraceSILFunction X("silgen constructor initializer", initF);
-        SILGenFunction(*this, *initF).emitClassConstructorInitializer(decl);
-        postEmitFunction(initConstant, initF);
-      });
+      emitOrDelayFunction(
+          *this, initConstant,
+          [this, initConstant, decl](SILFunction *initF) {
+            preEmitFunction(initConstant, decl, initF, decl);
+            PrettyStackTraceSILFunction X("silgen constructor initializer",
+                                          initF);
+            initF->createProfiler(decl, ForDefinition);
+            SILGenFunction(*this, *initF).emitClassConstructorInitializer(decl);
+            postEmitFunction(initConstant, initF);
+          },
+          /*forceEmission=*/ForCoverageMapping);
     }
   } else {
     // Struct and enum constructors do everything in a single function.

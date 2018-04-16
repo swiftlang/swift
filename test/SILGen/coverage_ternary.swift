@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_ternary %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @$S16coverage_ternary3barCACycfC
+// CHECK-LABEL: sil hidden @$S16coverage_ternary3barCACycfc
 // CHECK-NOT: return
 // CHECK: builtin "int_instrprof_increment"
 

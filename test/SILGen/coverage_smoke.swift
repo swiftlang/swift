@@ -85,9 +85,23 @@ func call_auto_closure() {
   let _ = use_auto_closure(true) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}3
 }
 
+class Class2 {
+  var field: Int
+  init(field: Int) {
+    if field > 0 {
+      self.field = 0 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    } else {
+      self.field = 1 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    }
+  }
+}
+
 main() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 foo()  // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 call_closure()
 call_auto_closure()
+
+let _ = Class2(field: 0)
+let _ = Class2(field: 1)
 
 // CHECK-REPORT: TOTAL {{.*}} 100.00% {{.*}} 100.00%
