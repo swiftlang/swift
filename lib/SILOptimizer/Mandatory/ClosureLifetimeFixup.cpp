@@ -119,6 +119,9 @@ static SILInstruction *lookThroughRebastractionUsers(
     SILInstruction *Inst,
     llvm::DenseMap<SILInstruction *, SILInstruction *> &Memoized) {
 
+  if (Inst == nullptr)
+    return nullptr;
+
   // Try a cached lookup.
   auto Res = Memoized.find(Inst);
   if (Res != Memoized.end())
