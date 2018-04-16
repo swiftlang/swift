@@ -2095,17 +2095,43 @@ public func checkEquatable<T : Equatable>(
     oracle: { expectedEqual || $0 == $1 }, ${trace}, showFrame: false)
 }
 
-/// Test that the elements of `instances` satisfy the semantic
-/// requirements of `Hashable`, using `equalityOracle` to generate
-/// equality expectations from pairs of positions in `instances`.
-public func checkHashable<Instances : Collection>(
+internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
+  var hasher = _Hasher()
+  if let seed = seed {
+    hasher.combine(seed)
+  }
+  hasher.combine(value)
+  return hasher.finalize()
+}
+
+/// Test that the elements of `instances` satisfy the semantic requirements of
+/// `Hashable`, using `equalityOracle` to generate equality and hashing
+/// expectations from pairs of positions in `instances`.
+public func checkHashable<Instances: Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
   ${TRACE}
-) where
-  Instances.Iterator.Element : Hashable {
+) where Instances.Iterator.Element: Hashable {
+  checkHashable(
+    instances,
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: equalityOracle,
+    allowBrokenTransitivity: allowBrokenTransitivity,
+    ${trace})
+}
 
+/// Test that the elements of `instances` satisfy the semantic
+/// requirements of `Hashable`, using `equalityOracle` to generate
+/// equality expectations from pairs of positions in `instances`,
+/// and `hashEqualityOracle` to do the same for hashing.
+public func checkHashable<Instances: Collection>(
+  _ instances: Instances,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
+  hashEqualityOracle: (Instances.Index, Instances.Index) -> Bool,
+  allowBrokenTransitivity: Bool = false,
+  ${TRACE}
+) where Instances.Iterator.Element: Hashable {
   checkEquatable(
     instances,
     oracle: equalityOracle,
@@ -2116,11 +2142,55 @@ public func checkHashable<Instances : Collection>(
     let x = instances[i]
     for j in instances.indices {
       let y = instances[j]
+      let predicted = hashEqualityOracle(i, j)
+      expectEqual(
+        predicted, hashEqualityOracle(j, i),
+        "bad hash oracle: broken symmetry between indices \(i), \(j)",
+        stackTrace: ${stackTrace})
       if x == y {
+        expectTrue(
+          predicted,
+          """
+          bad hash oracle: equality must imply hash equality
+          lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)
+          """,
+          stackTrace: ${stackTrace})
+      }
+      if predicted {
         expectEqual(
-          x.hashValue, y.hashValue,
+          hash(x), hash(y),
+          "hash(into:) expected to match, found to differ\n" +
           "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
           stackTrace: ${stackTrace})
+        expectEqual(
+          x.hashValue, y.hashValue,
+          "hashValue expected to match, found to differ\n" +
+          "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+          stackTrace: ${stackTrace})
+        expectEqual(
+          x._unsafeHashValue(), y._unsafeHashValue(),
+          "_unsafeHashValue() expected to match, found to differ\n" +
+          "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+          stackTrace: ${stackTrace})
+      } else {
+        // Try a few different seeds; one of them must discriminate
+        // between the hashes.
+        var pass = false
+        for s in 0..<10 {
+          if hash(x, seed: s) != hash(y, seed: s) {
+            // Triggers on first iteration in most cases.
+            pass = true
+            break
+          }
+        }
+        if !pass {
+          expectTrue(
+            AssertionResult(isPass: pass)
+              .withDescription(
+                "_hash(into:) expected to differ, found to match"),
+            "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
+            stackTrace: ${stackTrace})
+        }
       }
     }
   }
