@@ -30,6 +30,9 @@ struct TakesDictionary<T> {
 // CHECK-LABEL: func_decl "dictionaryUpcast(_:_:)"
 // CHECK: assign_expr
 // CHECK-NOT: collection_upcast_expr
+// CHECK: paren_expr type='([Int : (X) -> Void])'
+// CHECK-NOT: collection_upcast_expr
+// CHECK: (dictionary_expr type='[Int : (X) -> Void]'
 func dictionaryUpcast(_ x1: @escaping (P) -> Void, _ x2: @escaping (P) -> Void) {
-  _ = TakesDictionary<X>([1: x1, 2: x2])
+  _ = TakesDictionary<X>(([1: x1, 2: x2]))
 }

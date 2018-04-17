@@ -543,6 +543,25 @@ namespace {
     /// look-through.
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy);
 
+    /// Peephole an array upcast.
+    void peepholeArrayUpcast(ArrayExpr *expr, Type toType, bool bridged,
+                             Type elementType,
+                             ConstraintLocatorBuilder locator);
+
+    /// Peephole a dictionary upcast.
+    void peepholeDictionaryUpcast(DictionaryExpr *expr, Type toType,
+                                  bool bridged, Type keyType,
+                                  Type valueType,
+                                  ConstraintLocatorBuilder locator);
+
+    /// Try to peephole the collection upcast, eliminating that need for
+    /// a separate collection-upcast expression.
+    ///
+    /// \returns true if the peephole operation succeeded, in which case
+    /// \c expr already subsumes the upcast.
+    bool peepholeCollectionUpcast(Expr *expr, Type toType,  bool bridged,
+                                  ConstraintLocatorBuilder locator);
+
     /// \brief Build a collection upcast expression.
     ///
     /// \param bridged Whether this is a bridging conversion, meaning that the
@@ -6273,80 +6292,121 @@ buildOpaqueElementConversion(ExprRewriter &rewriter,
   return { opaque, conversion };
 }
 
+void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
+                                       bool bridged, Type elementType,
+                                       ConstraintLocatorBuilder locator) {
+  // Update the type of the array literal.
+  cs.setType(expr, toType);
+
+  // Convert the elements.
+  ConstraintLocatorBuilder innerLocator =
+    locator.withPathElement(
+                        ConstraintLocator::PathElement::getGenericArgument(0));
+  for (auto &element : expr->getElements()) {
+    if (auto newElement = buildElementConversion(*this, expr->getLoc(),
+                                                 cs.getType(element),
+                                                 elementType,
+                                                 bridged, innerLocator,
+                                                 element)) {
+      element = newElement;
+    }
+  }
+
+  (void)finishArrayExpr(expr);
+}
+
+void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
+                                            Type toType, bool bridged,
+                                            Type keyType, Type valueType,
+                                            ConstraintLocatorBuilder locator) {
+  // Update the type of the dictionary literal.
+  cs.setType(expr, toType);
+
+  ConstraintLocatorBuilder keyLocator =
+    locator.withPathElement(
+      ConstraintLocator::PathElement::getGenericArgument(0));
+  ConstraintLocatorBuilder valueLocator =
+    locator.withPathElement(
+      ConstraintLocator::PathElement::getGenericArgument(1));
+
+  // Convert the elements.
+  TupleTypeElt tupleTypeElts[2] = { keyType, valueType };
+  auto tupleType = TupleType::get(tupleTypeElts, cs.getASTContext());
+  for (auto element : expr->getElements()) {
+    if (auto tuple = dyn_cast<TupleExpr>(element)) {
+      auto key = tuple->getElement(0);
+      if (auto newKey = buildElementConversion(*this, expr->getLoc(),
+                                               cs.getType(key), keyType,
+                                               bridged, valueLocator, key))
+        tuple->setElement(0, newKey);
+
+      auto value = tuple->getElement(1);
+      if (auto newValue = buildElementConversion(*this, expr->getLoc(),
+                                                 cs.getType(value), valueType,
+                                                 bridged, valueLocator,
+                                                 value)) {
+        tuple->setElement(1, newValue);
+      }
+
+      cs.setType(tuple, tupleType);
+    }
+  }
+
+  (void)finishDictionaryExpr(expr);
+}
+
+bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
+                                            bool bridged,
+                                            ConstraintLocatorBuilder locator) {
+  // Recurse into parenthesized expressions.
+  if (auto paren = dyn_cast<ParenExpr>(expr)) {
+    // If we can't peephole the subexpression, we're done.
+    if (!peepholeCollectionUpcast(paren->getSubExpr(), toType, bridged,
+                                  locator))
+      return false;
+
+    // Update the type of this expression.
+    cs.setType(paren, ParenType::get(cs.getASTContext(),
+                                     cs.getType(paren->getSubExpr())));
+    return true;
+  }
+
+  // Array literals.
+  if (auto arrayLiteral = dyn_cast<ArrayExpr>(expr)) {
+    if (Optional<Type> elementType = ConstraintSystem::isArrayType(toType)) {
+      peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
+      return true;
+    }
+
+    if (Optional<Type> elementType = ConstraintSystem::isSetType(toType)) {
+      peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
+      return true;
+    }
+
+    return false;
+  }
+
+  // Dictionary literals.
+  if (auto dictLiteral = dyn_cast<DictionaryExpr>(expr)) {
+    if (auto elementType = ConstraintSystem::isDictionaryType(toType)) {
+      peepholeDictionaryUpcast(dictLiteral, toType, bridged,
+                               elementType->first, elementType->second,
+                               locator);
+      return true;
+    }
+
+    return false;
+  }
+
+  return false;
+}
+
 Expr *ExprRewriter::buildCollectionUpcastExpr(
                                             Expr *expr, Type toType,
                                             bool bridged,
                                             ConstraintLocatorBuilder locator) {
-  // If the operand is an array literal, cast the elements in-place.
-  if (auto arrayLiteral = dyn_cast<ArrayExpr>(expr)) {
-    Optional<Type> arrayOrSetElementType =
-      ConstraintSystem::isArrayType(toType);
-    if (!arrayOrSetElementType)
-      arrayOrSetElementType = ConstraintSystem::isSetType(toType);
-    if (arrayOrSetElementType) {
-      // Update the type of the array literal.
-      cs.setType(arrayLiteral, toType);
-
-      // Convert the elements.
-      ConstraintLocatorBuilder innerLocator =
-        locator.withPathElement(
-          ConstraintLocator::PathElement::getGenericArgument(0));
-      for (auto &element : arrayLiteral->getElements()) {
-        if (auto newElement = buildElementConversion(*this, expr->getLoc(),
-                                                     cs.getType(element),
-                                                     *arrayOrSetElementType,
-                                                     bridged, innerLocator,
-                                                     element)) {
-          element = newElement;
-        }
-      }
-
-      return finishArrayExpr(arrayLiteral);
-    }
-  }
-
-  // If the operand is a dictionary literal, cast the elements in-place.
-  if (auto dictLiteral = dyn_cast<DictionaryExpr>(expr)) {
-    if (auto elementType = ConstraintSystem::isDictionaryType(toType)) {
-      // Update the type of the dictionary literal.
-      cs.setType(dictLiteral, toType);
-
-      ConstraintLocatorBuilder keyLocator =
-        locator.withPathElement(
-          ConstraintLocator::PathElement::getGenericArgument(0));
-      ConstraintLocatorBuilder valueLocator =
-        locator.withPathElement(
-          ConstraintLocator::PathElement::getGenericArgument(1));
-
-      //
-      TupleTypeElt tupleTypeElts[2] =
-        { elementType->first, elementType->second };
-      auto tupleType = TupleType::get(tupleTypeElts, cs.getASTContext());
-      for (auto element : dictLiteral->getElements()) {
-        if (auto tuple = dyn_cast<TupleExpr>(element)) {
-          auto key = tuple->getElement(0);
-          if (auto newKey = buildElementConversion(*this, expr->getLoc(),
-                                                   cs.getType(key),
-                                                   elementType->first, bridged,
-                                                   valueLocator, key))
-            tuple->setElement(0, newKey);
-
-          auto value = tuple->getElement(1);
-          if (auto newValue = buildElementConversion(*this, expr->getLoc(),
-                                                     cs.getType(value),
-                                                     elementType->second,
-                                                     bridged, valueLocator,
-                                                     value)) {
-            tuple->setElement(1, newValue);
-          }
-
-          cs.setType(tuple, tupleType);
-        }
-      }
-
-      return finishDictionaryExpr(dictLiteral);
-    }
-  }
+  if (peepholeCollectionUpcast(expr, toType, bridged, locator))
+    return expr;
 
   ASTContext &ctx = cs.getASTContext();
   // Build the first value conversion.
