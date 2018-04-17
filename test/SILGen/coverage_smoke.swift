@@ -35,7 +35,7 @@ class Class1 {
   deinit {}
 }
 
-// CHECK-MAIN: Maximum function count: 3
+// CHECK-MAIN: Maximum function count: 4
 func main() {
 // CHECK-COV: {{ *}}[[@LINE+1]]|{{ *}}1{{.*}}f_public
   f_public()
@@ -85,9 +85,69 @@ func call_auto_closure() {
   let _ = use_auto_closure(true) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}3
 }
 
+class Class2 {
+  var field: Int
+  init(field: Int) {
+    if field > 0 {
+      self.field = 0 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    } else {
+      self.field = 1 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}3
+    }
+  }
+}
+
+extension Class2 {
+  convenience init() {
+    self.init(field: 0) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }
+}
+
+class SubClass1: Class2 {
+  override init(field: Int) {
+    super.init(field: field) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }
+}
+
+struct Struct1 {
+  var field: Int
+  init(field: Int) {
+    if field > 0 {
+      self.field = 0 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    } else {
+      self.field = 1 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    }
+  }
+}
+
+extension Struct1 {
+  init() {
+    self.init(field: 0) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }
+}
+
+var g2: Int = 0
+
+class Class3 {
+  var m1 = g2 == 0
+             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+}
+
 main() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 foo()  // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 call_closure()
 call_auto_closure()
+
+let _ = Class2(field: 0)
+let _ = Class2(field: 1)
+let _ = Class2()
+let _ = SubClass1(field: 0)
+
+let _ = Class3()
+g2 = 1
+let _ = Class3()
+
+let _ = Struct1(field: 1)
+let _ = Struct1()
 
 // CHECK-REPORT: TOTAL {{.*}} 100.00% {{.*}} 100.00%

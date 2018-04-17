@@ -17,7 +17,7 @@ while (i < 10) {
 
 // CHECK: sil_coverage_map{{.*}}__tlcd_line:[[@LINE+3]]:1
 // CHECK-NEXT:  [[@LINE+2]]:17 -> [[@LINE+2]]:18 : 1
-// CHECK-NEXT:  [[@LINE+1]]:21 -> [[@LINE+1]]:22 : 0
+// CHECK-NEXT:  [[@LINE+1]]:21 -> [[@LINE+1]]:22 : (0 - 1)
 var i2 = true ? 1 : 0;
 
 // CHECK: sil_coverage_map{{.*}}__tlcd_line:[[@LINE+4]]:1

@@ -3,15 +3,10 @@
 // rdar://39200851: Closure in init method covered twice
 
 class C2 {
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_closures.C2.__allocating_init()
-// CHECK-NEXT:  [[@LINE+7]]:10 -> [[@LINE+11]]:4 : 0
-// CHECK-NEXT: }
-
-// CHECK-LABEL: sil_coverage_map {{.*}}// closure #1 () -> () in coverage_closures.C2.init()
-// CHECK-NEXT:  [[@LINE+4]]:13 -> [[@LINE+6]]:6 : 0
-// CHECK-NEXT: }
-
   init() {
+// CHECK-LABEL: sil_coverage_map {{.*}}// closure #1 () -> () in coverage_closures.C2.init()
+// CHECK-NEXT:  [[@LINE+2]]:13 -> [[@LINE+4]]:6 : 0
+// CHECK-NEXT: }
     let _ = { () in
       print("hello")
     }
