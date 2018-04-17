@@ -1132,37 +1132,23 @@ entry(%f : $@convention(thin) (Int) -> @out Int, %x : $Int):
   return %y : $Int
 }
 
-// Make sure we serialize the body of closure even without -sil-serialize-all.
-// CHECK_DECL-LABEL:  @partial_apply_with_closure
-sil [transparent] [serialized] [transparent] @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> () {
+// CHECK-LABEL:  @partial_apply_with_closure
+sil [transparent] [serialized] @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> () {
 bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $UnsafePointer<Int8>, %3 : $Int64):
   %17 = function_ref @closure_body : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
-// CHECK_DECL: function_ref @closure_body
+// CHECK: function_ref @closure_body
   %18 = partial_apply %17(%2, %3) : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
-// CHECK_DECL: partial_apply
+// CHECK: partial_apply
   %30 = tuple ()
   return %30 : $()
 }
-
-sil shared [serialized] @closure_body : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
-bb0(%0 : $UnsafePointer<Int8>, %1 : $UnsafePointer<Int8>, %2 : $Int64):
-  %3 = function_ref @assert_fail : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
-  %4 = apply %3(%0, %1, %2) : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
-  %5 = tuple ()
-  return %5 : $()
-}
-
-// CHECK_DECL-LABEL: @closure_body : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
-// CHECK_DECL: function_ref @assert_fail
-
-sil [transparent] [serialized] @assert_fail : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
 
 // rdar: 15893086
 struct GenericStruct<T> {
   var x : T
 }
 
-// CHECK-LABEL: @extract_generic_struct
+// CHECK-LABEL: sil public_external [transparent] [serialized] @extract_generic_struct
 sil [transparent] [serialized] @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64 {
 entry(%0 : $GenericStruct<Int64>):
   // CHECK: %1 = struct_extract %0 : $GenericStruct<Int64>, #GenericStruct.x
@@ -1346,6 +1332,19 @@ bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
   return %17 : $()
 }
 
+
+sil [transparent] [serialized] @assert_fail : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
+
+sil shared [serialized] @closure_body : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
+bb0(%0 : $UnsafePointer<Int8>, %1 : $UnsafePointer<Int8>, %2 : $Int64):
+  %3 = function_ref @assert_fail : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
+  %4 = apply %3(%0, %1, %2) : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: @closure_body : $@convention(thin) (UnsafePointer<Int8>, UnsafePointer<Int8>, Int64) -> () {
+// CHECK: function_ref @assert_fail
 
 sil_vtable [serialized] Foo {
   #Foo.subscript!getter.1: @$S3tmp3FooC9subscriptSiSi1x_Si1ytcfg

@@ -44,7 +44,8 @@ public enum MaybePair {
   case Right(String)
   case Both(Int32, String)
 }
-@inlinable
+
+@_transparent
 public func do_switch(u u: MaybePair) {
   switch u {
   case .Neither:
