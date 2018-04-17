@@ -1,6 +1,8 @@
 var foo: Int = 0
 
-var bar: Int { fatalError() }
+var bar: Int {
+fatalError()
+}
 
 var qux: Int = 0 {
     willSet { print("hi") }

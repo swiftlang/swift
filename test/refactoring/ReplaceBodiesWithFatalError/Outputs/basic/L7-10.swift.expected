@@ -5,8 +5,12 @@ var bar: Int {
 }
 
 var qux: Int = 0 {
-    willSet { fatalError() }
-    didSet { fatalError() }
+    willSet {
+fatalError()
+}
+    didSet {
+fatalError()
+}
 }
 
 func generic<T>(_: T) -> Int {
