@@ -517,6 +517,90 @@ static ManagedValue emitBuiltinGetTailAddr(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(addr);
 }
 
+/// Specialized emitter for Builtin.beginUnpairedModifyAccess.
+static ManagedValue emitBuiltinBeginUnpairedModifyAccess(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                           SubstitutionList substitutions,
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
+  assert(substitutions.size() == 1 &&
+        "Builtin.beginUnpairedModifyAccess should have one substitution");
+  assert(args.size() == 3 &&
+         "beginUnpairedModifyAccess should be given three arguments");
+
+  SILType elemTy = SGF.getLoweredType(substitutions[0].getReplacement());
+  SILValue addr = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                               elemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
+
+  SILType valueBufferTy =
+      SGF.getLoweredType(SGF.getASTContext().TheUnsafeValueBufferType);
+
+  SILValue buffer = SGF.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
+                                                 valueBufferTy.getAddressType(),
+                                                 /*strict*/ true,
+                                                 /*invariant*/ false);
+  SGF.B.createBeginUnpairedAccess(loc, addr, buffer, SILAccessKind::Modify,
+                                  SILAccessEnforcement::Dynamic,
+                                  /*noNestedConflict*/ false);
+
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+/// Specialized emitter for Builtin.performInstantaneousReadAccess
+static ManagedValue emitBuiltinPerformInstantaneousReadAccess(SILGenFunction &SGF,
+                                                       SILLocation loc,
+                                                       SubstitutionList substitutions,
+                                                       ArrayRef<ManagedValue> args,
+                                                       SGFContext C) {
+  assert(substitutions.size() == 1 &&
+         "Builtin.performInstantaneousReadAccess should have one substitution");
+  assert(args.size() == 2 &&
+         "Builtin.performInstantaneousReadAccess should be given "
+         "two arguments");
+
+  SILType elemTy = SGF.getLoweredType(substitutions[0].getReplacement());
+  SILValue addr = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                               elemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
+
+  // Begin and then immediately end a read access. No nested conflict is
+  // possible because there are no instructions between the begin and the
+  // end of the access.
+  SILValue access = SGF.B.createBeginAccess(loc, addr, SILAccessKind::Read,
+                                            SILAccessEnforcement::Dynamic,
+                                            /*noNestedConflict*/ true);
+  SGF.B.createEndAccess(loc, access, /*aborted*/ false);
+
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+/// Specialized emitter for Builtin.endUnpairedAccessModifyAccess.
+static ManagedValue emitBuiltinEndUnpairedAccess(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                           SubstitutionList substitutions,
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
+  assert(substitutions.size() == 0 &&
+        "Builtin.endUnpairedAccess should have no substitutions");
+  assert(args.size() == 1 &&
+         "endUnpairedAccess should be given one argument");
+
+  SILType valueBufferTy =
+      SGF.getLoweredType(SGF.getASTContext().TheUnsafeValueBufferType);
+
+  SILValue buffer = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                                 valueBufferTy.getAddressType(),
+                                                 /*strict*/ true,
+                                                 /*invariant*/ false);
+  SGF.B.createEndUnpairedAccess(loc, buffer, SILAccessEnforcement::Dynamic,
+                                /*aborted*/ false);
+
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
 /// Specialized emitter for Builtin.condfail.
 static ManagedValue emitBuiltinCondFail(SILGenFunction &SGF,
                                         SILLocation loc,
