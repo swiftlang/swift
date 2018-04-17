@@ -675,7 +675,7 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
         auto selfKind = proto->findProtocolSelfReferences(req,
                                              /*allowCovariantParameters=*/false,
                                              /*skipAssocTypes=*/false);
-        if (!selfKind.other) {
+        if (!selfKind.other && !selfKind.requirement) {
           covariantSelf = classDecl;
         }
       }

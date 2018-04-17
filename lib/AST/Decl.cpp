@@ -3317,6 +3317,19 @@ bool ProtocolDecl::existentialConformsToSelfSlow() {
   return true;
 }
 
+/// Determine whether the given type is a dependent member type whose
+/// root generic parameter type is a the Self type of the protocol.
+static bool isDependentMemberOnProtocolSelf(Type type,
+                                            const ProtocolDecl *proto) {
+  auto depTy = type->getAs<DependentMemberType>();
+  if (!depTy) return false;
+
+  // Special handling for associated types.
+  auto rootType = depTy->getRootGenericParam();
+  return proto->getProtocolSelfType()->isEqual(rootType);
+    return SelfReferenceKind::Other();
+}
+
 /// Classify usages of Self in the given type.
 static SelfReferenceKind
 findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
@@ -3389,10 +3402,8 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     return SelfReferenceKind::Result();
 
   // Special handling for associated types.
-  if (!skipAssocTypes && type->is<DependentMemberType>()) {
-    type = type->getRootGenericParam();
-    if (proto->getProtocolSelfType()->isEqual(type))
-      return SelfReferenceKind::Other();
+  if (!skipAssocTypes && isDependentMemberOnProtocolSelf(type, proto)) {
+    return SelfReferenceKind::Other();
   }
 
   return SelfReferenceKind::None();
@@ -3401,7 +3412,8 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 /// Find Self references in a generic signature's same-type requirements.
 static SelfReferenceKind
 findProtocolSelfReferences(const ProtocolDecl *protocol,
-                           GenericSignature *genericSig){
+                           GenericSignature *genericSig,
+                           bool skipAssocTypes){
   if (!genericSig) return SelfReferenceKind::None();
 
   auto selfTy = protocol->getSelfInterfaceType();
@@ -3412,6 +3424,12 @@ findProtocolSelfReferences(const ProtocolDecl *protocol,
     if (req.getFirstType()->isEqual(selfTy) ||
         req.getSecondType()->isEqual(selfTy))
       return SelfReferenceKind::Requirement();
+
+    if (!skipAssocTypes &&
+        (isDependentMemberOnProtocolSelf(req.getFirstType(), protocol) ||
+         isDependentMemberOnProtocolSelf(req.getSecondType(), protocol))) {
+      return SelfReferenceKind::Requirement();
+    }
   }
 
   return SelfReferenceKind::None();
@@ -3453,7 +3471,8 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     // Check the requirements of a generic function.
     if (func->isGeneric()) {
       if (auto result =
-            ::findProtocolSelfReferences(this, func->getGenericSignature()))
+            ::findProtocolSelfReferences(this, func->getGenericSignature(),
+                                         skipAssocTypes))
         return result;
     }
 
@@ -3464,7 +3483,8 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     if (subscript->isGeneric()) {
       if (auto result =
             ::findProtocolSelfReferences(this,
-                                         subscript->getGenericSignature()))
+                                         subscript->getGenericSignature(),
+                                         skipAssocTypes))
         return result;
     }
 
