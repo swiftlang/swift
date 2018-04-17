@@ -415,18 +415,6 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  AutoDiffReverseInst *createAutoDiffReverse(SILLocation loc,
-                                             SILFunction *primal,
-                                             ArrayRef<unsigned> paramIndices,
-                                             bool seedable,
-                                             bool preservingResult) {
-    return insert(AutoDiffReverseInst::create(getModule(),
-                                              getSILDebugLocation(loc),
-                                              primal, paramIndices, seedable,
-                                              preservingResult));
-  }
-
-  /// SWIFT_ENABLE_TENSORFLOW
   GradientInst *createGradient(SILLocation loc, SILValue original,
                                ArrayRef<unsigned> paramIndices, bool seedable,
                                bool preservingResult) {

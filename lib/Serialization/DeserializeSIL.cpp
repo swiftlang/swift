@@ -1434,11 +1434,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffReverseInst: {
-    llvm_unreachable("not supported");
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GradientInst: {
     llvm_unreachable("not supported");
   }

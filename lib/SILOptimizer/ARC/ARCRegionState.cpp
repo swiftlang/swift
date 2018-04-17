@@ -173,8 +173,6 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::UnwindInst:
   case TermKind::YieldInst:
   case TermKind::TryApplyInst:
-  // SWIFT_ENABLE_TENSORFLOW
-  case TermKind::AutoDiffReverseInst:
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumInst:
   case TermKind::SwitchEnumAddrInst:

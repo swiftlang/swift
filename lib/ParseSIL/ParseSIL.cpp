@@ -2643,56 +2643,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffReverseInst: {
-    // Parse optional [wrt ...].
-    SmallVector<unsigned, 8> paramIndices;
-    if (P.consumeIf(tok::l_square)) {
-      if (parseVerbatim("wrt")) return true;
-      auto parseIndex = [&] {
-        unsigned index;
-        SourceLoc indexLoc;
-        if (P.parseUnsignedInteger(index, indexLoc,
-              diag::sil_reverse_autodiff_expected_parameter_index))
-          return true;
-        paramIndices.push_back(index);
-        return false;
-      };
-      if (parseIndex())
-        return true;
-      while (P.consumeIf(tok::comma))
-        if (parseIndex())
-          return true;
-      if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-        return true;
-    }
-    // Parse optional [seedable] and optional [preserving_result].
-    bool seedable = false;
-    bool preservingResult = false;
-    if (P.peekToken().getText() != "preserving_result" &&
-        P.consumeIf(tok::l_square)) {
-      if (P.Tok.getText() != "preserving_result") {
-        if (parseVerbatim("seedable") ||
-            P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-          return true;
-        seedable = true;
-      }
-    }
-    if (P.consumeIf(tok::l_square)) {
-      if (parseVerbatim("preserving_result") ||
-          P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-        return true;
-      preservingResult = true;
-    }
-    SILFunction *primalFn;
-    if (parseSILFunctionRef(InstLoc, primalFn) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-    ResultVal = B.createAutoDiffReverse(
-      InstLoc, primalFn, paramIndices, seedable, preservingResult);
-    break;
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GradientInst: {
     // Parse optional [wrt ...].
     SmallVector<unsigned, 8> paramIndices;
