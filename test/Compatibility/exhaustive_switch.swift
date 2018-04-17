@@ -473,6 +473,21 @@ func quiteBigEnough() -> Bool {
   case (.case10, _): return true
   }
 
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  case (.case0, _): return true
+  case (.case1, _): return true
+  case (.case2, _): return true
+  case (.case3, _): return true
+  case (.case4, _): return true
+  case (.case5, _): return true
+  case (.case6, _): return true
+  case (.case7, _): return true
+  case (.case8, _): return true
+  case (.case9, _): return true
+  case (.case10, _): return true
+  @unknown default: return false // expected-note {{remove '@unknown' to handle remaining values}} {{3-12=}}
+  }
+
 
   // No diagnostic
   switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) {
@@ -525,6 +540,10 @@ func quiteBigEnough() -> Bool {
   case .one: return true
   case .two: return true
   case .three: return true
+  }
+
+  // Make sure we haven't just stopped emitting diagnostics.
+  switch OverlyLargeSpaceEnum.case1 { // expected-error {{switch must be exhaustive}} expected-note 12 {{add missing case}} expected-note {{handle unknown values}}
   }
 }
 
