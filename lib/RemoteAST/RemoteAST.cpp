@@ -587,9 +587,8 @@ RemoteASTTypeBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
     return None;
 
   return llvm::StringSwitch<Optional<ForeignModuleKind>>(node->getText())
-      .Case(llvm::StringLiteral::withInnerNUL(MANGLING_MODULE_OBJC),
-            ForeignModuleKind::Imported)
-      .Case(llvm::StringLiteral::withInnerNUL(MANGLING_MODULE_CLANG_IMPORTER),
+      .Case(MANGLING_MODULE_OBJC, ForeignModuleKind::Imported)
+      .Case(MANGLING_MODULE_CLANG_IMPORTER,
             ForeignModuleKind::SynthesizedByImporter)
       .Default(None);
 }
