@@ -42,14 +42,6 @@ public:
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
   
-  enum LinkingMode {
-    /// Perform normal SIL linking.
-    LinkNormal,
-
-    /// Link all functions during SIL linking.
-    LinkAll
-  };
-
   /// Controls whether to pull in SIL from partial modules during the
   /// merge modules step. Could perhaps be merged with the link mode
   /// above but the interactions between all the flags are tricky.

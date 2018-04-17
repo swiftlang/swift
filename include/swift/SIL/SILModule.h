@@ -110,7 +110,15 @@ public:
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
-  using LinkingMode = SILOptions::LinkingMode;
+
+  enum class LinkingMode : uint8_t {
+    /// Link functions with non-public linkage. Used by the mandatory pipeline.
+    LinkNormal,
+
+    /// Link all functions. Used by the performance pipeine.
+    LinkAll
+  };
+
   using ActionCallback = std::function<void()>;
 
 private:
@@ -499,7 +507,7 @@ public:
   ///
   /// \return false if the linking failed.
   bool linkFunction(SILFunction *F,
-                    LinkingMode LinkAll = LinkingMode::LinkNormal);
+                    LinkingMode LinkMode = LinkingMode::LinkNormal);
 
   /// Check if a given function exists in any of the modules with a
   /// required linkage, i.e. it can be linked by linkFunction.
