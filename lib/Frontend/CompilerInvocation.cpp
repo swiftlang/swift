@@ -576,9 +576,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
   
-  if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking))
-    Opts.LinkMode = SILOptions::LinkNone;
-
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 

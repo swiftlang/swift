@@ -259,8 +259,7 @@ static void collectPartiallyAppliedArguments(
 static SILFunction *getCalleeFunction(
     SILFunction *F, FullApplySite AI, bool &IsThick,
     SmallVectorImpl<std::pair<SILValue, ParameterConvention>> &CaptureArgs,
-    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply,
-    SILModule::LinkingMode Mode) {
+    SmallVectorImpl<SILValue> &FullArgs, PartialApplyInst *&PartialApply) {
   IsThick = false;
   PartialApply = nullptr;
   CaptureArgs.clear();
@@ -410,11 +409,8 @@ static SILFunction *getCalleeFunction(
     return nullptr;
 
   // If CalleeFunction is a declaration, see if we can load it.
-  if (CalleeFunction->empty()) {
-    // FIXME: Remove 'Mode'
-    if (Mode != SILOptions::LinkingMode::LinkNone)
-      AI.getModule().loadFunction(CalleeFunction);
-  }
+  if (CalleeFunction->empty())
+    AI.getModule().loadFunction(CalleeFunction);
 
   // If we fail to load it, bail.
   if (CalleeFunction->empty())
@@ -467,7 +463,6 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
 runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
-                         SILModule::LinkingMode Mode,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
@@ -515,13 +510,13 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       bool IsThick;
       PartialApplyInst *PAI;
       SILFunction *CalleeFunction = getCalleeFunction(
-          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI, Mode);
+          F, InnerAI, IsThick, CaptureArgs, FullArgs, PAI);
 
       if (!CalleeFunction)
         continue;
 
       // Then recursively process it first before trying to inline it.
-      if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
+      if (!runOnFunctionRecursively(CalleeFunction, InnerAI,
                                     FullyInlinedSet, SetFactory,
                                     CurrentInliningSet, CHA)) {
         // If we failed due to circular inlining, then emit some notes to
@@ -630,7 +625,6 @@ class MandatoryInlining : public SILModuleTransform {
   void run() override {
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
     SILModule *M = getModule();
-    SILModule::LinkingMode Mode = getOptions().LinkMode;
     bool ShouldCleanup = !getOptions().DebugSerialization;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
@@ -645,9 +639,8 @@ class MandatoryInlining : public SILModuleTransform {
         continue;
 
       runOnFunctionRecursively(&F,
-                               FullApplySite(static_cast<ApplyInst*>(nullptr)),
-                               Mode, FullyInlinedSet,
-                               SetFactory, SetFactory.getEmptySet(), CHA);
+                               FullApplySite(), FullyInlinedSet, SetFactory,
+                               SetFactory.getEmptySet(), CHA);
     }
 
     if (!ShouldCleanup)
