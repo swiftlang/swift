@@ -790,8 +790,6 @@ MiscTestSuite.test("reversed()") {
 
 MiscTestSuite.test("Compatibility typealiases") {
   let _: CountablePartialRangeFrom = 1...
-  let _: CountablePartialRangeUpTo = ..<2
-  let _: CountablePartialRangeThrough = ...3
   let _: CountableRange = MinimalStrideableValue(3)..<MinimalStrideableValue(3)
   let _: CountableClosedRange = MinimalStrideableValue(3)...MinimalStrideableValue(3)
 }

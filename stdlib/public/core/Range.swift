@@ -911,11 +911,3 @@ public typealias CountableRange<Bound: Strideable> = Range<Bound>
 @available(*, deprecated: 4.2, renamed: "PartialRangeFrom")
 public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
   where Bound.Stride : SignedInteger
-
-@available(*, deprecated: 4.2, renamed: "PartialRangeUpTo")
-public typealias CountablePartialRangeUpTo<Bound: Strideable> = PartialRangeUpTo<Bound>
-  where Bound.Stride : SignedInteger
-
-@available(*, deprecated: 4.2, renamed: "PartialRangeThrough")
-public typealias CountablePartialRangeThrough<Bound: Strideable> = PartialRangeThrough<Bound>
-  where Bound.Stride : SignedInteger
