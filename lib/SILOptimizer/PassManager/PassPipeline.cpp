@@ -345,6 +345,13 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidModulePasses+StackPromote");
   P.addDeadFunctionElimination();
   P.addSILLinker();
+
+  // Re-run predictable memory optimizations, since previous optimization
+  // passes sometimes expose opportunities here.
+  //
+  // FIXME: Figure out why this is necessary.
+  P.addPredictableMemoryOptimizations();
+
   P.addDeadObjectElimination();
   P.addGlobalPropertyOpt();
 
