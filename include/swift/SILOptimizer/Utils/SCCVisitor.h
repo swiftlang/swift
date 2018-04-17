@@ -134,8 +134,6 @@ private:
     case TermKind::SwitchValueInst:
     case TermKind::ThrowInst:
     case TermKind::UnwindInst:
-    // SWIFT_ENABLE_TENSORFLOW
-    case TermKind::AutoDiffReverseInst:
       llvm_unreachable("Did not expect terminator that does not have args!");
 
     case TermKind::YieldInst:

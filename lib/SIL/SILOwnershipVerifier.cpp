@@ -987,13 +987,6 @@ OwnershipCompatibilityUseChecker::visitTryApplyInst(TryApplyInst *I) {
   return visitFullApply(I);
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::
-visitAutoDiffReverseInst(AutoDiffReverseInst *I) {
-  llvm_unreachable("Instruction without operand can not be compatible with "
-                   "any def's OwnershipValueKind");
-}
-
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitPartialApplyInst(PartialApplyInst *I) {
   // All non-trivial types should be captured.

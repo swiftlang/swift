@@ -654,19 +654,6 @@ SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
 /// SWIFT_ENABLE_TENSORFLOW
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitAutoDiffReverseInst(AutoDiffReverseInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getOriginalFunction());
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createAutoDiffReverse(getOpLocation(Inst->getLoc()),
-                                       OpFunction, Inst->getParameterIndices(),
-                                       Inst->isSeedable(),
-                                       Inst->isPreservingResult()));
-}
-
-/// SWIFT_ENABLE_TENSORFLOW
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,

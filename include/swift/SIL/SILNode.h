@@ -340,9 +340,6 @@ protected:
   IBWTO_BITFIELD_EMPTY(BranchInst, TermInst);
   // Ensure that YieldInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(YieldInst, TermInst);
-  // SWIFT_ENABLE_TENSORFLOW
-  // Ensure that AutoDiffReverseInst bitfield does not overflow.
-  IBWTO_BITFIELD_EMPTY(AutoDiffReverseInst, TermInst);
   IBWTO_BITFIELD(CondBranchInst, TermInst, 32-NumTermInstBits,
     NumTrueArgs : 32-NumTermInstBits
   );
