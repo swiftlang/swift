@@ -55,6 +55,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(SwiftOnoneSupport)
   # SWIFT_ENABLE_TENSORFLOW
   if(SWIFT_ENABLE_TENSORFLOW)
+    # TODO: Add TensorFlow support for iOS/Raspberry Pi.
     add_subdirectory(CTensorFlow)
     add_subdirectory(TensorFlow)
   endif()
