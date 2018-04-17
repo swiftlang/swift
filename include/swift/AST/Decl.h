@@ -5536,6 +5536,18 @@ public:
 
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
+  
+  /// isNaryOperator - Determine whether this is an n-ary operator
+  /// implementation.  This check is a syntactic rather than type-based check,
+  /// which looks at the number of parameters specified, in order to allow
+  /// for the definition of unary or binary operators on tuples, as in:
+  ///
+  ///   prefix func + (_:(a:Int, b:Int)) // unary operator +(1,2)
+  ///   infix func  + (a:Int, b:Int)     // binary operator 1 + 2
+  ///
+  /// This also allows the n-ary-operator-ness of a func decl to be determined
+  /// prior to type checking.
+  bool isNaryOperator(unsigned) const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,

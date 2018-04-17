@@ -5214,36 +5214,34 @@ Type FuncDecl::getResultInterfaceType() const {
   return resultTy;
 }
 
-bool FuncDecl::isUnaryOperator() const {
+bool FuncDecl::isNaryOperator(unsigned arity) const {
   if (!isOperator())
     return false;
-  
+
   auto *params = getParameterList(getDeclContext()->isTypeContext());
-  bool unaryParametersMatch = params->size() >= 1 && !params->get(0)->isVariadic();
-    
-  bool supplementaryParametersMatch = true;
-  for (unsigned i = 1; i < params->size(); ++i) {
-      supplementaryParametersMatch &= params->get(i)->isDefaultArgument();
+
+  // guarantee we have at least "arity" number of parameters
+  if (params->size() < arity)
+    return false;
+
+  for (unsigned i = 0; i < params->size(); ++i) {
+    // parameters to the operator must not be variadic
+    if (i < arity && params->get(i)->isVariadic())
+      return false;
+
+    // parameters beyond the arity must have default values
+    if (i >= arity && !params->get(i)->isDefaultArgument())
+      return false;
   }
-  
-  return unaryParametersMatch && supplementaryParametersMatch;
+  return true;
+}
+
+bool FuncDecl::isUnaryOperator() const {
+  return isNaryOperator(1);
 }
 
 bool FuncDecl::isBinaryOperator() const {
-  if (!isOperator())
-    return false;
-  
-  auto *params = getParameterList(getDeclContext()->isTypeContext());
-  bool binaryParametersMatch = params->size() >= 2 &&
-    !params->get(0)->isVariadic() &&
-    !params->get(1)->isVariadic();
-    
-  bool supplementaryParametersMatch = true;
-  for (unsigned i = 2; i < params->size(); ++i) {
-    supplementaryParametersMatch &= params->get(i)->isDefaultArgument();
-  }
-    
-  return binaryParametersMatch && supplementaryParametersMatch;
+  return isNaryOperator(2);
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
