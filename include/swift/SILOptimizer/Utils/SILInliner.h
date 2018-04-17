@@ -36,23 +36,38 @@ enum class InlineCost : unsigned {
 InlineCost instructionInlineCost(SILInstruction &I);
 
 class SILInliner : public TypeSubstCloner<SILInliner> {
-public:
   friend class SILInstructionVisitor<SILInliner>;
   friend class SILCloner<SILInliner>;
-  
-  enum class InlineKind {
-    MandatoryInline,
-    PerformanceInline
-  };
 
+public:
+  enum class InlineKind { MandatoryInline, PerformanceInline };
+
+private:
+  InlineKind IKind;
+
+  SILBasicBlock *CalleeEntryBB = nullptr;
+
+  /// \brief The location representing the inlined instructions.
+  ///
+  /// This location wraps the call site AST node that is being inlined.
+  /// Alternatively, it can be the SIL file location of the call site (in case
+  /// of SIL-to-SIL transformations).
+  Optional<SILLocation> Loc;
+  const SILDebugScope *CallSiteScope = nullptr;
+  SILFunction *CalleeFunction = nullptr;
+  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
+      InlinedScopeCache;
+  CloneCollector::CallbackType Callback;
+
+public:
   SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
              SubstitutionList ApplySubs,
              SILOpenedArchetypesTracker &OpenedArchetypesTracker,
              CloneCollector::CallbackType Callback = nullptr)
       : TypeSubstCloner<SILInliner>(To, From, ApplySubs,
                                     OpenedArchetypesTracker, true),
-        IKind(IKind), CalleeEntryBB(nullptr),
-        Callback(Callback) {
+        IKind(IKind), CalleeFunction(&Original), Callback(Callback) {
+    // CalleeEntryBB is initialized later in case the callee is modified.
   }
 
   /// Returns true if we are able to inline \arg AI.
@@ -79,6 +94,8 @@ public:
   void inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args);
 
 private:
+  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI);
+
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
 
@@ -113,22 +130,6 @@ private:
       // Create an inlined version of the scope.
       return getOrCreateInlineScope(DS);
   }
-
-  InlineKind IKind;
-  
-  SILBasicBlock *CalleeEntryBB;
-
-  /// \brief The location representing the inlined instructions.
-  ///
-  /// This location wraps the call site AST node that is being inlined.
-  /// Alternatively, it can be the SIL file location of the call site (in case
-  /// of SIL-to-SIL transformations).
-  Optional<SILLocation> Loc;
-  const SILDebugScope *CallSiteScope = nullptr;
-  SILFunction *CalleeFunction;
-  llvm::SmallDenseMap<const SILDebugScope *,
-                      const SILDebugScope *> InlinedScopeCache;
-  CloneCollector::CallbackType Callback;
 };
 
 } // end namespace swift

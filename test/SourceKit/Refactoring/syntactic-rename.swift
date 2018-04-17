@@ -23,7 +23,7 @@ let s = "a foo is here"
 #selector(AStruct.foo(a:))
 #selector(AStruct.foo())
 #selector(AStruct.foo)
-let y = "before foo \(foo(a:1)) foo after"
+let y = "before foo \(foo(a:1)) foo after foo"
 
 func bar(a/* a comment */: Int, b c: Int, _: Int, _ d: Int) {}
 bar(a: 1, b: 2, 3, 4)
@@ -69,10 +69,10 @@ struct Memberwise1 {
 
 struct Memberwise2 {
   let m: Memberwise1
-  let n: Memberwise1
+  let n: Memberwise1; subscript(x: Int) -> Int { return x }
 }
 
-_ = Memberwise2(m: Memberwise1(x: 1), n: Memberwise1.init(x: 2))
+_ = Memberwise2(m: Memberwise1(x: 1), n: Memberwise1.init(x: 2))[1]
 
 protocol Layer {
   associatedtype Content
@@ -81,7 +81,30 @@ struct MultiPaneLayout<A: Layer, B: Layer>: Layer where A.Content == B.Content{
   typealias Content = Int
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+protocol P {}
+struct S {
+    subscript<K: P>(key: K) -> Int {
+        return 0
+    }
+}
+protocol Q {}
+func genfoo<T: P, U, V where U: P>(x: T, y: U, z: V, a: P) -> P where V: P {
+  fatalError()
+}
+
+_ = Memberwise1(x: 2)
+_ = Memberwise1.init(x: 2)
+_ = Memberwise2.init(m: Memberwise1(x: 2), n: Memberwise1(x: 34))
+_  = " this init is init "
+// this init is init too
+
+#if NOTDEFINED
+_ = Memberwise1(x: 2)
+_ = Memberwise1.init(x: 2)
+_ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
+#endif
+
+// RUN: %empty-directory(%t.result)
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/x.in.json %s >> %t.result/x.expected
 // RUN: diff -u %S/syntactic-rename/x.expected %t.result/x.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/z.in.json %s >> %t.result/z.expected
@@ -103,8 +126,12 @@ struct MultiPaneLayout<A: Layer, B: Layer>: Layer where A.Content == B.Content{
 // RUN: diff -u %S/syntactic-rename/rename-memberwise.expected %t.result/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.result/rename-layer.expected
 // RUN: diff -u %S/syntactic-rename/rename-layer.expected %t.result/rename-layer.expected
+// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 3 >> %t.result/rename-P.expected
+// RUN: diff -u %S/syntactic-rename/rename-P.expected %t.result/rename-P.expected
+// RUN: %sourcekitd-test -req=syntactic-rename -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 3 >> %t.result/keywordbase.expected
+// RUN: diff -u %S/syntactic-rename/keywordbase.expected %t.result/keywordbase.expected
 
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/x.in.json %s >> %t.ranges/x.expected
 // RUN: diff -u %S/find-rename-ranges/x.expected %t.ranges/x.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/z.in.json %s >> %t.ranges/z.expected
@@ -123,3 +150,7 @@ struct MultiPaneLayout<A: Layer, B: Layer>: Layer where A.Content == B.Content{
 // RUN: diff -u %S/find-rename-ranges/rename-memberwise.expected %t.ranges/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.ranges/rename-layer.expected
 // RUN: diff -u %S/find-rename-ranges/rename-layer.expected %t.ranges/rename-layer.expected
+// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 3 >> %t.ranges/rename-P.expected
+// RUN: diff -u %S/find-rename-ranges/rename-P.expected %t.ranges/rename-P.expected
+// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 3 >> %t.ranges/keywordbase.expected
+// RUN: diff -u %S/find-rename-ranges/keywordbase.expected %t.ranges/keywordbase.expected

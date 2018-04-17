@@ -29,7 +29,7 @@ class SILBasicBlock;
 class SILPrintContext {
 public:
   struct ID {
-    enum ID_Kind { SILBasicBlock, SILUndef, SSAValue } Kind;
+    enum ID_Kind { SILBasicBlock, SILUndef, SSAValue, Null } Kind;
     unsigned Number;
 
     // A stable ordering of ID objects.

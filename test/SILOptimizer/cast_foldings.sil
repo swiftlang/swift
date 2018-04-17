@@ -139,3 +139,13 @@ bb0(%0 : $*AnyObject):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @testIOU
+// CHECK: bb0(%0 : $*Optional<AnyObject>, %1 : $*Optional<AnyObject>):
+// CHECK:  [[TMP:%.*]] = load %1 : $*Optional<AnyObject>
+// CHECK:  store [[TMP]] to %0 : $*Optional<AnyObject>
+sil @testIOU : $@convention(thin) (@in Optional<AnyObject>) -> (@out Optional<AnyObject>) {
+bb0(%0 : $*Optional<AnyObject>, %1: $*Optional<AnyObject>):
+  unconditional_checked_cast_addr ImplicitlyUnwrappedOptional<AnyObject> in %1 : $*Optional<AnyObject> to Optional<AnyObject> in %0 : $*Optional<AnyObject>
+  %2 = tuple ()
+  return %2 : $()
+}

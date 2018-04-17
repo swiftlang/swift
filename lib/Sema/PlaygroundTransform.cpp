@@ -52,7 +52,7 @@ private:
     BracePair(const SourceRange &BR) : BraceRange(BR) {}
   };
 
-  typedef std::forward_list<BracePair> BracePairStack;
+  using BracePairStack = std::forward_list<BracePair>;
 
   BracePairStack BracePairs;
   class BracePairPusher {
@@ -95,7 +95,7 @@ private:
     }
   };
 
-  typedef SmallVector<swift::ASTNode, 3> ElementVector;
+  using ElementVector = SmallVector<swift::ASTNode, 3>;
 
   // Before a "return," "continue" or similar statement, emit pops of
   // all the braces up to its target.
@@ -126,6 +126,8 @@ public:
       return S;
     case StmtKind::Brace:
       return transformBraceStmt(cast<BraceStmt>(S));
+    case StmtKind::Defer:
+      return transformDeferStmt(cast<DeferStmt>(S));
     case StmtKind::If:
       return transformIfStmt(cast<IfStmt>(S));
     case StmtKind::Guard:
@@ -151,6 +153,20 @@ public:
     case StmtKind::DoCatch:
       return transformDoCatchStmt(cast<DoCatchStmt>(S));
     }
+  }
+
+  DeferStmt *transformDeferStmt(DeferStmt *DS) {
+    if (auto *FD = DS->getTempDecl()) {
+      // Temporarily unmark the DeferStmt's FuncDecl as implicit so it is
+      // transformed (as typically implicit Decls are skipped by the
+      // transformer).
+      auto Implicit = FD->isImplicit();
+      FD->setImplicit(false);
+      auto *D = transformDecl(FD);
+      D->setImplicit(Implicit);
+      assert(D == FD);
+    }
+    return DS;
   }
 
   // transform*() return their input if it's unmodified,
@@ -264,6 +280,7 @@ public:
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
           FD->setBody(NB);
+          TypeChecker(Context).checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -353,7 +370,7 @@ public:
 
   BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
-    typedef SmallVector<swift::ASTNode, 3> ElementVector;
+    using ElementVector = SmallVector<swift::ASTNode, 3>;
     ElementVector Elements(OriginalElements.begin(), OriginalElements.end());
 
     SourceRange SR = BS->getSourceRange();
@@ -733,7 +750,7 @@ public:
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               MaybeLoadInitExpr->getType(), TypeCheckDC);
-    VD->setInterfaceType(TypeCheckDC->mapTypeOutOfContext(VD->getType()));
+    VD->setInterfaceType(VD->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);

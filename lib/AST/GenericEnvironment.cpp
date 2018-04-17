@@ -41,7 +41,8 @@ ArrayRef<Type> GenericEnvironment::getContextTypes() const {
                         Signature->getGenericParams().size());
 }
 
-ArrayRef<GenericTypeParamType *> GenericEnvironment::getGenericParams() const {
+TypeArrayView<GenericTypeParamType>
+GenericEnvironment::getGenericParams() const {
   return Signature->getGenericParams();
 }
 
@@ -120,29 +121,18 @@ Type GenericEnvironment::mapTypeIntoContext(GenericEnvironment *env,
   return env->mapTypeIntoContext(type);
 }
 
-Type
-GenericEnvironment::mapTypeOutOfContext(GenericEnvironment *env,
-                                        Type type) {
-  assert(!type->hasTypeParameter() && "already have an interface type");
-
-  if (!env)
-    return type.substDependentTypesWithErrorTypes();
-
-  return env->mapTypeOutOfContext(type);
+Type MapTypeOutOfContext::operator()(SubstitutableType *type) const {
+  return cast<ArchetypeType>(type)->getInterfaceType();
 }
 
-Type GenericEnvironment::mapTypeOutOfContext(Type type) const {
-  type = type.subst([&](SubstitutableType *t) -> Type {
-                      return cast<ArchetypeType>(t)->getInterfaceType();
-                    },
-                    MakeAbstractConformanceForGenericType(),
-                    SubstFlags::AllowLoweredTypes);
-  assert(!type->hasArchetype() && "not fully substituted");
-  return type;
+Type TypeBase::mapTypeOutOfContext() {
+  assert(!hasTypeParameter() && "already have an interface type");
+  return Type(this).subst(MapTypeOutOfContext(),
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::AllowLoweredTypes);
 }
 
-Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
-                                                SubstitutableType *type) const {
+Type QueryInterfaceTypeSubstitutions::operator()(SubstitutableType *type) const{
   if (auto gp = type->getAs<GenericTypeParamType>()) {
     // Find the index into the parallel arrays of generic parameters and
     // context types.
@@ -157,7 +147,7 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
     // If the context type isn't already known, lazily create it.
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
-      assert(self->Builder && "Missing generic signature builder for lazy query");
+      assert(self->Builder &&"Missing generic signature builder for lazy query");
       auto equivClass =
         self->Builder->resolveEquivalenceClass(
                                   type,
@@ -241,45 +231,24 @@ GenericEnvironment::getForwardingSubstitutions() const {
   return genericSig->getASTContext().AllocateCopy(result);
 }
 
-SubstitutionMap
-GenericEnvironment::
-getSubstitutionMap(TypeSubstitutionFn subs,
-                   LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap(const_cast<GenericEnvironment *>(this));
+std::pair<Type, ProtocolConformanceRef>
+GenericEnvironment::mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
+                                           Type conformingType,
+                                           ProtocolConformanceRef conformance) {
+  if (!genericEnv)
+    return {conformingType, conformance};
+  
+  return genericEnv->mapConformanceRefIntoContext(conformingType, conformance);
+}
 
-  getGenericSignature()->enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
-      auto canTy = depTy->getCanonicalType();
-
-      // Map the interface type to a context type.
-      auto contextTy = depTy.subst(QueryInterfaceTypeSubstitutions(this),
-                                   MakeAbstractConformanceForGenericType());
-
-      // Compute the replacement type.
-      Type currentReplacement = contextTy.subst(subs, lookupConformance,
-                                                SubstFlags::UseErrorType);
-
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
-        subMap.addSubstitution(paramTy, currentReplacement);
-
-      // Collect the conformances.
-      for (auto req: reqs) {
-        assert(req.getKind() == RequirementKind::Conformance);
-        auto protoType = req.getSecondType()->castTo<ProtocolType>();
-        auto conformance = lookupConformance(canTy,
-                                             currentReplacement,
-                                             protoType);
-        if (conformance) {
-          assert(conformance->getConditionalRequirements().empty() &&
-                 "unhandled conditional requirements");
-
-          subMap.addConformance(canTy, *conformance);
-        }
-      }
-
-      return false;
-    });
-
-  subMap.verify();
-  return subMap;
+std::pair<Type, ProtocolConformanceRef>
+GenericEnvironment::mapConformanceRefIntoContext(
+                                     Type conformingInterfaceType,
+                                     ProtocolConformanceRef conformance) const {
+  auto contextConformance = conformance.subst(conformingInterfaceType,
+    QueryInterfaceTypeSubstitutions(this),
+    LookUpConformanceInSignature(*getGenericSignature()));
+  
+  auto contextType = mapTypeIntoContext(conformingInterfaceType);
+  return {contextType, contextConformance};
 }

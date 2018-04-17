@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_if -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
@@ -11,9 +11,9 @@
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_if.guess1
-// SIL-LABEL: sil @_T06pgo_if6guess1s5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
-// IR-LABEL: define swiftcc i32 @_T06pgo_if6guess1s5Int32VAD1x_tF
-// IR-OPT-LABEL: define swiftcc i32 @_T06pgo_if6guess1s5Int32VAD1x_tF
+// SIL-LABEL: sil @$S6pgo_if6guess11xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
+// IR-LABEL: define swiftcc i32 @"$S6pgo_if6guess11xs5Int32VAE_tF"
+// IR-OPT-LABEL: define swiftcc i32 @"$S6pgo_if6guess11xs5Int32VAE_tF"
 public func guess1(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(5000) !false_count(1)
   // SIL-OPT: cond_br {{.*}} !true_count(5000) !false_count(1)
@@ -27,9 +27,9 @@ public func guess1(x: Int32) -> Int32 {
 }
 
 // SIL-LABEL: // pgo_if.guess2
-// SIL-LABEL: sil @_T06pgo_if6guess2s5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
-// IR-LABEL: define swiftcc i32 @_T06pgo_if6guess2s5Int32VAD1x_tF
-// IR-OPT-LABEL: define swiftcc i32 @_T06pgo_if6guess2s5Int32VAD1x_tF
+// SIL-LABEL: sil @$S6pgo_if6guess21xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {
+// IR-LABEL: define swiftcc i32 @"$S6pgo_if6guess21xs5Int32VAE_tF"
+// IR-OPT-LABEL: define swiftcc i32 @"$S6pgo_if6guess21xs5Int32VAE_tF"
 public func guess2(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(5000) !false_count(1)
   // SIL-OPT: cond_br {{.*}} !true_count(5000) !false_count(1)

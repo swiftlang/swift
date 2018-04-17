@@ -20,6 +20,7 @@
 
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
@@ -52,16 +53,6 @@ public:
     LinkAll
   };
 
-  /// Representation of optimization modes.
-  enum class SILOptMode: unsigned {
-    NotSet,
-    None,
-    Debug,
-    Optimize,
-    OptimizeForSize,
-    OptimizeUnchecked
-  };
-
   /// Controls how to perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
 
@@ -91,7 +82,7 @@ public:
   bool EmitVerboseSIL = false;
 
   /// Optimization mode being used.
-  SILOptMode Optimization = SILOptMode::NotSet;
+  OptimizationMode OptMode = OptimizationMode::NotSet;
 
   enum AssertConfiguration: unsigned {
     // Used by standard library code to distinguish between a debug and release
@@ -121,10 +112,9 @@ public:
 
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   llvm::StringRef ExternalPassPipelineFilename;
-  
-  /// Emit captures and function contexts using +0 caller-guaranteed ARC
-  /// conventions.
-  bool EnableGuaranteedClosureContexts = false;
+
+  /// Emit normal function arguments using the +0 guaranteed convention.
+  bool EnableGuaranteedNormalArguments = true;
 
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;
@@ -150,6 +140,9 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = true;
 
+  /// Emit extra exclusvity markers for memory access and verify coverage.
+  bool VerifyExclusivity = false;
+
   /// Enable the mandatory semantic arc optimizer.
   bool EnableMandatorySemanticARCOpts = false;
 
@@ -167,6 +160,14 @@ public:
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
   }
+
+  bool shouldOptimize() const {
+    return OptMode > OptimizationMode::NoOptimization;
+  }
+
+  bool hasMultipleIRGenThreads() const { return NumThreads > 1; }
+  bool shouldPerformIRGenerationInParallel() const { return NumThreads != 0; }
+  bool hasMultipleIGMs() const { return hasMultipleIRGenThreads(); }
 };
 
 } // end namespace swift

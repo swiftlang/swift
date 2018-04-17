@@ -171,7 +171,7 @@ func foo(x: E, intVal: Int) {
 #if !ENABLE_C
       break
 #else
-    case .C: // expected-error {{'case' label can only appear inside a 'switch' statement}} expected-error {{extraneous '.' in enum 'case' declaration}}
+    case .C: // expected-error {{'case' label can only appear inside a 'switch' statement}}
       break
 #endif
   }
@@ -206,7 +206,7 @@ func foo(x: E, intVal: Int) {
   // 'fallthrough' target.
   switch intVal {
     case 1:
-      fallthrough // expected-error {{'fallthrough' cannot transfer control to a case label that declares variables}}
+      fallthrough // expected-error {{'fallthrough' from a case which doesn't bind variable 'val'}}
 #if ENABLE_C
     case let val:
       break

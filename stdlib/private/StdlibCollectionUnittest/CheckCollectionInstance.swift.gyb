@@ -56,11 +56,11 @@ public func check${inc.capitalize()}rementable<Instances, BaseCollection>(
   _ instances: Instances,
   of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
-  ${end}Index: Instances.Iterator.Element, ${TRACE}
+  ${end}Index: Instances.Element, ${TRACE}
 ) where
   Instances : Collection,
   BaseCollection : ${protocol},
-  Instances.Iterator.Element == BaseCollection.Index {
+  Instances.Element == BaseCollection.Index {
 
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   for i in instances {
@@ -82,20 +82,20 @@ internal func _checkIncrementalAdvance<Instances, BaseCollection>(
   _ instances: Instances,
   of baseCollection : BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
-  limit: Instances.Iterator.Element,
-  sign: BaseCollection.IndexDistance, // 1 or -1
-  next: (Instances.Iterator.Element) -> Instances.Iterator.Element,
+  limit: Instances.Element,
+  sign: Int, // 1 or -1
+  next: (Instances.Element) -> Instances.Element,
   ${TRACE}
 ) where
   Instances : Collection,
   BaseCollection : Collection,
-  Instances.Iterator.Element == BaseCollection.Index {
+  Instances.Element == BaseCollection.Index {
   for i in instances {
-    let d: BaseCollection.IndexDistance = sign > 0 ?
+    let d: Int = sign > 0 ?
       baseCollection.distance(from: i, to: limit) :
       -baseCollection.distance(from: limit, to: i)
 
-    var offset: BaseCollection.IndexDistance = 0
+    var offset: Int = 0
     for _ in 0...Int64(d * sign) {
       let j = baseCollection.index(i, offsetBy: offset)
       let k = baseCollection.index(i, offsetBy: offset + sign, limitedBy: limit) ?? limit
@@ -119,11 +119,11 @@ public func checkForwardIndex<Instances, BaseCollection>(
   _ instances: Instances,
   of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
-  endIndex: Instances.Iterator.Element, ${TRACE}
+  endIndex: Instances.Element, ${TRACE}
 ) where
   Instances : Collection,
   BaseCollection : Collection,
-  Instances.Iterator.Element == BaseCollection.Index {
+  Instances.Element == BaseCollection.Index {
 
   checkIncrementable(instances, of: baseCollection,
     equalityOracle: equalityOracle, endIndex: endIndex, ${trace})
@@ -144,13 +144,13 @@ public func checkBidirectionalIndex<Instances, BaseCollection>(
   _ instances: Instances,
   of baseCollection: BaseCollection,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
-  startIndex: Instances.Iterator.Element,
-  endIndex: Instances.Iterator.Element,
+  startIndex: Instances.Element,
+  endIndex: Instances.Element,
   ${TRACE}
 ) where
   Instances: Collection,
   BaseCollection : BidirectionalCollection,
-  Instances.Iterator.Element == BaseCollection.Index {
+  Instances.Element == BaseCollection.Index {
 
   checkForwardIndex(instances, of: baseCollection,
     equalityOracle: equalityOracle, endIndex: endIndex)
@@ -176,9 +176,9 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
   _ instances: Instances, distances: Distances,
   of baseCollection: BaseCollection,
   distanceOracle:
-    (Instances.Index, Instances.Index) -> Distances.Iterator.Element,
+    (Instances.Index, Instances.Index) -> Distances.Element,
   advanceOracle:
-    (Instances.Index, Distances.Index) -> Instances.Iterator.Element,
+    (Instances.Index, Distances.Index) -> Instances.Element,
   startIndex: Instances.Iterator.Element,
   endIndex: Instances.Iterator.Element,
   ${TRACE}
@@ -186,8 +186,8 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
   Instances : Collection,
   Distances : Collection,
   BaseCollection : RandomAccessCollection,
-  Instances.Iterator.Element == BaseCollection.Index,
-  Distances.Iterator.Element == BaseCollection.IndexDistance {
+  Instances.Element == BaseCollection.Index,
+  Distances.Element == Int {
 
   checkBidirectionalIndex(instances, of: baseCollection,
     equalityOracle: { distanceOracle($0, $1) == 0 },
@@ -207,16 +207,16 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
   _ instances: Instances, distances: Distances,
   of baseCollection: BaseCollection,
   distanceOracle:
-    (Instances.Index, Instances.Index) -> Distances.Iterator.Element,
+    (Instances.Index, Instances.Index) -> Distances.Element,
   advanceOracle:
-    (Instances.Index, Distances.Index) -> Instances.Iterator.Element,
+    (Instances.Index, Distances.Index) -> Instances.Element,
   ${TRACE}
 ) where
   Instances : Collection,
   Distances : Collection,
   BaseCollection : Collection,
-  Instances.Iterator.Element == BaseCollection.Index,
-  Distances.Iterator.Element == BaseCollection.IndexDistance {
+  Instances.Element == BaseCollection.Index,
+  Distances.Element == Int {
 
   checkComparable(
     instances,
@@ -246,7 +246,7 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
 // picked up when the caller passes a literal), and another that
 // accepts any appropriate Collection type.
 % for genericParam, Element, Expected in [
-%   ('Expected: Collection',  'Expected.Iterator.Element',  'Expected'),
+%   ('Expected: Collection',  'Expected.Element',  'Expected'),
 %   ('Element'             ,  'Element'                  ,  'Array<Element>')]:
 
 // Top-level check for Collection instances. Alias for checkForwardCollection.
@@ -257,7 +257,7 @@ public func checkCollection<${genericParam}, C : Collection>(
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) where C.Iterator.Element == ${Element} {
+) where C.Element == ${Element} {
 
   checkForwardCollection(expected, collection, message(),
     stackTrace: stackTrace, showFrame: showFrame, file: file, line: line,
@@ -276,7 +276,7 @@ public func check${Traversal}Collection<
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
-  C.Iterator.Element == ${Element},
+  C.Element == ${Element},
   ${Element} : Equatable {
 
   check${Traversal}Collection(
@@ -296,7 +296,7 @@ public func check${Traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
-  C.Iterator.Element == ${Element} {
+  C.Element == ${Element} {
 
   checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks, sameValue: sameValue)
@@ -324,7 +324,7 @@ public func checkOneLevelOf${Traversal}Collection<
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) where C.Iterator.Element == ${Element} {
+) where C.Element == ${Element} {
 
   // A `Collection` is a multi-pass `Sequence`.
   for _ in 0..<3 {
@@ -370,7 +370,7 @@ public func checkOneLevelOf${Traversal}Collection<
 
 %     else:
 %       assert(Traversal == 'RandomAccess')
-  typealias Distance = C.IndexDistance
+  typealias Distance = Int
 
   let count: Distance  = collection.count
   let offset0 = min(5, count)
@@ -501,7 +501,7 @@ ${genericParam}, S : ${TraversalCollection}
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
-  S.Iterator.Element == ${Element} {
+  S.Element == ${Element} {
 
   let expectedArray = Array(expected)
 
@@ -564,14 +564,14 @@ public func checkRangeReplaceable<C, N>(
 ) where
   C : RangeReplaceableCollection,
   N : Collection,
-  C.Iterator.Element : Equatable,
-  C.Iterator.Element == N.Iterator.Element {
+  C.Element : Equatable,
+  C.Element == N.Element {
 
   typealias A = C
 
   // First make an independent copy of the array that we can use for
   // comparison later.
-  let source = Array<A.Iterator.Element>(makeCollection())
+  let source = Array<A.Element>(makeCollection())
 
   for (ix, i) in source.indices.enumerated() {
     for (jx_, j) in (i..<source.endIndex).enumerated() {

@@ -15,12 +15,12 @@ variations = [('', 'Sequence'), ('', 'Collection'), ('Bidirectional', 'Collectio
 // Test collections using value types as elements.
 % for (traversal, kind) in variations:
 CollectionTests.add${traversal}${kind}Tests(
-  make${kind}: { (elements: [OpaqueValue<Int>]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<OpaqueValue<Int>>> in
+  make${kind}: { (elements: [OpaqueValue<Int>]) -> LazyFilter${kind}<Minimal${traversal}${kind}<OpaqueValue<Int>>> in
     Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
   },
   wrapValue: identity,
   extractValue: identity,
-  make${kind}OfEquatable: { (elements: [MinimalEquatableValue]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<MinimalEquatableValue>> in
+  make${kind}OfEquatable: { (elements: [MinimalEquatableValue]) -> LazyFilter${kind}<Minimal${traversal}${kind}<MinimalEquatableValue>> in
     Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
   },
   wrapValueIntoEquatable: identityEq,
@@ -31,7 +31,7 @@ CollectionTests.add${traversal}${kind}Tests(
 // Test collections using reference types as elements.
 % for (traversal, kind) in variations:
 CollectionTests.add${traversal}${kind}Tests(
-  make${kind}: { (elements: [LifetimeTracked]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>> in
+  make${kind}: { (elements: [LifetimeTracked]) -> LazyFilter${kind}<Minimal${traversal}${kind}<LifetimeTracked>> in
     // FIXME: create a better sequence and filter
     Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
   },
@@ -41,7 +41,7 @@ CollectionTests.add${traversal}${kind}Tests(
   extractValue: { (element: LifetimeTracked) in
     OpaqueValue(element.value, identity: element.identity)
   },
-  make${kind}OfEquatable: { (elements: [LifetimeTracked]) -> LazyFilter${traversal}${kind}<Minimal${traversal}${kind}<LifetimeTracked>> in
+  make${kind}OfEquatable: { (elements: [LifetimeTracked]) -> LazyFilter${kind}<Minimal${traversal}${kind}<LifetimeTracked>> in
     // FIXME: create a better sequence and filter
     Minimal${traversal}${kind}(elements: elements).lazy.filter { _ in return true }
   },

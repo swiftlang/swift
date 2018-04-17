@@ -66,7 +66,12 @@ public:
   /// used for Swift value layout when a reference type may reference ObjC
   /// objects.
   SpareBitVector ObjCPointerReservedBits;
-  
+
+  /// These bits, if set, indicate that a Builtin.BridgeObject value is holding
+  /// an Objective-C object.
+  SpareBitVector IsObjCPointerBit;
+
+
   /// The alignment of heap objects.  By default, assume pointer alignment.
   Alignment HeapObjectAlignment;
   

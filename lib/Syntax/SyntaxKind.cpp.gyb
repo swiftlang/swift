@@ -18,8 +18,31 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/SyntaxKind.h"
+#include "swift/Syntax/TokenKinds.h"
 
 namespace swift {
+
+static StringRef getTokenTextInternal(tok kind) {
+  switch(kind) {
+% for token in SYNTAX_TOKENS:
+%   if token.text:
+  case tok::${token.kind}: return "${token.text}";
+%   end
+% end
+  default: return StringRef();
+  }
+}
+
+bool isTokenTextDetermined(tok kind) {
+  return !getTokenTextInternal(kind).empty();
+}
+
+StringRef getTokenText(tok kind) {
+  auto text = getTokenTextInternal(kind);
+  assert(!text.empty() && "token kind cannot be determined");
+  return text;
+}
+
 namespace syntax {
 
 void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
@@ -80,7 +103,23 @@ bool isUnknownKind(SyntaxKind Kind) {
   return Kind == SyntaxKind::Unknown ||
          Kind == SyntaxKind::UnknownDecl ||
          Kind == SyntaxKind::UnknownExpr ||
-         Kind == SyntaxKind::UnknownStmt;
+         Kind == SyntaxKind::UnknownStmt ||
+         Kind == SyntaxKind::UnknownType ||
+         Kind == SyntaxKind::UnknownPattern;
+}
+
+SyntaxKind getUnknownKind(SyntaxKind Kind) {
+  if (isExprKind(Kind))
+    return SyntaxKind::UnknownExpr;
+  if (isStmtKind(Kind))
+    return SyntaxKind::UnknownStmt;
+  if (isDeclKind(Kind))
+    return SyntaxKind::UnknownDecl;
+  if (isTypeKind(Kind))
+    return SyntaxKind::UnknownType;
+  if (isPatternKind(Kind))
+    return SyntaxKind::UnknownPattern;
+  return SyntaxKind::Unknown;
 }
 } // end namespace syntax
 } // end namespace swift

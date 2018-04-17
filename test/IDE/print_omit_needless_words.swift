@@ -46,7 +46,7 @@
 // CHECK-FOUNDATION: func copy(with: NSZone? = nil) -> Any!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(forKey: NSCopying) -> Any?
+// CHECK-FOUNDATION: func object(forKey: Any) -> Any?
 // CHECK-FOUNDATION: func removeObject(forKey: NSCopying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
@@ -143,7 +143,7 @@
 // CHECK-FOUNDATION: func doSomethingElse(with: NSCopying & NSObjectProtocol)
 
 // Note: Function type -> "Function".
-// CHECK-FOUNDATION: func sort(_: @escaping @convention(c) (AnyObject, AnyObject) -> Int)
+// CHECK-FOUNDATION: func sort(_: @escaping @convention(c) (Any, Any) -> Int)
 
 // Note: Plural: NSArray without type arguments -> "Objects".
 // CHECK-FOUNDATION: func remove(_: [Any])

@@ -1,6 +1,11 @@
 set(swift_runtime_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 set(swift_runtime_linker_flags ${SWIFT_RUNTIME_CORE_LINK_FLAGS})
 
+if(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT)
+  list(APPEND swift_runtime_compile_flags
+      "-DSWIFT_DARWIN_ENABLE_STABLE_ABI_BIT=1")
+endif()
+
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   list(APPEND swift_runtime_compile_flags
       "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
@@ -18,8 +23,6 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
-set(section_magic_compile_flags ${swift_runtime_compile_flags})
-
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
@@ -27,16 +30,18 @@ set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
     SwiftValue.mm
-    Reflection.mm
+    ReflectionMirror.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
+    )
 
 set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     Casting.cpp
+    CompatibilityOverride.cpp
     CygwinPort.cpp
-    HaikuPort.cpp
     Demangle.cpp
     Enum.cpp
     ErrorObjectConstants.cpp
@@ -44,11 +49,12 @@ set(swift_runtime_sources
     Errors.cpp
     ErrorDefaultImpls.cpp
     Exclusivity.cpp
+    ExistentialContainer.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionMachO.cpp
     ImageInspectionELF.cpp
-    ImageInspectionWin32.cpp
+    ImageInspectionCOFF.cpp
     KnownMetadata.cpp
     Metadata.cpp
     MetadataLookup.cpp
@@ -58,8 +64,8 @@ set(swift_runtime_sources
     Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
-    RuntimeEntrySymbols.cpp
     RuntimeInvocationsTracking.cpp
+    SwiftDtoa.cpp
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
@@ -67,16 +73,21 @@ set(swift_runtime_sources
     "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp")
 
+# When we're building with assertions, include the demangle node dumper to aid
+# in debugging.
+if (LLVM_ENABLE_ASSERTIONS)
+  list(APPEND swift_runtime_sources "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
+endif(LLVM_ENABLE_ASSERTIONS)
+
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
-    swift_sections.S
     MutexPThread.cpp
     MutexWin32.cpp
     CygwinPort.cpp
-    ImageInspectionInit.cpp
     ImageInspectionELF.cpp
-    ImageInspectionStatic.cpp
     StaticBinaryELF.cpp
+    SwiftRT-COFF.cpp
+    SwiftRT-ELF.cpp
     ${swift_runtime_sources}
     ${swift_runtime_objc_sources}
     ${swift_runtime_leaks_sources})
@@ -92,14 +103,6 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_swift_library(swiftImageInspectionStatic STATIC
-    ImageInspectionStatic.cpp
-    StaticBinaryELF.cpp
-    C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
-    LINK_FLAGS ${swift_runtime_linker_flags})
-  set_target_properties(swiftImageInspectionStatic PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
-
   add_swift_library(swiftImageInspectionShared STATIC
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
@@ -108,7 +111,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
 
   swift_install_in_component(stdlib
-    TARGETS swiftImageInspectionStatic swiftImageInspectionShared
+    TARGETS swiftImageInspectionShared
     DESTINATION "lib/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
@@ -145,113 +148,61 @@ add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   INSTALL_IN_COMPONENT never_install)
 
 set(ELFISH_SDKS)
+set(COFF_SDKS)
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF")
-    list(APPEND ELFISH_SDKS "${sdk}")
+    list(APPEND ELFISH_SDKS ${sdk})
+  elseif("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "COFF")
+    list(APPEND COFF_SDKS ${sdk})
   endif()
 endforeach()
 
-add_swift_library(section_magic_loader OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
-    ImageInspectionInit.cpp
-    C_COMPILE_FLAGS ${section_magic_compile_flags}
-    TARGET_SDKS "${ELFISH_SDKS}"
-    LINK_FLAGS ${swift_runtime_linker_flags}
-    INSTALL_IN_COMPONENT never_install)
-add_swift_library(section_magic_begin OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
-    swift_sections.S
-    C_COMPILE_FLAGS ${section_magic_compile_flags} "-DSWIFT_BEGIN"
-    TARGET_SDKS "${ELFISH_SDKS}"
-    LINK_FLAGS ${swift_runtime_linker_flags}
-    INSTALL_IN_COMPONENT never_install)
-add_swift_library(section_magic_end OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
-    swift_sections.S
-    C_COMPILE_FLAGS ${section_magic_compile_flags} "-DSWIFT_END"
-    LINK_FLAGS ${swift_runtime_linker_flags}
-    TARGET_SDKS "${ELFISH_SDKS}"
-    INSTALL_IN_COMPONENT never_install)
+add_swift_library(swiftImageRegistrationObjectELF
+                  OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+                  SwiftRT-ELF.cpp
+                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                  LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                  TARGET_SDKS ${ELFISH_SDKS}
+                  INSTALL_IN_COMPONENT none)
+add_swift_library(swiftImageRegistrationObjectCOFF
+                  OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+                  SwiftRT-COFF.cpp
+                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                  LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                  TARGET_SDKS ${COFF_SDKS}
+                  INSTALL_IN_COMPONENT none)
 
-set(object_target_list)
-foreach(sdk ${ELFISH_SDKS})
+foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
     set(arch_suffix "${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
 
-    set(section_magic_loader_obj "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/section_magic_loader-${arch_suffix}.dir/ImageInspectionInit.cpp${CMAKE_C_OUTPUT_EXTENSION}")
-    set(section_magic_begin_obj "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/section_magic_begin-${arch_suffix}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}")
-    set(section_magic_end_obj "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/section_magic_end-${arch_suffix}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}")
+    if("${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "ELF" OR
+       "${SWIFT_SDK_${sdk}_OBJECT_FORMAT}" STREQUAL "COFF")
+      # TODO(compnerd) switch to the generator expression when cmake is upgraded
+      # to a version which supports it.
+      # set(swiftrtObject "$<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}>")
+      set(swiftrtObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}.dir/SwiftRT-${SWIFT_SDK_${sdk}_OBJECT_FORMAT}.cpp${CMAKE_C_OUTPUT_EXTENSION})
+      set(swiftrtPath "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
 
-    set(ld_EXECUTABLE ${CMAKE_LINKER})
-    if(SWIFT_SDK_${sdk}_ARCH_${arch}_LINKER)
-      set(ld_EXECUTABLE ${SWIFT_SDK_${sdk}_ARCH_${arch}_LINKER})
-    endif()
-
-    add_custom_command_target(section_magic_${arch_suffix}_begin_object
-      COMMAND
-          # Merge ImageInspectionInit.o + swift_sections.S(BEGIN) => swift_begin.o
-          ${ld_EXECUTABLE} -r -o "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-          "${section_magic_begin_obj}" "${section_magic_loader_obj}"
-      OUTPUT
-          "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-      DEPENDS
-          "${section_magic_begin_obj}"
-          "${section_magic_loader_obj}")
-
-    add_custom_command_target(section_magic_${arch_suffix}_end_object
-      COMMAND
-          "${CMAKE_COMMAND}" -E copy
-          "${section_magic_end_obj}"
-          "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-      OUTPUT
-          "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-      DEPENDS
-          "${section_magic_end_obj}")
-
-    list(APPEND object_target_list
-        "${section_magic_${arch_suffix}_begin_object}"
-        "${section_magic_${arch_suffix}_end_object}")
-
-    swift_install_in_component(stdlib
-        FILES
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_begin.o"
-            "${SWIFTLIB_DIR}/${arch_subdir}/swift_end.o"
-        DESTINATION
-            "lib/swift/${arch_subdir}")
-
-    if(SWIFT_BUILD_STATIC_STDLIB)
-      # Static lib versions of swift_begin.o and swift_end.o
-      add_custom_command_target(static_section_magic_${arch_suffix}_begin_object
-        COMMAND
-            "${CMAKE_COMMAND}" -E copy
-            "${section_magic_begin_obj}"
-            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
-        OUTPUT
-            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
-        DEPENDS
-            "${section_magic_begin_obj}")
-
-      add_custom_command_target(static_section_magic_${arch_suffix}_end_object
-        COMMAND
-            "${CMAKE_COMMAND}" -E copy
-            "${section_magic_end_obj}"
-            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
-        OUTPUT
-            "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
-        DEPENDS
-            "${section_magic_end_obj}")
-
-      list(APPEND object_target_list
-            "${static_section_magic_${arch_suffix}_begin_object}"
-            "${static_section_magic_${arch_suffix}_end_object}")
-
+      add_custom_command_target(swiftImageRegistration-${arch_suffix}
+                                COMMAND
+                                  "${CMAKE_COMMAND}" -E copy "${swiftrtObject}" "${swiftrtPath}"
+                                OUTPUT
+                                  "${swiftrtPath}"
+                                DEPENDS
+                                  "${swiftrtObject}")
       swift_install_in_component(stdlib
-          FILES
-              "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_begin.o"
-              "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swift_end.o"
-          DESTINATION
-              "lib/swift_static/${arch_subdir}")
-    endif()
+                                 FILES
+                                   "${swiftrtPath}"
+                                 DESTINATION
+                                   "lib/swift/${arch_subdir}")
+      add_dependencies(swift-stdlib-${arch_suffix} ${swiftImageRegistration-${arch_suffix}})
 
+      add_custom_target(swiftImageRegistration-${arch_suffix}
+                        ALL DEPENDS
+                          ${swiftImageRegistration-${arch_suffix}})
+    endif()
   endforeach()
 endforeach()
 
-add_custom_target(section_magic ALL DEPENDS ${object_target_list})

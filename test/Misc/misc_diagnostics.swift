@@ -26,7 +26,7 @@ if (1) {} // expected-error{{'Int' is not convertible to 'Bool'}}
 if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
-var b: Int = [1, 2, 3] // expected-error{{contextual type 'Int' cannot be used with array literal}}
+var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
 
 var f1: Float = 2.0
 var f2: Float = 3.0
@@ -129,7 +129,7 @@ func test17875634() {
 
 // <rdar://problem/20770032> Pattern matching ranges against tuples crashes the compiler
 func test20770032() {
-  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'CountableClosedRange<Int>' cannot match values of type '(Int, Int)'}}
+  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}} expected-error{{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
   }
 }
 

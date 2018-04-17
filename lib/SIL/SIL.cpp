@@ -44,11 +44,6 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   if (isa<ClangModuleUnit>(fileContext))
     return FormalLinkage::PublicNonUnique;
 
-  if (!D->hasAccess()) {
-    assert(D->getDeclContext()->isLocalContext());
-    return FormalLinkage::Private;
-  }
-
   switch (D->getEffectiveAccess()) {
   case AccessLevel::Public:
   case AccessLevel::Open:
@@ -57,29 +52,10 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
     return FormalLinkage::HiddenUnique;
   case AccessLevel::FilePrivate:
   case AccessLevel::Private:
-    // Why "hidden" instead of "private"? Because the debugger may need to
-    // access these symbols.
-    return FormalLinkage::HiddenUnique;
+    return FormalLinkage::Private;
   }
 
   llvm_unreachable("Unhandled access level in switch.");
-}
-
-FormalLinkage swift::getTypeLinkage(CanType type) {
-  FormalLinkage result = FormalLinkage::Top;
-
-  // Merge all nominal types from the structural type.
-  (void) type.findIf([&](Type _type) {
-    CanType type = CanType(_type);
-
-    // For any nominal type reference, look at the type declaration.
-    if (auto nominal = type->getAnyNominal())
-      result ^= getDeclLinkage(nominal);
-
-    return false; // continue searching
-  });
-
-  return result;
 }
 
 SILLinkage swift::getSILLinkage(FormalLinkage linkage,
@@ -95,9 +71,6 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 
   case FormalLinkage::HiddenUnique:
     return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
-
-  case FormalLinkage::HiddenNonUnique:
-    return (forDefinition ? SILLinkage::Shared : SILLinkage::HiddenExternal);
 
   case FormalLinkage::Private:
     return SILLinkage::Private;

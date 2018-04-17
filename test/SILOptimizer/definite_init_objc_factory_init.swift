@@ -5,11 +5,11 @@
 import Foundation
 import ImportAsMember.Class
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So4HiveCSQyABGSQySo3BeeCG5queen_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : $Optional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
-  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = objc_method [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
+  // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = objc_method [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK-NEXT:   [[HIVE:%[0-9]+]] = apply [[FACTORY]]([[QUEEN]], [[HIVE_META_OBJC]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
   // CHECK-NEXT:   release_value [[QUEEN]]
   // CHECK-NEXT:   return [[HIVE]] : $Optional<Hive>
@@ -21,13 +21,13 @@ extension Hive {
   // initializer, not a convenience initializer, which means it does
   // not have an initializing entry point at all.
 
-  // CHECK-LABEL: sil hidden @_T0So4HiveC027definite_init_objc_factory_C0EABSo3BeeC10otherQueen_tcfc : $@convention(method) (@owned Bee, @owned Hive) -> @owned Hive
+  // CHECK-LABEL: sil hidden @$SSo4HiveC027definite_init_objc_factory_C0E10otherQueenABSo3BeeC_tcfc : $@convention(method) (@owned Bee, @owned Hive) -> @owned Hive
   convenience init(otherQueen other: Bee) {
     // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack $Hive
     // CHECK: store [[OLD_SELF:%[0-9]+]] to [[SELF_ADDR]]
     // CHECK: [[META:%[0-9]+]] = value_metatype $@thick Hive.Type, [[OLD_SELF]] : $Hive
-    // CHECK: [[FACTORY:%[0-9]+]] = objc_method [[META]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
     // CHECK: [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+    // CHECK: [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
     // CHECK: apply [[FACTORY]]([[QUEEN:%[0-9]+]], [[OBJC_META]]) : $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
     // CHECK: store [[NEW_SELF:%[0-9]+]] to [[SELF_ADDR]]
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[OLD_SELF]] : $Hive
@@ -54,12 +54,12 @@ extension SomeClass {
 }
 
 class SubHive : Hive {
-  // CHECK-LABEL: sil hidden @_T0027definite_init_objc_factory_B07SubHiveCACyt20delegatesToInherited_tcfc : $@convention(method) (@owned SubHive) -> @owned SubHive
+  // CHECK-LABEL: sil hidden @$S027definite_init_objc_factory_B07SubHiveC20delegatesToInheritedACyt_tcfc : $@convention(method) (@owned SubHive) -> @owned SubHive
   convenience init(delegatesToInherited: ()) {
     // CHECK: [[UPCAST:%.*]] = upcast %0 : $SubHive to $Hive
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick Hive.Type, [[UPCAST]] : $Hive
-    // CHECK: [[METHOD:%.*]] = objc_method [[METATYPE]] : $@thick Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee!) -> Hive!
     // CHECK: [[OBJC:%.*]] = thick_to_objc_metatype [[METATYPE]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+    // CHECK: [[METHOD:%.*]] = objc_method [[OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee?) -> Hive?
     // CHECK: apply [[METHOD]]({{.*}}, [[OBJC]])
 
     // CHECK: [[METATYPE:%.*]] = value_metatype $@thick SubHive.Type, %0 : $SubHive

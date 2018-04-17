@@ -5,8 +5,7 @@
 %{
 from gyb_stdlib_support import (
     TRAVERSALS,
-    sliceTypeName,
-    defaultIndicesForTraversal
+    collectionTypeName
 )
 }%
 
@@ -48,20 +47,18 @@ var SliceTests = TestSuite("Collection")
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
-%       Slice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%       Collection = 'Minimal' + Slice.replace('Slice', 'Collection')
+%       Collection = 'Minimal' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
 
-SliceTests.test("${Slice}/AssociatedTypes") {
+SliceTests.test("${Collection}.Slice/AssociatedTypes") {
  do {
     typealias Collection = ${Collection}<OpaqueValue<Int>>
-    typealias CollectionSlice = ${Slice}<Collection>
+    typealias CollectionSlice = Slice<Collection>
     expectSliceType(CollectionSlice.self)
     expectCollectionAssociatedTypes(
       collectionType: CollectionSlice.self,
       iteratorType: IndexingIterator<CollectionSlice>.self,
       subSequenceType: CollectionSlice.self,
       indexType: MinimalIndex.self,
-      indexDistanceType: Int.self,
       indicesType: Collection.Indices.self)
   }
 
@@ -76,11 +73,12 @@ SliceTests.test("${Slice}/AssociatedTypes") {
   }
 }
 
-SliceTests.test("${Slice}/init(base:bounds:)") {
+SliceTests.test("${Collection}.Slice/init(base:bounds:)") {
   for test in subscriptRangeTests {
     let base = ${Collection}(elements: test.collection)
-    var slice = ${Slice}(base: base, bounds: test.bounds(in: base))
-    expectType(${Slice}<${Collection}<OpaqueValue<Int>>>.self, &slice)
+    var slice = Slice(base: base, bounds: test.bounds(in: base))
+    expectType(Slice<${Collection}<OpaqueValue<Int>>>.self, &slice)
+    expectType(${Collection}<OpaqueValue<Int>>.SubSequence.self, &slice)
 
     checkCollection(
       test.expected,
@@ -91,19 +89,20 @@ SliceTests.test("${Slice}/init(base:bounds:)") {
 }
 
 % if RangeReplaceable == False and Mutable == False:
-SliceTests.test("${Slice}/baseProperty") {
+SliceTests.test("${Collection}.Slice/baseProperty") {
   let referenceCollection = ReferenceCollection()
-  let testSlice = ${Slice}(base: referenceCollection, bounds: 0..<1)
+  let testSlice = Slice(base: referenceCollection, bounds: 0..<1)
   expectTrue(testSlice.base === referenceCollection)
 }
 % end
 
-SliceTests.test("${Slice}.{startIndex,endIndex}") {
+SliceTests.test("${Collection}.Slice.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
     let c = ${Collection}(elements: test.collection)
     let bounds = test.bounds(in: c)
-    var slice = ${Slice}(base: c, bounds: bounds)
-    expectType(${Slice}<${Collection}<OpaqueValue<Int>>>.self, &slice)
+    var slice = Slice(base: c, bounds: bounds)
+    expectType(Slice<${Collection}<OpaqueValue<Int>>>.self, &slice)
+    expectType(${Collection}<OpaqueValue<Int>>.SubSequence.self, &slice)
 
     expectEqual(bounds.lowerBound, slice.startIndex)
     expectEqual(bounds.upperBound, slice.endIndex)

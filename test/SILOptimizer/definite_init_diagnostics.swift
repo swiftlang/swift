@@ -111,16 +111,22 @@ func test2() {
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
+  // expected-warning@+3 {{instance will be immediately deallocated as 'w2' is a 'weak' variable}}
+  // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@+1 {{'w2' declared here}}
   weak var w2 = SomeClass()
   _ = w2                // ok
   
   
-  // Unowned.  This is immediately crashing code (it causes a retain of a
-  // released object) so it should be diagnosed with a warning someday.
+  // Unowned. This is immediately crashing code (it causes a retain of a
+  // released object).
   // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
   _ = u1                // expected-error {{variable 'u1' used before being initialized}}
 
+  // expected-warning@+3 {{instance will be immediately deallocated as 'u2' is an 'unowned' variable}}
+  // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()
   _ = u2                // ok
 }
@@ -1245,5 +1251,112 @@ class Derived : Base {
     x = makeAnAny() as? Int
     y = makeAnAny() as? Int
     super.init()
+  }
+}
+
+// This test makes sure that we properly error (but don't crash) when calling a
+// subclass method as an argument to a super.init.
+class MethodTestParent {
+  init(i: Int) {}
+}
+
+class MethodTestChild : MethodTestParent {
+  init() {
+    super.init(i: getInt()) // expected-error {{'self' used in method call 'getInt' before 'super.init' call}}
+  }
+
+  init(val: ()) {
+    // Currently we squelch the inner error of using self in method call for 'getInt2'
+    super.init(i: getInt2(x: self)) // expected-error {{'self' used in method call 'getInt2' before 'super.init' call}}
+  }
+
+  func getInt() -> Int {
+    return 0
+  }
+
+  func getInt2(x: MethodTestChild) -> Int {
+    return 0
+  }
+}
+
+// This test makes sure that if we cast self to a protocol (implicitly or not), we properly error.
+protocol ProtocolCastTestProtocol : class {
+}
+
+class ProtocolCastTestParent {
+  init(foo f: ProtocolCastTestProtocol) {
+  }
+
+  init(foo2 f: Any) {
+  }
+}
+
+class ProtocolCastTestChild : ProtocolCastTestParent, ProtocolCastTestProtocol {
+  private let value: Int
+
+  init(value1 v: Int) {
+    value = v
+    super.init(foo: self) // expected-error {{'self' used before 'super.init' call}}
+  }
+
+  init(value2 v: Int) {
+    value = v
+    super.init(foo: self as ProtocolCastTestProtocol) // expected-error {{'self' used before 'super.init' call}}
+  }
+
+  init(value3 v: Int) {
+    value = v
+    super.init(foo2: self) // expected-error {{'self' used before 'super.init' call}}
+  }
+
+  init(value4 v: Int) {
+    value = v
+    super.init(foo2: self as Any) // expected-error {{'self' used before 'super.init' call}}
+  }
+}
+
+// Make sure we don't diagnose immediate deallocation of instances if we first
+// assign them through strong variables.
+func testDontDiagnoseUnownedImmediateDeallocationThroughStrong() {
+  weak var c1: SomeClass?
+  do {
+    let tmp = SomeClass()
+    c1 = tmp
+  }
+
+  unowned let c2: SomeClass
+  do {
+    let tmp = SomeClass()
+    c2 = tmp
+  }
+
+  weak var c3: SomeClass?
+  let c3Tmp = SomeClass()
+  c3 = c3Tmp
+
+  unowned let c4: SomeClass
+  let c4Tmp = SomeClass()
+  c4 = c4Tmp
+
+  _ = c1; _ = c2; _ = c3; _ = c4
+}
+
+class ClassWithUnownedProperties {
+
+  weak var c1: SomeClass?
+  unowned var c2: SomeClass
+
+  init(c2: SomeClass) {
+    self.c2 = c2
+  }
+
+  func assignToC1() {
+    let tmp = SomeClass()
+    c1 = tmp
+  }
+
+  func assignToC2() {
+    let tmp = SomeClass()
+    c2 = tmp
   }
 }

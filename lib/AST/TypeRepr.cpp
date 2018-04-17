@@ -137,21 +137,23 @@ TypeRepr *CloneVisitor::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
   // Clone the generic arguments.
-  auto genericArgs = Ctx.Allocate<TypeRepr*>(T->getGenericArgs().size());
-  for (unsigned argI : indices(genericArgs)) {
-    genericArgs[argI] = visit(T->getGenericArgs()[argI]);
+  SmallVector<TypeRepr*, 8> genericArgs;
+  genericArgs.reserve(T->getGenericArgs().size());
+  for (auto &arg : T->getGenericArgs()) {
+    genericArgs.push_back(visit(arg));
   }
-  return new (Ctx) GenericIdentTypeRepr(T->getIdLoc(), T->getIdentifier(),
+  return GenericIdentTypeRepr::create(Ctx, T->getIdLoc(), T->getIdentifier(),
                                         genericArgs, T->getAngleBrackets());
 }
 
 TypeRepr *CloneVisitor::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
   // Clone the components.
-  auto components = Ctx.Allocate<ComponentIdentTypeRepr*>(T->Components.size());
-  for (unsigned I : indices(components)) {
-    components[I] = cast<ComponentIdentTypeRepr>(visit(T->Components[I]));
+  SmallVector<ComponentIdentTypeRepr*, 8> components;
+  components.reserve(T->getComponents().size());
+  for (auto &component : T->getComponents()) {
+    components.push_back(cast<ComponentIdentTypeRepr>(visit(component)));
   }
-  return new (Ctx) CompoundIdentTypeRepr(components);
+  return CompoundIdentTypeRepr::create(Ctx, components);
 }
 
 TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
@@ -196,14 +198,14 @@ TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitCompositionTypeRepr(CompositionTypeRepr *T) {
   // Clone the protocols.
-  auto types = Ctx.Allocate<TypeRepr*>(T->getTypes().size());
-  for (unsigned argI : indices(types)) {
-    types[argI] = cast<TypeRepr>(visit(T->getTypes()[argI]));
+  SmallVector<TypeRepr*, 8> types;
+  types.reserve(T->getTypes().size());
+  for (auto &type : T->getTypes()) {
+    types.push_back(cast<TypeRepr>(visit(type)));
   }
 
-  return new (Ctx) CompositionTypeRepr(types,
-                                       T->getStartLoc(),
-                                       T->getCompositionRange());
+  return CompositionTypeRepr::create(Ctx, types, T->getStartLoc(),
+                                     T->getCompositionRange());
 }
 
 TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
@@ -220,6 +222,10 @@ TypeRepr *CloneVisitor::visitInOutTypeRepr(InOutTypeRepr *T) {
 
 TypeRepr *CloneVisitor::visitSharedTypeRepr(SharedTypeRepr *T) {
   return new (Ctx) SharedTypeRepr(visit(T->getBase()), T->getSpecifierLoc());
+}
+
+TypeRepr *CloneVisitor::visitOwnedTypeRepr(OwnedTypeRepr *T) {
+  return new (Ctx) OwnedTypeRepr(visit(T->getBase()), T->getSpecifierLoc());
 }
 
 TypeRepr *CloneVisitor::visitFixedTypeRepr(FixedTypeRepr *T) {
@@ -298,12 +304,10 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     return Attrs.has(K);
   };
 
-  if (!Options.SkipParameterTypeAttributes) {
-    if (hasAttr(TAK_autoclosure))
-      Printer.printSimpleAttr("@autoclosure") << " ";
-    if (hasAttr(TAK_escaping))
-      Printer.printSimpleAttr("@escaping") << " ";
-  }
+  if (hasAttr(TAK_autoclosure))
+    Printer.printSimpleAttr("@autoclosure") << " ";
+  if (hasAttr(TAK_escaping))
+    Printer.printSimpleAttr("@escaping") << " ";
 
   if (hasAttr(TAK_thin))
     Printer.printSimpleAttr("@thin") << " ";
@@ -325,7 +329,7 @@ IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
   if (Components.size() == 1)
     return Components.front();
 
-  return new (C) CompoundIdentTypeRepr(C.AllocateCopy(Components));
+  return CompoundIdentTypeRepr::create(C, Components);
 }
 
 static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
@@ -356,8 +360,8 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
 
 void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                       const PrintOptions &Opts) const {
-  printTypeRepr(Components.front(), Printer, Opts);
-  for (auto C : Components.slice(1)) {
+  printTypeRepr(getComponents().front(), Printer, Opts);
+  for (auto C : getComponents().slice(1)) {
     Printer << ".";
     printTypeRepr(C, Printer, Opts);
   }
@@ -410,12 +414,12 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
                              SourceRange Parens,
                              SourceLoc Ellipsis, unsigned EllipsisIdx)
     : TypeRepr(TypeReprKind::Tuple), Parens(Parens) {
+  Bits.TupleTypeRepr.HasEllipsis = Ellipsis.isValid();
+  Bits.TupleTypeRepr.NumElements = Elements.size();
 
   // Copy elements.
   std::uninitialized_copy(Elements.begin(), Elements.end(),
                           getTrailingObjects<TupleTypeReprElement>());
-  TupleTypeReprBits.HasEllipsis = Ellipsis.isValid();
-  TupleTypeReprBits.NumElements = Elements.size();
 
   // Set ellipsis location and index.
   if (Ellipsis.isValid()) {
@@ -442,6 +446,23 @@ TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
                                           SourceRange Parens) {
   return create(C, {}, Parens,
       /*Ellipsis=*/SourceLoc(), /*EllipsisIdx=*/0);
+}
+
+GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
+                                                   SourceLoc Loc,
+                                                   Identifier Id,
+                                                ArrayRef<TypeRepr*> GenericArgs,
+                                                   SourceRange AngleBrackets) {
+  auto size = totalSizeToAlloc<TypeRepr*>(GenericArgs.size());
+  auto mem = C.Allocate(size, alignof(GenericIdentTypeRepr));
+  return new (mem) GenericIdentTypeRepr(Loc, Id, GenericArgs, AngleBrackets);
+}
+
+CompoundIdentTypeRepr *CompoundIdentTypeRepr::create(const ASTContext &C,
+                                 ArrayRef<ComponentIdentTypeRepr*> Components) {
+  auto size = totalSizeToAlloc<ComponentIdentTypeRepr*>(Components.size());
+  auto mem = C.Allocate(size, alignof(CompoundIdentTypeRepr));
+  return new (mem) CompoundIdentTypeRepr(Components);
 }
 
 SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
@@ -477,7 +498,7 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
   Printer << "(";
 
-  for (unsigned i = 0, e = TupleTypeReprBits.NumElements; i != e; ++i) {
+  for (unsigned i = 0, e = Bits.TupleTypeRepr.NumElements; i != e; ++i) {
     if (i) Printer << ", ";
     Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
     auto name = getElementName(i);
@@ -506,21 +527,21 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ")";
 }
 
-CompositionTypeRepr *
-CompositionTypeRepr::create(ASTContext &C,
-                            ArrayRef<TypeRepr *> Types,
-                            SourceLoc FirstTypeLoc,
-                            SourceRange CompositionRange) {
-  return new (C) CompositionTypeRepr(C.AllocateCopy(Types),
-                                     FirstTypeLoc, CompositionRange);
+CompositionTypeRepr *CompositionTypeRepr::create(const ASTContext &C,
+                                                 ArrayRef<TypeRepr *> Types,
+                                                 SourceLoc FirstTypeLoc,
+                                                 SourceRange CompositionRange) {
+  auto size = totalSizeToAlloc<TypeRepr*>(Types.size());
+  auto mem = C.Allocate(size, alignof(CompositionTypeRepr));
+  return new (mem) CompositionTypeRepr(Types, FirstTypeLoc, CompositionRange);
 }
 
 void CompositionTypeRepr::printImpl(ASTPrinter &Printer,
                                     const PrintOptions &Opts) const {
-  if (Types.empty()) {
+  if (getTypes().empty()) {
     Printer << "Any";
   } else {
-    interleave(Types, [&](TypeRepr *T) { printTypeRepr(T, Printer, Opts); },
+    interleave(getTypes(), [&](TypeRepr *T) { printTypeRepr(T, Printer, Opts);},
                [&] { Printer << " & "; });
   }
 }
@@ -540,11 +561,19 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
-  if (getKind() == TypeReprKind::InOut) {
+  switch (getKind()) {
+  case TypeReprKind::InOut:
     Printer.printKeyword("inout");
-  } else {
-    assert((getKind() == TypeReprKind::Shared) && "Unknown kind");
+    break;
+  case TypeReprKind::Shared:
     Printer.printKeyword("shared");
+    break;
+  case TypeReprKind::Owned:
+    Printer.printKeyword("owned");
+    break;
+  default:
+    llvm_unreachable("unknown specifier type repr");
+    break;
   }
   Printer << " ";
   printTypeRepr(Base, Printer, Opts);

@@ -52,7 +52,7 @@ func testOverrideUSR() {
 // CHECK-OPTIONAL-NEXT:       key.typename: "Double",
 // CHECK-OPTIONAL-NEXT:       key.context: source.codecompletion.context.thisclass,
 // CHECK-OPTIONAL-NEXT:       key.num_bytes_to_erase: 1,
-// CHECK-OPTIONAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1SdSiF",
+// CHECK-OPTIONAL-NEXT:       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1ySdSiF",
 // CHECK-OPTIONAL-NEXT:       key.modulename: "complete_member"
 // CHECK-OPTIONAL-NEXT:     },
 

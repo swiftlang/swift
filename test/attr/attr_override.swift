@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 @override // expected-error {{'override' can only be specified on class members}} {{1-11=}} expected-error {{'override' is a declaration modifier, not an attribute}} {{1-2=}}
 func virtualAttributeCanNotBeUsedInSource() {}
@@ -38,6 +38,7 @@ class A {
   }
   var v8: Int = 0  // expected-note {{attempt to override property here}}
   var v9: Int { return 5 } // expected-note{{attempt to override property here}}
+  var v10: Int { return 5 } // expected-note{{attempt to override property here}}
 
   subscript (i: Int) -> String { // expected-note{{potential overridden subscript 'subscript' here}}
     get {
@@ -66,7 +67,7 @@ class A {
     set { }
   }
 
-  func overriddenInExtension() {} // expected-note {{overridden declaration is here}}
+  func overriddenInExtension() {} // expected-note {{overr}}
 }
 
 class B : A {
@@ -94,6 +95,7 @@ class B : A {
   // Stored properties
   override var v8: Int { return 5 } // expected-error {{cannot override mutable property with read-only property 'v8'}}
   override var v9: Int // expected-error{{cannot override with a stored property 'v9'}}
+  lazy override var v10: Int = 5 // expected-error{{cannot override with a stored property 'v10'}}
 
   override subscript (i: Int) -> String {
     get {
@@ -138,7 +140,7 @@ class B : A {
 }
 
 extension B {
-  override func overriddenInExtension() {} // expected-error{{overriding declarations in extensions is not supported}}
+  override func overriddenInExtension() {} // expected-error{{overr}}
 }
 
 struct S {
@@ -312,13 +314,13 @@ protocol P2 {}
 
 class MismatchOptional : MismatchOptionalBase {
   override func param(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{29-29=?}}
-  override func paramIUO(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int!' with non-optional type 'Int'}} {{32-32=?}}
+  override func paramIUO(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{32-32=?}}
   override func result() -> Int? { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{32-33=}}
 
   override func fixSeveralTypes(a: Int, b: Int) -> Int! { return nil }
   // expected-error@-1 {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{39-39=?}}
-  // expected-error@-2 {{cannot override instance method parameter of type 'Int!' with non-optional type 'Int'}} {{47-47=?}}
-  // expected-error@-3 {{cannot override instance method result type 'Int' with optional type 'Int!'}} {{55-56=}}
+  // expected-error@-2 {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{47-47=?}}
+  // expected-error@-3 {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{55-56=}}
 
   override func functionParam(x: @escaping (Int) -> Int) {} // expected-error {{cannot override instance method parameter of type '((Int) -> Int)?' with non-optional type '(Int) -> Int'}} {{34-34=(}} {{56-56=)?}}
   override func tupleParam(x: (Int, Int)) {} // expected-error {{cannot override instance method parameter of type '(Int, Int)?' with non-optional type '(Int, Int)'}} {{41-41=?}}
@@ -370,7 +372,7 @@ class MismatchOptional : MismatchOptionalBase {
 }
 
 class MismatchOptional2 : MismatchOptionalBase {
-  override func result() -> Int! { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int!'}} {{32-33=}}
+  override func result() -> Int! { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{32-33=}}
 
   // None of these are overrides because we didn't say 'override'. Since they're
   // not exact matches, they shouldn't result in errors.

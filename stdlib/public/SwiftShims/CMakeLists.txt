@@ -101,12 +101,10 @@ function(find_llvm_clang_headers suffix description out_var)
 endfunction()
 
 if(SWIFT_BUILT_STANDALONE)
-  find_llvm_clang_headers("" "LLVM" llvm_headers_location)
   find_llvm_clang_headers("/clang/${CLANG_VERSION}" "Clang"
     clang_headers_location)
 else() # NOT SWIFT_BUILT_STANDALONE
   set(clang_headers_location "${LLVM_LIBRARY_DIR}/clang/${CLANG_VERSION}")
-  set(llvm_headers_location "${LLVM_LIBRARY_DIR}")
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
@@ -126,20 +124,7 @@ add_custom_command_target(unused_var
     CUSTOM_TARGET_NAME "symlink_clang_headers"
     OUTPUT "${SWIFTLIB_DIR}/clang"
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
-
-# Adding LLVM symlink at compile time.
-add_custom_command_target(unused_var2
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "make_directory" "${SWIFTLIB_DIR}"
-    COMMAND
-      "${CMAKE_COMMAND}" "-E" "${cmake_symlink_option}"
-      "${llvm_headers_location}"
-      "${SWIFTLIB_DIR}/llvm"
-
-    CUSTOM_TARGET_NAME "symlink_llvm_headers"
-    OUTPUT "${SWIFTLIB_DIR}/llvm"
-    COMMENT "Symlinking LLVM resource headers into ${SWIFTLIB_DIR}/llvm")
-add_dependencies(copy_shim_headers symlink_clang_headers symlink_llvm_headers)
+add_dependencies(copy_shim_headers symlink_clang_headers)
 
 swift_install_in_component(compiler
     FILES ${sources}

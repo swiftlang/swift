@@ -172,7 +172,7 @@ This driver invokes swift-syntax-test using -round-trip-lex and
                                  args.skip_bad_syntax)
                    for filename in all_input_files]
 
-    failed = reduce(lambda a, b: a and b,
+    failed = reduce(lambda a, b: a or b,
                     map(run_task, lex_tasks + parse_tasks))
     sys.exit(1 if failed else 0)
 

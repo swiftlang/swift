@@ -130,6 +130,9 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
       } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
         val = cfi->getOperand();
         continue;
+      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
+        val = cvt->getOperand();
+        continue;
       }
       return inst;
     } else if (SILValue param = getParam(val)) {
@@ -654,9 +657,12 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   return true;
 }
 
-// Returns the callee of an apply_inst if it is basically inlineable.
+// Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
+  // For now, we cannot inline begin_apply at all.
+  if (isa<BeginApplyInst>(AI))
+    return nullptr;
 
   SILFunction *Callee = AI.getReferencedFunction();
   SILFunction *EligibleCallee = nullptr;
@@ -778,47 +784,83 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   return EligibleCallee;
 }
 
-/// Returns true if a given value is constant.
-/// The value is considered to be constant if it is:
-/// - a literal
-/// - a tuple or a struct whose fields are all constants
-static bool isConstantValue(SILValue V) {
-  if (isa<LiteralInst>(V))
-    return true;
-  if (auto *TI = dyn_cast<TupleInst>(V)) {
-    for (auto E : TI->getElements()) {
-      if (!isConstantValue(E))
-        return false;
+/// Returns true if the instruction \I has any interesting side effects which
+/// might prevent inlining a pure function.
+static bool hasInterestingSideEffect(SILInstruction *I) {
+  switch (I->getKind()) {
+    // Those instructions turn into no-ops after inlining, redundante load
+    // elimination, constant folding and dead-object elimination.
+    case swift::SILInstructionKind::StrongRetainInst:
+    case swift::SILInstructionKind::StrongReleaseInst:
+    case swift::SILInstructionKind::RetainValueInst:
+    case swift::SILInstructionKind::ReleaseValueInst:
+    case swift::SILInstructionKind::StoreInst:
+    case swift::SILInstructionKind::DeallocRefInst:
+      return false;
+    default:
+      return I->getMemoryBehavior() != SILInstruction::MemoryBehavior::None;
+  }
+}
+
+/// Returns true if the operand \p Arg is a constant or an object which is
+/// initialized with constant values.
+///
+/// The value is considered to be constant if it is composed of side-effect free
+/// instructions, like literal or aggregate instructions.
+static bool isConstantArg(Operand *Arg) {
+  auto *ArgI = Arg->get()->getDefiningInstruction();
+  if (!ArgI)
+    return false;
+
+  SmallPtrSet<SILInstruction *, 8> Visited;
+  SmallVector<SILInstruction *, 8> Worklist;
+
+  auto addToWorklist = [&](SILInstruction *I) {
+    if (Visited.insert(I).second)
+      Worklist.push_back(I);
+  };
+
+  addToWorklist(ArgI);
+
+  // Visit the transitive closure of \p Arg and see if there is any side-effect
+  // instructions which prevents folding away everything after inlining.
+  while (!Worklist.empty()) {
+    SILInstruction *I = Worklist.pop_back_val();
+
+    if (hasInterestingSideEffect(I))
+      return false;
+
+    for (SILValue Result : I->getResults()) {
+      for (Operand *Use : Result->getUses()) {
+        if (Use != Arg)
+          addToWorklist(Use->getUser());
+      }
     }
-    return true;
-  }
-  if (auto *SI = dyn_cast<StructInst>(V)) {
-    for (auto E : SI->getElements()) {
-      if (!isConstantValue(E))
+    for (Operand &Op : I->getAllOperands()) {
+      if (SILInstruction *OpInst = Op.get()->getDefiningInstruction()) {
+        addToWorklist(OpInst);
+      } else {
         return false;
+      }
     }
-    return true;
   }
-  if (auto *MT = dyn_cast<MetatypeInst>(V)) {
-    if (!MT->getType().hasArchetype())
-      return true;
-  }
-  return false;
+  return true;
 }
 
 
 bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
   // If a call has only constant arguments and the call is pure, i.e. has
   // no side effects, then we should always inline it.
+  // This includes arguments which are objects initialized with constant values.
   SideEffectAnalysis::FunctionEffects ApplyEffects;
   SEA->getEffects(ApplyEffects, AI);
   auto GE = ApplyEffects.getGlobalEffects();
   if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
     return false;
   // Check if all parameters are constant.
-  auto Args = AI.getArgumentsWithoutIndirectResults();
-  for (auto Arg : Args) {
-    if (!isConstantValue(Arg)) {
+  auto Args = AI.getArgumentOperands().slice(AI.getNumIndirectSILResults());
+  for (Operand &Arg : Args) {
+    if (!isConstantArg(&Arg)) {
       return false;
     }
   }

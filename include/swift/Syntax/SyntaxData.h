@@ -57,12 +57,13 @@ namespace syntax {
 /// This is only for holding a strong reference to the RawSyntax, a weak
 /// reference to the parent, and, in subclasses, lazily created strong
 /// references to non-terminal child nodes.
-class SyntaxData final : public llvm::ThreadSafeRefCountedBase<SyntaxData> {
+class SyntaxData final
+    : public llvm::ThreadSafeRefCountedBase<SyntaxData>,
+      private llvm::TrailingObjects<SyntaxData, AtomicCache<SyntaxData>> {
+  friend TrailingObjects;
+
   using RootDataPair = std::pair<RC<SyntaxData>, RC<SyntaxData>>;
 
-  llvm::SmallVector<AtomicCache<SyntaxData>, 10> Children;
-
-public:
   /// The shared raw syntax representing this syntax data node.
   const RC<RawSyntax> Raw;
 
@@ -77,22 +78,16 @@ public:
   /// If there is no parent, this is 0.
   const CursorIndex IndexInParent;
 
+  size_t numTrailingObjects(OverloadToken<AtomicCache<SyntaxData>>) const {
+    return Raw->getNumChildren();
+  }
+
   SyntaxData(RC<RawSyntax> Raw, const SyntaxData *Parent = nullptr,
              CursorIndex IndexInParent = 0)
-    : Raw(Raw), Parent(Parent), IndexInParent(IndexInParent) {
-      if (Raw) {
-        for (size_t I = 0; I < Raw->Layout.size(); ++I) {
-          Children.push_back(AtomicCache<SyntaxData>());
-        }
-      }
-    }
-
-  /// Constructs a SyntaxNode by replacing `self` and recursively building
-  /// the parent chain up to the root.
-  template <typename SyntaxNode>
-  SyntaxNode replaceSelf(const RC<RawSyntax> NewRaw) const {
-    auto NewRootAndData = replaceSelf(NewRaw);
-    return { NewRootAndData.first, NewRootAndData.second.get() };
+      : Raw(Raw), Parent(Parent), IndexInParent(IndexInParent) {
+    auto *I = getTrailingObjects<AtomicCache<SyntaxData>>();
+    for (auto *E = I + getNumChildren(); I != E; ++I)
+      ::new (static_cast<void *>(I)) AtomicCache<SyntaxData>();
   }
 
   /// With a new RawSyntax node, create a new node from this one and
@@ -101,8 +96,7 @@ public:
   /// DO NOT expose this as public API.
   RootDataPair replaceSelf(const RC<RawSyntax> NewRaw) const {
     if (hasParent()) {
-      auto NewRootAndParent =
-        getParent().getValue()->replaceChild(NewRaw, IndexInParent);
+      auto NewRootAndParent = Parent->replaceChild(NewRaw, IndexInParent);
       auto NewMe = NewRootAndParent.second->getChild(IndexInParent);
       return { NewRootAndParent.first, NewMe.get() };
     } else {
@@ -115,8 +109,38 @@ public:
   /// at the provided index.
   /// DO NOT expose this as public API.
   RC<SyntaxData> realizeSyntaxNode(CursorIndex Index) const {
-    auto RawChild = Raw->Layout.at(Index);
-    return SyntaxData::make(RawChild, this, Index);
+    if (auto &RawChild = Raw->getChild(Index))
+      return SyntaxData::make(RawChild, this, Index);
+    return nullptr;
+  }
+
+  /// Replace a child in the raw syntax and recursively rebuild the
+  /// parental chain up to the root.
+  ///
+  /// DO NOT expose this as public API.
+  template <typename CursorType>
+  RootDataPair replaceChild(const RC<RawSyntax> RawChild,
+                            CursorType ChildCursor) const {
+    auto NewRaw = Raw->replaceChild(ChildCursor, RawChild);
+    return replaceSelf(NewRaw);
+  }
+
+  ArrayRef<AtomicCache<SyntaxData>> getChildren() const {
+    return {getTrailingObjects<AtomicCache<SyntaxData>>(), getNumChildren()};
+  }
+
+public:
+  ~SyntaxData() {
+    for (auto &I : getChildren())
+      I.~AtomicCache<SyntaxData>();
+  }
+
+  /// Constructs a SyntaxNode by replacing `self` and recursively building
+  /// the parent chain up to the root.
+  template <typename SyntaxNode>
+  SyntaxNode replaceSelf(const RC<RawSyntax> NewRaw) const {
+    auto NewRootAndData = replaceSelf(NewRaw);
+    return { NewRootAndData.first, NewRootAndData.second.get() };
   }
 
   /// Replace a child in the raw syntax and recursively rebuild the
@@ -133,18 +157,6 @@ public:
     };
   }
 
-  /// Replace a child in the raw syntax and recursively rebuild the
-  /// parental chain up to the root.
-  ///
-  /// DO NOT expose this as public API.
-  template <typename CursorType>
-  RootDataPair replaceChild(const RC<RawSyntax> RawChild,
-                            CursorType ChildCursor) const {
-    auto NewRaw = Raw->replaceChild(ChildCursor, RawChild);
-    return replaceSelf(NewRaw);
-  }
-
-public:
 
   static RC<SyntaxData> make(RC<RawSyntax> Raw,
                              const SyntaxData *Parent = nullptr,
@@ -157,15 +169,12 @@ public:
 
   /// Returns the kind of syntax node this is.
   SyntaxKind getKind() const {
-    return Raw->Kind;
+    return Raw->getKind();
   }
 
   /// Return the parent syntax if there is one.
-  llvm::Optional<const SyntaxData *> getParent() const {
-    if (Parent != nullptr) {
-      return Parent;
-    }
-    return llvm::None;
+  const SyntaxData * getParent() const {
+    return Parent;
   }
 
   /// Returns true if this syntax node has a parent.
@@ -181,7 +190,7 @@ public:
 
   /// Returns the number of children this SyntaxData represents.
   size_t getNumChildren() const {
-    return Raw->Layout.size();
+    return Raw->getLayout().size();
   }
 
   /// Gets the child at the index specified by the provided cursor,
@@ -219,7 +228,9 @@ public:
   /// cache it. This is safe because AtomicCache only ever mutates its cache
   /// one time -- the first initialization that wins a compare_exchange_strong.
   RC<SyntaxData> getChild(size_t Index) const {
-    return Children[Index].getOrCreate([&]() {
+    if (!getRaw()->getChild(Index))
+      return nullptr;
+    return getChildren()[Index].getOrCreate([&]() {
       return realizeSyntaxNode(Index);
     });
   }
@@ -263,8 +274,8 @@ namespace llvm {
     }
     static unsigned getHashValue(const RCSD Value) {
       unsigned H = 0;
-      H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<const uintptr_t>(Value->Raw.get()));
-      H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<const uintptr_t>(Value->Parent));
+      H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<const uintptr_t>(Value->getRaw().get()));
+      H ^= DenseMapInfo<uintptr_t>::getHashValue(reinterpret_cast<const uintptr_t>(Value->getParent()));
       H ^= DenseMapInfo<swift::syntax::CursorIndex>::getHashValue(Value->getIndexInParent());
       return H;
     }
@@ -277,4 +288,3 @@ namespace llvm {
 }
 
 #endif // SWIFT_SYNTAX_SYNTAXDATA_H
-

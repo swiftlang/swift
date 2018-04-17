@@ -21,6 +21,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
@@ -104,13 +105,18 @@ public:
   
   bool hasConvention() const { return convention.hasValue(); }
   StringRef getConvention() const { return *convention; }
-  
-  bool hasOwnership() const { return getOwnership() != Ownership::Strong; }
-  Ownership getOwnership() const {
-    if (has(TAK_sil_weak)) return Ownership::Weak;
-    if (has(TAK_sil_unowned)) return Ownership::Unowned;
-    if (has(TAK_sil_unmanaged)) return Ownership::Unmanaged;
-    return Ownership::Strong;
+
+  bool hasOwnership() const {
+    return getOwnership() != ReferenceOwnership::Strong;
+  }
+  ReferenceOwnership getOwnership() const {
+    if (has(TAK_sil_weak))
+      return ReferenceOwnership::Weak;
+    if (has(TAK_sil_unowned))
+      return ReferenceOwnership::Unowned;
+    if (has(TAK_sil_unmanaged))
+      return ReferenceOwnership::Unmanaged;
+    return ReferenceOwnership::Strong;
   }
   
   void clearOwnership() {
@@ -284,6 +290,7 @@ public:
     OnConstructor      = 1 << 24,
     OnDestructor       = 1 << 25,
     OnFunc             = 1 << 26,
+    OnAccessor         = OnFunc,
     OnEnumElement      = 1 << 27,
 
     OnGenericTypeParam = 1 << 28,
@@ -293,6 +300,7 @@ public:
 
     // Cannot have any attributes.
     OnMissingMember = 0,
+    OnPoundDiagnostic = 0,
 
     // More coarse-grained aggregations for use in Attr.def.
     OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,
@@ -925,6 +933,23 @@ public:
   }
 };
 
+/// Represents the optimize attribute.
+class OptimizeAttr : public DeclAttribute {
+  OptimizationMode Mode;
+public:
+  OptimizeAttr(SourceLoc atLoc, SourceRange range, OptimizationMode mode)
+    : DeclAttribute(DAK_Optimize, atLoc, range, /*Implicit=*/false),
+      Mode(mode) {}
+
+  OptimizeAttr(OptimizationMode mode)
+    : OptimizeAttr(SourceLoc(), SourceRange(), mode) {}
+
+  OptimizationMode getMode() const { return Mode; }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Optimize;
+  }
+};
+
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
   EffectsKind Kind;
@@ -945,24 +970,27 @@ public:
 
 
 /// Represents weak/unowned/unowned(unsafe) decl modifiers.
-class OwnershipAttr : public DeclAttribute {
-  const Ownership ownership;
+class ReferenceOwnershipAttr : public DeclAttribute {
+  const ReferenceOwnership ownership;
+
 public:
-  OwnershipAttr(SourceRange range, Ownership kind)
-    : DeclAttribute(DAK_Ownership, range.Start, range, /*Implicit=*/false),
-      ownership(kind) {}
+  ReferenceOwnershipAttr(SourceRange range, ReferenceOwnership kind)
+      : DeclAttribute(DAK_ReferenceOwnership, range.Start, range,
+                      /*Implicit=*/false),
+        ownership(kind) {}
 
-  OwnershipAttr(Ownership kind) : OwnershipAttr(SourceRange(), kind) {}
+  ReferenceOwnershipAttr(ReferenceOwnership kind)
+      : ReferenceOwnershipAttr(SourceRange(), kind) {}
 
-  Ownership get() const { return ownership; }
+  ReferenceOwnership get() const { return ownership; }
 
   /// Returns a copy of this attribute without any source information.
-  OwnershipAttr *clone(ASTContext &context) const {
-    return new (context) OwnershipAttr(get());
+  ReferenceOwnershipAttr *clone(ASTContext &context) const {
+    return new (context) ReferenceOwnershipAttr(get());
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Ownership;
+    return DA->getKind() == DAK_ReferenceOwnership;
   }
 };
 
@@ -1178,6 +1206,61 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_RestatedObjCConformance;
+  }
+};
+
+/// Attached to type declarations synthesized by the Clang importer.
+///
+/// Used to control manglings.
+class ClangImporterSynthesizedTypeAttr : public DeclAttribute {
+public:
+  enum class Kind : char {
+    /// A struct synthesized by the importer to represent an NSError with a
+    /// particular domain, as specified by an enum with the \c ns_error_domain
+    /// Clang attribute.
+    ///
+    /// This one is for enums with names.
+    NSErrorWrapper,
+
+    /// A struct synthesized by the importer to represent an NSError with a
+    /// particular domain, as specified by an enum with the \c ns_error_domain
+    /// Clang attribute.
+    ///
+    /// This one is for anonymous enums that are immediately typedef'd, giving
+    /// them a unique name for linkage purposes according to the C++ standard.
+    NSErrorWrapperAnon,
+  };
+
+  /// The (Clang) name of the declaration that caused this type declaration to
+  /// be synthesized.
+  ///
+  /// Must be a valid Swift identifier as well, for mangling purposes.
+  const StringRef originalTypeName;
+  const Kind kind;
+
+  explicit ClangImporterSynthesizedTypeAttr(StringRef originalTypeName,
+                                            Kind kind)
+    : DeclAttribute(DAK_ClangImporterSynthesizedType, SourceLoc(),
+                    SourceRange(), /*Implicit=*/true),
+      originalTypeName(originalTypeName), kind(kind) {
+    assert(!originalTypeName.empty());
+  }
+
+  StringRef getManglingName() const {
+    return manglingNameForKind(kind);
+  }
+
+  static StringRef manglingNameForKind(Kind kind) {
+    switch (kind) {
+    case Kind::NSErrorWrapper:
+      return "e";
+    case Kind::NSErrorWrapperAnon:
+      return "E";
+    }
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ClangImporterSynthesizedType;
   }
 };
 

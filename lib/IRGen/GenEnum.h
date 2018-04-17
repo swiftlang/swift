@@ -33,11 +33,14 @@ namespace swiftcall {
 
 namespace swift {
   class EnumElementDecl;
-  
+  enum IsInitialization_t : bool;
+  enum IsTake_t : bool;
+
 namespace irgen {
   class EnumPayload;
   class EnumPayloadSchema;
   class IRGenFunction;
+  class MetadataDependencyCollector;
   class TypeConverter;
   using clang::CodeGen::swiftcall::SwiftAggLowering;
 
@@ -212,10 +215,6 @@ public:
   /// Return a tag index in the range [0..NumElements].
   unsigned getTagIndex(EnumElementDecl *Case) const;
 
-  /// Return a tag index in the range
-  /// [-ElementsWithPayload..ElementsWithNoPayload-1].
-  int getResilientTagIndex(EnumElementDecl *Case) const;
-
   /// Map the given element to the appropriate index in the
   /// discriminator type.
   /// Returns -1 if this is not supported by the enum implementation.
@@ -224,7 +223,7 @@ public:
   }
 
   /// Emit field names for enum reflection.
-  virtual llvm::Constant *emitCaseNames() const;
+  virtual bool isReflectable() const;
 
   /// \brief Return the bits used for discriminators for payload cases.
   ///
@@ -354,24 +353,27 @@ public:
   virtual void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                                 Size offset) const = 0;
   virtual void getSchema(ExplosionSchema &schema) const = 0;
-  virtual void destroy(IRGenFunction &IGF, Address addr, SILType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                       bool isOutlined) const = 0;
 
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                    Address dest, SILType T) const;
-  
-  virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
-  virtual void assignWithTake(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
-  virtual void initializeWithCopy(IRGenFunction &IGF, Address dest,
-                                  Address src, SILType T) const = 0;
-  virtual void initializeWithTake(IRGenFunction &IGF, Address dest,
-                                  Address src, SILType T) const = 0;
-  
+                                    Address dest, SILType T,
+                                    bool isOutlined) const;
+
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
+  virtual void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                                  SILType T, bool isOutlined) const = 0;
+  virtual void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                                  SILType T, bool isOutlined) const = 0;
+
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
-                                  llvm::Value *vwtable,
-                                  SILType T) const = 0;
+                                  bool isVWTMutable,
+                                  SILType T,
+                              MetadataDependencyCollector *collector) const = 0;
 
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
 
@@ -402,10 +404,10 @@ public:
                           Explosion &e) const = 0;
   virtual void loadAsTake(IRGenFunction &IGF, Address addr,
                           Explosion &e) const = 0;
-  virtual void assign(IRGenFunction &IGF, Explosion &e,
-                      Address addr) const = 0;
-  virtual void initialize(IRGenFunction &IGF, Explosion &e,
-                          Address addr) const = 0;
+  virtual void assign(IRGenFunction &IGF, Explosion &e, Address addr,
+                      bool isOutlined) const = 0;
+  virtual void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                          bool isOutlined) const = 0;
   virtual void reexplode(IRGenFunction &IGF, Explosion &src,
                          Explosion &dest) const = 0;
   virtual void copy(IRGenFunction &IGF, Explosion &src,
@@ -428,6 +430,25 @@ public:
   
   virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                          Address addr) const;
+
+  void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, IsInitialization_t isInit,
+                        IsTake_t isTake) const;
+
+  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+
+  virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                           SILType T) const = 0;
+
+  virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                         ReferenceCounting *rc) const {
+    return false;
+  }
+
+  void emitResilientTagIndices(IRGenModule &IGM) const;
+
+protected:
+
 
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;

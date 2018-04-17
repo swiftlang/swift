@@ -16,7 +16,9 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/TypeOrExtensionDecl.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/DenseMap.h"
 #include <limits.h>
 #include <vector>
 
@@ -36,16 +38,19 @@ enum DeclAttrKind : unsigned;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 
+
 /// Necessary information for archetype transformation during printing.
 struct TypeTransformContext {
   TypeBase *BaseType;
-  NominalTypeDecl *Nominal = nullptr;
+  TypeOrExtensionDecl Decl;
 
   explicit TypeTransformContext(Type T);
-  explicit TypeTransformContext(NominalTypeDecl* NTD);
+  explicit TypeTransformContext(TypeOrExtensionDecl D);
 
   Type getBaseType() const;
-  NominalTypeDecl *getNominal() const;
+  TypeOrExtensionDecl getDecl() const;
+
+  DeclContext *getDeclContext() const;
 
   bool isPrintingSynthesizedExtension() const;
 };
@@ -216,9 +221,6 @@ struct PrintOptions {
   /// protocol requirements.
   bool SkipOverrides = false;
 
-  /// Whether to skip parameter type attributes
-  bool SkipParameterTypeAttributes = false;
-
   /// Whether to skip placeholder members.
   bool SkipMissingMemberPlaceholders = true;
   
@@ -233,8 +235,9 @@ struct PrintOptions {
   bool PrintUserInaccessibleAttrs = true;
 
   /// List of attribute kinds that should not be printed.
-  std::vector<AnyAttrKind> ExcludeAttrList =
-      { DAK_Transparent, DAK_Effects, DAK_FixedLayout };
+  std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
+                                              DAK_FixedLayout,
+                                              DAK_ImplicitlyUnwrappedOptional};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -282,6 +285,7 @@ struct PrintOptions {
     ArgumentOnly,
     MatchSource,
     BothAlways,
+    EnumElement,
   };
 
   /// Whether to print the doc-comment from the conformance if a member decl
@@ -313,6 +317,13 @@ struct PrintOptions {
   /// When printing a name alias type, whether print the underlying type instead
   /// of the alias.
   bool PrintNameAliasUnderlyingType = false;
+
+  /// When printing an Optional<T>, rather than printing 'T?', print
+  /// 'T!'. Used as a modifier only when we know we're printing
+  /// something that was declared as an implicitly unwrapped optional
+  /// at the top level. This is stripped out of the printing options
+  /// for optionals that are nested within other optionals.
+  bool PrintOptionalAsImplicitlyUnwrapped = false;
 
   /// \brief Print dependent types as references into this generic environment.
   GenericEnvironment *GenericEnv = nullptr;
@@ -385,12 +396,14 @@ struct PrintOptions {
     result.PrintImplicitAttrs = false;
     result.ExcludeAttrList.push_back(DAK_Exported);
     result.ExcludeAttrList.push_back(DAK_Inline);
+    result.ExcludeAttrList.push_back(DAK_Optimize);
     result.ExcludeAttrList.push_back(DAK_Rethrows);
     result.PrintOverrideKeyword = false;
     result.AccessFilter = AccessLevel::Public;
     result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
+    result.PrintDocumentationComments = false;
     return result;
   }
 
@@ -407,6 +420,7 @@ struct PrintOptions {
     result.ElevateDocCommentFromConformance = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
+    result.PrintDocumentationComments = true;
     return result;
   }
 
@@ -415,7 +429,7 @@ struct PrintOptions {
 
   void setBaseType(Type T);
 
-  void initForSynthesizedExtension(NominalTypeDecl *D);
+  void initForSynthesizedExtension(TypeOrExtensionDecl D);
 
   void clearSynthesizedExtension();
 
@@ -455,6 +469,7 @@ struct PrintOptions {
     result.PrintForSIL = true;
     result.PrintInSILBody = true;
     result.PreferTypeRepr = false;
+    result.PrintIfConfig = false;
     return result;
   }
 

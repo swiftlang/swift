@@ -2,9 +2,11 @@ add_swift_library(swiftSIL STATIC
   AbstractionPattern.cpp
   BasicBlockUtils.cpp
   Bridging.cpp
+  DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
   InstructionUtils.cpp
+  MemAccessUtils.cpp
   Linker.cpp
   LoopInfo.cpp
   OptimizationRemark.cpp
@@ -27,6 +29,7 @@ add_swift_library(swiftSIL STATIC
   SILModule.cpp
   SILOpenedArchetypesTracker.cpp
   SILPrinter.cpp
+  SILProfiler.cpp
   SILSuccessor.cpp
   SILType.cpp
   SILValue.cpp

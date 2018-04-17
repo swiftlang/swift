@@ -200,8 +200,6 @@ enum class ConversionRestrictionKind {
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
-  /// Implicit forces of implicitly unwrapped optionals to their presumed values
-  ForceUnchecked,
   /// Implicit upcast conversion of array types.
   ArrayUpcast,
   /// Implicit upcast conversion of dictionary types, which includes
@@ -232,13 +230,9 @@ enum RememberChoice_t : bool {
 /// Describes the kind of fix to apply to the given constraint before
 /// visiting it.
 enum class FixKind : uint8_t {
-  /// No fix, which is used as a placeholder indicating that future processing
-  /// of this constraint should not attempt fixes.
-  None,
-
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
-    
+
   /// Introduce a '?.' to begin optional chaining.
   OptionalChaining,
 
@@ -247,9 +241,14 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
-  
+
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
+
+  /// Mark function type as explicitly '@escaping'.
+  ExplicitlyEscaping,
+  /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
+  ExplicitlyEscapingToAny,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.
@@ -264,9 +263,7 @@ class Fix {
   friend class Constraint;
 
 public:
-  Fix() : Kind(FixKind::None), Data(0) { }
-  
-  Fix(FixKind kind) : Kind(kind), Data(0) { 
+  Fix(FixKind kind) : Kind(kind), Data(0) {
     assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
   }
 
@@ -287,6 +284,8 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const 
                               LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
+
+  bool operator==(Fix const &b) { return Kind == b.Kind && Data == b.Data; }
 };
 
 
@@ -505,6 +504,11 @@ public:
     IsDisabled = true;
   }
 
+  void setEnabled() {
+    assert(isDisabled() && "Can't re-enable already active constraint!");
+    IsDisabled = false;
+  }
+
   /// Mark or retrieve whether this constraint should be favored in the system.
   void setFavored() { IsFavored = true; }
   bool isFavored() const { return IsFavored; }
@@ -700,7 +704,7 @@ namespace llvm {
 template<>
 struct ilist_traits<swift::constraints::Constraint>
          : public ilist_default_traits<swift::constraints::Constraint> {
-  typedef swift::constraints::Constraint Element;
+  using Element = swift::constraints::Constraint;
 
   static Element *createNode(const Element &V) = delete;
   static void deleteNode(Element *V) { /* never deleted */ }

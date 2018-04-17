@@ -22,6 +22,7 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/ToolChain.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/FrontendTool/FrontendTool.h"
@@ -70,7 +71,7 @@ extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
                                   SmallVectorImpl<const char *> &Args) {
-  assert(Args.size() > 0);
+  assert(!Args.empty());
 
   // If we are not run as 'swift', don't do anything special. This doesn't work
   // with symlinks with alternate names, but we can't detect 'swift' vs 'swiftc'
@@ -109,7 +110,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 extern int apinotes_main(ArrayRef<const char *> Args);
 
 int main(int argc_, const char **argv_) {
-  INITIALIZE_LLVM(argc_, argv_);
+  PROGRAM_START(argc_, argv_);
 
   SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
@@ -130,7 +131,7 @@ int main(int argc_, const char **argv_) {
       llvm::sys::path::parent_path(getExecutablePath(argv[0])));
     llvm::sys::path::append(SubcommandPath, SubcommandName);
 
-    // If we didn't find the tool there, search for it.let the OS search for it.
+    // If we didn't find the tool there, let the OS search for it.
     if (!llvm::sys::fs::exists(SubcommandPath)) {
       // Search for the program and use the path if found. If there was an
       // error, ignore it and just let the exec fail.
@@ -194,8 +195,17 @@ int main(int argc_, const char **argv_) {
     break;
   }
 
-  std::unique_ptr<Compilation> C = TheDriver.buildCompilation(argv);
+  std::unique_ptr<llvm::opt::InputArgList> ArgList =
+    TheDriver.parseArgStrings(ArrayRef<const char*>(argv).slice(1));
+  if (Diags.hadAnyError())
+    return 1;
 
+  std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
+  if (Diags.hadAnyError())
+    return 1;
+
+  std::unique_ptr<Compilation> C =
+      TheDriver.buildCompilation(*TC, std::move(ArgList));
   if (Diags.hadAnyError())
     return 1;
 

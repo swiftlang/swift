@@ -26,7 +26,7 @@ reflect(object: obj)
 // CHECK-32: (class reflect_empty_class.EmptyClass)
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=12 alignment=1 stride=12 num_extra_inhabitants=0)
+// CHECK-32: (class_instance size=8 alignment=1 stride=8 num_extra_inhabitants=0)
 
 doneReflecting()
 

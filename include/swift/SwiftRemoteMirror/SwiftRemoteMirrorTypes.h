@@ -35,12 +35,35 @@ typedef struct swift_reflection_section {
 /// \brief Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
 typedef struct swift_reflection_info {
-  swift_reflection_section_t fieldmd;
-  swift_reflection_section_t assocty;
-  swift_reflection_section_t builtin;
-  swift_reflection_section_t capture;
-  swift_reflection_section_t typeref;
-  swift_reflection_section_t reflstr;
+  struct {
+    swift_reflection_section_t section;
+    uintptr_t offset;
+  } field;
+
+  struct {
+    swift_reflection_section_t section;
+    uintptr_t offset;
+  } associated_types;
+
+  struct {
+    swift_reflection_section_t section;
+    uintptr_t offset;
+  } builtin_types;
+
+  struct {
+    swift_reflection_section_t section;
+    uintptr_t offset;
+  } capture;
+
+  struct {
+    swift_reflection_section_t section;
+    uintptr_t offset;
+  } type_references;
+
+  struct {
+    swift_reflection_section_t section;
+    uintptr_t offset;
+  } reflection_strings;
 
   // Start address in local and remote address spaces.
   uintptr_t LocalStartAddress;

@@ -9,13 +9,13 @@ protocol FooProtocol {}
 func garbage() -> () {
   var a : Int
   ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
-  return a + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+  return a + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
 }
 
 func moreGarbage() -> () {
   ) this line is invalid, but we will stop at the declaration... // expected-error{{expected expression}}
   func a() -> Int { return 4 }
-  return a() + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+  return a() + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
 }
 
 
@@ -464,7 +464,7 @@ struct ErrorInFunctionSignatureResultArrayType1 {
 
 struct ErrorInFunctionSignatureResultArrayType2 {
   func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-    return [0]  // expected-error {{contextual type 'Int' cannot be used with array literal}}
+    return [0]  // expected-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
@@ -624,6 +624,9 @@ struct InitializerWithName {
 
 struct InitializerWithNameAndParam {
   init a(b: Int) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? c(_ d: Int) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
+  init e<T>(f: T) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? g<T>(_: T) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
 }
 
 struct InitializerWithLabels {
@@ -749,7 +752,7 @@ func test23550816(ss: [String], s: String) {
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
 func test23719432() {
   var x = 42
-  &(Int:x)  // expected-error {{expression type 'inout _' is ambiguous without more context}}
+  &(Int:x) // expected-error {{use of extraneous '&'}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator

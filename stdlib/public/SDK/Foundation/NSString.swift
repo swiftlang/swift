@@ -22,12 +22,6 @@ public class NSSimpleCString {}
 @available(*, unavailable, message: "Please use String or NSString")
 public class NSConstantString {}
 
-@_silgen_name("swift_convertStringToNSString")
-public // COMPILER_INTRINSIC
-func _convertStringToNSString(_ string: String) -> NSString {
-  return string._bridgeToObjectiveC()
-}
-
 extension NSString : ExpressibleByStringLiteral {
   /// Create an instance initialized to `value`.
   public required convenience init(stringLiteral value: StaticString) {
@@ -114,6 +108,7 @@ extension NSString {
 }
 
 extension NSString : CustomPlaygroundQuickLookable {
+  @available(*, deprecated, message: "NSString.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(self as String)
   }

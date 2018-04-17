@@ -134,3 +134,22 @@
 #define L_OR_FALSE    (0 || 0)
 #define L_OR_TRUE_B   (EQUAL_FALSE || EQUAL_TRUE)
 #define L_OR_FALSE_B  (EQUAL_FALSE || L_OR_FALSE)
+
+// Recursion with expressions
+#define RECURSION_WITH_EXPR RECURSION_WITH_EXPR_HELPER + 1
+#define RECURSION_WITH_EXPR_HELPER RECURSION_WITH_EXPR
+
+#define RECURSION_WITH_EXPR2 RECURSION_WITH_EXPR2_HELPER
+#define RECURSION_WITH_EXPR2_HELPER RECURSION_WITH_EXPR2 + 1
+
+#define RECURSION_WITH_EXPR3 RECURSION_WITH_EXPR3_HELPER + 1
+#define RECURSION_WITH_EXPR3_HELPER RECURSION_WITH_EXPR3 + 1
+
+
+// Casts with problematic types
+#define UNAVAILABLE_ONE ((unavailable_t)1)
+typedef unsigned unavailable_t __attribute__((unavailable));
+#define DEPRECATED_ONE ((deprecated_t)1)
+typedef unsigned deprecated_t __attribute__((deprecated));
+#define OKAY_TYPED_ONE ((okay_t)1)
+typedef unsigned okay_t;

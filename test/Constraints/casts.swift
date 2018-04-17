@@ -208,7 +208,7 @@ _ = b1 as Int    // expected-error {{cannot convert value of type 'Bool' to type
 _ = seven as Int // expected-error {{cannot convert value of type 'Double' to type 'Int' in coercion}}
 
 func rdar29894174(v: B?) {
-  let _ = [v].flatMap { $0 as? D }
+  let _ = [v].compactMap { $0 as? D }
 }
 
 // When re-typechecking a solution with an 'is' cast applied,

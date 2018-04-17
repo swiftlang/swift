@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3 %s
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 enum Runcible {
   case spoon
@@ -30,7 +30,7 @@ func missingCases(x: Runcible?, y: Runcible?, z: Trioptional) {
 
   // Should warn in S3 mode that `fork` isn't used
   switch (x!, y!) { // expected-warning {{switch must be exhaustive}}
-  // expected-note@-1 3 {{add missing case:}}
+  // expected-note@-1 2 {{add missing case:}}
   case (.spoon, .spoon):
     break
   case (.spoon, .hat):
@@ -44,9 +44,7 @@ func missingCases(x: Runcible?, y: Runcible?, z: Trioptional) {
   // Should error, since `fork` is used but not totally covered
   switch (x!, y!) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.fork, .hat)'}}
-  // expected-note@-2 {{add missing case: '(.fork, .fork)'}}
-  // expected-note@-3 {{add missing case: '(.hat, .fork)'}}
-  // expected-note@-4 {{add missing case: '(_, .fork)'}}
+  // expected-note@-2 {{add missing case: '(_, .fork)'}}
   case (.spoon, .spoon):
     break
   case (.spoon, .hat):
@@ -89,9 +87,7 @@ func missingCases(x: Runcible?, y: Runcible?, z: Trioptional) {
   // Should warn in S3 mode that `fork` isn't used
   switch (x, y!) { // expected-warning {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.some(.fork), _)'}}
-  // expected-note@-2 {{add missing case: '(.none, .fork)'}}
-  // expected-note@-3 {{add missing case: '(.some(.hat), .fork)'}}
-  // expected-note@-4 {{add missing case: '(_, .fork)'}}
+  // expected-note@-2 {{add missing case: '(_, .fork)'}}
   case (.some(.spoon), .spoon):
     break
   case (.some(.spoon), .hat):
@@ -107,11 +103,10 @@ func missingCases(x: Runcible?, y: Runcible?, z: Trioptional) {
   }
 
   // Should warn in S3 mode that `fork` isn't used
-  switch (x, y) { // expected-warning {{switch must be exhaustive}}
+  switch (x, y) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{add missing case: '(.some(.fork), _)'}}
   // expected-note@-2 {{add missing case: '(_, .some(.fork))'}}
-  // expected-note@-3 {{add missing case: '(.some(.hat), .some(.fork))'}}
-  // expected-note@-4 {{add missing case: '(.none, _)'}}
+  // expected-note@-3 {{add missing case: '(.none, _)'}}
   case (.some(.spoon), .some(.spoon)):
     break
   case (.some(.spoon), .some(.hat)):

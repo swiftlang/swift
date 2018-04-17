@@ -96,7 +96,7 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
 
 protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
-    : Kind(kind), ConformingType(conformingType) { }
+    : Kind(kind), ConformingType(conformingType) {}
 
 public:
   /// Determine the kind of protocol conformance.
@@ -114,6 +114,11 @@ public:
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const;
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const;
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const;
 
   /// Determine whether this conformance is complete.
   bool isComplete() const {
@@ -251,6 +256,13 @@ public:
   /// interface type.
   GenericSignature *getGenericSignature() const;
 
+  /// Get the substitutions associated with this conformance.
+  SubstitutionMap getSubstitutions(ModuleDecl *M) const;
+
+  /// Determine whether the witness table access function for this conformance
+  /// needs to be passed information when called, or if it stands alone.
+  bool witnessTableAccessorRequiresArguments() const;
+
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;
 
@@ -342,6 +354,20 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// Also stores the "invalid" bit.
   llvm::PointerIntPair<Context, 1, bool> ContextAndInvalid;
 
+  /// \brief The reason that this conformance exists.
+  ///
+  /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
+  /// Protocol {}'), Synthesized (e.g. RawRepresentable for 'enum Foo: Int {}')
+  /// or Implied (e.g. 'Foo : Protocol' in 'protocol Other: Protocol {} struct
+  /// Foo: Other {}'). In only the latter case, the conformance is non-null and
+  /// points to the conformance that implies this one.
+  ///
+  /// This should never be Inherited: that is handled by
+  /// InheritedProtocolConformance.
+  llvm::PointerIntPair<NormalProtocolConformance *, 2, ConformanceEntryKind>
+      SourceKindAndImplyingConformance = {nullptr,
+                                          ConformanceEntryKind::Explicit};
+
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
   mutable WitnessMap Mapping;
@@ -364,7 +390,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// by the ASTContext's LazyResolver, which is really a Sema instance.
   LazyConformanceLoader *Loader = nullptr;
   uint64_t LoaderContextData;
-
   friend class ASTContext;
 
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
@@ -373,6 +398,8 @@ class NormalProtocolConformance : public ProtocolConformance,
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
   {
+    assert(!conformingType->hasArchetype() &&
+           "ProtocolConformances should store interface types");
     differenceAndStoreConditionalRequirements();
   }
 
@@ -384,6 +411,8 @@ class NormalProtocolConformance : public ProtocolConformance,
       ProtocolAndState(protocol, state), Loc(loc),
       ContextAndInvalid(behaviorStorage, false)
   {
+    assert(!conformingType->hasArchetype() &&
+           "ProtocolConformances should store interface types");
     differenceAndStoreConditionalRequirements();
   }
 
@@ -437,6 +466,28 @@ public:
     SignatureConformances = {};
   }
 
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return SourceKindAndImplyingConformance.getInt();
+  }
+
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    assert(getSourceKind() == ConformanceEntryKind::Implied);
+    return SourceKindAndImplyingConformance.getPointer();
+  }
+
+  void setSourceKindAndImplyingConformance(
+      ConformanceEntryKind sourceKind,
+      NormalProtocolConformance *implyingConformance) {
+    assert(sourceKind != ConformanceEntryKind::Inherited &&
+           "a normal conformance cannot be inherited");
+    assert((sourceKind == ConformanceEntryKind::Implied) ==
+               (bool)implyingConformance &&
+           "an implied conformance needs something that implies it");
+    SourceKindAndImplyingConformance = {implyingConformance, sourceKind};
+  }
+
   /// Determine whether this conformance is lazily loaded.
   ///
   /// This only matters to the AST verifier.
@@ -452,6 +503,15 @@ public:
   AbstractStorageDecl *getBehaviorDecl() const {
     return ContextAndInvalid.getPointer().dyn_cast<AbstractStorageDecl *>();
   }
+
+  /// A "retroactive" conformance is one that is defined in a module that
+  /// is neither the module that defines the protocol nor the module that
+  /// defines the conforming type.
+  bool isRetroactive() const;
+
+  /// Whether this conformance was synthesized automatically in multiple
+  /// modules, but in a manner that ensures that all copies are equivalent.
+  bool isSynthesizedNonUnique() const;
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
@@ -647,6 +707,15 @@ public:
     return GenericConformance->getState();
   }
 
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return GenericConformance->getSourceKind();
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    return GenericConformance->getImplyingConformance();
+  }
+
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
                       LazyResolver *resolver = nullptr) const;
 
@@ -748,6 +817,13 @@ public:
   ProtocolConformanceState getState() const {
     return InheritedConformance->getState();
   }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return ConformanceEntryKind::Inherited;
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const { return nullptr; }
 
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
                       LazyResolver *resolver = nullptr) const {

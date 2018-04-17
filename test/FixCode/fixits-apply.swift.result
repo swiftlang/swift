@@ -27,6 +27,8 @@ struct MyMask : OptionSet {
   static var Bingo: MyMask { return MyMask(1) }
 }
 
+let _: MyMask = []
+
 func supported() -> MyMask {
   return MyMask(rawValue: UInt(MyMask.Bingo))
 }

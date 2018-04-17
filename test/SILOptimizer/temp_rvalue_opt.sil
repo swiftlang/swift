@@ -5,12 +5,35 @@ sil_stage canonical
 import Builtin
 import Swift
 
+/////////////
+// Utility //
+/////////////
+
 struct GS<Base> {
   var _base: Base
   var _value: Builtin.Int64
 }
 
+class Klass {}
+
 sil @unknown : $@convention(thin) () -> ()
+
+sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
+bb0(%0 : $*Klass):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @inguaranteed_user_with_result : $@convention(thin) (@in_guaranteed Klass) -> @out Klass {
+bb0(%0 : $*Klass, %1 : $*Klass):
+  copy_addr %1 to [initialization] %0 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+///////////
+// Tests //
+///////////
 
 // CHECK-LABEL: sil @rvalue_simple
 // CHECK: bb0(%0 : $*GS<B>, %1 : $*GS<B>):
@@ -300,11 +323,11 @@ bb1:
   %6 = alloc_stack $UnfoldSequence<Element, State>
   copy_addr %1 to [initialization] %6 : $*UnfoldSequence<Element, State>
   %8 = struct_element_addr %6 : $*UnfoldSequence<Element, State>, #UnfoldSequence._next
-  %9 = load %8 : $*@callee_owned (@inout State) -> @out Optional<Element>
+  %9 = load %8 : $*@callee_guaranteed (@inout State) -> @out Optional<Element>
   %10 = alloc_stack $Optional<Element>
   %11 = struct_element_addr %1 : $*UnfoldSequence<Element, State>, #UnfoldSequence._state
-  strong_retain %9 : $@callee_owned (@inout State) -> @out Optional<Element>
-  %13 = apply %9(%10, %11) : $@callee_owned (@inout State) -> @out Optional<Element>
+  strong_retain %9 : $@callee_guaranteed (@inout State) -> @out Optional<Element>
+  %13 = apply %9(%10, %11) : $@callee_guaranteed (@inout State) -> @out Optional<Element>
   switch_enum_addr %10 : $*Optional<Element>, case #Optional.some!enumelt.1: bb3, case #Optional.none!enumelt: bb2
 
 bb2:
@@ -341,4 +364,83 @@ bb4:
 bb5:
   %40 = tuple ()
   return %40 : $()
+}
+
+// Make sure that we can eliminate temporaries passed via a temporary rvalue to
+// an @in_guaranteed function.
+//
+// CHECK-LABEL: sil @inguaranteed_no_result : $@convention(thin) (@inout Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*Klass):
+// CHECK-NOT: copy_addr
+// CHECK: apply {{%.*}}([[ARG]])
+// CHECK-NOT: destroy_addr
+// CHECK: } // end sil function 'inguaranteed_no_result'
+sil @inguaranteed_no_result : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  copy_addr %0 to [initialization] %1 : $*Klass
+  %5 = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+
+
+// Make sure that we can eliminate temporaries passed via a temporary rvalue to
+// an @in_guaranteed function.
+//
+// CHECK-LABEL: sil @inguaranteed_with_result : $@convention(thin) (@inout Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*Klass):
+// dead temp
+// CHECK: [[TMP_OUT:%.*]] = alloc_stack $Klass
+// CHECK-NOT: copy_addr
+// CHECK: apply {{%.*}}([[TMP_OUT]], [[ARG]])
+// CHECK-NOT: copy_addr
+// CHECK: destroy_addr [[TMP_OUT]]
+// CHECK-NOT: destroy_addr
+// CHECK: } // end sil function 'inguaranteed_with_result'
+sil @inguaranteed_with_result : $@convention(thin) (@inout Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  %1a = alloc_stack $Klass
+  copy_addr %0 to [initialization] %1 : $*Klass
+  %5 = function_ref @inguaranteed_user_with_result : $@convention(thin) (@in_guaranteed Klass) -> @out Klass
+  %6 = apply %5(%1a, %1) : $@convention(thin) (@in_guaranteed Klass) -> @out Klass
+  destroy_addr %1a : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1a : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// Make sure that we do not optimize this case.
+//
+// CHECK-LABEL: sil @non_overlapping_lifetime : $@convention(thin) (@in Klass) -> () {
+// CHECK: destroy_addr
+// CHECK: destroy_addr
+// CHECK: destroy_addr
+// CHECK: } // end sil function 'non_overlapping_lifetime'
+sil @non_overlapping_lifetime : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %1a = alloc_stack $Klass
+
+  %1 = alloc_stack $Klass
+  %2 = alloc_stack $Klass
+  copy_addr %0 to [initialization] %2 : $*Klass
+  copy_addr [take] %2 to [initialization] %1 : $*Klass
+  dealloc_stack %2 : $*Klass
+  copy_addr %1 to [initialization] %1a : $*Klass
+  destroy_addr %0 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+
+  %3 = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  apply %3(%1a) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %1a : $*Klass
+  dealloc_stack %1a : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
 }

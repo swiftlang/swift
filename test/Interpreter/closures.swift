@@ -48,3 +48,47 @@ map({()})
 
 map({(x: Int) -> Int in x})
 // CHECK: Non-void overload
+
+// This used to assert in runtime assert builds.
+protocol Initializable {
+  init()
+}
+
+func f2<T: Initializable>(_ x: T) -> T? { return nil }
+
+func c<T: Initializable>(_ x: T) {
+
+({
+  guard var b = f2(x) else { print("success") ; return }
+  let c = { b = T() }
+  _ = (b, c)
+})()
+
+}
+extension Bool : Initializable {
+  init() {
+    self = true
+  }
+}
+// CHECK: success
+c(true)
+
+
+func f() -> Bool? { return nil }
+
+// CHECK: success
+({
+  guard var b = f() else { print("success") ; return }
+  let c = { b = true }
+  _ = (b, c)
+})()
+
+// This used to crash at one point in optimized mode because we had the wrong
+// memory effects on swift_getFunctionTypeMetadata.
+func crash() {
+    let f: (Int, Int, Int, Int) -> Int = { _, _, _, _ in 21 }
+    let fs = [f, f]
+    // CHECK: fs: [(Function), (Function)]
+    print("fs: \(fs)")
+}
+crash()

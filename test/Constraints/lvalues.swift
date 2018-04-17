@@ -158,16 +158,14 @@ func testInOut(_ arg: inout Int) {
 }
 
 // Don't infer inout types.
-var ir = &i // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
-            // expected-error{{'&' can only appear immediately in a call argument list}}
-var ir2 = ((&i)) // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
-                 // expected-error{{'&' can only appear immediately in a call argument list}}
+var ir = &i // expected-error {{use of extraneous '&'}}
+var ir2 = ((&i)) // expected-error {{use of extraneous '&'}}
 
 // <rdar://problem/17133089>
 func takeArrayRef(_ x: inout Array<String>) { }
 
 // rdar://22308291
-takeArrayRef(["asdf", "1234"]) // expected-error{{contextual type 'inout Array<String>' cannot be used with array literal}}
+takeArrayRef(["asdf", "1234"]) // expected-error{{cannot pass immutable value of type '[String]' as inout argument}}
 
 // <rdar://problem/19835413> Reference to value from array changed
 func rdar19835413() {

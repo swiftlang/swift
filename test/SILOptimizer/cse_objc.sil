@@ -98,21 +98,21 @@ bb0(%0 : $Bar):
 
 // CHECK-LABEL: _TF4test9trytowalkFPS_8Walkable_T_
 // CHECK:           bb0(%0 : $Walkable):
-// CHECK-NEXT:      open_existential_ref
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
+// CHECK-NEXT:      {{%.*}} = open_existential_ref
+// CHECK-NEXT:      {{%.*}} = objc_method
+// CHECK-NEXT:      {{%.*}} = apply
+// CHECK-NEXT:      {{%.*}} = objc_method
+// CHECK-NEXT:      {{%.*}} = apply
 // CHECK-NEXT:      strong_release
-// CHECK-NEXT:      tuple
+// CHECK-NEXT:      {{%.*}} = tuple
 // CHECK-NEXT:      return
 // test.trytowalk (test.Walkable) -> ()
 sil hidden @_TF4test9trytowalkFPS_8Walkable_T_ : $@convention(thin) (@owned Walkable) -> () {
 bb0(%0 : $Walkable):
   %2 = open_existential_ref %0 : $Walkable to $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable // users: %3, %4
-  %3 = witness_method [volatile] $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!1.foreign, %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %4
+  %3 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %4
   %4 = apply %3<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
-  %5 = witness_method [volatile] $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!1.foreign, %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %6
+  %5 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %6
   %6 = apply %5<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
   strong_release %0 : $Walkable                   // id: %8
   %9 = tuple ()                                   // user: %10
@@ -267,7 +267,7 @@ bb0(%0 : $@objc_metatype XXX.Type):
 }
 
 sil_vtable Bar {
-  #Bar.init!initializer.1: _TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
-  #Bar.walk!1: _TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
-  #Bar.deinit!deallocator: _TFC4test3BarD	// test.Bar.__deallocating_deinit
+  #Bar.init!initializer.1: @_TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
+  #Bar.walk!1: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
+  #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
 }

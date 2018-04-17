@@ -1,5 +1,8 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
 sil_stage canonical
 
 import Builtin
@@ -1519,8 +1522,8 @@ bb0:
 sil @eliminate_thin_to_thick_apply : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @eliminate_dead_thin_to_thick_function_fun : $@convention(thin) () -> ()
-  %1 = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_owned () -> ()
-  %2 = apply %1() : $@callee_owned () -> ()
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+  %2 = apply %1() : $@callee_guaranteed () -> ()
   return %2 : $()
 }
 
@@ -3428,4 +3431,76 @@ bb1(%4 : $Builtin.Int32):
 
 bb2(%5 : $MyErrorType):
   throw %5 : $MyErrorType
+}
+
+// CHECK-LABEL: sil @mark_dependence_base
+// CHECK: bb0(
+// CHECK-NOT: init_existential_ref
+// CHECK-NOT: enum
+// CHECK-NEXT: mark_dependence
+// CHECK-NEXT: load
+// CHECK: return
+sil @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $B):
+  %x = init_existential_ref %1 : $B : $B, $AnyObject
+  %2 = enum $Optional<AnyObject>, #Optional.some!enumelt.1, %x : $AnyObject
+  %3 = mark_dependence %0 : $*Builtin.Int64 on %2 : $Optional<AnyObject>
+  %4 = load %3 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @mark_dependence_base2
+// CHECK: bb0(
+// CHECK-NOT: open_existential_ref
+// CHECK-NOT: enum
+// CHECK-NEXT: mark_dependence
+// CHECK-NEXT: load
+// CHECK: return
+sil @mark_dependence_base2 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $B):
+  %2 = init_existential_ref %1 : $B : $B, $AnyObject
+  %3 = open_existential_ref %2 : $AnyObject to $@opened("B674783A-EF08-11E7-97D6-8C85900CB088") _NSArrayCore
+  %5 = mark_dependence %0 : $*Builtin.Int64 on %3 : $@opened("B674783A-EF08-11E7-97D6-8C85900CB088") _NSArrayCore
+
+  %4 = load %5 : $*Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
+// Test to see if we can constant fold a classify_bridge_object on a Swift class
+// to false.
+// CHECK-LABEL: sil @test_classify_fold
+// CHECK-NOT: classify_bridge_object
+// CHECK: integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: return
+sil @test_classify_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> Builtin.Int1 {
+bb0(%0 : $_ContiguousArrayStorage<B>):
+  %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
+  %2 = classify_bridge_object %1 : $Builtin.BridgeObject
+  %3 = tuple_extract %2 : $(Builtin.Int1, Builtin.Int1), 0
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @bridge_cast_noop_fold
+// CHECK: bb0(%0
+// CHECK-NEXT: %1 = upcast %0
+// CHECK-NEXT: return %1
+sil @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> _ContiguousArrayStorageBase {
+bb0(%0 : $_ContiguousArrayStorage<B>):
+  %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
+  %2 = bridge_object_to_ref %1 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
+  return %2 : $_ContiguousArrayStorageBase
+}
+
+sil @returnInt : $@convention(thin) () -> Builtin.Int32
+
+// CHECK-LABEL: sil @optimize_convert_escape_to_noescape
+// CHECK: [[FN:%.*]] = function_ref @returnInt
+// CHECK: apply [[FN]]()
+sil @optimize_convert_escape_to_noescape : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @returnInt : $@convention(thin) () -> Builtin.Int32
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> Builtin.Int32 to $@callee_guaranteed () -> Builtin.Int32
+  %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Builtin.Int32 to $@noescape @callee_guaranteed () -> Builtin.Int32
+  %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
+  return %4 : $Builtin.Int32
 }

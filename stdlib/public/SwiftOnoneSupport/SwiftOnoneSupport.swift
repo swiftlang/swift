@@ -13,17 +13,19 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-struct _Prespecialize {
+@_frozen // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
+internal enum _Prespecialize {
   // Create specializations for the arrays of most
   // popular builtin integer and floating point types.
-  static internal func _specializeArrays() {
+  internal static func _specializeArrays() {
     func _createArrayUser<Element : Comparable>(_ sampleValue: Element) {
       // Initializers.
       let _: [Element] = [sampleValue]
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
-      let _ =  a[0]
+      _ = a[0]
 
       // Set array elements
       for j in 1..<a.count {
@@ -40,7 +42,7 @@ struct _Prespecialize {
       a[0] = sampleValue
 
       // Get count and capacity
-      let _ = a.count + a.capacity
+      _ = a.count + a.capacity
 
       // Iterate over array
       for e in a {
@@ -61,7 +63,7 @@ struct _Prespecialize {
       a.reserveCapacity(100)
 
       // Sort array
-      let _ = a.sorted { (a: Element, b: Element) in a < b }
+      _ = a.sorted { (a: Element, b: Element) in a < b }
       a.sort { (a: Element, b: Element) in a < b }
 
       // force specialization of append.
@@ -78,7 +80,7 @@ struct _Prespecialize {
       var a = [Element](repeating: sampleValue, count: 1)
 
       // Read array element
-      let _ =  a[0]
+      _ = a[0]
 
       // Set array elements
       for j in 0..<a.count {
@@ -94,7 +96,7 @@ struct _Prespecialize {
       a[0] = sampleValue
 
       // Get length and capacity
-      let _ = a.count + a.capacity
+      _ = a.count + a.capacity
 
       // Iterate over array
       for e in a {
@@ -156,7 +158,7 @@ struct _Prespecialize {
 
   // Force pre-specialization of Range<Int>
   @discardableResult
-  static internal func _specializeRanges() -> Int {
+  internal static func _specializeRanges() -> Int {
     let a = [Int](repeating: 1, count: 10)
     var count = 0
     // Specialize Range for integers
@@ -171,9 +173,9 @@ struct _Prespecialize {
   }
 }
 
-// Mark with optimize.sil.never to make sure its not get
+// Mark with optimize(none) to make sure its not get
 // rid of by dead function elimination. 
-@_semantics("optimize.sil.never")
+@_optimize(none)
 internal func _swift_forcePrespecializations() {
   _Prespecialize._specializeArrays()
   _Prespecialize._specializeRanges()

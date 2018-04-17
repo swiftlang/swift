@@ -239,4 +239,26 @@ class InClassSubscript3 {
 // CHECK-NOT: subscript
 }
 
+class InClassSubscript4 {
+// CHECK-LABEL: InClassSubscript4
+  subscript<T>(i: T) -> T where T: Equatable {
+    get {
+      return i
+    }
+    set(foo) {
+      if true {}
+    }
+  }
+// CHECK: {{^}}  subscript<T>(i: T) -> T where T : Equatable {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK: {{^}}    set(foo) {{{$}}
+// CHECK-NEXT: {{^}}      if  {{{$}}
+// CHECK-NEXT: {{^}}      }{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK-NEXT: {{^}}  }{{$}}
+// CHECK-NOT: subscript
+}
+
 

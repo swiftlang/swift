@@ -50,3 +50,61 @@
 
 @end
 
+
+// Don't conform to the protocol; that loads all protocol members.
+@interface SimpleDoer (Category)
+- (void)categoricallyDoSomeWork;
+- (void)categoricallyDoSomeWorkWithSpeed:(int)s;
+- (void)categoricallyDoSomeWorkWithSpeed:(int)s thoroughness:(int)t
+  NS_SWIFT_NAME(categoricallyDoVeryImportantWork(speed:thoroughness:));
+- (void)categoricallyDoSomeWorkWithSpeed:(int)s alacrity:(int)a
+  NS_SWIFT_NAME(categoricallyDoSomeWorkWithSpeed(speed:levelOfAlacrity:));
+
+// These we are generally trying to not-import, via laziness.
+- (void)categoricallyGoForWalk;
+- (void)categoricallyTakeNap;
+- (void)categoricallyEatMeal;
+- (void)categoricallyTidyHome;
+- (void)categoricallyCallFamily;
+- (void)categoricallySingSong;
+- (void)categoricallyReadBook;
+- (void)categoricallyAttendLecture;
+- (void)categoricallyWriteLetter;
+@end
+
+
+@protocol MirroredBase
++ (void)mirroredBaseClassMethod;
+- (void)mirroredBaseInstanceMethod;
+@end
+
+@protocol MirroredDoer <MirroredBase>
++ (void)mirroredDerivedClassMethod;
+- (void)mirroredDerivedInstanceMethod;
+@end
+
+@interface MirroringDoer : NSObject<MirroredDoer>
+- (void)unobtrusivelyGoForWalk;
+- (void)unobtrusivelyTakeNap;
+- (void)unobtrusivelyEatMeal;
+- (void)unobtrusivelyTidyHome;
+- (void)unobtrusivelyCallFamily;
+- (void)unobtrusivelySingSong;
+- (void)unobtrusivelyReadBook;
+- (void)unobtrusivelyAttendLecture;
+- (void)unobtrusivelyWriteLetter;
+@end
+
+@interface DerivedFromMirroringDoer : MirroringDoer
+@end
+
+@interface SimilarlyNamedThings
+- (void)doSomething:(double)x;
+- (void)doSomething:(double)x celsius:(double)y;
+- (void)doSomething:(double)x fahrenheit:(double)y using:(void (^)(void))block;
+@end
+
+@interface SimpleDoerSubclass : SimpleDoer
+- (void)simplyDoSomeWorkWithSpeed:(int)s thoroughness:(int)t
+  NS_SWIFT_NAME(simplyDoVeryImportantWork(speed:thoroughness:));
+@end

@@ -207,8 +207,7 @@ protected:
   size_t Capacity = 0;
 
 public:
-  
-  typedef T *iterator;
+  using iterator = T *;
 
   Vector() { }
 
@@ -290,6 +289,11 @@ protected:
   StringRef Text;
   size_t Pos = 0;
 
+  /// Mangling style where function type would have
+  /// labels attached to it, instead of having them
+  /// as part of the name.
+  bool IsOldFunctionTypeMangling = false;
+
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
   Vector<unsigned> PendingSubstitutions;
@@ -297,6 +301,8 @@ protected:
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
   int NumWords = 0;
+  
+  std::function<NodePointer (int32_t, const void *)> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
     if (!Text.substr(Pos).startswith(str)) return false;
@@ -378,6 +384,9 @@ protected:
                                  NodePointer Child2);
   NodePointer createWithChildren(Node::Kind kind, NodePointer Child1,
                                  NodePointer Child2, NodePointer Child3);
+  NodePointer createWithChildren(Node::Kind kind, NodePointer Child1,
+                                 NodePointer Child2, NodePointer Child3,
+                                 NodePointer Child4);
   NodePointer createWithPoppedType(Node::Kind kind) {
     return createWithChild(kind, popNode(Node::Kind::Type));
   }
@@ -406,13 +415,14 @@ protected:
   NodePointer popModule();
   NodePointer popContext();
   NodePointer popTypeAndGetChild();
-  NodePointer popTypeAndGetNominal();
+  NodePointer popTypeAndGetAnyGeneric();
   NodePointer demangleBuiltinType();
   NodePointer demangleAnyGenericType(Node::Kind kind);
   NodePointer demangleExtensionContext();
   NodePointer demanglePlainFunction();
   NodePointer popFunctionType(Node::Kind kind);
   NodePointer popFunctionParams(Node::Kind kind);
+  NodePointer popFunctionParamLabels(NodePointer FuncType);
   NodePointer popTuple();
   NodePointer popTypeList();
   NodePointer popProtocol();
@@ -420,17 +430,20 @@ protected:
   NodePointer demangleBoundGenericArgs(NodePointer nominalType,
                                     const Vector<NodePointer> &TypeLists,
                                     size_t TypeListIdx);
+  NodePointer demangleRetroactiveConformance();
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention();
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
   NodePointer demangleImplFunctionType();
   NodePointer demangleMetatype();
+  NodePointer demanglePrivateContextDescriptor();
   NodePointer createArchetypeRef(int depth, int i);
   NodePointer demangleArchetype();
   NodePointer demangleAssociatedTypeSimple(NodePointer GenericParamIdx);
   NodePointer demangleAssociatedTypeCompound(NodePointer GenericParamIdx);
 
   NodePointer popAssocTypeName();
+  NodePointer popAssocTypePath();
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();
@@ -460,6 +473,8 @@ protected:
   NodePointer demangleValueWitness();
 
   NodePointer demangleObjCTypeName();
+  NodePointer demangleTypeMangling();
+  NodePointer demangleSymbolicReference(const void *at);
 
   void dump();
 
@@ -468,10 +483,16 @@ public:
   
   void clear() override;
 
+  /// Install a resolver for symbolic references in a mangled string.
+  void setSymbolicReferenceResolver(
+                  std::function<NodePointer (int32_t, const void*)> resolver) {
+    SymbolicReferenceResolver = resolver;
+  }
+  
   /// Demangle the given symbol and return the parse tree.
   ///
   /// \param MangledName The mangled symbol string, which start with the
-  /// mangling prefix _T0.
+  /// mangling prefix $S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
@@ -482,7 +503,7 @@ public:
   /// Demangle the given type and return the parse tree.
   ///
   /// \param MangledName The mangled type string, which does _not_ start with
-  /// the mangling prefix _T0.
+  /// the mangling prefix $S.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.

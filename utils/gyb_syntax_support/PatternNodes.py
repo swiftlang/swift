@@ -2,10 +2,18 @@ from Child import Child
 from Node import Node  # noqa: I201
 
 PATTERN_NODES = [
+
+    # type-annotation -> ':' type
+    Node('TypeAnnotation', kind='Syntax',
+         children=[
+             Child('Colon', kind='ColonToken'),
+             Child('Type', kind='Type'),
+         ]),
+
     # enum-case-pattern -> type-identifier? '.' identifier tuple-pattern?
     Node('EnumCasePattern', kind='Pattern',
          children=[
-             Child('TypeIdentifier', kind='TypeIdentifier',
+             Child('Type', kind='Type',
                    is_optional=True),
              Child('Period', kind='PeriodToken'),
              Child('CaseName', kind='IdentifierToken'),
@@ -20,19 +28,17 @@ PATTERN_NODES = [
              Child('Type', kind='Type'),
          ]),
 
-    # optional-pattern -> identifier '?'
+    # optional-pattern -> pattern '?'
     Node('OptionalPattern', kind='Pattern',
          children=[
-             Child('Identifier', kind='IdentifierToken'),
+             Child('SubPattern', kind='Pattern'),
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
-    # identifier-pattern -> identifier type-annotation?
+    # identifier-pattern -> identifier
     Node('IdentifierPattern', kind='Pattern',
          children=[
-             Child('Identifier', kind='IdentifierToken'),
-             Child('TypeAnnotation', kind='TypeAnnotation',
-                   is_optional=True),
+             Child('Identifier', kind='IdentifierToken')
          ]),
 
     # as-pattern -> pattern 'as' type
@@ -43,14 +49,13 @@ PATTERN_NODES = [
              Child('Type', kind='Type'),
          ]),
 
-    # tuple-pattern -> '(' tuple-pattern-element-list ')' type-annotation?
+    # tuple-pattern -> '(' tuple-pattern-element-list ')'
     Node('TuplePattern', kind='Pattern',
+         traits=['Parenthesized'],
          children=[
-             Child('OpenParen', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken'),
              Child('Elements', kind='TuplePatternElementList'),
-             Child('CloseParen', kind='RightParenToken'),
-             Child('TypeAnnotation', kind='TypeAnnotation',
-                   is_optional=True),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 
     # wildcard-pattern -> '_' type-annotation?
@@ -63,13 +68,14 @@ PATTERN_NODES = [
 
     # tuple-pattern-element -> identifier? ':' pattern ','?
     Node('TuplePatternElement', kind='Syntax',
+         traits=['WithTrailingComma', 'Labeled'],
          children=[
              Child('LabelName', kind='IdentifierToken',
                    is_optional=True),
              Child('LabelColon', kind='ColonToken',
                    is_optional=True),
              Child('Pattern', kind='Pattern'),
-             Child('Comma', kind='CommaToken',
+             Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
 

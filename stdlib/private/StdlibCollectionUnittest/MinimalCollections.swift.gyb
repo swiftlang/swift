@@ -15,7 +15,7 @@ from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    sliceTypeName,
+    collectionTypeName,
     protocolsForCollectionFeatures
 )
 }%
@@ -160,7 +160,7 @@ internal enum _CollectionOperation : Equatable {
     case .reserveCapacity:
       let invalidIndices = newElementsIds.indices
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -180,7 +180,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -189,7 +189,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = atIndex..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -200,7 +200,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = atIndex..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -209,7 +209,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = index..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -222,7 +222,7 @@ internal enum _CollectionOperation : Equatable {
 
       let invalidIndices = subRange.lowerBound..<newElementsIds.endIndex
       newElementsIds.replaceSubrange(
-        Range(invalidIndices),
+        invalidIndices,
         with: repeatElement(nextStateId, count: invalidIndices.count))
       newEndIndexId = nextStateId
 
@@ -497,19 +497,11 @@ extension MinimalStrideableIndex : Strideable {
 // Minimal***[Mutable]?Collection
 //===----------------------------------------------------------------------===//
 
-/*
-FIXME: swift-3-indexing-model: generate three variants, with Int, Int8 and
-Int64 distances.
-
-  public typealias Distance = {Distance}
-*/
-
 % for Traversal in TRAVERSALS:
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       for StrideableIndex in [ False, True ]:
-%         SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%         Self = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%         Self = 'Minimal' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
 %         Self += 'WithStrideableIndex' if StrideableIndex else ''
 %         SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 %         Index = 'MinimalStrideableIndex' if StrideableIndex else 'MinimalIndex'
@@ -546,10 +538,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
     }
   }
 
-%     if StrideableIndex:
-  public typealias Indices = CountableRange<${Index}>
-%     end
-
 %     if RangeReplaceable:
   public init() {
     self.underestimatedCount = 0
@@ -574,7 +562,6 @@ public struct ${Self}<T> : ${SelfProtocols} {
   }
 
   public typealias Index = ${Index}
-  public typealias IndexDistance = Int
 
   internal func _index(forPosition i: Int) -> ${Index} {
     return ${Index}(
@@ -603,6 +590,13 @@ public struct ${Self}<T> : ${SelfProtocols} {
     timesEndIndexCalled.value += 1
     return _uncheckedIndex(forPosition: _elements.endIndex)
   }
+
+%     if StrideableIndex:
+  public typealias Indices = Range<${Index}>
+%     elif Traversal == 'RandomAccess':
+  // FIXME: this shouldn't be necessary, should come by default
+  public typealias Indices = DefaultIndices<${Self}<T>>
+%     end
 
   public func _failEarlyRangeCheck(
     _ index: ${Index},
@@ -661,7 +655,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
 %     end
 
   public func distance(from start: ${Index}, to end: ${Index})
-    -> IndexDistance {
+    -> Int {
 %     if Traversal == 'Forward':
     _precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
@@ -676,7 +670,7 @@ public struct ${Self}<T> : ${SelfProtocols} {
     return end.position - start.position
   }
 
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
 %     if Traversal == 'Forward':
     _precondition(n >= 0,
       "Only BidirectionalCollections can be advanced by a negative amount")
@@ -701,10 +695,10 @@ public struct ${Self}<T> : ${SelfProtocols} {
 %     end
   }
 
-  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<T>> {
+  public subscript(bounds: Range<${Index}>) -> Slice<${Self}<T>> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return ${SelfSlice}(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
 %     if Mutable:
     set {
@@ -853,10 +847,9 @@ public struct DefaultedSequence<Element> : Sequence {
 %   for Mutable in [ False, True ]:
 %     for RangeReplaceable in [ False, True ]:
 %       for StrideableIndex in [ False, True ]:
-%         SelfSlice = sliceTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
-%         Self = 'Defaulted' + SelfSlice.replace('Slice', 'Collection')
+%         Self = 'Defaulted' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
 %         Self += 'WithStrideableIndex' if StrideableIndex else ''
-%         Base = 'Minimal' + SelfSlice.replace('Slice', 'Collection')
+%         Base = 'Minimal' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
 %         Base += 'WithStrideableIndex' if StrideableIndex else ''
 %         SelfProtocols = ', '.join(protocolsForCollectionFeatures(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable))
 %         Index = 'MinimalStrideableIndex' if StrideableIndex else 'MinimalIndex'
@@ -871,10 +864,12 @@ public struct ${Self}<Element> : ${SelfProtocols} {
   public typealias Base = ${Base}<Element>
   public typealias Iterator = MinimalIterator<Element>
   public typealias Index = ${Index}
-  public typealias IndexDistance = Int
 
 %   if StrideableIndex:
-  public typealias Indices = CountableRange<${Index}>
+  public typealias Indices = Range<${Index}>
+%  elif Traversal == 'RandomAccess':
+  // FIXME: this shouldn't be necessary, should come by default
+  public typealias Indices = DefaultIndices<${Self}<Element>>
 %   end
 
 %   if Mutable or RangeReplaceable:
@@ -934,11 +929,11 @@ public struct ${Self}<Element> : ${SelfProtocols} {
 
 %       if Traversal == 'RandomAccess':
   public func distance(from start: ${Index}, to end: ${Index})
-    -> IndexDistance {
+    -> Int {
     return base.distance(from: start, to: end)
   }
 
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     return base.index(i, offsetBy: n)
   }
 %       end
@@ -973,10 +968,10 @@ public struct ${Self}<Element> : ${SelfProtocols} {
     // FIXME: swift-3-indexing-model: use defaults.
 //     if Self not in ['DefaultedCollection', 'DefaultedBidirectionalCollection', 'DefaultedRandomAccessCollection', 'DefaultedMutableCollection', 'DefaultedRangeReplaceableCollection']:
 
-  public subscript(bounds: Range<${Index}>) -> ${SelfSlice}<${Self}<Base.Element>> {
+  public subscript(bounds: Range<${Index}>) -> Slice<${Self}<Base.Element>> {
     get {
       // FIXME: swift-3-indexing-model: range check.
-      return ${SelfSlice}(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
 %     if Mutable:
     set {

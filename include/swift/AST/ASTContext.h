@@ -90,7 +90,6 @@ namespace swift {
   class PrecedenceGroupDecl;
   class TupleTypeElt;
   class EnumElementDecl;
-  enum OptionalTypeKind : unsigned;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
@@ -106,6 +105,10 @@ namespace swift {
   class UnifiedStatsReporter;
 
   enum class KnownProtocolKind : uint8_t;
+
+namespace syntax {
+  class SyntaxArena;
+}
 
 /// \brief The arena in which a particular ASTContext allocation will go.
 enum class AllocationArena {
@@ -170,10 +173,6 @@ public:
 };
 
 class SILLayout; // From SIL
-/// \brief Describes either a nominal type declaration or an extension
-/// declaration.
-typedef llvm::PointerUnion<NominalTypeDecl *, ExtensionDecl *>
-  TypeOrExtensionDecl;
 
 /// ASTContext - This object creates and owns the AST objects.
 /// However, this class does more than just maintain context within an AST.
@@ -380,6 +379,9 @@ public:
                               setVector.size());
   }
 
+  /// Retrive the syntax node memory manager for this context.
+  syntax::SyntaxArena &getSyntaxArena() const;
+
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
@@ -403,23 +405,11 @@ public:
   DECL_CLASS *get##NAME##Decl() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
-  /// Retrieve the declaration of Swift.Optional or ImplicitlyUnwrappedOptional.
-  EnumDecl *getOptionalDecl(OptionalTypeKind kind) const;
-
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
   
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalSomeDecl() const;
-
-  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
-  EnumElementDecl *getImplicitlyUnwrappedOptionalNoneDecl() const;
-
-  EnumElementDecl *getOptionalSomeDecl(OptionalTypeKind kind) const;
-  EnumElementDecl *getOptionalNoneDecl(OptionalTypeKind kind) const;
 
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
@@ -482,8 +472,8 @@ public:
   FuncDecl *getEqualIntDecl() const;
 
   /// Retrieve the declaration of
-  /// Swift._mixForSynthesizedHashValue (Int, Int) -> Int.
-  FuncDecl *getMixForSynthesizedHashValueDecl() const;
+  /// Swift._combineHashValues(Int, Int) -> Int.
+  FuncDecl *getCombineHashValuesDecl() const;
 
   /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
   FuncDecl *getMixIntDecl() const;
@@ -543,6 +533,11 @@ public:
   /// nested within it.
   void addExternalDecl(Decl *decl);
 
+  /// Add a declaration that was synthesized to a per-source file list if
+  /// if is part of a source file, or the external declarations list if
+  /// it is part of an imported type context.
+  void addSynthesizedDecl(Decl *decl);
+
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
 
@@ -573,6 +568,7 @@ public:
   const CanType TheUnknownObjectType;     /// Builtin.UnknownObject
   const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
+  const CanType TheSILTokenType;          /// Builtin.SILToken
   
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
@@ -750,10 +746,11 @@ public:
   /// \param substitutions The set of substitutions required to produce the
   /// specialized conformance from the generic conformance. This list is
   /// copied so passing a temporary is permitted.
-  SpecializedProtocolConformance *
+  ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            SubstitutionList substitutions);
+                            SubstitutionList substitutions,
+                            bool alreadyCheckedCollapsed = false);
 
   /// \brief Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic
@@ -767,7 +764,7 @@ public:
   /// specialized conformance from the generic conformance. The keys must
   /// be generic parameters, not archetypes, so for example passing in
   /// TypeBase::getContextSubstitutionMap() is OK.
-  SpecializedProtocolConformance *
+  ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
                             const SubstitutionMap &substitutions);
@@ -883,15 +880,6 @@ public:
   GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
                                        GenericSignatureBuilder *builder,
                                        GenericSignature *sig);
-
-  /// Retrieve the inherited name set for the given class.
-  const InheritedNameSet *getAllPropertyNames(ClassDecl *classDecl,
-                                              bool forInstance);
-
-  /// Retrieve the inherited name set for the given Objective-C class.
-  const InheritedNameSet *getAllPropertyNames(
-                            clang::ObjCInterfaceDecl *classDecl,
-                            bool forInstance);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.

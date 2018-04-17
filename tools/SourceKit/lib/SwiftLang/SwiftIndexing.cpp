@@ -158,8 +158,8 @@ static void indexModule(llvm::MemoryBuffer *Input,
                         IndexingConsumer &IdxConsumer,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::IndexModule);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
     SwiftArgs.Args.PrimaryFile = Input->getBufferIdentifier();
@@ -167,7 +167,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
     trace::StringPairs OpArgs;
     OpArgs.push_back(std::make_pair("ModuleName", ModuleName));
     OpArgs.push_back(std::make_pair("Hash", Hash));
-    TracedOp.start(trace::OperationKind::IndexModule, SwiftArgs, OpArgs);
+    TracedOp.start(SwiftArgs, OpArgs);
   }
 
   ASTContext &Ctx = CI.getASTContext();
@@ -253,13 +253,18 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   // response, and it can be expensive to do typo-correction when there are many
   // errors, which is common in indexing.
   SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  Args.push_back("-Xfrontend");
   Args.push_back("-disable-typo-correction");
 
   CompilerInvocation Invocation;
-  bool Failed = getASTManager().initCompilerInvocation(Invocation, Args,
-                                                       CI.getDiags(),
-                    /*PrimaryFile=*/IsModuleIndexing ? StringRef() : InputFile,
-                                                       Error);
+  bool Failed = true;
+  if (IsModuleIndexing) {
+    Failed = getASTManager().initCompilerInvocationNoInputs(
+        Invocation, Args, CI.getDiags(), Error);
+  } else {
+    Failed = getASTManager().initCompilerInvocation(
+        Invocation, Args, CI.getDiags(), InputFile, Error);
+  }
   if (Failed) {
     IdxConsumer.failed(Error);
     return;
@@ -279,7 +284,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     return;
   }
 
-  if (!Invocation.getFrontendOptions().Inputs.hasInputFilenames()) {
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
     IdxConsumer.failed("no input filenames specified");
     return;
   }
@@ -287,12 +292,12 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   if (CI.setup(Invocation))
     return;
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::IndexSource);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile, Args);
     trace::initTraceFiles(SwiftArgs, CI);
-    TracedOp.start(trace::OperationKind::IndexSource, SwiftArgs);
+    TracedOp.start(SwiftArgs);
   }
 
   CI.performSema();

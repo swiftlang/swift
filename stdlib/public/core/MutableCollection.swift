@@ -65,7 +65,8 @@ public typealias MutableIndexable = MutableCollection
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
-public protocol MutableCollection : Collection
+public protocol MutableCollection: Collection
+where SubSequence: MutableCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
@@ -73,7 +74,8 @@ public protocol MutableCollection : Collection
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Index
 
-  associatedtype SubSequence : MutableCollection = MutableSlice<Self>
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype SubSequence
 
   /// Accesses the element at the specified position.
   ///
@@ -187,7 +189,7 @@ public protocol MutableCollection : Collection
 
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
-  @_inlineable
+  @inlinable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -216,11 +218,11 @@ extension MutableCollection {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
-  @_inlineable
-  public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
+  @inlinable
+  public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableSlice(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
@@ -236,7 +238,7 @@ extension MutableCollection {
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
-  @_inlineable
+  @inlinable
   public mutating func swapAt(_ i: Index, _ j: Index) {
     guard i != j else { return }
     let tmp = self[i]
@@ -245,28 +247,4 @@ extension MutableCollection {
   }
 }
 
-extension MutableCollection where Self: BidirectionalCollection {
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> MutableBidirectionalSlice<Self> {
-    get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableBidirectionalSlice(base: self, bounds: bounds)
-    }
-    set {
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
-    }
-  }
-}
 
-extension MutableCollection where Self: RandomAccessCollection {
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> MutableRandomAccessSlice<Self> {
-    get {
-      _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-      return MutableRandomAccessSlice(base: self, bounds: bounds)
-    }
-    set {
-      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
-    }
-  }
-}

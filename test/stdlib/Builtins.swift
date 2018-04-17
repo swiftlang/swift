@@ -163,7 +163,7 @@ func exerciseArrayValueWitnesses<T>(_ value: T) {
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
   Builtin.destroyArray(T.self, buf._rawValue, 4._builtinWordValue)
 
-  buf.deallocate(capacity: 5)
+  buf.deallocate()
 }
 
 tests.test("array value witnesses") {
@@ -297,7 +297,6 @@ tests.test("_isOptional") {
   expectTrue(_isOptional(Optional<Int>.self))
   expectTrue(_isOptional(Optional<X>.self))
   expectTrue(_isOptional(Optional<P>.self))
-  expectTrue(_isOptional(ImplicitlyUnwrappedOptional<P>.self))
   expectFalse(_isOptional(Int.self))
   expectFalse(_isOptional(X.self))
   expectFalse(_isOptional(P.self))

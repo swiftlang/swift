@@ -21,7 +21,7 @@ public enum BenchmarkCategory : String {
   // we know is important to measure.
   case validation
   // subsystems to validate and their subcategories.
-  case api, Array, String, Dictionary, Codable, Set
+  case api, Array, String, Dictionary, Codable, Set, Data
   case sdk
   case runtime, refcount, metadata
   // Other general areas of compiled code validation.
@@ -90,17 +90,9 @@ public struct BenchmarkInfo {
   /// taken.
   public var tearDownFunction: (() -> ())?
 
-  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory]) {
-    self.name = name
-    self.runFunction = runFunction
-    self.tags = tags
-    self.setUpFunction = nil
-    self.tearDownFunction = nil
-  }
-
   public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
-              setUpFunction: (() -> ())?,
-              tearDownFunction: (() -> ())?) {
+              setUpFunction: (() -> ())? = nil,
+              tearDownFunction: (() -> ())? = nil) {
     self.name = name
     self.runFunction = runFunction
     self.tags = tags
@@ -183,7 +175,14 @@ public func someProtocolFactory() -> SomeProtocol { return MyStruct() }
 // Just consume the argument.
 // It's important that this function is in another module than the tests
 // which are using it.
+@inline(never)
 public func blackHole<T>(_ x: T) {
+}
+
+// Return the passed argument without letting the optimizer know that.
+@inline(never)
+public func identity<T>(_ x: T) -> T {
+  return x
 }
 
 // Return the passed argument without letting the optimizer know that.

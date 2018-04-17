@@ -47,6 +47,7 @@ class SILBuilder {
   SILBasicBlock *BB;
   SILBasicBlock::iterator InsertPt;
   const SILDebugScope *CurDebugScope = nullptr;
+  Optional<SILLocation> CurDebugLocOverride = None;
 
   /// If this pointer is non-null, then any inserted instruction is
   /// recorded in this list.
@@ -141,6 +142,18 @@ public:
   void setCurrentDebugScope(const SILDebugScope *DS) { CurDebugScope = DS; }
   const SILDebugScope *getCurrentDebugScope() const { return CurDebugScope; }
 
+  /// Apply a debug location override. If loc is None, the current override is
+  /// removed. Otherwise, newly created debug locations use the given location.
+  /// Note: the override location does not apply to debug_value[_addr].
+  void applyDebugLocOverride(Optional<SILLocation> loc) {
+    CurDebugLocOverride = loc;
+  }
+
+  /// Get the current debug location override.
+  Optional<SILLocation> getCurrentDebugLocOverride() const {
+    return CurDebugLocOverride;
+  }
+
   /// Convenience function for building a SILDebugLocation.
   SILDebugLocation getSILDebugLocation(SILLocation Loc) {
     // FIXME: Audit all uses and enable this assertion.
@@ -148,7 +161,8 @@ public:
     auto Scope = getCurrentDebugScope();
     if (!Scope && F)
         Scope = F->getDebugScope();
-    return SILDebugLocation(Loc, Scope);
+    auto overriddenLoc = CurDebugLocOverride ? *CurDebugLocOverride : Loc;
+    return SILDebugLocation(overriddenLoc, Scope);
   }
 
   //===--------------------------------------------------------------------===//
@@ -286,7 +300,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
-                                   SILDebugVariable Var = SILDebugVariable()) {
+                                   Optional<SILDebugVariable> Var = None) {
     Loc.markAsPrologue();
     return insert(AllocStackInst::create(getSILDebugLocation(Loc),
                                          elementType, getFunction(),
@@ -327,7 +341,7 @@ public:
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
-                               SILDebugVariable Var = SILDebugVariable()) {
+                               Optional<SILDebugVariable> Var = None) {
     Loc.markAsPrologue();
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        OpenedArchetypes, Var));
@@ -379,6 +393,25 @@ public:
                                            Args, Subs, CalleeConvention, *F,
                                            OpenedArchetypes,
                                            SpecializationInfo));
+  }
+
+  BeginApplyInst *createBeginApply(
+      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      ArrayRef<SILValue> Args, bool isNonThrowing,
+      const GenericSpecializationInformation *SpecializationInfo = nullptr) {
+    return insert(BeginApplyInst::create(getSILDebugLocation(Loc), Fn, Subs,
+                                         Args, isNonThrowing, silConv, *F,
+                                         OpenedArchetypes, SpecializationInfo));
+  }
+
+  AbortApplyInst *createAbortApply(SILLocation loc, SILValue beginApply) {
+    return insert(new (getModule()) AbortApplyInst(getSILDebugLocation(loc),
+                                                   beginApply));
+  }
+
+  EndApplyInst *createEndApply(SILLocation loc, SILValue beginApply) {
+    return insert(new (getModule()) EndApplyInst(getSILDebugLocation(loc),
+                                                 beginApply));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
@@ -511,8 +544,23 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
   }
 
+  /// If \p LV is non-trivial, return a \p Qualifier load of \p LV. If \p LV is
+  /// trivial, use trivial instead.
+  ///
+  /// *NOTE* The SupportUnqualifiedSIL is an option to ease the bring up of
+  /// Semantic SIL. It enables a pass that must be able to run on both Semantic
+  /// SIL and non-Semantic SIL. It has a default argument of false, so if this
+  /// is not necessary for your pass, just ignore the parameter.
   LoadInst *createTrivialLoadOr(SILLocation Loc, SILValue LV,
-                                LoadOwnershipQualifier Qualifier) {
+                                LoadOwnershipQualifier Qualifier,
+                                bool SupportUnqualifiedSIL = false) {
+    if (SupportUnqualifiedSIL && !getFunction().hasQualifiedOwnership()) {
+      assert(
+          Qualifier != LoadOwnershipQualifier::Copy &&
+          "In unqualified SIL, a copy must be done separately form the load");
+      return createLoad(Loc, LV, LoadOwnershipQualifier::Unqualified);
+    }
+
     if (LV->getType().isTrivial(getModule())) {
       return createLoad(Loc, LV, LoadOwnershipQualifier::Trivial);
     }
@@ -522,13 +570,12 @@ public:
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
-           getFunction().hasUnqualifiedOwnership() &&
+           !getFunction().hasQualifiedOwnership() &&
                "Unqualified inst in qualified function");
     assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            getFunction().hasQualifiedOwnership() &&
                "Qualified inst in unqualified function");
-    assert(!SILModuleConventions(getModule()).useLoweredAddresses()
-           || LV->getType().isLoadable(getModule()));
+    assert(LV->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
@@ -547,15 +594,13 @@ public:
   /// non-address values.
   SILValue emitLoadValueOperation(SILLocation Loc, SILValue LV,
                                   LoadOwnershipQualifier Qualifier) {
-    assert(!SILModuleConventions(getModule()).useLoweredAddresses()
-           || LV->getType().isLoadable(getModule()));
+    assert(LV->getType().isLoadableOrOpaque(getModule()));
     const auto &lowering = getTypeLowering(LV->getType());
     return lowering.emitLoad(*this, Loc, LV, Qualifier);
   }
 
   LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
-    assert(!SILModuleConventions(getModule()).useLoweredAddresses()
-           || LV->getType().isLoadable(getModule()));
+    assert(LV->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule())
                       LoadBorrowInst(getSILDebugLocation(Loc), LV));
   }
@@ -567,9 +612,22 @@ public:
 
   /// Utility function that returns a trivial store if the stored type is
   /// trivial and a \p Qualifier store if the stored type is non-trivial.
+  ///
+  /// *NOTE* The SupportUnqualifiedSIL is an option to ease the bring up of
+  /// Semantic SIL. It enables a pass that must be able to run on both Semantic
+  /// SIL and non-Semantic SIL. It has a default argument of false, so if this
+  /// is not necessary for your pass, just ignore the parameter.
   StoreInst *createTrivialStoreOr(SILLocation Loc, SILValue Src,
                                   SILValue DestAddr,
-                                  StoreOwnershipQualifier Qualifier) {
+                                  StoreOwnershipQualifier Qualifier,
+                                  bool SupportUnqualifiedSIL = false) {
+    if (SupportUnqualifiedSIL && !getFunction().hasQualifiedOwnership()) {
+      assert(
+          Qualifier != StoreOwnershipQualifier::Assign &&
+          "In unqualified SIL, assigns must be represented via 2 instructions");
+      return createStore(Loc, Src, DestAddr,
+                         StoreOwnershipQualifier::Unqualified);
+    }
     if (Src->getType().isTrivial(getModule())) {
       return createStore(Loc, Src, DestAddr, StoreOwnershipQualifier::Trivial);
     }
@@ -579,7 +637,7 @@ public:
   StoreInst *createStore(SILLocation Loc, SILValue Src, SILValue DestAddr,
                          StoreOwnershipQualifier Qualifier) {
     assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
-           getFunction().hasUnqualifiedOwnership() &&
+           !getFunction().hasQualifiedOwnership() &&
                "Unqualified inst in qualified function");
     assert((Qualifier == StoreOwnershipQualifier::Unqualified) ||
            getFunction().hasQualifiedOwnership() &&
@@ -611,9 +669,11 @@ public:
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
-                                     SILAccessEnforcement enforcement) {
+                                     SILAccessEnforcement enforcement,
+                                     bool noNestedConflict) {
     return insert(new (getModule()) BeginAccessInst(
-        getSILDebugLocation(loc), address, accessKind, enforcement));
+        getSILDebugLocation(loc), address, accessKind, enforcement,
+        noNestedConflict));
   }
 
   EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
@@ -625,9 +685,11 @@ public:
   BeginUnpairedAccessInst *
   createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
                             SILAccessKind accessKind,
-                            SILAccessEnforcement enforcement) {
+                            SILAccessEnforcement enforcement,
+                            bool noNestedConflict) {
     return insert(new (getModule()) BeginUnpairedAccessInst(
-        getSILDebugLocation(loc), address, buffer, accessKind, enforcement));
+        getSILDebugLocation(loc), address, buffer, accessKind, enforcement,
+        noNestedConflict));
   }
 
   EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
@@ -686,16 +748,9 @@ public:
   }
 
   DebugValueInst *createDebugValue(SILLocation Loc, SILValue src,
-                                   SILDebugVariable Var = SILDebugVariable()) {
-    return insert(DebugValueInst::create(getSILDebugLocation(Loc), src,
-                                         getModule(), Var));
-  }
-  DebugValueAddrInst *
-  createDebugValueAddr(SILLocation Loc, SILValue src,
-                       SILDebugVariable Var = SILDebugVariable()) {
-    return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
-                                             getModule(), Var));
-  }
+                                   SILDebugVariable Var);
+  DebugValueAddrInst *createDebugValueAddr(SILLocation Loc, SILValue src,
+                                           SILDebugVariable Var);
 
   LoadWeakInst *createLoadWeak(SILLocation Loc, SILValue src, IsTake_t isTake) {
     return insert(new (getModule())
@@ -740,6 +795,14 @@ public:
                                              SILType Ty) {
     return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
                                               getFunction(), OpenedArchetypes));
+  }
+
+  ConvertEscapeToNoEscapeInst *
+  createConvertEscapeToNoEscape(SILLocation Loc, SILValue Op, SILType Ty,
+                                bool lifetimeGuaranteed) {
+    return insert(ConvertEscapeToNoEscapeInst::create(
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes,
+        lifetimeGuaranteed));
   }
 
   ThinFunctionToPointerInst *
@@ -815,6 +878,13 @@ public:
                                                  SILType Ty) {
     return insert(new (getModule()) BridgeObjectToRefInst(
         getSILDebugLocation(Loc), Op, Ty));
+  }
+
+  ValueToBridgeObjectInst *createValueToBridgeObject(SILLocation Loc,
+                                                     SILValue value) {
+    auto Ty = SILType::getBridgeObjectType(getASTContext());
+    return insert(new (getModule()) ValueToBridgeObjectInst(
+        getSILDebugLocation(Loc), value, Ty));
   }
 
   BridgeObjectToWordInst *createBridgeObjectToWord(SILLocation Loc,
@@ -912,21 +982,23 @@ public:
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,
                                      Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) RetainValueInst(getSILDebugLocation(Loc),
                                                       operand, atomicity));
   }
 
   RetainValueAddrInst *createRetainValueAddr(SILLocation Loc, SILValue operand,
                                              Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) RetainValueAddrInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
 
   ReleaseValueInst *createReleaseValue(SILLocation Loc, SILValue operand,
                                        Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) ReleaseValueInst(getSILDebugLocation(Loc),
                                                        operand, atomicity));
   }
@@ -934,7 +1006,7 @@ public:
   ReleaseValueAddrInst *createReleaseValueAddr(SILLocation Loc,
                                                SILValue operand,
                                                Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) ReleaseValueAddrInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -943,6 +1015,7 @@ public:
                                                        SILValue operand,
                                                        Atomicity atomicity) {
     assert(getFunction().hasQualifiedOwnership());
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) UnmanagedRetainValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -951,6 +1024,7 @@ public:
                                                          SILValue operand,
                                                          Atomicity atomicity) {
     assert(getFunction().hasQualifiedOwnership());
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) UnmanagedReleaseValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
   }
@@ -967,6 +1041,7 @@ public:
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule())
                       DestroyValueInst(getSILDebugLocation(Loc), operand));
   }
@@ -1002,6 +1077,7 @@ public:
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements) {
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(
         StructInst::create(getSILDebugLocation(Loc), Ty, Elements,
                            getModule()));
@@ -1009,6 +1085,7 @@ public:
 
   TupleInst *createTuple(SILLocation Loc, SILType Ty,
                          ArrayRef<SILValue> Elements) {
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(
         TupleInst::create(getSILDebugLocation(Loc), Ty, Elements,
                           getModule()));
@@ -1018,18 +1095,21 @@ public:
 
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty) {
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) EnumInst(getSILDebugLocation(Loc),
                                                Operand, Element, Ty));
   }
 
   /// Inject a loadable value into the corresponding optional type.
   EnumInst *createOptionalSome(SILLocation Loc, SILValue operand, SILType ty) {
+    assert(ty.isLoadableOrOpaque(getModule()));
     auto someDecl = getModule().getASTContext().getOptionalSomeDecl();
     return createEnum(Loc, operand, someDecl, ty);
   }
 
   /// Create the nil value of a loadable optional type.
   EnumInst *createOptionalNone(SILLocation Loc, SILType ty) {
+    assert(ty.isLoadableOrOpaque(getModule()));
     auto noneDecl = getModule().getASTContext().getOptionalNoneDecl();
     return createEnum(Loc, nullptr, noneDecl, ty);
   }
@@ -1046,6 +1126,7 @@ public:
                                                  SILValue Operand,
                                                  EnumElementDecl *Element,
                                                  SILType Ty) {
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) UncheckedEnumDataInst(
         getSILDebugLocation(Loc), Operand, Element, Ty));
   }
@@ -1085,6 +1166,7 @@ public:
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
                    Optional<ArrayRef<ProfileCounter>> CaseCounts = None,
                    ProfileCounter DefaultCount = ProfileCounter()) {
+    assert(Ty.isLoadableOrOpaque(getModule()));
     return insert(SelectEnumInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
         getFunction(), CaseCounts, DefaultCount));
@@ -1190,6 +1272,24 @@ public:
         getModule(), getSILDebugLocation(Loc), Operand));
   }
 
+  MultipleValueInstruction *emitDestructureValueOperation(SILLocation Loc,
+                                                          SILValue Operand) {
+    SILType OpTy = Operand->getType();
+    if (OpTy.is<TupleType>())
+      return createDestructureTuple(Loc, Operand);
+    if (OpTy.getStructOrBoundGenericStruct())
+      return createDestructureStruct(Loc, Operand);
+    llvm_unreachable("Can not emit a destructure for this type of operand.");
+  }
+
+  void
+  emitShallowDestructureValueOperation(SILLocation Loc, SILValue Operand,
+                                       llvm::SmallVectorImpl<SILValue> &Result);
+
+  void emitShallowDestructureAddressOperation(
+      SILLocation Loc, SILValue Operand,
+      llvm::SmallVectorImpl<SILValue> &Result);
+
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ClassMethodInst(
@@ -1217,11 +1317,10 @@ public:
 
   WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
                                          ProtocolConformanceRef Conformance,
-                                         SILDeclRef Member, SILType MethodTy,
-                                         bool Volatile = false) {
+                                         SILDeclRef Member, SILType MethodTy) {
     return insert(WitnessMethodInst::create(
         getSILDebugLocation(Loc), LookupTy, Conformance, Member, MethodTy,
-        &getFunction(), OpenedArchetypes, Volatile));
+        &getFunction(), OpenedArchetypes));
   }
 
   OpenExistentialAddrInst *
@@ -1385,13 +1484,13 @@ public:
   }
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand,
                                        Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) StrongRetainInst(getSILDebugLocation(Loc),
                                                        Operand, atomicity));
   }
   StrongReleaseInst *createStrongRelease(SILLocation Loc, SILValue Operand,
                                          Atomicity atomicity) {
-    assert(isParsing || getFunction().hasUnqualifiedOwnership());
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
     return insert(new (getModule()) StrongReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
   }
@@ -1443,6 +1542,8 @@ public:
       return;
     createFixLifetime(Loc, Operand);
   }
+  ClassifyBridgeObjectInst *createClassifyBridgeObject(SILLocation Loc,
+                                                       SILValue value);
   MarkDependenceInst *createMarkDependence(SILLocation Loc, SILValue value,
                                            SILValue base) {
     return insert(new (getModule()) MarkDependenceInst(
@@ -1458,6 +1559,12 @@ public:
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsUniqueOrPinnedInst(
         getSILDebugLocation(Loc), value, Int1Ty));
+  }
+  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+                                                 SILValue operand) {
+    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    return insert(new (getModule()) IsEscapingClosureInst(
+        getSILDebugLocation(Loc), operand, Int1Ty));
   }
 
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {
@@ -1536,7 +1643,14 @@ public:
   // Runtime failure
   //===--------------------------------------------------------------------===//
 
-  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand) {
+  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand,
+                               bool Inverted = false) {
+    if (Inverted) {
+      SILType Ty = Operand->getType();
+      SILValue True(createIntegerLiteral(Loc, Ty, 1));
+      Operand =
+          createBuiltinBinaryFunction(Loc, "xor", Ty, Ty, {Operand, True});
+    }
     return insert(new (getModule())
                       CondFailInst(getSILDebugLocation(Loc), Operand));
   }
@@ -1587,6 +1701,18 @@ public:
   ThrowInst *createThrow(SILLocation Loc, SILValue errorValue) {
     return insertTerminator(
         new (getModule()) ThrowInst(getSILDebugLocation(Loc), errorValue));
+  }
+
+  UnwindInst *createUnwind(SILLocation loc) {
+    return insertTerminator(
+        new (getModule()) UnwindInst(getSILDebugLocation(loc)));
+  }
+
+  YieldInst *createYield(SILLocation loc, ArrayRef<SILValue> yieldedValues,
+                         SILBasicBlock *resumeBB, SILBasicBlock *unwindBB) {
+    return insertTerminator(
+        YieldInst::create(getSILDebugLocation(loc), yieldedValues,
+                          resumeBB, unwindBB, getFunction()));
   }
 
   CondBranchInst *
@@ -1832,6 +1958,8 @@ public:
   /// lowering for the non-address value.
   void emitDestroyValueOperation(SILLocation Loc, SILValue v) {
     assert(!v->getType().isAddress());
+    if (v.getOwnershipKind() == ValueOwnershipKind::Trivial)
+      return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);
   }
@@ -1960,6 +2088,73 @@ public:
       : SILBuilder(BB) {
     inheritScopeFrom(InheritScopeFrom);
   }
+
+  /// Creates a new SILBuilder with an insertion point at the
+  /// beginning of BB and the debug scope from the first
+  /// non-metainstruction in the BB.
+  explicit SILBuilderWithScope(SILBasicBlock *BB) : SILBuilder(BB->begin()) {
+    const SILDebugScope *DS = BB->getScopeOfFirstNonMetaInstruction();
+    assert(DS && "Instruction without debug scope associated!");
+    setCurrentDebugScope(DS);
+  }
+};
+
+class SavedInsertionPointRAII {
+  SILBuilder &Builder;
+  PointerUnion<SILInstruction *, SILBasicBlock *> SavedIP;
+
+public:
+  SavedInsertionPointRAII(SILBuilder &B, SILInstruction *NewIP)
+      : Builder(B), SavedIP(&*B.getInsertionPoint()) {
+    Builder.setInsertionPoint(NewIP);
+  }
+
+  SavedInsertionPointRAII(SILBuilder &B, SILBasicBlock *NewIP)
+      : Builder(B), SavedIP(B.getInsertionBB()) {
+    Builder.setInsertionPoint(NewIP);
+  }
+
+  SavedInsertionPointRAII(const SavedInsertionPointRAII &) = delete;
+  SavedInsertionPointRAII &operator=(const SavedInsertionPointRAII &) = delete;
+  SavedInsertionPointRAII(SavedInsertionPointRAII &&) = delete;
+  SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
+
+  ~SavedInsertionPointRAII() {
+    if (SavedIP.is<SILInstruction *>()) {
+      Builder.setInsertionPoint(SavedIP.get<SILInstruction *>());
+    } else {
+      Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());
+    }
+  }
+};
+
+/// Apply a debug location override for the duration of the current scope.
+class DebugLocOverrideRAII {
+  SILBuilder &Builder;
+  Optional<SILLocation> oldOverride;
+#ifndef NDEBUG
+  Optional<SILLocation> installedOverride;
+#endif
+
+public:
+  DebugLocOverrideRAII(SILBuilder &B, Optional<SILLocation> Loc) : Builder(B) {
+    oldOverride = B.getCurrentDebugLocOverride();
+    Builder.applyDebugLocOverride(Loc);
+#ifndef NDEBUG
+    installedOverride = Loc;
+#endif
+  }
+
+  ~DebugLocOverrideRAII() {
+    assert(Builder.getCurrentDebugLocOverride() == installedOverride &&
+           "Restoring debug location override to an unexpected state");
+    Builder.applyDebugLocOverride(oldOverride);
+  }
+
+  DebugLocOverrideRAII(const DebugLocOverrideRAII &) = delete;
+  DebugLocOverrideRAII &operator=(const DebugLocOverrideRAII &) = delete;
+  DebugLocOverrideRAII(DebugLocOverrideRAII &&) = delete;
+  DebugLocOverrideRAII &operator=(DebugLocOverrideRAII &&) = delete;
 };
 
 } // end swift namespace

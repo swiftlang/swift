@@ -18,7 +18,7 @@ import ObjectiveCTests
 
 public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStubDataAppend", runFunction: run_ObjectiveCBridgeStubDataAppend, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubDateAccess", runFunction: run_ObjectiveCBridgeStubDateAccess, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubDateAccess", runFunction: run_ObjectiveCBridgeStubDateAccess, tags: [.validation, .bridging, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubDateMutation", runFunction: run_ObjectiveCBridgeStubDateMutation, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubFromArrayOfNSString", runFunction: run_ObjectiveCBridgeStubFromArrayOfNSString, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDate", runFunction: run_ObjectiveCBridgeStubFromNSDate, tags: [.validation, .bridging]),

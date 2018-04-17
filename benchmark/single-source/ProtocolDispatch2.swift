@@ -20,7 +20,7 @@ import Foundation
 public let ProtocolDispatch2 = BenchmarkInfo(
   name: "ProtocolDispatch2",
   runFunction: run_ProtocolDispatch2,
-  tags: [.validation, .abstraction])
+  tags: [.validation, .abstraction, .unstable])
 
 protocol Pingable { func ping() -> Int;  func pong() -> Int}
 

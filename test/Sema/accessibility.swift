@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 public protocol PublicProto {
   func publicReq()
@@ -165,7 +165,7 @@ internal extension Base {
 }
 
 public class PublicSub: Base {
-  required init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-12=public }}
+  private required init() {} // expected-error {{'required' initializer must be accessible wherever class 'PublicSub' can be subclassed}} {{3-10=internal}}
   override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
   override var bar: Int { // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{12-12=public }}
     get { return 0 }
@@ -174,8 +174,12 @@ public class PublicSub: Base {
   override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{12-12=public }}
 }
 
+public class PublicSubGood: Base {
+  required init() {} // okay
+}
+
 internal class InternalSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=internal}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'InternalSub' can be subclassed}} {{12-19=internal}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=internal}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=internal}}
     get { return 0 }
@@ -207,7 +211,7 @@ internal class InternalSubPrivateSet: Base {
 }
 
 fileprivate class FilePrivateSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'FilePrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
@@ -249,7 +253,7 @@ fileprivate class FilePrivateSubPrivateSet: Base {
 }
 
 private class PrivateSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'PrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
@@ -426,6 +430,25 @@ class DefaultSubclassPublic : PublicClass {}
 class DefaultSubclassInternal : InternalClass {}
 class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared private or fileprivate because its superclass is private}}
 
+public class PublicGenericClass<T> {}
+// expected-note@+2 * {{type declared here}}
+// expected-note@+1 * {{superclass is declared here}}
+internal class InternalGenericClass<T> {}
+// expected-note@+1 * {{type declared here}}
+private class PrivateGenericClass<T> {}
+
+open class OpenConcreteSubclassInternal : InternalGenericClass<Int> {} // expected-error {{class cannot be declared open because its superclass is internal}} expected-error {{superclass 'InternalGenericClass<Int>' of open class must be open}}
+public class PublicConcreteSubclassPublic : PublicGenericClass<Int> {}
+public class PublicConcreteSubclassInternal : InternalGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is internal}}
+public class PublicConcreteSubclassPrivate : PrivateGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is private}}
+public class PublicConcreteSubclassPublicPrivateArg : PublicGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared public because its superclass is private}}
+
+open class OpenGenericSubclassInternal<T> : InternalGenericClass<T> {} // expected-error {{class cannot be declared open because its superclass is internal}} expected-error {{superclass 'InternalGenericClass<T>' of open class must be open}}
+public class PublicGenericSubclassPublic<T> : PublicGenericClass<T> {}
+public class PublicGenericSubclassInternal<T> : InternalGenericClass<T> {} // expected-error {{class cannot be declared public because its superclass is internal}}
+public class PublicGenericSubclassPrivate<T> : PrivateGenericClass<T> {} // expected-error {{class cannot be declared public because its superclass is private}}
+
+
 
 public enum PublicEnumPrivate {
   case A(PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
@@ -435,8 +458,8 @@ enum DefaultEnumPrivate {
 }
 public enum PublicEnumPI {
   case A(InternalStruct) // expected-error {{enum case in a public enum uses an internal type}}
-  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}}
-  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
+  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}} expected-error {{enum case in a public enum uses an internal type}}
+  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses an internal type}} expected-error {{enum case in a public enum uses a private type}}
 }
 enum DefaultEnumPublic {
   case A(PublicStruct) // no-warning
@@ -647,3 +670,24 @@ internal struct AssocTypeOuterProblem2 {
     fileprivate typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{5-16=internal}}
   }
 }
+
+internal typealias InternalComposition = PublicClass & PublicProto // expected-note {{declared here}}
+public class DerivedFromInternalComposition : InternalComposition { // expected-error {{class cannot be declared public because its superclass is internal}}
+  public func publicReq() {}
+}
+
+internal typealias InternalGenericComposition<T> = PublicGenericClass<T> & PublicProto // expected-note {{declared here}}
+public class DerivedFromInternalGenericComposition : InternalGenericComposition<Int> { // expected-error {{class cannot be declared public because its superclass is internal}}
+  public func publicReq() {}
+}
+
+internal typealias InternalConcreteGenericComposition = PublicGenericClass<Int> & PublicProto // expected-note {{declared here}}
+public class DerivedFromInternalConcreteGenericComposition : InternalConcreteGenericComposition { // expected-error {{class cannot be declared public because its superclass is internal}}
+  public func publicReq() {}
+}
+
+public typealias BadPublicComposition1 = InternalClass & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition2 = PublicClass & InternalProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition3<T> = InternalGenericClass<T> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition4 = InternalGenericClass<Int> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+public typealias BadPublicComposition5 = PublicGenericClass<InternalStruct> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}

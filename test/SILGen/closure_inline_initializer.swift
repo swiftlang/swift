@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
-// CHECK-LABEL: sil private @_T026closure_inline_initializer3FooV3fooSivpfiSiycfU_
+// CHECK-LABEL: sil private @$S26closure_inline_initializer3FooV3fooSivpfiSiyXEfU_
 
 struct Foo {
   var foo: Int = { 2 }()

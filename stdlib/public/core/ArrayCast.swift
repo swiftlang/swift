@@ -16,9 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_arrayDownCastIndirect")
-public func _arrayDownCastIndirect<SourceValue, TargetValue>(
+internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>) {
   target.initialize(to: _arrayForceCast(source.pointee))
@@ -28,7 +28,7 @@ public func _arrayDownCastIndirect<SourceValue, TargetValue>(
 ///
 /// - Note: When SourceElement and TargetElement are both bridged verbatim, type
 ///   checking is deferred until elements are actually accessed.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func _arrayForceCast<SourceElement, TargetElement>(
   _ source: Array<SourceElement>
 ) -> Array<TargetElement> {
@@ -53,25 +53,23 @@ public func _arrayForceCast<SourceElement, TargetElement>(
 }
 
 @_fixed_layout // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 internal struct _UnwrappingFailed : Error {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal init() {}
 }
 
 extension Optional {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func unwrappedOrError() throws -> Wrapped {
     if let x = self { return x }
     throw _UnwrappingFailed()
   }
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+/// Called by the casting machinery.
 @_silgen_name("_swift_arrayDownCastConditionalIndirect")
-public func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
+internal func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
   _ source: UnsafePointer<Array<SourceValue>>,
   _ target: UnsafeMutablePointer<Array<TargetValue>>
 ) -> Bool {
@@ -87,7 +85,7 @@ public func _arrayDownCastConditionalIndirect<SourceValue, TargetValue>(
 /// return `nil` if any element fails to convert.
 ///
 /// - Complexity: O(n), because each element must be checked.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func _arrayConditionalCast<SourceElement, TargetElement>(
   _ source: [SourceElement]
 ) -> [TargetElement]? {

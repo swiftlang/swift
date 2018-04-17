@@ -55,7 +55,7 @@ let _ = "Some text \(/*param-label:call*/aFunc(a:1)) around"
 class SomeClass {
     init() {}
     /*init:def*/init(a: Int, b:Int, c:Int) {}
-    /*sub:def*/subscript(x: Int, y: Int) -> Int {
+    /*sub:def*/subscript(x: Int, y j: Int) -> Int {
         get { return 1 }
         set {}
     }
@@ -64,8 +64,8 @@ class SomeClass {
 let someClass = SomeClass();
 let _ = /*init:call*/SomeClass(a:1, b:1, c:1)
 let _ = SomeClass . /*init*/init(a:b:c:)
-_ = someClass/*sub:ref*/[1, 2]
-someClass/*sub:ref*/[1, 2] = 2
+_ = someClass/*sub:ref*/[1, y: 2]
+someClass/*sub:ref*/[1, y: 2] = 2
 
 class AnotherClass {
     let bar = AnotherClass()
@@ -83,7 +83,7 @@ _ = Memberwise(/*memberwise-x:ref*/x: 1, z: 3)
 let memberwise = Memberwise.init(/*memberwise-x:ref*/x:z:)
 _ = memberwise . /*memberwise-x:ref*/x
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="bar" -is-function-like -old-name "bar(_:)" -new-name "barb(first:)" >> %t.result/functions_bar.swift
 // RUN: diff -u %S/Outputs/functions/bar.swift.expected %t.result/functions_bar.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="no-args" -is-function-like -old-name "aFunc" -new-name "anotherFunc" >> %t.result/functions_no-args.swift
@@ -120,11 +120,11 @@ _ = memberwise . /*memberwise-x:ref*/x
 // RUN: diff -u %S/Outputs/functions/import.swift.expected %t.result/functions_import.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="nested" -is-function-like -old-name "foo(a:)" -new-name "bar(b:)" >> %t.result/functions_nested.swift
 // RUN: diff -u %S/Outputs/functions/nested.swift.expected %t.result/functions_nested.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="sub" -is-function-like -old-name "subscript(x:y:)" -new-name "subscript(i:j:)" >> %t.result/functions_sub.swift
+// RUN: %refactor -syntactic-rename -source-filename %s -pos="sub" -is-function-like -old-name "subscript(_:y:)" -new-name "subscript(x:j:)" >> %t.result/functions_sub.swift
 // RUN: diff -u %S/Outputs/functions/sub.swift.expected %t.result/functions_sub.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="memberwise-x" -old-name "x" -new-name "new_x" >> %t.result/functions_memberwise-x.swift
 // RUN: diff -u %S/Outputs/functions/memberwise-x.swift.expected %t.result/functions_memberwise-x.swift
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="bar" -is-function-like -old-name "bar(_:)" >> %t.ranges/functions_bar.swift
 // RUN: diff -u %S/FindRangeOutputs/functions/bar.swift.expected %t.ranges/functions_bar.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="no-args" -is-function-like -old-name "aFunc" >> %t.ranges/functions_no-args.swift
@@ -145,7 +145,7 @@ _ = memberwise . /*memberwise-x:ref*/x
 // RUN: diff -u %S/FindRangeOutputs/functions/prefix-operator.swift.expected %t.ranges/functions_prefix-operator.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="init" -is-function-like -old-name "init(a:b:c:)" >> %t.ranges/functions_init.swift
 // RUN: diff -u %S/FindRangeOutputs/functions/init.swift.expected %t.ranges/functions_init.swift
-// RUN: %refactor -find-rename-ranges -source-filename %s -pos="sub" -is-function-like -old-name "subscript(x:y:)" >> %t.ranges/functions_sub.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="sub" -is-function-like -old-name "subscript(_:y:)" >> %t.ranges/functions_sub.swift
 // RUN: diff -u %S/FindRangeOutputs/functions/sub.swift.expected %t.ranges/functions_sub.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="memberwise-x" -old-name "x" >> %t.ranges/functions_memberwise-x.swift
 // RUN: diff -u %S/FindRangeOutputs/functions/memberwise-x.swift.expected %t.ranges/functions_memberwise-x.swift

@@ -104,10 +104,6 @@ void eraseUsesOfValue(SILValue V);
 
 FullApplySite findApplyFromDevirtualizedResult(SILValue value);
 
-/// Check that this is a partial apply of a reabstraction thunk and return the
-/// argument of the partial apply if it is.
-SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
-
 /// Cast a value into the expected, ABI compatible type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.
@@ -164,8 +160,6 @@ SingleValueInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
                           SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist);
-
-void recalcDomTreeForCCBOpt(DominanceInfo *DT, SILFunction &F);
 
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
@@ -432,122 +426,6 @@ void updateSSAAfterCloning(BaseThreadingCloner &Cloner, SILBasicBlock *SrcBB,
                            SILBasicBlock *DestBB,
                            bool NeedToSplitCriticalEdges = true);
 
-/// \brief This is a helper class used to optimize casts.
-class CastOptimizer {
-  // Callback to be called when uses of an instruction should be replaced.
-  std::function<void (SingleValueInstruction *I, ValueBase *V)>
-    ReplaceInstUsesAction;
-
-  // Callback to call when an instruction needs to be erased.
-  std::function<void (SILInstruction *)> EraseInstAction;
-
-  // Callback to call after an optimization was performed based on the fact
-  // that a cast will succeed.
-  std::function<void ()> WillSucceedAction;
-
-  // Callback to call after an optimization was performed based on the fact
-  // that a cast will fail.
-  std::function<void ()> WillFailAction;
-
-  /// Optimize a cast from a bridged ObjC type into
-  /// a corresponding Swift type implementing _ObjectiveCBridgeable.
-  SILInstruction *
-  optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
-      bool isConditional,
-      SILValue Src,
-      SILValue Dest,
-      CanType Source,
-      CanType Target,
-      Type BridgedSourceTy,
-      Type BridgedTargetTy,
-      SILBasicBlock *SuccessBB,
-      SILBasicBlock *FailureBB);
-
-  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
-  /// into a bridged ObjC type.
-  SILInstruction *
-  optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
-      CastConsumptionKind ConsumptionKind,
-      bool isConditional,
-      SILValue Src,
-      SILValue Dest,
-      CanType Source,
-      CanType Target,
-      Type BridgedSourceTy,
-      Type BridgedTargetTy,
-      SILBasicBlock *SuccessBB,
-      SILBasicBlock *FailureBB);
-
-  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
-                                          SILInstruction *TrapInst);
-
-public:
-  CastOptimizer(std::function<void (SingleValueInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
-                std::function<void (SILInstruction *)> EraseAction,
-                std::function<void ()> WillSucceedAction,
-                std::function<void ()> WillFailAction = [](){})
-    : ReplaceInstUsesAction(ReplaceInstUsesAction),
-      EraseInstAction(EraseAction),
-      WillSucceedAction(WillSucceedAction),
-      WillFailAction(WillFailAction) {}
-
-  // This constructor is used in
-  // 'SILOptimizer/Mandatory/ConstantPropagation.cpp'. MSVC2015 compiler
-  // couldn't use the single constructor version which has three default
-  // arguments. It seems the number of the default argument with lambda is
-  // limited.
-  CastOptimizer(std::function<void (SingleValueInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
-                std::function<void (SILInstruction *)> EraseAction = [](SILInstruction*){})
-    : CastOptimizer(ReplaceInstUsesAction, EraseAction, [](){}, [](){}) {}
-
-  /// Simplify checked_cast_br. It may change the control flow.
-  SILInstruction *
-  simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst);
-
-  /// Simplify checked_cast_value_br. It may change the control flow.
-  SILInstruction *
-  simplifyCheckedCastValueBranchInst(CheckedCastValueBranchInst *Inst);
-
-  /// Simplify checked_cast_addr_br. It may change the control flow.
-  SILInstruction *
-  simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst);
-
-  /// Optimize checked_cast_br. This cannot change the control flow.
-  SILInstruction *
-  optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst);
-
-  /// Optimize checked_cast_value_br. This cannot change the control flow.
-  SILInstruction *
-  optimizeCheckedCastValueBranchInst(CheckedCastValueBranchInst *Inst);
-
-  /// Optimize checked_cast_addr_br. This cannot change the control flow.
-  SILInstruction *
-  optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst);
-
-  /// Optimize unconditional_checked_cast. This cannot change the control flow.
-  ValueBase *
-  optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst);
-
-  /// Optimize unconditional_checked_cast_addr. This cannot change the control
-  /// flow.
-  SILInstruction *
-  optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst);
-
-  /// Check if it is a bridged cast and optimize it.
-  /// May change the control flow.
-  SILInstruction *
-  optimizeBridgedCasts(SILInstruction *Inst,
-      CastConsumptionKind ConsumptionKind,
-      bool isConditional,
-      SILValue Src,
-      SILValue Dest,
-      CanType Source,
-      CanType Target,
-      SILBasicBlock *SuccessBB,
-      SILBasicBlock *FailureBB);
-
-};
-
 // Helper class that provides a callback that can be used in
 // inliners/cloners for collecting new call sites.
 class CloneCollector {
@@ -731,6 +609,48 @@ SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
 /// Will look through single basic block predecessor arguments.
 void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
                              DominanceInfo *DomTree);
+
+/// Utility class for cloning init values into the static initializer of a
+/// SILGlobalVariable.
+class StaticInitCloner : public SILCloner<StaticInitCloner> {
+  friend class SILInstructionVisitor<StaticInitCloner>;
+  friend class SILCloner<StaticInitCloner>;
+
+  /// The number of not yet cloned operands for each instruction.
+  llvm::DenseMap<SILInstruction *, int> NumOpsToClone;
+
+  /// List of instructions for which all operands are already cloned (or which
+  /// don't have any operands).
+  llvm::SmallVector<SILInstruction *, 8> ReadyToClone;
+
+public:
+  StaticInitCloner(SILGlobalVariable *GVar)
+      : SILCloner<StaticInitCloner>(GVar) { }
+
+  /// Add \p InitVal and all its operands (transitively) for cloning.
+  ///
+  /// Note: all init values must are added, before calling clone().
+  void add(SILInstruction *InitVal);
+
+  /// Clone \p InitVal and all its operands into the initializer of the
+  /// SILGlobalVariable.
+  ///
+  /// \return Returns the cloned instruction in the SILGlobalVariable.
+  SingleValueInstruction *clone(SingleValueInstruction *InitVal);
+
+  /// Convenience function to clone a single \p InitVal.
+  static void appendToInitializer(SILGlobalVariable *GVar,
+                                  SingleValueInstruction *InitVal) {
+    StaticInitCloner Cloner(GVar);
+    Cloner.add(InitVal);
+    Cloner.clone(InitVal);
+  }
+
+protected:
+  SILLocation remapLocation(SILLocation Loc) {
+    return ArtificialUnreachableLocation();
+  }
+};
 
 } // end namespace swift
 

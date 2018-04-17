@@ -46,7 +46,7 @@ void emitStoreEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
 template <class Impl>
 class WitnessSizedTypeInfo : public IndirectTypeInfo<Impl, TypeInfo> {
 private:
-  typedef IndirectTypeInfo<Impl, TypeInfo> super;
+  using super = IndirectTypeInfo<Impl, TypeInfo>;
 
 protected:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
@@ -68,28 +68,23 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return false; }
 
-  StackAddress allocateStack(IRGenFunction &IGF,
-                                 SILType T,
-                                 bool isInEntryBlock,
-                                 const llvm::Twine &name) const override {
+  StackAddress allocateStack(IRGenFunction &IGF, SILType T,
+                             const llvm::Twine &name) const override {
     // Allocate memory on the stack.
-    auto alloca = emitDynamicAlloca(IGF, T, isInEntryBlock);
-    assert((isInEntryBlock && alloca.SavedSP == nullptr) ||
-           (!isInEntryBlock && alloca.SavedSP != nullptr) &&
-               "stacksave/restore operations can only be skipped in the entry "
-               "block");
-    IGF.Builder.CreateLifetimeStart(alloca.Alloca);
-    return { getAsBitCastAddress(IGF, alloca.Alloca), alloca.SavedSP };
+    auto alloca = IGF.emitDynamicAlloca(T, name);
+    IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
+    return alloca.withAddress(
+             getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    emitDeallocateDynamicAlloca(IGF, stackAddress);
+    IGF.emitDeallocateDynamicAlloca(stackAddress);
   }
 
-  void destroyStack(IRGenFunction &IGF, StackAddress stackAddress,
-                    SILType T) const override {
+  void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
+                    bool isOutlined) const override {
     emitDestroyCall(IGF, T, stackAddress.getAddress());
     deallocateStack(IGF, stackAddress, T);
   }

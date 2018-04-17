@@ -10,12 +10,9 @@ ATTRIBUTE_NODES = [
     Node('Attribute', kind='Syntax',
          children=[
              Child('AtSignToken', kind='AtSignToken'),
-             Child('Identifier', kind='IdentifierToken'),
-             Child('LeftParen', kind='LeftParenToken',
-                   is_optional=True),
+             Child('AttributeName', kind='Token'),
+             # FIXME: more structure
              Child('BalancedTokens', kind='TokenList'),
-             Child('RightParen', kind='RightParenToken',
-                   is_optional=True),
          ]),
 
     # attribute-list -> attribute attribute-list?

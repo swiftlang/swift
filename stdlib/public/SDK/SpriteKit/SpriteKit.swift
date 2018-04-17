@@ -15,7 +15,7 @@ import simd
 
 // SpriteKit defines SKColor using a macro.
 
-#if os(OSX)
+#if os(macOS)
 public typealias SKColor = NSColor
 #elseif os(iOS) || os(tvOS) || os(watchOS)
 public typealias SKColor = UIColor
@@ -30,7 +30,7 @@ public typealias SKColor = UIColor
 }
 
 @available(iOS, introduced: 10.0)
-@available(OSX, introduced: 10.12)
+@available(macOS, introduced: 10.12)
 @available(tvOS, introduced: 10.0)
 @available(watchOS, introduced: 3.0)
 extension SKWarpGeometryGrid {

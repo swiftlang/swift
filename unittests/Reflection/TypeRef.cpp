@@ -147,10 +147,11 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   EXPECT_NE(F4, F1);
 
   // Test parameter with and without inout/shared/variadic and/or label.
-  ParameterTypeFlags paramFlags;
-  auto inoutFlags = paramFlags.withInOut(true);
+  ParameterFlags paramFlags;
+  auto inoutFlags = paramFlags.withValueOwnership(ValueOwnership::InOut);
   auto variadicFlags = paramFlags.withVariadic(true);
-  auto sharedFlags = paramFlags.withShared(true);
+  auto sharedFlags = paramFlags.withValueOwnership(ValueOwnership::Shared);
+  auto ownedFlags = paramFlags.withValueOwnership(ValueOwnership::Owned);
 
   auto F6 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
                                        FunctionTypeFlags());
@@ -170,17 +171,27 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
                                          Result, FunctionTypeFlags());
   EXPECT_EQ(F8, F8_1);
 
-  auto F9 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
-  auto F9_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
+  auto F9 = Builder.createFunctionType({Param1.withFlags(ownedFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F9_1 = Builder.createFunctionType({Param1.withFlags(ownedFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F9, F9_1);
+
+  auto F10 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
+  auto F10_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
                                          FunctionTypeFlags());
-  EXPECT_NE(F9, F9_1);
+  EXPECT_NE(F10, F10_1);
 
   EXPECT_NE(F6, F7);
   EXPECT_NE(F6, F8);
   EXPECT_NE(F6, F9);
+  EXPECT_NE(F6, F10);
   EXPECT_NE(F7, F8);
   EXPECT_NE(F7, F9);
+  EXPECT_NE(F7, F10);
   EXPECT_NE(F8, F9);
+  EXPECT_NE(F8, F10);
+  EXPECT_NE(F9, F10);
 
   auto VoidVoid1 =
       Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());
@@ -189,25 +200,36 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   EXPECT_EQ(VoidVoid1, VoidVoid2);
   EXPECT_NE(VoidVoid1, F1);
+
+  // Test escaping.
+  auto F11 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F12 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F13 = Builder.createFunctionType(
+      Parameters1, Result, FunctionTypeFlags().withEscaping(false));
+  EXPECT_EQ(F11, F12);
+  EXPECT_NE(F11, F13);
 }
 
 TEST(TypeRefTest, UniqueProtocolTypeRef) {
   TypeRefBuilder Builder;
 
-  auto P1 = Builder.createProtocolType(ABC, MyModule, "", MyProtocol);
-  auto P2 = Builder.createProtocolType(ABC, MyModule, "", MyProtocol);
-  auto P3 = Builder.createProtocolType(ABCD, MyModule, "", Shmrotocol);
-  auto P4 = Builder.createProtocolType(XYZ, Shmodule, "", MyProtocol);
+  Optional<std::string> P1 = ABC;
+  Optional<std::string> P2 = ABC;
+  Optional<std::string> P3 = ABCD;
+  Optional<std::string> P4 = XYZ;
 
   EXPECT_EQ(P1, P2);
   EXPECT_NE(P2, P3);
   EXPECT_NE(P2, P3);
   EXPECT_NE(P3, P4);
 
-  auto PC1 = Builder.createProtocolCompositionType({P1, P2}, false);
-  auto PC2 = Builder.createProtocolCompositionType({P1, P2}, false);
-  auto PC3 = Builder.createProtocolCompositionType({P1, P2, P2}, false);
-  auto Any = Builder.createProtocolCompositionType({}, false);
+  auto PC1 = Builder.createProtocolCompositionType({P1, P2}, nullptr, false);
+  auto PC2 = Builder.createProtocolCompositionType({P1, P2}, nullptr, false);
+  auto PC3 =
+    Builder.createProtocolCompositionType({P1, P2, P2}, nullptr, false);
+  auto Any = Builder.createProtocolCompositionType({}, nullptr, false);
 
   EXPECT_EQ(PC1, PC2);
   EXPECT_NE(PC2, PC3);
@@ -258,8 +280,8 @@ TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
-  auto P1 = Builder.createProtocolType(ABC, MyModule, "", MyProtocol);
-  auto P2 = Builder.createProtocolType(ABCD, Shmodule, "", MyProtocol);
+  Optional<std::string> P1 = ABC;
+  Optional<std::string> P2 = ABCD;
 
   auto DM1 = Builder.createDependentMemberType("Index", N1, P1);
   auto DM2 = Builder.createDependentMemberType("Index", N1, P1);

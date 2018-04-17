@@ -180,7 +180,7 @@ obj.generic4!(5) // expected-error{{value of type 'Id' (aka 'AnyObject') has no 
 // Find properties via dynamic lookup.
 var prop1Result : Int = obj.prop1!
 var prop2Result : String = obj.prop2!
-obj.prop2 = "hello" // expected-error{{cannot assign to property: 'obj' is immutable}}
+obj.prop2 = "hello" // expected-error{{cannot assign to immutable expression of type 'String?'}}
 var protoPropResult : Int = obj.protoProp!
 
 // Find subscripts via dynamic lookup
@@ -217,8 +217,8 @@ let uopt : AnyObject! = nil
 uopt.wibble!()
 
 // Should not be able to see private or internal @objc methods.
-uopt.privateFoo!() // expected-error{{'privateFoo' is inaccessible due to 'private' protection level}}
-uopt.internalFoo!() // expected-error{{'internalFoo' is inaccessible due to 'internal' protection level}}
+uopt.privateFoo!() // expected-error{{value of type 'AnyObject?' has no member 'privateFoo'}}
+uopt.internalFoo!() // expected-error{{value of type 'AnyObject?' has no member 'internalFoo'}}
 
 let anyValue: Any = X()
 _ = anyValue.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
@@ -251,3 +251,88 @@ func rdar29960565(_ o: AnyObject) {
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: 'privateFoo' declared here
 // <unknown>:0: error: unexpected note produced: 'internalFoo' declared here
+
+@objc protocol Q {}
+
+@objc class Dynamic : NSObject, Q {
+  @objc var s: String = ""
+  @objc func foo() -> String {}
+  @objc subscript(_: String) -> String {
+    get {
+      return "hi"
+    }
+    set {}
+  }
+}
+
+@objc class DynamicIUO : NSObject, Q {
+  @objc var t: String! = ""
+  @objc func bar() -> String! {}
+  @objc subscript(_: DynamicIUO) -> DynamicIUO! {
+    get {
+      return self
+    }
+    set {}
+  }
+}
+
+var dyn = Dynamic()
+var dyn_iuo = DynamicIUO()
+let s = "hi"
+var o: AnyObject = dyn
+let _: String = o.s
+let _: String = o.s!
+let _: String? = o.s
+let _: String = o.foo()
+let _: String = o.foo!()
+let _: String? = o.foo()
+let _: String = o[s]
+let _: String = o[s]!
+let _: String? = o[s]
+// FIXME: These should all produce lvalues that we can write through
+o.s = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
+o.s! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
+o[s] = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
+o[s]! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
+
+let _: String = o.t
+let _: String = o.t!
+let _: String = o.t!!
+let _: String? = o.t
+let _: String = o.bar()
+let _: String = o.bar!()
+let _: String = o.bar()!
+let _: String = o.bar!()!
+let _: String? = o.bar()
+let _: DynamicIUO = o[dyn_iuo]
+let _: DynamicIUO = o[dyn_iuo]!
+let _: DynamicIUO = o[dyn_iuo]!!
+let _: DynamicIUO? = o[dyn_iuo]
+// FIXME: These should all produce lvalues that we can write through
+o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO??'}}
+o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO?'}}
+o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO'}}
+
+
+// Check that we avoid picking an unavailable overload if there's an
+// alternative.
+class OverloadedWithUnavailable1 {
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc
+  @available(swift, obsoleted: 3)
+  func overloadedWithUnavailableB() { }
+}
+
+class OverloadedWithUnavailable2 {
+  @available(swift, obsoleted: 3)
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc func overloadedWithUnavailableB() { }
+}
+
+func testOverloadedWithUnavailable(ao: AnyObject) {
+  ao.overloadedWithUnavailableA()
+  ao.overloadedWithUnavailableB()
+}
+

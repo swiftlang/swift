@@ -579,7 +579,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
 
-    if (isDebugInst(UseInst))
+    if (UseInst->isDebugInstruction())
       continue;
 
     if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
@@ -698,7 +698,7 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     if (isa<MarkDependenceInst>(UseInst))
       continue;
 
-    if (isDebugInst(UseInst))
+    if (UseInst->isDebugInstruction())
       continue;
     
     // Found an unsafe or unknown user. The Array may escape here.
@@ -761,7 +761,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   if (isa<MarkDependenceInst>(UseInst))
     return true;
 
-  if (isDebugInst(UseInst))
+  if (UseInst->isDebugInstruction())
     return true;
   
   // If this is an instruction which is a safe array element use if and only if
@@ -797,7 +797,7 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
 static bool isArrayEltStore(StoreInst *SI) {
   SILValue Dest = stripAddressProjections(SI->getDest());
   if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
-    Dest = MD->getOperand(0);
+    Dest = MD->getValue();
 
   if (auto *PtrToAddr =
           dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
@@ -1095,17 +1095,21 @@ private:
     DepInsts.push_back(StructExtractArrayAddr);
 
     // Check the base the array element address is dependent on.
-    auto *EnumArrayAddr = dyn_cast<EnumInst>(MarkDependence->getBase());
-    if (!EnumArrayAddr)
-      return false;
-    DepInsts.push_back(EnumArrayAddr);
-    auto *UncheckedRefCast =
-        dyn_cast<UncheckedRefCastInst>(EnumArrayAddr->getOperand());
-    if (!UncheckedRefCast)
-      return false;
-    DepInsts.push_back(UncheckedRefCast);
+    SILValue base = MarkDependence->getBase();
 
-    SILValue ArrayBuffer = stripValueProjections(UncheckedRefCast->getOperand(), DepInsts);
+    // We can optionally have an enum instruction here.
+    if (auto *EnumArrayAddr = dyn_cast<EnumInst>(base)) {
+      DepInsts.push_back(EnumArrayAddr);
+      base = EnumArrayAddr->getOperand();
+    }
+
+    // We can optionally have an unchecked cast.
+    if (auto *UncheckedRefCast = dyn_cast<UncheckedRefCastInst>(base)) {
+      DepInsts.push_back(UncheckedRefCast);
+      base = UncheckedRefCast->getOperand();
+    }
+
+    SILValue ArrayBuffer = stripValueProjections(base, DepInsts);
     auto *BaseLoad = dyn_cast<LoadInst>(ArrayBuffer);
     if (!BaseLoad ||  Loop->contains(BaseLoad->getOperand()->getParentBlock()))
       return false;
@@ -1760,7 +1764,7 @@ private:
   bool checkSafeArrayAddressUses(UserList &AddressUsers) {
     for (auto *UseInst : AddressUsers) {
 
-      if (isDebugInst(UseInst))
+      if (UseInst->isDebugInstruction())
         continue;
 
       if (isa<DeallocStackInst>(UseInst)) {
@@ -2316,8 +2320,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     auto *Fn = getFunction();
 
     // Don't hoist array property calls at Osize.
-    auto OptMode = Fn->getModule().getOptions().Optimization;
-    if (OptMode == SILOptions::SILOptMode::OptimizeForSize)
+    if (Fn->optimizeForSize())
       return;
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
@@ -2364,9 +2367,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
                             DT, nullptr);
 
       DEBUG(getFunction()->viewCFG());
-    }
 
-    if (HasChanged) {
       // We preserve the dominator tree. Let's invalidate everything
       // else.
       DA->lockInvalidation();

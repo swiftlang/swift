@@ -49,8 +49,12 @@ static bool seemsUseful(SILInstruction *I) {
     return BI->getBuiltinInfo().ID == BuiltinValueKind::OnFastPath;
   }
 
-  if (isa<ReturnInst>(I) || isa<UnreachableInst>(I) || isa<ThrowInst>(I))
+  if (isa<UnreachableInst>(I))
     return true;
+  if (auto TI = dyn_cast<TermInst>(I)) {
+    if (TI->isFunctionExiting())
+      return true;
+  }
 
   return false;
 }
@@ -291,6 +295,8 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::UnwindInst:
+  case TermKind::YieldInst:
 
   case TermKind::UnreachableInst:
   case TermKind::SwitchValueInst:
@@ -381,6 +387,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
   switch (cast<TermInst>(I)->getTermKind()) {
   case TermKind::BranchInst:
   case TermKind::UnreachableInst:
+  case TermKind::UnwindInst:
     return;
 
   case TermKind::ReturnInst:
@@ -396,6 +403,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
 
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
+  case TermKind::YieldInst:
     for (auto &O : I->getAllOperands())
       markValueLive(O.get());
     return;

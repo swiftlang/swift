@@ -7,7 +7,7 @@
 
 // CHECK-NOT: UnknownCode
 
-let a: Int? = 1 // expected-note {{did you mean 'a'?}}
+let a: Int? = 1 // expected-note {{'a' declared here}}
 guard let b = a else {
   fatalError()
 }

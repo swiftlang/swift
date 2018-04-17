@@ -12,12 +12,11 @@
 
 @_exported import MetalKit // Clang module
 
-@available(swift 4)
 @available(macOS 10.11, iOS 9.0, tvOS 9.0, *)
 extension MTKMesh {
     public class func newMeshes(asset: MDLAsset, device: MTLDevice) throws -> (modelIOMeshes: [MDLMesh], metalKitMeshes: [MTKMesh]) {
         var modelIOMeshes: NSArray?
-        var metalKitMeshes = try MTKMesh.newMeshes(from: asset, device: device, sourceMeshes: &modelIOMeshes)
+        let metalKitMeshes = try MTKMesh.__newMeshes(from: asset, device: device, sourceMeshes: &modelIOMeshes)
         return (modelIOMeshes: modelIOMeshes as! [MDLMesh], metalKitMeshes: metalKitMeshes)
     }
 }
@@ -26,7 +25,7 @@ extension MTKMesh {
 @available(macOS 10.12, iOS 10.0, tvOS 10.0, *)
 public func MTKModelIOVertexDescriptorFromMetalWithError(_ metalDescriptor: MTLVertexDescriptor) throws -> MDLVertexDescriptor {
     var error: NSError? = nil
-    let result = MTKModelIOVertexDescriptorFromMetalWithError(metalDescriptor, &error)
+    let result = __MTKModelIOVertexDescriptorFromMetalWithError(metalDescriptor, &error)
     if let error = error {
         throw error
     }
@@ -37,7 +36,7 @@ public func MTKModelIOVertexDescriptorFromMetalWithError(_ metalDescriptor: MTLV
 @available(macOS 10.12, iOS 10.0, tvOS 10.0, *)
 public func MTKMetalVertexDescriptorFromModelIOWithError(_ modelIODescriptor: MDLVertexDescriptor) throws -> MTLVertexDescriptor? {
     var error: NSError? = nil
-    let result = MTKMetalVertexDescriptorFromModelIOWithError(modelIODescriptor, &error)
+    let result = __MTKMetalVertexDescriptorFromModelIOWithError(modelIODescriptor, &error)
     if let error = error {
         throw error
     }

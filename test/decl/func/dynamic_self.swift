@@ -89,7 +89,7 @@ class C1 {
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{use of unresolved identifier 'Self'}} expected-note {{did you mean 'self'?}}
+    return Self() // expected-error{{use of unresolved identifier 'Self'; did you mean 'self'?}}
   }
 
   // This used to crash because metatype construction went down a
@@ -287,6 +287,7 @@ extension Y {
 
 extension X {
   func tryToClone() -> Self? { return nil }
+  func tryHarderToClone() -> Self! { return nil }
   func cloneOrFail() -> Self { return self }
   func cloneAsObjectSlice() -> X? { return self }
 }
@@ -308,6 +309,10 @@ func testOptionalSelf(_ y : Y) {
   // isn't coincidental.
   if let clone = y.cloneAsObjectSlice() {
     clone.operationThatOnlyExistsOnY() // expected-error {{value of type 'X' has no member 'operationThatOnlyExistsOnY'}}
+  }
+
+  if let clone = y.tryHarderToClone().tryToClone() {
+    clone.operationThatOnlyExistsOnY();
   }
 }
 

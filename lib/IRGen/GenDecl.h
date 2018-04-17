@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_GENDECL_H
 #define SWIFT_IRGEN_GENDECL_H
 
+#include "swift/Basic/OptimizationMode.h"
+#include "swift/SIL/SILLocation.h"
 #include "llvm/IR/CallingConv.h"
 #include "DebugTypeInfo.h"
 #include "IRGen.h"
@@ -29,14 +31,20 @@ namespace llvm {
 namespace swift {
 namespace irgen {
   class IRGenModule;
+  class LinkEntity;
   class LinkInfo;
   class Signature;
+
+  void updateLinkageForDefinition(IRGenModule &IGM,
+                                  llvm::GlobalValue *global,
+                                  const LinkEntity &entity);
 
   llvm::Function *createFunction(IRGenModule &IGM,
                                  LinkInfo &linkInfo,
                                  const Signature &signature,
-                                 llvm::Function *insertBefore = nullptr);
-
+                                 llvm::Function *insertBefore = nullptr,
+                                 OptimizationMode FuncOptMode =
+                                   OptimizationMode::NotSet);
 
   llvm::GlobalVariable *createVariable(IRGenModule &IGM,
                                        LinkInfo &linkInfo,
@@ -45,6 +53,7 @@ namespace irgen {
                                        DebugTypeInfo DebugType=DebugTypeInfo(),
                                        Optional<SILLocation> DebugLoc = None,
                                        StringRef DebugName = StringRef());
+
 }
 }
 

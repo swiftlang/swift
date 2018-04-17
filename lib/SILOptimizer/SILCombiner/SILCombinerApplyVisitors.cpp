@@ -17,6 +17,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -24,7 +25,6 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -155,7 +155,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
   auto Args = PAI->getArguments();
   Params = Params.drop_front(Params.size() - Args.size());
 
-  llvm::SmallVector<std::pair<SILValue, unsigned>, 8> ArgsToHandle;
+  llvm::SmallVector<std::pair<SILValue, uint16_t>, 8> ArgsToHandle;
   for (unsigned i : indices(Args)) {
     SILValue Arg = Args[i];
     SILParameterInfo Param = Params[i];
@@ -197,8 +197,8 @@ bool PartialApplyCombiner::allocateTemporaries() {
     SILValue Arg = ArgWithIdx.first;
     Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
     // Create a new temporary at the beginning of a function.
-    auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(),
-                                        {/*Constant*/ true, ArgWithIdx.second});
+    SILDebugVariable DbgVar(/*Constant*/ true, ArgWithIdx.second);
+    auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg->getType(), DbgVar);
     Builder.setInsertionPoint(PAI);
     // Copy argument into this temporary.
     Builder.createCopyAddr(PAI->getLoc(), Arg, Tmp,
@@ -328,20 +328,24 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
+    if (!PAI->hasCalleeGuaranteedContext())
+      Builder.createStrongRelease(AI.getLoc(), PAI,
+                                  Builder.getDefaultAtomicity());
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
+    if (!PAI->hasCalleeGuaranteedContext())
+      Builder.emitDestroyValueOperation(PAI->getLoc(), PAI);
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
     // Release the non-consumed parameters.
     for (auto Arg : ToBeReleasedArgs) {
       Builder.emitDestroyValueOperation(PAI->getLoc(), Arg);
     }
-    Builder.createStrongRelease(AI.getLoc(), PAI, Builder.getDefaultAtomicity());
+    if (!PAI->hasCalleeGuaranteedContext())
+      Builder.emitDestroyValueOperation(PAI->getLoc(), PAI);
   }
 
   if (auto apply = dyn_cast<ApplyInst>(AI))
@@ -373,7 +377,7 @@ SILInstruction *PartialApplyCombiner::combine() {
     auto *User = Use->getUser();
 
     // Recurse through conversions.
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(User)) {
+    if (auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(User)) {
       // TODO: Handle argument conversion. All the code in this file needs to be
       // cleaned up and generalized. The argument conversion handling in
       // optimizeApplyOfConvertFunctionInst should apply to any combine
@@ -382,12 +386,12 @@ SILInstruction *PartialApplyCombiner::combine() {
       // For now, just handle conversion to @noescape, which is irrelevant for
       // direct application of the closure.
       auto ConvertCalleeTy = CFI->getType().castTo<SILFunctionType>();
-      auto EscapingCalleeTy = Lowering::adjustFunctionType(
-          ConvertCalleeTy, ConvertCalleeTy->getExtInfo().withNoEscape(false),
-          ConvertCalleeTy->getWitnessMethodConformanceOrNone());
-      if (Use->get()->getType().castTo<SILFunctionType>() == EscapingCalleeTy)
-        Uses.append(CFI->getUses().begin(), CFI->getUses().end());
-
+      auto EscapingCalleeTy =
+          ConvertCalleeTy->getWithExtInfo(
+            ConvertCalleeTy->getExtInfo().withNoEscape(false));
+      assert(Use->get()->getType().castTo<SILFunctionType>() ==
+             EscapingCalleeTy);
+      Uses.append(CFI->getUses().begin(), CFI->getUses().end());
       continue;
     }
     // If this use of a partial_apply is not
@@ -485,13 +489,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
-    } else if (SILType::canRefCast(OldOpType, NewOpType, AI.getModule())) {
-      auto URC = Builder.createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
+    } else if (OldOpType.getSwiftRValueType() != NewOpType.getSwiftRValueType()) {
+      auto URC = Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
-      assert((!OldOpType.isHeapObjectReferenceType()
-              && !NewOpType.isHeapObjectReferenceType()) &&
-             "ref argument types should map to refs.");
       Args.push_back(Op);
     }
   }
@@ -600,7 +601,7 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
 }
 
 /// Returns the address of an object with which the stack location \p ASI is
-/// initialized. This is either a init_existential_addr or the source of a
+/// initialized. This is either a init_existential_addr or the destination of a
 /// copy_addr. Returns a null value if the address does not dominate the
 /// alloc_stack user \p ASIUser.
 /// If the value is copied from another stack location, \p isCopied is set to
@@ -807,21 +808,45 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   return NewAI.getInstruction();
 }
 
+namespace {
+/// Record conformance and concrete type info derived from init_existential.
+struct ConformanceAndConcreteType {
+  Optional<ProtocolConformanceRef> Conformance;
+  // Concrete type of self from the found init_existential.
+  CanType ConcreteType;
+  // For opened existentials, record the type definition.
+  SingleValueInstruction *ConcreteTypeDef = nullptr;
+  // The value of concrete type used to initialize the existential.
+  SILValue NewSelf;
+  // The value that owns the lifetime of NewSelf.
+  // init_existential_addr's source address.
+  // init_existential_ref's defined value.
+  SILValue NewSelfOwner;
+  ArrayRef<ProtocolConformanceRef> Conformances;
+
+  ConformanceAndConcreteType(ASTContext &Ctx, FullApplySite AI,
+                             SILInstruction *InitExistential,
+                             ProtocolDecl *Protocol);
+
+  bool isValid() const {
+    return Conformance.hasValue() && ConcreteType && NewSelf;
+  }
+
+  ProtocolConformanceRef getConformance() const {
+    return Conformance.getValue();
+  }
+};
+} // namespace
+
 /// Derive a concrete type of self and conformance from the init_existential
 /// instruction.
-static Optional<std::tuple<ProtocolConformanceRef, CanType,
-                           SingleValueInstruction*, SILValue>>
-getConformanceAndConcreteType(ASTContext &Ctx,
-                              FullApplySite AI,
-                              SILInstruction *InitExistential,
-                              ProtocolDecl *Protocol,
-                              ArrayRef<ProtocolConformanceRef> &Conformances) {
-  // Try to derive the concrete type of self from the found init_existential.
-  CanType ConcreteType;
+/// If successful, initializes a valid ConformanceAndConcreteType.
+ConformanceAndConcreteType::ConformanceAndConcreteType(
+    ASTContext &Ctx, FullApplySite AI, SILInstruction *InitExistential,
+    ProtocolDecl *Protocol) {
+
   // The existential type result of the found init_existential.
   CanType ExistentialType;
-  SingleValueInstruction *ConcreteTypeDef = nullptr;
-  SILValue NewSelf;
 
   // FIXME: Factor this out. All we really need here is the ExistentialSig
   // below, which should be stored directly in the SILInstruction.
@@ -845,7 +870,8 @@ getConformanceAndConcreteType(ASTContext &Ctx,
       ConcreteType = cast<MetatypeType>(ConcreteType).getInstanceType();
     }
   } else {
-    return None;
+    assert(!isValid());
+    return;
   }
 
   // Construct a substitution map from the existential type's generic
@@ -859,9 +885,8 @@ getConformanceAndConcreteType(ASTContext &Ctx,
   // If the requirement is in a base protocol that is refined by the
   // conforming protocol, fish out the exact conformance for the base
   // protocol using the substitution map.
-  auto ExactConformance = SubMap.lookupConformance(
-    CanType(ExistentialSig->getGenericParams()[0]),
-    Protocol);
+  Conformance = SubMap.lookupConformance(
+      CanType(ExistentialSig->getGenericParams()[0]), Protocol);
 
   // If the concrete type is another existential, we're "forwarding" an
   // opened existential type, so we must keep track of the original
@@ -877,127 +902,149 @@ getConformanceAndConcreteType(ASTContext &Ctx,
           InitExistential->getTypeDependentOperands()[0].get());
     }
   }
-
-  return std::make_tuple(*ExactConformance, ConcreteType,
-                         ConcreteTypeDef, NewSelf);
+  assert(isValid());
 }
 
-static bool isUseAfterFree(SILValue val, SILInstruction *Apply,
-                           DominanceInfo *DT) {
-  for (auto Use : val->getUses()) {
-    auto *User = Use->getUser();
-    if (!isa<DeallocStackInst>(User) && !isa<DestroyAddrInst>(User) &&
-        !isa<DeinitExistentialAddrInst>(User)) {
-      continue;
-    }
-    if (!DT->properlyDominates(Apply, User)) {
-      // we have use-after-free - Conservative heuristic
-      // Non conservative solution would require data flow analysis
+// Return true if the given value is guaranteed to be initialized across the
+// given call site.
+//
+// It's possible for an address to be initialized/deinitialized/reinitialized.
+// Rather than keeping track of liveness, we very conservatively check that all
+// deinitialization occures after the call.
+//
+// FIXME: Rather than whitelisting, use a common AllocStackAnalyzer.
+static bool isAddressInitializedAtCall(SILValue addr, SILInstruction *AI,
+                                       DominanceInfo *DT) {
+  auto isDestroy = [](Operand *use) {
+    switch (use->getUser()->getKind()) {
+    default:
+      return false;
+    case SILInstructionKind::DestroyAddrInst:
+    case SILInstructionKind::DeinitExistentialAddrInst:
       return true;
+    case SILInstructionKind::CopyAddrInst: {
+      auto *copy = cast<CopyAddrInst>(use->getUser());
+      return copy->getSrc() == use->get() && copy->isTakeOfSrc();
+    }
+    }
+  };
+  for (auto use : addr->getUses()) {
+    SILInstruction *user = use->getUser();
+    if (isDestroy(use)) {
+      if (!DT->properlyDominates(AI, user))
+        return false;
+    } else {
+      assert(isa<CopyAddrInst>(user) || isa<InitExistentialAddrInst>(user) ||
+             isa<OpenExistentialAddrInst>(user) ||
+             isa<DeallocStackInst>(user) ||
+             user->isDebugInstruction() && "Unexpected instruction");
     }
   }
-  return false;
+  return true;
 }
+
+/// Scoped registration of opened archetypes.
+class RAIIOpenedArchetypesTracker {
+  SILBuilder &B;
+  // The original tracker may be null.
+  SILOpenedArchetypesTracker *OldOpenedArchetypesTracker;
+  SILOpenedArchetypesTracker OpenedArchetypesTracker;
+
+public:
+  RAIIOpenedArchetypesTracker(SILBuilder &B)
+    : B(B), OldOpenedArchetypesTracker(B.getOpenedArchetypesTracker()),
+    OpenedArchetypesTracker(&B.getFunction()) {
+    B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  }
+
+  SILOpenedArchetypesTracker &getTracker() {
+    return OpenedArchetypesTracker;
+  }
+
+  ~RAIIOpenedArchetypesTracker() {
+    B.setOpenedArchetypesTracker(OldOpenedArchetypesTracker);
+  }
+};
 
 /// Propagate information about a concrete type from init_existential_addr
 /// or init_existential_ref into witness_method conformances and into
 /// apply instructions.
 /// This helps the devirtualizer to replace witness_method by
 /// class_method instructions and then devirtualize.
-SILInstruction *
-SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
-    ProtocolDecl *Protocol,
-    llvm::function_ref<void(CanType , ProtocolConformanceRef)> Propagate) {
+SILInstruction *SILCombiner::propagateConcreteTypeOfInitExistential(
+    FullApplySite Apply, ProtocolDecl *Protocol,
+    llvm::function_ref<void(CanType, ProtocolConformanceRef)> Propagate) {
 
   ASTContext &Ctx = Builder.getASTContext();
 
   // Get the self argument.
-  SILValue Self;
-  if (auto *Apply = dyn_cast<ApplyInst>(AI)) {
-    if (Apply->hasSelfArgument())
-      Self = Apply->getSelfArgument();
-  } else if (auto *Apply = dyn_cast<TryApplyInst>(AI)) {
-    if (Apply->hasSelfArgument())
-      Self = Apply->getSelfArgument();
-  }
-
-  assert(Self && "Self argument should be present");
+  assert(Apply.hasSelfArgument() && "Self argument should be present");
+  SILValue Self = Apply.getSelfArgument();
 
   // Try to find the init_existential, which could be used to
   // determine a concrete type of the self.
   ArchetypeType *OpenedArchetype = nullptr;
   SILValue OpenedArchetypeDef;
   bool isCopied = false;
-  SILInstruction *InitExistential =
-    findInitExistential(AI, Self, OpenedArchetype, OpenedArchetypeDef,
-                        isCopied);
+  SILInstruction *InitExistential = findInitExistential(
+      Apply, Self, OpenedArchetype, OpenedArchetypeDef, isCopied);
   if (!InitExistential)
     return nullptr;
 
   // Try to derive the concrete type of self and a related conformance from
   // the found init_existential.
-  ArrayRef<ProtocolConformanceRef> Conformances;
-  auto ConformanceAndConcreteType =
-    getConformanceAndConcreteType(Ctx, AI, InitExistential,
-                                  Protocol, Conformances);
-  if (!ConformanceAndConcreteType)
+  ConformanceAndConcreteType CCT(Ctx, Apply, InitExistential, Protocol);
+  if (!CCT.isValid())
     return nullptr;
 
-  ProtocolConformanceRef Conformance = std::get<0>(*ConformanceAndConcreteType);
-  CanType ConcreteType = std::get<1>(*ConformanceAndConcreteType);
-  auto ConcreteTypeDef = std::get<2>(*ConformanceAndConcreteType);
-  SILValue NewSelf = std::get<3>(*ConformanceAndConcreteType);
-
-  SILOpenedArchetypesTracker *OldOpenedArchetypesTracker =
-      Builder.getOpenedArchetypesTracker();
-
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(AI.getFunction());
-
-  if (ConcreteType->isOpenedExistential()) {
-    // Prepare a mini-mapping for opened archetypes.
-    // SILOpenedArchetypesTracker OpenedArchetypesTracker(*AI.getFunction());
-    OpenedArchetypesTracker.addOpenedArchetypeDef(
-        cast<ArchetypeType>(ConcreteType), ConcreteTypeDef);
-    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
+  RAIIOpenedArchetypesTracker tempTracker(Builder);
+  if (CCT.ConcreteType->isOpenedExistential()) {
+    // Temporarily record this opened existential def. Don't permanently record
+    // in the Builder's tracker because this opened existential's original
+    // dominating def may not have been recorded yet.
+    // FIXME: Redesign the tracker. This is not robust.
+    tempTracker.getTracker().addOpenedArchetypeDef(
+        cast<ArchetypeType>(CCT.ConcreteType), CCT.ConcreteTypeDef);
   }
 
   // Propagate the concrete type into the callee-operand if required.
-  Propagate(ConcreteType, Conformance);
+  Propagate(CCT.ConcreteType, CCT.getConformance());
 
-  if (isCopied) {
+  auto canReplaceCopiedSelf = [&]() {
     // If the witness method is mutating self, we cannot replace self with
     // the source of a copy. Otherwise the call would modify another value than
     // the original self.
-    switch (AI.getArgumentConvention(AI.getNumArguments() - 1)) {
-      case SILArgumentConvention::ConventionType::Indirect_Inout:
-      case SILArgumentConvention::ConventionType::Indirect_InoutAliasable:
-        return nullptr;
-      default:
-        break;
-    }
-    // check if using the value in the apply would cause use-after-free
-    auto *DT = DA->get(AI.getFunction());
-    auto *apply = AI.getInstruction();
-    auto op = InitExistential->getOperand(0);
-    if (isUseAfterFree(op, apply, DT)) {
-      return nullptr;
-    }
-    if (isUseAfterFree(NewSelf, apply, DT)) {
-      return nullptr;
-    }
-  }
+    if (Apply.getOrigCalleeType()->getSelfParameter().isIndirectMutating())
+      return false;
+
+    auto *DT = DA->get(Apply.getFunction());
+    auto *AI = Apply.getInstruction();
+    // Only init_existential_addr may be copied.
+    SILValue existentialAddr =
+        cast<InitExistentialAddrInst>(InitExistential)->getOperand();
+    return isAddressInitializedAtCall(existentialAddr, AI, DT);
+  };
+  if (isCopied && !canReplaceCopiedSelf())
+    return nullptr;
+
   // Create a new apply instruction that uses the concrete type instead
   // of the existential type.
-  auto *NewAI = createApplyWithConcreteType(AI, NewSelf, Self, ConcreteType,
-                                            ConcreteTypeDef, Conformance,
-                                            OpenedArchetype);
-
-  if (ConcreteType->isOpenedExistential())
-    Builder.setOpenedArchetypesTracker(OldOpenedArchetypesTracker);
+  auto *NewAI = createApplyWithConcreteType(
+      Apply, CCT.NewSelf, Self, CCT.ConcreteType, CCT.ConcreteTypeDef,
+      CCT.getConformance(), OpenedArchetype);
 
   return NewAI;
 }
 
+/// Rewrite a witness method's lookup type from an archetype to a concrete type.
+/// Example:
+///   %existential = alloc_stack $Protocol
+///   %value = init_existential_addr %existential : $Concrete
+///   copy_addr ... to %value
+///   %witness = witness_method $@opened
+///   apply %witness<T : Protocol>(%existential)
+///
+/// ==> apply %witness<Concrete : Protocol>(%existential)
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                     WitnessMethodInst *WMI) {
@@ -1049,8 +1096,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     auto *NewWMI = Builder.createWitnessMethod(WMI->getLoc(),
                                                 ConcreteType,
                                                 Conformance, WMI->getMember(),
-                                                WMI->getType(),
-                                                WMI->isVolatile());
+                                                WMI->getType());
     // Replace only uses of the witness_method in the apply that is going to
     // be changed.
     MutableArrayRef<Operand> Operands = AI.getInstruction()->getAllOperands();
@@ -1097,7 +1143,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
       return nullptr;
   }
 
-  // Obtain the protocol whose which should be used by the conformance.
+  // Obtain the protocol which should be used by the conformance.
   auto *AFD = dyn_cast<AbstractFunctionDecl>(Callee->getDeclContext());
   if (!AFD)
     return nullptr;
@@ -1259,6 +1305,27 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
   return true;
 }
 
+// Return a new apply with the specified callee. This creates a new apply rather
+// than simply rewriting the callee operand because the apply's SubstCalleeType,
+// derived from the callee and substitution list, may change.
+FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
+                                              SILValue callee) {
+  SmallVector<SILValue, 4> arguments;
+  for (SILValue arg : apply.getArguments())
+    arguments.push_back(arg);
+
+  Builder.addOpenedArchetypeOperands(apply.getInstruction());
+  if (auto *TAI = dyn_cast<TryApplyInst>(apply)) {
+    return Builder.createTryApply(TAI->getLoc(), callee,
+                                  TAI->getSubstitutions(), arguments,
+                                  TAI->getNormalBB(), TAI->getErrorBB());
+  } else {
+    return Builder.createApply(apply.getLoc(), callee, apply.getSubstitutions(),
+                               arguments,
+                               cast<ApplyInst>(apply)->isNonThrowing());
+  }
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   Builder.setCurrentDebugScope(AI->getDebugScope());
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
@@ -1271,7 +1338,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunction();
-  if (SF && SF->getEffectsKind() < EffectsKind::ReadWrite) {
+  if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
       if (eraseApply(AI, Users))
@@ -1281,7 +1348,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   }
 
   if (SF) {
-    if (SF->getEffectsKind() < EffectsKind::ReadWrite) {
+    if (SF->getEffectsKind() < EffectsKind::ReleaseNone) {
       // Try to optimize string concatenation.
       if (auto I = optimizeConcatenationOfStringLiterals(AI)) {
         return I;
@@ -1300,20 +1367,11 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // (apply (thin_to_thick_function f)) to (apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
-    // TODO: Handle substitutions and indirect results
-    if (AI->hasSubstitutions() || AI->hasIndirectResults())
-      return nullptr;
-    SmallVector<SILValue, 4> Arguments;
-    for (auto &Op : AI->getArgumentOperands()) {
-      Arguments.push_back(Op.get());
-    }
-    // The type of the substitution is the source type of the thin to thick
-    // instruction.
-    Builder.addOpenedArchetypeOperands(AI);
-    auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
-                                      AI->getSubstitutions(), Arguments,
-                                      AI->isNonThrowing());
-    return NewAI;
+    // We currently don't remove any possible retain associated with the thick
+    // function when rewriting the callsite. This should be ok because the
+    // ABI normally expects a guaranteed callee.
+    if (!AI->getOrigCalleeType()->isCalleeConsumed())
+      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
   }
 
   // (apply (witness_method)) -> propagate information about
@@ -1404,7 +1462,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *Fn = AI->getReferencedFunction();
-  if (Fn && Fn->getEffectsKind() < EffectsKind::ReadWrite) {
+  if (Fn && Fn->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {
       SILBasicBlock *BB = AI->getParent();
@@ -1431,21 +1489,12 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
   // (try_apply (thin_to_thick_function f)) to (try_apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
-    // TODO: Handle substitutions and indirect results
-    if (AI->hasSubstitutions() || AI->hasIndirectResults())
-      return nullptr;
-    SmallVector<SILValue, 4> Arguments;
-    for (auto &Op : AI->getArgumentOperands()) {
-      Arguments.push_back(Op.get());
-    }
-    // The type of the substitution is the source type of the thin to thick
-    // instruction.
-    auto *NewAI = Builder.createTryApply(AI->getLoc(), TTTFI->getOperand(),
-                                         AI->getSubstitutions(), Arguments,
-                                         AI->getNormalBB(), AI->getErrorBB());
-    return NewAI;
+    // We currently don't remove any possible retain associated with the thick
+    // function when rewriting the callsite. This should be ok because the
+    // ABI normally expects a guaranteed callee.
+    if (!AI->getOrigCalleeType()->isCalleeConsumed())
+      return rewriteApplyCallee(AI, TTTFI->getOperand()).getInstruction();
   }
-
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {

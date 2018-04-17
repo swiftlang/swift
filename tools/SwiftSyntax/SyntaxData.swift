@@ -38,6 +38,65 @@ final class SyntaxData: Equatable {
 
   let childCaches: [AtomicCache<SyntaxData>]
 
+  let positionCache: AtomicCache<AbsolutePosition>
+
+  fileprivate func calculatePosition(_ initPos: AbsolutePosition) ->
+      AbsolutePosition {
+    guard let parent = parent else {
+      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
+      // If this node is SourceFileSyntax, its location is the start of the file.
+      return initPos
+    }
+
+    // If the node is the first child of its parent, the location is same with
+    // the parent's location.
+    guard indexInParent != 0 else { return parent.position }
+
+    // Otherwise, the location is same with the previous sibling's location
+    // adding the stride of the sibling.
+    for idx in (0..<indexInParent).reversed() {
+      if let sibling = parent.cachedChild(at: idx) {
+        let pos = sibling.position.copy()
+        sibling.raw.accumulateAbsolutePosition(pos)
+        return pos
+      }
+    }
+    return parent.position
+  }
+
+  var position: AbsolutePosition {
+    return positionCache.value { return calculatePosition(UTF8Position()) }
+  }
+
+  var positionAfterSkippingLeadingTrivia: AbsolutePosition {
+    let result = position.copy()
+    _ = raw.accumulateLeadingTrivia(result)
+    return result
+  }
+
+  fileprivate func getNextSiblingPos() -> AbsolutePosition {
+    // If this node is root, the position of the next sibling is the end of
+    // this node.
+    guard let parent = parent else {
+      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
+      let result = self.position.copy()
+      raw.accumulateAbsolutePosition(result)
+      return result
+    }
+
+    // Find the first valid sibling and return its position.
+    for i in indexInParent+1..<parent.raw.layout.count {
+      guard let sibling = parent.cachedChild(at: i) else { continue }
+      return sibling.position
+    }
+    // Otherwise, use the parent's sibling instead.
+    return parent.getNextSiblingPos()
+  }
+
+  var byteSize: Int {
+    return getNextSiblingPos().byteOffset - self.position.byteOffset
+  }
+
   /// Creates a SyntaxData with the provided raw syntax, pointing to the
   /// provided index, in the provided parent.
   /// - Parameters:
@@ -51,6 +110,7 @@ final class SyntaxData: Equatable {
     self.indexInParent = indexInParent
     self.parent = parent
     self.childCaches = raw.layout.map { _ in AtomicCache<SyntaxData>() }
+    self.positionCache = AtomicCache<AbsolutePosition>()
   }
 
   /// The index path from this node to the root. This can be used to uniquely
@@ -72,7 +132,8 @@ final class SyntaxData: Equatable {
   ///
   /// - Parameter index: The index to create and cache.
   /// - Returns: The child's data at the provided index.
-  func cachedChild(at index: Int) -> SyntaxData {
+  func cachedChild(at index: Int) -> SyntaxData? {
+    if raw.layout[index] == nil { return nil }
     return childCaches[index].value { realizeChild(index) }
   }
 
@@ -84,7 +145,7 @@ final class SyntaxData: Equatable {
   /// - Parameter cursor: The cursor to create and cache.
   /// - Returns: The child's data at the provided cursor.
   func cachedChild<CursorType: RawRepresentable>(
-    at cursor: CursorType) -> SyntaxData
+    at cursor: CursorType) -> SyntaxData?
     where CursorType.RawValue == Int {
     return cachedChild(at: cursor.rawValue)
   }
@@ -123,7 +184,7 @@ final class SyntaxData: Equatable {
     // recursively up to the root.
     if let parent = parent {
       let (root, newParent) = parent.replacingChild(newRaw, at: indexInParent)
-      let newMe = newParent.cachedChild(at: indexInParent)
+      let newMe = newParent.cachedChild(at: indexInParent)!
       return (root: root, newValue: newMe)
     } else {
       // Otherwise, we're already the root, so return the new data as both the
@@ -185,7 +246,7 @@ final class SyntaxData: Equatable {
   /// - Returns: A new SyntaxData for the specific child you're
   ///            creating, whose parent is pointing to self.
   func realizeChild(_ index: Int) -> SyntaxData {
-    return SyntaxData(raw: raw.layout[index],
+    return SyntaxData(raw: raw.layout[index]!,
                       indexInParent: index,
                       parent: self)
   }
@@ -195,5 +256,83 @@ final class SyntaxData: Equatable {
   /// - Returns: True if both datas are exactly the same.
   static func ==(lhs: SyntaxData, rhs: SyntaxData) -> Bool {
     return lhs === rhs
+  }
+}
+
+/// An absolute position in a source file as text - the absolute byteOffset from
+/// the start, line, and column.
+public class AbsolutePosition {
+  public fileprivate(set) var byteOffset: Int
+  public fileprivate(set) var line: Int
+  public fileprivate(set) var column: Int
+
+  required public init(line: Int = 1, column: Int = 1, byteOffset: Int = 0) {
+    self.line = line
+    self.column = column
+    self.byteOffset = byteOffset
+  }
+
+  internal func add(text: String) {
+     preconditionFailure("this function must be overridden")
+  }
+
+  internal func copy() -> Self {
+    return type(of: self).init(line: line, column: column, byteOffset: byteOffset)
+  }
+}
+
+extension AbsolutePosition {
+
+  /// Add some number of columns to the position.
+  internal func add(columns: Int) {
+    column += columns
+    byteOffset += columns
+  }
+
+  /// Add some number of newlines to the position, resetting the column.
+  /// Size is byte size of newline char.
+  /// '\n' and '\r' are 1, '\r\n' is 2.
+  internal func add(lines: Int, size: Int) {
+    line += lines
+    column = 1
+    byteOffset += lines * size
+  }
+
+  /// Use some text as a reference for adding to the absolute position,
+  /// taking note of newlines, etc.
+  fileprivate func add<C: BidirectionalCollection>(text chars: C)
+      where C.Element: UnsignedInteger  {
+    let cr: C.Element = 13
+    let nl: C.Element = 10
+    var idx = chars.startIndex
+    while idx != chars.endIndex {
+      let c = chars[idx]
+      idx = chars.index(after: idx)
+      switch c {
+      case cr:
+        if chars[idx] == nl {
+          add(lines: 1, size: 2)
+          idx = chars.index(after: idx)
+        } else {
+          add(lines: 1, size: 1)
+        }
+      case nl:
+        add(lines: 1, size: 1)
+      default:
+        add(columns: 1)
+      }
+    }
+  }
+}
+
+class UTF8Position: AbsolutePosition {
+  internal override func add(text: String) {
+    add(text: text.utf8)
+  }
+}
+
+class UTF16Position: AbsolutePosition {
+  internal override func add(text: String) {
+    add(text: text.utf16)
   }
 }

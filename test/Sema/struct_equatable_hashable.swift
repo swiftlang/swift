@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown
 
@@ -9,6 +9,8 @@ struct Point: Hashable {
 
 if Point(x: 1, y: 2) == Point(x: 2, y: 1) { }
 var pointHash: Int = Point(x: 3, y: 5).hashValue
+
+Point(x: 1, y: 2) == Point(x: 2, y: 1) // expected-warning {{result of operator '==' is unused}}
 
 struct Pair<T: Hashable>: Hashable {
   let first: T

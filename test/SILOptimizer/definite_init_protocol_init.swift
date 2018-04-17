@@ -25,21 +25,24 @@ extension TriviallyConstructible {
 class TrivialClass : TriviallyConstructible {
   required init(lower: Int) {}
 
-  // CHECK-LABEL: sil hidden @_T0023definite_init_protocol_B012TrivialClassCACSi5upper_tcfc
+  // CHECK-LABEL: sil hidden @$S023definite_init_protocol_B012TrivialClassC5upperACSi_tcfc
   // CHECK:     bb0(%0 : $Int, [[OLD_SELF:%.*]] : $TrivialClass):
   // CHECK-NEXT:  [[SELF_BOX:%.*]] = alloc_stack $TrivialClass
   // CHECK-NEXT:  debug_value
   // CHECK-NEXT:  store [[OLD_SELF]] to [[SELF_BOX]]
   // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self TrivialClass.Type, %1
-  // CHECK-NEXT:  // function_ref
-  // CHECK-NEXT:  [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
   // CHECK-NEXT:  [[RESULT:%.*]] = alloc_stack $TrivialClass
+  // CHECK-NEXT:  // function_ref
+  // CHECK-NEXT:  [[FN:%.*]] = function_ref @$S023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
   // CHECK-NEXT:  apply [[FN]]<@dynamic_self TrivialClass>([[RESULT]], %0, [[METATYPE]])
   // CHECK-NEXT:  [[NEW_SELF:%.*]] = load [[RESULT]]
   // CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]
   // CHECK-NEXT:  [[METATYPE:%.*]] = value_metatype $@thick TrivialClass.Type, %1
   // CHECK-NEXT:  dealloc_partial_ref %1 : $TrivialClass, [[METATYPE]] : $@thick TrivialClass.Type
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
+  // TODO: Once we restore arbitrary takes, the strong_retain/destroy_addr pair below will go away.
+  // CHECK-NEXT:  strong_retain [[NEW_SELF]]
+  // CHECK-NEXT:  destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:  dealloc_stack [[SELF_BOX]]
   // CHECK-NEXT:  return [[NEW_SELF]]
   convenience init(upper: Int) {
@@ -60,12 +63,12 @@ struct TrivialStruct : TriviallyConstructible {
 
   init(lower: Int) { self.x = lower }
 
-// CHECK-LABEL: sil hidden @_T0023definite_init_protocol_B013TrivialStructVACSi5upper_tcfC
+// CHECK-LABEL: sil hidden @$S023definite_init_protocol_B013TrivialStructV5upperACSi_tcfC
 // CHECK:     bb0(%0 : $Int, %1 : $@thin TrivialStruct.Type):
 // CHECK-NEXT: [[SELF:%.*]] = alloc_stack $TrivialStruct
-// CHECK:      [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
-// CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $TrivialStruct
+// CHECK:      [[SELF_BOX:%.*]] = alloc_stack $TrivialStruct
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialStruct.Type
+// CHECK:      [[FN:%.*]] = function_ref @$S023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
 // CHECK-NEXT: apply [[FN]]<TrivialStruct>([[SELF_BOX]], %0, [[METATYPE]])
 // CHECK-NEXT: [[NEW_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT: store [[NEW_SELF]] to [[SELF]]
@@ -90,12 +93,12 @@ struct AddressOnlyStruct : TriviallyConstructible {
 
   init(lower: Int) { self.x = lower }
 
-// CHECK-LABEL: sil hidden @_T0023definite_init_protocol_B017AddressOnlyStructVACSi5upper_tcfC
+// CHECK-LABEL: sil hidden @$S023definite_init_protocol_B017AddressOnlyStructV5upperACSi_tcfC
 // CHECK:     bb0(%0 : $*AddressOnlyStruct, %1 : $Int, %2 : $@thin AddressOnlyStruct.Type):
 // CHECK-NEXT: [[SELF:%.*]] = alloc_stack $AddressOnlyStruct
-// CHECK:      [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
-// CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $AddressOnlyStruct
+// CHECK:      [[SELF_BOX:%.*]] = alloc_stack $AddressOnlyStruct
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick AddressOnlyStruct.Type
+// CHECK:      [[FN:%.*]] = function_ref @$S023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
 // CHECK-NEXT: apply [[FN]]<AddressOnlyStruct>([[SELF_BOX]], %1, [[METATYPE]])
 // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [initialization] [[SELF]]
 // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
@@ -123,12 +126,12 @@ enum TrivialEnum : TriviallyConstructible {
     self = .NotSoTrivial
   }
 
-// CHECK-LABEL: sil hidden @_T0023definite_init_protocol_B011TrivialEnumOACSi5upper_tcfC
+// CHECK-LABEL: sil hidden @$S023definite_init_protocol_B011TrivialEnumO5upperACSi_tcfC
 // CHECK:     bb0(%0 : $Int, %1 : $@thin TrivialEnum.Type):
 // CHECK-NEXT: [[SELF:%.*]] = alloc_stack $TrivialEnum
-// CHECK:      [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
-// CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $TrivialEnum
+// CHECK:      [[SELF_BOX:%.*]] = alloc_stack $TrivialEnum
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialEnum.Type
+// CHECK:      [[FN:%.*]] = function_ref @$S023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
 // CHECK-NEXT: apply [[FN]]<TrivialEnum>([[SELF_BOX]], %0, [[METATYPE]])
 // CHECK-NEXT: [[NEW_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT: store [[NEW_SELF]] to [[SELF]]

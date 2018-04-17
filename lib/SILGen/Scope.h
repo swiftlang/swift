@@ -31,11 +31,14 @@ class LLVM_LIBRARY_VISIBILITY Scope {
   CleanupsDepth depth;
   CleanupsDepth savedInnermostScope;
   CleanupLocation loc;
+  PostponedCleanup *currentlyActivePostponedCleanup;
 
 public:
   explicit Scope(CleanupManager &cleanups, CleanupLocation loc)
       : cleanups(cleanups), depth(cleanups.getCleanupsDepth()),
-        savedInnermostScope(cleanups.innermostScope), loc(loc) {
+        savedInnermostScope(cleanups.innermostScope), loc(loc),
+        currentlyActivePostponedCleanup(
+            cleanups.SGF.CurrentlyActivePostponedCleanup) {
     assert(depth.isValid());
     cleanups.stack.checkIterator(cleanups.innermostScope);
     cleanups.innermostScope = depth;
@@ -64,12 +67,6 @@ public:
   /// Pop this scope pushing the +1 rvalue through the scope. Asserts if rv is a
   /// plus zero rvalue.
   RValue popPreservingValue(RValue &&rv);
-
-  /// Pop the scope pushing the +1 ManagedValues in `innerValues` through the
-  /// scope. Asserts if any ManagedValue is plus zero. Each cleanup is recreated
-  /// in the outer scope and associated with a managed value in `outerValues`.
-  void popPreservingValues(ArrayRef<ManagedValue> innerValues,
-                           MutableArrayRef<ManagedValue> outerValues);
 
 private:
   /// Internal private implementation of popImpl so we can use it in Scope::pop

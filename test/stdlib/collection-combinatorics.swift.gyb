@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/collection-combinatorics.swift
 // RUN: %target-swift-frontend -typecheck -verify %t/collection-combinatorics.swift
 
@@ -66,6 +65,6 @@ struct ${indexLabel}${mutable}${rangeReplaceable}${capability}Butt
   // This type alias is required for some random-access collections with
   // a custom index type -- without it the default implementation for
   // `indices` doesn't attach.
-  typealias Indices = DefaultRandomAccessIndices<${indexLabel}${mutable}${rangeReplaceable}${capability}Butt>
+  typealias Indices = DefaultIndices<${indexLabel}${mutable}${rangeReplaceable}${capability}Butt>
 %         end
 }

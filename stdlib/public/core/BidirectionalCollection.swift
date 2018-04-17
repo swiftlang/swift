@@ -44,13 +44,19 @@ public typealias BidirectionalIndexable = BidirectionalCollection
 ///   `c.index(before: c.index(after: i)) == i`.
 /// - If `i > c.startIndex && i <= c.endIndex`
 ///   `c.index(after: c.index(before: i)) == i`.
-public protocol BidirectionalCollection : Collection 
-{
+public protocol BidirectionalCollection: Collection
+where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Index
+
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype SubSequence
+
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Indices
 
   /// Returns the position immediately before the given index.
   ///
@@ -64,16 +70,6 @@ public protocol BidirectionalCollection : Collection
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   func formIndex(before i: inout Index)
-
-  /// A sequence that can represent a contiguous subrange of the collection's
-  /// elements.
-  associatedtype SubSequence : BidirectionalCollection
-    = BidirectionalSlice<Self>
-
-  /// A type that represents the indices that are valid for subscripting the
-  /// collection, in ascending order.
-  associatedtype Indices : BidirectionalCollection
-    = DefaultBidirectionalIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -144,14 +140,14 @@ public protocol BidirectionalCollection : Collection
 /// Default implementation for bidirectional collections.
 extension BidirectionalCollection {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func formIndex(before i: inout Index) {
     i = index(before: i)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  @inlinable // FIXME(sil-serialize-all)
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
@@ -162,9 +158,9 @@ extension BidirectionalCollection {
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     if n >= 0 {
       return _advanceForward(i, by: n, limitedBy: limit)
@@ -179,36 +175,25 @@ extension BidirectionalCollection {
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public func distance(from start: Index, to end: Index) -> IndexDistance {
+  @inlinable // FIXME(sil-serialize-all)
+  public func distance(from start: Index, to end: Index) -> Int {
     var start = start
-    var count: IndexDistance = 0
+    var count = 0
 
     if start < end {
       while start != end {
-        count += 1 as IndexDistance
+        count += 1
         formIndex(after: &start)
       }
     }
     else if start > end {
       while start != end {
-        count -= 1 as IndexDistance
+        count -= 1
         formIndex(before: &start)
       }
     }
 
     return count
-  }
-}
-
-/// Supply the default "slicing" `subscript` for `BidirectionalCollection`
-/// models that accept the default associated `SubSequence`,
-/// `BidirectionalSlice<Self>`.
-extension BidirectionalCollection where SubSequence == BidirectionalSlice<Self> {
-  @_inlineable // FIXME(sil-serialize-all)
-  public subscript(bounds: Range<Index>) -> BidirectionalSlice<Self> {
-    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-    return BidirectionalSlice(base: self, bounds: bounds)
   }
 }
 
@@ -223,7 +208,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   or more elements; otherwise, `nil`.
   ///
   /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
     let element = last!
@@ -239,7 +224,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Returns: The last element of the collection.
   ///
   /// - Complexity: O(1)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func removeLast() -> Element {
     let element = last!
@@ -256,13 +241,13 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= numericCast(n),
+    _precondition(count >= n,
       "Can't remove more items from a collection than it contains")
-    self = self[startIndex..<index(endIndex, offsetBy: numericCast(-n))]
+    self = self[startIndex..<index(endIndex, offsetBy: -n)]
   }
 }
 
@@ -284,13 +269,13 @@ extension BidirectionalCollection {
   /// - Returns: A subsequence that leaves off `n` elements from the end.
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(
       endIndex,
-      offsetBy: numericCast(-n),
+      offsetBy: -n,
       limitedBy: startIndex) ?? startIndex
     return self[startIndex..<end]
   }
@@ -313,14 +298,14 @@ extension BidirectionalCollection {
   ///   most `maxLength` elements.
   ///
   /// - Complexity: O(*n*), where *n* is equal to `maxLength`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")
     let start = index(
       endIndex,
-      offsetBy: numericCast(-maxLength),
+      offsetBy: -maxLength,
       limitedBy: startIndex) ?? startIndex
     return self[start..<endIndex]
   }

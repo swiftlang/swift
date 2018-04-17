@@ -19,6 +19,7 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/LLVM.h"
 #include <type_traits>
 
@@ -43,11 +44,10 @@ enum class SILNodeKind {
 #include "swift/SIL/SILNodes.def"
 };
 
-enum {
-  NumSILNodeKindBits = 8
-};
-static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
-              "SILNodeKind fits in NumSILNodeKindBits bits");
+enum { NumSILNodeKindBits =
+  countBitsUsed(static_cast<unsigned>(SILNodeKind::Last_SILNode)) };
+
+enum class SILInstructionKind : std::underlying_type<SILNodeKind>::type;
 
 /// A SILNode is a node in the use-def graph of a SILFunction.  It is
 /// either an instruction or a defined value which can be used by an
@@ -93,51 +93,288 @@ static_assert(unsigned(SILNodeKind::Last_SILNode) < (1 << NumSILNodeKindBits),
 ///   Always use the LLVM casts (cast<>, dyn_cast<>, etc.) instead.
 class alignas(8) SILNode {
 public:
-  /// The assumed number of bits that a SILNode+padding will take up. Public for
-  /// static assertion purposes.
-  static constexpr unsigned NumTotalSILNodeBits = 64;
-
-private:
-  static constexpr unsigned NumKindBits = NumSILNodeKindBits;
-  static constexpr unsigned NumStorageLocBits = 1;
-  static constexpr unsigned NumIsRepresentativeBits = 1;
+  enum { NumVOKindBits = 3 };
+  enum { NumStoreOwnershipQualifierBits = 2 };
+  enum { NumLoadOwnershipQualifierBits = 2 };
+  enum { NumSILAccessKindBits = 2 };
+  enum { NumSILAccessEnforcementBits = 2 };
 
 protected:
-  static constexpr unsigned NumSubclassDataBits =
-      NumTotalSILNodeBits - NumKindBits - NumStorageLocBits -
-      NumIsRepresentativeBits;
+  union { uint64_t OpaqueBits;
+
+  SWIFT_INLINE_BITFIELD_BASE(SILNode, bitmax(NumSILNodeKindBits,8)+1+1,
+    Kind : bitmax(NumSILNodeKindBits,8),
+    StorageLoc : 1,
+    IsRepresentativeNode : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(ValueBase, SILNode);
+
+  SWIFT_INLINE_BITFIELD(SILArgument, ValueBase, NumVOKindBits,
+    VOKind : NumVOKindBits
+  );
+
+  // No MultipleValueInstructionResult subclass needs inline bits right now,
+  // therefore let's naturally align and size the Index for speed.
+  SWIFT_INLINE_BITFIELD_FULL(MultipleValueInstructionResult, ValueBase,
+                             NumVOKindBits+32,
+      VOKind : NumVOKindBits,
+      : NumPadBits,
+      Index : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(SILInstruction, SILNode);
+
+  // Special handling for UnaryInstructionWithTypeDependentOperandsBase
+  SWIFT_INLINE_BITFIELD(IBWTO, SILNode, 64-NumSILNodeBits,
+    // DO NOT allocate bits at the front!
+    // IBWTO is a template, and templates must allocate bits from back to front
+    // so that "normal" subclassing can allocate bits from front to back.
+    // If you update this, then you must update the IBWTO_BITFIELD macros.
+
+    /*pad*/ : 32-NumSILNodeBits,
+
+    // Total number of operands of this instruction.
+    // It is number of type dependent operands + 1.
+    NumOperands : 32;
+    template<SILInstructionKind Kind, typename, typename, typename...>
+    friend class InstructionBaseWithTrailingOperands
+  );
+
+#define IBWTO_BITFIELD(T, U, C, ...) \
+  SWIFT_INLINE_BITFIELD_TEMPLATE(T, U, (C), 32, __VA_ARGS__)
+#define IBWTO_BITFIELD_EMPTY(T, U) \
+  SWIFT_INLINE_BITFIELD_EMPTY(T, U)
+
+#define UIWTDOB_BITFIELD(T, U, C, ...) \
+  IBWTO_BITFIELD(T, U, (C), __VA_ARGS__)
+#define UIWTDOB_BITFIELD_EMPTY(T, U) \
+  IBWTO_BITFIELD_EMPTY(T, U)
+
+  SWIFT_INLINE_BITFIELD_EMPTY(SingleValueInstruction, SILInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(DeallocationInst, SILInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(LiteralInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD_EMPTY(AllocationInst, SingleValueInstruction);
+
+  // Ensure that StructInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(StructInst, SingleValueInstruction);
+
+  // Ensure that TupleInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(TupleInst, SingleValueInstruction);
+
+  IBWTO_BITFIELD(BuiltinInst, SingleValueInstruction,
+                             32-NumSingleValueInstructionBits,
+    NumSubstitutions : 32-NumSingleValueInstructionBits
+  );
+
+  IBWTO_BITFIELD(ObjectInst, SingleValueInstruction,
+                             32-NumSingleValueInstructionBits,
+    NumBaseElements : 32-NumSingleValueInstructionBits
+  );
+
+  IBWTO_BITFIELD(SelectEnumInstBase, SingleValueInstruction, 1,
+    HasDefault : 1
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(IntegerLiteralInst, LiteralInst, 32,
+    : NumPadBits,
+    numBits : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(FloatLiteralInst, LiteralInst, 32,
+    : NumPadBits,
+    numBits : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(StringLiteralInst, LiteralInst, 2+32,
+    TheEncoding : 2,
+    : NumPadBits,
+    Length : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(ConstStringLiteralInst, LiteralInst, 1+32,
+    TheEncoding : 1,
+    : NumPadBits,
+    Length : 32
+  );
+
+  SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
+    OnStack : 1
+  );
+
+  // Ensure that AllocBoxInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(AllocBoxInst, AllocationInst);
+  // Ensure that AllocExistentialBoxInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(AllocExistentialBoxInst, AllocationInst);
+  SWIFT_INLINE_BITFIELD_FULL(AllocStackInst, AllocationInst,
+                             64-NumAllocationInstBits,
+    NumOperands : 32-NumAllocationInstBits,
+    VarInfo : 32
+  );
+  IBWTO_BITFIELD(AllocRefInstBase, AllocationInst, 32-NumAllocationInstBits,
+    ObjC : 1,
+    OnStack : 1,
+    NumTailTypes : 32-1-1-NumAllocationInstBits
+  );
+  static_assert(32-1-1-NumAllocationInstBits >= 16, "Reconsider bitfield use?");
+
+  UIWTDOB_BITFIELD_EMPTY(AllocValueBufferInst, AllocationInst);
+
+  // TODO: Sort the following in SILNodes.def order
+
+  SWIFT_INLINE_BITFIELD_EMPTY(NonValueInstruction, SILInstruction);
+  SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
+      atomicity : 1
+  );
+  SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
+      atomicity : 1
+  );
+
+  // Ensure that BindMemoryInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(BindMemoryInst, NonValueInstruction);
+
+  // Ensure that MarkFunctionEscapeInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(MarkFunctionEscapeInst, NonValueInstruction);
+
+  // Ensure that MetatypeInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(MetatypeInst, SingleValueInstruction);
+
+  SWIFT_INLINE_BITFIELD(CopyAddrInst, NonValueInstruction, 1+1,
+    /// IsTakeOfSrc - True if ownership will be taken from the value at the
+    /// source memory location.
+    IsTakeOfSrc : 1,
+
+    /// IsInitializationOfDest - True if this is the initialization of the
+    /// uninitialized destination memory location.
+    IsInitializationOfDest : 1
+  );
+
+  SWIFT_INLINE_BITFIELD(LoadReferenceInstBaseT, NonValueInstruction, 1,
+    IsTake : 1;
+    template<SILInstructionKind K>
+    friend class LoadReferenceInstBase
+  );
+
+  SWIFT_INLINE_BITFIELD(StoreReferenceInstBaseT, NonValueInstruction, 1,
+    IsInitializationOfDest : 1;
+    template<SILInstructionKind K>
+    friend class StoreReferenceInstBase
+  );
+
+  SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
+                        NumSILAccessKindBits+NumSILAccessEnforcementBits
+                        + 1,
+    AccessKind : NumSILAccessKindBits,
+    Enforcement : NumSILAccessEnforcementBits,
+    NoNestedConflict : 1
+  );
+  SWIFT_INLINE_BITFIELD(BeginUnpairedAccessInst, NonValueInstruction,
+                        NumSILAccessKindBits + NumSILAccessEnforcementBits + 1,
+                        AccessKind : NumSILAccessKindBits,
+                        Enforcement : NumSILAccessEnforcementBits,
+                        NoNestedConflict : 1);
+
+  SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
+    Aborting : 1
+  );
+  SWIFT_INLINE_BITFIELD(EndUnpairedAccessInst, NonValueInstruction,
+                        NumSILAccessEnforcementBits + 1,
+                        Enforcement : NumSILAccessEnforcementBits,
+                        Aborting : 1);
+
+  SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
+                        NumStoreOwnershipQualifierBits,
+    OwnershipQualifier : NumStoreOwnershipQualifierBits
+  );
+  SWIFT_INLINE_BITFIELD(LoadInst, SingleValueInstruction,
+                        NumLoadOwnershipQualifierBits,
+    OwnershipQualifier : NumLoadOwnershipQualifierBits
+  );
+
+  SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
+                        NumVOKindBits,
+    Kind : NumVOKindBits
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(TupleExtractInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    FieldNo : 32
+  );
+  SWIFT_INLINE_BITFIELD_FULL(TupleElementAddrInst, SingleValueInstruction, 32,
+    : NumPadBits,
+    FieldNo : 32
+  );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
+  // Ensure that WitnessMethodInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(WitnessMethodInst, MethodInst);
+  UIWTDOB_BITFIELD_EMPTY(ObjCMethodInst, MethodInst);
+
+  SWIFT_INLINE_BITFIELD_EMPTY(ConversionInst, SingleValueInstruction);
+  SWIFT_INLINE_BITFIELD(PointerToAddressInst, ConversionInst, 1+1,
+    IsStrict : 1,
+    IsInvariant : 1
+  );
+
+  UIWTDOB_BITFIELD_EMPTY(ConvertFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(UncheckedRefCastInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(UncheckedAddrCastInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(UncheckedTrivialBitCastInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(UncheckedBitwiseCastInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(ThinToThickFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastValueInst, ConversionInst);
+  UIWTDOB_BITFIELD_EMPTY(InitExistentialAddrInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD_EMPTY(InitExistentialValueInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD_EMPTY(InitExistentialRefInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD_EMPTY(InitExistentialMetatypeInst, SingleValueInstruction);
+
+  SWIFT_INLINE_BITFIELD_EMPTY(TermInst, SILInstruction);
+  UIWTDOB_BITFIELD_EMPTY(CheckedCastBranchInst, SingleValueInstruction);
+  UIWTDOB_BITFIELD_EMPTY(CheckedCastValueBranchInst, SingleValueInstruction);
+
+  // Ensure that BranchInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(BranchInst, TermInst);
+  // Ensure that YieldInst bitfield does not overflow.
+  IBWTO_BITFIELD_EMPTY(YieldInst, TermInst);
+  IBWTO_BITFIELD(CondBranchInst, TermInst, 32-NumTermInstBits,
+    NumTrueArgs : 32-NumTermInstBits
+  );
+  IBWTO_BITFIELD(SwitchValueInst, TermInst, 1,
+    HasDefault : 1
+  );
+  SWIFT_INLINE_BITFIELD_FULL(SwitchEnumInstBase, TermInst, 1+32,
+    HasDefault : 1,
+    : NumPadBits,
+    NumCases : 32
+  );
+
+  } Bits;
 
   enum class SILNodeStorageLocation : uint8_t { Value, Instruction };
 
-  enum class IsRepresentative : uint8_t {
-    No = 0,
-    Yes = 1,
+  enum class IsRepresentative : bool {
+    No = false,
+    Yes = true,
   };
 
 private:
-  const uint64_t Kind : NumKindBits;
-  const uint64_t StorageLoc : NumStorageLocBits;
-  const uint64_t IsRepresentativeNode : NumIsRepresentativeBits;
-  uint64_t SubclassData : NumSubclassDataBits;
 
   SILNodeStorageLocation getStorageLoc() const {
-    return SILNodeStorageLocation(StorageLoc);
+    return SILNodeStorageLocation(Bits.SILNode.StorageLoc);
   }
 
   const SILNode *getRepresentativeSILNodeSlowPath() const;
 
 protected:
   SILNode(SILNodeKind kind, SILNodeStorageLocation storageLoc,
-          IsRepresentative isRepresentative)
-      : Kind(unsigned(kind)), StorageLoc(unsigned(storageLoc)),
-        IsRepresentativeNode(unsigned(isRepresentative)), SubclassData(0) {}
-
-  uint64_t getSubclassData() const { return SubclassData; }
-
-  void setSubclassData(uint64_t NewData) {
-    assert(!(NewData & ~((uint64_t(1) << NumSubclassDataBits) - 1)) &&
-           "New subclass data is too large to fit in SubclassData");
-    SubclassData = NewData;
+          IsRepresentative isRepresentative) {
+    Bits.OpaqueBits = 0;
+    Bits.SILNode.Kind = unsigned(kind);
+    Bits.SILNode.StorageLoc = unsigned(storageLoc);
+    Bits.SILNode.IsRepresentativeNode = unsigned(isRepresentative);
   }
 
 public:
@@ -154,7 +391,9 @@ public:
   }
 
   /// Is this SILNode the representative SILNode subobject in this object?
-  bool isRepresentativeSILNodeInObject() const { return IsRepresentativeNode; }
+  bool isRepresentativeSILNodeInObject() const {
+    return Bits.SILNode.IsRepresentativeNode;
+  }
 
   /// Return a pointer to the representative SILNode subobject in this object.
   SILNode *getRepresentativeSILNodeInObject() {
@@ -171,7 +410,7 @@ public:
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SILNodeKind getKind() const {
-    return SILNodeKind(Kind);
+    return SILNodeKind(Bits.SILNode.Kind);
   }
 
   /// Return the SILNodeKind of this node's representative SILNode.
@@ -316,7 +555,7 @@ struct cast_convert_val<To, const swift::SILNode, From>;
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
-class PointerLikeTypeTraits<swift::SILNode *> {
+struct PointerLikeTypeTraits<swift::SILNode *> {
 public:
   static inline void *getAsVoidPointer(swift::SILNode *I) {
     return (void*)I;

@@ -1,0 +1,55 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+
+sil_stage raw // CHECK: sil_stage raw
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @public_definition : $@convention(thin) () -> ()
+sil @public_definition : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil non_abi @always_emit_into_client_definition : $@convention(thin) () -> ()
+sil non_abi @always_emit_into_client_definition : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil shared @shared_definition : $@convention(thin) () -> ()
+sil shared @shared_definition : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil hidden @hidden_definition : $@convention(thin) () -> ()
+sil hidden @hidden_definition : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil private @private_definition : $@convention(thin) () -> ()
+sil private @private_definition : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil public_external @public_available_externally_definition : $@convention(thin) () -> ()
+sil public_external @public_available_externally_definition : $() -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil @public_declaration : $@convention(thin) () -> ()
+sil @public_declaration : $() -> ()
+
+// CHECK-LABEL: sil hidden_external @hidden_declaration : $@convention(thin) () -> ()
+sil hidden_external @hidden_declaration : $() -> ()
+

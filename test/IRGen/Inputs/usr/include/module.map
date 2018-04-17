@@ -22,3 +22,7 @@ module Foundation {
 module CoreFoundation {
   header "BridgeTestCoreFoundation.h"
 }
+
+module ObjCInterop {
+  header "ObjCInterop.h"
+}

@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 struct S1 {
-  // expected-error @+4 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
-  // expected-error @+3 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
-  // expected-note @+2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
+  // expected-error @+2 {{type member must not be named 'Type', since it would conflict with the 'foo.Type' expression}}
   // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Type`}}
   enum Type {
     case A

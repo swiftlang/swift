@@ -11,8 +11,7 @@ add_swift_library(swiftParse STATIC
   ParseType.cpp
   PersistentParserState.cpp
   Scope.cpp
-  DEPENDS
-    swift-syntax-generated-headers
+  SyntaxParsingContext.cpp
   LINK_LIBRARIES
     swiftAST
     swiftSyntax

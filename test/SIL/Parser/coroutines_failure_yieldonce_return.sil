@@ -1,0 +1,12 @@
+// RUN: not --crash %target-swift-frontend %s -emit-silgen -verify
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Swift
+
+sil @once_signature : $@yield_once () -> (@yields Int, @yields Float) {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

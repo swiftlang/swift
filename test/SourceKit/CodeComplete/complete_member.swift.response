@@ -19,7 +19,7 @@
       key.typename: "Double",
       key.context: source.codecompletion.context.thisclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1SdSiF",
+      key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1ySdSiF",
       key.modulename: "complete_member"
     },
     {

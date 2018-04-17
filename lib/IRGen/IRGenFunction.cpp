@@ -32,11 +32,12 @@ using namespace swift;
 using namespace irgen;
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
+                             OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
                              Optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
-      CurFn(Fn), DbgScope(DbgScope), inOutlinedFunction(false) {
+      OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {
 
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
@@ -58,6 +59,13 @@ IRGenFunction::~IRGenFunction() {
 
   // Tear down any side-table data structures.
   if (LocalTypeData) destroyLocalTypeData();
+}
+
+OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
+  if (OptMode != OptimizationMode::NotSet)
+    return OptMode;
+
+  return IGM.getOptions().OptMode;
 }
 
 ModuleDecl *IRGenFunction::getSwiftModule() const {
@@ -386,11 +394,12 @@ llvm::Value *Offset::getAsValue(IRGenFunction &IGF) const {
   }
 }
 
-Offset Offset::offsetBy(IRGenFunction &IGF, Offset other) const {
-  if (isStatic() && other.isStatic()) {
-    return Offset(getStatic() + other.getStatic());
+Offset Offset::offsetBy(IRGenFunction &IGF, Size other) const {
+  if (isStatic()) {
+    return Offset(getStatic() + other);
   }
-  return Offset(IGF.Builder.CreateAdd(getDynamic(), other.getDynamic()));
+  auto otherVal = llvm::ConstantInt::get(IGF.IGM.SizeTy, other.getValue());
+  return Offset(IGF.Builder.CreateAdd(getDynamic(), otherVal));
 }
 
 Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
@@ -423,9 +432,33 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   return Address(slotPtr, objectAlignment);
 }
 
-bool IRGenFunction::isInOutlinedFunction() { return inOutlinedFunction; }
+llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM) {
+  if (IGM.IRGen.Opts.shouldOptimize()) {
+    // Emit unique side-effecting inline asm calls in order to eliminate
+    // the possibility that an LLVM optimization or code generation pass
+    // will merge these blocks back together again. We emit an empty asm
+    // string with the side-effect flag set, and with a unique integer
+    // argument for each cond_fail we see in the function.
+    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
+    llvm::Type *argTys = {asmArgTy};
+    llvm::FunctionType *asmFnTy =
+        llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
+    llvm::InlineAsm *inlineAsm =
+        llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
+    CreateAsmCall(inlineAsm,
+                  llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
+  }
 
-void IRGenFunction::setInOutlinedFunction() {
-  assert(!isInOutlinedFunction() && "Expected inOutlinedFunction to be false");
-  inOutlinedFunction = true;
+  // Emit the trap instruction.
+  llvm::Function *trapIntrinsic =
+      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
+  auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
+  setCallingConvUsingCallee(Call);
+  return Call;
+}
+
+void IRGenFunction::emitTrap(bool EmitUnreachable) {
+  Builder.CreateNonMergeableTrap(IGM);
+  if (EmitUnreachable)
+    Builder.CreateUnreachable();
 }

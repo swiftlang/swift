@@ -52,6 +52,8 @@ public:
       return S;
     case StmtKind::Brace:
       return transformBraceStmt(cast<BraceStmt>(S));
+    case StmtKind::Defer:
+      return transformDeferStmt(cast<DeferStmt>(S));
     case StmtKind::If:
       return transformIfStmt(cast<IfStmt>(S));
     case StmtKind::Guard:
@@ -282,6 +284,21 @@ public:
     }
     return DCS;
   }
+  
+  DeferStmt *transformDeferStmt(DeferStmt *DS) {
+    if (auto *FD = DS->getTempDecl()) {
+      // Temporarily unmark the DeferStmt's FuncDecl as implicit so it is
+      // transformed (as typically implicit Decls are skipped by the
+      // transformer).
+      auto Implicit = FD->isImplicit();
+      FD->setImplicit(false);
+      auto *D = transformDecl(FD);
+      D->setImplicit(Implicit);
+      assert(D == FD);
+    }
+    return DS;
+
+  }
 
   Decl *transformDecl(Decl *D) {
     if (D->isImplicit())
@@ -300,15 +317,12 @@ public:
           EndLoc = FD->getParameterLists().back()->getSourceRange().End;
         }
 
-        if (EndLoc.isValid()) {
-          BraceStmt *NNB = prependLoggerCall(NB, {StartLoc, EndLoc});
-          if (NNB != B) {
-            FD->setBody(NNB);
-          }
-        } else {
-          if (NB != B) {
-            FD->setBody(NB);
-          }
+        if (EndLoc.isValid())
+          NB = prependLoggerCall(NB, {StartLoc, EndLoc});
+
+        if (NB != B) {
+          FD->setBody(NB);
+          TypeChecker(Context).checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -675,12 +689,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
           if (FD->getBody()) {
             ASTContext &ctx = FD->getASTContext();
             Instrumenter I(ctx, FD, TmpNameIndex);
-            Decl *NewDecl = I.transformDecl(FD);
-            if (AbstractFunctionDecl *NFD =
-                    dyn_cast<AbstractFunctionDecl>(NewDecl)) {
-              TypeChecker TC(ctx);
-              TC.checkFunctionErrorHandling(NFD);
-            }
+            I.transformDecl(FD);
             return false;
           }
         }

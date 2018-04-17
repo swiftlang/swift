@@ -6,24 +6,23 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-from __future__ import print_function
 
-import argparse
 import os
 import sys
 import unittest
-
 from contextlib import contextmanager
 from io import StringIO
-
-from build_swift import driver_arguments
-from build_swift.tests import expected_options as eo
 
 from swift_build_support.swift_build_support import migration
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
     get_all_preset_names,
     get_preset_options,
 )
+
+from . import expected_options as eo
+from .. import argparse
+from .. import driver_arguments
+
 
 FILE_PATH = os.path.abspath(__file__)
 TESTS_PATH = os.path.abspath(os.path.join(FILE_PATH, os.pardir))
@@ -591,7 +590,6 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.build_libicu)
             self.assertFalse(namespace.build_lldb)
             self.assertFalse(namespace.build_llbuild)
-            self.assertFalse(namespace.build_playgroundlogger)
             self.assertFalse(namespace.build_playgroundsupport)
             self.assertFalse(namespace.build_swiftpm)
             self.assertFalse(namespace.build_xctest)
@@ -647,6 +645,7 @@ class TestDriverArgumentParser(unittest.TestCase):
                 '--test', '0',
                 '--validation-test', '0',
                 '--long-test', '0',
+                '--stress-test', '0',
             ])
 
             self.assertFalse(namespace.test_linux)

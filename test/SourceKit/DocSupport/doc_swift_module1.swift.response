@@ -41,6 +41,11 @@ protocol P3 {
     func p3Required()
 }
 
+extension Dictionary.Keys where Key : Hashable {
+
+    func foo()
+}
+
 
 [
   {
@@ -121,16 +126,6 @@ protocol P3 {
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 102,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 104,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -144,16 +139,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 114,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 112,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 114,
     key.length: 1
   },
@@ -176,11 +161,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 139,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 139,
     key.length: 1
   },
@@ -315,16 +295,6 @@ protocol P3 {
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 316,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 318,
-    key.length: 1
-  },
-  {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
@@ -338,16 +308,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 328,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 326,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 328,
     key.length: 1
   },
@@ -370,11 +330,6 @@ protocol P3 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 353,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 353,
     key.length: 1
   },
@@ -433,6 +388,52 @@ protocol P3 {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 439,
     key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 455,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Dictionary",
+    key.usr: "s:s10DictionaryV",
+    key.offset: 465,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Keys",
+    key.usr: "s:s10DictionaryV4KeysV",
+    key.offset: 476,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 481,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 487,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Hashable",
+    key.usr: "s:s8HashableP",
+    key.offset: 493,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 509,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 514,
+    key.length: 3
   }
 ]
 [
@@ -463,7 +464,7 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo2(a:b:)",
-        key.usr: "s:5cake12P1P4foo2ySi1a_Si1btF",
+        key.usr: "s:5cake12P1P4foo21a1bySi_SitF",
         key.offset: 92,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -487,7 +488,7 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:5cake12P1PS2icip",
+        key.usr: "s:5cake12P1PyS2icip",
         key.offset: 127,
         key.length: 38,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",
@@ -575,8 +576,8 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo2(a:b:)",
-        key.usr: "s:5cake12P2PAAE4foo2ySi1a_Si1btF",
-        key.default_implementation_of: "s:5cake12P1P4foo2ySi1a_Si1btF",
+        key.usr: "s:5cake12P2PAAE4foo21a1bySi_SitF",
+        key.default_implementation_of: "s:5cake12P1P4foo21a1bySi_SitF",
         key.offset: 306,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
@@ -600,8 +601,8 @@ protocol P3 {
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:5cake12P2PAAES2icip",
-        key.default_implementation_of: "s:5cake12P1PS2icip",
+        key.usr: "s:5cake12P2PAAEyS2icip",
+        key.default_implementation_of: "s:5cake12P1PyS2icip",
         key.offset: 341,
         key.length: 26,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",
@@ -658,6 +659,39 @@ protocol P3 {
         key.offset: 434,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>p3Required</decl.name>()</decl.function.method.instance>"
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_params: [
+      {
+        key.name: "Key"
+      },
+      {
+        key.name: "Value"
+      }
+    ],
+    key.generic_requirements: [
+      {
+        key.description: "Key : Hashable"
+      }
+    ],
+    key.offset: 455,
+    key.length: 66,
+    key.extends: {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "Keys",
+      key.usr: "s:s10DictionaryV4KeysV"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "foo()",
+        key.usr: "s:s10DictionaryV4KeysV5cake1E3fooyyF",
+        key.offset: 509,
+        key.length: 10,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>"
       }
     ]
   }

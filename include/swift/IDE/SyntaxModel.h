@@ -48,6 +48,8 @@ enum class SyntaxNodeKind : uint8_t {
   BuildConfigKeyword,
   /// An identifier in a #if condition.
   BuildConfigId,
+  /// #-keywords like #warning, #sourceLocation
+  PoundDirectiveKeyword,
   /// Any occurrence of '@<attribute-name>' anywhere.
   AttributeId,
   /// A "resolved/active" attribute. Mis-applied attributes will be AttributeId.
@@ -96,6 +98,7 @@ enum class SyntaxStructureKind : uint8_t {
   TypeAlias,
   Subscript,
   AssociatedType,
+  GenericTypeParam,
 
   ForEachStatement,
   WhileStatement,
@@ -111,7 +114,8 @@ enum class SyntaxStructureKind : uint8_t {
   ArrayExpression,
   DictionaryExpression,
   ObjectLiteralExpression,
-  TupleExpression
+  TupleExpression,
+  ClosureExpression
 };
 
 enum class SyntaxStructureElementKind : uint8_t {

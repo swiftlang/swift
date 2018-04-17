@@ -32,8 +32,7 @@ func foo() {}
 // SEMA_2: 0 {{.*}} source.statistic.num-semantic-requests
 // SEMA_2: 2 {{.*}} source.statistic.num-ast-builds
 // SEMA_2: 1 {{.*}} source.statistic.num-asts-in-memory
-// SEMA_2: 2 {{.*}} source.statistic.max-asts-in-memory
-// SEMA_2: 0 {{.*}} source.statistic.num-ast-cache-hits
+// FIXME_SEMA_2: 0 {{.*}} source.statistic.num-ast-cache-hits
 // SEMA_2: 0 {{.*}} source.statistic.num-ast-snaphost-uses
 
 // RUN: %sourcekitd-test -req=sema %s -- %s == -req=cursor -pos=1:6 %s -- %s == -req=stats | %FileCheck %s -check-prefix=SEMA_3

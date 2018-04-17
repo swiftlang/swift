@@ -6,12 +6,12 @@
 import Builtin
 import Swift
 
-// CHECK: [[REF:%swift.refcounted]] = type
-// CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[OBJCCLASS:%objc_class]] = type
-// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[C_CLASS:%T5class1CC]] = type
-// CHECK: [[OBJCOBJ:%objc_object]] = type
+// CHECK-DAG: [[REF:%swift.refcounted]] = type
+// CHECK-DAG: [[TYPE:%swift.type]] = type
+// CHECK-DAG: [[OBJCCLASS:%objc_class]] = type
+// CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
+// CHECK-DAG: [[C_CLASS:%T5class1CC]] = type
+// CHECK-DAG: [[OBJCOBJ:%objc_object]] = type
 
 class C {}
 sil_vtable C {}
@@ -33,35 +33,35 @@ sil_vtable C {}
 // \ CHECK:   i8* null
 // \ CHECK: }
 
-//   CHECK: @_T05class1CCMf = internal global <{ {{.*}} }> <{
-// \ CHECK:   void ([[C_CLASS]]*)* @_T05class1CCfD,
-// \ CHECK:   i8** @_T0BoWV,
-// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_T05class1CCMm to i64),
-// \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
+//   CHECK: @"$S5class1CCMf" = internal global <{ {{.*}} }> <{
+// \ CHECK:   void ([[C_CLASS]]*)* @"$S5class1CCfD",
+// \ CHECK:   i8** @"$SBoWV",
+// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @"$S5class1CCMm" to i64),
+// \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* null,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 1)
 // \ CHECK: }>
 
 // Destroying destructor
-// CHECK: define{{( protected)?}} swiftcc [[REF]]* @_T05class1CCfd([[C_CLASS]]* swiftself) {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc [[REF]]* @"$S5class1CCfd"([[C_CLASS]]* swiftself) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
 // CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
-sil @_T05class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
+sil @$S5class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
   %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
 
 // Deallocating destructor
-// CHECK: define{{( protected)?}} swiftcc void @_T05class1CCfD([[C_CLASS]]* swiftself)
-sil @_T05class1CCfD : $@convention(method) (@owned C) -> () {
+// CHECK: define{{( protected)?}} swiftcc void @"$S5class1CCfD"([[C_CLASS]]* swiftself)
+sil @$S5class1CCfD : $@convention(method) (@owned C) -> () {
 bb0(%0 : $C):
   // CHECK-NEXT: entry
-  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call swiftcc [[REF]]* @_T05class1CCfd([[C_CLASS]]* swiftself %0)
+  // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call swiftcc [[REF]]* @"$S5class1CCfd"([[C_CLASS]]* swiftself %0)
   // CHECK-NEXT: [[SELF_OBJ:%[a-zA-Z0-9]+]] = bitcast [[REF]]* [[SELF]] to [[C_CLASS]]*
-  %1 = function_ref @_T05class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %2
+  %1 = function_ref @$S5class1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %2
   %2 = apply %1(%0) : $@convention(method) (@owned C) -> @owned Builtin.NativeObject // user: %3
   %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $C // user: %4
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* [[SELF_OBJ]] to [[REF]]*
@@ -100,7 +100,7 @@ bb0(%0 : $@thick C.Type):
   // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i16*
   // CHECK:   [[ALIGN16:%.*]] = load i16, i16* [[T1]], align 4
   // CHECK:   [[ALIGN:%.*]] = zext i16 [[ALIGN16]] to i64
-  // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]])
+  // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]])
   %1 = alloc_ref_dynamic %0 : $@thick C.Type, $C
   return %1 : $C
 }
@@ -137,12 +137,12 @@ sil public_external @alloc_RequiredBase : $@convention(method) (@thick RequiredB
 sil public_external @init_RequiredBase : $@convention(method) (@owned RequiredBase) -> @owned RequiredBase
 
 sil_vtable NonRequiredBase {
-  #NonRequiredBase.init!initializer.1: init_NonRequiredBase
+  #NonRequiredBase.init!initializer.1: @init_NonRequiredBase
 }
 
 sil_vtable RequiredBase {
-  #NonRequiredBase.init!initializer.1: init_RequiredBase
-  #RequiredBase.init!allocator.1: alloc_RequiredBase
+  #NonRequiredBase.init!initializer.1: @init_RequiredBase
+  #RequiredBase.init!allocator.1: @alloc_RequiredBase
 }
 
 // rdar://problem/19902523

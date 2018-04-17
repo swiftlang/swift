@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "llvm/ADT/MapVector.h"
 
 namespace llvm {
   class Constant;
@@ -34,6 +35,7 @@ namespace llvm {
 }
 
 namespace swift {
+  enum IsInitialization_t : bool;
   enum IsTake_t : bool;
   class SILType;
 
@@ -47,6 +49,7 @@ namespace irgen {
   class ExplosionSchema;
   class NativeConventionSchema;
   enum OnHeap_t : unsigned char;
+  class OutliningMetadataCollector;
   class OwnedAddress;
   class RValue;
   class RValueSchema;
@@ -62,7 +65,7 @@ enum class FixedPacking {
   /// It needs to be checked dynamically.
   Dynamic
 };
-  
+
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -260,7 +263,6 @@ public:
 
   /// Allocate a variable of this type on the stack.
   virtual StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                                     bool isInEntryBlock,
                                      const llvm::Twine &name) const = 0;
 
   /// Deallocate a variable of this type.
@@ -269,41 +271,43 @@ public:
 
   /// Destroy the value of a variable of this type, then deallocate its
   /// memory.
-  virtual void destroyStack(IRGenFunction &IGF, StackAddress addr,
-                            SILType T) const = 0;
+  virtual void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                            bool isOutlined) const = 0;
 
   /// Copy or take a value out of one address and into another, destroying
   /// old value in the destination.  Equivalent to either assignWithCopy
   /// or assignWithTake depending on the value of isTake.
   void assign(IRGenFunction &IGF, Address dest, Address src, IsTake_t isTake,
-              SILType T) const;
+              SILType T, bool isOutlined) const;
 
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
-  virtual void assignWithCopy(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
 
   /// Move a value out of an object and into another, destroying the
   /// old value there and leaving the source object in an invalid state.
-  virtual void assignWithTake(IRGenFunction &IGF, Address dest,
-                              Address src, SILType T) const = 0;
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const = 0;
 
   /// Copy-initialize or take-initialize an uninitialized object
   /// with the value from a different object.  Equivalent to either
   /// initializeWithCopy or initializeWithTake depending on the value
   /// of isTake.
   void initialize(IRGenFunction &IGF, Address dest, Address src,
-                  IsTake_t isTake, SILType T) const;
+                  IsTake_t isTake, SILType T, bool isOutlined) const;
 
   /// Perform a "take-initialization" from the given object.  A
   /// take-initialization is like a C++ move-initialization, except that
   /// the old object is actually no longer permitted to be destroyed.
   virtual void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                                  Address srcAddr, SILType T) const = 0;
+                                  Address srcAddr, SILType T,
+                                  bool isOutlined) const = 0;
 
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                                  Address srcAddr, SILType T) const = 0;
+                                  Address srcAddr, SILType T,
+                                  bool isOutlined) const = 0;
 
   /// Perform a copy-initialization from the given fixed-size buffer
   /// into an uninitialized fixed-size buffer, allocating the buffer if
@@ -338,10 +342,12 @@ public:
 
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
-                                    Address src, SILType T) const = 0;
+                                    Address src, SILType T,
+                                    bool isOutlined) const = 0;
 
   /// Destroy an object of this type in memory.
-  virtual void destroy(IRGenFunction &IGF, Address address, SILType T) const = 0;
+  virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
+                       bool isOutlined) const = 0;
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single object pointer?
@@ -384,13 +390,6 @@ public:
                                     Address dest,
                                     SILType T) const = 0;
   
-  /// Initialize a freshly instantiated value witness table. Should be a no-op
-  /// for fixed-size types.
-  virtual void initializeMetadata(IRGenFunction &IGF,
-                                  llvm::Value *metadata,
-                                  llvm::Value *vwtable,
-                                  SILType T) const = 0;
-
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
   /// Optional<T>.
   virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
@@ -477,6 +476,11 @@ public:
                                    Address src, llvm::Value *count,
                                    SILType T) const;
 
+  /// Collect all the metadata necessary in order to perform value
+  /// operations on this type.
+  virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                           SILType T) const;
+
   /// Get the native (abi) convention for a return value of this type.
   const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;
 
@@ -488,6 +492,12 @@ public:
   virtual void verify(IRGenTypeVerifierFunction &IGF,
                       llvm::Value *typeMetadata,
                       SILType T) const;
+
+  void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, IsInitialization_t isInit,
+                        IsTake_t isTake) const;
+
+  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
 };
 
 } // end namespace irgen

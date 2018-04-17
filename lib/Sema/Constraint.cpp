@@ -358,6 +358,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << "decl-via-unwrapped-optional ";
       printDecl();
       break;
+    case OverloadChoiceKind::DynamicMemberLookup:
+      Out << "dynamic member lookup '" << overload.getName() << "'";
+      break;
     case OverloadChoiceKind::BaseType:
       Out << "base type";
       break;
@@ -462,8 +465,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[inout-to-pointer]";
   case ConversionRestrictionKind::PointerToPointer:
     return "[pointer-to-pointer]";
-  case ConversionRestrictionKind::ForceUnchecked:
-    return "[force-unchecked]";
   case ConversionRestrictionKind::ArrayUpcast:
     return "[array-upcast]";
   case ConversionRestrictionKind::DictionaryUpcast:
@@ -493,8 +494,6 @@ Type Fix::getTypeArgument(ConstraintSystem &cs) const {
 
 StringRef Fix::getName(FixKind kind) {
   switch (kind) {
-  case FixKind::None:
-    return "prevent fixes";
   case FixKind::ForceOptional:
     return "fix: force optional";
   case FixKind::OptionalChaining:
@@ -505,6 +504,9 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: add address-of";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
+  case FixKind::ExplicitlyEscaping:
+  case FixKind::ExplicitlyEscapingToAny:
+    return "fix: add @escaping";
   }
 
   llvm_unreachable("Unhandled FixKind in switch.");

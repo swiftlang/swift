@@ -37,7 +37,6 @@ namespace swift {
 
     bool AutolinkForceLoad = false;
     bool EnableNestedTypeLookupTable = false;
-    bool EnableDeclMemberNamesTable = false;
     bool SerializeAllSIL = false;
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;

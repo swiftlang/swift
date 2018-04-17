@@ -18,6 +18,8 @@
 #define SWIFT_REFLECTION_RECORDS_H
 
 #include "swift/Basic/RelativePointer.h"
+#include "swift/Demangling/Demangle.h"
+#include "llvm/ADT/ArrayRef.h"
 
 const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 3; // superclass field
 
@@ -30,7 +32,10 @@ class FieldRecordFlags {
   using int_type = uint32_t;
   enum : int_type {
     // Is this an indirect enum case?
-    IsIndirectCase = 0x1
+    IsIndirectCase = 0x1,
+    
+    // Is this a mutable `var` property?
+    IsVar = 0x2,
   };
   int_type Data = 0;
 
@@ -39,11 +44,22 @@ public:
     return (Data & IsIndirectCase) == IsIndirectCase;
   }
 
+  bool isVar() const {
+    return (Data & IsVar) == IsVar;
+  }
+
   void setIsIndirectCase(bool IndirectCase=true) {
     if (IndirectCase)
       Data |= IsIndirectCase;
     else
       Data &= ~IsIndirectCase;
+  }
+
+  void setIsVar(bool Var=true) {
+    if (Var)
+      Data |= IsVar;
+    else
+      Data &= ~IsVar;
   }
 
   int_type getRawValue() const {
@@ -63,13 +79,14 @@ public:
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  StringRef getMangledTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char *)((uintptr_t)MangledTypeName.get() + Offset));
   }
 
-  std::string getFieldName()  const {
+  StringRef getFieldName(uintptr_t Offset)  const {
     if (FieldName)
-      return FieldName.get();
+      return (const char *)((uintptr_t)FieldName.get() + Offset);
     return "";
   }
 
@@ -172,6 +189,10 @@ public:
             Kind == FieldDescriptorKind::ObjCProtocol);
   }
 
+  bool isStruct() const {
+    return Kind == FieldDescriptorKind::Struct;
+  }
+
   const_iterator begin() const {
     auto Begin = getFieldRecordBuffer();
     auto End = Begin + NumFields;
@@ -184,20 +205,26 @@ public:
     return const_iterator { End, End };
   }
 
+  llvm::ArrayRef<FieldRecord> getFields() const {
+    return {getFieldRecordBuffer(), NumFields};
+  }
+
   bool hasMangledTypeName() const {
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  StringRef getMangledTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char *)((uintptr_t)MangledTypeName.get() + Offset));
   }
 
   bool hasSuperclass() const {
     return Superclass;
   }
 
-  std::string getSuperclass() const {
-    return Superclass.get();
+  StringRef getSuperclass(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)Superclass.get() + Offset));
   }
 };
 
@@ -241,12 +268,13 @@ class AssociatedTypeRecord {
   const RelativeDirectPointer<const char> SubstitutedTypeName;
 
 public:
-  std::string getName() const {
-    return Name.get();
+  StringRef getName(uintptr_t Offset) const {
+    return (const char*)((uintptr_t)Name.get() + Offset);
   }
 
-  std::string getMangledSubstitutedTypeName() const {
-    return SubstitutedTypeName.get();
+  StringRef getMangledSubstitutedTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)SubstitutedTypeName.get() + Offset));
   }
 };
 
@@ -295,8 +323,11 @@ struct AssociatedTypeRecordIterator {
 // An associated type descriptor contains a collection of associated
 // type records for a conformance.
 struct AssociatedTypeDescriptor {
+private:
   const RelativeDirectPointer<const char> ConformingTypeName;
   const RelativeDirectPointer<const char> ProtocolTypeName;
+public:
+
   uint32_t NumAssociatedTypes;
   uint32_t AssociatedTypeRecordSize;
 
@@ -304,7 +335,6 @@ struct AssociatedTypeDescriptor {
     return reinterpret_cast<const AssociatedTypeRecord *>(this + 1);
   }
 
-public:
   using const_iterator = AssociatedTypeRecordIterator;
 
   const_iterator begin() const {
@@ -319,12 +349,14 @@ public:
     return const_iterator { End, End };
   }
 
-  std::string getMangledProtocolTypeName() const {
-    return ProtocolTypeName.get();
+  StringRef getMangledProtocolTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)ProtocolTypeName.get() + Offset));
   }
 
-  std::string getMangledConformingTypeName() const {
-    return ConformingTypeName.get();
+  StringRef getMangledConformingTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)ConformingTypeName.get() + Offset));
   }
 };
 
@@ -377,8 +409,9 @@ public:
     return TypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return TypeName.get();
+  StringRef getMangledTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)TypeName.get() + Offset));
   }
 };
 
@@ -424,8 +457,9 @@ public:
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  StringRef getMangledTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)MangledTypeName.get() + Offset));
   }
 };
 
@@ -470,16 +504,18 @@ public:
     return MangledTypeName;
   }
 
-  std::string getMangledTypeName() const {
-    return MangledTypeName.get();
+  StringRef getMangledTypeName(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)MangledTypeName.get() + Offset));
   }
 
   bool hasMangledMetadataSource() const {
     return MangledMetadataSource;
   }
 
-  std::string getMangledMetadataSource() const {
-    return MangledMetadataSource.get();
+  StringRef getMangledMetadataSource(uintptr_t Offset) const {
+    return Demangle::makeSymbolicMangledNameStringRef(
+      (const char*)((uintptr_t)MangledMetadataSource.get() + Offset));
   }
 };
 

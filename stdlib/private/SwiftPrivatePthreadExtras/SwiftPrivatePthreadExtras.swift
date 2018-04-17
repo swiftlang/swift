@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
@@ -107,8 +107,8 @@ public func _stdlib_pthread_join<Result>(
     let threadResultPtr = threadResultRawPtr!.assumingMemoryBound(
       to: Result.self)
     let threadResult = threadResultPtr.pointee
-    threadResultPtr.deinitialize()
-    threadResultPtr.deallocate(capacity: 1)
+    threadResultPtr.deinitialize(count: 1)
+    threadResultPtr.deallocate()
     return (result, threadResult)
   } else {
     return (result, nil)

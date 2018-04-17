@@ -195,15 +195,8 @@ static void doGlobalExtensionLookup(Type BaseType,
     if (!isExtensionApplied(*const_cast<DeclContext*>(CurrDC), BaseType,
                             extension))
       continue;
-    bool validatedExtension = false;
-    if (TypeResolver && extension->getAsProtocolExtensionContext()) {
-      if (!TypeResolver->isProtocolExtensionUsable(
-              const_cast<DeclContext *>(CurrDC), BaseType, extension)) {
-        continue;
-      }
-      validatedExtension = true;
-    }
 
+    bool validatedExtension = false;
     for (auto Member : extension->getMembers()) {
       if (auto VD = dyn_cast<ValueDecl>(Member))
         if (isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver)) {
@@ -298,6 +291,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (D->getOverriddenDecl())
         return;
 
+      // If the declaration is not @objc, it cannot be called dynamically.
+      if (!D->isObjC())
+        return;
+
       // Ensure that the declaration has a type.
       if (!D->hasInterfaceType()) {
         if (!TypeResolver) return;
@@ -337,6 +334,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       // For other kinds of values, check if we already reported a decl
       // with the same signature.
 
+      case DeclKind::Accessor:
       case DeclKind::Func: {
         auto FD = cast<FuncDecl>(D);
         assert(FD->getImplicitSelfDecl() && "should not find free functions");
@@ -675,35 +673,6 @@ template <> struct DenseMapInfo<FoundDeclTy> {
 
 namespace {
 
-/// Similar to swift::conflicting, but lenient about protocol extensions which
-/// don't affect code completion's concept of overloading.
-static bool relaxedConflicting(const OverloadSignature &sig1,
-                               const OverloadSignature &sig2) {
-
-  // If the base names are different, they can't conflict.
-  if (sig1.Name.getBaseName() != sig2.Name.getBaseName())
-    return false;
-
-  // If one is a compound name and the other is not, they do not conflict
-  // if one is a property and the other is a non-nullary function.
-  if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
-    return !((sig1.IsProperty && sig2.Name.getArgumentNames().size() > 0) ||
-             (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
-  }
-
-  // Allow null property types to match non-null ones, which only happens when
-  // one property is from a generic extension and the other is not.
-  if (sig1.InterfaceType != sig2.InterfaceType) {
-    if (!sig1.IsProperty || !sig2.IsProperty)
-      return false;
-    if (sig1.InterfaceType && sig2.InterfaceType)
-      return false;
-  }
-
-  return sig1.Name == sig2.Name && sig1.UnaryOperator == sig2.UnaryOperator &&
-         sig1.IsInstanceMember == sig2.IsInstanceMember;
-}
-
 /// Hack to guess at whether substituting into the type of a declaration will
 /// be okay.
 /// FIXME: This is awful. We should either have Type::subst() work for
@@ -810,11 +779,12 @@ public:
     }
 
     auto FoundSignature = VD->getOverloadSignature();
-    if (FoundSignature.InterfaceType && shouldSubst &&
-        shouldSubstIntoDeclType(FoundSignature.InterfaceType)) {
+    auto FoundSignatureType = VD->getOverloadSignatureType();
+    if (FoundSignatureType && shouldSubst &&
+        shouldSubstIntoDeclType(FoundSignatureType)) {
       auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
-      if (auto CT = FoundSignature.InterfaceType.subst(subs))
-        FoundSignature.InterfaceType = CT->getCanonicalType();
+      if (auto CT = FoundSignatureType.subst(subs))
+        FoundSignatureType = CT->getCanonicalType();
     }
 
     for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
@@ -827,14 +797,18 @@ public:
       }
 
       auto OtherSignature = OtherVD->getOverloadSignature();
-      if (OtherSignature.InterfaceType && shouldSubst &&
-          shouldSubstIntoDeclType(OtherSignature.InterfaceType)) {
+      auto OtherSignatureType = OtherVD->getOverloadSignatureType();
+      if (OtherSignatureType && shouldSubst &&
+          shouldSubstIntoDeclType(OtherSignatureType)) {
         auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
-        if (auto CT = OtherSignature.InterfaceType.subst(subs))
-          OtherSignature.InterfaceType = CT->getCanonicalType();
+        if (auto CT = OtherSignatureType.subst(subs))
+          OtherSignatureType = CT->getCanonicalType();
       }
 
-      if (relaxedConflicting(FoundSignature, OtherSignature)) {
+      if (conflicting(M->getASTContext(), FoundSignature, FoundSignatureType,
+                      OtherSignature, OtherSignatureType,
+                      /*wouldConflictInSwift5*/nullptr,
+                      /*skipProtocolExtensionCheck*/true)) {
         if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);

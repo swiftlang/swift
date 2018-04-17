@@ -26,6 +26,7 @@ namespace swift {
   class ASTContext;
   class Decl;
   class Expr;
+  class GenericSignature;
   class Pattern;
   class Stmt;
   class TypeRepr;
@@ -127,6 +128,24 @@ public:
   PrettyStackTraceTypeRepr(ASTContext &C, const char *action, TypeRepr *type)
     : Context(C), TheType(type), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
+};
+
+class PrettyStackTraceGenericSignature : public llvm::PrettyStackTraceEntry {
+  const char *Action;
+  GenericSignature *GenericSig;
+  Optional<unsigned> Requirement;
+
+public:
+  PrettyStackTraceGenericSignature(const char *action,
+                                   GenericSignature *genericSig,
+                                   Optional<unsigned> requirement = None)
+    : Action(action), GenericSig(genericSig), Requirement(requirement) { }
+
+  void setRequirement(Optional<unsigned> requirement) {
+    Requirement = requirement;
+  }
+
+  void print(llvm::raw_ostream &out) const override;
 };
 
 } // end namespace swift

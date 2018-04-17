@@ -37,6 +37,7 @@ enum SILStringEncoding : uint8_t {
 
 enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_PUBLIC,
+  SIL_LINKAGE_PUBLIC_NON_ABI,
   SIL_LINKAGE_HIDDEN,
   SIL_LINKAGE_SHARED,
   SIL_LINKAGE_PRIVATE,
@@ -45,7 +46,7 @@ enum SILLinkageEncoding : uint8_t {
   SIL_LINKAGE_SHARED_EXTERNAL,
   SIL_LINKAGE_PRIVATE_EXTERNAL,
 };
-using SILLinkageField = BCFixed<3>;
+using SILLinkageField = BCFixed<4>;
 
 enum SILVTableEntryKindEncoding : uint8_t {
   SIL_VTABLE_ENTRY_NORMAL,
@@ -83,6 +84,7 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   OptionalChain,
   OptionalForce,
   OptionalWrap,
+  External,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
@@ -115,7 +117,8 @@ namespace sil_index_block {
     SIL_WITNESS_TABLE_NAMES,
     SIL_WITNESS_TABLE_OFFSETS,
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
-    SIL_DEFAULT_WITNESS_TABLE_OFFSETS
+    SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+    SIL_PROPERTY_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -159,11 +162,15 @@ namespace sil_block {
     SIL_WITNESS_BASE_ENTRY,
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
+    SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
     SIL_DEFAULT_WITNESS_TABLE_ENTRY,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
+    SIL_PROPERTY,
+    SIL_ONE_OPERAND_EXTRA_ATTR,
+    SIL_TWO_OPERANDS_EXTRA_ATTR,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -196,6 +203,15 @@ namespace sil_block {
     SILVTableEntryKindField,  // Kind
     SILLinkageField,      // Linkage
     BCArray<ValueIDField> // SILDeclRef
+  >;
+  
+  using PropertyLayout = BCRecordLayout<
+    SIL_PROPERTY,
+    DeclIDField,          // Property decl
+    BCFixed<1>,           // Is serialized
+    BCArray<ValueIDField> // Encoded key path component
+    // Any substitutions or conformances required for the key path component
+    // follow.
   >;
 
   using WitnessTableLayout = BCRecordLayout<
@@ -234,6 +250,12 @@ namespace sil_block {
     TypeIDField
   >;
 
+  using WitnessConditionalConformanceLayout = BCRecordLayout<
+    SIL_WITNESS_CONDITIONAL_CONFORMANCE,
+    TypeIDField // ID of associated type
+    // Trailed by the conformance itself if appropriate.
+  >;
+
   using DefaultWitnessTableLayout = BCRecordLayout<
     SIL_DEFAULT_WITNESS_TABLE,
     DeclIDField,  // ID of ProtocolDecl
@@ -268,9 +290,11 @@ namespace sil_block {
                      BCFixed<2>,  // thunk/reabstraction_thunk
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
-                     BCFixed<2>,  // side effect info.
+                     BCFixed<2>,  // optimizationMode
+                     BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
+                     BCFixed<1>,  // must be weakly referenced
                      TypeIDField, // SILFunctionType
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
@@ -355,7 +379,9 @@ namespace sil_block {
     SIL_PARTIAL_APPLY,
     SIL_BUILTIN,
     SIL_TRY_APPLY,
-    SIL_NON_THROWING_APPLY
+    SIL_NON_THROWING_APPLY,
+    SIL_BEGIN_APPLY,
+    SIL_NON_THROWING_BEGIN_APPLY
   };
   
   using SILInstApplyLayout = BCRecordLayout<
@@ -380,17 +406,36 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<4>,          // Optional attributes
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField
+  >;
+
+  using SILOneOperandExtraAttributeLayout = BCRecordLayout<
+    SIL_ONE_OPERAND_EXTRA_ATTR,
+    SILInstOpCodeField,
+    BCFixed<5>, // Optional attributes
+    TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 
   // SIL instructions with two typed values.
   using SILTwoOperandsLayout = BCRecordLayout<
     SIL_TWO_OPERANDS,
     SILInstOpCodeField,
-    BCFixed<4>,          // Optional attributes
+    BCFixed<2>,          // Optional attributes
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField
+  >;
+
+  using SILTwoOperandsExtraAttributeLayout = BCRecordLayout<
+    SIL_TWO_OPERANDS_EXTRA_ATTR,
+    SILInstOpCodeField,
+    BCFixed<5>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

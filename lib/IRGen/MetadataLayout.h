@@ -49,19 +49,24 @@ public:
   enum class Kind {
     Class,
     Struct,
-    Enum
-    // Update NominalMetadataLayout::classof if you add a non-nominal layout.
+    Enum,
+    ForeignClass,
   };
 
   class StoredOffset {
-    enum State {
+  public:
+    enum Kind {
       /// The high bits are an integer displacement.
       Static = 0,
 
-      /// The high bits are an llvm::Constant* for the displacement,
-      /// which may be null if it hasn't been computed yet.
+      /// The high bits are an integer displacement relative to a offset stored
+      /// in a class metadata base offset global variable. This is used to
+      /// access members of class metadata where the superclass is resilient to
+      /// us, and therefore has an unknown size.
       Dynamic,
     };
+
+  private:
     enum : uint64_t {
       KindBits = 1,
       KindMask = (1 << KindBits) - 1,
@@ -71,28 +76,32 @@ public:
     mutable uintptr_t Data;
   public:
     StoredOffset() : Data(0) {}
-    explicit StoredOffset(llvm::Constant *offset)
-      : Data(reinterpret_cast<uintptr_t>(offset) | Dynamic) {}
-    explicit StoredOffset(Size offset)
-      : Data((static_cast<uint64_t>(offset.getValue()) << KindBits) | Static) {
-      assert(!offset.isZero() && "cannot store a zero offset");
-      assert(getStaticOffset() == offset && "overflow");
+    explicit StoredOffset(Size offset, Kind kind)
+      : Data((static_cast<uint64_t>(offset.getValue()) << KindBits) | kind) {
+      assert(kind == Kind::Dynamic || !offset.isZero() &&
+             "cannot store a zero static offset");
+      if (kind == Kind::Static)
+        assert(getStaticOffset() == offset && "overflow");
+      if (kind == Kind::Dynamic)
+        assert(getRelativeOffset() == offset && "overflow");
     }
 
     bool isValid() const { return Data != 0; }
     bool isStatic() const { return isValid() && (Data & KindMask) == Static; }
     bool isDynamic() const { return (Data & KindMask) == Dynamic; }
+
+    /// If this is a metadata offset into a resilient class, returns the offset
+    /// relative to the size of the superclass metadata.
+    Size getRelativeOffset() const {
+      assert(isDynamic());
+      return Size(static_cast<int64_t>(Data) >> KindBits);
+    }
+
+    /// Returns the offset relative to start of metadata. Only used for
+    /// metadata fields whose offset is completely known at compile time.
     Size getStaticOffset() const {
       assert(isStatic());
       return Size(static_cast<int64_t>(Data) >> KindBits);
-    }
-    llvm::Constant *getDynamicOffsetVariable() const {
-      assert(isDynamic());
-      return reinterpret_cast<llvm::Constant*>(Data & PayloadMask);
-    }
-    void setDynamicOffsetVariable(llvm::Constant *pointer) const {
-      assert(isDynamic());
-      Data = reinterpret_cast<uintptr_t>(pointer) | Dynamic;
     }
   };
 
@@ -119,11 +128,19 @@ public:
 /// Base class for nominal type metadata layouts.
 class NominalMetadataLayout : public MetadataLayout {
 protected:
+  NominalTypeDecl *Nominal;
   StoredOffset GenericRequirements;
 
-  NominalMetadataLayout(Kind kind) : MetadataLayout(kind) {}
+  NominalMetadataLayout(Kind kind, NominalTypeDecl *nominal)
+      : MetadataLayout(kind), Nominal(nominal) {}
+
+  Offset emitOffset(IRGenFunction &IGF, StoredOffset offset) const;
 
 public:
+  NominalTypeDecl *getDecl() const {
+    return Nominal;
+  }
+
   bool hasGenericRequirements() const {
     return GenericRequirements.isValid();
   }
@@ -134,7 +151,15 @@ public:
   Offset getGenericRequirementsOffset(IRGenFunction &IGF) const;
 
   static bool classof(const MetadataLayout *layout) {
-    return true; // No non-nominal metadata for now.
+    switch (layout->getKind()) {
+    case MetadataLayout::Kind::Class:
+    case MetadataLayout::Kind::Enum:
+    case MetadataLayout::Kind::Struct:
+      return true;
+
+    case MetadataLayout::Kind::ForeignClass:
+      return false;
+    }
   }
 };
 
@@ -150,6 +175,13 @@ public:
   };
 
 private:
+  bool HasResilientSuperclass = false;
+
+  StoredOffset StartOfImmediateMembers;
+
+  StoredOffset MetadataSize;
+  StoredOffset MetadataAddressPoint;
+
   StoredOffset InstanceSize;
   StoredOffset InstanceAlignMask;
 
@@ -168,6 +200,9 @@ private:
   /// The start of the field-offset vector.
   StoredOffset FieldOffsetVector;
 
+  /// The number of members to add after superclass metadata.
+  unsigned NumImmediateMembers;
+
   const StoredMethodInfo &getStoredMethodInfo(SILDeclRef method) const {
     auto it = MethodInfos.find(method);
     assert(it != MethodInfos.end());
@@ -184,12 +219,25 @@ private:
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
 
 public:
+  ClassDecl *getDecl() const {
+    return cast<ClassDecl>(Nominal);
+  }
+
+  bool hasResilientSuperclass() const {
+    return HasResilientSuperclass;
+  }
+
+  constexpr static bool areImmediateMembersNegative() {
+    return false;
+  }
+
+  Size getMetadataSizeOffset() const;
+
+  Size getMetadataAddressPointOffset() const;
+
   Size getInstanceSizeOffset() const;
 
   Size getInstanceAlignMaskOffset() const;
-
-  /// Should only be used when emitting the nominal type descriptor.
-  Size getStaticVTableOffset() const;
 
   /// Returns the start of the vtable in the class metadata.
   Offset getVTableOffset(IRGenFunction &IGF) const;
@@ -218,9 +266,28 @@ public:
   Size getStaticFieldOffset(VarDecl *field) const;
 
   /// Should only be used when emitting the nominal type descriptor.
+  Size getRelativeGenericRequirementsOffset() const;
+
   Size getStaticFieldOffsetVectorOffset() const;
+  Size getRelativeFieldOffsetVectorOffset() const;
+
+  Size getStaticVTableOffset() const;
+  Size getRelativeVTableOffset() const;
 
   Offset getFieldOffsetVectorOffset(IRGenFunction &IGF) const;
+
+  /// If the start of the immediate members is statically known, this
+  /// method will return it. Otherwise, it will assert.
+  Size getStartOfImmediateMembers() const {
+    return StartOfImmediateMembers.getStaticOffset();
+  }
+
+  /// The number of members to add after superclass metadata. The size of
+  /// this metadata is the superclass size plus the number of immediate
+  /// members in the class itself.
+  unsigned getNumImmediateMembers() const {
+    return NumImmediateMembers;
+  }
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Class;
@@ -239,6 +306,10 @@ class EnumMetadataLayout : public NominalMetadataLayout {
   EnumMetadataLayout(IRGenModule &IGM, EnumDecl *theEnum);
 
 public:
+  EnumDecl *getDecl() const {
+    return cast<EnumDecl>(Nominal);
+  }
+
   bool hasPayloadSizeOffset() const {
     return PayloadSizeOffset.isValid();
   }
@@ -267,6 +338,9 @@ class StructMetadataLayout : public NominalMetadataLayout {
   StructMetadataLayout(IRGenModule &IGM, StructDecl *theStruct);
 
 public:
+  StructDecl *getDecl() const {
+    return cast<StructDecl>(Nominal);
+  }
 
   Offset getFieldOffset(IRGenFunction &IGF, VarDecl *field) const;
 
@@ -281,6 +355,22 @@ public:
 
   static bool classof(const MetadataLayout *layout) {
     return layout->getKind() == Kind::Struct;
+  }
+};
+
+/// Layout for foreign class type metadata.
+class ForeignClassMetadataLayout : public MetadataLayout {
+  ClassDecl *Class;
+  StoredOffset SuperClassOffset;
+
+  friend class IRGenModule;
+  ForeignClassMetadataLayout(IRGenModule &IGM, ClassDecl *theClass);
+
+public:
+  StoredOffset getSuperClassOffset() const { return SuperClassOffset; }
+
+  static bool classof(const MetadataLayout *layout) {
+    return layout->getKind() == Kind::ForeignClass;
   }
 };
 
@@ -303,6 +393,19 @@ Size getClassFieldOffsetOffset(IRGenModule &IGM,
 Address emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                        llvm::Value *metadata,
                                        NominalTypeDecl *theDecl);
+
+/// Given a reference to class type metadata of the given type,
+/// decide the offset to the given field.  This assumes that the
+/// offset is stored in the metadata, i.e. its offset is potentially
+/// dependent on generic arguments.  The result is a ptrdiff_t.
+llvm::Value *emitClassFieldOffset(IRGenFunction &IGF,
+                                  ClassDecl *theClass,
+                                  VarDecl *field,
+                                  llvm::Value *metadata);
+
+/// Given a class metadata pointer, emit the address of its superclass field.  
+Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
+                                                  llvm::Value *metadata);
 
 } // end namespace irgen
 } // end namespace swift

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
 // RUN: %target-run %t/a.out
@@ -103,66 +102,6 @@ ExclusiveAccessTestSuite.test("ModifyFollowedByModify") {
 
   globalX = X() // no-trap
 }
-
-// FIXME: This should be covered by static diagnostics.
-// Once this radar is fixed, confirm that a it is covered by a static diagnostic
-// (-verify) test in exclusivity_static_diagnostics.sil.
-// <rdar://problem/32061282> Enforce exclusive access in noescape closures.
-//
-//ExclusiveAccessTestSuite.test("ClosureCaptureModifyModify")
-//.skip(.custom(
-//    { _isFastAssertConfiguration() },
-//    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("Previous access (a modification) started at")
-//  .crashOutputMatches("Current access (a modification) started at")
-//  .code
-//{
-//  var x = X()
-//  modifyAndPerform(&x) {
-//    expectCrashLater()
-//    x.i = 12
-//  }
-//}
-
-// FIXME: This should be covered by static diagnostics.
-// Once this radar is fixed, confirm that a it is covered by a static diagnostic
-// (-verify) test in exclusivity_static_diagnostics.sil.
-// <rdar://problem/32061282> Enforce exclusive access in noescape closures.
-//
-//ExclusiveAccessTestSuite.test("ClosureCaptureReadModify")
-//.skip(.custom(
-//    { _isFastAssertConfiguration() },
-//    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("Previous access (a read) started at")
-//  .crashOutputMatches("Current access (a modification) started at")
-//  .code
-//{
-//  var x = X()
-//  modifyAndPerform(&x) {
-//    expectCrashLater()
-//    _blackHole(x.i)
-//  }
-//}
-
-// FIXME: This should be covered by static diagnostics.
-// Once this radar is fixed, confirm that a it is covered by a static diagnostic
-// (-verify) test in exclusivity_static_diagnostics.sil.
-// <rdar://problem/32061282> Enforce exclusive access in noescape closures.
-//
-//ExclusiveAccessTestSuite.test("ClosureCaptureModifyRead")
-//.skip(.custom(
-//    { _isFastAssertConfiguration() },
-//    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("Previous access (a modification) started at")
-//  .crashOutputMatches("Current access (a read) started at")
-//  .code
-//{
-//  var x = X()
-//  readAndPerform(&x) {
-//    expectCrashLater()
-//    x.i = 12
-//  }
-//}
 
 ExclusiveAccessTestSuite.test("ClosureCaptureReadRead") {
   var x = X()
@@ -300,5 +239,28 @@ ExclusiveAccessTestSuite.test("InoutWriteEscapeWrite")
   expectCrashLater()
   doOne { modifyAndPerform(&x, closure: c) }
 }
+
+class ClassWithStoredProperty {
+  var f = 7
+}
+
+// FIXME: This should trap with a modify/modify violation at run time.
+ExclusiveAccessTestSuite.test("KeyPathClassStoredProp")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+//  .crashOutputMatches("Previous access (a modification) started at")
+//  .crashOutputMatches("Current access (a modification) started at")
+  .code
+{
+  let getF = \ClassWithStoredProperty.f
+  let c = ClassWithStoredProperty()
+
+//  expectCrashLater()
+  modifyAndPerform(&c[keyPath: getF]) {
+    c[keyPath: getF] = 12
+  }
+}
+
 
 runAllTests()

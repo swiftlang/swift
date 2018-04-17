@@ -96,6 +96,16 @@ function(_construct_sources_for_multibench sources_out objfile_out)
   set(${objfile_out} ${objfiles} PARENT_SCOPE)
 endfunction()
 
+function(add_opt_view opt_view_main_dir, module_name, opt_view_dir_out)
+  set(opt_view_dir "${opt_view_main_dir}/${module_name}")
+  set(opt_record "${objdir}/${module_name}.opt.yaml")
+  add_custom_command(
+    OUTPUT ${opt_view_dir}
+    DEPENDS "${objfile}"
+    COMMAND ${SWIFT_BENCHMARK_OPT_VIEWER} ${opt_record} "-o" ${opt_view_dir})
+  set(${opt_view_dir_out} ${opt_view_dir} PARENT_SCOPE)
+endfunction()
+
 # Regular whole-module-compilation: only a single object file is
 # generated.
 function (add_swift_multisource_wmo_benchmark_library objfile_out)
@@ -200,7 +210,15 @@ function (swift_benchmark_compile_archopts)
       "-${BENCH_COMPILE_ARCHOPTS_OPT}"
       "-no-link-objc-runtime"
       "-I" "${srcdir}/utils/ObjectiveCTests")
-  set(common_swift3_options ${common_options} "-swift-version" "3")
+
+  set(opt_view_main_dir)
+  if(SWIFT_BENCHMARK_GENERATE_OPT_VIEW AND LLVM_HAVE_OPT_VIEWER_MODULES)
+    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
+      list(APPEND common_options "-save-optimization-record")
+      set(opt_view_main_dir "${objdir}/opt-view")
+    endif()
+  endif()
+
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
   # Always optimize the driver modules.
@@ -218,6 +236,7 @@ function (swift_benchmark_compile_archopts)
 
   set(bench_library_objects)
   set(bench_library_sibfiles)
+  set(opt_view_dirs)
   # Build libraries used by the driver and benchmarks.
   foreach(module_name_path ${BENCH_LIBRARY_MODULES})
     set(sources "${srcdir}/${module_name_path}.swift")
@@ -227,7 +246,7 @@ function (swift_benchmark_compile_archopts)
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
       SOURCES ${sources}
-      LIBRARY_FLAGS ${common_swift3_options})
+      LIBRARY_FLAGS ${common_swift4_options})
     precondition(objfile_out)
     list(APPEND bench_library_objects "${objfile_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
@@ -296,10 +315,11 @@ function (swift_benchmark_compile_archopts)
             ${stdlib_dependencies} ${bench_library_objects}
             "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
-          ${common_swift3_options}
+          ${common_swift4_options}
           ${extra_options}
           "-parse-as-library"
           ${bench_flags}
+          ${SWIFT_BENCHMARK_EXTRA_FLAGS}
           "-module-name" "${module_name}"
           "-emit-module-path" "${swiftmodule}"
           "-I" "${objdir}"
@@ -314,14 +334,22 @@ function (swift_benchmark_compile_archopts)
               ${stdlib_dependencies} ${bench_library_sibfiles}
               "${srcdir}/${module_name_path}.swift"
             COMMAND "${SWIFT_EXEC}"
-            ${common_swift3_options}
+            ${common_swift4_options}
             "-parse-as-library"
             ${bench_flags}
+            ${SWIFT_BENCHMARK_EXTRA_FLAGS}
             "-module-name" "${module_name}"
             "-I" "${objdir}"
             "-emit-sib"
             "-o" "${sibfile}"
             "${source}")
+      endif()
+
+      if(opt_view_main_dir)
+        set(opt_view_dir)
+        add_opt_view(${opt_view_main_dir}, ${module_name}, opt_view_dir)
+        precondition(opt_view_dir)
+        list(APPEND opt_view_dirs ${opt_view_dir})
       endif()
     endif()
   endforeach()
@@ -337,10 +365,17 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
+
+      if(opt_view_main_dir)
+        set(opt_view_dir)
+        add_opt_view(${opt_view_main_dir}, ${module_name}, opt_view_dir)
+        precondition(opt_view_dir)
+        list(APPEND opt_view_dirs ${opt_view_dir})
+      endif()
     else()
       set(objfiles_out)
       add_swift_multisource_nonwmo_benchmark_library(objfiles_out
@@ -348,7 +383,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfiles_out)
       list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
@@ -366,10 +401,17 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
+
+      if(opt_view_main_dir)
+        set(opt_view_dir)
+        add_opt_view(${opt_view_main_dir}, ${module_name}, opt_view_dir)
+        precondition(opt_view_dir)
+        list(APPEND opt_view_dirs ${opt_view_dir})
+      endif()
     else()
       set(objfiles_out)
       add_swift_multisource_nonwmo_benchmark_library(objfiles_out
@@ -377,7 +419,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfiles_out)
       list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
@@ -394,7 +436,7 @@ function (swift_benchmark_compile_archopts)
         ${bench_library_sibfiles} ${bench_driver_sibfiles}
         ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
-      ${common_swift3_options}
+      ${common_swift4_options}
       "-force-single-frontend-invocation"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
@@ -435,7 +477,7 @@ function (swift_benchmark_compile_archopts)
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS
         ${bench_library_objects} ${bench_driver_objects} ${SWIFT_BENCH_OBJFILES}
-        "${objcfile}"
+        "${objcfile}" ${opt_view_dirs}
       COMMAND
         "${CLANG_EXEC}"
         "-fno-stack-protector"

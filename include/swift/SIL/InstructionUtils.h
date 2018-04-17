@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -48,6 +48,11 @@ SILValue stripUpCasts(SILValue V);
 /// upcasts and downcasts.
 SILValue stripClassCasts(SILValue V);
 
+/// Return the underlying SILValue after stripping off non-projection address
+/// casts. The result will still be an address--this does not look through
+/// pointer-to-address.
+SILValue stripAddressAccess(SILValue V);
+
 /// Return the underlying SILValue after stripping off all address projection
 /// instructions.
 SILValue stripAddressProjections(SILValue V);
@@ -76,6 +81,55 @@ SILValue stripExpectIntrinsic(SILValue V);
 /// If V is a begin_borrow, strip off the begin_borrow and return. Otherwise,
 /// ust return V.
 SILValue stripBorrow(SILValue V);
+
+/// Return a non-null SingleValueInstruction if the given instruction merely
+/// copies a value, possibly changing its type or ownership state, but otherwise
+/// having no effect.
+///
+/// This is useful for checking all users of a value to verify that the value is
+/// only used in recognizable patterns without otherwise "escaping". These are
+/// instructions that the use-visitor can recurse into. Note that the value's
+/// type may be changed by a cast.
+SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
+
+/// Return true if this instruction terminates a SIL-level scope. Scope end
+/// instructions do not produce a result.
+bool isEndOfScopeMarker(SILInstruction *user);
+
+/// Return true if the given instruction has no effect on it's operand values
+/// and produces no result. These are typically end-of scope markers.
+///
+/// This is useful for checking all users of a value to verify that the value is
+/// only used in recognizable patterns without otherwise "escaping".
+bool isIncidentalUse(SILInstruction *user);
+
+/// Return true if the given `user` instruction modifies the value's refcount
+/// without propagating the value or having any other effect aside from
+/// potentially destroying the value itself (and executing associated cleanups).
+///
+/// This is useful for checking all users of a value to verify that the value is
+/// only used in recognizable patterns without otherwise "escaping".
+bool onlyAffectsRefCount(SILInstruction *user);
+
+/// If V is a convert_function or convert_escape_to_noescape return its operand
+/// recursively.
+SILValue stripConvertFunctions(SILValue V);
+
+/// Check that this is a partial apply of a reabstraction thunk and return the
+/// argument of the partial apply if it is.
+SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
+
+struct LLVM_LIBRARY_VISIBILITY FindClosureResult {
+  PartialApplyInst *PAI = nullptr;
+  bool isReabstructionThunk = false;
+  FindClosureResult(PartialApplyInst *PAI, bool isReabstructionThunk)
+      : PAI(PAI), isReabstructionThunk(isReabstructionThunk) {}
+};
+
+/// If V is a function closure, return the partial_apply and the
+/// IsReabstractionThunk flag set to true if the closure is indirectly captured
+/// by a reabstraction thunk.
+FindClosureResult findClosureForAppliedArg(SILValue V);
 
 /// A utility class for evaluating whether a newly parsed or deserialized
 /// function has qualified or unqualified ownership.

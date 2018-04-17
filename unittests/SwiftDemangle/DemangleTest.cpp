@@ -38,6 +38,33 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
   EXPECT_EQ(Result, strlen(DemangledNameWithSugar));
 }
 
+TEST(FunctionNameDemangleTests, NewManglingPrefix) {
+  char OutputBuffer[128];
+
+  const char *FunctionName = "$S1a10run_MatMulyySiF";
+  const char *FunctionNameNew = "$s1a10run_MatMulyySiF";
+  const char *DemangledName = "a.run_MatMul(Swift.Int) -> ()";
+  const char *SimplifiedName = "run_MatMul(_:)";
+
+  size_t Result = swift_demangle_getDemangledName(FunctionName, OutputBuffer,
+                                                  sizeof(OutputBuffer));
+
+  EXPECT_STREQ(DemangledName, OutputBuffer);
+  EXPECT_EQ(Result, strlen(DemangledName));
+
+  Result = swift_demangle_getDemangledName(FunctionNameNew, OutputBuffer,
+                                           sizeof(OutputBuffer));
+
+  EXPECT_STREQ(DemangledName, OutputBuffer);
+  EXPECT_EQ(Result, strlen(DemangledName));
+
+  Result = swift_demangle_getSimplifiedDemangledName(FunctionName, OutputBuffer,
+                                                     sizeof(OutputBuffer));
+
+  EXPECT_STREQ(SimplifiedName, OutputBuffer);
+  EXPECT_EQ(Result, strlen(SimplifiedName));
+}
+
 TEST(FunctionNameDemangledTests, WorksWithNULLBuffer) {
   const char *FunctionName = "_TFC3foo3bar3basfT3zimCS_3zim_T_";
   const char *DemangledName = "foo.bar.bas(zim: foo.zim) -> ()";

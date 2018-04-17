@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/availability.swiftmodule -typecheck -emit-objc-header-path %t/availability.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/availability.h
@@ -48,16 +47,22 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ OBJC_DESIGNATED_INITIALIZER SWIFT_AVAILABILITY(macos,introduced=10.10);
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger simpleProperty;
+// CHECK-NEXT: @property (nonatomic) NSInteger alwaysUnavailableProperty SWIFT_UNAVAILABLE_MSG("'alwaysUnavailableProperty' has been renamed to 'baz': whatever");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger alwaysDeprecatedProperty SWIFT_DEPRECATED_MSG("use something else", "quux");
+// CHECK-NEXT: @property (nonatomic, readonly, strong) Availability * _Null_unspecified singlePlatCombinedPropertyClass SWIFT_AVAILABILITY(macos,introduced=10.7,deprecated=10.9,obsoleted=10.10);
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger platformUnavailableRenameWithMessageProperty SWIFT_AVAILABILITY(macos,unavailable,message="'platformUnavailableRenameWithMessageProperty' has been renamed to 'anotherPlea': still trapped");
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: {{^}}SWIFT_AVAILABILITY(macos,introduced=999){{$}}
 // CHECK-NEXT: @interface Availability (SWIFT_EXTENSION(availability))
 // CHECK-NEXT: - (void)extensionAvailability:(WholeClassAvailability * _Nonnull)_;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger propertyDeprecatedInsideExtension SWIFT_AVAILABILITY(macos,deprecated=10.10);
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: @interface AvailabilitySub
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
-// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE;
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)_ SWIFT_UNAVAILABLE;
 // CHECK-NEXT: @end
 
@@ -147,12 +152,52 @@
     @objc init() {}
     @available(macOS 10.10, *)
     @objc init(x _: Int) {}
+
+    var simpleProperty: Int {
+	get {
+		return 100
+	    }
+    }
+    @available(*, unavailable, message: "whatever", renamed: "baz")
+    @objc var alwaysUnavailableProperty: Int {
+	get {
+		return 100
+	    }
+	set {
+	    }
+    }
+    @available(*, deprecated, message: "use something else", renamed: "quux")
+    @objc var alwaysDeprecatedProperty: Int {
+	get {
+		return -1
+	    }
+    }
+    @available(macOS, introduced: 10.7, deprecated: 10.9, obsoleted: 10.10)
+    @objc var singlePlatCombinedPropertyClass: Availability! {
+	get {
+		return nil
+	    }
+    }
+    @available(macOS, unavailable, renamed: "anotherPlea", message: "still trapped")
+    @objc var platformUnavailableRenameWithMessageProperty: Int {
+	get {
+		return -1
+	    }
+    }
 }
 
 // Deliberately a high number that the default deployment target will not reach.
 @available(macOS 999, *)
 extension Availability {
   @objc func extensionAvailability(_: WholeClassAvailability) {}
+
+
+  @available(macOS, deprecated: 10.10)
+  var propertyDeprecatedInsideExtension: Int {
+	  get {
+		  return 0
+	  }
+  }
 }
 
 @objc class AvailabilitySub: Availability {

@@ -23,7 +23,7 @@
 namespace swift {
 
 /// The associativity of a binary operator.
-enum class Associativity : unsigned char {
+enum class Associativity : uint8_t {
   /// Non-associative operators cannot be written next to other
   /// operators with the same precedence.  Relational operators are
   /// typically non-associative.
@@ -73,6 +73,7 @@ enum class InlineKind : uint8_t {
 enum class EffectsKind : uint8_t {
   ReadNone,
   ReadOnly,
+  ReleaseNone,
   ReadWrite,
   Unspecified
 };

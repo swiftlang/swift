@@ -34,6 +34,8 @@ class NodePointer;
 namespace swift {
 namespace reflection {
 
+template <typename Runtime> class ReflectionContext;
+
 template <typename Iterator>
 class ReflectionSection {
   using const_iterator = Iterator;
@@ -51,6 +53,13 @@ public:
 
   void *startAddress() {
     return const_cast<void *>(Begin);
+  }
+  const void *startAddress() const {
+    return Begin;
+  }
+  
+  const void *endAddress() const {
+    return End;
   }
 
   const_iterator begin() const {
@@ -73,12 +82,36 @@ using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
-  FieldSection fieldmd;
-  AssociatedTypeSection assocty;
-  BuiltinTypeSection builtin;
-  CaptureSection capture;
-  GenericSection typeref;
-  GenericSection reflstr;
+  struct {
+    FieldSection Metadata;
+    uintptr_t SectionOffset;
+  } Field;
+
+  struct {
+    AssociatedTypeSection Metadata;
+    uintptr_t SectionOffset;
+  } AssociatedType;
+
+  struct {
+    BuiltinTypeSection Metadata;
+    uintptr_t SectionOffset;
+  } Builtin;
+
+  struct {
+    CaptureSection Metadata;
+    uintptr_t SectionOffset;
+  } Capture;
+
+  struct {
+    GenericSection Metadata;
+    uintptr_t SectionOffset;
+  } TypeReference;
+
+  struct {
+    GenericSection Metadata;
+    uintptr_t SectionOffset;
+  } ReflectionString;
+
   uintptr_t LocalStartAddress;
   uintptr_t RemoteStartAddress;
 };
@@ -127,6 +160,7 @@ class TypeRefBuilder {
 public:
   using BuiltType = const TypeRef *;
   using BuiltNominalTypeDecl = Optional<std::string>;
+  using BuiltProtocolDecl = Optional<std::string>;
 
   TypeRefBuilder();
 
@@ -160,6 +194,8 @@ public:
     return TR;
   }
 
+  Demangle::NodeFactory &getNodeFactory() { return Dem; }
+
   ///
   /// Factory methods for all TypeRef kinds
   ///
@@ -173,10 +209,15 @@ public:
     return Demangle::mangleNode(node);
   }
 
+  Optional<std::string>
+  createProtocolDecl(const Demangle::NodePointer &node) {
+    return Demangle::mangleNode(node);
+  }
+
   Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
     return std::move(mangledName);
   }
-
+  
   const NominalTypeRef *createNominalType(
                                     const Optional<std::string> &mangledName) {
     return NominalTypeRef::create(*this, *mangledName, nullptr);
@@ -215,24 +256,17 @@ public:
     return FunctionTypeRef::create(*this, params, result, flags);
   }
 
-  const ProtocolTypeRef *createProtocolType(const std::string &mangledName,
-                                            const std::string &moduleName,
-                                            const std::string &privateDiscriminator,
-                                            const std::string &name) {
-    return ProtocolTypeRef::create(*this, mangledName);
-  }
-
   const ProtocolCompositionTypeRef *
-  createProtocolCompositionType(const std::vector<const TypeRef*> &members,
-                                bool hasExplicitAnyObject) {
-    for (auto member : members) {
-      if (!isa<ProtocolTypeRef>(member) &&
-          !isa<NominalTypeRef>(member) &&
-          !isa<BoundGenericTypeRef>(member))
-        return nullptr;
+  createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
+                                BuiltType superclass,
+                                bool isClassBound) {
+    std::vector<const NominalTypeRef *> protocolRefs;
+    for (const auto &protocol : protocols) {
+      protocolRefs.push_back(createNominalType(protocol));
     }
-    return ProtocolCompositionTypeRef::create(*this, members,
-                                              hasExplicitAnyObject);
+
+    return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
+                                              isClassBound);
   }
 
   const ExistentialMetatypeTypeRef *
@@ -253,10 +287,8 @@ public:
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member,
                             const TypeRef *base,
-                            const TypeRef *protocol) {
-    if (!isa<ProtocolTypeRef>(protocol))
-      return nullptr;
-    return DependentMemberTypeRef::create(*this, member, base, protocol);
+                            Optional<std::string> protocol) {
+    return DependentMemberTypeRef::create(*this, member, base, *protocol);
   }
 
   const UnownedStorageTypeRef *createUnownedStorageType(const TypeRef *base) {
@@ -306,27 +338,53 @@ public:
   void addReflectionInfo(ReflectionInfo I) {
     ReflectionInfos.push_back(I);
   }
+  
+  const std::vector<ReflectionInfo> &getReflectionInfos() {
+    return ReflectionInfos;
+  }
 
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
+  
+  uint64_t getRemoteAddrOfTypeRefPointer(const void *pointer);
 
 public:
+  template<typename Runtime>
+  void setSymbolicReferenceResolverReader(
+                      remote::MetadataReader<Runtime, TypeRefBuilder> &reader) {
+    // Have the TypeRefBuilder demangle symbolic references by reading their
+    // demangling out of the referenced context descriptors in the target
+    // process.
+    Dem.setSymbolicReferenceResolver(
+      [this, &reader](int32_t offset, const void *base) -> Demangle::NodePointer {
+        // Resolve the reference to a remote address.
+        auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
+        if (remoteAddress == 0)
+          return nullptr;
+        
+        return reader.readDemanglingForContextDescriptor(remoteAddress + offset,
+                                                         Dem);
+      });
+  }
+
   TypeConverter &getTypeConverter() { return TC; }
 
   const TypeRef *
   lookupTypeWitness(const std::string &MangledTypeName,
                     const std::string &Member,
-                    const TypeRef *Protocol);
+                    StringRef Protocol);
 
   const TypeRef *
   lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
-  const FieldDescriptor *getFieldTypeInfo(const TypeRef *TR);
+  std::pair<const FieldDescriptor *, const ReflectionInfo *>
+  getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  bool getFieldTypeRefs(const TypeRef *TR, const FieldDescriptor *FD,
-                        std::vector<FieldTypeInfo> &Fields);
+  bool getFieldTypeRefs(const TypeRef *TR,
+           const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD,
+           std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.
   const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
@@ -336,13 +394,14 @@ public:
   const CaptureDescriptor *getCaptureDescriptor(uintptr_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
-  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD);
+  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD,
+                                           uintptr_t Offset);
 
   ///
   /// Dumping typerefs, field declarations, associated types
   ///
 
-  void dumpTypeRef(const std::string &MangledName,
+  void dumpTypeRef(llvm::StringRef MangledName,
                    std::ostream &OS, bool printTypeName = false);
   void dumpFieldSection(std::ostream &OS);
   void dumpAssociatedTypeSection(std::ostream &OS);

@@ -1,17 +1,18 @@
-set(SWIFT_GYB_FLAGS
-  --line-directive "''")
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+  set(SWIFT_GYB_FLAGS --line-directive "^\"#line %(line)d \\\"%(file)s\\\"^\"")
+else()
+  set(SWIFT_GYB_FLAGS --line-directive "\'#line" "%(line)d" "\"%(file)s\"\'")
+endif()
 
 add_swift_library(swiftSyntax STATIC
   SyntaxNodes.cpp.gyb
   SyntaxBuilders.cpp.gyb
   SyntaxKind.cpp.gyb
   SyntaxFactory.cpp.gyb
-  Trivia.cpp
+  SyntaxVisitor.cpp.gyb
+  Trivia.cpp.gyb
   RawSyntax.cpp
-  RawTokenSyntax.cpp
   Syntax.cpp
+  SyntaxArena.cpp
   SyntaxData.cpp
-  UnknownSyntax.cpp
-  SyntaxParsingContext.cpp
-  DEPENDS
-    swift-syntax-generated-headers)
+  UnknownSyntax.cpp)

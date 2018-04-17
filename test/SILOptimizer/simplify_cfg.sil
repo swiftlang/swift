@@ -1,10 +1,13 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 // FIXME: Update for select_enum change.
+
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
+sil_stage canonical
 
 import Builtin
 import Swift
-
-sil_stage canonical
 
 ///////////////////////
 // Type Declarations //
@@ -2176,7 +2179,7 @@ bb3 (%10: $Builtin.Int32):
 // CHECK: bb0
 // CHECK:  cond_br {{.*}}, bb1, bb2
 // CHECK: bb1
-// CHECK:  witness_method
+// CHECK:  objc_method
 // CHECK:  apply
 // CHECK:  strong_release
 // CHECK:  cond_br {{.*}}, bb3, bb4
@@ -2196,7 +2199,7 @@ bb0(%0: $Builtin.Int1, %1 : $T, %2 : $Builtin.Int1):
   cond_br %0, bb1 , bb2
 
 bb1:
-  %3 = witness_method [volatile] $T, #ObjcProto.foo!1.foreign : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
+  %3 = objc_method %1 : $T, #ObjcProto.foo!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
   %4 = apply %3<T>(%1) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
   br bb2
 
@@ -2982,3 +2985,65 @@ bb7:
   br bb5
 }
 
+// CHECK-LABEL: sil @test_constant_folding
+// CHECK:  [[R:%[0-9]+]] = integer_literal $Builtin.Int32, 30
+// CHECK:  return [[R]] : $Builtin.Int32
+// CHECK-NEXT: }
+sil @test_constant_folding : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %20 = integer_literal $Builtin.Int32, 20
+  %30 = integer_literal $Builtin.Int32, 30
+  cond_br %0, bb1, bb2
+bb1:
+  br bb3(%20 : $Builtin.Int32)
+bb2:
+  br bb3(%30 : $Builtin.Int32)
+
+bb3(%2 : $Builtin.Int32):
+  %3 = builtin "cmp_slt_Int32"(%2 : $Builtin.Int32, %30 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %3, bb4, bb5
+bb4:
+  br bb6(%20 : $Builtin.Int32)
+bb5:
+  br bb6(%30 : $Builtin.Int32)
+
+bb6(%4 : $Builtin.Int32):
+  %5 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %30 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %5, bb7, bb8
+bb7:
+  br bb9(%20 : $Builtin.Int32)
+bb8:
+  br bb9(%30 : $Builtin.Int32)
+
+bb9(%6 : $Builtin.Int32):
+  return %6 : $Builtin.Int32
+}
+
+sil @adder : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+
+// CHECK-LABEL: sil @test_noescape
+// CHECK:  [[FN:%.*]] = function_ref @adder
+// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%0)
+// CHECK-NOT: try_apply
+// CHECK:  apply [[PA]](%1)
+// CHECK: return
+sil @test_noescape : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %f = function_ref @adder : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %conv = convert_function %pa : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32) to $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  %ne = convert_escape_to_noescape %conv : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error) to $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error)
+  try_apply %ne(%1) : $@noescape @callee_guaranteed (Builtin.Int32) -> (Builtin.Int32, @error Error), normal bb1, error bb2
+
+bb1(%r : $Builtin.Int32):
+	br bb3(%r : $Builtin.Int32)
+
+bb2(%e : $Error):
+  %r1 = integer_literal $Builtin.Int32, 0
+	br bb3(%r1 : $Builtin.Int32)
+
+bb3(%res : $Builtin.Int32):
+  release_value %pa : $@callee_guaranteed (Builtin.Int32) -> (Builtin.Int32)
+  return  %res : $Builtin.Int32
+}

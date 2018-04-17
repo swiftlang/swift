@@ -133,8 +133,8 @@ static void dumpSwiftHeapObjects() {
 #include "swift/ABI/MetadataKind.def"
     }
 
-    if (const NominalTypeDescriptor *NTD =
-            Metadata->getNominalTypeDescriptor()) {
+    if (auto *NTD =
+            Metadata->getTypeContextDescriptor()) {
       fprintf(stderr, "{"
                       "\"type\": \"nominal\", "
                       "\"name\": \"%s\", "

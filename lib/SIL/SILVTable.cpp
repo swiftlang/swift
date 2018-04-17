@@ -58,10 +58,6 @@ void SILVTable::removeFromVTableCache(Entry &entry) {
   M.VTableEntryCache.erase({this, entry.Method});
 }
 
-IsSerialized_t SILVTable::isSerialized() const {
-  return Serialized ? IsSerialized : IsNotSerialized;
-}
-
 SILVTable::SILVTable(ClassDecl *c, IsSerialized_t serialized,
                      ArrayRef<Entry> entries)
   : Class(c), Serialized(serialized), NumEntries(entries.size()) {

@@ -24,9 +24,7 @@
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/TypeLowering.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -50,6 +48,9 @@ template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
 
 public:
   void visitProtocolDecl(ProtocolDecl *protocol) {
+    // The protocol conformance descriptor gets added first.
+    asDerived().addProtocolConformanceDescriptor();
+
     // Associated types get added after the inherited conformances, but
     // before all the function requirements.
     bool haveAddedAssociatedTypes = false;
@@ -57,11 +58,20 @@ public:
       if (haveAddedAssociatedTypes) return;
       haveAddedAssociatedTypes = true;
 
+      SmallVector<AssociatedTypeDecl *, 2> associatedTypes;
       for (Decl *member : protocol->getMembers()) {
         if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
-          // TODO: only add associated types when they're new?
-          asDerived().addAssociatedType(AssociatedType(associatedType));
+          associatedTypes.push_back(associatedType);
         }
+      }
+
+      // Sort associated types by name, for resilience.
+      llvm::array_pod_sort(associatedTypes.begin(), associatedTypes.end(),
+                           TypeDecl::compare);
+
+      for (auto *associatedType : associatedTypes) {
+        // TODO: only add associated types when they're new?
+        asDerived().addAssociatedType(AssociatedType(associatedType));
       }
     };
 
@@ -119,9 +129,6 @@ public:
 
   /// Fallback for unexpected protocol requirements.
   void visitDecl(Decl *d) {
-#ifndef NDEBUG
-    d->print(llvm::errs());
-#endif
     llvm_unreachable("unhandled protocol requirement");
   }
 
@@ -141,10 +148,12 @@ public:
     asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
-  void visitFuncDecl(FuncDecl *func) {
+  void visitAccessorDecl(AccessorDecl *func) {
     // Accessors are emitted by visitAbstractStorageDecl, above.
-    if (func->isAccessor())
-      return;
+  }
+
+  void visitFuncDecl(FuncDecl *func) {
+    assert(!isa<AccessorDecl>(func));
     asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
   }
 
@@ -167,6 +176,10 @@ public:
   void visitIfConfigDecl(IfConfigDecl *icd) {
     // We only care about the active members, which were already subsumed by the
     // enclosing type.
+  }
+
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
+    // We don't care about diagnostics at this stage.
   }
 };
 

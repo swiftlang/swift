@@ -86,11 +86,6 @@ struct Test {
   }
 }
 
-// Legacy test dictionaries.
-public var precommitTests: [BenchmarkInfo] = []
-public var otherTests: [BenchmarkInfo] = []
-public var stringTests: [BenchmarkInfo] = []
-
 // We should migrate to a collection of BenchmarkInfo.
 public var registeredBenchmarks: [BenchmarkInfo] = []
 
@@ -213,14 +208,10 @@ struct TestConfig {
     }
 
     if let x = benchArgs.optionalArgsMap["--sleep"] {
-      if x.isEmpty {
+      guard let v = Int(x) else {
         return .fail("--sleep requires a non-empty integer value")
       }
-      let v: Int? = Int(x)
-      if v == nil {
-        return .fail("--sleep requires a non-empty integer value")
-      }
-      afterRunSleep = v!
+      afterRunSleep = v
     }
 
     if let _ = benchArgs.optionalArgsMap["--list"] {
@@ -231,22 +222,12 @@ struct TestConfig {
   }
 
   mutating func findTestsToRun() {
-    // Begin by creating a set of our non-legacy registeredBenchmarks
-    var allTests = Set(registeredBenchmarks)
-
-    // Merge legacy benchmark info into allTests. If we already have a
-    // registered benchmark info, formUnion leaves this alone. This allows for
-    // us to perform incremental work.
-    for testList in [precommitTests, otherTests, stringTests] {
-      allTests.formUnion(testList)
-    }
-
     let benchmarkNameFilter = Set(filters)
 
     // t is needed so we don't capture an ivar of a mutable inout self.
     let t = tags
     let st = skipTags
-    let filteredTests = Array(allTests.filter { benchInfo in
+    let filteredTests = Array(registeredBenchmarks.filter { benchInfo in
       if !t.isSubset(of: benchInfo.tags) {
         return false
       }
@@ -313,9 +294,9 @@ func internalMedian(_ inputs: [UInt64]) -> UInt64 {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 @_silgen_name("_swift_leaks_startTrackingObjects")
-func startTrackingObjects(_: UnsafeMutableRawPointer) -> ()
+func startTrackingObjects(_: UnsafePointer<CChar>) -> ()
 @_silgen_name("_swift_leaks_stopTrackingObjects")
-func stopTrackingObjects(_: UnsafeMutableRawPointer) -> Int
+func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 
 #endif
 
@@ -361,15 +342,14 @@ class SampleRunner {
   func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
     // Start the timer.
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
-    var str = name
-    startTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
+    name.withCString { p in startTrackingObjects(p) }
 #endif
     let start_ticks = timer.getTime()
     fn(Int(num_iters))
     // Stop the timer.
     let end_ticks = timer.getTime()
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
-    stopTrackingObjects(UnsafeMutableRawPointer(str._core.startASCII))
+    name.withCString { p in stopTrackingObjects(p) }
 #endif
 
     // Compute the spent time and the scaling factor.

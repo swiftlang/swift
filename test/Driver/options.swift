@@ -4,8 +4,12 @@
 // NO_FILES: this mode requires at least one input file
 
 // RUN: not %target-swift-frontend -parse-sil -emit-sil 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
-// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %s 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
 // SIL_FILES: this mode requires a single input file
+
+// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %s 2>&1 | %FileCheck -check-prefix=DUPLICATE_FILES %s
+// RUN: not %target-swift-frontend -parse-sil -emit-sil %s %S/../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=SIL_FILES %s
+// DUPLICATE_FILES: duplicate input file 'SOURCE_DIR/test/Driver/options.swift'
+
 
 // RUN: not %target-swift-frontend -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift 2>&1 | %FileCheck -check-prefix=INVALID_MODULE_NAME %s
 // INVALID_MODULE_NAME: error: module name "invalid-module-name" is not a valid identifier; use -module-name flag to specify an alternate name
@@ -117,3 +121,11 @@
 // RUN: %swiftc_driver -driver-print-jobs -enforce-exclusivity=checked %s | %FileCheck -check-prefix=EXCLUSIVITY_CHECKED %s
 // EXCLUSIVITY_CHECKED: swift
 // EXCLUSIVITY_CHECKED: -enforce-exclusivity=checked
+
+// RUN: %swiftc_driver -driver-print-jobs -remove-runtime-asserts %s | %FileCheck -check-prefix=REMOVE_RUNTIME_ASSERTS %s
+// REMOVE_RUNTIME_ASSERTS: swift
+// REMOVE_RUNTIME_ASSERTS: -frontend {{.*}} -remove-runtime-asserts
+
+// RUN: %swiftc_driver -driver-print-jobs -assume-single-threaded %s | %FileCheck -check-prefix=ASSUME_SINGLE_THREADED %s
+// ASSUME_SINGLE_THREADED: swift
+// ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded

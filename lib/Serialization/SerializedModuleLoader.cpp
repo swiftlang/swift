@@ -28,7 +28,7 @@
 using namespace swift;
 
 namespace {
-typedef std::pair<Identifier, SourceLoc> AccessPathElem;
+using AccessPathElem = std::pair<Identifier, SourceLoc>;
 } // end unnamed namespace
 
 // Defined out-of-line so that we can see ~ModuleFile.
@@ -67,7 +67,7 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   Scratch.clear();
   llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleDocOrErr =
-  llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
+      llvm::MemoryBuffer::getFile(StringRef(Scratch.data(), Scratch.size()));
   if (!ModuleDocOrErr &&
       ModuleDocOrErr.getError() != std::errc::no_such_file_or_directory) {
     return ModuleDocOrErr.getError();
@@ -200,7 +200,10 @@ FileUnit *SerializedModuleLoader::loadAST(
                        isFramework, loadedModuleFile,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
-    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+    // In LLDB always use the default resilience strategy, so IRGen can query
+    // the size of resilient types.
+    if (!Ctx.LangOpts.DebuggerSupport)
+      M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,

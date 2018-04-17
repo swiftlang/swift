@@ -7,7 +7,7 @@ public protocol IGiveOutInts {
   func callMe() -> Int64
 }
 
-// CHECK: define {{.*}}@_T011protocolarg16printSomeNumbersyAA12IGiveOutInts_pF
+// CHECK: define {{.*}}@"$S11protocolarg16printSomeNumbersyyAA12IGiveOutInts_pF"
 // CHECK: @llvm.dbg.declare(metadata %T11protocolarg12IGiveOutIntsP** %
 // CHECK-SAME:              metadata ![[ARG:[0-9]+]],
 // CHECK-SAME:              metadata !DIExpression(DW_OP_deref))

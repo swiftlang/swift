@@ -16,17 +16,56 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Unreachable.h"
+#include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
 
 #include <vector>
 
 using namespace swift;
+
+#ifndef NDEBUG
+template <> void ProtocolDescriptor::dump() const {
+  unsigned NumInheritedProtocols =
+      InheritedProtocols ? InheritedProtocols->NumProtocols : 0;
+
+  printf("TargetProtocolDescriptor.\n"
+         "Name: \"%s\".\n"
+         "ObjC Isa: %p.\n",
+         Name, _ObjC_Isa);
+  Flags.dump();
+  printf("Has Inherited Protocols: %s.\n",
+         (NumInheritedProtocols ? "true" : "false"));
+  if (NumInheritedProtocols) {
+    printf("Inherited Protocol List:\n");
+    for (unsigned i = 0, e = NumInheritedProtocols; i != e; ++i) {
+      printf("%s\n", (*InheritedProtocols)[i]->Name);
+    }
+  }
+}
+
+void ProtocolDescriptorFlags::dump() const {
+  printf("ProtocolDescriptorFlags.\n");
+  printf("Is Swift: %s.\n", (isSwift() ? "true" : "false"));
+  printf("Needs Witness Table: %s.\n",
+         (needsWitnessTable() ? "true" : "false"));
+  printf("Is Resilient: %s.\n", (isResilient() ? "true" : "false"));
+  printf("Special Protocol: %s.\n",
+         (bool(getSpecialProtocol()) ? "Error" : "None"));
+  printf("Class Constraint: %s.\n",
+         (bool(getClassConstraint()) ? "Class" : "Any"));
+  printf("Dispatch Strategy: %s.\n",
+         (bool(getDispatchStrategy()) ? "Swift" : "ObjC"));
+}
+
+#endif
 
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
@@ -36,7 +75,7 @@ static const char *class_getName(const ClassMetadata* type) {
     reinterpret_cast<Class>(const_cast<ClassMetadata*>(type)));
 }
 
-template<> void ProtocolConformanceRecord::dump() const {
+template<> void ProtocolConformanceDescriptor::dump() const {
   auto symbolName = [&](const void *addr) -> const char * {
     SymbolInfo info;
     int ok = lookupSymbol(addr, &info);
@@ -46,45 +85,51 @@ template<> void ProtocolConformanceRecord::dump() const {
   };
 
   switch (auto kind = getTypeKind()) {
-    case TypeMetadataRecordKind::Universal:
-      printf("universal");
+    case TypeMetadataRecordKind::Reserved:
+      printf("unknown (reserved)");
       break;
-    case TypeMetadataRecordKind::UniqueDirectType:
-    case TypeMetadataRecordKind::NonuniqueDirectType:
-      printf("%s direct type ",
-             kind == TypeMetadataRecordKind::UniqueDirectType
-             ? "unique" : "nonunique");
-      if (const auto *ntd = getDirectType()->getNominalTypeDescriptor()) {
-        printf("%s", ntd->Name.get());
-      } else {
-        printf("<structural type>");
-      }
-      break;
-    case TypeMetadataRecordKind::UniqueDirectClass:
-      printf("unique direct class %s",
-             class_getName(getDirectClass()));
-      break;
-    case TypeMetadataRecordKind::UniqueIndirectClass:
-      printf("unique indirect class %s",
-             class_getName(*getIndirectClass()));
+
+    case TypeMetadataRecordKind::IndirectObjCClass:
+      printf("indirect Objective-C class %s",
+             class_getName(*getIndirectObjCClass()));
       break;
       
-    case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-      printf("unique nominal type descriptor %s", symbolName(getNominalTypeDescriptor()));
+    case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+    case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
+      printf("unique nominal type descriptor %s", symbolName(getTypeContextDescriptor()));
       break;
   }
   
   printf(" => ");
   
   switch (getConformanceKind()) {
-    case ProtocolConformanceReferenceKind::WitnessTable:
+    case ConformanceFlags::ConformanceKind::WitnessTable:
       printf("witness table %s\n", symbolName(getStaticWitnessTable()));
       break;
-    case ProtocolConformanceReferenceKind::WitnessTableAccessor:
+    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
       printf("witness table accessor %s\n",
              symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
       break;
+    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
+      printf("conditional witness table accessor %s\n",
+             symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
+      break;
   }
+}
+#endif
+
+#ifndef NDEBUG
+template<> void ProtocolConformanceDescriptor::verify() const {
+  auto typeKind = unsigned(getTypeKind());
+  assert(((unsigned(TypeMetadataRecordKind::First_Kind) <= typeKind) &&
+          (unsigned(TypeMetadataRecordKind::Last_Kind) >= typeKind)) &&
+         "Corrupted type metadata record kind");
+
+  auto confKind = unsigned(getConformanceKind());
+  using ConformanceKind = ConformanceFlags::ConformanceKind;
+  assert(((unsigned(ConformanceKind::First_Kind) <= confKind) &&
+          (unsigned(ConformanceKind::Last_Kind) >= confKind)) &&
+         "Corrupted conformance kind");
 }
 #endif
 
@@ -92,35 +137,21 @@ template<> void ProtocolConformanceRecord::dump() const {
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
 template <>
-const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
+const Metadata *
+ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
   switch (getTypeKind()) {
-  case TypeMetadataRecordKind::UniqueDirectType:
-    // Already unique.
-    return getDirectType();
-  case TypeMetadataRecordKind::NonuniqueDirectType: {
-    // Ask the runtime for the unique metadata record we've canonized.
-    const ForeignTypeMetadata *FMD =
-        static_cast<const ForeignTypeMetadata *>(getDirectType());
-    return swift_getForeignTypeMetadata(const_cast<ForeignTypeMetadata *>(FMD));
-  }
-  case TypeMetadataRecordKind::UniqueIndirectClass:
+  case TypeMetadataRecordKind::Reserved:
+    return nullptr;
+  case TypeMetadataRecordKind::IndirectObjCClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata. The class additionally may be weak-linked, so we have to check
     // for null.
-    if (auto *ClassMetadata = *getIndirectClass())
-      return swift_getObjCClassMetadata(ClassMetadata);
+    if (auto *ClassMetadata = *getIndirectObjCClass())
+      return getMetadataForClass(ClassMetadata);
     return nullptr;
       
-  case TypeMetadataRecordKind::UniqueDirectClass:
-    // The class may be ObjC, in which case we need to instantiate its Swift
-    // metadata.
-    if (auto *ClassMetadata = getDirectClass())
-      return swift_getObjCClassMetadata(ClassMetadata);
-    return nullptr;
-      
-  case TypeMetadataRecordKind::UniqueNominalTypeDescriptor:
-  case TypeMetadataRecordKind::Universal:
-    // The record does not apply to a single type.
+  case TypeMetadataRecordKind::DirectNominalTypeDescriptor:
+  case TypeMetadataRecordKind::IndirectNominalTypeDescriptor:
     return nullptr;
   }
 
@@ -129,18 +160,45 @@ const Metadata *ProtocolConformanceRecord::getCanonicalTypeMetadata() const {
 
 template<>
 const WitnessTable *
-ProtocolConformanceRecord::getWitnessTable(const Metadata *type)
-const {
+ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
   switch (getConformanceKind()) {
-  case ProtocolConformanceReferenceKind::WitnessTable:
+  case ConformanceFlags::ConformanceKind::WitnessTable:
     return getStaticWitnessTable();
 
-  case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-    return getWitnessTableAccessor()(type);
-  }
+  case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
+    return getWitnessTableAccessor()(type, nullptr, 0);
 
-  swift_runtime_unreachable(
-      "Unhandled ProtocolConformanceReferenceKind in switch.");
+  case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
+    // Check the conditional requirements.
+    std::vector<unsigned> genericParamCounts;
+    (void)_gatherGenericParameterCounts(type->getTypeContextDescriptor(),
+                                        genericParamCounts);
+    auto genericArgs = type->getGenericArgs();
+    std::vector<const void *> conditionalArgs;
+    bool failed =
+      _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
+        [&](unsigned flatIndex) {
+          // FIXME: Adjust for non-key type parameters.
+          return genericArgs[flatIndex];
+        },
+        [&](unsigned depth, unsigned index) -> const Metadata *  {
+          // FIXME: Adjust for non-key type parameters.
+          if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
+                                                      genericParamCounts)) {
+            return genericArgs[*flatIndex];
+          }
+
+          return nullptr;
+        });
+    if (failed) return nullptr;
+
+    return getWitnessTableAccessor()(
+                           type,
+                           (const swift::WitnessTable**)conditionalArgs.data(),
+                           conditionalArgs.size());
+  }
+  }
+  return nullptr;
 }
 
 namespace {
@@ -160,7 +218,9 @@ namespace {
     const ProtocolDescriptor *Proto;
 
     ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
-      : Type(type), Proto(proto) {}
+        : Type(type), Proto(proto) {
+      assert(type);
+    }
   };
 
   struct ConformanceCacheEntry {
@@ -258,7 +318,26 @@ struct ConformanceState {
                                     const ProtocolDescriptor *proto) {
     return Cache.find(ConformanceCacheKey(type, proto));
   }
+
+#ifndef NDEBUG
+  void verify() const LLVM_ATTRIBUTE_USED;
+#endif
 };
+
+#ifndef NDEBUG
+void ConformanceState::verify() const {
+  // Iterate over all of the sections and verify all of the protocol
+  // descriptors.
+  auto &Self = const_cast<ConformanceState &>(*this);
+  ScopedLock guard(Self.SectionsToScanLock);
+
+  for (const auto &Section : SectionsToScan) {
+    for (const auto &Record : Section) {
+      Record.get()->verify();
+    }
+  }
+}
+#endif
 
 static Lazy<ConformanceState> Conformances;
 
@@ -272,8 +351,8 @@ _registerProtocolConformances(ConformanceState &C,
 
 void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
                                                    uintptr_t conformancesSize) {
-  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0
-         && "weird-sized conformances section?!");
+  assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0 &&
+         "conformances section not a multiple of ProtocolConformanceRecord");
 
   // If we have a section, enqueue the conformances for lookup.
   auto conformanceBytes = reinterpret_cast<const char *>(conformances);
@@ -324,6 +403,15 @@ struct ConformanceCacheResult {
     return ConformanceCacheResult { false, nullptr, nullptr };
   }
 };
+
+/// Retrieve the type key from the given metadata, to be used when looking
+/// into the conformance cache.
+static const void *getConformanceCacheTypeKey(const Metadata *type) {
+  if (auto description = type->getTypeContextDescriptor())
+    return description;
+
+  return type;
+}
 
 /// Search for a witness table in the ConformanceCache.
 static
@@ -379,10 +467,10 @@ recur:
     // For generic and resilient types, nondependent conformances
     // are keyed by the nominal type descriptor rather than the
     // metadata, so try that.
-    const auto *description = type->getNominalTypeDescriptor();
+    auto typeKey = getConformanceCacheTypeKey(type);
 
     // Hash and lookup the type-protocol pair in the cache.
-    if (auto *Value = C.findCached(description, protocol)) {
+    if (auto *Value = C.findCached(typeKey, protocol)) {
       if (Value->isSuccessful())
         return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
 
@@ -394,7 +482,7 @@ recur:
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (classHasSuperclass(classType)) {
-      type = swift_getObjCClassMetadata(classType->SuperClass);
+      type = getMetadataForClass(classType->Superclass);
       goto recur;
     }
   }
@@ -421,19 +509,23 @@ bool isRelatedType(const Metadata *type, const void *candidate,
                    bool candidateIsMetadata) {
 
   while (true) {
-    if (type == candidate && candidateIsMetadata)
+    // Check whether the types match.
+    if (candidateIsMetadata && type == candidate)
       return true;
 
-    // If the type is resilient or generic, see if there's a witness table
-    // keyed off the nominal type descriptor.
-    const auto *description = type->getNominalTypeDescriptor();
-    if (description == candidate && !candidateIsMetadata)
-      return true;
+    // Check whether the nominal type descriptors match.
+    if (!candidateIsMetadata) {
+      const auto *description = type->getTypeContextDescriptor();
+      auto candidateDescription =
+        static_cast<const TypeContextDescriptor *>(candidate);
+      if (description && equalContexts(description, candidateDescription))
+        return true;
+    }
 
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
       if (classHasSuperclass(classType)) {
-        type = swift_getObjCClassMetadata(classType->SuperClass);
+        type = getMetadataForClass(classType->Superclass);
         continue;
       }
     }
@@ -444,9 +536,9 @@ bool isRelatedType(const Metadata *type, const void *candidate,
   return false;
 }
 
-const WitnessTable *
-swift::swift_conformsToProtocol(const Metadata * const type,
-                                const ProtocolDescriptor *protocol) {
+static const WitnessTable *
+swift_conformsToProtocolImpl(const Metadata * const type,
+                             const ProtocolDescriptor *protocol) {
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
@@ -505,6 +597,42 @@ swift::swift_conformsToProtocol(const Metadata * const type,
     return nullptr;
   }
 
+  /// Local function to retrieve the witness table and record the result.
+  auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
+                                const Metadata *type) {
+    switch (descriptor.getConformanceKind()) {
+    case ConformanceFlags::ConformanceKind::WitnessTable:
+      // If the record provides a nondependent witness table for all
+      // instances of a generic type, cache it for the generic pattern.
+      C.cacheSuccess(type, protocol, descriptor.getStaticWitnessTable());
+      return;
+
+    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
+      // If the record provides a dependent witness table accessor,
+      // cache the result for the instantiated type metadata.
+      C.cacheSuccess(type, protocol, descriptor.getWitnessTable(type));
+      return;
+
+    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
+      // Note: we might end up doing more scanning for other conformances
+      // when checking the conditional requirements, so do a gross unlock/lock.
+      // FIXME: Don't do this :)
+      C.SectionsToScanLock.unlock();
+      auto witnessTable = descriptor.getWitnessTable(type);
+      C.SectionsToScanLock.lock();
+      if (witnessTable)
+        C.cacheSuccess(type, protocol, witnessTable);
+      else
+        C.cacheFailure(type, protocol);
+      return;
+    }
+    }
+
+    // Always fail, because we cannot interpret a future conformance
+    // kind.
+    C.cacheFailure(type, protocol);
+  };
+
   // Really scan conformance records.
 
   for (unsigned sectionIdx = startSectionIdx;
@@ -513,9 +641,11 @@ swift::swift_conformsToProtocol(const Metadata * const type,
     auto &section = C.SectionsToScan[sectionIdx];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
+      auto &descriptor = *record.get();
+
       // If the record applies to a specific type, cache it.
-      if (auto metadata = record.getCanonicalTypeMetadata()) {
-        auto P = record.getProtocol();
+      if (auto metadata = descriptor.getCanonicalTypeMetadata()) {
+        auto P = descriptor.getProtocol();
 
         // Look for an exact match.
         if (protocol != P)
@@ -524,22 +654,18 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
           continue;
 
-        // Store the type-protocol pair in the cache.
-        auto witness = record.getWitnessTable(metadata);
-        if (witness) {
-          C.cacheSuccess(metadata, P, witness);
-        } else {
-          C.cacheFailure(metadata, P);
-        }
+        // Record the witness table.
+        recordWitnessTable(descriptor, metadata);
 
       // TODO: "Nondependent witness table" probably deserves its own flag.
       // An accessor function might still be necessary even if the witness table
       // can be shared.
-      } else if (record.getTypeKind()
-                   == TypeMetadataRecordKind::UniqueNominalTypeDescriptor) {
-
-        auto R = record.getNominalTypeDescriptor();
-        auto P = record.getProtocol();
+      } else if (descriptor.getTypeKind()
+                   == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
+                 descriptor.getTypeKind()
+                  == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
+        auto R = descriptor.getTypeContextDescriptor();
+        auto P = descriptor.getProtocol();
 
         // Look for an exact match.
         if (protocol != P)
@@ -548,21 +674,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
         if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
           continue;
 
-        // Store the type-protocol pair in the cache.
-        switch (record.getConformanceKind()) {
-        case ProtocolConformanceReferenceKind::WitnessTable:
-          // If the record provides a nondependent witness table for all
-          // instances of a generic type, cache it for the generic pattern.
-          C.cacheSuccess(R, P, record.getStaticWitnessTable());
-          break;
-
-        case ProtocolConformanceReferenceKind::WitnessTableAccessor:
-          // If the record provides a dependent witness table accessor,
-          // cache the result for the instantiated type metadata.
-          C.cacheSuccess(type, P, record.getWitnessTable(type));
-          break;
-
-        }
+        recordWitnessTable(descriptor, type);
       }
     }
   }
@@ -579,10 +691,9 @@ swift::swift_conformsToProtocol(const Metadata * const type,
   }
 }
 
-const Metadata *
-swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
+const TypeContextDescriptor *
+swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
-  const Metadata *foundMetadata = nullptr;
 
   ScopedLock guard(C.SectionsToScanLock);
 
@@ -592,17 +703,128 @@ swift::_searchConformancesByMangledTypeName(const llvm::StringRef typeName) {
   for (; sectionIdx < endSectionIdx; ++sectionIdx) {
     auto &section = C.SectionsToScan[sectionIdx];
     for (const auto &record : section) {
-      if (auto metadata = record.getCanonicalTypeMetadata())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, metadata, nullptr);
-      else if (auto ntd = record.getNominalTypeDescriptor())
-        foundMetadata = _matchMetadataByMangledTypeName(typeName, nullptr, ntd);
-
-      if (foundMetadata != nullptr)
-        break;
+      if (auto ntd = record->getTypeContextDescriptor()) {
+        if (_contextDescriptorMatchesMangling(ntd, node))
+          return ntd;
+      }
     }
-    if (foundMetadata != nullptr)
-      break;
   }
 
-  return foundMetadata;
+  return nullptr;
 }
+
+/// Resolve a reference to a generic parameter to type metadata.
+static const Metadata *resolveGenericParamRef(
+                            const GenericParamRef &param,
+                            SubstFlatGenericParameterFn substFlatGenericParam) {
+  // Resolve the root generic parameter.
+  const Metadata *current = substFlatGenericParam(param.getRootParamIndex());
+  if (!current) return nullptr;
+
+  // Follow the associated type path.
+  for (const auto &assocTypeRef : param) {
+    // Look for the witness table.
+    auto witnessTable =
+      swift_conformsToProtocol(current, assocTypeRef.Protocol);
+    if (!witnessTable) return nullptr;
+
+    // Call the associated type access function.
+    using AssociatedTypeAccessFn =
+      const Metadata *(*)(const Metadata *base, const WitnessTable *);
+    unsigned adjustedIndex =
+      assocTypeRef.Index + WitnessTableFirstRequirementOffset;
+    current =
+      ((const AssociatedTypeAccessFn *)witnessTable)[adjustedIndex]
+        (current, witnessTable);
+    if (!current) return nullptr;
+  }
+
+  return current;
+}
+
+bool swift::_checkGenericRequirements(
+                      llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+                      std::vector<const void *> &extraArguments,
+                      SubstFlatGenericParameterFn substFlatGenericParam,
+                      SubstGenericParameterFn substGenericParam) {
+  for (const auto &req : requirements) {
+    // Make sure we understand the requirement we're dealing with.
+    if (!req.hasKnownKind()) return true;
+
+    // Resolve the subject generic parameter.
+    auto subjectType =
+      resolveGenericParamRef(req.getParam(), substFlatGenericParam);
+    if (!subjectType) return true;
+
+    // Check the requirement.
+    switch (req.getKind()) {
+    case GenericRequirementKind::Protocol: {
+      const WitnessTable *witnessTable = nullptr;
+      if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
+                               &witnessTable))
+        return true;
+
+      // If we need a witness table, add it.
+      if (req.getProtocol()->Flags.needsWitnessTable()) {
+        assert(witnessTable);
+        extraArguments.push_back(witnessTable);
+      }
+
+      continue;
+    }
+
+    case GenericRequirementKind::SameType: {
+      // Demangle the second type under the given substitutions.
+      auto otherType =
+        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+      if (!otherType) return true;
+
+      assert(!req.getFlags().hasExtraArgument());
+
+      // Check that the types are equivalent.
+      if (subjectType != otherType) return true;
+
+      continue;
+    }
+
+    case GenericRequirementKind::Layout: {
+      switch (req.getLayout()) {
+      case GenericRequirementLayoutKind::Class:
+        if (!subjectType->satisfiesClassConstraint())
+          return true;
+        continue;
+      }
+
+      // Unknown layout.
+      return true;
+    }
+
+    case GenericRequirementKind::BaseClass: {
+      // Demangle the base type under the given substitutions.
+      auto baseType =
+        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+      if (!baseType) return true;
+
+      // Check whether it's dynamically castable, which works as a superclass
+      // check.
+      if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
+
+      continue;
+    }
+
+    case GenericRequirementKind::SameConformance: {
+      // FIXME: Implement this check.
+      continue;
+    }
+    }
+
+    // Unknown generic requirement kind.
+    return true;
+  }
+
+  // Success!
+  return false;
+}
+
+#define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

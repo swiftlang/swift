@@ -2,6 +2,7 @@
 
 .. highlight:: none
 
+============================
 Debugging the Swift Compiler
 ============================
 
@@ -67,12 +68,85 @@ print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except ``-dump-ast``) can be redirected
 with an additional ``-o <file>`` option.
 
+Debugging the Type Checker
+--------------------------
+
+Enabling Logging
+~~~~~~~~~~~~~~~~
+
+To enable logging in the type checker, use the following argument: ``-Xfrontend -debug-constraints``.
+This will cause the typechecker to log its internal state as it solves
+constraints and present the final type checked solution, e.g.::
+
+  ---Constraint solving for the expression at [test.swift:3:10 - line:3:10]---
+  ---Initial constraints for the given expression---
+  (integer_literal_expr type='$T0' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)
+  Score: 0 0 0 0 0 0 0 0 0 0 0 0 0
+  Contextual Type: Int
+  Type Variables:
+    #0 = $T0 [inout allowed]
+
+  Active Constraints:
+
+  Inactive Constraints:
+    $T0 literal conforms to ExpressibleByIntegerLiteral [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
+    $T0 conv Int [[locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]]];
+  ($T0 literal=3 bindings=(subtypes of) (default from ExpressibleByIntegerLiteral) Int)
+  Active bindings: $T0 := Int
+  (trying $T0 := Int
+    (found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
+  )
+  ---Solution---
+  Fixed score: 0 0 0 0 0 0 0 0 0 0 0 0 0
+  Type variables:
+    $T0 as Int
+
+  Overload choices:
+
+  Constraint restrictions:
+
+  Disjunction choices:
+
+  Conformances:
+    At locator@0x7ffa3a865a00 [IntegerLiteral@test.swift:3:10]
+  (normal_conformance type=Int protocol=ExpressibleByIntegerLiteral lazy
+    (normal_conformance type=Int protocol=_ExpressibleByBuiltinIntegerLiteral lazy))
+  (found solution 0 0 0 0 0 0 0 0 0 0 0 0 0)
+  ---Type-checked expression---
+  (call_expr implicit type='Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] arg_labels=_builtinIntegerLiteral:
+    (constructor_ref_call_expr implicit type='(_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10]
+      (declref_expr implicit type='(Int.Type) -> (_MaxBuiltinIntegerType) -> Int' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] decl=Swift.(file).Int.init(_builtinIntegerLiteral:) function_ref=single)
+      (type_expr implicit type='Int.Type' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] typerepr='Int'))
+    (tuple_expr implicit type='(_builtinIntegerLiteral: Int2048)' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] names=_builtinIntegerLiteral
+      (integer_literal_expr type='Int2048' location=test.swift:3:10 range=[test.swift:3:10 - line:3:10] value=0)))
+
+When using the integrated swift-repl, one can dump the same output for each
+expression as one evaluates the expression by enabling constraints debugging by
+typing ``:constraints debug on``::
+
+  $ swift -frontend -repl -enable-objc-interop -module-name REPL
+  ***  You are running Swift's integrated REPL,  ***
+  ***  intended for compiler and stdlib          ***
+  ***  development and testing purposes only.    ***
+  ***  The full REPL is built as part of LLDB.   ***
+  ***  Type ':help' for assistance.              ***
+  (swift) :constraints debug on
+
+Asserting on First Error
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+When changing the typechecker, one can cause a series of cascading errors. Since
+Swift doesn't assert on such errors, one has to know more about the typechecker
+to know where to stop in the debugger. Rather than doing that, one can use the
+option ``-Xllvm -swift-diagnostics-assert-on-error=1`` to cause the
+DiagnosticsEngine to assert upon the first error, providing the signal that the
+debugger needs to know that it should attach.
 
 Debugging on SIL Level
-~~~~~~~~~~~~~~~~~~~~~~
+----------------------
 
 Options for Dumping the SIL
-```````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Often it is not sufficient to dump the SIL at the beginning or end of the
 optimization pipeline.
@@ -92,7 +166,7 @@ function names (``-Xllvm -sil-print-only-function``/``s``) or by pass names
 For details see ``PassManager.cpp``.
 
 Dumping the SIL and other Data in LLDB
-``````````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When debugging the Swift compiler with LLDB (or Xcode, of course), there is
 even a more powerful way to examine the data in the compiler, e.g. the SIL.
@@ -125,7 +199,7 @@ Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
 
 Debugging and Profiling on SIL level
-````````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The compiler provides a way to debug and profile on SIL level. To enable SIL
 debugging add the front-end option -gsil together with -g. Example::
@@ -141,7 +215,7 @@ To enable SIL debugging and profiling for the Swift standard library, use
 the build-script-impl option ``--build-sil-debugging-stdlib``.
 
 ViewCFG: Regex based CFG Printer
-````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ViewCFG (``./utils/viewcfg``) is a script that parses a textual CFG (e.g. a llvm
 or sil function) and displays a .dot file of the CFG. Since the parsing is done
@@ -175,10 +249,20 @@ to be invoked with the sil function body. Note,
 ``sil-mode-display-function-cfg`` does not take any arguments.
 
 **NOTE** viewcfg must be in the $PATH for viewcfg to work.
+
 **NOTE** Since we use open, .dot files should be associated with the Graphviz app for viewcfg to work.
 
+There is another useful script to view the CFG of a disassembled function:
+``./utils/dev-scripts/blockifyasm``.
+It splits a disassembled function up into basic blocks which can then be
+used with viewcfg::
+
+    (lldb) disassemble
+      <copy-paste output to file.s>
+    $ blockifyasm < file.s | viewcfg
+
 Using Breakpoints
-`````````````````
+~~~~~~~~~~~~~~~~~
 
 LLDB has very powerful breakpoints, which can be utilized in many ways to debug
 the compiler and Swift executables. The examples in this section show the LLDB
@@ -255,7 +339,7 @@ we know to ignore swift_getGenericMetadata 84 times, i.e.::
     (lldb) br set -i 84 -n GlobalARCOpts::run
 
 LLDB Scripts
-````````````
+~~~~~~~~~~~~
 
 LLDB has powerful capabilities of scripting in Python among other languages. An
 often overlooked, but very useful technique is the -s command to lldb. This
@@ -293,8 +377,55 @@ Then by running ``lldb test -s test.lldb``, lldb will:
 Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly every time.
 
+Custom LLDB Commands
+~~~~~~~~~~~~~~~~~~~~
+
+If you've ever found yourself repeatedly entering a complex sequence of
+commands within a debug session, consider using custom lldb commands. Custom
+commands are a handy way to automate debugging tasks.
+
+For example, say we need a command that prints the contents of the register
+``rax`` and then steps to the next instruction. Here's how to define that
+command within a debug session::
+
+    (lldb) script
+    Python Interactive Interpreter. To exit, type 'quit()', 'exit()' or Ctrl-D.
+    >>> def custom_step():
+    ...   print "rax =", lldb.frame.FindRegister("rax")
+    ...   lldb.thread.StepInstruction(True)
+    ...
+    >>> ^D
+
+You can call this function using the ``script`` command, or via an alias::
+
+    (lldb) script custom_step()
+    rax = ...
+    <debugger steps to the next instruction>
+
+    (lldb) command alias cs script custom_step()
+    (lldb) cs
+    rax = ...
+    <debugger steps to the next instruction>
+
+Printing registers and single-stepping are by no means the only things you can
+do with custom commands. The LLDB Python API surfaces a lot of useful
+functionality, such as arbitrary expression evaluation.
+
+There are some pre-defined custom commands which can be especially useful while
+debugging the swift compiler. These commands live in
+``swift/utils/lldb/lldbToolBox.py``. There is a wrapper script available in
+``SWIFT_BINARY_DIR/bin/lldb-with-tools`` which launches lldb with those
+commands loaded.
+
+A command named ``sequence`` is included in lldbToolBox. ``sequence`` runs
+multiple semicolon separated commands together as one command. This can be used
+to define custom commands using just other lldb commands. For example,
+``custom_step()`` function defined above could be defined as::
+
+    (lldb) command alias cs sequence p/x $rax; stepi
+
 Reducing SIL test cases using bug_reducer
-`````````````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There is functionality provided in ./swift/utils/bug_reducer/bug_reducer.py for
 reducing SIL test cases by:
@@ -374,7 +505,7 @@ That will write the types log to the file passed to the -f option.
 
 **NOTE** Module loading can happen as a side-effect of other operations in lldb
  (e.g. the "file" command). To be sure that one has enabled logging before /any/
- module loading has occured, place the command into either::
+ module loading has occurred, place the command into either::
 
    ~/.lldbinit
    $PWD/.lldbinit
@@ -399,8 +530,8 @@ following non-exhaustive list of state:
 1. The unparsed, textual expression passed to the compiler.
 2. The parsed expression.
 3. The initial SILGen.
-4. SILGen after SILLinking has occured.
-5. SILGen after SILLinking and Guaranteed Optimizations have occured.
+4. SILGen after SILLinking has occurred.
+5. SILGen after SILLinking and Guaranteed Optimizations have occurred.
 6. The resulting LLVM IR.
 7. The assembly code that will be used by the JIT.
 

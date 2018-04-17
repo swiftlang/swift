@@ -6,7 +6,7 @@ enum AnEnumeration {
 
   // EnumElement
   case Element
-  // CHECK: [[@LINE-1]]:8 | enumerator/Swift | Element | s:14swift_ide_test13AnEnumerationO7ElementA2CmF | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:8 | enumerator/Swift | Element | s:14swift_ide_test13AnEnumerationO7ElementyA2CmF | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | enum/Swift | AnEnumeration | s:14swift_ide_test13AnEnumerationO
 }
 
@@ -18,21 +18,21 @@ struct AStruct {
 
   // Subscript
   subscript(index: Int) -> Int {
-    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVS2icip | Def,RelChild | rel: 1
+    // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVyS2icip | Def,RelChild | rel: 1
     // CHECK-NEXT: RelChild | struct/Swift | AStruct | s:14swift_ide_test7AStructV
 
     // Accessor + AccessorAddressor
     unsafeAddress {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-addr/Swift |  | s:14swift_ide_test7AStructVS2icilu | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVS2icip
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-addr/Swift |  | s:14swift_ide_test7AStructVyS2icilu | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVyS2icip
 
       return UnsafePointer(base)
     }
 
     // Accessor + AccessorMutableAddressor
     unsafeMutableAddress {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-mutaddr/Swift |  | s:14swift_ide_test7AStructVS2iciau | Def,RelChild,RelAcc | rel: 1
-      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVS2icip
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-mutaddr/Swift |  | s:14swift_ide_test7AStructVyS2iciau | Def,RelChild,RelAcc | rel: 1
+      // CHECK-NEXT: RelChild,RelAcc | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructVyS2icip
 
       return base
     }
@@ -48,10 +48,10 @@ class AClass {
 
   // InstanceMethod + Parameters
   func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,Dyn,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethod1a1b_1d_ySi_S4itF | Def,Dyn,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
-  // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitFAEL_Sivp | Def,RelChild | rel: 1
-  // CHECK-NEXT: RelChild | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF
+  // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethod1a1b_1d_ySi_S4itFAEL_Sivp | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethod1a1b_1d_ySi_S4itF
   // CHECK: [[@LINE-5]]:33 | param(local)/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
   // CHECK: [[@LINE-6]]:43 | param(local)/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
   // CHECK: [[@LINE-7]]:53 | param(local)/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
@@ -134,7 +134,7 @@ protocol AProtocol {
 
   // AssociatedType
   associatedtype T
-  // CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | T | s:14swift_ide_test9AProtocolP1T | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | T | s:14swift_ide_test9AProtocolP1TQa | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP
 }
 
@@ -182,15 +182,15 @@ var foo = 1
 
 // PrefixOperator
 prefix func -(a: AStruct) -> AStruct { return a }
-// CHECK: [[@LINE-1]]:13 | function/prefix-operator/Swift | -(_:) | s:14swift_ide_test1sopAA7AStructVADF | Def | rel: 0
+// CHECK: [[@LINE-1]]:13 | function/prefix-operator/Swift | -(_:) | s:14swift_ide_test1sopyAA7AStructVADF | Def | rel: 0
 
 // PostfixOperator
 postfix func ++(a: AStruct) -> AStruct { return a }
-// CHECK: [[@LINE-1]]:14 | function/postfix-operator/Swift | ++(_:) | s:14swift_ide_test2ppoPAA7AStructVADF | Def | rel: 0
+// CHECK: [[@LINE-1]]:14 | function/postfix-operator/Swift | ++(_:) | s:14swift_ide_test2ppoPyAA7AStructVADF | Def | rel: 0
 
 // InfixOperator
 func +(a: AStruct, b: AStruct) -> AStruct { return a }
-// CHECK: [[@LINE-1]]:6 | function/infix-operator/Swift | +(_:_:) | s:14swift_ide_test1poiAA7AStructVAD_ADtF | Def | rel: 0
+// CHECK: [[@LINE-1]]:6 | function/infix-operator/Swift | +(_:_:) | s:14swift_ide_test1poiyAA7AStructVAD_ADtF | Def | rel: 0
 
 class XCTestCase {}
 class MyTestCase : XCTestCase {

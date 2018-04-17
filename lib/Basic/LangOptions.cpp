@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
@@ -60,6 +61,10 @@ static const StringRef SupportedConditionalCompilationRuntimes[] = {
   "_Native",
 };
 
+static const StringRef SupportedConditionalCompilationTargetEnvironments[] = {
+  "simulator",
+};
+
 template <size_t N>
 bool contains(const StringRef (&Array)[N], const StringRef &V,
               std::vector<StringRef> &suggestions) {
@@ -98,6 +103,9 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
                     suggestions);
   case PlatformConditionKind::Runtime:
     return contains(SupportedConditionalCompilationRuntimes, Value,
+                    suggestions);
+  case PlatformConditionKind::TargetEnvironment:
+    return contains(SupportedConditionalCompilationTargetEnvironments, Value,
                     suggestions);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -164,25 +172,25 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // Set the "os" platform condition.
   if (Target.isMacOSX())
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
-  else if (triple.isTvOS())
+  else if (Target.isTvOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
-  else if (triple.isWatchOS())
+  else if (Target.isWatchOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
-  else if (triple.isiOS())
+  else if (Target.isiOS())
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
-  else if (triple.isAndroid())
+  else if (Target.isAndroid())
     addPlatformConditionValue(PlatformConditionKind::OS, "Android");
-  else if (triple.isOSLinux())
+  else if (Target.isOSLinux())
     addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
-  else if (triple.isOSFreeBSD())
+  else if (Target.isOSFreeBSD())
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
-  else if (triple.isOSWindows())
+  else if (Target.isOSWindows())
     addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
-  else if (triple.isWindowsCygwinEnvironment())
+  else if (Target.isWindowsCygwinEnvironment())
     addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
-  else if (triple.isPS4())
+  else if (Target.isPS4())
     addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
-  else if (triple.isOSHaiku())
+  else if (Target.isOSHaiku())
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
   else
     UnsupportedOS = true;
@@ -253,6 +261,13 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::Runtime, "_ObjC");
   else
     addPlatformConditionValue(PlatformConditionKind::Runtime, "_Native");
+
+  // Set the "targetEnvironment" platform condition if targeting a simulator
+  // environment. Otherwise _no_ value is present for targetEnvironment; it's
+  // an optional disambiguating refinement of the triple.
+  if (swift::tripleIsAnySimulator(Target))
+    addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
+                              "simulator");
 
   // If you add anything to this list, change the default size of
   // PlatformConditionValues to not require an extra allocation

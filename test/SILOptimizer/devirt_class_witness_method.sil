@@ -1,5 +1,6 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer -sil-combine -enable-resilience | tee /tmp/xxx | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer -sil-combine -enable-resilience -save-optimization-record-path=%t.opt.yaml | %FileCheck %s
 sil_stage canonical
+// RUN: %FileCheck -check-prefix=YAML -input-file=%t.opt.yaml %s
 
 import Builtin
 
@@ -19,6 +20,24 @@ sil hidden_external [transparent] [thunk] @witness_thunk : $@convention(witness_
 // CHECK: [[FN:%.*]] = function_ref @witness_thunk
 // CHECK: apply [[FN]]<C<T, U>, T, U>(
 // CHECK: return
+
+// YAML:      --- !Passed
+// YAML-NEXT: Pass:            sil-devirtualizer
+// YAML-NEXT: Name:            sil.WitnessMethodDevirtualized
+// YAML-NEXT: DebugLoc:
+// YAML-NEXT:   File:            {{.*}}/devirt_class_witness_method.sil
+// YAML-NEXT:   Line:            47
+// YAML-NEXT:   Column:          8
+// YAML-NEXT: Function:        caller
+// YAML-NEXT: Args:
+// YAML-NEXT:   - String:          'Devirtualized call to '
+// YAML-NEXT:   - Method:          '"witness_thunk"'
+// YAML-NEXT:     DebugLoc:
+// YAML-NEXT:       File:            {{.*}}/devirt_class_witness_method.sil
+// YAML-NEXT:       Line:            17
+// YAML-NEXT:       Column:          44
+// YAML-NEXT: ...
+
 sil hidden @caller : $@convention(thin) <T, U> (@owned C<T, U>) -> () {
 bb0(%0 : $C<T, U>):
   strong_retain %0 : $C<T, U>

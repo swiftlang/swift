@@ -119,32 +119,29 @@ RValue Scope::popPreservingValue(RValue &&rv) {
   return RValue(SGF, std::move(managedValues), type, numEltsRemaining);
 }
 
-void Scope::popPreservingValues(ArrayRef<ManagedValue> innerValues,
-                                MutableArrayRef<ManagedValue> outerValues) {
-  auto &SGF = cleanups.SGF;
-  assert(innerValues.size() == outerValues.size());
-
-  // Record the cleanup information for each preserved value and deactivate its
-  // cleanup.
-  SmallVector<CleanupCloner, 4> cleanups;
-  cleanups.reserve(innerValues.size());
-  for (auto &mv : innerValues) {
-    cleanups.emplace_back(SGF, mv);
-    mv.forward(SGF);
-  }
-
-  // Pop any unpreserved cleanups.
-  pop();
-
-  // Create a managed value for each preserved value, cloning its cleanup.
-  // Since the CleanupCloner does not remember its SILValue, grab it from the
-  // original, now-deactivated managed value.
-  for (auto index : indices(innerValues)) {
-    outerValues[index] = cleanups[index].clone(innerValues[index].getValue());
-  }
-}
-
 void Scope::popImpl() {
+  SmallVector<SILValue, 16> cleanupsToPropagateToOuterScope;
+
+  // Deactivate any postpone cleanups in the current scope.
+  if (currentlyActivePostponedCleanup) {
+    bool inScope;
+    do {
+      inScope = false;
+      auto &deferredCleanups =
+          currentlyActivePostponedCleanup->deferredCleanups;
+      if (deferredCleanups.empty())
+        break;
+      auto &top = deferredCleanups.back();
+      auto topCleanupDepth = top.first.getDepth();
+      if (topCleanupDepth > depth.getDepth()) {
+        cleanups.forwardCleanup(top.first);
+        cleanupsToPropagateToOuterScope.push_back(top.second);
+        deferredCleanups.pop_back();
+        inScope = true;
+      }
+    } while (inScope);
+  }
+
   cleanups.stack.checkIterator(depth);
   cleanups.stack.checkIterator(cleanups.innermostScope);
   assert(cleanups.innermostScope == depth && "popping scopes out of order");
@@ -153,4 +150,14 @@ void Scope::popImpl() {
   cleanups.endScope(depth, loc);
   cleanups.stack.checkIterator(cleanups.innermostScope);
   cleanups.popTopDeadCleanups(cleanups.innermostScope);
+
+  // Propagate the cleanup to the current parent scope.
+  for (auto valueToCleanup : cleanupsToPropagateToOuterScope) {
+    auto handle = cleanups.SGF.enterDestroyCleanup(valueToCleanup);
+    // Propagate cleanup to parent Scope.
+    if (currentlyActivePostponedCleanup->depth.getDepth() < depth.getDepth()) {
+      currentlyActivePostponedCleanup->deferredCleanups.push_back(
+          std::make_pair(handle, valueToCleanup));
+    }
+  }
 }

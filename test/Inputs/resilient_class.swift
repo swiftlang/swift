@@ -65,6 +65,10 @@ open class ResilientOutsideParent {
   open class func classMethod() {
     print("ResilientOutsideParent.classMethod()")
   }
+
+  open func getValue() -> Int {
+    return 0
+  }
 }
 
 

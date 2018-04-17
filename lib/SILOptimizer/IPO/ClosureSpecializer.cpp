@@ -248,6 +248,12 @@ public:
     return getClosureParameterInfo().isConsumed();
   }
 
+  bool isTrivialNoEscapeParameter() const {
+    auto ClosureParmFnTy =
+        getClosureParameterInfo().getType()->getAs<SILFunctionType>();
+    return ClosureParmFnTy->isTrivialNoEscape();
+  }
+
   SILLocation getLoc() const { return getClosure()->getLoc(); }
 
   SILModule &getModule() const { return AI.getModule(); }
@@ -614,8 +620,9 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 
   auto ClonedTy = SILFunctionType::get(
       ClosureUserFunTy->getGenericSignature(), ExtInfo,
+      ClosureUserFunTy->getCoroutineKind(),
       ClosureUserFunTy->getCalleeConvention(), NewParameterInfoList,
-      ClosureUserFunTy->getResults(),
+      ClosureUserFunTy->getYields(), ClosureUserFunTy->getResults(),
       ClosureUserFunTy->getOptionalErrorResult(), M.getASTContext());
 
   // We make this function bare so we don't have to worry about decls in the
@@ -632,7 +639,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->isThunk(), ClosureUser->getClassSubclassScope(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
-  if (ClosureUser->hasUnqualifiedOwnership()) {
+  if (!ClosureUser->hasQualifiedOwnership()) {
     Fn->setUnqualifiedOwnership();
   }
   for (auto &Attr : ClosureUser->getSemanticsAttrs())
@@ -647,12 +654,16 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(SILValue calleeValue,
   if (calleeValue == CallSiteDesc.getClosure())
     return NewClosure;
 
-  auto *CFI = cast<ConvertFunctionInst>(calleeValue);
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(calleeValue)) {
+    calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder);
+    return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
+                                         CFI->getType());
+  }
 
-  calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder);
-
-  return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
-                                       CFI->getType());
+  auto *Cvt = cast<ConvertEscapeToNoEscapeInst>(calleeValue);
+  calleeValue = cloneCalleeConversion(Cvt->getOperand(), NewClosure, Builder);
+  return Builder.createConvertEscapeToNoEscape(
+      CallSiteDesc.getLoc(), calleeValue, Cvt->getType(), true);
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as
@@ -726,7 +737,8 @@ void ClosureSpecCloner::populateCloned() {
   // Then insert a release in all non failure exit BBs if our partial apply was
   // guaranteed. This is b/c it was passed at +0 originally and we need to
   // balance the initial increment of the newly created closure.
-  if (CallSiteDesc.isClosureGuaranteed() &&
+  if ((CallSiteDesc.isClosureGuaranteed() ||
+       CallSiteDesc.isTrivialNoEscapeParameter()) &&
       CallSiteDesc.closureHasRefSemanticContext()) {
     for (SILBasicBlock *BB : CallSiteDesc.getNonFailureExitBBs()) {
       SILBasicBlock *OpBB = BBMap[BB];
@@ -734,9 +746,14 @@ void ClosureSpecCloner::populateCloned() {
       TermInst *TI = OpBB->getTerminator();
       auto Loc = CleanupLocation::get(NewClosure->getLoc());
 
-      // If we have a return, we place the release right before it so we know
+      // If we have a return/throw, we place the release right before it so we know
       // that it will be executed at the end of the epilogue.
       if (isa<ReturnInst>(TI)) {
+        Builder.setInsertionPoint(TI);
+        Builder.createReleaseValue(Loc, SILValue(NewClosure),
+                                   Builder.getDefaultAtomicity());
+        continue;
+      } else if (isa<ThrowInst>(TI)) {
         Builder.setInsertionPoint(TI);
         Builder.createReleaseValue(Loc, SILValue(NewClosure),
                                    Builder.getDefaultAtomicity());
@@ -862,6 +879,10 @@ void SILClosureSpecializerTransform::gatherCallSites(
           Uses.append(CFI->getUses().begin(), CFI->getUses().end());
           continue;
         }
+        if (auto *Cvt= dyn_cast<ConvertEscapeToNoEscapeInst>(Use->getUser())) {
+          Uses.append(Cvt->getUses().begin(), Cvt->getUses().end());
+          continue;
+        }
         // If this use is not an apply inst or an apply inst with
         // substitutions, there is nothing interesting for us to do, so
         // continue...
@@ -949,7 +970,9 @@ void SILClosureSpecializerTransform::gatherCallSites(
         // However, thin_to_thick_function closures don't have a context and
         // don't need to be released.
         llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
-        if (ClosureParamInfo.isGuaranteed() &&
+        if ((ClosureParamInfo.isGuaranteed() || ClosureParamInfo.getType()
+                                                    ->castTo<SILFunctionType>()
+                                                    ->isTrivialNoEscape()) &&
             !isa<ThinToThickFunctionInst>(ClosureInst) &&
             !findAllNonFailureExitBBs(ApplyCallee, NonFailureExitBBs)) {
           continue;

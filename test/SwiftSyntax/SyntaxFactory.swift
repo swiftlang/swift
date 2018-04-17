@@ -1,21 +1,24 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
-// REQUIRES: sdk_overlay
+// REQUIRES: objc_interop
 
 import Foundation
 import StdlibUnittest
 import SwiftSyntax
 
 func cannedStructDecl() -> StructDeclSyntax {
-  let fooID = SyntaxFactory.makeIdentifier("Foo", trailingTrivia: .spaces(1))
   let structKW = SyntaxFactory.makeStructKeyword(trailingTrivia: .spaces(1))
+  let fooID = SyntaxFactory.makeIdentifier("Foo", trailingTrivia: .spaces(1))
   let rBrace = SyntaxFactory.makeRightBraceToken(leadingTrivia: .newlines(1))
+  let members = MemberDeclBlockSyntax {
+    $0.useLeftBrace(SyntaxFactory.makeLeftBraceToken())
+    $0.useRightBrace(rBrace)
+  }
   return StructDeclSyntax {
     $0.useStructKeyword(structKW)
     $0.useIdentifier(fooID)
-    $0.useLeftBrace(SyntaxFactory.makeLeftBraceToken())
-    $0.useRightBrace(rBrace)
+    $0.useMembers(members)
   }
 }
 
@@ -31,7 +34,7 @@ SyntaxFactoryAPI.test("Generated") {
               }
               """)
 
-  let forType = SyntaxFactory.makeIdentifier("for", 
+  let forType = SyntaxFactory.makeIdentifier("for",
                                              leadingTrivia: .backticks(1),
                                              trailingTrivia: [
                                                .backticks(1), .spaces(1)
@@ -39,7 +42,8 @@ SyntaxFactoryAPI.test("Generated") {
   let newBrace = SyntaxFactory.makeRightBraceToken(leadingTrivia: .newlines(2))
 
   let renamed = structDecl.withIdentifier(forType)
-                          .withRightBrace(newBrace)
+                          .withMembers(structDecl.members
+                                                 .withRightBrace(newBrace))
 
   expectEqual("\(renamed)",
               """
@@ -48,17 +52,18 @@ SyntaxFactoryAPI.test("Generated") {
               }
               """)
 
-  expectNotEqual(structDecl.leftBrace, renamed.leftBrace)
-  expectEqual(structDecl, structDecl.root)
+  expectNotEqual(structDecl.members, renamed.members)
+  expectEqual(structDecl, structDecl.root as? StructDeclSyntax)
   expectNil(structDecl.parent)
-  expectNotNil(structDecl.leftBrace.parent)
-  expectEqual(structDecl.leftBrace.parent, structDecl)
+  expectNotNil(structDecl.members.parent)
+  expectEqual(structDecl.members.parent as? StructDeclSyntax, structDecl)
 
   // Ensure that accessing children via named identifiers is exactly the
   // same as accessing them as their underlying data.
-  expectEqual(structDecl.leftBrace, structDecl.child(at: 7))
-  
-  expectEqual("\(structDecl.rightBrace)",
+  expectEqual(structDecl.members,
+              structDecl.child(at: 7) as? MemberDeclBlockSyntax)
+
+  expectEqual("\(structDecl.members.rightBrace)",
               """
 
               }

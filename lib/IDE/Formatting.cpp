@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/SourceEntityWalker.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Basic/SourceManager.h"
@@ -39,7 +39,7 @@ struct TokenInfo {
   operator bool() { return StartOfLineTarget && StartOfLineBeforeTarget; }
 };
 
-typedef llvm::SmallString<64> StringBuilder;
+using StringBuilder = llvm::SmallString<64>;
 
 static SourceLoc getVarDeclInitEnd(VarDecl *VD) {
   return VD->getBracesRange().isValid()
@@ -339,7 +339,7 @@ public:
     //  { <- We add no indentation here.
     //    return 0
     //  }
-    if (auto FD = dyn_cast_or_null<FuncDecl>(Start.getAsDecl())) {
+    if (auto FD = dyn_cast_or_null<AccessorDecl>(Start.getAsDecl())) {
       if (FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
         if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
           return false;
@@ -485,7 +485,7 @@ public:
 };
 
 class FormatWalker : public SourceEntityWalker {
-  typedef ArrayRef<Token>::iterator TokenIt;
+  using TokenIt = ArrayRef<Token>::iterator;
   class SiblingCollector {
     SourceLoc FoundSibling;
     SourceManager &SM;
@@ -510,6 +510,7 @@ class FormatWalker : public SourceEntityWalker {
       bool operator==(const SourceLocIterator& rhs) {return It==rhs.It;}
       bool operator!=(const SourceLocIterator& rhs) {return It!=rhs.It;}
       SourceLoc operator*() {return It->getLoc();}
+      const SourceLoc operator*() const { return It->getLoc(); }
     };
 
     void adjustTokenIteratorToImmediateAfter(SourceLoc End) {
@@ -667,7 +668,7 @@ class FormatWalker : public SourceEntityWalker {
   SiblingCollector SCollector;
 
   /// Sometimes, target is a part of "parent", for instance, "#else" is a part
-  /// of an ifconfigstmt, so that ifconfigstmt is not really the parent of "#else".
+  /// of an IfConfigDecl, so that IfConfigDecl is not really the parent of "#else".
   bool isTargetPartOf(swift::ASTWalker::ParentTy Parent) {
     if (auto Conf = dyn_cast_or_null<IfConfigDecl>(Parent.getAsDecl())) {
       for (auto Clause : Conf->getClauses()) {
@@ -842,6 +843,9 @@ public:
     auto AddIndentFunc = [&] () {
       auto Width = FmtOptions.UseTabs ? FmtOptions.TabWidth
                                       : FmtOptions.IndentWidth;
+      // We don't need to add additional indentation if Width is zero.
+      if (!Width)
+        return;
       // Increment indent.
       ExpandedIndent += Width;
       // Normalize indent to align on proper column indent width.
@@ -981,6 +985,15 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
                                                        CodeFormatOptions Options,
                                                        SourceManager &SM,
                                                        SourceFile &SF) {
+  // Sanitize 0-width tab
+  if (Options.UseTabs && !Options.TabWidth) {
+    // If IndentWidth is specified, use it as the tab width.
+    if (Options.IndentWidth)
+      Options.TabWidth = Options.IndentWidth;
+    // Otherwise, use the default value,
+    else
+      Options.TabWidth = 4;
+  }
   FormatWalker walker(SF, SM);
   auto SourceBufferID = SF.getBufferID().getValue();
   StringRef Text = SM.getLLVMSourceMgr()

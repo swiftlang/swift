@@ -7,7 +7,7 @@
 
 % import os.path
 % import gyb
-% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal, sliceTypeName, defaultIndicesForTraversal
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -580,21 +580,17 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
 CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooLarge")
   .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a larger size")
   .code {
-  var x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  var x = Slice(base: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], bounds: 0..<10)
   expectCrashLater()
-  x.withUnsafeMutableBufferPointer { buffer in
-    buffer[2..<4] = buffer[4..<8]
-  }
+  x[2..<4] = x[4..<8]
 }
 
 CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooSmall")
   .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a smaller size")
   .code {
-  var x = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  var x = Slice(base: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], bounds: 0..<10)
   expectCrashLater()
-  x.withUnsafeMutableBufferPointer { buffer in
-    buffer[2..<6] = buffer[6..<8]
-  }
+  x[2..<6] = x[6..<8]
 }
 
 //===----------------------------------------------------------------------===//
@@ -829,8 +825,6 @@ func ==(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
 % for Traversal in TRAVERSALS:
 %   Collection = collectionForTraversal(Traversal)
 %   Self = 'Fatal' + Collection
-%   Slice = sliceTypeName(Traversal, False, False)
-%   Indices = defaultIndicesForTraversal(Traversal)
 
 struct ${Self}<T> : ${Collection} {
   var startIndex: FatalIndex { fatalError() }
@@ -847,12 +841,35 @@ CollectionTypeTests.test("AssociatedTypes/${Collection}") {
   expectCollectionAssociatedTypes(
     collectionType: C.self,
     iteratorType: IndexingIterator<C>.self,
-    subSequenceType: ${Slice}<C>.self,
+    subSequenceType: Slice<C>.self,
     indexType: FatalIndex.self,
-    indexDistanceType: Int.self,
-    indicesType: ${Indices}<C>.self)
+    indicesType: DefaultIndices<C>.self)
 }
 % end
+
+
+struct RACollectionWithIntIndex<T> {
+  var contents: [T]
+}
+
+extension RACollectionWithIntIndex: RandomAccessCollection {
+  var startIndex: Int { return contents.startIndex }
+  var endIndex: Int { return contents.endIndex }
+  subscript(index: Int) -> T {
+    get { return contents[index] }
+    set { }
+  }
+}
+
+CollectionTypeTests.test("AssociatedTypes/RACollectionWithIntIndex") {
+  typealias C = RACollectionWithIntIndex<Void>
+  expectCollectionAssociatedTypes(
+    collectionType: C.self,
+    iteratorType: IndexingIterator<C>.self,
+    subSequenceType: Slice<C>.self,
+    indexType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
 
 
 runAllTests()

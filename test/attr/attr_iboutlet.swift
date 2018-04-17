@@ -181,10 +181,10 @@ class SwiftGizmo {
   @IBOutlet weak var i : C!
   @IBOutlet unowned var j : C // expected-error{{@IBOutlet property has non-optional type 'C'}}
   // expected-note @-1{{add '?' to form the optional type 'C?'}}{{30-30=?}}
-  // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{30-30=!}}
+  // expected-note @-2{{add '!' to form an implicitly unwrapped optional}}{{30-30=!}}
   @IBOutlet unowned(unsafe) var k : C // expected-error{{@IBOutlet property has non-optional type 'C'}}
   // expected-note @-1{{add '?' to form the optional type 'C?'}}{{38-38=?}}
-  // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{38-38=!}}
+  // expected-note @-2{{add '!' to form an implicitly unwrapped optional}}{{38-38=!}}
 
   @IBOutlet var bad1 : Int  // expected-error {{@IBOutlet property cannot have non-object type 'Int'}} {{3-13=}}
 
@@ -197,10 +197,10 @@ class SwiftGizmo {
 class MissingOptional {
   @IBOutlet var a: C // expected-error{{@IBOutlet property has non-optional type 'C'}}
   // expected-note @-1{{add '?' to form the optional type 'C?'}}{{21-21=?}}
-  // expected-note @-2{{add '!' to form the implicitly unwrapped optional type 'C!'}}{{21-21=!}}
+  // expected-note @-2{{add '!' to form an implicitly unwrapped optional}}{{21-21=!}}
 
   @IBOutlet weak var b: C // expected-error{{@IBOutlet property has non-optional type 'C'}}
-  // expected-note @-1{{add '!' to form the implicitly unwrapped optional type 'C!'}} {{26-26=!}}
+  // expected-note @-1{{add '!' to form an implicitly unwrapped optional}} {{26-26=!}}
   // expected-note @-2{{add '?' to form the optional type 'C?'}} {{26-26=?}}
 
   init() {}

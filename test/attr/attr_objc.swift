@@ -32,6 +32,9 @@ protocol Protocol_Class2 : class {}
 
 @objc extension PlainStruct { } // expected-error{{'@objc' can only be applied to an extension of a class}}{{1-7=}}
 
+class FáncyName {}
+@objc (FancyName) extension FáncyName {}
+
 @objc  
 var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 
@@ -121,7 +124,7 @@ func subject_genericFunc<T>(t: T) { // expected-error {{@objc can only be used w
 func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
 }
 
-@objc // expected-error {{@objc cannot be applied to this declaration}} {{1-7=}}
+@objc // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_struct {
   @objc
   var subject_instanceVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
@@ -133,7 +136,7 @@ struct subject_struct {
   func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
 }
 
-@objc   // expected-error {{@objc cannot be applied to this declaration}} {{1-7=}}
+@objc   // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_genericStruct<T> {
   @objc
   var subject_instanceVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
@@ -209,7 +212,7 @@ enum subject_enum: Int {
   @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
 
-  @nonobjc // expected-error {{@nonobjc cannot be applied to this declaration}}
+  @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
   case subject_enumElement7
 
   @objc   
@@ -1650,7 +1653,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}} @IBOutlet @objc weak var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}} @IBOutlet @_implicitly_unwrapped_optional @objc weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
@@ -2283,11 +2286,21 @@ class User: NSObject {
   }
 }
 
-// 'dynamic' methods cannot be @_inlineable or @_versioned
+// 'dynamic' methods cannot be @inlinable or @usableFromInline
 class BadClass {
-  @_inlineable @objc dynamic func badMethod1() {}
-  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to 'dynamic' declarations}}
+  @inlinable @objc dynamic func badMethod1() {}
+  // expected-error@-1 {{'@inlinable' attribute cannot be applied to 'dynamic' declarations}}
 
-  @_versioned @objc dynamic func badMethod2() {}
-  // expected-error@-1 {{'@_versioned' attribute cannot be applied to 'dynamic' declarations}}
+  @usableFromInline @objc dynamic func badMethod2() {}
+  // expected-error@-1 {{'@usableFromInline' attribute cannot be applied to 'dynamic' declarations}}
+}
+
+@objc
+protocol ObjCProtocolWithWeakProperty {
+   weak var weakProp: AnyObject? { get set } // okay
+}
+
+@objc
+protocol ObjCProtocolWithUnownedProperty {
+   unowned var unownedProp: AnyObject { get set } // okay
 }

@@ -58,7 +58,6 @@ KNOWN_STDLIB_TYPE_DECL(WritableKeyPath, NominalTypeDecl, 2)
 KNOWN_STDLIB_TYPE_DECL(ReferenceWritableKeyPath, NominalTypeDecl, 2)
 
 KNOWN_STDLIB_TYPE_DECL(Optional, EnumDecl, 1)
-KNOWN_STDLIB_TYPE_DECL(ImplicitlyUnwrappedOptional, EnumDecl, 1)
 
 KNOWN_STDLIB_TYPE_DECL(OptionSet, NominalTypeDecl, 1)
 

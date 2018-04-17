@@ -25,3 +25,5 @@ source.edit.kind.active:
   26:28-26:29 source.refactoring.range.kind.call-argument-colon arg-index=0
 source.edit.kind.string:
   26:33-26:36 source.refactoring.range.kind.basename
+source.edit.kind.string:
+  26:43-26:46 source.refactoring.range.kind.basename

@@ -23,15 +23,15 @@ public let ObjectiveCBridging = [
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectToString, tags: [.validation, .bridging, .String]),
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSArrayAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSArrayAnyObjectToStringForced, tags: [.validation, .bridging, .String]),
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObject", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObject, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectForced", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectForced", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectForced, tags: [.validation, .bridging, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeToNSDictionary", runFunction: run_ObjectiveCBridgeToNSDictionary, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString, tags: [.validation, .bridging, .String]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced, tags: [.validation, .bridging, .String]),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToString, tags: [.validation, .bridging, .String, .unstable]),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSDictionaryAnyObjectToStringForced, tags: [.validation, .bridging, .String, .unstable]),
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObject", runFunction: run_ObjectiveCBridgeFromNSSetAnyObject, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectForced", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectForced, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeToNSSet", runFunction: run_ObjectiveCBridgeToNSSet, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToString", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToString, tags: [.validation, .bridging, .String]),
-  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced, tags: [.validation, .bridging, .String]),
+  BenchmarkInfo(name: "ObjectiveCBridgeFromNSSetAnyObjectToStringForced", runFunction: run_ObjectiveCBridgeFromNSSetAnyObjectToStringForced, tags: [.validation, .bridging, .String, .unstable]),
 ]
 
 #if _runtime(_ObjC)

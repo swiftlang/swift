@@ -24,6 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/IRGen/ValueWitness.h"
 
 #include "Callee.h"
@@ -41,7 +42,7 @@ using namespace irgen;
 /// If we align them more, we'll need to introduce padding to
 /// make protocol types work.
 Size irgen::getFixedBufferSize(IRGenModule &IGM) {
-  return 3 * IGM.getPointerSize();
+  return NumWords_ValueBuffer * IGM.getPointerSize();
 }
 Alignment irgen::getFixedBufferAlignment(IRGenModule &IGM) {
   return IGM.getPointerAlignment();
@@ -108,7 +109,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false);
   }
   
-  /// int (*getEnumTag)(T *obj, M *self);
+  /// unsigned (*getEnumTag)(T *obj, M *self);
   case ValueWitness::GetEnumTag: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
@@ -130,7 +131,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false);
   }
 
-  /// void (*destructiveInjectEnumTag)(T *obj, int tag, M *self);
+  /// void (*destructiveInjectEnumTag)(T *obj, unsigned tag, M *self);
   case ValueWitness::DestructiveInjectEnumTag: {
     llvm::Type *voidTy = IGM.VoidTy;
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
@@ -142,8 +143,8 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(voidTy, args, /*isVarArg*/ false);
   }
 
-  /// int (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases,
-  ///                                M *self)
+  /// unsigned (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases,
+  ///                                     M *self)
   case ValueWitness::GetEnumTagSinglePayload: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
     llvm::Type *indexTy = IGM.Int32Ty;
@@ -153,7 +154,7 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(indexTy, args, false);
   }
 
-  /// void (*storeEnumTagSinglePayload)(T* enum, INT_TYPE whichCase,
+  /// void (*storeEnumTagSinglePayload)(T* enum, UINT_TYPE whichCase,
   ///                                   UINT_TYPE emptyCases,
   ///                                   M *self)
   case ValueWitness::StoreEnumTagSinglePayload: {
@@ -353,20 +354,18 @@ emitLoadOfValueWitnessFunctionFromMetadata(IRGenFunction &IGF,
   return emitLoadOfValueWitnessFunction(IGF, vwtable, index);
 }
 
-llvm::Value * IRGenFunction::emitValueWitnessValue(SILType type,
-                                                   ValueWitness index) {
+llvm::Value *IRGenFunction::emitValueWitnessValue(SILType type,
+                                                  ValueWitness index) {
   assert(!isValueWitnessFunction(index));
 
-  if (auto witness = tryGetLocalTypeDataForLayout(type,
-                                LocalTypeDataKind::forValueWitness(index))) {
+  auto key = LocalTypeDataKind::forValueWitness(index);
+  if (auto witness = tryGetLocalTypeDataForLayout(type, key)) {
     return witness;
   }
   
   auto vwtable = emitValueWitnessTableRef(type);
   auto witness = emitLoadOfValueWitnessValue(*this, vwtable, index);
-  setScopedLocalTypeDataForLayout(type,
-                                  LocalTypeDataKind::forValueWitness(index),
-                                  witness);
+  setScopedLocalTypeDataForLayout(type, key, witness);
   return witness;
 }
 
@@ -376,8 +375,8 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
                                            ValueWitness index) {
   assert(isValueWitnessFunction(index));
 
-  if (auto witness = tryGetLocalTypeDataForLayout(type,
-                                LocalTypeDataKind::forValueWitness(index))) {
+  auto key = LocalTypeDataKind::forValueWitness(index);
+  if (auto witness = tryGetLocalTypeDataForLayout(type, key)) {
     metadataSlot = emitTypeMetadataRefForLayout(type);
     auto signature = IGM.getValueWitnessSignature(index);
     return FunctionPointer(witness, signature);
@@ -385,9 +384,7 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
   
   auto vwtable = emitValueWitnessTableRef(type, &metadataSlot);
   auto witness = emitLoadOfValueWitnessFunction(*this, vwtable, index);
-  setScopedLocalTypeDataForLayout(type,
-                                  LocalTypeDataKind::forValueWitness(index),
-                                  witness.getPointer());
+  setScopedLocalTypeDataForLayout(type, key, witness.getPointer());
   return witness;
 }
 
@@ -443,39 +440,86 @@ irgen::emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
 /// Emit a dynamic alloca call to allocate enough memory to hold an object of
 /// type 'T' and an optional llvm.stackrestore point if 'isInEntryBlock' is
 /// false.
-DynamicAlloca irgen::emitDynamicAlloca(IRGenFunction &IGF, SILType T,
-                                       bool isInEntryBlock) {
+StackAddress IRGenFunction::emitDynamicAlloca(SILType T,
+                                              const llvm::Twine &name) {
+  llvm::Value *size = emitLoadOfSize(*this, T);
+  return emitDynamicAlloca(IGM.Int8Ty, size, Alignment(16), name);
+}
+
+StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
+                                              llvm::Value *arraySize,
+                                              Alignment align,
+                                              const llvm::Twine &name) {
+  // In coroutines, call llvm.coro.alloca.alloc.
+  if (isCoroutine()) {
+    // Compute the number of bytes to allocate.
+    llvm::Value *byteCount;
+    auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
+    if (eltSize == 1) {
+      byteCount = arraySize;
+    } else {
+      byteCount = Builder.CreateMul(arraySize, IGM.getSize(Size(eltSize)));
+    }
+
+    auto alignment = llvm::ConstantInt::get(IGM.Int32Ty, align.getValue());
+
+    // Allocate memory.  This produces an abstract token.
+    auto allocFn = llvm::Intrinsic::getDeclaration(
+        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_alloc, { IGM.SizeTy });
+    auto allocToken = Builder.CreateCall(allocFn, { byteCount, alignment });
+
+    // Get the allocation result.
+    auto getFn = llvm::Intrinsic::getDeclaration(
+        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_get);
+    auto ptr = Builder.CreateCall(getFn, { allocToken });
+
+    return {Address(ptr, align), allocToken};
+  }
+
+  // Otherwise, use a dynamic alloca.
   llvm::Value *stackRestorePoint = nullptr;
 
   // Save the stack pointer if we are not in the entry block (we could be
   // executed more than once).
+  bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
   if (!isInEntryBlock) {
     auto *stackSaveFn = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::ID::stacksave);
+        &IGM.Module, llvm::Intrinsic::ID::stacksave);
 
-    stackRestorePoint =  IGF.Builder.CreateCall(stackSaveFn, {}, "spsave");
+    stackRestorePoint =  Builder.CreateCall(stackSaveFn, {}, "spsave");
   }
 
   // Emit the dynamic alloca.
-  llvm::Value *size = emitLoadOfSize(IGF, T);
-  auto *alloca = IGF.Builder.CreateAlloca(IGF.IGM.Int8Ty, size, "alloca");
-  alloca->setAlignment(16);
+  auto *alloca = Builder.IRBuilderBase::CreateAlloca(eltTy, arraySize, name);
+  alloca->setAlignment(align.getValue());
+
   assert(!isInEntryBlock ||
-         IGF.getActiveDominancePoint().isUniversal() &&
+         getActiveDominancePoint().isUniversal() &&
              "Must be in entry block if we insert dynamic alloca's without "
              "stackrestores");
-  return {alloca, stackRestorePoint};
+  return {Address(alloca, align), stackRestorePoint};
 }
 
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
-void irgen::emitDeallocateDynamicAlloca(IRGenFunction &IGF,
-                                        StackAddress address) {
-  if (!address.needsSPRestore())
+void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address) {
+  // In coroutines, unconditionally call llvm.coro.alloca.free.
+  if (isCoroutine()) {
+    auto allocToken = address.getExtraInfo();
+    assert(allocToken && "dynamic alloca in coroutine without alloc token?");
+    auto freeFn = llvm::Intrinsic::getDeclaration(
+        &IGM.Module, llvm::Intrinsic::ID::coro_alloca_free);
+    Builder.CreateCall(freeFn, address.getAddressPointer());
+    return;
+  }
+
+  // Otherwise, call llvm.stackrestore if an address was saved.
+  auto savedSP = address.getExtraInfo();
+  if (savedSP == nullptr)
     return;
   auto *stackRestoreFn = llvm::Intrinsic::getDeclaration(
-      &IGF.IGM.Module, llvm::Intrinsic::ID::stackrestore);
-  IGF.Builder.CreateCall(stackRestoreFn, address.getSavedSP());
+      &IGM.Module, llvm::Intrinsic::ID::stackrestore);
+  Builder.CreateCall(stackRestoreFn, savedSP);
 }
 
 /// Emit a call to do an 'initializeArrayWithCopy' operation.
@@ -673,7 +717,7 @@ llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
 }
 
 /// Emit a trampoline to call the getEnumTagSinglePayload witness. API:
-/// INT_TYPE (const T* enum, UINT_TYPE emptyCases, M *self)
+/// UINT_TYPE (const T* enum, UINT_TYPE emptyCases, M *self)
 static llvm::Constant *
 getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
 
@@ -703,7 +747,7 @@ getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
 }
 
 /// Emit a trampoline to call the storeEnumTagSinglePayload witness. API:
-/// VOID_TYPE (const T* enum, INT_TYPE whichCase, UINT_TYPE emptyCases,
+/// VOID_TYPE (const T* enum, UINT_TYPE whichCase, UINT_TYPE emptyCases,
 ///            M *self)
 static llvm::Constant *
 getStoreEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
@@ -735,7 +779,7 @@ llvm::Value *irgen::emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF,
                                                     SILType T,
                                                     llvm::Value *numEmptyCases,
                                                     Address destObject) {
-  if (!IGF.IGM.getOptions().OptimizeForSize) {
+  if (!IGF.optimizeForSize()) {
     llvm::Value *metadata;
     auto fn = IGF.emitValueWitnessFunctionRef(
         T, metadata, ValueWitness::GetEnumTagSinglePayload);
@@ -755,7 +799,7 @@ llvm::Value *irgen::emitGetEnumTagSinglePayloadCall(IRGenFunction &IGF,
 llvm::Value *irgen::emitStoreEnumTagSinglePayloadCall(
     IRGenFunction &IGF, SILType T, llvm::Value *whichCase,
     llvm::Value *numEmptyCases, Address destObject) {
-  if (!IGF.IGM.getOptions().OptimizeForSize) {
+  if (!IGF.optimizeForSize()) {
     llvm::Value *metadata;
     auto fn = IGF.emitValueWitnessFunctionRef(
         T, metadata, ValueWitness::StoreEnumTagSinglePayload);
@@ -801,13 +845,11 @@ void irgen::emitDestructiveProjectEnumDataCall(IRGenFunction &IGF,
 /// The type must be dynamically known to have enum witnesses.
 void irgen::emitDestructiveInjectEnumTagCall(IRGenFunction &IGF,
                                              SILType T,
-                                             unsigned tag,
+                                             llvm::Value *tagValue,
                                              Address srcObject) {
   llvm::Value *metadata;
   auto fn = IGF.emitValueWitnessFunctionRef(T, metadata,
                                       ValueWitness::DestructiveInjectEnumTag);
-  llvm::Value *tagValue =
-    llvm::ConstantInt::get(IGF.IGM.Int32Ty, tag);
   IGF.Builder.CreateCall(fn, {srcObject.getAddress(), tagValue, metadata});
 }
 
@@ -854,7 +896,7 @@ llvm::Value *irgen::emitLoadOfIsInline(IRGenFunction &IGF, SILType T) {
 /// Load the 'hasExtraInhabitants' valueWitness from the given table as an i1.
 llvm::Value *irgen::emitLoadOfHasExtraInhabitants(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
-  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::Enum_HasExtraInhabitants));
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::HasExtraInhabitants));
   auto masked = IGF.Builder.CreateAnd(flags, mask);
   return IGF.Builder.CreateICmpNE(masked, IGF.IGM.getSize(Size(0)),
                                   flags->getName() + ".hasExtraInhabitants");

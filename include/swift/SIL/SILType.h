@@ -251,6 +251,10 @@ public:
   bool isLoadable(SILModule &M) const {
     return !isAddressOnly(M);
   }
+  /// True if either:
+  /// 1) The type, or the referenced type of an address type, is loadable.
+  /// 2) The SIL Module conventions uses lowered addresses
+  bool isLoadableOrOpaque(SILModule &M) const;
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const;
@@ -363,13 +367,16 @@ public:
   /// pointer.
   bool isPointerSizeAndAligned();
 
-  /// True if the layout of `fromType` is known to cover the layout of
-  /// `totype`. This is conservatively imprecise and is not
-  /// reflexive. `fromType` may be larger than the given type and still be
-  /// castable. It is the caller's responsibility to ensure that the overlapping
-  /// fields are layout compatible.
-  static bool canUnsafeCastValue(SILType fromType, SILType toType,
-                                 SILModule &M);
+  /// Return true if the layout of `toType` is an ABI compatible prefix of
+  /// `fromType` ignoring reference types. `fromType` may be larger than
+  /// `toType` and still be unsafe castable. `fromType` may contain references
+  /// in positions where `toType` does not contain references and still be
+  /// unsafe castable. This is used solely to determine whether an address cast
+  /// can be promoted to a cast between aggregates of scalar values without
+  /// confusing IRGen.
+  static bool canPerformABICompatibleUnsafeCastValue(SILType fromType,
+                                                     SILType toType,
+                                                     SILModule &M);
 
   /// True if `operTy` can be cast by single-reference value into `resultTy`.
   static bool canRefCast(SILType operTy, SILType resultTy, SILModule &M);
@@ -379,7 +386,7 @@ public:
   bool isBlockPointerCompatible() const {
     // Look through one level of optionality.
     SILType ty = *this;
-    if (auto optPayload = ty.getAnyOptionalObjectType()) {
+    if (auto optPayload = ty.getOptionalObjectType()) {
       ty = optPayload;
     }
       
@@ -478,19 +485,12 @@ public:
 
   /// Returns the lowered type for T if this type is Optional<T>;
   /// otherwise, return the null type.
-  SILType getAnyOptionalObjectType() const;
+  SILType getOptionalObjectType() const;
 
   /// Unwraps one level of optional type.
   /// Returns the lowered T if the given type is Optional<T>.
   /// Otherwise directly returns the given type.
-  SILType unwrapAnyOptionalType() const;
-
-  /// Wraps one level of optional type.
-  ///
-  /// Returns the lowered Optional<T> if the given type is T.
-  ///
-  /// \arg F The SILFunction where the SILType is used.
-  SILType wrapAnyOptionalType(SILFunction &F) const;
+  SILType unwrapOptionalType() const;
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
@@ -538,6 +538,9 @@ public:
 
   /// Get the standard exception type.
   static SILType getExceptionType(const ASTContext &C);
+
+  /// Get the SIL token type.
+  static SILType getSILTokenType(const ASTContext &C);
 
   //
   // Utilities for treating SILType as a pointer-like type.
@@ -609,7 +612,7 @@ namespace llvm {
 // Allow the low bit of SILType to be used for nefarious purposes, e.g. putting
 // a SILType into a PointerUnion.
 template<>
-class PointerLikeTypeTraits<swift::SILType> {
+struct PointerLikeTypeTraits<swift::SILType> {
 public:
   static inline void *getAsVoidPointer(swift::SILType T) {
     return T.getOpaqueValue();

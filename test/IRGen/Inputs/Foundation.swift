@@ -3,34 +3,6 @@
 
 @_exported import ObjectiveC
 
-// String/NSString bridging functions.
-@_silgen_name("swift_StringToNSString") internal
-func _convertStringToNSString(_ string: String) -> NSString
-
-@_silgen_name("swift_NSStringToString") internal
-func _convertNSStringToString(_ nsstring: NSString?) -> String
-
-@_silgen_name("swift_ArrayToNSArray") internal
-func _convertArrayToNSArray<T>(array: Array<T>) -> NSArray
-
-@_silgen_name("swift_NSArrayToArray") internal
-func _convertNSArrayToArray<T>(nsstring: NSArray?) -> Array<T>
-
-@_silgen_name("swift_DictionaryToNSDictionary") internal
-func _convertDictionaryToNSDictionary<K: Hashable, V>(array: Dictionary<K, V>) -> NSDictionary
-
-@_silgen_name("swift_NSDictionaryToDictionary") internal
-func _convertNSDictionaryToDictionary<K: Hashable, V>(nsstring: NSDictionary?) -> Dictionary<K, V>
-
-// NSSet bridging entry points
-func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
-  return NSSet()
-}
-
-func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
-  return Set<T>()
-}
-
 extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
@@ -124,6 +96,17 @@ extension NSError: Error {
   public var _code: Int { return code }
 }
 
-public func _convertErrorToNSError(_ x: Error) -> NSError {
-  return x as NSError
+public enum _GenericObjCError : Error {
+  case nilError
+}
+
+public func _convertNSErrorToError(_ error: NSError?) -> Error {
+  if let error = error {
+    return error
+  }
+  return _GenericObjCError.nilError
+}
+
+public func _convertErrorToNSError(_ error: Error) -> NSError {
+  return error as NSError
 }

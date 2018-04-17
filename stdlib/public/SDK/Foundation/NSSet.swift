@@ -73,6 +73,21 @@ extension Set : _ObjectiveCBridgeable {
       return
     }
 
+    if Element.self == String.self {
+      // String and NSString have different concepts of equality, so
+      // string-keyed NSSets may generate key collisions when bridged over to
+      // Swift. See rdar://problem/35995647
+      var set = Set(minimumCapacity: s.count)
+      s.enumerateObjects({ (anyMember: Any, _) in
+        let member = Swift._forceBridgeFromObjectiveC(
+          anyMember as AnyObject, Element.self)
+        // FIXME: Log a warning if `member` is already in the set.
+        set.insert(member)
+      })
+      result = set
+      return
+    }
+
     // `Set<Element>` where `Element` is a value type may not be backed by
     // an NSSet.
     var builder = _SetBuilder<Element>(count: s.count)
@@ -101,25 +116,9 @@ extension Set : _ObjectiveCBridgeable {
     // set; map it to an empty set.
     if _slowPath(s == nil) { return Set() }
 
-    if let native =
-      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorageOf(s! as AnyObject) {
-
-      return native
-    }
-
-    if _isBridgedVerbatimToObjectiveC(Element.self) {
-      return Set<Element>(_cocoaSet: unsafeBitCast(s! as AnyObject,
-                                                   to: _NSSet.self))
-    }
-
-    // `Set<Element>` where `Element` is a value type may not be backed by
-    // an NSSet.
-    var builder = _SetBuilder<Element>(count: s!.count)
-    s!.enumerateObjects({ (anyMember: Any, _) in
-      builder.add(member: Swift._forceBridgeFromObjectiveC(
-        anyMember as AnyObject, Element.self))
-    })
-    return builder.take()
+    var result: Set? = nil
+    Set<Element>._forceBridgeFromObjectiveC(s!, result: &result)
+    return result!
   }
 }
 
@@ -177,9 +176,9 @@ extension NSSet {
     assert(alignment == MemoryLayout<AnyObject>.alignment)
 
     let rawBuffer = UnsafeMutableRawPointer.allocate(
-      bytes: bufferSize, alignedTo: alignment)
+      byteCount: bufferSize, alignment: alignment)
     defer {
-      rawBuffer.deallocate(bytes: bufferSize, alignedTo: alignment)
+      rawBuffer.deallocate()
       _fixLifetime(anSet)
     }
     let valueBuffer = rawBuffer.bindMemory(

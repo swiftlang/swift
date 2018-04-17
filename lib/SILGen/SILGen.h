@@ -15,11 +15,9 @@
 
 #include "ASTVisitor.h"
 #include "Cleanup.h"
-#include "SILGenProfiling.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -57,28 +55,6 @@ public:
   /// TopLevelSGF - The SILGenFunction used to visit top-level code, or null if
   /// the current source file is not a script source file.
   SILGenFunction /*nullable*/ *TopLevelSGF;
-
-  /// The profiler for instrumentation based profiling, or null if profiling is
-  /// disabled.
-  std::unique_ptr<SILGenProfiling> Profiler;
-
-  /// The indexed profile data to be used for PGO, or nullptr.
-  std::unique_ptr<llvm::IndexedInstrProfReader> PGOReader;
-
-  /// Load the profiled execution count corresponding to \p N, if one is
-  /// available.
-  ProfileCounter loadProfilerCount(ASTNode N) {
-    if (PGOReader && Profiler && Profiler->hasRegionCounters())
-      return Profiler->getExecutionCount(N);
-    return ProfileCounter();
-  }
-
-  /// Get the PGO's node parent
-  Optional<ASTNode> getPGOParent(ASTNode Node) {
-    if (PGOReader && Profiler && Profiler->hasRegionCounters())
-      return Profiler->getPGOParent(Node);
-    return None;
-  }
 
   /// Mapping from SILDeclRefs to emitted SILFunctions.
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
@@ -164,15 +140,6 @@ public:
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
   
-  /// Returns the type of a constant reference.
-  SILType getConstantType(SILDeclRef constant);
-  
-  /// Returns the calling convention for a function.
-  SILFunctionTypeRepresentation getDeclRefRepresentation(SILDeclRef constant) {
-    return getConstantType(constant).getAs<SILFunctionType>()
-      ->getRepresentation();
-  }
-
   /// Get the function for a SILDeclRef, or return nullptr if it hasn't been
   /// emitted yet.
   SILFunction *getEmittedFunction(SILDeclRef constant,
@@ -181,11 +148,11 @@ public:
   /// Get the function for a SILDeclRef, creating it if necessary.
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
-  
+
   /// Get the dynamic dispatch thunk for a SILDeclRef.
   SILFunction *getDynamicThunk(SILDeclRef constant,
                                CanSILFunctionType constantTy);
-  
+
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
@@ -201,15 +168,9 @@ public:
     return Types.getTypeLowering(t).getLoweredType();
   }
 
-  /// Translate a formal enum element decl into its lowered form.
-  ///
-  /// This just turns ImplicitlyUnwrappedOptional's cases into Optional's.
-  EnumElementDecl *getLoweredEnumElementDecl(EnumElementDecl *element);
-  
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(
-                                           GenericEnvironment *genericEnv,
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
@@ -247,6 +208,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td);
   void visitIfConfigDecl(IfConfigDecl *icd);
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
@@ -355,10 +317,6 @@ public:
                           SILGlobalVariable *onceToken,
                           SILFunction *onceFunc);
 
-  void emitGlobalGetter(VarDecl *global,
-                        SILGlobalVariable *onceToken,
-                        SILFunction *onceFunc);
-  
   /// True if the given function requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(FuncDecl *method);
@@ -370,6 +328,23 @@ public:
   /// Emit a global initialization.
   void emitGlobalInitialization(PatternBindingDecl *initializer, unsigned elt);
   
+  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
+                                 AccessKind accessKind);
+  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
+
+  KeyPathPatternComponent
+  emitKeyPathComponentForDecl(SILLocation loc,
+                              GenericEnvironment *genericEnv,
+                              unsigned &baseOperand,
+                              bool &needsGenericContext,
+                              SubstitutionList subs,
+                              AbstractStorageDecl *storage,
+                              ArrayRef<ProtocolConformanceRef> indexHashables,
+                              CanType baseTy,
+                              bool forPropertyDescriptor);
+
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
@@ -458,6 +433,9 @@ public:
   SubstitutionList
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
+  /// Emit a property descriptor for the given storage decl if it needs one.
+  void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
+  
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);

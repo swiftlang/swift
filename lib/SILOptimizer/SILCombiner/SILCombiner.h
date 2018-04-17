@@ -21,13 +21,14 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_SILCOMBINER_H
 
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
@@ -211,6 +212,7 @@ public:
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
+  SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
   SILInstruction *visitUnconditionalCheckedCastInst(
                     UnconditionalCheckedCastInst *UCCI);
   SILInstruction *
@@ -240,7 +242,12 @@ public:
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
   SILInstruction *visitEnumInst(EnumInst *EI);
+      
+  SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
+  SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
+  SILInstruction *
+  visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(BuiltinInst *AI);
@@ -276,6 +283,9 @@ private:
                                                SILValue ConcreteTypeDef,
                                                ProtocolConformanceRef Conformance,
                                                ArchetypeType *OpenedArchetype);
+
+  FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
+
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite AI,
       ProtocolDecl *Protocol,

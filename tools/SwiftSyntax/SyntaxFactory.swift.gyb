@@ -40,13 +40,15 @@ public enum SyntaxFactory {
     let data = SyntaxData(raw: .node(.unknown, 
                                      tokens.map { $0.data.raw },
                                      .present))
-    return Syntax(root: data, data: data)
+    return UnknownSyntax(root: data, data: data)
   }
 
 /// MARK: Syntax Node Creation APIs
 
 % for node in SYNTAX_NODES:
-%   if node.children:
+%   if node.is_base():
+%     pass
+%   elif node.children:
 %     child_params = []
 %     for child in node.children:
 %         param_type = child.type_name
@@ -75,14 +77,16 @@ public enum SyntaxFactory {
   }
 %   end
 
+%   if not node.is_base():
   public static func makeBlank${node.syntax_kind}() -> ${node.name} {
     let data = SyntaxData(raw: .node(.${node.swift_syntax_kind}, [
-%   for child in node.children:
+%     for child in node.children:
       ${make_missing_swift_child(child)},
-%   end
+%     end
     ], .present))
     return ${node.name}(root: data, data: data)
   }
+%   end
 % end
 
 /// MARK: Token Creation APIs
@@ -120,47 +124,44 @@ public enum SyntaxFactory {
                          rightParen: makeRightParenToken())
   }
 
-  public static func makeTupleTypeElement(label: TokenSyntax?,
+  public static func makeTupleTypeElement(name: TokenSyntax?,
     colon: TokenSyntax?, type: TypeSyntax,
-    comma: TokenSyntax?) -> TupleTypeElementSyntax {
-    let annotation = makeTypeAnnotation(attributes: makeBlankAttributeList(),
-                                        inOutKeyword: nil,
-                                        type: type)
-    return makeTupleTypeElement(label: label, colon: colon, 
-                                typeAnnotation: annotation,
-                                comma: comma)
+    trailingComma: TokenSyntax?) -> TupleTypeElementSyntax {
+    return makeTupleTypeElement(inOut: nil, name: name, secondName: nil,
+                                colon: colon, type: type, ellipsis: nil,
+                                initializer: nil, trailingComma: trailingComma)
   }
 
   public static func makeTupleTypeElement(type: TypeSyntax,
-    comma: TokenSyntax?) -> TupleTypeElementSyntax  {
-    return makeTupleTypeElement(label: nil, colon: nil, 
-                                type: type, comma: comma)
+    trailingComma: TokenSyntax?) -> TupleTypeElementSyntax  {
+    return makeTupleTypeElement(name: nil, colon: nil, 
+                                type: type, trailingComma: trailingComma)
   }
 
-  public static func makeGenericParameter(type: TypeIdentifierSyntax,
+  public static func makeGenericParameter(name: TokenSyntax,
       trailingComma: TokenSyntax) -> GenericParameterSyntax {
-    return makeGenericParameter(typeIdentifier: type, colon: nil,
+    return makeGenericParameter(attributes: nil, name: name, colon: nil,
                                 inheritedType: nil,
                                 trailingComma: trailingComma)
   }
 
-  public static func makeTypeIdentifier(_ typeName: String,
+  public static func makeTypeIdentifier(_ name: String,
     leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> TypeIdentifierSyntax {
-    let identifier = makeIdentifier(typeName, leadingTrivia: leadingTrivia, 
+    trailingTrivia: Trivia = []) -> TypeSyntax {
+    let identifier = makeIdentifier(name, leadingTrivia: leadingTrivia, 
                                     trailingTrivia: trailingTrivia)
-    return makeTypeIdentifier(typeName:identifier, genericArgumentClause: nil,
-                              period: nil, typeIdentifier: nil)
+    return makeSimpleTypeIdentifier(name: identifier,
+                                    genericArgumentClause: nil)
   }
 
   public static func makeAnyTypeIdentifier(leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> TypeIdentifierSyntax {
+    trailingTrivia: Trivia = []) -> TypeSyntax {
     return makeTypeIdentifier("Any", leadingTrivia: leadingTrivia, 
                               trailingTrivia: trailingTrivia)
   }
 
   public static func makeSelfTypeIdentifier(leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> TypeIdentifierSyntax {
+    trailingTrivia: Trivia = []) -> TypeSyntax {
     return makeTypeIdentifier("Self", leadingTrivia: leadingTrivia, 
                               trailingTrivia: trailingTrivia)
   }
@@ -196,10 +197,10 @@ public enum SyntaxFactory {
 
   public static func makeVariableExpr(_ text: String,
     leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> SymbolicReferenceExprSyntax {
+    trailingTrivia: Trivia = []) -> IdentifierExprSyntax {
     let string = makeIdentifier(text,
       leadingTrivia: leadingTrivia, trailingTrivia: trailingTrivia)
-    return makeSymbolicReferenceExpr(identifier: string,
-                                     genericArgumentClause: nil)
+    return makeIdentifierExpr(identifier: string,
+                              declNameArguments: nil)
   }
 }

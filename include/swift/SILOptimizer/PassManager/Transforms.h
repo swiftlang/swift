@@ -72,9 +72,6 @@ namespace swift {
       return Mod;
     }
 
-    /// Get the name of the transform.
-    llvm::StringRef getName() { return PassKindName(getPassKind()); }
-
     /// Get the transform's (command-line) tag.
     llvm::StringRef getTag() { return PassKindTag(getPassKind()); }
 
@@ -117,6 +114,7 @@ namespace swift {
     /// The number should be small anyway, but bugs in optimizations could cause
     /// an infinite loop in the passmanager.
     void notifyAddFunction(SILFunction *F, SILFunction *DerivedFrom) {
+      PM->notifyOfNewFunction(F, this);
       PM->addFunctionToWorklist(F, DerivedFrom);
       PM->notifyAnalysisOfFunction(F);
     }
@@ -125,7 +123,6 @@ namespace swift {
     /// pipeline on it.
     void restartPassPipeline() { PM->restartWithCurrentFunction(this); }
 
-  protected:
     SILFunction *getFunction() { return F; }
 
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
@@ -174,6 +171,7 @@ namespace swift {
 
     /// Inform the pass manager of an added function.
     void notifyAddFunction(SILFunction *F) {
+      PM->notifyOfNewFunction(F, this);
       PM->notifyAnalysisOfFunction(F);
     }
   };

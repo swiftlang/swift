@@ -166,6 +166,13 @@ public:
   virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                        AccessKind accessKind) const = 0;
 
+  /// Is loading a value from this component guaranteed to have no observable
+  /// side effects?
+  virtual bool isLoadingPure() const {
+    // By default, don't assume any component is pure; components must opt-in.
+    return false;
+  }
+
   virtual bool isRValue() const { return false; }
 
   /// Returns the logical type-as-rvalue of the value addressed by the
@@ -231,6 +238,11 @@ protected:
     : PathComponent(typeData, Kind) {
     assert(isLogical() && "LogicalPathComponent Kind isn't logical");
   }
+
+  /// Materialize this component into a temporary and return the temporary's
+  /// address.
+  ManagedValue materializeIntoTemporary(SILGenFunction &SGF, SILLocation loc,
+                                        ManagedValue base) &&;
 
 public:
   /// Clone the path component onto the heap.
@@ -357,6 +369,16 @@ public:
                            CanType substFormalType);
 
   bool isValid() const { return !Path.empty(); }
+
+  /// Is loading a value from this lvalue guaranteed to have no observable side
+  /// effects?
+  bool isLoadingPure() {
+    assert(isValid());
+    for (auto &component : Path)
+      if (!component->isLoadingPure())
+        return false;
+    return true;
+  }
 
   /// Is this lvalue purely physical?
   bool isPhysical() const {
@@ -495,6 +517,8 @@ public:
   ~InOutConversionScope();
 };
 
+// FIXME: Misnomer. This class is used for both shared (read) and exclusive
+// (modify) formal borrows.
 struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
   std::unique_ptr<LogicalPathComponent> component;
   ManagedValue base;
@@ -526,6 +550,62 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
     performWriteback(SGF, /*isFinal*/ true);
     component.reset();
   }
+};
+
+struct LLVM_LIBRARY_VISIBILITY UnenforcedAccess {
+  // Make sure someone called `endAccess` before destroying this.
+  struct DeleterCheck {
+    void operator()(BeginAccessInst *) {
+      llvm_unreachable("access scope must be ended");
+    }
+  };
+  typedef std::unique_ptr<BeginAccessInst, DeleterCheck> BeginAccessPtr;
+  BeginAccessPtr beginAccessPtr;
+
+  UnenforcedAccess() = default;
+  UnenforcedAccess(const UnenforcedAccess &other) = delete;
+  UnenforcedAccess(UnenforcedAccess &&other) = default;
+
+  UnenforcedAccess &operator=(const UnenforcedAccess &) = delete;
+  UnenforcedAccess &operator=(UnenforcedAccess &&other) = default;
+
+  // Return the a new begin_access if it was required, otherwise return the
+  // given `address`.
+  SILValue beginAccess(SILGenFunction &SGF, SILLocation loc, SILValue address,
+                       SILAccessKind kind);
+
+  // End the access and release beginAccessPtr.
+  void endAccess(SILGenFunction &SGF);
+
+  // Emit the end_access (on a branch) without marking this access as ended.
+  void emitEndAccess(SILGenFunction &SGF);
+};
+
+/// Pseudo-formal access that emits access markers but does not actually
+/// require enforcement. It may be used for access to formal memory that is
+/// exempt from exclusivity checking, such as initialization, or it may be used
+/// for accesses to local memory that are indistinguishable from formal access
+/// at the SIL level. Adding the access markers in these cases gives SIL address
+/// users a structural property that allows for exhaustive verification.
+struct LLVM_LIBRARY_VISIBILITY UnenforcedFormalAccess : FormalAccess {
+
+  static SILValue enter(SILGenFunction &SGF, SILLocation loc, SILValue address,
+                        SILAccessKind kind);
+
+  // access.beginAccessPtr is either the begin_access or null if no access was
+  // required.
+  UnenforcedAccess access;
+
+  UnenforcedFormalAccess(SILLocation loc, UnenforcedAccess &&access,
+                         CleanupHandle cleanup)
+      : FormalAccess(sizeof(*this), FormalAccess::Unenforced, loc, cleanup),
+        access(std::move(access)) {}
+
+  // Emit the end_access (on a branch) without marking this access as ended.
+  void emitEndAccess(SILGenFunction &SGF);
+
+  // Only called at the end formal evaluation scope. End this access.
+  void finishImpl(SILGenFunction &SGF) override;
 };
 
 } // namespace Lowering

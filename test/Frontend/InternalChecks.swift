@@ -10,8 +10,8 @@ func test_internal_checks_config(_ x: Int, _ y: Int) -> Int {
   return x + y
 }
 
-// CHECKS-LABEL: _T014InternalChecks27test_internal_checks_configS2i_SitF
+// CHECKS-LABEL: $S14InternalChecks27test_internal_checks_configyS2i_SitF
 // CHECKS: "internal check emitted"
 
-// NOCHECKS-LABEL: _T014InternalChecks27test_internal_checks_configS2i_SitF
+// NOCHECKS-LABEL: $S14InternalChecks27test_internal_checks_configyS2i_SitF
 // NOCHECKS-NOT: "internal check emitted"

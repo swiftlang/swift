@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -Xllvm -sil-disable-pass="Function Inlining" -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -Xllvm -sil-disable-pass=inline -emit-sil -primary-file %s | %FileCheck %s
 
 // Check if GlobalOpt generates the getters with the right linkage and the right mangling
 
@@ -9,15 +9,20 @@ struct MyStruct {
 let Global = 27
 
 func testit() -> Int {
-  return MyStruct.StaticVar + Global
+  return MyStruct.StaticVar + Global + PublicGlobal
 }
+
+public let PublicGlobal = 27
 
 _ = testit()
 
 // CHECK: sil hidden @{{.*}}testit
 
 // CHECK:      // MyStruct.StaticVar.getter
-// CHECK-NEXT: sil private @_{{.*}}StaticVar
+// CHECK-NEXT: sil private @$S{{.*}}StaticVar
 
 // CHECK:      // Global.getter
-// CHECK-NEXT: sil private @_{{.*}}Global
+// CHECK-NEXT: sil private @$S{{.*}}Global
+
+// CHECK:      // PublicGlobal.getter
+// CHECK-NEXT: sil non_abi @$S{{.*}}PublicGlobal

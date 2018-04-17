@@ -52,7 +52,6 @@ class OwnedString {
   void initialize(const char* Data, size_t Length, StringOwnership Ownership) {
     this->Length = Length;
     this->Ownership = Ownership;
-    assert(Length >= 0 && "expected length to be non-negative");
     if (Ownership == StringOwnership::Copied && Data) {
       char *substring = static_cast<char *>(malloc(Length + 1));
       assert(substring && "expected successful malloc of copy");

@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 206,
+  key.length: 342,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
     {
@@ -92,6 +92,86 @@
       key.kind: source.lang.swift.syntaxtype.number,
       key.offset: 194,
       key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 206,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 210,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 216,
+      key.length: 6
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.string,
+      key.offset: 223,
+      key.length: 7
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 232,
+      key.length: 7
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 240,
+      key.length: 4
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 245,
+      key.length: 8
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.string,
+      key.offset: 254,
+      key.length: 9
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 265,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 271,
+      key.length: 15
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 287,
+      key.length: 4
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.string,
+      key.offset: 293,
+      key.length: 12
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 307,
+      key.length: 4
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.number,
+      key.offset: 312,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 317,
+      key.length: 15
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 335,
+      key.length: 6
     }
   ]
 }

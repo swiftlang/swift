@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -primary-file %s
 
 protocol AnyCodeUnits_ {
-  typealias IndexDistance = Int64
   typealias Index = Int64
   typealias Element = UInt32
   var startIndex: Index { get }
@@ -15,7 +14,7 @@ protocol AnyCodeUnits_ {
 
 struct AnyCodeUnits : RandomAccessCollection, AnyCodeUnits_ {
   let me: AnyCodeUnits_
-  typealias Indices = DefaultRandomAccessIndices<AnyCodeUnits>
+  typealias Indices = DefaultIndices<AnyCodeUnits>
   var startIndex: Int64 { return me.startIndex }
   var endIndex: Int64 { return me.endIndex }
   func index(after i: Index) -> Index { return me.index(after: i) }

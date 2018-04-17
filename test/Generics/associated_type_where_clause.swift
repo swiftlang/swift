@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify -swift-version 4
 
 func needsSameType<T>(_: T.Type, _: T.Type) {}
 
@@ -22,7 +22,7 @@ struct ConcreteConforms2: Conforms { typealias T = Int }
 struct ConcreteConformsNonFoo2: Conforms { typealias T = Float }
 
 protocol NestedConforms {
-    associatedtype U where U: Conforms, U.T: Foo2
+    associatedtype U where U: Conforms, U.T: Foo2 // expected-note{{protocol requires nested type 'U'; do you want to add it?}}
 
     func foo(_: U)
 }
@@ -43,7 +43,7 @@ struct BadConcreteNestedConforms: NestedConforms {
     typealias U = ConcreteConformsNonFoo2
 }
 struct BadConcreteNestedConformsInfer: NestedConforms {
-    // expected-error@-1 {{type 'ConcreteConformsNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
+    // expected-error@-1 {{type 'BadConcreteNestedConformsInfer' does not conform to protocol 'NestedConforms'}}
     func foo(_: ConcreteConformsNonFoo2) {}
 }
 
@@ -61,7 +61,7 @@ func needsNestedConformsDefault<X: NestedConformsDefault>(_: X.Type) {
 }
 
 protocol NestedSameType {
-    associatedtype U: Conforms where U.T == Int
+    associatedtype U: Conforms where U.T == Int // expected-note{{protocol requires nested type 'U'; do you want to add it?}}
 
     func foo(_: U)
 }
@@ -76,8 +76,7 @@ struct BadConcreteNestedSameType: NestedSameType {
     typealias U = ConcreteConformsNonFoo2
 }
 struct BadConcreteNestedSameTypeInfer: NestedSameType {
-    // expected-error@-1 {{'NestedSameType' requires the types 'ConcreteConformsNonFoo2.T' (aka 'Float') and 'Int' be equivalent}}
-    // expected-note@-2 {{requirement specified as 'Self.U.T' == 'Int' [with Self = BadConcreteNestedSameTypeInfer]}}
+    // expected-error@-1 {{type 'BadConcreteNestedSameTypeInfer' does not conform to protocol 'NestedSameType'}}
     func foo(_: ConcreteConformsNonFoo2) {}
 }
 

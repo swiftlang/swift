@@ -54,6 +54,11 @@
         "key.line": 26,
         "key.column": 33,
         "key.nametype": source.syntacticrename.unknown
+      },
+      {
+        "key.line": 26,
+        "key.column": 43,
+        "key.nametype": source.syntacticrename.unknown
       }
     ]
   }

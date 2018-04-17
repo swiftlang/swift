@@ -34,8 +34,14 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
-  case TermKind::TryApplyInst:
+  case TermKind::UnwindInst:
     return false;
+  // yield is special because it can do arbitrary,
+  // potentially-process-terminating things.
+  case TermKind::YieldInst:
+    return false;
+  case TermKind::TryApplyInst:
+    return true;
   }
 
   llvm_unreachable("Unhandled TermKind in switch.");
@@ -43,7 +49,7 @@ static bool isSafeNonExitTerminator(TermInst *TI) {
 
 static bool isTrapNoReturnFunction(ApplyInst *AI) {
   const char *fatalName =
-    MANGLE_AS_STRING(MANGLE_SYM(s18_fatalErrorMessageys12StaticStringV_AcCSutF));
+    MANGLE_AS_STRING(MANGLE_SYM(s18_fatalErrorMessageyys12StaticStringV_AcCSutF));
   auto *Fn = AI->getReferencedFunction();
 
   // We use endswith here since if we specialize fatal error we will always
@@ -66,7 +72,7 @@ findAllNonFailureExitBBs(SILFunction *F,
       continue;
 
     // A return inst is always a non-failure exit bb.
-    if (isa<ReturnInst>(TI)) {
+    if (isa<ReturnInst>(TI) || isa<ThrowInst>(TI)) {
       BBs.push_back(&BB);
       continue;
     }

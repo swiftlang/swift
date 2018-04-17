@@ -30,10 +30,8 @@ namespace DomTreeBuilder {
 using SILDomTree = llvm::DomTreeBase<swift::SILBasicBlock>;
 using SILPostDomTree = llvm::PostDomTreeBase<swift::SILBasicBlock>;
 
-extern template void Calculate<SILDomTree, swift::SILFunction>(
-    SILDomTree &DT, swift::SILFunction &F);
-extern template void Calculate<SILPostDomTree, swift::SILFunction>(
-    SILPostDomTree &DT, swift::SILFunction &F);
+extern template void Calculate<SILDomTree>(SILDomTree &DT);
+extern template void Calculate<SILPostDomTree>(SILPostDomTree &DT);
 } // namespace DomTreeBuilder
 } // namespace llvm
 
@@ -51,6 +49,11 @@ public:
 
   /// Does instruction A properly dominate instruction B?
   bool properlyDominates(SILInstruction *a, SILInstruction *b);
+
+  /// Does instruction A dominate instruction B?
+  bool dominates(SILInstruction *a, SILInstruction *b) {
+    return a == b || properlyDominates(a, b);
+  }
 
   /// Does value A properly dominate instruction B?
   bool properlyDominates(SILValue a, SILInstruction *b);
@@ -74,6 +77,7 @@ public:
   }
 
   using DominatorTreeBase::properlyDominates;
+  using DominatorTreeBase::dominates;
 
   bool isValid(SILFunction *F) const {
     return getNode(&F->front()) != nullptr;
@@ -188,7 +192,7 @@ namespace llvm {
 /// iterable by generic graph iterators.
 template <> struct GraphTraits<swift::DominanceInfoNode *> {
   using ChildIteratorType = swift::DominanceInfoNode::iterator;
-  typedef swift::DominanceInfoNode *NodeRef;
+  using NodeRef = swift::DominanceInfoNode *;
 
   static NodeRef getEntryNode(NodeRef N) { return N; }
   static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
@@ -197,7 +201,7 @@ template <> struct GraphTraits<swift::DominanceInfoNode *> {
 
 template <> struct GraphTraits<const swift::DominanceInfoNode *> {
   using ChildIteratorType = swift::DominanceInfoNode::const_iterator;
-  typedef const swift::DominanceInfoNode *NodeRef;
+  using NodeRef = const swift::DominanceInfoNode *;
 
   static NodeRef getEntryNode(NodeRef N) { return N; }
   static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }

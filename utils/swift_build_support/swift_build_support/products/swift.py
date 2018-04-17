@@ -33,12 +33,18 @@ class Swift(product.Product):
         # Add any sil ownership flags.
         self.cmake_options.extend(self._sil_ownership_flags)
 
+        # Add any guaranteed normal arguments flags
+        self.cmake_options.extend(self._guaranteed_normal_arguments_flags)
+
         # Generate the compile db.
         self.cmake_options.extend(self._compile_db_flags)
 
         # Add the flag if we are supposed to force the typechecker to compile
         # with optimization.
         self.cmake_options.extend(self._force_optimized_typechecker_flags)
+
+        # Add any exclusivity checking flags for stdlibcore.
+        self.cmake_options.extend(self._stdlibcore_exclusivity_checking_flags)
 
     @property
     def _runtime_sanitizer_flags(self):
@@ -110,6 +116,12 @@ updated without updating swift.py?")
         return ["-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=TRUE"]
 
     @property
+    def _guaranteed_normal_arguments_flags(self):
+        if self.args.disable_guaranteed_normal_arguments:
+            return ["-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE"]
+        return ["-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=TRUE"]
+
+    @property
     def _compile_db_flags(self):
         return ['-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE']
 
@@ -118,3 +130,11 @@ updated without updating swift.py?")
         if not self.args.force_optimized_typechecker:
             return ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']
         return ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=TRUE']
+
+    @property
+    def _stdlibcore_exclusivity_checking_flags(self):
+        # This is just to get around 80 column limitations.
+        result = '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING={}'
+        if not self.args.enable_stdlibcore_exclusivity_checking:
+            return [result.format("FALSE")]
+        return [result.format("TRUE")]

@@ -118,11 +118,11 @@ func testAKA(structValue: ImportantCStruct, aliasValue: ImportantCAlias) {
 
   let optStructValue: Optional = structValue
   let _: Int = optStructValue
-  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'Optional<ImportantCStruct>' to specified type 'Int'
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'ImportantCStruct?' to specified type 'Int'
 
   let optAliasValue: Optional = aliasValue
   let _: Int = optAliasValue
-  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'Optional<ImportantCAlias>' (aka 'Optional<Int32>') to specified type 'Int'
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:16: error: cannot convert value of type 'ImportantCAlias?' (aka 'Optional<Int32>') to specified type 'Int'
 }
 
 func testRenamedEnumConstants() {
@@ -251,14 +251,14 @@ func testRenamedOptionyEnum() {
 #if !swift(>=4)
 
 func useSwift3Name(_: ImportantCStruct) {}
-// CHECK-SILGEN-3: sil hidden @_T09versioned13useSwift3NameySC20VeryImportantCStructVF
+// CHECK-SILGEN-3: sil hidden @$S9versioned13useSwift3NameyySo11SomeCStructVF
 
 func useNewlyNested(_: InnerInSwift4) {}
-// CHECK-SILGEN-3: sil hidden @_T09versioned14useNewlyNestedySC5OuterV5InnerVF
+// CHECK-SILGEN-3: sil hidden @$S9versioned14useNewlyNestedyySo13InnerInSwift4VF
 #endif
 
 func useSwift4Name(_: VeryImportantCStruct) {}
-// CHECK-SILGEN: sil hidden @_T09versioned13useSwift4NameySC20VeryImportantCStructVF
+// CHECK-SILGEN: sil hidden @$S9versioned13useSwift4NameyySo11SomeCStructVF
 
 
 

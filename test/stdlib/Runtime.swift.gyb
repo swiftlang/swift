@@ -9,7 +9,7 @@ import Swift
 import StdlibUnittest
 import SwiftShims
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
@@ -38,7 +38,7 @@ func _stdlib_demangleName(_ mangledName: String) -> String {
 
     if let demangledNamePtr = demangledNamePtr {
       let demangledName = String(cString: demangledNamePtr)
-      _swift_stdlib_free(demangledNamePtr)
+      _stdlib_free(demangledNamePtr)
       return demangledName
     }
     return mangledName
@@ -363,10 +363,10 @@ Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
   expectEqual("\0", _stdlib_demangleName("\0"))
-  expectEqual("Swift.Double", _stdlib_demangleName("_T0SdD"))
+  expectEqual("Swift.Double", _stdlib_demangleName("$SSdD"))
   expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
-      _stdlib_demangleName("_T01x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
-  expectEqual("Foobar", _stdlib_demangleName("_T013__lldb_expr_46FoobarCD"))
+      _stdlib_demangleName("$S1x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
+  expectEqual("Foobar", _stdlib_demangleName("$S13__lldb_expr_46FoobarCD"))
 }
 
 % for optionality in ['', '?']:
@@ -553,7 +553,7 @@ Runtime.test("Struct layout with reference storage types") {
 }
 
 Runtime.test("SwiftError layout constants for LLDB") {
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 #elseif os(Linux)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
@@ -565,7 +565,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
     dlsym(RTLD_DEFAULT, "_swift_lldb_offsetof_SwiftError_typeMetadata")!
   let sizeof_SwiftError =
     dlsym(RTLD_DEFAULT, "_swift_lldb_sizeof_SwiftError")!
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 #if arch(i386) || arch(arm)
   expectEqual(20, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(36, sizeof_SwiftError.load(as: UInt.self))
@@ -803,9 +803,11 @@ Reflection.test("Enum/MultiPayloadTagBitsNonGeneric/DefaultMirror") {
       "  - a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Plus\n" +
       "  - a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.SE30\n" +
       "  ▿ a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Classic\n" +
-      "    - Classic: 16\n" +
+      "    ▿ Classic: (1 element)\n" +
+      "      - mhz: 16\n" +
       "  ▿ a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Performa\n" +
-      "    - Performa: 220\n"
+      "    ▿ Performa: (1 element)\n" +
+      "      - model: 220\n"
 
     expectEqual(expected, output)
   }
@@ -849,11 +851,13 @@ Reflection.test("Enum/MultiPayloadSpareBitsNonGeneric/DefaultMirror") {
       "  - a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.MacPaint\n" +
       "  - a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.FileMaker\n" +
       "  ▿ a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.ClarisWorks\n" +
-      "    ▿ ClarisWorks: a.Floppy #0\n" +
-      "      - capacity: 800\n" +
+      "    ▿ ClarisWorks: (1 element)\n" +
+      "      ▿ floppy: a.Floppy #0\n" +
+      "        - capacity: 800\n" +
       "  ▿ a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.HyperCard\n" +
-      "    ▿ HyperCard: a.CDROM #1\n" +
-      "      - capacity: 600\n"
+      "    ▿ HyperCard: (1 element)\n" +
+      "      ▿ cdrom: a.CDROM #1\n" +
+      "        - capacity: 600\n"
 
     expectEqual(expected, output)
   }
@@ -885,9 +889,11 @@ Reflection.test("Enum/MultiPayloadTagBitsSmallNonGeneric/DefaultMirror") {
       "  - a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.MacPaint\n" +
       "  - a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.FileMaker\n" +
       "  ▿ a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.ClarisWorks\n" +
-      "    - ClarisWorks: true\n" +
+      "    ▿ ClarisWorks: (1 element)\n" +
+      "      - floppy: true\n" +
       "  ▿ a.MultiPayloadTagBitsSmallNonGenericEnumWithDefaultMirror.HyperCard\n" +
-      "    - HyperCard: false\n"
+      "    ▿ HyperCard: (1 element)\n" +
+      "      - cdrom: false\n"
 
     expectEqual(expected, output)
   }
@@ -920,9 +926,11 @@ Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.IIe\n" +
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.IIgs\n" +
       "  ▿ a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Centris\n" +
-      "    - Centris: 4096\n" +
+      "    ▿ Centris: (1 element)\n" +
+      "      - ram: 4096\n" +
       "  ▿ a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Quadra\n" +
-      "    - Quadra: \"160MB\"\n" +
+      "    ▿ Quadra: (1 element)\n" +
+      "      - hdd: \"160MB\"\n" +
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBook170\n" +
       "  - a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBookDuo220\n"
 
@@ -960,6 +968,16 @@ Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
   let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
   expectEqual("Cons(first: 0, rest: a.List<Swift.Int>.Cons(first: 1, rest: a.List<Swift.Int>.Nil))",
     "\(list)")
+}
+
+enum MyError: Error {
+  case myFirstError(LifetimeTracked)
+}
+
+Reflection.test("Enum/CaseName/Error") {
+  // Just make sure this doesn't leak.
+  let e: Error = MyError.myFirstError(LifetimeTracked(0))
+  _ = String(describing: e)
 }
 
 class Brilliant : CustomReflectable {
@@ -1556,16 +1574,6 @@ Reflection.test("SetIterator/Mirror") {
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
-func computeCountLeadingZeroes(_ x: Int64) -> Int64 {
-  var x = x
-  var r: Int64 = 64
-  while x != 0 {
-    x >>= 1
-    r -= 1
-  }
-  return r
-}
-
 BitTwiddlingTestSuite.test("_pointerSize") {
 #if arch(i386) || arch(arm)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
@@ -1574,13 +1582,6 @@ BitTwiddlingTestSuite.test("_pointerSize") {
 #else
   fatalError("implement")
 #endif
-}
-
-BitTwiddlingTestSuite.test("_countLeadingZeros") {
-  for i in Int64(0)..<1000 {
-    expectEqual(computeCountLeadingZeroes(i), _countLeadingZeros(i))
-  }
-  expectEqual(0, _countLeadingZeros(Int64.min))
 }
 
 BitTwiddlingTestSuite.test("_isPowerOf2/Int") {
@@ -1619,13 +1620,6 @@ BitTwiddlingTestSuite.test("_isPowerOf2/UInt") {
   expectTrue(_isPowerOf2(asUInt(1024)))
   expectTrue(_isPowerOf2(asUInt(0x8000_0000)))
   expectFalse(_isPowerOf2(UInt.max))
-}
-
-BitTwiddlingTestSuite.test("_floorLog2") {
-  expectEqual(_floorLog2(1), 0)
-  expectEqual(_floorLog2(8), 3)
-  expectEqual(_floorLog2(15), 3)
-  expectEqual(_floorLog2(Int64.max), 62) // 63 minus 1 for sign bit.
 }
 
 var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
@@ -1677,7 +1671,7 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 
 // _stdlib_isOSVersionAtLeast is broken for
 // watchOS. rdar://problem/20234735
-#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   // This test assumes that no version component on an OS we test upon
   // will ever be greater than 1066 and that every major version will always
   // be greater than 1.

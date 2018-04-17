@@ -462,22 +462,22 @@ extension rdar17051675_S2 {
 
 // <rdar://problem/17400366> let properties should not be mutable in convenience initializers
 class ClassWithConvenienceInit {
-  let x : Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  let x : Int // expected-note {{declared here}}
   init(newX: Int) {
     x = 42
   }
   
   convenience init(newY: Int) {
     self.init(newX: 19)
-    x = 67  // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
+    x = 67  // expected-error {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
   }
 }
 
 struct StructWithDelegatingInit {
-  let x: Int       // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  let x: Int // expected-note {{declared here}}
   
   init(x: Int) { self.x = x }
-  init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
+  init() { self.init(x: 0); self.x = 22 } // expected-error {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }
 
 func test_recovery_missing_name_2(let: Int) {} // expected-error {{'let' as a parameter attribute is not allowed}}{{35-38=}} 

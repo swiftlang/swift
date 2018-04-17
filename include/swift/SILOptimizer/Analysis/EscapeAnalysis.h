@@ -667,8 +667,8 @@ private:
 
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
-  
-  /// Returns true if \p V is a "pointer" value.
+
+  /// Returns true if \p V may encapsulate a "pointer" value.
   /// See EscapeAnalysis::NodeType::Value.
   bool isPointer(ValueBase *V);
 
@@ -768,12 +768,6 @@ public:
   /// If \p V has reference semantics, this function returns false if only the
   /// address of a contained property escapes, but not the object itself.
   bool canEscapeTo(SILValue V, FullApplySite FAS);
-
-  /// Returns true if the value \p V or its content can escape to the
-  /// function call \p FAS.
-  /// This is the same as above, except that it returns true if an address of
-  /// a contained property escapes.
-  bool canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS);
 
   /// Returns true if the value \p V can escape to the release-instruction \p
   /// RI. This means that \p RI may release \p V or any called destructor may

@@ -9,11 +9,12 @@ using llvm::SmallString;
 using namespace swift;
 using namespace swift::syntax;
 
+/*
 SymbolicReferenceExprSyntax getCannedSymbolicRef() {
   // First, make a symbolic reference to an 'Array<Int>'
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto IntArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder
@@ -32,7 +33,8 @@ FunctionCallExprSyntax getCannedFunctionCall() {
   auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto One = SyntaxFactory::makePrefixOperatorExpr(NoSign,
+    SyntaxFactory::makeIntegerLiteralExpr(OneDigits));
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 
   auto Arg = SyntaxFactory::makeFunctionCallArgument(Label, Colon, One,
@@ -40,7 +42,7 @@ FunctionCallExprSyntax getCannedFunctionCall() {
   auto Args = SyntaxFactory::makeFunctionCallArgumentList({ Arg });
 
   return SyntaxFactory::makeFunctionCallExpr(getCannedSymbolicRef(), LParen,
-                                             Args, RParen);
+                                             Args, RParen, None);
 }
 
 TEST(UnknownSyntaxTests, UnknownSyntaxMakeAPIs) {
@@ -82,7 +84,7 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
     // RawSyntax layout but with the UnknownExpr Kind.;
     auto Unknown = make<UnknownExprSyntax>(Call.getRaw());
 
-    ASSERT_EQ(Unknown.getNumChildren(), size_t(2));
+    ASSERT_EQ(Unknown.getNumChildren(), size_t(3));
 
     // Get the second child from the unknown call, which is the argument list.
     // This should print the same as the known one: "elements: 1"
@@ -112,7 +114,7 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
     // RawSyntax layout but with the Unknown Kind.
     auto Unknown = make<UnknownSyntax>(Call.getRaw());
 
-    ASSERT_EQ(Unknown.getNumChildren(), size_t(2));
+    ASSERT_EQ(Unknown.getNumChildren(), size_t(3));
 
     // Get the second child from the unknown call, which is the argument list.
     // This should print the same as the known one: "elements: 1"
@@ -141,7 +143,7 @@ TEST(UnknownSyntaxTests, EmbedUnknownExpr) {
   auto CallWithKnownExpr = SyntaxFactory::makeFunctionCallExpr(SymbolicRef,
                                                                LParen,
                                                                EmptyArgs,
-                                                               RParen);
+                                                               RParen, None);
   CallWithKnownExpr.print(KnownOS);
 
   // Let's make a function call expression where the called expression is
@@ -169,3 +171,4 @@ TEST(UnknownSyntaxTests, EmbedUnknownStmt) {
   // TODO
 }
 
+*/

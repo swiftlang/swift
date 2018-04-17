@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 import StdlibUnittest
 func foo<T>(_ x: T) -> () {
-  // CHECK: define {{.*}} @_T011generic_arg3fooyxlF
+  // CHECK: define {{.*}} @"$S11generic_arg3fooyyxlF"
   // CHECK: %[[T:.*]] = alloca %swift.type*
   // CHECK: call void @llvm.dbg.declare(metadata %swift.type** %[[T]],
   // CHECK-SAME:               metadata ![[T1:.*]], metadata !DIExpression())
@@ -14,7 +14,7 @@ func foo<T>(_ x: T) -> () {
   // CHECK-SAME:                       flags: DIFlagArtificial)
   // CHECK: ![[X1]] = !DILocalVariable(name: "x", arg: 1,
   // CHECK-SAME:          line: 3, type: ![[TY:.*]])
-  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_T011generic_arg3fooyxlFQq_D")
+  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "$S11generic_arg3fooyyxlFQq_D")
   _blackHole(x)
 }
 

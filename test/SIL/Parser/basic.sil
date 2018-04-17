@@ -1,7 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=false | %FileCheck %s
-//
-// FIXME: Enable sil-verify-all in both commands above:
-//        SIL Parsing fails on vtables: <rdar://problem/24060338> Identify problems with textual SIL and fix them.
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true | %FileCheck %s
 
 sil_stage raw // CHECK: sil_stage raw
 
@@ -37,22 +34,6 @@ sil_global @static_array : $TestArrayStorage = {
   %4 = struct $Int64 (%1 : $Builtin.Int64)
   %5 = struct $Int64 (%2 : $Builtin.Int64)
   %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
-}
-
-// Linkage types.
-
-// CHECK-LABEL: sil shared @clang_thunk : $@convention(thin) () -> ()
-sil shared @clang_thunk : $() -> () {
-bb0:
-  %0 = tuple ()
-  return %0 : $()
-}
-
-// CHECK-LABEL: sil private @internal_fn : $@convention(thin) () -> ()
-sil private @internal_fn : $() -> () {
-bb0:
-  %0 = tuple ()
-  return %0 : $()
 }
 
 // Type references
@@ -279,7 +260,6 @@ bb0(%0: $Optional<D>):
 // Generated from:
 // func archetype_member_ref<T:Runcible>(x:T) {
 //   x.free_method()
-//   var u = x.associated_method()
 //   T.static_method()
 // }
 
@@ -290,28 +270,20 @@ protocol Runcible {
   static func static_method()
 }
 
-/* SIL parsing of substitutions in apply insts is totally busted.
-// C/HECK: $@convention(thin) <T : Runcible> (@in T) -> ()
+// CHECK: $@convention(thin) <T where T : Runcible> (@in T) -> ()
 sil @_T4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@convention(thin) <T : Runcible> (@in T) -> () {
 bb0(%0 : $*T):
-  // C/HECK: witness_method $*T, #Runcible.free_method!1
-  %1 = witness_method $*T, #Runcible.free_method!1 : $@cc(method) (@inout T) -> Int
-  %2 = apply %1(%0) : $@cc(method) (@inout T) -> Int
-  %3 = alloc_stack $@thick T.U.Type
-  // C/HECK: witness_method $*T, #Runcible.associated_method!1
-  %4 = witness_method $*T, #Runcible.associated_method!1 : $@cc(method) (@inout T) -> @thick T.U.Type
-  %5 = apply %4(%0) : $@cc(method) (@inout T) -> @thick T.U.Type
-  store %5 to %3 : $*@thick T.U.Type
-  %7 = metatype $@thick T.Type
-  // C/HECK: witness_method [volatile] $*T, #Runcible.static_method!1
-  %8 = witness_method [volatile] $*T, #Runcible.static_method!1 : $(@thick T.Type) -> ()
-  %9 = apply %8(%7) : $(@thick T.Type) -> ()
-  dealloc_stack %3 : $*@thick T.U.Type
-  %11 = tuple ()
+  // CHECK: witness_method $T, #Runcible.free_method!1
+  %1 = witness_method $T, #Runcible.free_method!1 : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
+  %2 = apply %1<T>(%0) : $@convention(witness_method: Runcible) <Self : Runcible> (@in Self) -> Int
+  %3 = metatype $@thick T.Type
+  // CHECK: witness_method $T, #Runcible.static_method!1
+  %4 = witness_method $T, #Runcible.static_method!1 : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
+  %5 = apply %4<T>(%3) : $@convention(witness_method: Runcible) <Self : Runcible> (@thick T.Type) -> ()
+  %6 = tuple ()
   destroy_addr %0 : $*T
-  return %11 : $()
+  return %6 : $()
 }
-*/
 
 protocol Bendable { }
 
@@ -1169,7 +1141,7 @@ class Foo {
   init()
 }
 
-sil @_TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Foo) -> Int32 {
+sil @Foo_subscript_getter : $@convention(method) (Int32, Int32, @guaranteed Foo) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int32  // var x               // users: %17, %6
@@ -1181,14 +1153,13 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %10 = metatype $@thin Int32.Type
   %12 = integer_literal $Builtin.Int32, 0         // user: %13
   %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %18
-  destroy_addr %8 : $*Foo
   dealloc_stack %8 : $*Foo
   dealloc_stack %5 : $*Int32
   dealloc_stack %4 : $*Int32
   return %13 : $Int32
 }
 
-sil @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Int32, Foo) -> () {
+sil @Foo_subscript_setter : $@convention(method) (Int32, Int32, Int32, @guaranteed Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value           // users: %16, %5
   store %0 to %4 : $*Int32
@@ -1198,7 +1169,6 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   store %2 to %7 : $*Int32
   %10 = alloc_stack $Foo  // var self             // users: %13, %12, %11
   store %3 to %10 : $*Foo
-  destroy_addr %10 : $*Foo
   dealloc_stack %10 : $*Foo
   dealloc_stack %7 : $*Int32
   dealloc_stack %6 : $*Int32
@@ -1371,6 +1341,14 @@ entry(%0 : $@convention(thin) (AnyObject) -> Optional<AnyObject>):
   %1 = convert_function %0 : $@convention(thin) (AnyObject) -> Optional<AnyObject> to $@convention(thin) (Optional<AnyObject>) -> AnyObject
   return %1 : $@convention(thin) (Optional<AnyObject>) -> AnyObject
 }
+// CHECK-LABEL: sil @convert_function_trivial
+// CHECK:  %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+// CHECK: return
+sil @convert_function_trivial : $@convention(thin) (@owned @callee_guaranteed (AnyObject) -> Optional<AnyObject>) -> () {
+entry(%0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject>):
+  %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+  return undef : $()
+}
 
 sil @meta_metatype : $@convention(thin) () -> @thick Beth.Type.Type {
 entry:
@@ -1490,6 +1468,13 @@ sil @is_unique_or_pinned : $@convention(thin) (@inout Builtin.NativeObject) -> B
 bb0(%0 : $*Builtin.NativeObject):
   // CHECK: %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
   %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
+  return %1 : $Builtin.Int1
+}
+// CHECK-LABEL: sil @is_escaping_closure
+sil @is_escaping_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  // CHECK: %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
   return %1 : $Builtin.Int1
 }
 
@@ -1635,6 +1620,41 @@ bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
   return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
 }
 
+class A {
+  @sil_stored var property: Any { get set }
+  deinit
+  init()
+}
+
+// CHECK-LABEL: sil @test_access : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: begin_access [read] [dynamic]
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK: begin_unpaired_access [read] [dynamic]
+// CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'test_access'
+sil @test_access : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.property
+  %3 = begin_access [dynamic] [read] %2 : $*Any
+  copy_addr %3 to [initialization] %1 : $*Any
+  end_access %3 : $*Any
+  %6 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Any
+  copy_addr %6 to %1 : $*Any
+  end_access %6 : $*Any
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  end_unpaired_access [dynamic] %9 : $*Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [no_nested_conflict] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
+}
+
 struct EmptyStruct {}
 
 sil @test_empty_destructure : $@convention(thin) () -> () {
@@ -1647,12 +1667,12 @@ bb0:
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
-// CHECK: #Foo.subscript!setter.1: {{.*}} : _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden @Foo_subscript_getter
+// CHECK: #Foo.subscript!setter.1: {{.*}} : @Foo_subscript_setter
 // CHECK: }
 sil_vtable Foo {
-  // Override the linke to check if it is parsed correctly.
-  #Foo.subscript!getter.1: hidden _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+  // Override the linkage to check if it is parsed correctly.
+  #Foo.subscript!getter.1: hidden @Foo_subscript_getter
   // The public linkage is the same as the function's linkage and should not be printed.
-  #Foo.subscript!setter.1: public _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
+  #Foo.subscript!setter.1: public @Foo_subscript_setter
 }

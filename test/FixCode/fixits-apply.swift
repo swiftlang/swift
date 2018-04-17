@@ -30,6 +30,8 @@ struct MyMask : OptionSet {
   static var Bingo: MyMask { return MyMask(1) }
 }
 
+let _: MyMask = 0
+
 func supported() -> MyMask {
   return Int(MyMask.Bingo.rawValue)
 }

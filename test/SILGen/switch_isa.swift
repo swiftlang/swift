@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name switch_isa -emit-silgen %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -11,7 +12,7 @@ func testSwitchOnExistential(_ value: Any) {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010switch_isa23testSwitchOnExistentialyypF :
+// CHECK-LABEL: sil hidden @$S10switch_isa23testSwitchOnExistentialyyypF :
 // CHECK:   [[ANY:%.*]] = alloc_stack $Any
 // CHECK:   copy_addr %0 to [initialization] [[ANY]]
 // CHECK:   [[BOOL:%.*]] = alloc_stack $Bool
@@ -38,7 +39,7 @@ func testSwitchEnumOnExistential(_ value: Any) {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010switch_isa27testSwitchEnumOnExistentialyypF : $@convention(thin) (@in Any) -> ()
+// CHECK-LABEL: sil hidden @$S10switch_isa27testSwitchEnumOnExistentialyyypF : $@convention(thin) (@in_guaranteed Any) -> ()
 // CHECK:   checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to Foo
 // CHECK:   checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to Bar<Int>
 // CHECK:   checked_cast_addr_br copy_on_success Any in {{%.*}} : $*Any to Bar<Foo>
@@ -49,12 +50,12 @@ class D: B {}
 func guardFn(_ l: D, _ r: D) -> Bool { return true }
 
 // rdar://problem/21087371
-// CHECK-LABEL: sil hidden @_T010switch_isa32testSwitchTwoIsPatternsWithGuardyAA1BC_AD1rtF
+// CHECK-LABEL: sil hidden @$S10switch_isa32testSwitchTwoIsPatternsWithGuard_1ryAA1BC_AEtF
 // CHECK:         checked_cast_br {{%.*}} : $B to $D, [[R_CAST_YES:bb[0-9]+]], [[R_CAST_NO:bb[0-9]+]]
 // CHECK:       [[R_CAST_YES]]({{.*}}):
 // CHECK:         checked_cast_br {{%.*}} : $B to $D, [[L_CAST_YES:bb[0-9]+]], [[L_CAST_NO:bb[0-9]+]]
 // CHECK:       [[L_CAST_YES]]({{.*}}):
-// CHECK:         function_ref @_T010switch_isa7guardFnSbAA1DC_ADtF
+// CHECK:         function_ref @$S10switch_isa7guardFnySbAA1DC_ADtF
 // CHECK:         cond_br {{%.*}}, [[GUARD_YES:bb[0-9]+]], [[GUARD_NO:bb[0-9]+]]
 // CHECK:       [[GUARD_NO]]:
 // CHECK-NEXT:    destroy_value [[R2:%.*]] : $D

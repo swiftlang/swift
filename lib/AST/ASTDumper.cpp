@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/QuotedString.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -24,12 +23,14 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -292,7 +293,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 }
 static StringRef getAccessorKindString(AccessorKind value) {
   switch (value) {
-    case AccessorKind::NotAccessor: return "notAccessor";
     case AccessorKind::IsGetter: return "getter";
     case AccessorKind::IsSetter: return "setter";
     case AccessorKind::IsWillSet: return "willSet";
@@ -525,7 +525,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOptionalSomePattern(OptionalSomePattern *P) {
-      printCommon(P, "optional_some_element");
+      printCommon(P, "pattern_optional_some");
       OS << '\n';
       printRec(P->getSubPattern());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -756,10 +756,10 @@ namespace {
       printCommon((ValueDecl *)NTD, Name, Color);
 
       if (NTD->hasInterfaceType()) {
-        if (NTD->hasFixedLayout())
-          OS << " @_fixed_layout";
+        if (NTD->isResilient())
+          OS << " resilient";
         else
-          OS << " @_resilient_layout";
+          OS << " non-resilient";
       }
     }
 
@@ -950,12 +950,23 @@ namespace {
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      if (P->getSpecifier() == VarDecl::Specifier::Var)
+      switch (P->getSpecifier()) {
+      case VarDecl::Specifier::Let:
+        /* nothing */
+        break;
+      case VarDecl::Specifier::Var:
         OS << " mutable";
-      if (P->getSpecifier() == VarDecl::Specifier::InOut)
+        break;
+      case VarDecl::Specifier::InOut:
         OS << " inout";
-      if (P->isShared())
+        break;
+      case VarDecl::Specifier::Shared:
         OS << " shared";
+        break;
+      case VarDecl::Specifier::Owned:
+        OS << " owned";
+        break;
+      }
 
       if (P->isVariadic())
         OS << " variadic";
@@ -1008,21 +1019,27 @@ namespace {
         OS << '\n';
         printRec(Body);
       }
-     }
+    }
 
-    void visitFuncDecl(FuncDecl *FD) {
-      printCommonAFD(FD, "func_decl");
+    void printCommonFD(FuncDecl *FD, const char *type) {
+      printCommonAFD(FD, type);
       if (FD->isStatic())
         OS << " type";
-      if (auto *ASD = FD->getAccessorStorageDecl()) {
-        OS << " " << getAccessorKindString(FD->getAccessorKind());
-        OS << "_for=" << ASD->getFullName();
-      }
+    }
 
+    void visitFuncDecl(FuncDecl *FD) {
+      printCommonFD(FD, "func_decl");
       printAbstractFunctionDecl(FD);
-
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
-     }
+    }
+
+    void visitAccessorDecl(AccessorDecl *AD) {
+      printCommonFD(AD, "accessor_decl");
+      OS << " " << getAccessorKindString(AD->getAccessorKind());
+      OS << "_for=" << AD->getStorage()->getFullName();
+      printAbstractFunctionDecl(AD);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommonAFD(CD, "constructor_decl");
@@ -1088,6 +1105,16 @@ namespace {
         Indent -= 2;
       }
 
+      Indent -= 2;
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    }
+
+    void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
+      printCommon(PDD, "pound_diagnostic_decl");
+      auto kind = PDD->isError() ? "error" : "warning";
+      OS << " kind=" << kind << "\n";
+      Indent += 2;
+      printRec(PDD->getMessage());
       Indent -= 2;
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1175,6 +1202,16 @@ void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
 
 void Decl::dump() const {
   dump(llvm::errs(), 0);
+}
+
+void Decl::dump(const char *filename) const {
+  std::error_code ec;
+  llvm::raw_fd_ostream stream(filename, ec, llvm::sys::fs::F_RW);
+  // In assert builds, we blow up. Otherwise, we just return.
+  assert(!ec && "Failed to open file for dumping?!");
+  if (ec)
+    return;
+  dump(stream, 0);
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
@@ -1519,11 +1556,15 @@ public:
   }
   void visitCaseStmt(CaseStmt *S) {
     printCommon(S, "case_stmt");
+    if (S->hasUnknownAttr())
+      OS << " @unknown";
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       OS.indent(Indent + 2);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_label_item";
+      if (LabelItem.isDefault())
+        OS << " default";
       if (auto *CasePattern = LabelItem.getPattern()) {
         OS << '\n';
         printRec(CasePattern);
@@ -1596,10 +1637,16 @@ namespace {
 class PrintExpr : public ExprVisitor<PrintExpr> {
 public:
   raw_ostream &OS;
+  llvm::function_ref<Type(const Expr *)> GetTypeOfExpr;
+  llvm::function_ref<Type(const TypeLoc &)> GetTypeOfTypeLoc;
   unsigned Indent;
 
-  PrintExpr(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
-  }
+  PrintExpr(raw_ostream &os,
+            llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            unsigned indent)
+      : OS(os), GetTypeOfExpr(getTypeOfExpr),
+        GetTypeOfTypeLoc(getTypeOfTypeLoc), Indent(indent) {}
 
   void printRec(Expr *E) {
     Indent += 2;
@@ -1643,7 +1690,7 @@ public:
 
     if (E->isImplicit())
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
-    PrintWithColorRAII(OS, TypeColor) << " type='" << E->getType() << '\'';
+    PrintWithColorRAII(OS, TypeColor) << " type='" << GetTypeOfExpr(E) << '\'';
 
     if (E->hasLValueAccessKind()) {
       PrintWithColorRAII(OS, ExprModifierColor)
@@ -1651,7 +1698,7 @@ public:
     }
 
     // If we have a source range and an ASTContext, print the source range.
-    if (auto Ty = E->getType()) {
+    if (auto Ty = GetTypeOfExpr(E)) {
       auto &Ctx = Ty->getASTContext();
       auto L = E->getLoc();
       if (L.isValid()) {
@@ -1693,7 +1740,7 @@ public:
     if (E->isNegative())
       PrintWithColorRAII(OS, LiteralValueColor) << " negative";
     PrintWithColorRAII(OS, LiteralValueColor) << " value=";
-    Type T = E->getType();
+    Type T = GetTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
       PrintWithColorRAII(OS, LiteralValueColor) << E->getDigitsText();
     else
@@ -1796,16 +1843,20 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E) {
-    printCommon(E, "overloaded_decl_ref_expr")
-      << " name=" << E->getDecls()[0]->getBaseName()
-      << " #decls=" << E->getDecls().size()
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
-
-    for (ValueDecl *D : E->getDecls()) {
-      OS << '\n';
-      OS.indent(Indent);
-      D->dumpRef(OS);
-    }
+    printCommon(E, "overloaded_decl_ref_expr");
+    PrintWithColorRAII(OS, IdentifierColor) << " name="
+      << E->getDecls()[0]->getBaseName();
+    PrintWithColorRAII(OS, ExprModifierColor)
+      << " number_of_decls=" << E->getDecls().size()
+      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind())
+      << " decls=[\n";
+    interleave(E->getDecls(),
+               [&](ValueDecl *D) {
+                 OS.indent(Indent + 2);
+                 D->dumpRef(PrintWithColorRAII(OS, DeclModifierColor).getOS());
+               },
+               [&] { PrintWithColorRAII(OS, DeclModifierColor) << ",\n"; });
+    PrintWithColorRAII(OS, ExprModifierColor) << "]";
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
@@ -1906,6 +1957,11 @@ public:
   }
   void visitDictionaryExpr(DictionaryExpr *E) {
     printCommon(E, "dictionary_expr");
+    if (auto semaE = E->getSemanticExpr()) {
+      OS << '\n';
+      printRec(semaE);
+      return;
+    }
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);
@@ -2022,6 +2078,13 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitImplicitlyUnwrappedFunctionConversionExpr(
+      ImplicitlyUnwrappedFunctionConversionExpr *E) {
+    printCommon(E, "implicitly_unwrapped_function_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitErasureExpr(ErasureExpr *E) {
     printCommon(E, "erasure_expr") << '\n';
     for (auto conf : E->getConformances()) {
@@ -2303,7 +2366,7 @@ public:
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
       OS << getCheckedCastKindName(checkedCast->getCastKind()) << ' ';
     OS << "writtenType='";
-    E->getCastTypeLoc().getType().print(OS);
+    GetTypeOfTypeLoc(E->getCastTypeLoc()).print(OS);
     OS << "'\n";
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -2504,12 +2567,23 @@ public:
 
 } // end anonymous namespace
 
+void Expr::dump(
+    raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+    llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc) const {
+  if (auto ty = getTypeOfExpr(this)) {
+    llvm::SaveAndRestore<bool> X(
+        ty->getASTContext().LangOpts.DebugConstraintSolver, true);
+    print(OS, getTypeOfExpr, getTypeOfTypeLoc);
+  } else {
+    print(OS, getTypeOfExpr, getTypeOfTypeLoc);
+  }
+  OS << '\n';
+}
 
 void Expr::dump(raw_ostream &OS) const {
   if (auto ty = getType()) {
     llvm::SaveAndRestore<bool> X(ty->getASTContext().LangOpts.
                                  DebugConstraintSolver, true);
-  
     print(OS);
   } else {
     print(OS);
@@ -2521,8 +2595,26 @@ void Expr::dump() const {
   dump(llvm::errs());
 }
 
+void Expr::dump(
+    llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+    llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc) const {
+  dump(llvm::errs(), getTypeOfExpr, getTypeOfTypeLoc);
+}
+
+void Expr::print(raw_ostream &OS,
+                 llvm::function_ref<Type(const Expr *)> getTypeOfExpr,
+                 llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+                 unsigned Indent) const {
+  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeLoc, Indent)
+      .visit(const_cast<Expr *>(this));
+}
+
 void Expr::print(raw_ostream &OS, unsigned Indent) const {
-  PrintExpr(OS, Indent).visit(const_cast<Expr*>(this));
+  auto getTypeOfExpr = [](const Expr *E) -> Type { return E->getType(); };
+  auto getTypeOfTypeLoc = [](const TypeLoc &TL) -> Type {
+    return TL.getType();
+  };
+  print(OS, getTypeOfExpr, getTypeOfTypeLoc, Indent);
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
@@ -2673,6 +2765,12 @@ public:
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitOwnedTypeRepr(OwnedTypeRepr *T) {
+    printCommon("type_owned") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace
@@ -2780,12 +2878,13 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
         }
         PrintWithColorRAII(out, ParenthesisColor) << ')';
       });
+
+      for (auto conformance : normal->getSignatureConformances()) {
+        out << '\n';
+        conformance.dump(out, indent + 2);
+      }
     }
 
-    for (auto conformance : normal->getSignatureConformances()) {
-      out << '\n';
-      conformance.dump(out, indent + 2);
-    }
     for (auto requirement : normal->getConditionalRequirements()) {
       out << '\n';
       out.indent(indent + 2);
@@ -2926,6 +3025,7 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnknownObject, builtin_unknown_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
+    TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
     void visitBuiltinVectorType(BuiltinVectorType *T, StringRef label) {
       printCommon(label, "builtin_vector_type");
@@ -2937,6 +3037,11 @@ namespace {
     void visitNameAliasType(NameAliasType *T, StringRef label) {
       printCommon(label, "name_alias_type");
       printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+
+      for (auto arg : T->getInnermostGenericArgs())
+        printRec(arg);
       OS << ")";
     }
 
@@ -3046,7 +3151,8 @@ namespace {
 
     void visitArchetypeType(ArchetypeType *T, StringRef label) {
       printCommon(label, "archetype_type");
-      if (T->getOpenedExistentialType())
+      auto openedExistential = T->getOpenedExistentialType();
+      if (openedExistential)
         printField("opened_existential_id", T->getOpenedExistentialID());
       else
         printField("name", T->getFullName());
@@ -3056,9 +3162,10 @@ namespace {
         printField("conforms_to", proto->printRef());
       if (auto parent = T->getParent())
         printField("parent", static_cast<void *>(parent));
-      if (auto assocType = T->getAssocType())
-        printField("assoc_type", assocType->printRef());
-
+      if (!openedExistential) {
+        if (auto assocType = T->getAssocType())
+          printField("assoc_type", assocType->printRef());
+      }
       // FIXME: This is ugly.
       OS << "\n";
       if (auto genericEnv = T->getGenericEnvironment()) {
@@ -3069,7 +3176,7 @@ namespace {
 
       if (auto superclass = T->getSuperclass())
         printRec("superclass", superclass);
-      if (auto openedExistential = T->getOpenedExistentialType())
+      if (openedExistential)
         printRec("opened_existential", openedExistential);
 
       Indent += 2;
@@ -3173,13 +3280,6 @@ namespace {
 
     void visitOptionalType(OptionalType *T, StringRef label) {
       printCommon(label, "optional_type");
-      printRec(T->getBaseType());
-      OS << ")";
-    }
-
-    void visitImplicitlyUnwrappedOptionalType(
-           ImplicitlyUnwrappedOptionalType *T, StringRef label) {
-      printCommon(label, "implicitly_unwrapped_optional_type");
       printRec(T->getBaseType());
       OS << ")";
     }

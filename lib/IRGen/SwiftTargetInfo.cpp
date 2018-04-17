@@ -39,7 +39,8 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
             SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK);
   setToMask(target.ObjCPointerReservedBits, 64,
             SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK);
-  
+  setToMask(target.IsObjCPointerBit, 64, SWIFT_ABI_ARM64_IS_OBJC_BIT);
+
   if (triple.isOSDarwin()) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
@@ -50,7 +51,7 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
 
   // arm64 requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
-    "mov\tfp, fp\t\t# marker for objc_retainAutoreleaseReturnValue";
+    "mov\tfp, fp\t\t// marker for objc_retainAutoreleaseReturnValue";
 
   // arm64 requires ISA-masking.
   target.ObjCUseISAMask = true;
@@ -67,7 +68,8 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
             SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK);
   setToMask(target.ObjCPointerReservedBits, 64,
             SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK);
-  
+  setToMask(target.IsObjCPointerBit, 64, SWIFT_ABI_X86_64_IS_OBJC_BIT);
+
   if (triple.isOSDarwin()) {
     target.LeastValidPointerValue =
       SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
@@ -90,6 +92,7 @@ static void configureX86(IRGenModule &IGM, const llvm::Triple &triple,
                          SwiftTargetInfo &target) {
   // x86 uses objc_msgSend_fpret but not objc_msgSend_fp2ret.
   target.ObjCUseFPRet = true;
+  setToMask(target.IsObjCPointerBit, 32, SWIFT_ABI_I386_IS_OBJC_BIT);
 }
 
 /// Configures target-specific information for 32-bit arm platforms.
@@ -97,11 +100,13 @@ static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
                          SwiftTargetInfo &target) {
   // ARM requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
-    "mov\tr7, r7\t\t@ marker for objc_retainAutoreleaseReturnValue";
+    "mov\tr7, r7\t\t// marker for objc_retainAutoreleaseReturnValue";
 
   // armv7k has opaque ISAs which must go through the ObjC runtime.
   if (triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7k)
     target.ObjCHasOpaqueISAs = true;
+
+  setToMask(target.IsObjCPointerBit, 32, SWIFT_ABI_ARM_IS_OBJC_BIT);
 }
 
 /// Configures target-specific information for powerpc64 platforms.

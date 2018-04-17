@@ -70,7 +70,8 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User);
+  return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User) ||
+         isa<IsEscapingClosureInst>(User);
 }
 
 //===----------------------------------------------------------------------===//
@@ -441,8 +442,17 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
 
   FullApplySite FAS(User);
 
-  // Ok, we have a full apply site. If the apply has no arguments, we don't need
-  // to worry about any guaranteed parameters.
+  // Ok, we have a full apply site. Check if the callee is callee_guaranteed. In
+  // such a case, if we can not prove no alias, we need to be conservative and
+  // return true.
+  CanSILFunctionType FType = FAS.getSubstCalleeType();
+  if (FType->isCalleeGuaranteed() && !AA->isNoAlias(FAS.getCallee(), Ptr)) {
+    return true;
+  }
+
+  // Ok, we have a full apply site and our callee is a normal use. Thus if the
+  // apply does not have any normal arguments, we don't need to worry about any
+  // guaranteed parameters and return early.
   if (!FAS.getNumArguments())
     return false;
 
@@ -450,7 +460,6 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // iterate through the function parameters. If any of the parameters are
   // guaranteed, attempt to prove that the passed in parameter cannot alias
   // Ptr. If we fail, return true.
-  CanSILFunctionType FType = FAS.getSubstCalleeType();
   auto Params = FType->getParameters();
   for (unsigned i : indices(Params)) {    
     if (!Params[i].isGuaranteed())

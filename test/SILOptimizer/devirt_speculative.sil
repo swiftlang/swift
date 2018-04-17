@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt  | %FileCheck %s
+// RUN: %target-sil-opt -module-name devirt_speculative -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt  | %FileCheck %s
 
 sil_stage canonical
 
@@ -36,13 +36,13 @@ sil @Base_exit : $@convention(method) (@guaranteed Base) -> Never
 sil @Sub_exit : $@convention(method) (@guaranteed Sub) -> Never
 
 sil_vtable Base {
-  #Base.foo!1: _TBaseFooFun
-  #Base.exit!1: Base_exit 
+  #Base.foo!1: @_TBaseFooFun
+  #Base.exit!1: @Base_exit 
 }
 
 sil_vtable Sub {
-  #Base.foo!1: _TSubFooFun
-  #Base.exit!1: Sub_exit 
+  #Base.foo!1: @_TSubFooFun
+  #Base.exit!1: @Sub_exit 
 }
 
 sil @test_objc_ancestry : $@convention(thin) (@guaranteed Base) -> () {
@@ -93,11 +93,11 @@ bb0(%0 : $Sub2):
 }
 
 sil_vtable Base2 {
-  #Base2.foo!1: _TBase2FooFun
+  #Base2.foo!1: @_TBase2FooFun
 }
 
 sil_vtable Sub2 {
-  #Base2.foo!1: _TSub2FooFun
+  #Base2.foo!1: @_TSub2FooFun
 }
 
 sil @test_objc_ancestry2 : $@convention(thin) (@guaranteed Base2) -> () {

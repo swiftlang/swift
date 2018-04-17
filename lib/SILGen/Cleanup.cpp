@@ -138,7 +138,7 @@ SILBasicBlock *CleanupManager::emitBlockForCleanups(JumpDest dest,
 
   // Otherwise, create and emit a new block.
   auto *newBlock = SGF.createBasicBlock();
-  SavedInsertionPoint IPRAII(SGF, newBlock);
+  SILGenSavedInsertionPoint IPRAII(SGF, newBlock);
   emitBranchAndCleanups(dest, branchLoc, args);
   return newBlock;
 }

@@ -35,8 +35,8 @@ reflect(object: obj)
 // CHECK-32: (class reflect_UInt16.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=14 alignment=2 stride=14 num_extra_inhabitants=0
-// CHECK-32:   (field name=t offset=12
+// CHECK-32: (class_instance size=10 alignment=2 stride=10 num_extra_inhabitants=0
+// CHECK-32:   (field name=t offset=8
 // CHECK-32:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
 // CHECK-32:       (field name=_value offset=0
 // CHECK-32:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0)))))

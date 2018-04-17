@@ -98,6 +98,13 @@ class JobStats(object):
                         self.module, self.start_usec, self.dur_usec,
                         self.jobargs, prefixed_stats)
 
+    def divided_by(self, n):
+        divided_stats = dict([(k, v / n)
+                              for (k, v) in self.stats.items()])
+        return JobStats(self.jobkind, random.randint(0, 1000000000),
+                        self.module, self.start_usec, self.dur_usec,
+                        self.jobargs, divided_stats)
+
     def incrementality_percentage(self):
         """Assuming the job is a driver job, return the amount of
         jobs that actually ran, as a percentage of the total number."""
@@ -170,25 +177,56 @@ class JobStats(object):
         }
 
 
+AUXPATSTR = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
+             r"-(?P<out>[^-]*)-(?P<opt>[^-]+)")
+AUXPAT = re.compile(AUXPATSTR)
+
+TIMERPATSTR = (r"time\.swift-(?P<jobkind>\w+)\." + AUXPATSTR +
+               "\.(?P<timerkind>\w+)$")
+TIMERPAT = re.compile(TIMERPATSTR)
+
+FILEPATSTR = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
+              AUXPATSTR +
+              r"-(?P<pid>\d+)(-.*)?.json$")
+FILEPAT = re.compile(FILEPATSTR)
+
+
+def match_auxpat(s):
+    m = AUXPAT.match(s)
+    if m is not None:
+        return m.groupdict()
+    else:
+        return None
+
+
+def match_timerpat(s):
+    m = TIMERPAT.match(s)
+    if m is not None:
+        return m.groupdict()
+    else:
+        return None
+
+
+def match_filepat(s):
+    m = FILEPAT.match(s)
+    if m is not None:
+        return m.groupdict()
+    else:
+        return None
+
+
 def load_stats_dir(path, select_module=[], select_stat=[],
-                   exclude_timers=False, **kwargs):
+                   exclude_timers=False, merge_timers=False, **kwargs):
     """Loads all stats-files found in path into a list of JobStats objects"""
     jobstats = []
-    auxpat = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
-              r"-(?P<out>[^-]*)-(?P<opt>[^-]+)")
-    fpat = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
-            auxpat +
-            r"-(?P<pid>\d+)(-.*)?.json$")
-    fre = re.compile(fpat)
     sre = re.compile('.*' if len(select_stat) == 0 else
                      '|'.join(select_stat))
     for root, dirs, files in os.walk(path):
         for f in files:
-            m = fre.match(f)
-            if not m:
+            mg = match_filepat(f)
+            if not mg:
                 continue
             # NB: "pid" in fpat is a random number, not unix pid.
-            mg = m.groupdict()
             jobkind = mg['kind']
             jobid = int(mg['pid'])
             start_usec = int(mg['start'])
@@ -200,21 +238,22 @@ def load_stats_dir(path, select_module=[], select_stat=[],
             with open(os.path.join(root, f)) as fp:
                 j = json.load(fp)
             dur_usec = 1
-            patstr = (r"time\.swift-" + jobkind + r"\." + auxpat +
-                      r"\.wall$")
-            pat = re.compile(patstr)
             stats = dict()
             for (k, v) in j.items():
                 if sre.search(k) is None:
                     continue
-                if k.startswith("time."):
-                    v = int(1000000.0 * float(v))
-                    if exclude_timers:
-                        continue
-                stats[k] = v
-                tm = re.match(pat, k)
+                if k.startswith('time.') and exclude_timers:
+                    continue
+                tm = match_timerpat(k)
                 if tm:
-                    dur_usec = v
+                    v = int(1000000.0 * float(v))
+                    if tm['jobkind'] == jobkind and \
+                       tm['timerkind'] == 'wall':
+                        dur_usec = v
+                    if merge_timers:
+                        k = "time.swift-%s.%s" % (tm['jobkind'],
+                                                  tm['timerkind'])
+                stats[k] = v
 
             e = JobStats(jobkind=jobkind, jobid=jobid,
                          module=module, start_usec=start_usec,
@@ -225,7 +264,7 @@ def load_stats_dir(path, select_module=[], select_stat=[],
 
 
 def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
-                       merge_by="sum", **kwargs):
+                       merge_by="sum", divide_by=1, **kwargs):
     """Does a pairwise merge of the elements of list of jobs"""
     m = None
     if len(select_module) > 0:
@@ -237,7 +276,8 @@ def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
         jobstats.sort(key=keyfunc)
         prefixed = []
         for mod, group in itertools.groupby(jobstats, keyfunc):
-            groupmerge = merge_all_jobstats(group, merge_by=merge_by)
+            groupmerge = merge_all_jobstats(group, merge_by=merge_by,
+                                            divide_by=divide_by)
             prefixed.append(groupmerge.prefixed_by(mod))
         jobstats = prefixed
     for j in jobstats:
@@ -245,4 +285,6 @@ def merge_all_jobstats(jobstats, select_module=[], group_by_module=False,
             m = j
         else:
             m = m.merged_with(j, merge_by=merge_by)
-    return m
+    if m is None:
+        return m
+    return m.divided_by(divide_by)

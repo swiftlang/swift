@@ -142,6 +142,11 @@ public:
   ParameterList *clone(const ASTContext &C,
                        OptionSet<CloneFlags> options = None) const;
 
+  /// Return a TupleType or ParenType for this parameter list,
+  /// based on types provided by a callback.
+  Type getType(const ASTContext &C,
+               llvm::function_ref<Type(ParamDecl *)> getType) const;
+
   /// Return a TupleType or ParenType for this parameter list, written in terms
   /// of contextual archetypes.
   Type getType(const ASTContext &C) const;

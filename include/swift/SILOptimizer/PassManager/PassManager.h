@@ -72,9 +72,6 @@ class SILPassManager {
   /// The number of passes run so far.
   unsigned NumPassesRun = 0;
 
-  /// Number of optimization iterations run.
-  unsigned NumOptimizationIterations = 0;
-
   /// A mask which has one bit for each pass. A one for a pass-bit means that
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
@@ -97,6 +94,9 @@ class SILPassManager {
   /// same function.
   bool RestartPipeline = false;
 
+  /// If true, passes are also run for functions which have
+  /// OptimizationMode::NoOptimization.
+  bool isMandatoryPipeline = false;
 
   /// The IRGen SIL passes. These have to be dynamically added by IRGen.
   llvm::DenseMap<unsigned, SILTransform *> IRGenPasses;
@@ -104,12 +104,17 @@ class SILPassManager {
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
-  SILPassManager(SILModule *M, llvm::StringRef Stage = "");
+  ///
+  /// If \p isMandatoryPipeline is true, passes are also run for functions
+  /// which have OptimizationMode::NoOptimization.
+  SILPassManager(SILModule *M, llvm::StringRef Stage = "",
+                 bool isMandatoryPipeline = false);
 
   /// C'tor. It creates an IRGen pass manager. Passes can query for the
   /// IRGenModule.
   SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                 llvm::StringRef Stage = "");
+                 llvm::StringRef Stage = "",
+                 bool isMandatoryPipeline = false);
 
   const SILOptions &getOptions() const;
 
@@ -131,9 +136,6 @@ public:
   /// pass manager.
   irgen::IRGenModule *getIRGenModule() { return IRMod; }
 
-  /// \brief Run one iteration of the optimization pipeline.
-  void runOneIteration();
-
   /// \brief Restart the function pass pipeline on the same function
   /// that is currently being processed.
   void restartWithCurrentFunction(SILTransform *T);
@@ -152,6 +154,9 @@ public:
     // Assume that all functions have changed. Clear all masks of all functions.
     CompletedPassesMap.clear();
   }
+
+  /// \brief Notify the pass manager of a newly create function for tracing.
+  void notifyOfNewFunction(SILFunction *F, SILTransform *T);
 
   /// \brief Add the function \p F to the function pass worklist.
   /// If not null, the function \p DerivedFrom is the function from which \p F
@@ -264,9 +269,7 @@ public:
   }
 
 private:
-  void execute() {
-    runOneIteration();
-  }
+  void execute();
 
   /// Add a pass of a specific kind.
   void addPass(PassKind Kind);
@@ -274,17 +277,15 @@ private:
   /// Add a pass with a given name.
   void addPassForName(StringRef Name);
 
-  /// Run the SIL module transform \p SMT over all the functions in
+  /// Run the \p TransIdx'th SIL module transform over all the functions in
   /// the module.
-  void runModulePass(SILModuleTransform *SMT);
+  void runModulePass(unsigned TransIdx);
 
-  /// Run the pass \p SFT on the function \p F.
-  void runPassOnFunction(SILFunctionTransform *SFT, SILFunction *F);
+  /// Run the \p TransIdx'th pass on the function \p F.
+  void runPassOnFunction(unsigned TransIdx, SILFunction *F);
 
-  /// Run the passes in \p FuncTransforms. Return true
-  /// if the pass manager requested to stop the execution
-  /// of the optimization cycle (this is a debug feature).
-  void runFunctionPasses(ArrayRef<SILFunctionTransform *> FuncTransforms);
+  /// Run the passes in Transform from \p FromTransIdx to \p ToTransIdx.
+  void runFunctionPasses(unsigned FromTransIdx, unsigned ToTransIdx);
 
   /// A helper function that returns (based on SIL stage and debug
   /// options) whether we should continue running passes.
@@ -292,6 +293,13 @@ private:
 
   /// Return true if all analyses are unlocked.
   bool analysesUnlocked();
+
+  /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
+  void dumpPassInfo(const char *Title, SILTransform *Tr, SILFunction *F);
+
+  /// Dumps information about the pass with index \p TransIdx to llvm::dbgs().
+  void dumpPassInfo(const char *Title, unsigned TransIdx,
+                    SILFunction *F = nullptr);
 
   /// Displays the call graph in an external dot-viewer.
   /// This function is meant for use from the debugger.

@@ -276,33 +276,33 @@ bb0(%0 : $public_derived):
 
 
 sil_vtable private_base {
-  #private_base.foo!1: private_base_foo
+  #private_base.foo!1: @private_base_foo
 }
 
 sil_vtable private_derived {
-  #private_base.foo!1: private_derived_foo
+  #private_base.foo!1: @private_derived_foo
 }
 
 sil_vtable internal_base {
-  #internal_base.foo!1: internal_base_foo
-  #internal_base.bar!1: internal_base_bar
+  #internal_base.foo!1: @internal_base_foo
+  #internal_base.bar!1: @internal_base_bar
 }
 
 sil_vtable internal_derived {
-  #internal_base.foo!1: internal_derived_foo
-  #internal_base.bar!1: internal_derived_bar
+  #internal_base.foo!1: @internal_derived_foo
+  #internal_base.bar!1: @internal_derived_bar
 }
 
 sil_vtable public_base {
-  #public_base.foo!1: public_base_foo
-  #public_base.bar!1: public_base_bar
-  #public_base.baz!1: public_base_baz
+  #public_base.foo!1: @public_base_foo
+  #public_base.bar!1: @public_base_bar
+  #public_base.baz!1: @public_base_baz
 }
 
 sil_vtable public_derived {
-  #public_base.foo!1: public_derived_foo
-  #public_base.bar!1: public_derived_bar
-  #public_base.baz!1: public_derived_baz
+  #public_base.foo!1: @public_derived_foo
+  #public_base.bar!1: @public_derived_bar
+  #public_base.baz!1: @public_derived_baz
 }
 
 private protocol private_proto_1 {
@@ -461,19 +461,19 @@ bb0(%0 : $*T):
 
 
 sil_vtable private_proto_private_class {
-  #private_proto_private_class.theMethod!1: private_proto_private_class_theMethod
+  #private_proto_private_class.theMethod!1: @private_proto_private_class_theMethod
 }
 
 sil_vtable private_proto_internal_class {
-  #private_proto_internal_class.theMethod!1: private_proto_internal_class_theMethod
+  #private_proto_internal_class.theMethod!1: @private_proto_internal_class_theMethod
 }
 
 sil_vtable private_proto_public_class {
-  #private_proto_public_class.theMethod!1: private_proto_public_class_theMethod
+  #private_proto_public_class.theMethod!1: @private_proto_public_class_theMethod
 }
 
 sil_vtable private_proto_public_class_private_method {
-  #private_proto_public_class_private_method.theMethod!1: private_proto_public_class_private_method_theMethod
+  #private_proto_public_class_private_method.theMethod!1: @private_proto_public_class_private_method_theMethod
 }
 
 sil_witness_table private private_proto_private_class: private_proto_1 module witness {

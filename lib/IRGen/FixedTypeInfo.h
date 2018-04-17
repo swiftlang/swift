@@ -76,15 +76,16 @@ public:
     return (isFixedSize(expansion) && StorageSize.isZero());
   }
 
-  StackAddress allocateStack(IRGenFunction &IGF, SILType T, bool isEntryBlock,
+  StackAddress allocateStack(IRGenFunction &IGF, SILType T,
                              const llvm::Twine &name) const override;
   void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
-  void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
+  void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
+                    bool isOutlined) const override;
 
   // We can give these reasonable default implementations.
 
-  void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr, SILType T) const override;
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override;
 
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
@@ -221,12 +222,12 @@ public:
   /// larger than this type, the trailing bits are untouched.
   static void applyFixedSpareBitsMask(SpareBitVector &mask,
                                       const SpareBitVector &spareBits);
-  
-  /// Fixed-size types never need dynamic value witness table instantiation.
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          llvm::Value *vwtable,
-                          SILType T) const override {}
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    // We assume that fixed type infos generally do not require type
+    // metadata in order to perform value operations.
+  }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,

@@ -72,7 +72,7 @@ namespace serialization {
 using DeclID = llvm::PointerEmbeddedInt<unsigned, 31>;
 }
 
-enum class DeclContextKind : uint8_t {
+enum class DeclContextKind : unsigned {
   AbstractClosureExpr,
   Initializer,
   TopLevelCodeDecl,
@@ -120,8 +120,8 @@ enum class LocalDeclContextKind : uint8_t {
 ///
 /// The enumerators are ordered in terms of decreasing preference:
 /// an inherited conformance is best, followed by explicit
-/// conformances, then implied conformances. Earlier conformance
-/// kinds supersede later conformance kinds, possibly with a
+/// conformances, then synthesized and implied conformances. Earlier
+/// conformance kinds supersede later conformance kinds, possibly with a
 /// diagnostic (e.g., if an inherited conformance supersedes an
 /// explicit conformance).
 enum class ConformanceEntryKind : unsigned {
@@ -131,11 +131,11 @@ enum class ConformanceEntryKind : unsigned {
   /// Explicitly specified.
   Explicit,
 
-  /// Implied by an explicitly-specified conformance.
-  Implied,
-
   /// Implicitly synthesized.
   Synthesized,
+
+  /// Implied by an explicitly-specified conformance.
+  Implied,
 };
 
 /// Describes the kind of conformance lookup desired.
@@ -179,19 +179,24 @@ struct ConformanceDiagnostic {
 /// DeclContext, but a new brace statement is not.  There's no
 /// particular mandate for this, though.
 ///
-/// Note that DeclContexts have stricter alignment requirements than AST nodes
-/// in general, so if an AST node class multiply inherits from DeclContext
-/// and another base class, it must 'using DeclContext::operator new;' in order
-/// to use an allocator with the correct alignment.
+/// Please note that DeclContext assumes that it prefaces AST type hierarchies
+/// and therefore can safely access trailing memory. If you need to create a
+/// macro context, please see GenericContext for how to minimize new entries in
+/// the ASTHierarchy enum below.
 class alignas(1 << DeclContextAlignInBits) DeclContext {
-  
-  enum {
-    KindBits = DeclContextAlignInBits
+  enum class ASTHierarchy : unsigned {
+    Decl,
+    Expr,
+    FileUnit,
+    Initializer,
+    SerializedLocal,
+    // If you add a new AST hierarchies, then update the static_assert() below.
   };
-  static_assert(unsigned(DeclContextKind::Last_DeclContextKind) < 1U<<KindBits,
-                "Not enough KindBits for DeclContextKind");
-  
-  llvm::PointerIntPair<DeclContext*, KindBits, DeclContextKind> ParentAndKind;
+  static_assert(unsigned(ASTHierarchy::SerializedLocal) <
+                (1 << DeclContextAlignInBits),
+                "ASTHierarchy exceeds bits available");
+
+  llvm::PointerIntPair<DeclContext*, 3, ASTHierarchy> ParentAndKind;
 
   /// Change the parent of this context.  This should only be used
   /// very carefully.
@@ -203,23 +208,51 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
   
+  // See swift/AST/Decl.h
   static DeclContext *castDeclToDeclContext(const Decl *D);
 
   /// If this DeclContext is a GenericType declaration or an
   /// extension thereof, return the GenericTypeDecl.
   GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
 
+  static ASTHierarchy getASTHierarchyFromKind(DeclContextKind Kind) {
+    switch (Kind) {
+    case DeclContextKind::AbstractClosureExpr:
+      return ASTHierarchy::Expr;
+    case DeclContextKind::Initializer:
+      return ASTHierarchy::Initializer;
+    case DeclContextKind::SerializedLocal:
+      return ASTHierarchy::SerializedLocal;
+    case DeclContextKind::FileUnit:
+      return ASTHierarchy::FileUnit;
+    case DeclContextKind::Module:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::GenericTypeDecl:
+    case DeclContextKind::ExtensionDecl:
+      return ASTHierarchy::Decl;
+    }
+    llvm_unreachable("Unhandled DeclContextKind");
+  }
+
 public:
+  Decl *getAsDeclOrDeclExtensionContext() {
+    return ParentAndKind.getInt() == ASTHierarchy::Decl ?
+      reinterpret_cast<Decl*>(this + 1) : nullptr;
+  }
+  const Decl *getAsDeclOrDeclExtensionContext() const {
+    return const_cast<DeclContext*>(this)->getAsDeclOrDeclExtensionContext();
+  }
+
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
-    : ParentAndKind(Parent, Kind) {
-    assert((Parent != 0 || isModuleContext()) &&
-           "DeclContext must have a parent unless it is a module!");
+      : ParentAndKind(Parent, getASTHierarchyFromKind(Kind)) {
+    if (Kind != DeclContextKind::Module)
+      assert(Parent != nullptr && "DeclContext must have a parent context");
   }
 
   /// Returns the kind of context this is.
-  DeclContextKind getContextKind() const {
-    return ParentAndKind.getInt();
-  }
+  DeclContextKind getContextKind() const;
   
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
@@ -229,25 +262,18 @@ public:
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.
-  bool isModuleContext() const {
-    return getContextKind() == DeclContextKind::Module;
-  }
+  bool isModuleContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a context with module-wide scope, e.g. a module
   /// or a source file.
-  bool isModuleScopeContext() const {
-    return getContextKind() == DeclContextKind::Module ||
-           getContextKind() == DeclContextKind::FileUnit;
-  }
+  bool isModuleScopeContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
   bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
-  bool isExtensionContext() const {
-    return getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isExtensionContext() const; // see swift/AST/Decl.h
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
@@ -323,9 +349,6 @@ public:
   /// Map an interface type to a contextual type within this context.
   Type mapTypeIntoContext(Type type) const;
 
-  /// Map a type within this context to an interface type.
-  Type mapTypeOutOfContext(Type type) const;
-
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.
   DeclContext *getLocalContext();
@@ -384,6 +407,10 @@ public:
         return true;
     return false;
   }
+
+  /// Compute a context C such that C is a parent context of A and B.
+  /// If no such context exists, return \c nullptr.
+  static DeclContext *getCommonParentContext(DeclContext *A, DeclContext *B);
 
   /// Returns the module context that contains this context.
   ModuleDecl *getParentModule() const;
@@ -521,7 +548,7 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
   
-  // Some Decls are DeclContexts, but not all.
+  // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
 };
 
@@ -590,7 +617,7 @@ typedef IteratorRange<DeclIterator> DeclRange;
 
 /// The kind of an \c IterableDeclContext.
 enum class IterableDeclContextKind : uint8_t {  
-  NominalTypeDecl,
+  NominalTypeDecl = 0,
   ExtensionDecl,
 };
 
@@ -600,17 +627,26 @@ enum class IterableDeclContextKind : uint8_t {
 /// Note that an iterable declaration context must inherit from both
 /// \c IterableDeclContext and \c DeclContext.
 class IterableDeclContext {
+  enum LazyMembers : unsigned {
+    Present = 1 << 0,
+
+    /// Lazy member loading has a variety of feedback loops that need to
+    /// switch to pseudo-empty-member behaviour to avoid infinite recursion;
+    /// we use this flag to control them.
+    InProgress = 1 << 1,
+  };
+
   /// The first declaration in this context along with a bit indicating whether
   /// the members of this context will be lazily produced.
-  mutable llvm::PointerIntPair<Decl *, 1, bool> FirstDeclAndLazyMembers;
+  mutable llvm::PointerIntPair<Decl *, 2, LazyMembers> FirstDeclAndLazyMembers;
 
   /// The last declaration in this context, used for efficient insertion,
   /// along with the kind of iterable declaration context.
-  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
+  mutable llvm::PointerIntPair<Decl *, 1, IterableDeclContextKind>
     LastDeclAndKind;
 
-  // The DeclID this IDC was deserialized from, if any. Used for named lazy
-  // member loading, as a key when doing lookup in this IDC.
+  /// The DeclID this IDC was deserialized from, if any. Used for named lazy
+  /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
 
   template<class A, class B, class C>
@@ -633,13 +669,31 @@ public:
   /// Retrieve the set of members in this context.
   DeclRange getMembers() const;
 
+  /// Retrieve the set of members in this context without loading any from the
+  /// associated lazy loader; this should only be used as part of implementing
+  /// abstractions on top of member loading, such as a name lookup table.
+  DeclRange getCurrentMembersWithoutLoading() const;
+
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
-    return FirstDeclAndLazyMembers.getInt();
+    return FirstDeclAndLazyMembers.getInt() & LazyMembers::Present;
+  }
+
+  bool isLoadingLazyMembers() {
+    return FirstDeclAndLazyMembers.getInt() & LazyMembers::InProgress;
+  }
+
+  void setLoadingLazyMembers(bool inProgress) {
+    LazyMembers status = FirstDeclAndLazyMembers.getInt();
+    if (inProgress)
+      status = LazyMembers(status | LazyMembers::InProgress);
+    else
+      status = LazyMembers(status & ~LazyMembers::InProgress);
+    FirstDeclAndLazyMembers.setInt(status);
   }
 
   /// Setup the loader for lazily-loaded members.

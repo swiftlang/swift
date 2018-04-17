@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Syntax/UnknownSyntax.h"
-#include "llvm/Support/ErrorHandling.h"
+#include "swift/Syntax/SyntaxData.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -19,9 +18,9 @@ using namespace swift::syntax;
 RC<SyntaxData> SyntaxData::make(RC<RawSyntax> Raw,
                                 const SyntaxData *Parent,
                                 CursorIndex IndexInParent) {
-  return RC<SyntaxData> {
-    new SyntaxData(Raw, Parent, IndexInParent)
-  };
+  auto size = totalSizeToAlloc<AtomicCache<SyntaxData>>(Raw->getNumChildren());
+  void *data = ::operator new(size);
+  return RC<SyntaxData>{new (data) SyntaxData(Raw, Parent, IndexInParent)};
 }
 
 bool SyntaxData::isType() const {
@@ -41,7 +40,7 @@ bool SyntaxData::isExpr() const {
 }
 
 bool SyntaxData::isPattern() const {
-  return false; // FIXME: Raw->isPattern();
+  return Raw->isPattern();
 }
 
 bool SyntaxData::isUnknown() const {

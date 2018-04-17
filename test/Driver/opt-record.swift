@@ -15,20 +15,20 @@ func foo() {
 public func bar() {
   // YAML:      --- !Passed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            Inlined
+  // YAML-NEXT: Name:            sil.Inlined
   // YAML-NEXT: DebugLoc:
   // YAML-NEXT:   File:            {{.*}}opt-record.swift
   // YAML-NEXT:   Line:            42
   // YAML-NEXT:   Column:          3
-  // YAML-NEXT: Function:        _T012optrecordmod3baryyF
+  // YAML-NEXT: Function:        'bar()'
   // YAML-NEXT: Args:
-  // YAML-NEXT:   - Callee:          _T012optrecordmod3fooyyF
+  // YAML-NEXT:   - Callee:          '"optrecordmod.foo()"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}opt-record.swift
   // YAML-NEXT:       Line:            11
   // YAML-NEXT:       Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
-  // YAML-NEXT:   - Caller:          _T012optrecordmod3baryyF
+  // YAML-NEXT:   - Caller:          '"optrecordmod.bar()"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}opt-record.swift
   // YAML-NEXT:       Line:            15

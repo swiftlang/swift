@@ -22,6 +22,6 @@ func getContainerForFungiblePanda() -> FungibleAnimalContainer<Animal> {
 
 
 func getContainerForFungiblePanda() -> FungibleAnimalContainer<Animal & Fungible> {
-  // expected-error@+1 {{cannot convert return expression of type 'FungibleAnimalContainer<Animal>!' to return type 'FungibleAnimalContainer<Animal & Fungible>'}}
+  // expected-error@+1 {{cannot convert return expression of type 'FungibleAnimalContainer<Animal>?' to return type 'FungibleAnimalContainer<Animal & Fungible>'}}
   return Panda.getFungibleContainer()
 }

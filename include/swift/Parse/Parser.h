@@ -25,14 +25,15 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Syntax/RawTokenSyntax.h"
-#include "swift/Syntax/SyntaxParsingContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
+#include "swift/Parse/ParserPosition.h"
 #include "swift/Parse/ParserResult.h"
+#include "swift/Parse/SyntaxParserResult.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
@@ -55,6 +56,13 @@ namespace swift {
   
   struct EnumElementInfo;
   
+  namespace syntax {
+    class AbsolutePosition;
+    class RawSyntax;
+    enum class SyntaxKind;
+    class TypeSyntax;
+  }// end of syntax namespace
+
   /// Different contexts in which BraceItemList are parsed.
   enum class BraceItemListKind {
     /// A statement list terminated by a closing brace. The default.
@@ -192,6 +200,14 @@ public:
   /// \brief This is the current token being considered by the parser.
   Token Tok;
 
+  /// \brief leading trivias for \c Tok.
+  /// Always empty if !SF.shouldBuildSyntaxTree().
+  syntax::Trivia LeadingTrivia;
+
+  /// \brief trailing trivias for \c Tok.
+  /// Always empty if !SF.shouldBuildSyntaxTree().
+  syntax::Trivia TrailingTrivia;
+
   /// \brief The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
 
@@ -260,7 +276,7 @@ public:
   /// Describes the kind of a lexical structure marker, indicating
   /// what kind of structural element we started parsing at a
   /// particular location.
-  enum class StructureMarkerKind : unsigned char {
+  enum class StructureMarkerKind : uint8_t {
     /// The start of a declaration.
     Declaration,
     /// The start of a statement.
@@ -328,7 +344,7 @@ public:
   llvm::SmallVector<StructureMarker, 16> StructureMarkers;
 
   /// Current syntax parsing context where call backs should be directed to.
-  syntax::SyntaxParsingContext *SyntaxContext;
+  SyntaxParsingContext *SyntaxContext;
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
@@ -340,29 +356,18 @@ public:
 
   bool isInSILMode() const { return SIL != nullptr; }
 
+  /// Calling this function to finalize libSyntax tree creation without destroying
+  /// the parser instance.
+  void finalizeSyntaxTree() {
+    assert(Tok.is(tok::eof) && "not done parsing yet");
+    SyntaxContext->finalizeRoot();
+  }
+
   //===--------------------------------------------------------------------===//
   // Routines to save and restore parser state.
 
-  class ParserPosition {
-  public:
-    ParserPosition() = default;
-    ParserPosition &operator=(const ParserPosition &) = default;
-
-    bool isValid() const {
-      return LS.isValid();
-    }
-
-  private:
-    ParserPosition(Lexer::State LS, SourceLoc PreviousLoc):
-        LS(LS), PreviousLoc(PreviousLoc)
-    {}
-    Lexer::State LS;
-    SourceLoc PreviousLoc;
-    friend class Parser;
-  };
-
   ParserPosition getParserPosition() {
-    return ParserPosition(L->getStateForBeginningOfToken(Tok),
+    return ParserPosition(L->getStateForBeginningOfToken(Tok, LeadingTrivia),
                           PreviousLoc);
   }
 
@@ -370,9 +375,6 @@ public:
     return ParserPosition(L->getStateForBeginningOfTokenLoc(Pos.Loc),
                           Pos.PrevLoc);
   }
-
-  /// \brief Return parser position after the first character of token T
-  ParserPosition getParserPositionAfterFirstCharacter(Token T);
 
   void restoreParserPosition(ParserPosition PP, bool enableDiagnostics = false) {
     L->restoreState(PP.LS, enableDiagnostics);
@@ -405,21 +407,24 @@ public:
     Parser &P;
     ParserPosition PP;
     DiagnosticTransaction DT;
+    /// This context immediately deconstructed with transparent accumulation
+    /// on cancelBacktrack().
+    llvm::Optional<SyntaxParsingContext> SynContext;
     bool Backtrack = true;
 
   public:
     BacktrackingScope(Parser &P)
-      : P(P), PP(P.getParserPosition()), DT(P.Diags) {}
-
-    ~BacktrackingScope() {
-      if (Backtrack) {
-        P.backtrackToPosition(PP);
-        DT.abort();
-      }
+        : P(P), PP(P.getParserPosition()), DT(P.Diags) {
+      SynContext.emplace(P.SyntaxContext);
+      SynContext->setDiscard();
     }
+
+    ~BacktrackingScope();
 
     void cancelBacktrack() {
       Backtrack = false;
+      SynContext->setTransparent();
+      SynContext.reset();
       DT.commit();
     }
   };
@@ -575,7 +580,9 @@ public:
 
   /// \brief Consume the starting character of the current token, and split the
   /// remainder of the token into a new token (or tokens).
-  SourceLoc consumeStartingCharacterOfCurrentToken();
+  SourceLoc
+  consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
+                                         size_t Len = 1);
 
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
@@ -669,6 +676,7 @@ public:
   /// \brief Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
+                         syntax::SyntaxKind Kind,
                          std::function<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
@@ -707,12 +715,7 @@ public:
   };
 
   /// Options that control the parsing of declarations.
-  typedef OptionSet<ParseDeclFlags> ParseDeclOptions;
-
-  /// Skips the current token if it is '}', and emits a diagnostic.
-  ///
-  /// \returns true if any tokens were skipped.
-  bool skipExtraTopLevelRBraces();
+  using ParseDeclOptions = OptionSet<ParseDeclFlags>;
 
   void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                      ParseDeclOptions Flags);
@@ -752,6 +755,9 @@ public:
   ParserResult<IfConfigDecl> parseIfConfig(
     llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements);
 
+  /// Parse a #error or #warning diagnostic.
+  ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
+
   /// Parse a #line/#sourceLocation directive.
   /// 'isLine = true' indicates parsing #line instead of #sourcelocation
   ParserStatus parseLineDirective(bool isLine = false);
@@ -761,6 +767,10 @@ public:
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
                               bool &FoundCodeCompletionToken);
+
+  /// Parse the optional modifiers  before a declaration.
+  bool parseDeclModifierList(DeclAttributes &Attributes, SourceLoc &StaticLoc,
+                             StaticSpellingKind &StaticSpelling);
 
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
@@ -822,8 +832,7 @@ public:
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
-  parseDeclClass(SourceLoc ClassLoc,
-                 ParseDeclOptions Flags, DeclAttributes &Attributes);
+  parseDeclClass(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<PatternBindingDecl>
   parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                SmallVectorImpl<Decl *> &Decls,
@@ -835,12 +844,12 @@ public:
 
   struct ParsedAccessors {
     SourceLoc LBLoc, RBLoc;
-    FuncDecl *Get = nullptr;
-    FuncDecl *Set = nullptr;
-    FuncDecl *Addressor = nullptr;
-    FuncDecl *MutableAddressor = nullptr;
-    FuncDecl *WillSet = nullptr;
-    FuncDecl *DidSet = nullptr;
+    AccessorDecl *Get = nullptr;
+    AccessorDecl *Set = nullptr;
+    AccessorDecl *Addressor = nullptr;
+    AccessorDecl *MutableAddressor = nullptr;
+    AccessorDecl *WillSet = nullptr;
+    AccessorDecl *DidSet = nullptr;
 
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,
@@ -849,11 +858,14 @@ public:
                 SmallVectorImpl<Decl *> &decls);
   };
 
+  void parseAccessorAttributes(DeclAttributes &Attributes);
+
   bool parseGetSetImpl(ParseDeclOptions Flags,
                        GenericParamList *GenericParams,
                        ParameterList *Indices,
                        TypeLoc ElementTy,
                        ParsedAccessors &accessors,
+                       AbstractStorageDecl *storage,
                        SourceLoc &LastValidLoc,
                        SourceLoc StaticLoc, SourceLoc VarLBLoc,
                        SmallVectorImpl<Decl *> &Decls);
@@ -862,6 +874,7 @@ public:
                    ParameterList *Indices,
                    TypeLoc ElementTy,
                    ParsedAccessors &accessors,
+                   AbstractStorageDecl *storage,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
                        TypeLoc elementTy, const DeclAttributes &attrs,
@@ -913,12 +926,10 @@ public:
                                    bool HandleCodeCompletion = true,
                                    bool IsSILFuncDecl = false);
 
-  ParserResult<TypeRepr> parseTypeSimpleOrComposition();
   ParserResult<TypeRepr>
     parseTypeSimpleOrComposition(Diag<> MessageID,
                                  bool HandleCodeCompletion = true);
 
-  ParserResult<TypeRepr> parseTypeSimple();
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
                                          bool HandleCodeCompletion = true);
 
@@ -943,11 +954,13 @@ public:
   ///   type-simple:
   ///     '[' type ']'
   ///     '[' type ':' type ']'
-  ParserResult<TypeRepr> parseTypeCollection();
-  ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
+  SyntaxParserResult<syntax::TypeSyntax, TypeRepr> parseTypeCollection();
 
-  ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
-    parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
+  SyntaxParserResult<syntax::TypeSyntax, OptionalTypeRepr>
+  parseTypeOptional(TypeRepr *Base);
+
+  SyntaxParserResult<syntax::TypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
+  parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
   bool isOptionalToken(const Token &T) const;
   SourceLoc consumeOptionalToken();
@@ -978,7 +991,7 @@ public:
 
     /// Set the parsed context for all the initializers to the given
     /// function.
-    void setFunctionContext(AbstractFunctionDecl *AFD);
+    void setFunctionContext(DeclContext *DC, MutableArrayRef<ParameterList *> paramList);
     
     DefaultArgumentInfo(bool inTypeContext) {
       NextIndex = inTypeContext ? 1 : 0;
@@ -995,7 +1008,7 @@ public:
     SourceLoc SpecifierLoc;
     
     /// The parsed specifier kind, if present.
-    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Owned;
+    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Default;
 
     /// The location of the first name.
     ///
@@ -1040,6 +1053,8 @@ public:
     Subscript,
     /// A curried argument clause.
     Curried,
+    /// An enum element.
+    EnumElement,
   };
 
   /// Parse a parameter-clause.
@@ -1144,19 +1159,21 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
-  ParserResult<Expr> parseExpr(Diag<> ID) {
-    return parseExprImpl(ID, /*isExprBasic=*/false);
+  ParserResult<Expr> parseExpr(Diag<> ID, bool allowAmpPrefix = false) {
+    return parseExprImpl(ID, /*isExprBasic=*/false, allowAmpPrefix);
   }
   ParserResult<Expr> parseExprBasic(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/true);
   }
-  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
+  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic,
+                                   bool allowAmpPrefix = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
-                                       bool isForConditionalDirective = false);
+                                       bool isForConditionalDirective = false,
+                                       bool allowAmpPrefix = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
@@ -1164,6 +1181,7 @@ public:
                                             bool periodHasKeyPathBehavior,
                                             bool &hasBindOptional);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprPrimary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
@@ -1172,6 +1190,10 @@ public:
   ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
+
+  ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
+                                   SmallVectorImpl<Expr*> &Exprs,
+                                   Token EntireTok);
 
   /// Parse an argument label `identifier ':'`, if it exists.
   ///
@@ -1242,7 +1264,8 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
+                                   syntax::SyntaxKind Kind);
 
   /// Parse an expression list, keeping all of the pieces separated.
   ParserStatus parseExprList(tok leftTok, tok rightTok,
@@ -1253,7 +1276,9 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             Expr *&trailingClosure);
+                             Expr *&trailingClosure,
+                             syntax::SyntaxKind Kind,
+                             bool allowAmpPrefix = false);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 
@@ -1264,17 +1289,14 @@ public:
   /// Parse an object literal.
   ///
   /// \param LK The literal kind as determined by the first token.
-  /// \param NewName New name for a legacy literal.
   ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
-                                            bool isExprBasic,
-                                            StringRef NewName = StringRef());
+                                            bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
-  ParserResult<Expr> parseExprCollection(SourceLoc LSquareLoc = SourceLoc());
-  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc,
-                                    ParserResult<Expr> FirstExpr);
-  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc,
-                                         ParserResult<Expr> FirstKey);
+  ParserResult<Expr> parseExprCollection();
+  ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
+  ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
@@ -1291,6 +1313,10 @@ public:
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtDefer();
+  ParserStatus
+  parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
+                            Diag<> DefaultID, StmtKind ParentKind,
+                            StringRef &BindingKindStr);
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
                                   StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
@@ -1310,6 +1336,8 @@ public:
 
   ParserResult<GenericParamList> parseGenericParameters();
   ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
+  ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
+                        SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
@@ -1407,7 +1435,8 @@ ParsedDeclName parseDeclName(StringRef name) LLVM_READONLY;
 DeclName formDeclName(ASTContext &ctx,
                       StringRef baseName,
                       ArrayRef<StringRef> argumentLabels,
-                      bool isFunctionName);
+                      bool isFunctionName,
+                      bool isInitializer);
 
 /// Parse a stringified Swift declaration name, e.g. "init(frame:)".
 DeclName parseDeclName(ASTContext &ctx, StringRef name);
@@ -1417,19 +1446,14 @@ bool isKeywordPossibleDeclStart(const Token &Tok);
 
 /// \brief Lex and return a vector of `TokenSyntax` tokens, which include
 /// leading and trailing trivia.
-std::vector<std::pair<RC<syntax::RawTokenSyntax>,
+std::vector<std::pair<RC<syntax::RawSyntax>,
                                  syntax::AbsolutePosition>>
 tokenizeWithTrivia(const LangOptions &LangOpts,
                    const SourceManager &SM,
                    unsigned BufferID,
                    unsigned Offset = 0,
-                   unsigned EndOffset = 0);
-
-
-void populateTokenSyntaxMap(const LangOptions &LangOpts,
-                            const SourceManager &SM,
-                            unsigned BufferID,
-                            std::vector<syntax::RawTokenInfo> &Result);
+                   unsigned EndOffset = 0,
+                   DiagnosticEngine *Diags = nullptr);
 } // end namespace swift
 
 #endif

@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if defined(__APPLE__)
+#define _REENTRANT
+#include <math.h>
+#endif
 #include <random>
 #include <type_traits>
 #include <cmath>
@@ -20,11 +24,17 @@
 #else
 #include <unistd.h>
 #include <pthread.h>
+#include <semaphore.h>
+#include <sys/ioctl.h>
 #endif
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "../SwiftShims/LibcShims.h"
@@ -33,15 +43,19 @@
 using namespace swift;
 
 static_assert(std::is_same<ssize_t, swift::__swift_ssize_t>::value,
-              "__swift_ssize_t must be defined as equivalent to ssize_t");
+              "__swift_ssize_t must be defined as equivalent to ssize_t in LibcShims.h");
+#if !defined(_WIN32) || defined(__CYGWIN__)
+static_assert(std::is_same<mode_t, swift::__swift_mode_t>::value,
+              "__swift_mode_t must be defined as equivalent to mode_t in LibcShims.h");
+#endif
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-void swift::_swift_stdlib_free(void *ptr) {
+void swift::_stdlib_free(void *ptr) {
   free(ptr);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_putchar_unlocked(int c) {
+int swift::_stdlib_putchar_unlocked(int c) {
 #if defined(_WIN32)
   return _putc_nolock(c, stdout);
 #else
@@ -50,31 +64,31 @@ int swift::_swift_stdlib_putchar_unlocked(int c) {
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_size_t swift::_swift_stdlib_fwrite_stdout(const void *ptr,
-                                                  __swift_size_t size,
-                                                  __swift_size_t nitems) {
-  return fwrite(ptr, size, nitems, stdout);
+__swift_size_t swift::_stdlib_fwrite_stdout(const void *ptr,
+                                         __swift_size_t size,
+                                         __swift_size_t nitems) {
+    return fwrite(ptr, size, nitems, stdout);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_size_t swift::_swift_stdlib_strlen(const char *s) {
-  return strlen(s);
+__swift_size_t swift::_stdlib_strlen(const char *s) {
+    return strlen(s);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_size_t swift::_swift_stdlib_strlen_unsigned(const unsigned char *s) {
+__swift_size_t swift::_stdlib_strlen_unsigned(const unsigned char *s) {
   return strlen(reinterpret_cast<const char *>(s));
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_memcmp(const void *s1, const void *s2,
-                                __swift_size_t n) {
+int swift::_stdlib_memcmp(const void *s1, const void *s2,
+                       __swift_size_t n) {
   return memcmp(s1, s2, n);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t
-swift::_swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
+swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
   return _read(fd, buf, nbyte);
 #else
@@ -84,7 +98,7 @@ swift::_swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_ssize_t
-swift::_swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
+swift::_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
   return _write(fd, buf, nbyte);
 #else
@@ -93,7 +107,7 @@ swift::_swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_close(int fd) {
+int swift::_stdlib_close(int fd) {
 #if defined(_WIN32)
   return _close(fd);
 #else
@@ -101,38 +115,119 @@ int swift::_swift_stdlib_close(int fd) {
 #endif
 }
 
+
+#if defined(_WIN32) && !defined(__CYGWIN__)
+// Windows
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
+  return _open(path, oflag, static_cast<int>(mode));
+}
+
+#else
+// not Windows
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
+  return open(path, oflag, mode);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_openat(int fd, const char *path, int oflag,
+                          __swift_mode_t mode) {
+  return openat(fd, path, oflag, mode);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void *swift::_stdlib_sem_open2(const char *name, int oflag) {
+  return sem_open(name, oflag);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void *swift::_stdlib_sem_open4(const char *name, int oflag,
+                               __swift_mode_t mode, unsigned int value) {
+  return sem_open(name, oflag, mode, value);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_fcntl(int fd, int cmd, int value) {
+  return fcntl(fd, cmd, value);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_fcntlPtr(int fd, int cmd, void* ptr) {
+  return fcntl(fd, cmd, ptr);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_ioctl(int fd, unsigned long int request, int value) {
+  return ioctl(fd, request, value);
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr) {
+  return ioctl(fd, request, ptr);
+}
+
+#if defined(__FreeBSD__)
+SWIFT_RUNTIME_STDLIB_INTERNAL
+char * _Nullable *swift::_stdlib_getEnviron() {
+  extern char **environ;
+  return environ;
+}
+#elif defined(__APPLE__)
+SWIFT_RUNTIME_STDLIB_INTERNAL
+char * _Nullable *swift::_stdlib_getEnviron() {
+  extern char * _Nullable **_NSGetEnviron(void);
+  return *_NSGetEnviron();
+}
+#endif
+
+#endif // !(defined(_WIN32) && !defined(__CYGWIN__))
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int swift::_stdlib_getErrno() {
+  return errno;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void swift::_stdlib_setErrno(int value) {
+  errno = value;
+}
+
+
 #if defined(_WIN32)
 static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
               "__swift_thread_key_t is not a DWORD");
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-void _swift_stdlib_destroyTLS(void *);
+void _stdlib_destroyTLS(void *);
 
 static void
 #if defined(_M_IX86)
 __stdcall
 #endif
-_swift_stdlib_destroyTLS_CCAdjustmentThunk(void *ptr) {
-  _swift_stdlib_destroyTLS(ptr);
+destroyTLS_CCAdjustmentThunk(void *ptr) {
+  _stdlib_destroyTLS(ptr);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int
-swift::_swift_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
-                                       void (* _Nullable destructor)(void *)) {
-  *key = FlsAlloc(_swift_stdlib_destroyTLS_CCAdjustmentThunk);
+swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
+                              void (* _Nullable destructor)(void *)) {
+  *key = FlsAlloc(destroyTLS_CCAdjustmentThunk);
   return *key != FLS_OUT_OF_INDEXES;
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void * _Nullable
-swift::_swift_stdlib_thread_getspecific(__swift_thread_key_t key) {
+swift::_stdlib_thread_getspecific(__swift_thread_key_t key) {
   return FlsGetValue(key);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_thread_setspecific(__swift_thread_key_t key,
-                                            const void * _Nullable value) {
+int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
+                                   const void * _Nullable value) {
   return FlsSetValue(key, const_cast<void *>(value)) == TRUE;
 }
 #else
@@ -145,20 +240,20 @@ static_assert(std::is_same<__swift_thread_key_t, pthread_key_t>::value,
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 int
-swift::_swift_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
-                                       void (* _Nullable destructor)(void *)) {
+swift::_stdlib_thread_key_create(__swift_thread_key_t * _Nonnull key,
+                              void (* _Nullable destructor)(void *)) {
   return pthread_key_create(key, destructor);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void * _Nullable
-swift::_swift_stdlib_thread_getspecific(__swift_thread_key_t key) {
+swift::_stdlib_thread_getspecific(__swift_thread_key_t key) {
   return pthread_getspecific(key);
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-int swift::_swift_stdlib_thread_setspecific(__swift_thread_key_t key,
-                                            const void * _Nullable value) {
+int swift::_stdlib_thread_setspecific(__swift_thread_key_t key,
+                                      const void * _Nullable value) {
   return pthread_setspecific(key, value);
 }
 #endif
@@ -166,7 +261,7 @@ int swift::_swift_stdlib_thread_setspecific(__swift_thread_key_t key,
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
+size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_size(ptr);
 }
 #elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
@@ -175,19 +270,19 @@ size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
 #endif
 #include <malloc.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
+size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
 #elif defined(_WIN32)
 #include <malloc.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
+size_t swift::_stdlib_malloc_size(const void *ptr) {
   return _msize(const_cast<void *>(ptr));
 }
 #elif defined(__FreeBSD__)
 #include <malloc_np.h>
 SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
+size_t swift::_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
 #else
@@ -201,13 +296,13 @@ static std::mt19937 &getGlobalMT19937() {
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_uint32_t swift::_swift_stdlib_cxx11_mt19937() {
+__swift_uint32_t swift::_stdlib_cxx11_mt19937() {
   return getGlobalMT19937()();
 }
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint32_t
-swift::_swift_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
+swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   if (upper_bound > 0)
     upper_bound--;
   std::uniform_int_distribution<__swift_uint32_t> RandomUniform(0, upper_bound);

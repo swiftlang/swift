@@ -675,7 +675,7 @@ private:
                               Node::Kind::GenericSpecializationNotReAbstracted :
                               Node::Kind::GenericSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is externally inlinable.
       if (Mangled.nextIf("q")) {
         auto kind = Node::Kind::SpecializationIsFragile;
         spec->addChild(Factory.createNode(kind), Factory);
@@ -692,7 +692,7 @@ private:
       auto spec =
           Factory.createNode(Node::Kind::FunctionSignatureSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is externally inlinable.
       if (Mangled.nextIf("q")) {
         auto kind = Node::Kind::SpecializationIsFragile;
         spec->addChild(Factory.createNode(kind), Factory);
@@ -858,7 +858,8 @@ private:
     if (Mangled.nextIf('o'))
       return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_OBJC);
     if (Mangled.nextIf('C'))
-      return Factory.createNode(Node::Kind::Module, MANGLING_MODULE_C);
+      return Factory.createNode(Node::Kind::Module,
+                                MANGLING_MODULE_CLANG_IMPORTER);
     if (Mangled.nextIf('a'))
       return createSwiftType(Node::Kind::Structure, "Array");
     if (Mangled.nextIf('b'))
@@ -1848,6 +1849,9 @@ private:
       if (c == 'p')
         return Factory.createNode(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");
+      if (c == 't')
+        return Factory.createNode(Node::Kind::BuiltinTypeName,
+                                     "Builtin.SILToken");
       if (c == 'w')
         return Factory.createNode(Node::Kind::BuiltinTypeName,
                                      "Builtin.Word");

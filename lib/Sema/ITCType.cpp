@@ -54,7 +54,7 @@ bool IterativeTypeChecker::isResolveTypeReprSatisfied(
         // If we're only looking to resolve the structure of the type,
         // don't walk into generic arguments. They don't affect the
         // structure.
-        if (Options.contains(TR_ResolveStructure) &&
+        if (Options.contains(TypeResolutionFlags::ResolveStructure) &&
             isa<GenericIdentTypeRepr>(ident))
           return false;
       }

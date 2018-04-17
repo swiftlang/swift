@@ -1,6 +1,9 @@
-// RUN: %scale-test -Xfrontend=-propagate-constraints --begin 1 --end 5 --step 1 --select incrementScopeCounter %s --polynomial-threshold 1.7
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select incrementScopeCounter %s --polynomial-threshold 1.7
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
+
+// FIXME: https://bugs.swift.org/browse/SR-6520
+// REQUIRES: SR6520
 
 let derivative = { (t: Double) -> (Double) in
   return -2.0 / (

@@ -1,11 +1,12 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -Xllvm -sil-disable-pass="External Definition To Declaration" -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 sil_stage canonical
 
 // CHECK: define{{( protected)?}} swiftcc void @public_fragile_function_test() {{.*}} {
-// CHECK: define{{( protected)?}} internal swiftcc void @public_transparent_fragile_function_test() {{.*}} {
+// CHECK: define{{( protected)?}} swiftcc void @public_transparent_fragile_function_test() {{.*}} {
 // CHECK: define{{( protected)?}} swiftcc void @public_transparent_function_test() {{.*}} {
-// CHECK: define{{( hidden)?}} swiftcc void @hidden_fragile_function_test() {{.*}} {
+// CHECK: define hidden swiftcc void @public_non_abi_function_test() {{.*}} {
+// CHECK: define hidden swiftcc void @hidden_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_fragile_function_test() {{.*}} {
 // CHECK: define{{( internal)?}} swiftcc void @private_fragile_function_test() {{.*}} {
 // Public external functions are not emitted into clients.
@@ -33,6 +34,11 @@ sil public [transparent] [serialized] @public_transparent_fragile_function_test 
 }
 
 sil public [transparent] @public_transparent_function_test : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil non_abi [serialized] @public_non_abi_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
@@ -138,6 +144,7 @@ sil public @use_all_symbols : $@convention(thin) () -> () {
   %0 = function_ref @public_fragile_function_test : $@convention(thin) () -> ()
   %t0 = function_ref @public_transparent_fragile_function_test : $@convention(thin) () -> ()
   %t1 = function_ref @public_transparent_function_test : $@convention(thin) () -> ()
+  %t2 = function_ref @public_non_abi_function_test : $@convention(thin) () -> ()
   %1 = function_ref @hidden_fragile_function_test : $@convention(thin) () -> ()
   %2 = function_ref @shared_fragile_function_test : $@convention(thin) () -> ()
   %3 = function_ref @private_fragile_function_test : $@convention(thin) () -> ()

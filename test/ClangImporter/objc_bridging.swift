@@ -26,20 +26,20 @@ extension Set {
 }
 
 func foo() {
-  _  = NSStringToNSString as (String!) -> String?
+  _  = NSStringToNSString as (String?) -> String?
   _ = DummyClass().nsstringProperty.onlyOnString() as String
 
   _  = BOOLtoBOOL as (Bool) -> Bool
   _  = DummyClass().boolProperty.onlyOnBool() as Bool
 
-  _  = arrayToArray as (Array<Any>!) -> (Array<Any>!)
+  _  = arrayToArray as (Array<Any>?) -> (Array<Any>?)
   DummyClass().arrayProperty.onlyOnArray()
 
-  _ = dictToDict as (Dictionary<AnyHashable, Any>!) -> Dictionary<AnyHashable, Any>!
+  _ = dictToDict as (Dictionary<AnyHashable, Any>?) -> Dictionary<AnyHashable, Any>?
 
   DummyClass().dictProperty.onlyOnDictionary()
 
-  _ = setToSet as (Set<AnyHashable>!) -> Set<AnyHashable>!
+  _ = setToSet as (Set<AnyHashable>?) -> Set<AnyHashable>?
   DummyClass().setProperty.onlyOnSet()
 }
 

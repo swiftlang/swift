@@ -50,23 +50,16 @@ namespace swift {
 
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
-  void performSILDiagnoseUnreachable(SILModule *M, SILModuleTransform *T);
+  void performSILDiagnoseUnreachable(SILModule *M);
 
   /// \brief Remove dead functions from \p M.
   void performSILDeadFunctionElimination(SILModule *M);
 
-  /// \brief Link a SILFunction declaration to the actual definition in the
-  /// serialized modules.
-  ///
-  /// \param M the SILModule on which to operate
-  /// \param LinkAll when true, always link. For testing purposes.
-  void performSILLinking(SILModule *M, bool LinkAll = false);
-
   /// \brief Convert SIL to a lowered form suitable for IRGen.
   void runSILLoweringPasses(SILModule &M);
 
-  /// \brief Perform SIL Inst Count on M.
-  void performSILInstCount(SILModule *M);
+  /// \brief Perform SIL Inst Count on M if needed.
+  void performSILInstCountIfNeeded(SILModule *M);
 
   /// \brief Identifiers for all passes. Used to procedurally create passes from
   /// lists of passes.
@@ -80,7 +73,6 @@ namespace swift {
   PassKind PassKindFromString(StringRef ID);
   StringRef PassKindID(PassKind Kind);
   StringRef PassKindTag(PassKind Kind);
-  StringRef PassKindName(PassKind Kind);
 
 #define PASS(ID, TAG, NAME) SILTransform *create##ID();
 #define IRGEN_PASS(ID, TAG, NAME)

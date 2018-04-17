@@ -83,7 +83,6 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   if (decls.empty())
     return false;
 
-  ASTContext &ctx = decls.front()->getASTContext();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
     while (auto overrides = decl->getOverriddenDecl()) {
@@ -95,7 +94,7 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
       // C.init overrides B.init overrides A.init, but only C.init and
       // A.init are in the chain. Make sure we still remove A.init from the
       // set in this case.
-      if (decl->getFullName().getBaseName() == ctx.Id_init) {
+      if (decl->getFullName().getBaseName() == DeclBaseName::createConstructor()) {
         /// FIXME: Avoid the possibility of an infinite loop by fixing the root
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
@@ -193,7 +192,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // constrained extensions, so use the overload signature's
     // type. This is layering a partial fix upon a total hack.
     if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
-      signature = asd->getOverloadSignature().InterfaceType;
+      signature = asd->getOverloadSignatureType();
 
     // If we've seen a declaration with this signature before, note it.
     auto &knownDecls =
@@ -1024,15 +1023,6 @@ public:
     return Lookup.find(name);
   }
 
-  /// \brief Add an empty entry to the lookup map for a given name if it does
-  /// not yet have one.
-  void addEmptyEntry(DeclName name) {
-    (void)Lookup[name];
-    if (!name.isSimpleName()) {
-      (void)Lookup[name.getBaseName()];
-    }
-  }
-
   // \brief Mark all Decls in this table as not-resident in a table, drop
   // references to them. Should only be called when this was not fully-populated
   // from an IterableDeclContext.
@@ -1042,7 +1032,7 @@ public:
     assert(LastExtensionIncluded == nullptr);
     for (auto const &i : Lookup) {
       for (auto d : i.getSecond()) {
-        d->ValueDeclBits.AlreadyInLookupTable = false;
+        d->setAlreadyInLookupTable(false);
       }
     }
     Lookup.clear();
@@ -1111,10 +1101,10 @@ void MemberLookupTable::addMember(Decl *member) {
 
   // If this declaration is already in the lookup table, don't add it
   // again.
-  if (vd->ValueDeclBits.AlreadyInLookupTable) {
+  if (vd->isAlreadyInLookupTable()) {
     return;
   }
-  vd->ValueDeclBits.AlreadyInLookupTable = true;
+  vd->setAlreadyInLookupTable();
 
   // Add this declaration to the lookup set under its compound name and simple
   // name.
@@ -1176,7 +1166,8 @@ void ExtensionDecl::addedMember(Decl *member) {
       return;
 
     auto nominal = getExtendedType()->getAnyNominal();
-    if (nominal->LookupTable.getPointer()) {
+    if (nominal->LookupTable.getPointer() &&
+        nominal->LookupTable.getInt()) {
       // Make sure we have the complete list of extensions.
       // FIXME: This is completely unnecessary. We want to determine whether
       // our own extension has already been included in the lookup table.
@@ -1246,6 +1237,70 @@ void ExtensionDecl::addedMember(Decl *member) {
 // In all lookup routines, the 'ignoreNewExtensions' flag means that
 // lookup should only use the set of extensions already observed.
 
+static bool
+populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
+                                          MemberLookupTable &LookupTable,
+                                          DeclName name,
+                                          IterableDeclContext *IDC) {
+  if (IDC->isLoadingLazyMembers()) {
+    return false;
+  }
+  IDC->setLoadingLazyMembers(true);
+  auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
+                                                   /*lazyLoader=*/nullptr);
+  if (auto res = ci->loader->loadNamedMembers(IDC, name.getBaseName(),
+                                              ci->memberData)) {
+    IDC->setLoadingLazyMembers(false);
+    if (auto s = ctx.Stats) {
+      ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
+    }
+    for (auto d : *res) {
+      LookupTable.addMember(d);
+    }
+    return false;
+  } else {
+    IDC->setLoadingLazyMembers(false);
+    if (auto s = ctx.Stats) {
+      ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
+    }
+    return true;
+  }
+}
+
+static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
+    ASTContext &ctx, MemberLookupTable &LookupTable, DeclName name,
+    IterableDeclContext *IDC) {
+  for (auto m : IDC->getCurrentMembersWithoutLoading()) {
+    if (auto v = dyn_cast<ValueDecl>(m)) {
+      if (v->getFullName().matchesRef(name.getBaseName())) {
+        LookupTable.addMember(m);
+      }
+    }
+  }
+}
+
+static bool
+populateLookupTableEntryFromExtensions(ASTContext &ctx,
+                                       MemberLookupTable &table,
+                                       NominalTypeDecl *nominal,
+                                       DeclName name,
+                                       bool ignoreNewExtensions) {
+  if (!ignoreNewExtensions) {
+    for (auto e : nominal->getExtensions()) {
+      if (e->wasDeserialized() || e->hasClangNode()) {
+        if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
+                                                      name, e)) {
+          return true;
+        }
+      } else {
+        populateLookupTableEntryFromCurrentMembersWithoutLoading(ctx, table,
+                                                                 name, e);
+      }
+    }
+  }
+  return false;
+}
+
 void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   // If we haven't allocated the lookup table yet, do so now.
   if (!LookupTable.getPointer()) {
@@ -1253,24 +1308,34 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
     LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
   }
 
-  // If we're an IDC that has not yet loaded its full member set, we're doing
-  // NamedLazyMemberLoading, and we should not force getMembers().
-  if (hasLazyMembers())
-    return;
+  if (hasLazyMembers()) {
+    // Lazy members: if the table needs population, populate the table _only
+    // from those members already in the IDC member list_ such as implicits or
+    // globals-as-members, then update table entries from the extensions that
+    // have the same names as any such initial-population members.
+    if (!LookupTable.getInt()) {
+      LookupTable.setInt(true);
+      LookupTable.getPointer()->addMembers(getCurrentMembersWithoutLoading());
+      for (auto *m : getCurrentMembersWithoutLoading()) {
+        if (auto v = dyn_cast<ValueDecl>(m)) {
+          populateLookupTableEntryFromExtensions(getASTContext(),
+                                                 *LookupTable.getPointer(),
+                                                 this, v->getBaseName(),
+                                                 ignoreNewExtensions);
+        }
+      }
+    }
 
-  // If we haven't walked the member list yet to update the lookup
-  // table, do so now.
-  if (!LookupTable.getInt()) {
-    // Note that we'll have walked the members now.
-    LookupTable.setInt(true);
-
-    // Add the members of the nominal declaration to the table.
-    LookupTable.getPointer()->addMembers(getMembers());
-  }
-
-  if (!ignoreNewExtensions) {
-    // Update the lookup table to introduce members from extensions.
-    LookupTable.getPointer()->updateLookupTable(this);
+  } else {
+    // No lazy members: if the table needs population, populate the table
+    // en-masse; and in either case update the extensions.
+    if (!LookupTable.getInt()) {
+      LookupTable.setInt(true);
+      LookupTable.getPointer()->addMembers(getMembers());
+    }
+    if (!ignoreNewExtensions) {
+      LookupTable.getPointer()->updateLookupTable(this);
+    }
   }
 }
 
@@ -1283,53 +1348,32 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
   LookupTable.getPointer()->addMember(member);
 }
 
-static bool
-populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
-                                          MemberLookupTable &LookupTable,
-                                          DeclName name,
-                                          IterableDeclContext *IDC) {
-  auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
-                                                   /*lazyLoader=*/nullptr);
-  // Populate LookupTable with an empty vector before we call into our loader,
-  // so that any reentry of this routine will find the set-so-far, and not
-  // fall into infinite recursion.
-  LookupTable.addEmptyEntry(name);
-  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
-    if (auto s = ctx.Stats) {
-      ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
-    }
-    for (auto d : *res) {
-      LookupTable.addMember(d);
-    }
-    return false;
-  } else {
-    if (auto s = ctx.Stats) {
-      ++s->getFrontendCounters().NamedLazyMemberLoadFailureCount;
-    }
-    return true;
-  }
-}
-
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
-  RecursiveSharedTimer::Guard guard;
   ASTContext &ctx = getASTContext();
+  FrontendStatsTracer tracer(ctx.Stats, "lookup-direct", this);
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
-    guard = s->getFrontendRecursiveSharedTimers()
-                .NominalTypeDecl__lookupDirect.getGuard();
   }
-
-  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
-        << ", lookupTable.getInt()=" << LookupTable.getInt()
-        << ", hasLazyMembers()=" << hasLazyMembers()
-        << "\n");
 
   // We only use NamedLazyMemberLoading when a user opts-in and we have
   // not yet loaded all the members into the IDC list in the first place.
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
+
+  // FIXME: At present, lazy member loading conflicts with a bunch of other code
+  // that appears to special-case initializers (clang-imported initializer
+  // sorting, implicit initializer synthesis), so for the time being we have to
+  // turn it off for them entirely.
+  if (name.getBaseName() == DeclBaseName::createConstructor())
+    useNamedLazyMemberLoading = false;
+
+  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
+        << ", lookupTable.getInt()=" << LookupTable.getInt()
+        << ", hasLazyMembers()=" << hasLazyMembers()
+        << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
+        << "\n");
 
   // We check the LookupTable at most twice, possibly treating a miss in the
   // first try as a cache-miss that we then do a cache-fill on, and retry.
@@ -1339,12 +1383,22 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // populated the IDC and brought it up to date with any extensions. This
     // will flip the hasLazyMembers() flag to false as well.
     if (!useNamedLazyMemberLoading) {
-      // If we're about to load members here, purge the MemberLookupTable;
-      // it will be rebuilt in prepareLookup, below.
-      if (hasLazyMembers() && LookupTable.getPointer()) {
-        // We should not have scanned the IDC list yet. Double check.
-        assert(!LookupTable.getInt());
+      // It's possible that the lookup table exists but has information in it
+      // that is either currently out of date or soon to be out of date.
+      // This can happen two ways:
+      //
+      //   - We've not yet indexed the members we have (LookupTable.getInt()
+      //     is zero).
+      //
+      //   - We've still got more lazy members left to load; this can happen
+      //     even if we _did_ index some members.
+      //
+      // In either of these cases, we want to reset the table to empty and
+      // mark it as needing reconstruction.
+      if (LookupTable.getPointer() &&
+          (hasLazyMembers() || !LookupTable.getInt())) {
         LookupTable.getPointer()->clear();
+        LookupTable.setInt(false);
       }
 
       (void)getMembers();
@@ -1358,8 +1412,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     }
 
     // Next, in all cases, prepare the lookup table for use, possibly
-    // repopulating it from the IDC if just did our initial IDC population
-    // above.
+    // repopulating it from the IDC if the IDC member list has just grown.
     prepareLookupTable(ignoreNewExtensions);
 
     // Look for a declaration with this name.
@@ -1380,18 +1433,10 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // false, and we fall back to loading all members during the retry.
     auto &Table = *LookupTable.getPointer();
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                  name, this)) {
+                                                  name, this) ||
+        populateLookupTableEntryFromExtensions(ctx, Table, this, name,
+                                               ignoreNewExtensions)) {
       useNamedLazyMemberLoading = false;
-    } else {
-      if (!ignoreNewExtensions) {
-        for (auto E : getExtensions()) {
-          if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                        name, E)) {
-            useNamedLazyMemberLoading = false;
-            break;
-          }
-        }
-      }
     }
   }
 
@@ -1462,12 +1507,36 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
-                        AccessLevel access) {
+AccessLevel
+ValueDecl::adjustAccessLevelForProtocolExtension(AccessLevel access) const {
+  if (auto *ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
+    if (auto *protocol = ext->getAsProtocolOrProtocolExtensionContext()) {
+      // Note: it gets worse. The standard library has public methods
+      // in protocol extensions of a @usableFromInline internal protocol,
+      // and expects these extension methods to witness public protocol
+      // requirements. Which works at the ABI level, so let's keep
+      // supporting that here by passing 'isUsageFromInline'.
+      auto protoAccess = protocol->getFormalAccess(/*useDC=*/nullptr,
+                                                   /*isUsageFromInline=*/true);
+      if (protoAccess == AccessLevel::Private)
+        protoAccess = AccessLevel::FilePrivate;
+      access = std::min(access, protoAccess);
+    }
+  }
+
+  return access;
+}
+
+static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
+                        AccessLevel access, bool forConformance) {
   if (!useDC)
     return access >= AccessLevel::Public;
 
-  assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
+  auto *sourceDC = VD->getDeclContext();
+
+  if (!forConformance)
+    access = VD->adjustAccessLevelForProtocolExtension(access);
+
   switch (access) {
   case AccessLevel::Private:
     return (useDC == sourceDC ||
@@ -1491,11 +1560,14 @@ static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
   llvm_unreachable("bad access level");
 }
 
-bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  return checkAccess(DC, getDeclContext(), getFormalAccess());
+bool ValueDecl::isAccessibleFrom(const DeclContext *DC,
+                                 bool forConformance) const {
+  auto access = getFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
 }
 
-bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
+bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
+                                                 bool forConformance) const {
   assert(isSettable(DC));
 
   // If a stored property does not have a setter, it is still settable from the
@@ -1507,7 +1579,20 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   if (isa<ParamDecl>(this))
     return true;
 
-  return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
+  auto access = getSetterFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
+}
+
+Type AbstractStorageDecl::getStorageInterfaceType() const {
+  if (auto var = dyn_cast<VarDecl>(this)) {
+    return var->getInterfaceType();
+  }
+  
+  if (auto sub = dyn_cast<SubscriptDecl>(this)) {
+    return sub->getElementInterfaceType();
+  }
+  
+  llvm_unreachable("unhandled storage decl kind");
 }
 
 bool DeclContext::lookupQualified(Type type,
@@ -1652,7 +1737,8 @@ bool DeclContext::lookupQualified(Type type,
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        if (!ctor->isInheritable())
+        if (isa<ClassDecl>(ctor->getDeclContext()) &&
+            !ctor->isInheritable())
           return false;
       } else {
         return false;
@@ -1695,7 +1781,7 @@ bool DeclContext::lookupQualified(Type type,
 
     // Make sure we've resolved implicit members, if we need them.
     if (typeResolver) {
-      if (member.getBaseName() == ctx.Id_init)
+      if (member.getBaseName() == DeclBaseName::createConstructor())
         typeResolver->resolveImplicitConstructors(current);
 
       typeResolver->resolveImplicitMember(current, member);
@@ -1724,7 +1810,7 @@ bool DeclContext::lookupQualified(Type type,
       // current class permits inheritance. Even then, only find complete
       // object initializers.
       bool visitSuperclass = true;
-      if (member.getBaseName() == ctx.Id_init) {
+      if (member.getBaseName() == DeclBaseName::createConstructor()) {
         if (classDecl->inheritsSuperclassInitializers(typeResolver))
           onlyCompleteObjectInits = true;
         else
@@ -1785,6 +1871,10 @@ bool DeclContext::lookupQualified(Type type,
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.
       if (decl->getOverriddenDecl())
+        continue;
+
+      // If the declaration is not @objc, it cannot be called dynamically.
+      if (!decl->isObjC())
         continue;
 
       auto dc = decl->getDeclContext();

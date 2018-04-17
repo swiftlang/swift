@@ -827,10 +827,9 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   if (decl->isImplicit()) return nullptr;
 
   // Accessors are always nested within their abstract storage declaration.
-  if (auto func = dyn_cast<FuncDecl>(decl)) {
-    if (func->isAccessor() &&
-        !parentDirectDescendedFromAbstractStorageDecl(
-            parent, func->getAccessorStorageDecl()))
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    if (!parentDirectDescendedFromAbstractStorageDecl(
+            parent, accessor->getStorage()))
       return nullptr;
   }
 
@@ -882,6 +881,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   case DeclKind::Param:
   case DeclKind::EnumElement:
   case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
     // These declarations do not introduce scopes.
     return nullptr;
@@ -934,6 +934,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
   }
 
   case DeclKind::Func:
+  case DeclKind::Accessor:
   case DeclKind::Constructor:
   case DeclKind::Destructor: {
     auto abstractFunction = cast<AbstractFunctionDecl>(decl);
@@ -1417,8 +1418,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
   case ASTScopeKind::AbstractFunctionDecl: {
     // For an accessor, all of the parameters are implicit, so start them at
     // the start location of the accessor.
-    if (isa<FuncDecl>(abstractFunction) &&
-        cast<FuncDecl>(abstractFunction)->isAccessor())
+    if (isa<AccessorDecl>(abstractFunction))
       return SourceRange(abstractFunction->getLoc(),
                          abstractFunction->getEndLoc());
 
@@ -1430,8 +1430,7 @@ SourceRange ASTScope::getSourceRangeImpl() const {
 
     // For an accessor, all of the parameters are implicit, so start them at
     // the start location of the accessor.
-    if (isa<FuncDecl>(abstractFunctionParams.decl) &&
-        cast<FuncDecl>(abstractFunctionParams.decl)->isAccessor())
+    if (isa<AccessorDecl>(abstractFunctionParams.decl))
       return SourceRange(abstractFunctionParams.decl->getLoc(), endLoc);
 
     // For the 'self' parameter of a member function, use the start of the

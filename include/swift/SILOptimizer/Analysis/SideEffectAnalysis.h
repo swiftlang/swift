@@ -247,6 +247,9 @@ public:
     /// Get the array of parameter effects. If a side-effect can be associated
     /// to a specific parameter, it is contained here instead of the global
     /// effects.
+    /// Note that if a parameter effect is mayRelease(), it means that the
+    /// global function effects can be anything, because the destructor of an
+    /// object can have arbitrary side effects.
     ArrayRef<Effects> getParameterEffects() const { return ParamEffects; }
     
     /// Merge effects from \p RHS.

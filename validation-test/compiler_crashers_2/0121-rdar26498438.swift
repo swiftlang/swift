@@ -1,4 +1,8 @@
 // RUN: not --crash %target-swift-frontend %s -emit-ir
+
+// rdar://26498438
+// REQUIRES: no_asan
+
 class C { }
 
 protocol PI

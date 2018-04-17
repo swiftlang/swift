@@ -41,9 +41,10 @@ extension AudioBuffer {
     _ typedBuffer: UnsafeMutableBufferPointer<Element>,
     numberOfChannels: Int
   ) {
-    self.mNumberChannels = UInt32(numberOfChannels)
-    self.mData = UnsafeMutableRawPointer(typedBuffer.baseAddress)
-    self.mDataByteSize = UInt32(typedBuffer.count * MemoryLayout<Element>.stride)
+    let byteSize = typedBuffer.count * MemoryLayout<Element>.stride
+    self.init(mNumberChannels: UInt32(numberOfChannels),
+              mDataByteSize: UInt32(byteSize),
+              mData: UnsafeMutableRawPointer(typedBuffer.baseAddress))
   }
 }
 
@@ -162,15 +163,15 @@ extension UnsafeMutableAudioBufferListPointer
   }
 
   public subscript(bounds: Range<Int>)
-    -> MutableRandomAccessSlice<UnsafeMutableAudioBufferListPointer> {
+    -> Slice<UnsafeMutableAudioBufferListPointer> {
     get {
-      return MutableRandomAccessSlice(base: self, bounds: bounds)
+      return Slice(base: self, bounds: bounds)
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
   }
 
-  public typealias Indices = CountableRange<Int>
+  public typealias Indices = Range<Int>
 }
 

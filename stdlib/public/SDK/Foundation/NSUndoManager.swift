@@ -13,19 +13,13 @@
 @_exported import Foundation // Clang module
 import _SwiftFoundationOverlayShims
 
-@_silgen_name("NS_Swift_NSUndoManager_registerUndoWithTargetHandler")
-internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
-  _ self_: AnyObject,
-  _ target: AnyObject,
-  _ handler: @escaping @convention(block) (AnyObject) -> Void)
-
 extension UndoManager {
   @available(*, unavailable, renamed: "registerUndo(withTarget:handler:)")
   public func registerUndoWithTarget<TargetType : AnyObject>(_ target: TargetType, handler: (TargetType) -> Void) {
     fatalError("This API has been renamed")
   }
 
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func registerUndo<TargetType : AnyObject>(withTarget target: TargetType, handler: @escaping (TargetType) -> Void) {
     __NSUndoManagerRegisterWithTargetHandler( self, target) { internalTarget in
       handler(internalTarget as! TargetType)

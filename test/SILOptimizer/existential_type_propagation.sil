@@ -227,7 +227,7 @@ sil_witness_table hidden X: P module nix {
 
 
 sil_vtable ArrayClassReaderWriter {
-  #ArrayClassReaderWriter.init!initializer.1: _TFC28existential_type_propagation22ArrayClassReaderWritercfMS0_FT_S0_
+  #ArrayClassReaderWriter.init!initializer.1: @_TFC28existential_type_propagation22ArrayClassReaderWritercfMS0_FT_S0_
 }
 
 sil_witness_table public_external ArrayClassReaderWriter: ReaderWriterType module main {
@@ -291,6 +291,51 @@ bb0(%0 : $XXX):
   strong_release %0 : $XXX
   %11 = tuple ()
   return %11 : $()
+}
+
+@objc protocol Q : class {
+  @objc func bar()
+}
+
+// rdar://35800315: crash in SILBuilder::addOpenedArchetypeOperands.
+//
+// When SILCombineApply propagates concrete types it temporarily installed an
+// opened archetype tracker to rewrite witness_method. It may then fail because
+// the copied existential is destroyed before the method is applied leaving a
+// dangling stack pointer. If silcombine continues iterating it may hit an
+// objc_method, which does a lookup in the archetype tracker.
+sil @silcombine_apply_opened_archetype : $@convention(thin) (@in P, Q) -> () {
+bb0(%0 : $*P, %1 : $Q):
+  // A single operand instruction that uses an opened existential.
+  // For some reason this is handled specialy in
+  // SILBuilder::addOpenedArchetypeOperands.
+  %ref = open_existential_ref %1 : $Q to $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0") Q
+  %om = objc_method %ref : $@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0") Q, #Q.bar!1.foreign : <Self where Self : Q> (Self) -> () -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : Q> (τ_0_0) -> ()
+  %call1 = apply %om<@opened("D66B9398-D800-11E7-8432-0A0000BBF6C0") Q>(%ref) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Q> (τ_0_0) -> ()
+
+  // Some code to simplify in iteration #1
+  %ptr = address_to_pointer %0 : $*P to $Builtin.RawPointer
+  %adr = pointer_to_address %ptr : $Builtin.RawPointer to $*P
+
+  // Some code to confuse SILCombineApply.
+  %p0 = alloc_stack $P
+  %opened = open_existential_addr immutable_access %adr : $*P to $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  %p1 = alloc_stack $P
+  %v1 = init_existential_addr %p1 : $*P, $@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  copy_addr %opened to [initialization] %v1 : $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  copy_addr [take] %p1 to [initialization] %p0 : $*P
+  destroy_addr %0 : $*P
+  %v0 = open_existential_addr immutable_access %p0 : $*P to $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  %p2 = alloc_stack $@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  copy_addr %v0 to [initialization] %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  %wm = witness_method $@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P, #P.foo : <T where T : P> (T) -> () -> Int64, %opened : $*@opened("A66B9398-D800-11E7-8432-0A0000BBF6C0") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %call2 = apply %wm<@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P>(%p2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  destroy_addr %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  dealloc_stack %p2 : $*@opened("B66B9398-D800-11E7-8432-0A0000BBF6C0") P
+  dealloc_stack %p1 : $*P
+  dealloc_stack %p0 : $*P
+  %r = tuple ()
+  return %r : $()
 }
 
 sil @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_ : $@convention(witness_method: PPP) (@guaranteed XXX) -> ()

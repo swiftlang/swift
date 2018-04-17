@@ -20,6 +20,10 @@ extension Double : P2 {
 
 extension X<Int, Double, String> { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
 
+typealias GGG = X<Int, Double, String>
+
+extension GGG { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
+
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
   let x = 0

@@ -26,13 +26,14 @@
 namespace swift {
 namespace irgen {
 
+using SwiftAggLowering = clang::CodeGen::swiftcall::SwiftAggLowering;
+
 class NativeConventionSchema {
-  clang::CodeGen::swiftcall::SwiftAggLowering Lowering;
+  SwiftAggLowering Lowering;
   bool RequiresIndirect;
 
 public:
-  using EnumerationCallback =
-      clang::CodeGen::swiftcall::SwiftAggLowering::EnumerationCallback;
+  using EnumerationCallback = SwiftAggLowering::EnumerationCallback;
 
   NativeConventionSchema(IRGenModule &IGM, const TypeInfo *TI, bool isResult);
 
@@ -55,7 +56,8 @@ public:
   /// Map from a non-native explosion to an explosion that follows the native
   /// calling convention's schema.
   Explosion mapIntoNative(IRGenModule &IGM, IRGenFunction &IGF,
-                          Explosion &fromNonNative, SILType type) const;
+                          Explosion &fromNonNative, SILType type,
+                          bool isOutlined) const;
 
   /// Map form a native explosion that follows the native calling convention's
   /// schema to a non-native explosion whose schema is described by

@@ -56,7 +56,7 @@
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
@@ -260,13 +260,12 @@
 // LINUX_DYNLIB-x86_64-DAG: -fuse-ld=gold
 // LINUX_DYNLIB-x86_64-NOT: -pie
 // LINUX_DYNLIB-x86_64-DAG: -Xlinker -rpath -Xlinker [[STDLIB_PATH:[^ ]+/lib/swift/linux]]
-// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_begin.o
+// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swiftrt.o
 // LINUX_DYNLIB-x86_64-DAG: [[OBJECTFILE]]
 // LINUX_DYNLIB-x86_64-DAG: @[[AUTOLINKFILE]]
 // LINUX_DYNLIB-x86_64-DAG: [[STDLIB_PATH]]
 // LINUX_DYNLIB-x86_64-DAG: -lswiftCore
 // LINUX_DYNLIB-x86_64-DAG: -L bar
-// LINUX_DYNLIB-x86_64: [[STDLIB_PATH]]/x86_64/swift_end.o
 // LINUX_DYNLIB-x86_64: -o dynlib.out
 
 // DEBUG: bin/swift

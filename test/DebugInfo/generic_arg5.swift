@@ -6,7 +6,7 @@ public struct S<Type>
 
 public func foo<Type>(_ values : [S<Type>])
 {
-  // CHECK: define {{.*}}_T012generic_arg53fooySayAA1SVyxGGlFAESgAEcfU_
+  // CHECK: define {{.*}}$S12generic_arg53fooyySayAA1SVyxGGlFAESgAEXEfU_
   // CHECK: call void @llvm.dbg.declare
   // CHECK: call void @llvm.dbg.declare(metadata %[[TY:.*]]** %[[ALLOCA:[^,]+]],
   // CHECK-SAME:       metadata ![[ARG:[0-9]+]],
@@ -16,7 +16,7 @@ public func foo<Type>(_ values : [S<Type>])
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
   // CHECK-SAME:                        line: [[@LINE+3]],
   // CHECK-SAME:     type: ![[TY:.*]])
-  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_T012generic_arg51SVyAA3fooySayACyxGGlFQq_GD")
+  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "$S12generic_arg51SVyAA3fooyySayACyxGGlFQq_GD")
   let _ = values.flatMap { arg in
     return .some(arg)
   }

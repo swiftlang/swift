@@ -55,7 +55,7 @@ private:
 public:
   FormatterDocument(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     // Formatting logic requires tokens on source file.
-    CompInv.getLangOptions().KeepTokensInSourceFile = true;
+    CompInv.getLangOptions().CollectParsedToken = true;
     updateCode(std::move(Buffer));
   }
 

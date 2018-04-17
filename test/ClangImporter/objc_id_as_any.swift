@@ -25,7 +25,7 @@ idLover.takesArray(ofId: &y) // expected-error{{argument type 'Any' does not con
 idLover.takesId(x)
 idLover.takesId(y)
 
-install_global_event_handler(idLover) // expected-error {{cannot convert value of type 'NSIdLover' to expected argument type 'event_handler?' (aka 'Optional<@convention(c) (AnyObject) -> ()>')}}
+install_global_event_handler(idLover) // expected-error {{cannot convert value of type 'NSIdLover' to expected argument type 'event_handler?' (aka 'Optional<@convention(c) (Any) -> ()>')}}
 
 // FIXME: this should not type-check!
 // Function conversions are not legal when converting to a thin function type.

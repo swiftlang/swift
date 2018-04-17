@@ -225,6 +225,18 @@ BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)
 /// or else undefined behavior will ensue.
 BUILTIN_SIL_OPERATION(CastToBridgeObject, "castToBridgeObject", Special)
 
+/// ValueToBridgeObject has type (T) -> Builtin.BridgeObject.
+/// It sets the BridgeObject to a tagged pointer representation holding its
+//  operands by tagging and shifting the operand if needed.
+///
+/// valueToBridgeObject(x) === (x << _swift_abi_ObjCReservedLowBits) |
+///     _swift_BridgeObject_TaggedPointerBits
+///
+/// x thus must not be using any high bits shifted away (via _swift_abi_ObjCReservedLowBits)
+/// or the tag bits post-shift.
+/// ARC operations on such tagged values are NOPs.
+BUILTIN_SIL_OPERATION(ValueToBridgeObject, "valueToBridgeObject", Special)
+
 /// CastReferenceFromBridgeObject has type (Builtin.BridgeObject) -> T.
 /// It recovers the heap object reference by masking spare bits from the
 /// BridgeObject.
@@ -237,6 +249,13 @@ BUILTIN_SIL_OPERATION(CastReferenceFromBridgeObject,
 BUILTIN_SIL_OPERATION(CastBitPatternFromBridgeObject,
                       "castBitPatternFromBridgeObject",
                       Special)
+
+/// ClassifyBridgeObject has type:
+///      (Builtin.BridgeObject) -> (Builtin.Int1, Builtin.Int1).
+/// It interprets the bits mangled into a bridge object, returning whether it is
+/// an Objective-C object or tagged pointer representation.
+BUILTIN_SIL_OPERATION(ClassifyBridgeObject, "classifyBridgeObject", Special)
+
 
 /// BridgeToRawPointer has type (T) -> Builtin.RawPointer
 BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
@@ -429,6 +448,8 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
+/// StringObjectOr has type (T,T) -> T.
+BUILTIN_MISC_OPERATION(StringObjectOr,     "stringObjectOr",      "n", Integer)
 
 /// Special truncation builtins that check for sign and overflow errors. These
 /// take an integer as an input and return a tuple of the truncated result and

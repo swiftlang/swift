@@ -114,6 +114,9 @@ var x15: Int {
   // applied to the getter.
   weak
   var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
+  // expected-warning@-1 {{instance will be immediately deallocated as 'foo' is a 'weak' variable}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'foo' declared here}}
   return 0
 }
 
@@ -1121,7 +1124,7 @@ class OwnershipBadSub : OwnershipBase {
 
 // <rdar://problem/17391625> Swift Compiler Crashes when Declaring a Variable and didSet in an Extension
 class rdar17391625 {
-  var prop = 42  // expected-note {{overridden declaration is here}}
+  var prop = 42  // expected-note {{overri}}
 }
 
 extension rdar17391625 {
@@ -1137,7 +1140,7 @@ class rdar17391625derived :  rdar17391625 {
 
 extension rdar17391625derived {
   // Not a stored property, computed because it is an override.
-  override var prop: Int { // expected-error {{overriding declarations in extensions is not supported}}
+  override var prop: Int { // expected-error {{overri}}
   didSet {
   }
   }

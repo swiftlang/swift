@@ -8,8 +8,8 @@ func f() -> Bool? { return nil }
   _ = (b, c)
 })()
 
-// CHECK-LABEL: @_T09alloc_boxyycfU_
+// CHECK-LABEL: @"$S9alloc_boxyyXEfU_"
 // CHECK: <label>:8:
-// CHECK: call void @swift_setDeallocating
-// CHECK: call void @swift_rt_swift_deallocObject
+// CHECK-NOT: call void @swift_setDeallocating
+// CHECK: call void @swift_deallocUninitializedObject
 

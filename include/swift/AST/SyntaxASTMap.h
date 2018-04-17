@@ -24,10 +24,6 @@
 
 namespace swift {
 
-namespace syntax {
-  class LegacyASTTransformer;
-}
-
 /// The top-level container and manager for semantic analysis.
 ///
 /// Eventually, this should contain cached semantic information such as

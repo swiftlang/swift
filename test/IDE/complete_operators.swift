@@ -58,6 +58,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_2| %FileCheck %s -check-prefix=ASSIGN_TUPLE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_3| %FileCheck %s -check-prefix=ASSIGN_TUPLE_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_1 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_2 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_3 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_4 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
+
 struct S {}
 postfix operator ++ {}
 postfix func ++(x: inout S) -> S { return x }
@@ -278,7 +283,7 @@ func testInfix16<T: P where T.T == S2>() {
 }
 
 // INFIX_16: Begin completions, 1 items
-// INFIX_16-NEXT: Pattern/ExprSpecific:               ({#(self): T#})[#() -> S2#]; name=(self: T)
+// INFIX_16-NEXT: Pattern/CurrModule:               ({#(self): T#})[#() -> S2#]; name=(self: T)
 // INFIX_16: End completions
 
 func testInfix17(x: Void) {
@@ -321,7 +326,7 @@ func testInfix22() {
   E.B#^INFIX_22^#
 }
 // INFIX_22: Begin completions, 1 items
-// INFIX_22-NEXT: Pattern/ExprSpecific:               ({#S2#})[#E#]; name=(S2)
+// INFIX_22-NEXT: Pattern/CurrModule:               ({#S2#})[#E#]; name=(S2)
 // INFIX_22: End completions
 
 func testSpace(x: S2) {
@@ -397,3 +402,25 @@ func testAssignTuple2() {
   (x, y)#^ASSIGN_TUPLE_2^#
 }
 // ASSIGN_TUPLE_2: BuiltinOperator/None:                        = {#(S2, S2)#}[#Void#];
+
+
+infix operator ====: ComparisonPrecedence
+infix operator &&&& : LogicalConjunctionPrecedence
+infix operator |||| : LogicalDisjunctionPrecedence
+struct Boolish {}
+func ====(x: Boolish, y: Boolish) -> Boolish { return x }
+func &&&&(x: Boolish, y: @autoclosure ()->Boolish) -> Boolish { return x }
+func ||||(x: Boolish, y: @autoclosure ()->Boolish) -> Boolish { return x }
+
+func testAutoclosure(x: Boolish, y: Boolish) {
+  if x #^INFIX_AUTOCLOSURE_1^# {}
+  if x &&&& y #^INFIX_AUTOCLOSURE_2^# {}
+  if x |||| y #^INFIX_AUTOCLOSURE_3^# {}
+  if x &&&& x |||| y #^INFIX_AUTOCLOSURE_4^# {}
+}
+
+// INFIX_AUTOCLOSURE_1: Begin completions
+// INFIX_AUTOCLOSURE_1-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']&&&& {#Boolish#}[#Boolish#];
+// INFIX_AUTOCLOSURE_1-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']==== {#Boolish#}[#Boolish#];
+// INFIX_AUTOCLOSURE_1-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']|||| {#Boolish#}[#Boolish#];
+// INFIX_AUTOCLOSURE_1: End completions

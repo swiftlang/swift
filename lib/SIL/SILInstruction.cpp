@@ -387,7 +387,8 @@ namespace {
     bool visitBeginAccessInst(const BeginAccessInst *right) {
       auto left = cast<BeginAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
-          && left->getEnforcement() == right->getEnforcement();
+          && left->getEnforcement() == right->getEnforcement()
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
     }
 
     bool visitEndAccessInst(const EndAccessInst *right) {
@@ -398,7 +399,8 @@ namespace {
     bool visitBeginUnpairedAccessInst(const BeginUnpairedAccessInst *right) {
       auto left = cast<BeginUnpairedAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
-          && left->getEnforcement() == right->getEnforcement();
+          && left->getEnforcement() == right->getEnforcement()
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
     }
 
     bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
@@ -742,6 +744,10 @@ namespace {
       return true;
     }
 
+    bool visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *RHS) {
+      return true;
+    }
+
     bool visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *RHS) {
       return true;
     }
@@ -758,11 +764,18 @@ namespace {
       return true;
     }
 
+    bool visitValueToBridgeObjectInst(ValueToBridgeObjectInst *i) {
+      return true;
+    }
+
     bool visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
       return true;
     }
       
     bool visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
+      return true;
+    }
+    bool visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
       return true;
     }
     bool visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
@@ -807,8 +820,6 @@ namespace {
 
     bool visitWitnessMethodInst(const WitnessMethodInst *RHS) {
       auto *X = cast<WitnessMethodInst>(LHS);
-      if (X->isVolatile() != RHS->isVolatile())
-        return false;
       if (X->getMember() != RHS->getMember())
         return false;
       if (X->getLookupType() != RHS->getLookupType())
@@ -994,6 +1005,10 @@ bool SILInstruction::mayRelease() const {
 
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
+  case SILInstructionKind::BeginApplyInst:
+  case SILInstructionKind::AbortApplyInst:
+  case SILInstructionKind::EndApplyInst:
+  case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::UnownedReleaseInst:
@@ -1055,6 +1070,7 @@ bool SILInstruction::mayRelease() const {
 bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
     return true;
   default:
@@ -1129,9 +1145,6 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 /// additional handling. It is important to know this information when
 /// you perform such optimizations like e.g. jump-threading.
 bool SILInstruction::isTriviallyDuplicatable() const {
-  if (isa<ThrowInst>(this))
-    return false;
-
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
   }
@@ -1139,7 +1152,6 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     if (ARI->canAllocOnStack())
       return false;
   }
-
   if (isa<OpenExistentialAddrInst>(this) || isa<OpenExistentialRefInst>(this) ||
       isa<OpenExistentialMetatypeInst>(this) ||
       isa<OpenExistentialValueInst>(this) || isa<OpenExistentialBoxInst>(this) ||
@@ -1156,6 +1168,13 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     if (MI->getMember().isForeign)
       return false;
   }
+  if (isa<ThrowInst>(this))
+    return false;
+
+  // BeginAccess defines the access scope entry point. All associated EndAccess
+  // instructions must directly operate on the BeginAccess.
+  if (isa<BeginAccessInst>(this))
+    return false;
 
   return true;
 }
@@ -1169,6 +1188,20 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
+}
+
+bool SILInstruction::isMetaInstruction() const {
+  // Every instruction that implements getVarInfo() should be in this list.
+  switch (getKind()) {
+  case SILInstructionKind::AllocBoxInst:
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueAddrInst:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Instruction not handled in isMetaInstruction()!");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1335,8 +1368,23 @@ SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
   return iterator(*this, getEndOffset());
 }
 
+SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rbegin() const {
+  return llvm::make_reverse_iterator(end());
+}
+
+SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rend() const {
+  return llvm::make_reverse_iterator(begin());
+}
+
 SILInstructionResultArray::range SILInstructionResultArray::getValues() const {
   return {begin(), end()};
+}
+
+SILInstructionResultArray::reverse_range
+SILInstructionResultArray::getReversedValues() const {
+  return {rbegin(), rend()};
 }
 
 const ValueBase *SILInstructionResultArray::front() const {
@@ -1375,33 +1423,17 @@ MultipleValueInstructionResult::MultipleValueInstructionResult(
 
 void MultipleValueInstructionResult::setOwnershipKind(
     ValueOwnershipKind NewKind) {
-  // Get the original data, merge in our new lower values and then reset the
-  // value in our data.
-  //
-  // *NOTE* This is a two phase set so if this code ever needs to be used in a
-  // concurrent context, a this will need to be updated.
-  uint64_t OriginalData = getSubclassData();
-  uint64_t NewData =
-      (OriginalData & ~ValueOwnershipKind::Mask) | uint64_t(NewKind);
-  setSubclassData(NewData);
+  Bits.MultipleValueInstructionResult.VOKind = unsigned(NewKind);
 }
 
 void MultipleValueInstructionResult::setIndex(unsigned NewIndex) {
-  // We only take the last 3 bytes for simplicity. If more bits are needed at
-  // some point, we can take 5 bits we are burning here and combine them with
-  // 6 bits from SILType, Operand to get more storage. But to do so now would
-  // be premature optimization since we could potentially use those bits for
-  // flags. 500k fields is probably enough.
-  assert(NewIndex < (1 << NumIndexBits) && "Unrepresentable index");
-  uint64_t OriginalData = getSubclassData();
-  uint64_t NewData = (OriginalData & ~(IndexMask << IndexBitOffset)) |
-                     (NewIndex << IndexBitOffset);
-  setSubclassData(NewData);
+  // We currently use 32 bits to store the Index. A previous comment wrote
+  // that "500k fields is probably enough".
+  Bits.MultipleValueInstructionResult.Index = NewIndex;
 }
 
 ValueOwnershipKind MultipleValueInstructionResult::getOwnershipKind() const {
-  uint64_t Data = getSubclassData() & ValueOwnershipKind::Mask;
-  return ValueOwnershipKind(Data);
+  return ValueOwnershipKind(Bits.MultipleValueInstructionResult.VOKind);
 }
 
 MultipleValueInstruction *MultipleValueInstructionResult::getParent() {

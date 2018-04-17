@@ -22,7 +22,7 @@ from gyb_foundation_support import \
 
 // MARK: Exposing SCNFloat
 
-#if os(OSX)
+#if os(macOS)
 public typealias SCNFloat = CGFloat
 #elseif os(iOS) || os(tvOS) || os(watchOS)
 public typealias SCNFloat = Float
@@ -32,14 +32,10 @@ public typealias SCNFloat = Float
 
 extension SCNVector3 {
   public init(_ x: Float, _ y: Float, _ z: Float) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z))
   }
   public init(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z))
   }
   public init(_ x: Double, _ y: Double, _ z: Double) {
     self.init(SCNFloat(x), SCNFloat(y), SCNFloat(z))
@@ -71,16 +67,10 @@ extension double3 {
 
 extension SCNVector4 {
   public init(_ x: Float, _ y: Float, _ z: Float, _ w: Float) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
-    self.w = SCNFloat(w)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z), w: SCNFloat(w))
   }
   public init(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat, _ w: CGFloat) {
-    self.x = SCNFloat(x)
-    self.y = SCNFloat(y)
-    self.z = SCNFloat(z)
-    self.w = SCNFloat(w)
+    self.init(x: SCNFloat(x), y: SCNFloat(y), z: SCNFloat(z), w: SCNFloat(w))
   }
   public init(_ x: Double, _ y: Double, _ z: Double, _ w: Double) {
     self.init(SCNFloat(x), SCNFloat(y), SCNFloat(z), SCNFloat(w))
@@ -152,7 +142,7 @@ extension double4x4 {
 // MARK: Swift Extensions
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.8)
+@available(macOS, introduced: 10.8)
 extension SCNGeometryElement {
   /// Creates an instance from `indices` for a `primitiveType`
   /// that has a constant number of indices per primitive
@@ -185,7 +175,7 @@ extension SCNGeometryElement {
 }
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.8)
+@available(macOS, introduced: 10.8)
 extension SCNGeometrySource {
   @nonobjc
   public convenience init(vertices: [SCNVector3]) {
@@ -202,7 +192,7 @@ extension SCNGeometrySource {
 }
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.10)
+@available(macOS, introduced: 10.10)
 extension SCNBoundingVolume {
   public var boundingBox: (min: SCNVector3, max: SCNVector3) {
     get {
@@ -228,7 +218,7 @@ extension SCNBoundingVolume {
 // MARK: APIs refined for Swift
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.8)
+@available(macOS, introduced: 10.8)
 extension SCNSceneSource {
   public func entryWithIdentifier<T: AnyObject>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return self.__entry(withIdentifier: uid, with: entryClass) as! T?

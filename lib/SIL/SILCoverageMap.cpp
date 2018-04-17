@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/STLExtras.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILModule.h"
 
@@ -24,27 +25,32 @@ using llvm::coverage::CounterExpression;
 
 SILCoverageMap *
 SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
-                       bool External, uint64_t Hash,
+                       StringRef PGOFuncName, uint64_t Hash,
                        ArrayRef<MappedRegion> MappedRegions,
                        ArrayRef<CounterExpression> Expressions) {
   auto *Buf = M.allocate<SILCoverageMap>(1);
-  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(Hash, External);
+  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(Hash);
 
   // Store a copy of the names so that we own the lifetime.
   CM->Filename = M.allocateCopy(Filename);
   CM->Name = M.allocateCopy(Name);
+  CM->PGOFuncName = M.allocateCopy(PGOFuncName);
 
   // Since we have two arrays, we need to manually tail allocate each of them,
   // rather than relying on the flexible array trick.
   CM->MappedRegions = M.allocateCopy(MappedRegions);
   CM->Expressions = M.allocateCopy(Expressions);
 
-  M.coverageMaps.push_back(CM);
+  auto result = M.coverageMaps.insert({CM->PGOFuncName, CM});
+
+  // Assert that this coverage map is unique.
+  assert(result.second && "Duplicate coverage mapping for function");
+
   return CM;
 }
 
-SILCoverageMap::SILCoverageMap(uint64_t Hash, bool External)
-    : External(External), Hash(Hash) {}
+SILCoverageMap::SILCoverageMap(uint64_t Hash)
+    : Hash(Hash), HasSymtabEntry(false) {}
 
 SILCoverageMap::~SILCoverageMap() {}
 

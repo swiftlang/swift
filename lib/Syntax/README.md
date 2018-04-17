@@ -425,7 +425,7 @@ auto Integer = SyntaxFactory::makeIntegerLiteralExpr(IntegerTok);
 auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
 
 // This ReturnStmtSyntax is floating, with no root.
-auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer, 
+auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, Integer,
                                             /*Semicolon=*/ None);
 
 auto RightBrace = SyntaxFactory::makeLeftBraceToken({}, {});
@@ -466,7 +466,7 @@ Legend:
 
 A couple of interesting points and reminders:
 - All strong references point downward in the tree.
-- One `SyntaxData` for each `RawSyntax`.  
+- One `SyntaxData` for each `RawSyntax`.
   Remember, a `SyntaxData` is essentially a `RawSyntax` with a parent pointer
   and cached `SyntaxData` children.
 - Parent pointers are omitted here but there are weak references pointing
@@ -530,14 +530,11 @@ will be re-generated whenever any Python files are changed.
 ## Adding new Syntax Nodes
 
 Here's a handy checklist when implementing a production in the grammar.
-- Check that the corresponding `lib/AST` node has `SourceLocs` for all terms. If
-  it doesn't, [file a Swift bug][NewSwiftBug] and fix that first.
-  - **Add the `Syntax` bug label!**
 - Check if it's not already being worked on, and then
-  [file a Swift bug][NewSwiftBug], noting which grammar productions
-  are affected.
+  [file a Swift bug](https://bugs.swift.org/secure/CreateIssue!default.jspa),
+  noting which grammar productions are affected.
   - **Add the `Syntax` bug label!**
-- Create the `${KIND}` entry in the appropriate Python file (Expr, Stmt, 
+- Create the `${KIND}` entry in the appropriate Python file (Expr, Stmt,
   Pattern, etc.).
   - Add C++ unit tests for `with` APIs for all layout elements
       (e.g. `withLeftTypeIdentifier(...)`).
@@ -558,4 +555,47 @@ Here's a handy checklist when implementing a production in the grammar.
     - check for a zero-diff print with `-round-trip-parse`
 - Update `lib/Syntax/Status.md` if applicable.
 
-[NewSwiftBug]: https://bugs.swift.org/secure/CreateIssue!default.jspa)
+## Try libSyntax in Xcode
+
+Here's how to build a Swift command line tool in Xcode using libSyntax:
+1. Download the latest open source toolchain from swift.org:
+  [Trunk Development (master)](https://swift.org/download/#snapshots).
+2. Run the downloaded package installer.
+3. Start Xcode and specify the just-installed toolchain to use in
+`Xcode->Toolchains->Swift Development Snapshot...`
+4. Create a new Swift command line tool project in Xcode.
+5. In the project's build setting, specify two variables:
+    - Runpath search paths: `$(TOOLCHAIN_DIR)/usr/lib/swift/macosx`
+    - Library search paths: `$(TOOLCHAIN_DIR)/usr/lib/swift/macosx`
+6. Now, in `main.swift`, we can `import SwiftSyntax` and experiment with its APIs.
+  For example, the following code snippet renames every function called `foo` to `bar`.
+
+```swift
+import Foundation
+import SwiftSyntax
+
+class Renamer: SyntaxRewriter {
+  override func visit(_ node: FunctionDeclSyntax) -> DeclSyntax {
+    if node.identifier.text == "foo" {
+      return super.visit(node.withIdentifier(SyntaxFactory.makeIdentifier("bar")))
+    } else {
+      return super.visit(node)
+    }
+  }
+}
+
+// Parse a .swift file
+let currentFile = URL(fileURLWithPath: "/tmp/test.swift")
+let currentFileContents = try String(contentsOf: currentFile)
+let parsed = try SourceFileSyntax.parse(currentFile)
+
+// Print the original file
+print("\n//======== Original =========\n")
+print(parsed)
+
+let R = Renamer()
+
+// Print the file after renaming
+print("\n//======== Renamed =========\n")
+print(R.visit(parsed))
+```

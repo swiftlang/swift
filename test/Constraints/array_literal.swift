@@ -105,7 +105,7 @@ func longArray() {
 [1,2].map // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
 
 
-// <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to _ArrayProtocol
+// <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
   var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
   // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}
@@ -129,7 +129,7 @@ func defaultToAny(i: Int, s: String) {
 
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  let _: Int = a2  // expected-error{{value of type 'Array<Any>'}}
+  let _: Int = a2  // expected-error{{value of type '[Any]'}}
   
   let a3 = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
@@ -137,7 +137,7 @@ func defaultToAny(i: Int, s: String) {
   
   let a4: Array = [1, "a", nil, 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
-  let _: Int = a4 // expected-error{{value of type 'Array<Any?>'}}
+  let _: Int = a4 // expected-error{{value of type '[Any?]'}}
 
   let a5 = []
   // expected-error@-1{{empty collection literal requires an explicit type}}
@@ -322,3 +322,21 @@ let routerFruit = Company(
 //        accident.
 let SR3786a: [Int] = [1, 2, 3]
 let SR3786aa = [SR3786a.reversed(), SR3786a]
+
+// Conditional conformance
+protocol P { }
+
+struct PArray<T> { }
+
+extension PArray : ExpressibleByArrayLiteral where T: P {
+  typealias ArrayLiteralElement = T
+
+  init(arrayLiteral elements: T...) { }
+}
+
+extension Int: P { }
+
+func testConditional(i: Int, s: String) {
+  let _: PArray<Int> = [i, i, i]
+  let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
+}

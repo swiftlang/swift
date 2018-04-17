@@ -315,6 +315,8 @@ class SelfMetadataBase : SelfMetadataTest {}
 
 class SelfMetadataDerived : SelfMetadataBase {}
 
+class SelfMetadataGeneric<T> : SelfMetadataTest {}
+
 func testSelfMetadata<T : SelfMetadataTest>(_ x: T, _ t: T.T) -> [Any.Type] {
   return [x.staticTypeOfSelf(),
           x.staticTypeOfSelfTakesT(t),
@@ -347,6 +349,16 @@ ProtocolExtensionTestSuite.test("WitnessSelf") {
     expectTrue(SelfMetadataBase.self == result[1])
     expectTrue(SelfMetadataDerived.self == result[2])
     expectTrue(SelfMetadataDerived.self == result[3])
+  }
+
+  // Make sure the calling convention works out if 'Self' is a generic
+  // class too.
+  do {
+    let result = testSelfMetadata(SelfMetadataGeneric<Int>(), 0)
+    expectTrue(SelfMetadataGeneric<Int>.self == result[0])
+    expectTrue(SelfMetadataGeneric<Int>.self == result[1])
+    expectTrue(SelfMetadataGeneric<Int>.self == result[2])
+    expectTrue(SelfMetadataGeneric<Int>.self == result[3])
   }
 }
 

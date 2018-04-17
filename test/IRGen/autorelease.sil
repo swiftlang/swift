@@ -58,7 +58,7 @@ bb0(%0 : $C?):
 // x86_64:    define{{( protected)?}} swiftcc i64 @bar(i64)
 // x86_64:      [[T0:%.*]] = call swiftcc i64 @foo(i64 %0)
 // x86_64-NEXT: [[T1:%.*]] = inttoptr i64 [[T0]] to i8*
-// x86_64-NEXT: [[T2:%.*]] = call i8* @objc_retainAutoreleasedReturnValue(i8* [[T1]])
+// x86_64-NEXT: [[T2:%.*]] = notail call i8* @objc_retainAutoreleasedReturnValue(i8* [[T1]])
 // x86_64-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i64
 // x86_64-NEXT: ret i64 [[T3]]
 

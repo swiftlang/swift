@@ -5,5 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -emit-ir
+// RUN: %target-swift-frontend -typecheck %s -emit-ir
 nil as Int!as?Int?!

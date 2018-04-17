@@ -1,12 +1,16 @@
-int _T0Bi32_N;
-int _T0Bi64_N;
-int _T0Bi8_N;
-void _swift_getEnumCaseSinglePayload(void) {}
-void _swift_getGenericMetadata(void) {}
-void _swift_slowAlloc(void) {}
-void _swift_slowDealloc(void) {}
-void _swift_storeEnumTagSinglePayload(void) {}
+int $SBi32_N;
+int $SBi64_N;
+int $SBi8_N;
+int $SBi32_WV;
+int $SBi64_WV;
+int $SBi8_WV;
+void swift_getEnumCaseSinglePayload(void) {}
+void swift_getGenericMetadata(void) {}
+void swift_checkMetadataState(void) {}
+void swift_slowAlloc(void) {}
+void swift_slowDealloc(void) {}
+void swift_storeEnumTagSinglePayload(void) {}
 void swift_allocateGenericValueMetadata(void) {}
-void swift_initEnumValueWitnessTableSinglePayload(void) {}
-void _swift_retain(){}
+void swift_initEnumMetadataSinglePayload(void) {}
+void swift_retain(){}
 void swift_allocBox(){}

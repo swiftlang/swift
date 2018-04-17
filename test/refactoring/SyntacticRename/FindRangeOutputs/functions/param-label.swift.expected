@@ -55,7 +55,7 @@ let _ = "Some text \(/*param-label:call*/<base>aFunc</base>(<callarg index=0>a</
 class SomeClass {
     init() {}
     /*init:def*/init(a: Int, b:Int, c:Int) {}
-    /*sub:def*/subscript(x: Int, y: Int) -> Int {
+    /*sub:def*/subscript(x: Int, y j: Int) -> Int {
         get { return 1 }
         set {}
     }
@@ -64,8 +64,8 @@ class SomeClass {
 let someClass = SomeClass();
 let _ = /*init:call*/SomeClass(a:1, b:1, c:1)
 let _ = SomeClass . /*init*/init(a:b:c:)
-_ = someClass/*sub:ref*/[1, 2]
-someClass/*sub:ref*/[1, 2] = 2
+_ = someClass/*sub:ref*/[1, y: 2]
+someClass/*sub:ref*/[1, y: 2] = 2
 
 class AnotherClass {
     let bar = AnotherClass()

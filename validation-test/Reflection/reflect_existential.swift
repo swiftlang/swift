@@ -37,8 +37,8 @@ reflect(object: TestGeneric(D() as Any))
 // CHECK-32:   (protocol_composition))
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=28 alignment=4 stride=28 num_extra_inhabitants=0
-// CHECK-32:   (field name=t offset=12
+// CHECK-32: (class_instance size=24 alignment=4 stride=24 num_extra_inhabitants=0
+// CHECK-32:   (field name=t offset=8
 // CHECK-32:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-32:       (field name=metadata offset=12
 // CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096)))))
@@ -65,8 +65,8 @@ reflect(object: TestGeneric(D() as P))
 // CHECK-32:     (protocol reflect_existential.P)))
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=32 alignment=4 stride=32 num_extra_inhabitants=0
-// CHECK-32:   (field name=t offset=12
+// CHECK-32: (class_instance size=28 alignment=4 stride=28 num_extra_inhabitants=0
+// CHECK-32:   (field name=t offset=8
 // CHECK-32:     (opaque_existential size=20 alignment=4 stride=20 num_extra_inhabitants=0
 // CHECK-32:       (field name=metadata offset=12
 // CHECK-32:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096))
@@ -95,8 +95,8 @@ reflect(object: TestGeneric(D() as (P & AnyObject)))
 // CHECK-32:     (protocol reflect_existential.P)))
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=20 alignment=4 stride=20 num_extra_inhabitants=0
-// CHECK-32:   (field name=t offset=12
+// CHECK-32: (class_instance size=16 alignment=4 stride=16 num_extra_inhabitants=0
+// CHECK-32:   (field name=t offset=8
 // CHECK-32:     (class_existential size=8 alignment=4 stride=8 num_extra_inhabitants=4096
 // CHECK-32:       (field name=object offset=0
 // CHECK-32:         (reference kind=strong refcounting=unknown))
@@ -125,8 +125,8 @@ reflect(object: TestGeneric(D() as CP))
 // CHECK-32:     (protocol reflect_existential.CP)))
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=20 alignment=4 stride=20 num_extra_inhabitants=0
-// CHECK-32:   (field name=t offset=12
+// CHECK-32: (class_instance size=16 alignment=4 stride=16 num_extra_inhabitants=0
+// CHECK-32:   (field name=t offset=8
 // CHECK-32:     (class_existential size=8 alignment=4 stride=8 num_extra_inhabitants=4096
 // CHECK-32:       (field name=object offset=0
 // CHECK-32:         (reference kind=strong refcounting=unknown))
@@ -157,8 +157,8 @@ reflect(object: TestGeneric(D() as (C & P)))
 // CHECK-32:     (protocol reflect_existential.P)))
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=20 alignment=4 stride=20 num_extra_inhabitants=0
-// CHECK-32:   (field name=t offset=12
+// CHECK-32: (class_instance size=16 alignment=4 stride=16 num_extra_inhabitants=0
+// CHECK-32:   (field name=t offset=8
 // CHECK-32:     (class_existential size=8 alignment=4 stride=8 num_extra_inhabitants=4096
 // CHECK-32:       (field name=object offset=0
 // CHECK-32:         (reference kind=strong refcounting=native))

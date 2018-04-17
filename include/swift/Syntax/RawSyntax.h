@@ -29,12 +29,16 @@
 #ifndef SWIFT_SYNTAX_RAWSYNTAX_H
 #define SWIFT_SYNTAX_RAWSYNTAX_H
 
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Syntax/References.h"
 #include "swift/Syntax/SyntaxKind.h"
+#include "swift/Syntax/TokenKinds.h"
 #include "swift/Syntax/Trivia.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <vector>
@@ -44,7 +48,10 @@ using llvm::StringRef;
 
 #ifndef NDEBUG
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
-  (assert(Raw->getChild(Cursor)->Kind == ExpectedKind));
+  ({                                                                           \
+    if (auto &__Child = Raw->getChild(Cursor))                                 \
+      assert(__Child->getKind() == ExpectedKind);                              \
+  })
 #else
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind) ({});
 #endif
@@ -53,16 +60,18 @@ using llvm::StringRef;
 #define syntax_assert_child_token(Raw, CursorName, ...)                        \
   ({                                                                           \
     bool __Found = false;                                                      \
-    auto __Token = cast<RawTokenSyntax>(Raw->getChild(Cursor::CursorName));    \
-    if (__Token->isPresent()) {                                                \
-      for (auto Token : {__VA_ARGS__}) {                                       \
-        if (__Token->getTokenKind() == Token) {                                \
-          __Found = true;                                                      \
-          break;                                                               \
+    if (auto &__Token = Raw->getChild(Cursor::CursorName)) {                   \
+      assert(__Token->isToken());                                              \
+      if (__Token->isPresent()) {                                              \
+        for (auto Token : {__VA_ARGS__}) {                                     \
+          if (__Token->getTokenKind() == Token) {                              \
+            __Found = true;                                                    \
+            break;                                                             \
+          }                                                                    \
         }                                                                      \
+        assert(__Found && "invalid token supplied for " #CursorName            \
+                          ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
-      assert(__Found && "invalid token supplied for "                          \
-             #CursorName ", expected one of {" #__VA_ARGS__ "}");              \
     }                                                                          \
   })
 #else
@@ -72,18 +81,20 @@ using llvm::StringRef;
 #ifndef NDEBUG
 #define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...)        \
   ({                                                                           \
-    bool __Found = false;                                                    \
-    auto __Child = cast<RawTokenSyntax>(Raw->getChild(Cursor::CursorName));  \
-    if (__Child->isPresent()) {                                              \
-      assert(__Child->getTokenKind() == TokenKind);                            \
-      for (auto __Text : {__VA_ARGS__}) {                                      \
-        if (__Child->getText() == __Text) {                                    \
-          __Found = true;                                                      \
-          break;                                                               \
+    bool __Found = false;                                                      \
+    if (auto &__Child = Raw->getChild(Cursor::CursorName)) {                   \
+      assert(__Child->isToken());                                              \
+      if (__Child->isPresent()) {                                              \
+        assert(__Child->getTokenKind() == TokenKind);                          \
+        for (auto __Text : {__VA_ARGS__}) {                                    \
+          if (__Child->getTokenText() == __Text) {                             \
+            __Found = true;                                                    \
+            break;                                                             \
+          }                                                                    \
         }                                                                      \
+        assert(__Found && "invalid text supplied for " #CursorName             \
+                          ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
-      assert(__Found && "invalid text supplied for "                           \
-             #CursorName ", expected one of {" #__VA_ARGS__ "}");              \
     }                                                                          \
   })
 #else
@@ -103,7 +114,9 @@ using llvm::StringRef;
 namespace swift {
 namespace syntax {
 
-using CursorIndex = uint32_t;
+class SyntaxArena;
+
+using CursorIndex = size_t;
 
 /// Get a numeric index suitable for array/vector indexing
 /// from a syntax node's Cursor enum value.
@@ -126,27 +139,35 @@ public:
   }
 
   /// Add some number of newlines to the position, resetting the column.
-  void addNewlines(uint32_t NewLines) {
+  /// Size is byte size of newline char.
+  /// '\n' and '\r' are 1, '\r\n' is 2.
+  void addNewlines(uint32_t NewLines, uint32_t Size) {
     Line += NewLines;
     Column = 1;
-    Offset += NewLines;
+    Offset += NewLines * Size;
   }
-
+  
   /// Use some text as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
   void addText(StringRef Str) {
-    for (auto C : Str) {
-      addCharacter(C);
-    }
-  }
-
-  /// Use some character as a reference for adding to the absolute position,
-  /// taking note of newlines, etc.
-  void addCharacter(char C) {
-    if (C == '\n') {
-      addNewlines(1);
-    } else {
-      addColumns(1);
+    const char * C = Str.begin();
+    while (C != Str.end()) {
+      switch (*C++) {
+      case '\n':
+        addNewlines(1, 1);
+        break;
+      case '\r':
+        if (C != Str.end() && *C == '\n') {
+          addNewlines(1, 2);
+          ++C;
+        } else {
+          addNewlines(1, 1);
+        }
+        break;
+      default:
+        addColumns(1);
+        break;
+      }
     }
   }
 
@@ -188,80 +209,235 @@ enum class SourcePresence {
 struct SyntaxPrintOptions {
   bool Visual = false;
   bool PrintSyntaxKind = false;
+  bool PrintTrivialNodeKind = false;
 };
 
 /// RawSyntax - the strictly immutable, shared backing nodes for all syntax.
 ///
 /// This is implementation detail - do not expose it in public API.
-struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
+class RawSyntax final
+    : public llvm::ThreadSafeRefCountedBase<RawSyntax>,
+      private llvm::TrailingObjects<RawSyntax, RC<RawSyntax>, OwnedString,
+                                    TriviaPiece> {
+  friend TrailingObjects;
 
-  using LayoutList = std::vector<RC<RawSyntax>>;
+  union {
+    uint64_t Clear;
+    struct {
+      /// The kind of syntax this node represents.
+      unsigned Kind : bitmax(NumSyntaxKindBits, 8);
+      /// Whether this piece of syntax was actually present in the source.
+      unsigned Presence : 1;
+      /// Whether this piece of syntax was constructed with manually managed
+      /// memory.
+      unsigned ManualMemory : 1;
+    };
+    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 };
 
-  /// The kind of syntax this node represents.
-  const SyntaxKind Kind;
+    // For "layout" nodes.
+    struct {
+      uint64_t : bitmax(NumRawSyntaxBits, 32);
+      /// Number of children this "layout" node has.
+      unsigned NumChildren : 32;
+    };
 
-  /// The "layout" of the node - representing the children, or the terms
-  /// in the production of the grammar.
-  const LayoutList Layout;
+    // For "token" nodes.
+    struct {
+      uint64_t : bitmax(NumRawSyntaxBits, 16);
+      /// The kind of token this "token" node represents.
+      unsigned TokenKind : 16;
+      /// Number of leading  trivia pieces.
+      unsigned NumLeadingTrivia : 16;
+      /// Number of trailing trivia pieces.
+      unsigned NumTrailingTrivia : 16;
+    };
+  } Bits;
 
-  /// Whether this piece of syntax was actually present in the source.
-  const SourcePresence Presence;
-
-  /// Create a piece of raw syntax.
-  RawSyntax(const SyntaxKind Kind, const std::vector<RC<RawSyntax>> Layout,
-            const SourcePresence Presence)
-      : Kind(Kind), Layout(Layout), Presence(Presence) {}
-
-  /// Returns a raw syntax node of the given Kind, specified Layout,
-  /// and source presence.
-  static RC<RawSyntax> make(const SyntaxKind Kind, const LayoutList Layout,
-                            const SourcePresence Presence) {
-    return RC<RawSyntax>{new RawSyntax{Kind, Layout, Presence}};
+  size_t numTrailingObjects(OverloadToken<RC<RawSyntax>>) const {
+    return isToken() ? 0 : Bits.NumChildren;
+  }
+  size_t numTrailingObjects(OverloadToken<OwnedString>) const {
+    return isToken() ? 1 : 0;
+  }
+  size_t numTrailingObjects(OverloadToken<TriviaPiece>) const {
+    return isToken() ? Bits.NumLeadingTrivia + Bits.NumTrailingTrivia : 0;
   }
 
-  /// Returns a raw syntax node of the given Kind, marked as missing.
-  static RC<RawSyntax> missing(const SyntaxKind Kind) {
-    return make(Kind, {}, SourcePresence::Missing);
+  RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+            SourcePresence Presence, bool ManualMemory);
+  RawSyntax(tok TokKind, OwnedString Text,
+            ArrayRef<TriviaPiece> LeadingTrivia,
+            ArrayRef<TriviaPiece> TrailingTrivia,
+            SourcePresence Presence, bool ManualMemory);
+
+public:
+  ~RawSyntax();
+
+  void Release() const {
+    if (Bits.ManualMemory)
+      return;
+    return llvm::ThreadSafeRefCountedBase<RawSyntax>::Release();
+  }
+  void Retain() const {
+    if (Bits.ManualMemory)
+      return;
+    return llvm::ThreadSafeRefCountedBase<RawSyntax>::Retain();
+  }
+
+  /// \name Factory methods.
+  /// @{
+  
+  /// Make a raw "layout" syntax node.
+  static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                            SourcePresence Presence,
+                            SyntaxArena *Arena = nullptr);
+
+  /// Make a raw "token" syntax node.
+  static RC<RawSyntax> make(tok TokKind, OwnedString Text,
+                            ArrayRef<TriviaPiece> LeadingTrivia,
+                            ArrayRef<TriviaPiece> TrailingTrivia,
+                            SourcePresence Presence,
+                            SyntaxArena *Arena = nullptr);
+
+  /// Make a missing raw "layout" syntax node.
+  static RC<RawSyntax> missing(SyntaxKind Kind, SyntaxArena *Arena = nullptr) {
+    return make(Kind, {}, SourcePresence::Missing, Arena);
+  }
+
+  /// Make a missing raw "token" syntax node.
+  static RC<RawSyntax> missing(tok TokKind, OwnedString Text,
+                               SyntaxArena *Arena = nullptr) {
+    return make(TokKind, Text, {}, {}, SourcePresence::Missing, Arena);
+  }
+
+  static RC<RawSyntax> getToken(SyntaxArena &Arena, tok TokKind,
+                                OwnedString Text,
+                                ArrayRef<TriviaPiece> LeadingTrivia,
+                                ArrayRef<TriviaPiece> TrailingTrivia);
+
+  /// @}
+
+  SourcePresence getPresence() const {
+    return static_cast<SourcePresence>(Bits.Presence);
+  }
+
+  SyntaxKind getKind() const { return static_cast<SyntaxKind>(Bits.Kind); }
+
+  /// Returns true if the node is "missing" in the source (i.e. it was
+  /// expected (or optional) but not written.
+  bool isMissing() const { return getPresence() == SourcePresence::Missing; }
+
+  /// Returns true if the node is "present" in the source.
+  bool isPresent() const { return getPresence() == SourcePresence::Present; }
+
+  /// Returns true if this raw syntax node is some kind of declaration.
+  bool isDecl() const { return isDeclKind(getKind()); }
+
+  /// Returns true if this raw syntax node is some kind of type syntax.
+  bool isType() const { return isTypeKind(getKind()); }
+
+  /// Returns true if this raw syntax node is some kind of statement.
+  bool isStmt() const { return isStmtKind(getKind()); }
+
+  /// Returns true if this raw syntax node is some kind of expression.
+  bool isExpr() const { return isExprKind(getKind()); }
+
+  /// Returns true if this raw syntax node is some kind of pattern.
+  bool isPattern() const { return isPatternKind(getKind()); }
+
+  /// Return true is this raw syntax node is a unknown node.
+  bool isUnknown() const { return isUnknownKind(getKind()); }
+
+  /// Return true if this raw syntax node is a token.
+  bool isToken() const { return isTokenKind(getKind()); }
+
+  /// \name Getter routines for SyntaxKind::Token.
+  /// @{
+
+  /// Get the kind of the token.
+  tok getTokenKind() const {
+    assert(isToken());
+    return static_cast<tok>(Bits.TokenKind);
+  }
+
+  /// Return the text of the token.
+  StringRef getTokenText() const {
+    assert(isToken());
+    return getTrailingObjects<OwnedString>()->str();
+  }
+
+  /// Return the leading trivia list of the token.
+  ArrayRef<TriviaPiece> getLeadingTrivia() const {
+    assert(isToken());
+    return {getTrailingObjects<TriviaPiece>(), Bits.NumLeadingTrivia};
+  }
+  /// Return the trailing trivia list of the token.
+  ArrayRef<TriviaPiece> getTrailingTrivia() const {
+    assert(isToken());
+    return {getTrailingObjects<TriviaPiece>() + Bits.NumLeadingTrivia,
+            Bits.NumTrailingTrivia};
+  }
+
+  /// Return \c true if this is the given kind of token.
+  bool isToken(tok K) const { return isToken() && getTokenKind() == K; }
+
+  /// @}
+
+  /// \name Transform routines for "token" nodes.
+  /// @{
+
+  /// Return a new token like this one, but with the given leading
+  /// trivia instead.
+  RC<RawSyntax>
+  withLeadingTrivia(ArrayRef<TriviaPiece> NewLeadingTrivia) const {
+    return make(getTokenKind(), getTokenText(), NewLeadingTrivia,
+                getTrailingTrivia(), getPresence());
+  }
+
+  RC<RawSyntax> withLeadingTrivia(Trivia NewLeadingTrivia) const {
+    return withLeadingTrivia(NewLeadingTrivia.Pieces);
+  }
+
+  /// Return a new token like this one, but with the given trailing
+  /// trivia instead.
+  RC<RawSyntax>
+  withTrailingTrivia(ArrayRef<TriviaPiece> NewTrailingTrivia) const {
+    return make(getTokenKind(), getTokenText(), getLeadingTrivia(),
+                NewTrailingTrivia, getPresence());
+  }
+
+  RC<RawSyntax> withTrailingTrivia(Trivia NewTrailingTrivia) const {
+    return withTrailingTrivia(NewTrailingTrivia.Pieces);
+  }
+
+  /// @}
+
+  /// \name Getter routines for "layout" nodes.
+  /// @{
+
+  /// Get the child nodes.
+  ArrayRef<RC<RawSyntax>> getLayout() const {
+    if (isToken())
+      return {};
+    return {getTrailingObjects<RC<RawSyntax>>(), Bits.NumChildren};
+  }
+
+  size_t getNumChildren() const {
+    if (isToken())
+      return 0;
+    return Bits.NumChildren;
   }
 
   /// Get a child based on a particular node's "Cursor", indicating
   /// the position of the terms in the production of the Swift grammar.
-  template <typename CursorType> RC<RawSyntax> getChild(CursorType C) const {
-    return Layout[cursorIndex(C)];
+  const RC<RawSyntax> &getChild(CursorIndex Index) const {
+    return getLayout()[Index];
   }
 
-  /// Returns true if the node is "missing" in the source (i.e. it was
-  /// expected (or optional) but not written.
-  bool isMissing() const { return Presence == SourcePresence::Missing; }
+  /// @}
 
-  /// Returns true if the node is "present" in the source.
-  bool isPresent() const {
-    return Presence == SourcePresence::Present;
-  }
-
-  /// Returns true if this raw syntax node is some kind of declaration.
-  bool isDecl() const { return isDeclKind(Kind); }
-
-  /// Returns true if this raw syntax node is some kind of type syntax.
-  bool isType() const { return isTypeKind(Kind); }
-
-  /// Returns true if this raw syntax node is some kind of statement.
-  bool isStmt() const { return isStmtKind(Kind); }
-
-  /// Returns true if this raw syntax node is some kind of expression.
-  bool isExpr() const { return isExprKind(Kind); }
-
-  /// Returns true if this raw syntax node is some kind of pattern.
-  bool isPattern() const { return isPatternKind(Kind); }
-
-  /// Return true if this raw syntax node is a token.
-  bool isToken() const { return isTokenKind(Kind); }
-
-  bool isUnknown() const { return isUnknownKind(Kind); }
-
-  /// Get the absolute position of this raw syntax: its offset, line,
-  /// and column.
-  AbsolutePosition getAbsolutePosition(RC<RawSyntax> Root) const;
+  /// \name Transform routines for "layout" nodes.
+  /// @{
 
   /// Return a new raw syntax node with the given new layout element appended
   /// to the end of the node's layout.
@@ -269,21 +445,18 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
 
   /// Return a new raw syntax node with the given new layout element replacing
   /// another at some cursor position.
-  template <typename CursorType>
   RC<RawSyntax>
-  replaceChild(CursorType C, RC<RawSyntax> NewLayoutElement) const {
-    LayoutList NewLayout;
+  replaceChild(CursorIndex Index, RC<RawSyntax> NewLayoutElement) const;
 
-    std::copy(Layout.begin(), Layout.begin() + cursorIndex(C),
-              std::back_inserter(NewLayout));
+  /// @}
 
-    NewLayout.push_back(NewLayoutElement);
-
-    std::copy(Layout.begin() + cursorIndex(C) + 1, Layout.end(),
-              std::back_inserter(NewLayout));
-
-    return RawSyntax::make(Kind, NewLayout, Presence);
-  }
+  /// Advance the provided AbsolutePosition by the full width of this node.
+  ///
+  /// If this is token node, returns the AbsolutePosition of the start of the
+  /// token's nontrivial text. Otherwise, return the position of the first
+  /// token. If this contains no tokens, return None.
+  llvm::Optional<AbsolutePosition>
+  accumulateAbsolutePosition(AbsolutePosition &Pos) const;
 
   /// Print this piece of syntax recursively.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const;
@@ -292,11 +465,11 @@ struct RawSyntax : public llvm::ThreadSafeRefCountedBase<RawSyntax> {
   void dump() const;
 
   /// Dump this piece of syntax recursively.
-  void dump(llvm::raw_ostream &OS, unsigned Indent) const;
+  void dump(llvm::raw_ostream &OS, unsigned Indent = 0) const;
 
-private:
-  bool accumulateAbsolutePosition(AbsolutePosition &Pos,
-                                  const RawSyntax *UpToTargetNode) const;
+  static void Profile(llvm::FoldingSetNodeID &ID, tok TokKind, OwnedString Text,
+                      ArrayRef<TriviaPiece> LeadingTrivia,
+                      ArrayRef<TriviaPiece> TrailingTrivia);
 };
 
 } // end namespace syntax

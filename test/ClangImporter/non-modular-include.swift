@@ -6,6 +6,11 @@
 // CHECK-native: error: could not build C module 'Foo'
 // CHECK-NOT: error
 
+// RUN: %target-swift-frontend -debugger-support -typecheck %s -I %S/Inputs/non-modular -F %S/Inputs/non-modular 2>&1 | %FileCheck --allow-empty --check-prefix=CHECK-DEBUGGER %s
+
+// CHECK-DEBUGGER-NOT: error:
+
+
 import Foo
 
 _ = Foo.x

@@ -7,14 +7,14 @@ import Swift
 
 class SwiftClass {}
 sil_vtable SwiftClass {}
-sil @_T013partial_apply10SwiftClassCfD : $@convention(method) (SwiftClass) -> ()
+sil @$S13partial_apply10SwiftClassCfD : $@convention(method) (SwiftClass) -> ()
 
 sil @partially_applyable_to_class : $@convention(thin) (@owned SwiftClass) -> ()
 
 // CHECK: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_class(%T13partial_apply10SwiftClassC*) {{.*}} {
 // CHECK: entry:
 // CHECK:   %1 = bitcast %T13partial_apply10SwiftClassC* %0 to %swift.refcounted*
-// CHECK:   %2 = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @_T028partially_applyable_to_classTA to i8*), %swift.refcounted* undef }, %swift.refcounted* %1, 1
+// CHECK:   %2 = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @"$S28partially_applyable_to_classTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* %1, 1
 // CHECK:   ret { i8*, %swift.refcounted* } %2
 // CHECK: }
 sil @partial_apply_class : $@convention(thin) SwiftClass -> @callee_owned () -> () {
@@ -29,7 +29,7 @@ entry(%c : $SwiftClass):
 // in the forwarder.
 //
 
-// CHECK-LABEL: define internal swiftcc i64 @_T022generic_captured_paramTA(i64, %swift.refcounted* swiftself) {{.*}} {
+// CHECK-LABEL: define internal swiftcc i64 @"$S22generic_captured_paramTA"(i64, %swift.refcounted* swiftself) {{.*}} {
 // CHECK:         bitcast %TSi* {{%.*}} to %swift.opaque*
 sil public_external @generic_captured_param : $@convention(thin) <T> (Int, @inout T) -> Int
 
@@ -47,7 +47,7 @@ sil public_external @generic_captured_and_open_param : $@convention(thin) <T> (@
 
 // CHECK-LABEL: define {{.*}} @partial_apply_open_generic_capture({{.*}} %swift.type* %T) {{.*}} {
 // CHECK:         store %swift.type* %T
-// CHECK:         insertvalue {{.*}} [[PARTIAL_APPLY_STUB:@_T0[A-Za-z0-9_]+TA]]
+// CHECK:         insertvalue {{.*}} [[PARTIAL_APPLY_STUB:@"\$S[A-Za-z0-9_]+TA"]]
 
 // CHECK:       define {{.*}} [[PARTIAL_APPLY_STUB]]
 // CHECK:         [[T:%.*]] = load %swift.type*, %swift.type**
@@ -68,7 +68,7 @@ sil public_external @guaranteed_captured_class_param : $@convention(thin) (Int, 
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_guaranteed_class_param(%T13partial_apply10SwiftClassC*)
 // CHECK:         [[CONTEXT_OBJ:%.*]] = bitcast %T13partial_apply10SwiftClassC* {{%.*}} to %swift.refcounted*
-// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_T0[A-Za-z0-9_]+TA]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@"\$S[A-Za-z0-9_]+TA"]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
@@ -92,7 +92,7 @@ sil public_external @indirect_guaranteed_captured_class_param : $@convention(thi
 // CHECK:         [[X:%.*]] = load %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC** %0
 // CHECK-NEXT:    [[CONTEXT_OBJ:%.*]] = bitcast %T13partial_apply10SwiftClassC* [[X]] to %swift.refcounted*
 // CHECK-NOT:     {{retain|release}}
-// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_T0[A-Za-z0-9_]+TA]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@"\$S[A-Za-z0-9_]+TA"]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
@@ -104,7 +104,7 @@ sil public_external @indirect_guaranteed_captured_class_param : $@convention(thi
 // CHECK-NOT:     release
 // CHECK:         [[RESULT:%.*]] = call swiftcc i64 @indirect_guaranteed_captured_class_param(i64 %0, %T13partial_apply10SwiftClassC** noalias nocapture dereferenceable({{.*}}) [[X_CAST]]
 // CHECK-NOT:     retain
-// CHECK:         call void @swift_rt_swift_release(%swift.refcounted* %1)
+// CHECK:         call void @swift_release(%swift.refcounted* %1)
 // CHECK:         ret i64 [[RESULT]]
 
 sil @partial_apply_indirect_guaranteed_class_param : $@convention(thin) (@in SwiftClass) -> @callee_owned (Int) -> Int {
@@ -121,7 +121,7 @@ sil public_external @indirect_consumed_captured_class_param : $@convention(thin)
 // CHECK:         [[X:%.*]] = load %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC** %0
 // CHECK-NEXT:    [[CONTEXT_OBJ:%.*]] = bitcast %T13partial_apply10SwiftClassC* [[X]] to %swift.refcounted*
 // CHECK-NOT:     {{retain|release}}
-// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_T0[A-Za-z0-9_]+TA]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@"\$S[A-Za-z0-9_]+TA"]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
@@ -131,7 +131,7 @@ sil public_external @indirect_consumed_captured_class_param : $@convention(thin)
 // CHECK-NOT:     load
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
-// CHECK:         [[RESULT:%.*]] = tail call swiftcc i64 @indirect_consumed_captured_class_param(i64 %0, %T13partial_apply10SwiftClassC** noalias nocapture dereferenceable({{.*}}) [[X_CAST]])
+// CHECK:         [[RESULT:%.*]] = call swiftcc i64 @indirect_consumed_captured_class_param(i64 %0, %T13partial_apply10SwiftClassC** noalias nocapture dereferenceable({{.*}}) [[X_CAST]])
 // CHECK-NOT:     retain
 // CHECK-NOT:     release
 // CHECK:         ret i64 [[RESULT]]
@@ -153,14 +153,14 @@ struct SwiftClassPair { var x: SwiftClass, y: SwiftClass }
 sil public_external @guaranteed_captured_class_pair_param : $@convention(thin) (Int, @guaranteed SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_guaranteed_class_pair_param(%T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC*)
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         [[PAIR_ADDR:%.*]] = getelementptr
 // CHECK-NEXT:    [[X_ADDR:%.*]] = getelementptr inbounds %T13partial_apply14SwiftClassPairV, %T13partial_apply14SwiftClassPairV* [[PAIR_ADDR]], i32 0, i32 0
 // CHECK-NEXT:    store %T13partial_apply10SwiftClassC* %0, %T13partial_apply10SwiftClassC** [[X_ADDR]], align
 // CHECK-NEXT:    [[Y_ADDR:%.*]] = getelementptr inbounds %T13partial_apply14SwiftClassPairV, %T13partial_apply14SwiftClassPairV* [[PAIR_ADDR]], i32 0, i32 1
 // CHECK-NEXT:    store %T13partial_apply10SwiftClassC* %1, %T13partial_apply10SwiftClassC** [[Y_ADDR]], align
 // CHECK-NOT:     {{retain|release}}
-// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_T0[A-Za-z0-9_]+TA]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@"\$S[A-Za-z0-9_]+TA"]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
@@ -184,9 +184,9 @@ bb0(%x : $SwiftClassPair):
 sil public_external @indirect_guaranteed_captured_class_pair_param : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_indirect_guaranteed_class_pair_param(%T13partial_apply14SwiftClassPairV* noalias nocapture dereferenceable({{.*}}))
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK-NOT:     {{retain|release}}
-// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_T0[A-Za-z0-9_]+TA]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@"\$S[A-Za-z0-9_]+TA"]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
@@ -207,16 +207,14 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @indirect_consumed_captured_class_pair_param : $@convention(thin) (Int, @in SwiftClassPair) -> Int
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_indirect_consumed_class_pair_param(%T13partial_apply14SwiftClassPairV* noalias nocapture dereferenceable({{.*}}))
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK-NOT:     {{retain|release}}
-// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_T0[A-Za-z0-9_]+TA]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@"\$S[A-Za-z0-9_]+TA"]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal swiftcc i64 [[PARTIAL_APPLY_FORWARDER]]
 // CHECK:         [[X_TMP:%.*]] = alloca
-// CHECK:         retain
-// CHECK:         retain
-// CHECK-NOT:     retain
+// CHECK:         call %T13partial_apply14SwiftClassPairV* @"$S13partial_apply14SwiftClassPairVWOc"
 // CHECK:         release{{.*}}%1)
 // CHECK:         [[RESULT:%.*]] = call swiftcc i64 @indirect_consumed_captured_class_pair_param(i64 %0, %T13partial_apply14SwiftClassPairV* noalias nocapture dereferenceable({{.*}}) [[X_TMP]])
 // CHECK:         ret i64 [[RESULT]]
@@ -269,7 +267,7 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK-32:      [[TOTAL_ALIGN:%.*]] = or [[WORD]] [[TOTAL_ALIGN_1]], 3
 
 // -- Allocate using the total size and alignment.
-// CHECK:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}}, [[WORD]] [[TOTAL_SIZE]], [[WORD]] [[TOTAL_ALIGN]])
+// CHECK:         [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}}, [[WORD]] [[TOTAL_SIZE]], [[WORD]] [[TOTAL_ALIGN]])
 // CHECK:         [[BOX_DATA:%.*]] = bitcast %swift.refcounted* [[BOX]]
 // -- metadata
 // CHECK:         getelementptr inbounds {{.*}} [[BOX_DATA]], i32 0, i32 1
@@ -282,7 +280,7 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[BOX_BYTES:%.*]] = bitcast {{.*}} [[BOX_DATA]] to i8*
 // CHECK:         getelementptr inbounds {{.*}} [[BOX_BYTES]], [[WORD]] [[INT_OFFSET]]
 
-// CHECK:         insertvalue {{.*}} [[PARTIAL_APPLY_STUB:@_T0[A-Za-z0-9_]+TA]]
+// CHECK:         insertvalue {{.*}} [[PARTIAL_APPLY_STUB:@"\$S[A-Za-z0-9_]+TA"]]
 // CHECK:       define internal swiftcc void [[PARTIAL_APPLY_STUB]](%swift.refcounted* swiftself)
 sil @partial_apply_indirect_non_fixed_layout : $@convention(thin) <T> (@owned SwiftClass, @in T, Int) -> @callee_owned () -> () {
 bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
@@ -300,7 +298,7 @@ bb0(%x : $*T):
   return %p : $@callee_owned () -> @out T
 }
 
-// CHECK-LABEL: define internal swiftcc void @_T028captured_dependent_out_paramTA(%swift.opaque* noalias nocapture sret, %swift.refcounted* swiftself) {{.*}} {
+// CHECK-LABEL: define internal swiftcc void @"$S28captured_dependent_out_paramTA"(%swift.opaque* noalias nocapture sret, %swift.refcounted* swiftself) {{.*}} {
 // CHECK:         call swiftcc void @captured_dependent_out_param(%swift.opaque* noalias nocapture sret
 
 sil @partial_apply_dynamic_with_out_param : $@convention(thin) <T> (Int32, @owned @callee_owned (Int32) -> @out T) -> @callee_owned () -> @out T {
@@ -310,7 +308,7 @@ bb0(%x : $Int32, %f : $@callee_owned (Int32) -> @out T):
 }
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_dynamic_with_out_param
-// CHECK:         insertvalue {{.*}} [[FORWARDER:@_T0TA[A-Za-z0-9_]*]]
+// CHECK:         insertvalue {{.*}} [[FORWARDER:@"\$STA[A-Za-z0-9_]*"]]
 // CHECK:       define internal swiftcc void [[FORWARDER]]
 // CHECK:         call swiftcc void {{%.*}}(%swift.opaque* noalias nocapture sret
 
@@ -333,17 +331,19 @@ sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@o
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @test_partial_apply(%T13partial_apply4BaseC*)
 // CHECK:  [[CTX:%.*]] = bitcast %T13partial_apply4BaseC* %0 to %swift.refcounted*
-// CHECK:  [[TYPE:%.*]] = call %swift.type* @_T013partial_apply3SubCMa()
-// CHECK:  call swiftcc void @receive_closure(i8* bitcast (%T13partial_apply3SubC* (%swift.refcounted*)* @_T026parametric_casting_closureTA.{{[0-9]+}} to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
+// CHECK:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S13partial_apply3SubCMa"(i64 0)
+// CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK:  call swiftcc void @receive_closure(i8* bitcast (%T13partial_apply3SubC* (%swift.refcounted*)* @"$S26parametric_casting_closureTA.{{[0-9]+}}" to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
 
-// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @_T026parametric_casting_closureTA(%T13partial_apply4BaseC*, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$S26parametric_casting_closureTA"(%T13partial_apply4BaseC*, %swift.refcounted* swiftself)
 // CHECK: [[RES:%.*]] = tail call swiftcc %T13partial_apply4BaseC* @parametric_casting_closure
 // CHECK: [[CASTED:%.*]] = bitcast %T13partial_apply4BaseC* [[RES]] to %T13partial_apply3SubC*
 // CHECK: ret %T13partial_apply3SubC* [[CASTED]]
 
 
-// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @_T026parametric_casting_closureTA.{{[0-9]+}}(%swift.refcounted* swiftself)
-// CHECK:  [[TYPE:%.*]] = call %swift.type* @_T013partial_apply3SubCMa()
+// CHECK-LABEL: define internal swiftcc %T13partial_apply3SubC* @"$S26parametric_casting_closureTA.{{[0-9]+}}"(%swift.refcounted* swiftself)
+// CHECK:  [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S13partial_apply3SubCMa"(i64 0)
+// CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:  [[CTX:%.*]] = bitcast %swift.refcounted* %0 to %T13partial_apply4BaseC*
 // CHECK:  [[CALL:%.*]] = tail call swiftcc %T13partial_apply4BaseC* @parametric_casting_closure(%T13partial_apply4BaseC* [[CTX]], %swift.type* [[TYPE]])
 // CHECK:  [[CAST:%.*]] = bitcast %T13partial_apply4BaseC* [[CALL]] to %T13partial_apply3SubC*
@@ -389,7 +389,7 @@ bb0(%0 : $Int):
   return %result : $()
 }
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @partial_apply_complex_generic_function(i64, %swift.type* %T, i8** %T.P2, i8** %T.Y.P2)
-// CHECK:      [[T0:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* {{.*}}, i64 48, i64 7)
+// CHECK:      [[T0:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}}, i64 48, i64 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.refcounted* [[T0]] to <{ %swift.refcounted, [24 x i8], %TSi }>*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, <{ %swift.refcounted, [24 x i8], %TSi }>* [[T1]], i32 0, i32 1
 // CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T2]] to %swift.type**
@@ -401,7 +401,7 @@ bb0(%0 : $Int):
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
 // CHECK-NEXT: store i8** %T.Y.P2, i8*** [[T1]], align 8
 
-// CHECK-LABEL: define internal swiftcc void @_T024complex_generic_functionTA(%swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc void @"$S24complex_generic_functionTA"(%swift.refcounted* swiftself)
 // CHECK:      [[T0:%.*]] = bitcast %swift.refcounted* %0 to <{ %swift.refcounted, [24 x i8], %TSi }>*
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, <{ %swift.refcounted, [24 x i8], %TSi }>* [[T0]], i32 0, i32 1
 // CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T1]] to %swift.type**
@@ -450,9 +450,9 @@ enum GenericEnum<T> {
 sil public_external @generic_indirect_return : $@convention(thin) <T> (Int) -> @owned GenericEnum<T>
 
 // CHECK-LABEL: define{{.*}} @partial_apply_generic_indirect_return
-// CHECK: insertvalue {{.*}}_T023generic_indirect_returnTA
+// CHECK: insertvalue {{.*}}$S23generic_indirect_returnTA
 
-// CHECK-LABEL: define internal swiftcc void @_T023generic_indirect_returnTA(%T13partial_apply11GenericEnumOySiG* noalias nocapture sret, %swift.refcounted* swiftself
+// CHECK-LABEL: define internal swiftcc void @"$S23generic_indirect_returnTA"(%T13partial_apply11GenericEnumOySiG* noalias nocapture sret, %swift.refcounted* swiftself
 // CHECK:  [[CASTEDRETURN:%.*]] = bitcast %T13partial_apply11GenericEnumOySiG* %0 to %T13partial_apply11GenericEnumO*
 // CHECK:  call swiftcc void @generic_indirect_return({{.*}}[[CASTEDRETURN]]
 // CHECK:  ret void
@@ -472,9 +472,9 @@ enum GenericEnum2<T> {
 sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
 
 // CHECK-LABEL: define{{.*}} @partial_apply_generic_indirect_return2
-// CHECK: insertvalue {{.*}}_T024generic_indirect_return2TA
+// CHECK: insertvalue {{.*}}$S24generic_indirect_return2TA
 
-// CHECK-LABEL: define internal swiftcc void @_T024generic_indirect_return2TA(%T13partial_apply12GenericEnum2OySiG* noalias nocapture sret, %swift.refcounted* swiftself) #0 {
+// CHECK-LABEL: define internal swiftcc void @"$S24generic_indirect_return2TA"(%T13partial_apply12GenericEnum2OySiG* noalias nocapture sret, %swift.refcounted* swiftself)
 // CHECK:  [[CASTED_ADDR:%.*]] = bitcast %T13partial_apply12GenericEnum2OySiG* %0 to %T13partial_apply12GenericEnum2O*
 // CHECK: call swiftcc void @generic_indirect_return2(%T13partial_apply12GenericEnum2O* noalias nocapture sret [[CASTED_ADDR]]
 // CHECK:  ret void
@@ -491,7 +491,7 @@ sil @fun : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
 
 // CHECK-LABEL: define{{.*}} swiftcc { i8*, %swift.refcounted* } @partial_apply_thin_type(%T13partial_apply10SwiftClassC*)
 // CHECK: [[CONTEXT:%.*]] = bitcast %T13partial_apply10SwiftClassC* %0 to %swift.refcounted*
-// CHECK: [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @_T03funTA to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
+// CHECK: [[CLOSURE:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @"$S3funTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
 // CHECK:  ret { i8*, %swift.refcounted* } [[CLOSURE]]
 
 sil @partial_apply_thin_type : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> @callee_owned () -> () {
@@ -499,4 +499,24 @@ entry(%0: $@thin SwiftStruct.Type, %1: $SwiftClass):
   %fun = function_ref @fun : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
   %closure = partial_apply %fun (%0, %1) : $@convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
   return %closure : $@callee_owned () -> ()
+}
+
+sil @afun : $@convention(thin) (Int) -> @error Error
+
+// Check that we don't assert on a thin noescape function.
+// CHECK-LABEL: define{{.*}} swiftcc void @convert_thin_test
+// CHECK: call swiftcc void @afun(i64 {{.*}}, %swift.refcounted* swiftself undef
+// CHECK: ret void
+sil @convert_thin_test : $@convention(thin) (Int) -> () {
+bb(%0 : $Int):
+  %f = function_ref @afun : $@convention(thin) (Int) -> @error Error
+  %c = convert_function %f : $@convention(thin) (Int) -> @error Error to $@convention(thin) @noescape (Int) -> @error Error
+  try_apply %c(%0) : $@convention(thin) @noescape (Int) -> @error Error, normal bb2, error bb1
+
+bb1(%err: $Error):
+  %t = tuple ()
+  br bb2(%t: $())
+
+bb2(%v : $()):
+  return %v : $()
 }

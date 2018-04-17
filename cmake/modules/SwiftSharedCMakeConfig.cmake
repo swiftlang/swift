@@ -201,6 +201,9 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   swift_common_standalone_build_config_llvm(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_clang(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_cmark(${product})
+
+  # Enable groups for IDE generators (Xcode and MSVC).
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endmacro()
 
 # Common cmake project config for unified builds.
@@ -309,7 +312,7 @@ function(swift_common_llvm_config target)
     else()
       # HACK: Otherwise (for example, for executables), use a plain signature,
       # because LLVM CMake does that already.
-      target_link_libraries("${target}" ${libnames})
+      target_link_libraries("${target}" PRIVATE ${libnames})
     endif()
   else()
     # If Swift was not built standalone, dispatch to 'llvm_config()'.

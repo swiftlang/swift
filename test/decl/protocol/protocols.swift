@@ -195,7 +195,7 @@ extension IntIterator : SequenceViaStream {
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'NotSequence.SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> Int {}
 }
 
@@ -266,8 +266,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-	// FIXME: Weird diagnostic
-  var x = e.makeIterator() // expected-error{{'Sequence' is not convertible to 'Sequence.Iterator'}}
+  var x = e.makeIterator() // expected-error{{'Sequence' requires the types 'Sequence' and 'Sequence.Iterator' be equivalent to use 'makeIterator'}}
   x.next()
   x.nonexistent()
 }
@@ -503,10 +502,10 @@ class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}
 protocol LetThereBeCrash {
   let x: Int
   // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
-  // expected-note@-2 {{change 'let' to 'var' to make it mutable}}
+  // expected-note@-2 {{declared here}}
 }
 
 extension LetThereBeCrash {
   init() { x = 1 }
-  // expected-error@-1 {{cannot assign to property: 'x' is a 'let' constant}}
+  // expected-error@-1 {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }

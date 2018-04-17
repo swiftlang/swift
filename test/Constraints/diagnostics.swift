@@ -161,7 +161,7 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
-  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'String.CharacterView.IndexDistance'}}{{24-26=}}
+  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}}{{13-15=}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -182,7 +182,7 @@ func recArea(_ h: Int, w : Int) {
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
 func r17224804(_ monthNumber : Int) {
   // expected-error @+2 {{binary operator '+' cannot be applied to operands of type 'String' and 'Int'}}
-  // expected-note @+1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (UnsafeMutablePointer<Pointee>, Int), (UnsafePointer<Pointee>, Int)}}
+  // expected-note @+1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
   let monthString = (monthNumber <= 9) ? ("0" + monthNumber) : String(monthNumber)
 }
 
@@ -196,7 +196,7 @@ func r17020197(_ x : Int?, y : Int) {
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
 func validateSaveButton(_ text: String) {
-  return (text.characters.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}}
+  return (text.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}}
 }
 
 // <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
@@ -234,8 +234,8 @@ String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
 
 // <rdar://problem/21553065> Spurious diagnostic: '_' can only appear in a pattern or on the left side of an assignment
 protocol r21553065Protocol {}
-class r21553065Class<T : AnyObject> {}
-_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Protocol' is not convertible to 'AnyObject'}}
+class r21553065Class<T : AnyObject> {} // expected-note{{requirement specified as 'T' : 'AnyObject'}}
+_ = r21553065Class<r21553065Protocol>()  // expected-error {{'r21553065Class' requires that 'r21553065Protocol' be a class type}}
 
 // Type variables not getting erased with nested closures
 struct Toe {
@@ -452,13 +452,12 @@ func testTypeSugar(_ a : Int) {
 
   let x = Stride(a)
   x+"foo"            // expected-error {{binary operator '+' cannot be applied to operands of type 'Stride' (aka 'Int') and 'String'}}
-// expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
 }
 
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(_ y : Int) {
-  let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
-   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  let x = &(1.0 + y) // expected-error {{use of extraneous '&'}}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -633,7 +632,7 @@ func r23272739(_ contentType: String) {
 // <rdar://problem/23641896> QoI: Strings in Swift cannot be indexed directly with integer offsets
 func r23641896() {
   var g = "Hello World"
-  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'CountableClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
+  g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'ClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
 
   _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
@@ -922,13 +921,83 @@ let r29850459_a: Int = 0
 let r29850459_b: Int = 1
 func r29850459() -> Bool { return false }
 let _ = (r29850459_flag ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
 let _ = ({ true }() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
 let _ = (r29850459() ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
 let _ = ((r29850459_flag || r29850459()) ? r29850459_a : r29850459_b) + 42.0 // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+// expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
+
+// SR-6272: Tailored diagnostics with fixits for numerical conversions
+
+func SR_6272_a() {
+  enum Foo: Int {
+    case bar
+  }
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{35-41=}} {{42-43=}}
+  // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
+  let _: Int = Foo.bar.rawValue * Float(0)
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{18-18=Float(}} {{34-34=)}}
+  // expected-note@+1 {{expected an argument list of type '(Float, Float)'}}
+  let _: Float = Foo.bar.rawValue * Float(0)
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{none}}
+  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
+  Foo.bar.rawValue * Float(0)
+}
+
+func SR_6272_b() {
+  let lhs = Float(3)
+  let rhs = Int(0)
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{24-24=Float(}} {{27-27=)}}
+  // expected-note@+1 {{expected an argument list of type '(Float, Float)'}}
+  let _: Float = lhs * rhs
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{16-16=Int(}} {{19-19=)}}
+  // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
+  let _: Int = lhs * rhs
+
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Float' and 'Int'}} {{none}}
+  // expected-note@+1 {{overloads for '*' exist with these partially matching parameter lists: (Float, Float), (Int, Int)}}
+  lhs * rhs
+}
+
+func SR_6272_c() {
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'String'}} {{none}}
+  // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
+  Int(3) * "0"
+
+  struct S {}
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'S'}} {{none}}
+  // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
+  Int(10) * S()
+}
+
+struct SR_6272_D: ExpressibleByIntegerLiteral {
+  typealias IntegerLiteralType = Int
+  init(integerLiteral: Int) {}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note {{found this candidate}}
+}
+
+func SR_6272_d() {
+  let x: Float = 1.0
+
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{none}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
+  let _: Float = SR_6272_D(integerLiteral: 42) + x
+
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Double'}} {{none}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Double, Double)}}
+  let _: Float = SR_6272_D(integerLiteral: 42) + 42.0
+
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'SR_6272_D' and 'Float'}} {{none}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (SR_6272_D, Int), (Float, Float)}}
+  let _: Float = SR_6272_D(integerLiteral: 42) + x + 1.0
+}
 
 // Ambiguous overload inside a trailing closure
 
@@ -1097,7 +1166,7 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 {{type of expression is ambiguous without more context}}
+    // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }
 

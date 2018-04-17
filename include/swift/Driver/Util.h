@@ -13,8 +13,8 @@
 #ifndef SWIFT_DRIVER_UTIL_H
 #define SWIFT_DRIVER_UTIL_H
 
-#include "swift/Driver/Types.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
@@ -27,9 +27,9 @@ namespace swift {
 
 namespace driver {
   /// An input argument from the command line and its inferred type.
-  typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
+  using InputPair = std::pair<file_types::ID, const llvm::opt::Arg *>;
   /// Type used for a list of input arguments.
-  typedef SmallVector<InputPair, 16> InputFileList;
+  using InputFileList = SmallVector<InputPair, 16>;
 
   enum class LinkKind {
     None,
@@ -43,13 +43,19 @@ namespace driver {
   /// The Compilation is responsible for generating this file before running
   /// the Job this info is attached to.
   struct FilelistInfo {
-    enum WhichFiles : bool {
+    enum class WhichFiles : unsigned {
       Input,
-      Output
+      PrimaryInputs,
+      Output,
+      /// Batch mode frontend invocations may have so many supplementary
+      /// outputs that they don't comfortably fit as command-line arguments.
+      /// In that case, add a FilelistInfo to record the path to the file.
+      /// The type is ignored.
+      SupplementaryOutput,
     };
 
     StringRef path;
-    types::ID type;
+    file_types::ID type;
     WhichFiles whichFiles;
   };
 

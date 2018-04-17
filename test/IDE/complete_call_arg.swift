@@ -32,13 +32,18 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_1 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_2 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 -code-complete-call-pattern-heuristics | %FileCheck %s -check-prefix=FIRST_ARG_NAME_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_1 | %FileCheck %s -check-prefix=BOUND_GENERIC_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_2 | %FileCheck %s -check-prefix=BOUND_GENERIC_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_1 | %FileCheck %s -check-prefix=EMPTY_OVERLOAD
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_2 | %FileCheck %s -check-prefix=EMPTY_OVERLOAD
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CALLARG_IUO | %FileCheck %s -check-prefix=CALLARG_IUO
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FORCED_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
 
 var i1 = 1
 var i2 = 2
@@ -342,8 +347,7 @@ func firstArg(arg1 arg1: Int, arg2: Int) {}
 func testArg1Name1() {
   firstArg(#^FIRST_ARG_NAME_1^#
 }
-// Skip the RParen, since it will be annotated in the second test.
-// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}
+// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}[')']
 func testArg2Name1() {
   firstArg(#^FIRST_ARG_NAME_2^#)
 }
@@ -352,6 +356,7 @@ func testArg2Name3() {
   firstArg(#^FIRST_ARG_NAME_3^#,
 }
 // FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
+// FIRST_ARG_NAME_4: Pattern/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 
 func takeArray<T>(_ x: [T]) {}
 struct TestBoundGeneric1 {
@@ -382,3 +387,23 @@ _ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
 // EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i2[#Int#];
 // EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i1[#Int#];
 // EMPTY_OVERLOAD: End completions
+
+public func fopen() -> TestBoundGeneric1! { fatalError() }
+func other() {
+  _ = fopen(#^CALLARG_IUO^#)
+// CALLARG_IUO-NOT: Begin completions
+// CALLARG_IUO-NOT: End completions
+}
+
+class Foo { let x: Int }
+class Bar {
+  var collectionView: Foo!
+
+  func foo() {
+    self.collectionView? .#^BOUND_IUO^#x
+    self.collectionView! .#^FORCED_IUO^#x
+  }
+  // MEMBEROF_IUO: Begin completions, 1 items
+  // MEMBEROF_IUO: Decl[InstanceVar]/CurrNominal: x[#Int#]; name=x
+  // MEMBEROF_IUO: End completions
+}

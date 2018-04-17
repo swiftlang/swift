@@ -35,11 +35,11 @@ final class Bobamathing: Thingamabob {
     }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T{{.*}}GadgetC{{.*}}CTW
+// CHECK-LABEL: sil private [transparent] [thunk] @$S{{.*}}GadgetC{{.*}}CTW
 // CHECK:         class_method {{%.*}} : $@thick Gadget.Type, #Gadget.init!allocator.1 :
 
 // CHECK-LABEL: sil_vtable Gadget {
-// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : _T{{.*}}GadgetC{{.*}}C //
+// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : @$S{{.*}}GadgetC{{.*}}C //
 
 // CHECK-LABEL: sil_vtable Gizmo {
-// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : _T{{.*}}GizmoC{{.*}}C [override] //
+// CHECK:         #Gadget.init!allocator.1: (Gadget.Type) -> () -> Gadget : @$S{{.*}}GizmoC{{.*}}C [override] //

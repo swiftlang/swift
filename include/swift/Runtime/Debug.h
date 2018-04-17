@@ -18,6 +18,8 @@
 #define _SWIFT_RUNTIME_DEBUG_HELPERS_
 
 #include <llvm/Support/Compiler.h>
+#include <cstdarg>
+#include <cstdio>
 #include <stdint.h>
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Unreachable.h"
@@ -128,6 +130,10 @@ void swift_abortRetainUnowned(const void *object);
 LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
 void swift_abortUnownedRetainOverflow();
 
+// Halt due to an overflow in incrementWeak().
+LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+void swift_abortWeakRetainOverflow();
+
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
 /// is the address of the stack frame at index \p index. If \p shortOutput is
 /// true, this functions prints only the name of the symbol and offset, ignores
@@ -161,7 +167,7 @@ struct RuntimeErrorDetails {
   uintptr_t framesToSkip;
 
   // Address of some associated object (if there's any).
-  void *memoryAddress;
+  const void *memoryAddress;
 
   // A structure describing an extra thread (and its stack) that is related.
   struct Thread {
@@ -210,17 +216,50 @@ enum: uintptr_t {
 };
 
 /// Debugger hook. Calling this stops the debugger with a message and details
-/// about the issues.
-///
-/// This is not considered a finalized runtime entry point at this time. Do not
-/// emit calls to it from arbitrary Swift code; it's only meant for libraries
-/// that ship with the runtime (i.e. the stdlib and overlays).
-SWIFT_RUNTIME_EXPORT
+/// about the issues. Called by overlays.
+SWIFT_RUNTIME_STDLIB_SPI
 void _swift_reportToDebugger(uintptr_t flags, const char *message,
                              RuntimeErrorDetails *details = nullptr);
 
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_reportFatalErrorsToDebugger;
+
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_shouldReportFatalErrorsToDebugger();
+
+
+LLVM_ATTRIBUTE_ALWAYS_INLINE
+inline static int swift_asprintf(char **strp, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+#if defined(_WIN32)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+  int len = _vscprintf(fmt, args);
+#pragma GCC diagnostic pop
+  if (len < 0) {
+    va_end(args);
+    return -1;
+  }
+  char *buffer = static_cast<char *>(malloc(len + 1));
+  if (!buffer) {
+    va_end(args);
+    return -1;
+  }
+  int result = vsprintf(buffer, fmt, args);
+  if (result < 0) {
+    va_end(args);
+    free(buffer);
+    return -1;
+  }
+  *strp = buffer;
+#else
+  int result = vasprintf(strp, fmt, args);
+#endif
+  va_end(args);
+  return result;
+}
+
 
 // namespace swift
 }

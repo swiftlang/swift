@@ -41,7 +41,7 @@ func test1b(_ b : Bool) {
 
 enum MaybeInt {
   case none
-  case some(Int) // expected-note {{did you mean 'some'?}}
+  case some(Int) // expected-note {{'some' declared here}}
 
   init(_ i: Int) { self = MaybeInt.some(i) }
 }
@@ -87,7 +87,7 @@ func test3(_ a: ZeroOneTwoThree) {
   
   var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{type '(Int, Int) -> ZeroOneTwoThree' has no member 'Two'}}
   var _ : Int = .Two // expected-error{{type 'Int' has no member 'Two'}}
-  var _ : MaybeInt = 0 > 3 ? .none : .soma(3) // expected-error {{type 'MaybeInt' has no member 'soma'}}
+  var _ : MaybeInt = 0 > 3 ? .none : .soma(3) // expected-error {{type 'MaybeInt' has no member 'soma'; did you mean 'some'?}}
 }
 
 func test3a(_ a: ZeroOneTwoThree) {
@@ -310,10 +310,13 @@ enum E21269142 {  // expected-note {{did you mean to specify a raw type on the e
 print(E21269142.Foo.rawValue)  // expected-error {{value of type 'E21269142' has no member 'rawValue'}}
 
 // Check that typo correction does something sensible with synthesized members.
-enum SyntheticMember { // expected-note {{did you mean the implicitly-synthesized property 'hashValue'?}}
+enum SyntheticMember { // expected-note {{property 'hashValue' is implicitly declared}}
   case Foo
 }
-print(SyntheticMember.Foo.hasValue) // expected-error {{value of type 'SyntheticMember' has no member 'hasValue'}}
+
+func useSynthesizedMember() {
+  print(SyntheticMember.Foo.hasValue) // expected-error {{value of type 'SyntheticMember' has no member 'hasValue'; did you mean 'hashValue'?}}
+}
 
 // Non-materializable argument type
 enum Lens<T> {

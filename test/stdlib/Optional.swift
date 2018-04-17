@@ -16,12 +16,6 @@ extension Optional where Wrapped : TestProtocol1 {
   }
 }
 
-extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
-  var _wrappedIsTestProtocol1: Bool {
-    fatalError("not implemented")
-  }
-}
-
 OptionalTests.test("nil comparison") {
   var x: Int? = nil
   expectFalse(x != nil)
@@ -73,6 +67,19 @@ func testRelation(_ p: (Int?, Int?) -> Bool) -> [Bool] {
 OptionalTests.test("Equatable") {
   expectEqual([true, false, false, false, false, true], testRelation(==))
   expectEqual([false, true, true, true, true, false], testRelation(!=))
+}
+
+OptionalTests.test("Hashable") {
+    let o1: Optional<Int> = .some(1010)
+    let o2: Optional<Int> = .some(2020)
+    let o3: Optional<Int> = .none
+    checkHashable([o1, o2, o3], equalityOracle: { $0 == $1 })
+
+    let oo1: Optional<Optional<Int>> = .some(.some(1010))
+    let oo2: Optional<Optional<Int>> = .some(.some(2010))
+    let oo3: Optional<Optional<Int>> = .some(.none)
+    let oo4: Optional<Optional<Int>> = .none
+    checkHashable([oo1, oo2, oo3, oo4], equalityOracle: { $0 == $1 })
 }
 
 OptionalTests.test("CustomReflectable") {
@@ -222,31 +229,31 @@ OptionalTests.test("flatMap") {
 // FIXME: @inline(never) does not inhibit specialization
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAny<T, U>(_ a: T, _ : U.Type) -> U {
   return a as! U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAnyIs<T, U>(_ a: T, _ : U.Type) -> Bool {
   return a is U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAnyIsOptional<T, U>(_ a: T?, _ : U.Type) -> Bool {
   return a is U?
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func anyToAnyOrNil<T, U>(_ a: T, _ : U.Type) -> U? {
   return a as? U
 }
 
 @inline(never)
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func canGenericCast<T, U>(_ a: T, _ ty : U.Type) -> Bool {
   return anyToAnyOrNil(a, ty) != nil
 }
@@ -333,13 +340,11 @@ OptionalTests.test("Casting Optional") {
 
 OptionalTests.test("Casting Optional Traps") {
   let nx: C? = nil
-  expectCrashLater()
-  _blackHole(anyToAny(nx, Int.self))
+  expectCrash { _blackHole(anyToAny(nx, Int.self)) }
 }
 OptionalTests.test("Casting Optional Any Traps") {
   let nx: X? = X()
-  expectCrashLater()
-  _blackHole(anyToAny(nx as Any, Optional<Int>.self))
+  expectCrash { _blackHole(anyToAny(nx as Any, Optional<Int>.self)) }
 }
 
 class TestNoString {}

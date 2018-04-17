@@ -106,7 +106,7 @@ import SwiftShims
 
 func allocBytes(count: Int, alignment: Int)
   -> UnsafeMutableRawPointer {
-  return UnsafeMutableRawPointer.allocate(bytes: count, alignedTo: alignment)
+  return UnsafeMutableRawPointer.allocate(byteCount: count, alignment: alignment)
 }
 
 func deallocBytes(
@@ -114,7 +114,7 @@ func deallocBytes(
   byteCount: Int,
   alignment: Int
 ) {
-  pointer.deallocate(bytes: byteCount, alignedTo: alignment)
+  pointer.deallocate()
 }
 
 func _swift_stdlib_atomicStoreInt(
@@ -158,25 +158,6 @@ func _dumpRec(
   for (label, value) in mirror.children {
     for _ in 0..<(depth+4) { print(" ", terminator: "") }
     _dumpRec(value, name: label, depth: depth + 1, maxDepth: maxDepth)
-  }
-}
-
-struct _Stdout : TextOutputStream {
-  mutating func _lock() {
-    _swift_stdlib_flockfile_stdout()
-  }
-
-  mutating func _unlock() {
-    _swift_stdlib_funlockfile_stdout()
-  }
-
-  mutating func write(_ string: String) {
-    // FIXME: buffering?
-    // It is important that we use stdio routines in order to correctly
-    // interoperate with stdio buffering.
-    for c in string.utf8 {
-      _swift_stdlib_putchar_unlocked(Int32(c))
-    }
   }
 }
 
@@ -1054,12 +1035,12 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
       for i in keyPopulationBitmap.setBitIndices {
         (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
           .assumingMemoryBound(to: Key.self)
-          .deinitialize()
+          .deinitialize(count: 1)
       }
     }
     if !_isPOD(Value.self) {
       for i in keyPopulationBitmap.setBitIndices {
-        (_valueArray + i).deinitialize()
+        (_valueArray + i).deinitialize(count: 1)
       }
     }
     deallocBytes(self._nodePointer,
@@ -1135,7 +1116,7 @@ struct _PVArrayNodePointer<Key : Hashable, Value>
     precondition(!keyPopulationBitmap[i]) // sanity check
 
     (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
-      .initializeMemory(as: Key.self, to: key)
+      .initializeMemory(as: Key.self, repeating: key, count: 1)
     (_valueArray + i).initialize(to: value)
 
     keyPopulationBitmap[i] = true
@@ -2214,4 +2195,3 @@ PersistentVectorTests.test("removeValue(forKey:)/NoCollisionsInRootNode/1") {
 }
 
 runAllTests()
-

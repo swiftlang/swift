@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_while -o %t/main
 // RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
@@ -12,9 +12,9 @@
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_while.guessWhile
-// SIL-LABEL: sil @_T09pgo_while10guessWhiles5Int32VAD1x_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
-// IR-LABEL: define swiftcc i32 @_T09pgo_while10guessWhiles5Int32VAD1x_tF
-// IR-OPT-LABEL: define swiftcc i32 @_T09pgo_while10guessWhiles5Int32VAD1x_tF
+// SIL-LABEL: sil @$S9pgo_while10guessWhile1xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(42) {
+// IR-LABEL: define swiftcc i32 @"$S9pgo_while10guessWhile1xs5Int32VAE_tF"
+// IR-OPT-LABEL: define swiftcc i32 @"$S9pgo_while10guessWhile1xs5Int32VAE_tF"
 
 public func guessWhile(x: Int32) -> Int32 {
   // SIL: cond_br {{.*}} !true_count(420) !false_count(42)

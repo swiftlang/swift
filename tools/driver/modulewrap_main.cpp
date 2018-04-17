@@ -18,10 +18,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Bitcode/BitstreamReader.h"
@@ -43,7 +45,7 @@ private:
   std::vector<std::string> InputFilenames;
 
 public:
-  bool hasUniqueInputFilename() const { return InputFilenames.size() == 1; }
+  bool hasSingleInput() const { return InputFilenames.size() == 1; }
   const std::string &getFilenameOfFirstInput() const {
     return InputFilenames[0];
   }
@@ -112,10 +114,7 @@ public:
 
 int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                     void *MainAddr) {
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
+  INITIALIZE_LLVM();
 
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
@@ -131,7 +130,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
     return 1;
   }
 
-  if (!Invocation.hasUniqueInputFilename()) {
+  if (!Invocation.hasSingleInput()) {
     Instance.getDiags().diagnose(SourceLoc(),
                                  diag::error_mode_requires_one_input_file);
     return 1;

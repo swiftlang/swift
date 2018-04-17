@@ -12,8 +12,7 @@ func align<T>(_ offset: Int, to: T.Type) -> Int {
   return (offset + alignMask) & ~alignMask
 }
 
-// FIXME: Object header size will eventually be MemoryLayout<Int>.size * 2
-let classHeaderSize = MemoryLayout<Int>.size + 8
+let classHeaderSize = MemoryLayout<Int>.size * 2
 
 class C<T> {
   var x: Int
@@ -199,9 +198,9 @@ struct TestKeyPathBuilder {
     assert(offset >= 0 && offset <= 0x7FFF_FFFF,
            "invalid offset")
     let referencePrefixMask: UInt32 = endsReferencePrefix ? 0x8000_0000 : 0
-    if forceOverflow || offset >= 0x1FFF_FFFF {
+    if forceOverflow || offset >= 0x00FF_FFFF {
       // Offset is overflowed into another word
-      push(referencePrefixMask | kindMask | 0x1FFF_FFFF)
+      push(referencePrefixMask | kindMask | 0x00FF_FFFF)
       push(UInt32(offset))
     } else {
       // Offset is packed in-line
@@ -225,7 +224,7 @@ struct TestKeyPathBuilder {
   mutating func addClassComponent(offset: Int,
                                   forceOverflow: Bool = false,
                                   endsReferencePrefix: Bool = false) {
-    addOffsetComponent(offset: offset, kindMask: 0x4000_0000,
+    addOffsetComponent(offset: offset, kindMask: 0x0200_0000,
                        forceOverflow: forceOverflow,
                        endsReferencePrefix: endsReferencePrefix)
   }
@@ -238,13 +237,13 @@ struct TestKeyPathBuilder {
     endsReferencePrefix: Bool = false
   ) {
     assert(state == .component, "not expecting a component")
-    push(0x2100_0000 | (endsReferencePrefix ? 0x8000_0000 : 0))
+    push(0x0108_0000 | (endsReferencePrefix ? 0x8000_0000 : 0))
     pushWord(id)
     pushWord(getter)
     pushWord(args.count)
     pushWord(witnesses)
 
-    buffer.copyBytes(from: args)
+    buffer.copyMemory(from: args)
     buffer = .init(start: buffer.baseAddress! + args.count,
                    count: buffer.count - args.count)
 
@@ -953,7 +952,7 @@ func testCopy(from: UnsafeRawPointer,
               to: UnsafeMutableRawPointer,
               count: Int) {
   numberOfCopyOperations += 1
-  to.copyBytes(from: from, count: count)
+  to.copyMemory(from: from, byteCount: count)
 }
 
 var numberOfEqualsOperations = 0

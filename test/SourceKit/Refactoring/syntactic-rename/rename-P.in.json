@@ -1,0 +1,45 @@
+[
+  {
+    "key.name": "P",
+    "key.newname": "NewP",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 84,
+        "key.column": 10,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 86,
+        "key.column": 18,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 91,
+        "key.column": 16,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 91,
+        "key.column": 33,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 91,
+        "key.column": 57,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 91,
+        "key.column": 63,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 91,
+        "key.column": 74,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  }
+]

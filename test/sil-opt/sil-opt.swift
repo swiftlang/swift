@@ -7,23 +7,23 @@
 // CHECK: func unknown()
 
 // CHECK: struct X {
-// CHECK-NEXT:  @_inlineable func test()
-// CHECK-NEXT:  @_inlineable init
+// CHECK-NEXT:  @inlinable func test()
+// CHECK-NEXT:  @inlinable init
 // CHECK-NEXT: }
 
 // CHECK: sil{{.*}} @unknown : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil [serialized] @_T0s1XV4testyyF : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil [serialized] [canonical] @$Ss1XVABycfC : $@convention(method) (@thin X.Type) -> X
+// CHECK: bb0
+// CHECK-NEXT: struct $X ()
+// CHECK-NEXT: return
+
+// CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: tuple
-// CHECK-NEXT: return
-
-// CHECK-LABEL: sil [serialized] @_T0s1XVABycfC : $@convention(method) (@thin X.Type) -> X
-// CHECK: bb0
-// CHECK-NEXT: struct $X ()
 // CHECK-NEXT: return
 
 
@@ -37,9 +37,14 @@
 // SIB-CHECK-NEXT:  init
 // SIB-CHECK-NEXT: }
 
-// SIB-CHECK: sil @unknown : $@convention(thin) () -> ()
+// SIB-CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
 
-// SIB-CHECK-LABEL: sil [serialized] @_T0s1XV4testyyF : $@convention(method) (X) -> ()
+// SIB-CHECK-LABEL: sil [serialized] [canonical] @$Ss1XVABycfC : $@convention(method) (@thin X.Type) -> X
+// SIB-CHECK: bb0
+// SIB-CHECK-NEXT: struct $X ()
+// SIB-CHECK-NEXT: return
+
+// SIB-CHECK-LABEL: sil [serialized] [canonical] @$Ss1XV4testyyF : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
 // SIB-CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -47,21 +52,16 @@
 // SIB-CHECK-NEXT: tuple
 // SIB-CHECK-NEXT: return
 
-// SIB-CHECK-LABEL: sil [serialized] @_T0s1XVABycfC : $@convention(method) (@thin X.Type) -> X
-// SIB-CHECK: bb0
-// SIB-CHECK-NEXT: struct $X ()
-// SIB-CHECK-NEXT: return
-
 @_silgen_name("unknown")
 public func unknown() -> ()
 
-// FIXME: Why does it need to be public?
+@_fixed_layout
 public struct X {
-  @_inlineable
+  @inlinable
   public func test() {
     unknown()
   }
 
-  @_inlineable
+  @inlinable
   public init() {}
 }

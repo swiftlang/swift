@@ -7,7 +7,7 @@
 from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
-    sliceTypeName
+    collectionTypeName
 )
 
 import itertools
@@ -34,11 +34,11 @@ def all_tests():
     test.base_kind = base_kind
     test.mutable = mutable
     test.range_replaceable = range_replaceable
-    test.base_slice = sliceTypeName(
+    test.base = base_kind + collectionTypeName(
       traversal=traversal,
       mutable=mutable,
       rangeReplaceable=range_replaceable)
-    test.base = base_kind + test.base_slice.replace('Slice', 'Collection')
+
     for name, prefix, suffix in [
       ('FullWidth', '[]', '[]'),
       ('WithPrefix', '[-9999, -9998, -9997]', '[]'),

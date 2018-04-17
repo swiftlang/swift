@@ -120,6 +120,7 @@ static SILValue skipValueProjections(SILValue V) {
       case ValueKind::TupleExtractInst:
       case ValueKind::UncheckedEnumDataInst:
       case ValueKind::UncheckedTrivialBitCastInst:
+      case ValueKind::UncheckedRefCastInst:
         V = cast<SingleValueInstruction>(V)->getOperand(0);
         break;
       default:
@@ -158,6 +159,11 @@ bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
     return true;
   }
   switch (F->getEffectsKind()) {
+    case EffectsKind::ReleaseNone:
+      Effects.GlobalEffects.Reads = true;
+      Effects.GlobalEffects.Writes = true;
+      Effects.GlobalEffects.Releases = false;
+      return true;
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:
@@ -346,10 +352,6 @@ void SideEffectAnalysis::analyzeInstruction(FunctionInfo *FInfo,
     case SILInstructionKind::ReleaseValueInst:
     case SILInstructionKind::UnownedReleaseInst:
       FInfo->FE.getEffectsOn(I->getOperand(0))->Releases = true;
-      
-      // TODO: Check the call graph to be less conservative about what
-      // destructors might be called.
-      FInfo->FE.setWorstEffects();
       return;
     case SILInstructionKind::UnconditionalCheckedCastInst:
       FInfo->FE.getEffectsOn(cast<UnconditionalCheckedCastInst>(I)->getOperand())->Reads = true;
@@ -486,7 +488,7 @@ void SideEffectAnalysis::recompute(FunctionInfo *Initial) {
 }
 
 void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite FAS) {
-  assert(ApplyEffects.ParamEffects.size() == 0 &&
+  assert(ApplyEffects.ParamEffects.empty() &&
          "Not using a new ApplyEffects?");
   ApplyEffects.ParamEffects.resize(FAS.getNumArguments());
 

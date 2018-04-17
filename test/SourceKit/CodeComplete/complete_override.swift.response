@@ -2,6 +2,15 @@
   key.results: [
     {
       key.kind: source.lang.swift.keyword,
+      key.name: "__consuming",
+      key.sourcetext: "__consuming",
+      key.description: "__consuming",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
       key.name: "associatedtype",
       key.sourcetext: "associatedtype",
       key.description: "associatedtype",
@@ -71,7 +80,7 @@
       key.typename: "",
       key.context: source.codecompletion.context.superclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:17complete_override4BaseC1fySi5getMe_Sd1btF",
+      key.associated_usrs: "s:17complete_override4BaseC1f5getMe1bySi_SdtF",
       key.modulename: "complete_override"
     },
     {
@@ -106,6 +115,15 @@
       key.name: "import",
       key.sourcetext: "import",
       key.description: "import",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "indirect",
+      key.sourcetext: "indirect",
+      key.description: "indirect",
       key.typename: "",
       key.context: source.codecompletion.context.none,
       key.num_bytes_to_erase: 0
@@ -189,6 +207,15 @@
       key.name: "nonmutating",
       key.sourcetext: "nonmutating",
       key.description: "nonmutating",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "open",
+      key.sourcetext: "open",
+      key.description: "open",
       key.typename: "",
       key.context: source.codecompletion.context.none,
       key.num_bytes_to_erase: 0

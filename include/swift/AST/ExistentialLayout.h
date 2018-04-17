@@ -17,6 +17,7 @@
 #ifndef SWIFT_EXISTENTIAL_LAYOUT_H
 #define SWIFT_EXISTENTIAL_LAYOUT_H
 
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/SmallVector.h"
@@ -49,10 +50,8 @@ struct ExistentialLayout {
 
   bool isObjC() const {
     // FIXME: Does the superclass have to be @objc?
-    return ((superclass ||
-             hasExplicitAnyObject ||
-             getProtocols().size() > 0)
-            && !containsNonObjCProtocol);
+    return ((superclass || hasExplicitAnyObject || !getProtocols().empty()) &&
+            !containsNonObjCProtocol);
   }
 
   /// Whether the existential requires a class, either via an explicit
@@ -66,21 +65,28 @@ struct ExistentialLayout {
   // constraints?
   bool isErrorExistential() const;
 
-  ArrayRef<ProtocolType *> getProtocols() const {
-    if (singleProtocol)
-      return ArrayRef<ProtocolType *>{&singleProtocol, 1};
-    return multipleProtocols;
+  static inline ProtocolType *getProtocolType(const Type &Ty) {
+    return cast<ProtocolType>(Ty.getPointer());
   }
+  typedef ArrayRefView<Type,ProtocolType*,getProtocolType> ProtocolTypeArrayRef;
+
+  ProtocolTypeArrayRef getProtocols() const & {
+    if (singleProtocol)
+      return llvm::makeArrayRef(&singleProtocol, 1);
+    return protocols;
+  }
+  /// The returned ArrayRef may point directly to \c this->singleProtocol, so
+  /// calling this on a temporary is likely to be incorrect.
+  ProtocolTypeArrayRef getProtocols() const && = delete;
 
   LayoutConstraint getLayoutConstraint() const;
 
 private:
-  // Inline storage for 'protocols' member above when computing
-  // layout of a single ProtocolType
-  ProtocolType *singleProtocol;
+  // The protocol from a ProtocolType
+  Type singleProtocol;
 
-  /// Zero or more protocol constraints.
-  ArrayRef<ProtocolType *> multipleProtocols;
+  /// Zero or more protocol constraints from a ProtocolCompositionType
+  ArrayRef<Type> protocols;
 };
 
 }

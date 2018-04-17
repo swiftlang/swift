@@ -1,0 +1,62 @@
+
+version: 0
+case-sensitive: false
+roots:
+  - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared"
+    type: directory
+    contents:
+      - name: DriverSpecs.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/driverspecs.h"
+      - name: SpecStrings.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/specstrings.h"
+      - name: wtypesbase.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/shared/WTypesbase.h"
+  - name: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um"
+    type: directory
+    contents:
+      - name: oaidl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/OAIdl.h"
+      - name: objidl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ObjIdl.h"
+      - name: objidlbase.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/ObjIdlbase.h"
+      - name: ole2.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Ole2.h"
+      - name: oleauto.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/OleAuto.h"
+      - name: propidl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/PropIdl.h"
+      - name: propidlbase.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/PropIdlBase.h"
+      - name: psapi.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Psapi.h"
+      - name: unknwn.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Unknwn.h"
+      - name: unknwnbase.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Unknwnbase.h"
+      - name: winbase.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/WinBase.h"
+      - name: windows.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/Windows.h"
+      - name: winnls.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/WinNls.h"
+      - name: winuser.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/WinUser.h"
+

@@ -18,8 +18,9 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Strings.h"
 
@@ -244,9 +245,6 @@ static bool growingSubstitutions(SubstitutionList Subs1,
   for (unsigned idx = 0, e = Subs1.size(); idx < e; ++idx) {
     auto Type1 = Subs1[idx].getReplacement()->getCanonicalType();
     auto Type2 = Subs2[idx].getReplacement()->getCanonicalType();
-    // Replacement types should be concrete.
-    assert(!Type1->hasArchetype());
-    assert(!Type2->hasArchetype());
     // If types are the same, the substitution type does not grow.
     if (TypeCmp.isEqual(Type2, Type1))
       continue;
@@ -347,12 +345,6 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 
 static bool shouldNotSpecializeCallee(SILFunction *Callee,
                                       SubstitutionList Subs = {}) {
-  if (!Callee->shouldOptimize()) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize function " << Callee->getName()
-          << " marked to be excluded from optimizations.\n");
-    return true;
-  }
-
   if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
     return true;
 
@@ -368,7 +360,8 @@ static bool shouldNotSpecializeCallee(SILFunction *Callee,
 /// Returns false, if the current function cannot be specialized.
 /// Returns true otherwise.
 bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
-                                        SubstitutionList ParamSubs) {
+                                        SubstitutionList ParamSubs,
+                                        OptRemark::Emitter *ORE) {
   if (shouldNotSpecializeCallee(Callee))
     return false;
 
@@ -387,6 +380,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   if (CalleeGenericSig)
     InterfaceSubs = CalleeGenericSig->getSubstitutionMap(ParamSubs);
 
+  using namespace OptRemark;
   // We do not support partial specialization.
   if (!EnablePartialSpecialization && InterfaceSubs.hasArchetypes()) {
     DEBUG(llvm::dbgs() << "    Partial specialization is not supported.\n");
@@ -396,7 +390,10 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   // Perform some checks to see if we need to bail.
   if (InterfaceSubs.hasDynamicSelf()) {
-    DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
+    REMARK_OR_DEBUG(ORE, [&]() {
+      return RemarkMissed("DynamicSelf", *Apply.getInstruction())
+             << IndentDebug(4) << "Cannot specialize with dynamic self";
+    });
     return false;
   }
 
@@ -406,8 +403,11 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   for (auto Sub : ParamSubs) {
     auto Replacement = Sub.getReplacement();
     if (isTypeTooComplex(Replacement)) {
-      DEBUG(llvm::dbgs()
-            << "    Cannot specialize because the generic type is too deep.\n");
+      REMARK_OR_DEBUG(ORE, [&]() {
+        return RemarkMissed("TypeTooDeep", *Apply.getInstruction())
+               << IndentDebug(4)
+               << "Cannot specialize because the generic type is too deep";
+      });
       NumPreventedTooComplexGenericSpecializations++;
       return false;
     }
@@ -481,11 +481,14 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   // Check if specializing this call site would create in an infinite generic
   // specialization loop.
   if (createsInfiniteSpecializationLoop(Apply)) {
-    DEBUG(llvm::dbgs() << "    Generic specialization is not supported if "
-                          "it would result in a generic specialization of "
-                          "infinite depth.\n");
-    DEBUG(llvm::dbgs() << "Callee " << Callee->getName()
-                       << " occurs multiple times on the call chain\n");
+    REMARK_OR_DEBUG(ORE, [&]() {
+      return RemarkMissed("SpecializationLoop", *Apply.getInstruction())
+             << IndentDebug(4)
+             << "Generic specialization is not supported if it would result in "
+                "a generic specialization of infinite depth. Callee "
+             << NV("Callee", Callee)
+             << " occurs multiple times on the call chain";
+    });
     if (PrintGenericSpecializationLoops)
       llvm::errs() << "Detected and prevented an infinite "
                       "generic specialization loop for callee: "
@@ -505,8 +508,9 @@ bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
 
 ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
                                      ArrayRef<Substitution> ParamSubs,
-                                     bool ConvertIndirectToDirect) {
-  if (!prepareAndCheck(Apply, Callee, ParamSubs))
+                                     bool ConvertIndirectToDirect,
+                                     OptRemark::Emitter *ORE) {
+  if (!prepareAndCheck(Apply, Callee, ParamSubs, ORE))
     return;
 
   this->ConvertIndirectToDirect = ConvertIndirectToDirect;
@@ -675,11 +679,25 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   // Try to convert indirect incoming parameters to direct parameters.
   unsigned IdxForParam = NumFormalIndirectResults;
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
-    if (substConv.getSILType(PI).isLoadable(M) &&
-        PI.getConvention() == ParameterConvention::Indirect_In) {
-      Conversions.set(IdxForParam);
-    }
+    auto IdxToInsert = IdxForParam;
     ++IdxForParam;
+    if (!substConv.getSILType(PI).isLoadable(M)) {
+      continue;
+    }
+
+    switch (PI.getConvention()) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
+      Conversions.set(IdxToInsert);
+      break;
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Guaranteed:
+      break;
+    }
   }
 
   // Produce a specialized type, which is the substituted type with
@@ -721,8 +739,10 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   // Use the new specialized generic signature.
   auto NewFnTy = SILFunctionType::get(
-      CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCalleeConvention(),
-      FnTy->getParameters(), FnTy->getResults(), FnTy->getOptionalErrorResult(),
+      CanSpecializedGenericSig, FnTy->getExtInfo(),
+      FnTy->getCoroutineKind(), FnTy->getCalleeConvention(),
+      FnTy->getParameters(), FnTy->getYields(),
+      FnTy->getResults(), FnTy->getOptionalErrorResult(),
       M.getASTContext(), FnTy->getWitnessMethodConformanceOrNone());
 
   // This is an interface type. It should not have any archetypes.
@@ -735,6 +755,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   llvm::SmallVector<SILResultInfo, 8> SpecializedResults;
+  llvm::SmallVector<SILYieldInfo, 8> SpecializedYields;
   llvm::SmallVector<SILParameterInfo, 8> SpecializedParams;
 
   unsigned IndirectResultIdx = 0;
@@ -756,22 +777,36 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   }
   unsigned ParamIdx = 0;
   for (SILParameterInfo PI : SubstFTy->getParameters()) {
-    if (isParamConverted(ParamIdx++)) {
-      // Convert the indirect parameter to a direct parameter.
-      SILType SILParamTy = SILType::getPrimitiveObjectType(PI.getType());
-      // Indirect parameters are passed as owned, so we also need to pass the
-      // direct parameter as owned (except it's a trivial type).
-      auto C = (SILParamTy.isTrivial(M) ? ParameterConvention::Direct_Unowned :
-                ParameterConvention::Direct_Owned);
-      SpecializedParams.push_back(SILParameterInfo(PI.getType(), C));
-    } else {
+    if (!isParamConverted(ParamIdx++)) {
       // No conversion: re-use the original, substituted parameter info.
       SpecializedParams.push_back(PI);
+      continue;
     }
+
+    // Convert the indirect parameter to a direct parameter.
+    SILType SILParamTy = SILType::getPrimitiveObjectType(PI.getType());
+    // Indirect parameters are passed as owned/guaranteed, so we also
+    // need to pass the direct/guaranteed parameter as
+    // owned/guaranteed (except it's a trivial type).
+    auto C = ParameterConvention::Direct_Unowned;
+    if (!SILParamTy.isTrivial(M)) {
+      if (PI.isGuaranteed()) {
+        C = ParameterConvention::Direct_Guaranteed;
+      } else {
+        C = ParameterConvention::Direct_Owned;
+      }
+    }
+    SpecializedParams.push_back(SILParameterInfo(PI.getType(), C));
+  }
+  for (SILYieldInfo YI : SubstFTy->getYields()) {
+    // For now, always just use the original, substituted parameter info.
+    SpecializedYields.push_back(YI);
   }
   return SILFunctionType::get(
-      SubstFTy->getGenericSignature(), SubstFTy->getExtInfo(),
-      SubstFTy->getCalleeConvention(), SpecializedParams, SpecializedResults,
+      SubstFTy->getGenericSignature(),
+      SubstFTy->getExtInfo(), SubstFTy->getCoroutineKind(),
+      SubstFTy->getCalleeConvention(),
+      SpecializedParams, SpecializedYields, SpecializedResults,
       SubstFTy->getOptionalErrorResult(), M.getASTContext(),
       SubstFTy->getWitnessMethodConformanceOrNone());
 }
@@ -1391,10 +1426,7 @@ void FunctionSignaturePartialSpecializer::
 
     // Add a same type requirement based on the provided generic parameter
     // substitutions.
-    auto ReplacementCallerInterfaceTy = Replacement;
-    if (CallerGenericEnv)
-      ReplacementCallerInterfaceTy =
-          CallerGenericEnv->mapTypeOutOfContext(Replacement);
+    auto ReplacementCallerInterfaceTy = Replacement->mapTypeOutOfContext();
 
     auto SpecializedReplacementCallerInterfaceTy =
         ReplacementCallerInterfaceTy.subst(
@@ -1534,8 +1566,8 @@ void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
         // First, map callee's interface type to specialized interface type.
         auto Ty = Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
         Type SpecializedInterfaceTy =
-            SpecializedGenericEnv->mapTypeOutOfContext(
-                SpecializedGenericEnv->mapTypeIntoContext(Ty));
+          SpecializedGenericEnv->mapTypeIntoContext(Ty)
+            ->mapTypeOutOfContext();
         assert(!SpecializedInterfaceTy->hasError());
         return SpecializedInterfaceTy;
       },
@@ -1832,12 +1864,10 @@ void ReabstractionInfo::verify() const {
 /// Create a new specialized function if possible, and cache it.
 SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   // Do not create any new specializations at Onone.
-  if (M.getOptions().Optimization <= SILOptions::SILOptMode::None)
+  if (!GenericFunc->shouldOptimize())
     return nullptr;
 
-  DEBUG(
-    if (M.getOptions().Optimization <= SILOptions::SILOptMode::Debug) {
-      llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n"; });
+  DEBUG(llvm::dbgs() << "Creating a specialization: " << ClonedName << "\n";);
 
   ReInfo.verify();
 
@@ -1852,7 +1882,7 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
           SpecializedF->getGenericEnvironment()) ||
          (!SpecializedF->getLoweredFunctionType()->isPolymorphic() &&
           !SpecializedF->getGenericEnvironment()));
-  assert(SpecializedF->hasUnqualifiedOwnership());
+  assert(!SpecializedF->hasQualifiedOwnership());
   // Check if this specialization should be linked for prespecialization.
   linkSpecialization(M, SpecializedF);
   // Store the meta-information about how this specialization was created.
@@ -2007,6 +2037,13 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     A->replaceAllUsesWith(NewAI);
     return NewAI;
   }
+  if (auto *A = dyn_cast<BeginApplyInst>(AI)) {
+    assert(!StoreResultTo);
+    auto *NewAI = Builder.createBeginApply(Loc, Callee, Subs, Arguments,
+                                           A->isNonThrowing());
+    A->replaceAllUsesPairwiseWith(NewAI);
+    return NewAI;
+  }
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
     auto *NewPAI = Builder.createPartialApply(
         Loc, Callee, Subs, Arguments,
@@ -2101,7 +2138,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   // inline qualified into unqualified functions /or/ have the
   // OwnershipModelEliminator run as part of the normal compilation pipeline
   // (which we are not doing yet).
-  if (SpecializedFunc->hasUnqualifiedOwnership()) {
+  if (!SpecializedFunc->hasQualifiedOwnership()) {
     Thunk->setUnqualifiedOwnership();
   }
 
@@ -2243,7 +2280,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
 
 void swift::trySpecializeApplyOfGeneric(
     ApplySite Apply, DeadInstructionSet &DeadApplies,
-    llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
+    llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
+    OptRemark::Emitter &ORE) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
   auto *RefF = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
@@ -2277,7 +2315,8 @@ void swift::trySpecializeApplyOfGeneric(
   if (Apply.getModule().isOptimizedOnoneSupportModule())
     Serialized = IsNotSerialized;
 
-  ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutions());
+  ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutions(),
+                           /*ConvertIndirectToDirect=*/true, &ORE);
   if (!ReInfo.canBeSpecialized())
     return;
 
@@ -2301,7 +2340,7 @@ void swift::trySpecializeApplyOfGeneric(
       SILInstruction *User = Use->getUser();
       if (isa<RefCountingInst>(User))
         continue;
-      if (isDebugInst(User))
+      if (User->isDebugInstruction())
         continue;
 
       auto FAS = FullApplySite::isa(User);
@@ -2335,20 +2374,25 @@ void swift::trySpecializeApplyOfGeneric(
                        << SpecializedF->getName() << "\n"
                        << "Specialized function type: "
                        << SpecializedF->getLoweredFunctionType() << "\n");
-    assert(SpecializedF->hasUnqualifiedOwnership());
+    assert(!SpecializedF->hasQualifiedOwnership());
     NewFunctions.push_back(SpecializedF);
   }
+
+  ORE.emit([&]() {
+    std::string Str;
+    llvm::raw_string_ostream OS(Str);
+    SpecializedF->getLoweredFunctionType().print(
+        OS, PrintOptions::printQuickHelpDeclaration());
+
+    using namespace OptRemark;
+    return RemarkPassed("Specialized", *Apply.getInstruction())
+           << "Specialized function " << NV("Function", RefF) << " with type "
+           << NV("FuncType", OS.str());
+  });
 
   assert(ReInfo.getSpecializedType()
          == SpecializedF->getLoweredFunctionType() &&
          "Previously specialized function does not match expected type.");
-
-  // FIXME: Replace pre-specialization's "keep as public" hack with something
-  // more principled
-  assert((Serialized == SpecializedF->isSerialized() ||
-          SpecializedF->isKeepAsPublic()) &&
-         "Previously specialized function does not match expected "
-         "resilience level.");
 
   DeadApplies.insert(Apply.getInstruction());
 
@@ -2406,27 +2450,6 @@ void swift::trySpecializeApplyOfGeneric(
 // This uses the SIL linker to checks for the does not load the body of the pres
 // =============================================================================
 
-static void keepSpecializationAsPublic(SILFunction *F) {
-  DEBUG(auto DemangledNameString =
-            swift::Demangle::demangleSymbolAsString(F->getName());
-        StringRef DemangledName = DemangledNameString;
-        llvm::dbgs() << "Keep specialization public: " << DemangledName << " : "
-                     << F->getName() << "\n");
-  // Make it public, so that others can refer to it.
-  //
-  // NOTE: This function may refer to non-public symbols, which may lead to
-  // problems, if you ever try to inline this function. Therefore, these
-  // specializations should only be used to refer to them, but should never
-  // be inlined!  The general rule could be: Never inline specializations
-  // from stdlib!
-  //
-  // NOTE: Making these specializations public at this point breaks
-  // some optimizations. Therefore, just mark the function.
-  // DeadFunctionElimination pass will check if the function is marked
-  // and preserve it if required.
-  F->setKeepAsPublic(true);
-}
-
 /// Link a specialization for generating prespecialized code.
 ///
 /// For now, it is performed only for specializations in the
@@ -2438,14 +2461,15 @@ static void keepSpecializationAsPublic(SILFunction *F) {
 /// the library, but only used only by client code compiled at -Onone. They
 /// should be never inlined.
 static bool linkSpecialization(SILModule &M, SILFunction *F) {
-  if (F->isKeepAsPublic())
+  if (F->getLinkage() == SILLinkage::Public)
     return true;
   // Do not remove functions that are known prespecializations.
   // Keep them around. Change their linkage to public, so that other
   // applications can refer to them.
   if (M.isOptimizedOnoneSupportModule()) {
     if (isKnownPrespecialization(F->getName())) {
-      keepSpecializationAsPublic(F);
+      F->setLinkage(SILLinkage::Public);
+      F->setSerialized(IsNotSerialized);
       return true;
     }
   }

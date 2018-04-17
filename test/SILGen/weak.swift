@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name weak -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class C {
   func f() -> Int { return 42 }
@@ -10,10 +11,10 @@ struct A {
   weak var x: C?
 }
 
-// CHECK:    sil hidden @_T04weak5test0yAA1CC1c_tF : $@convention(thin) (@owned C) -> () {
+// CHECK:    sil hidden @$S4weak5test01cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 func test0(c c: C) {
   var c = c
-// CHECK:    bb0(%0 : @owned $C):
+// CHECK:    bb0(%0 : @guaranteed $C):
 // CHECK:      [[C:%.*]] = alloc_box ${ var C }
 // CHECK-NEXT: [[PBC:%.*]] = project_box [[C]]
 
@@ -51,8 +52,8 @@ func test0(c c: C) {
 
 // <rdar://problem/16871284> silgen crashes on weak capture
 // CHECK: closure #1 () -> Swift.Int in weak.testClosureOverWeak() -> ()
-// CHECK-LABEL: sil private @_T04weak19testClosureOverWeakyyFSiycfU_ : $@convention(thin) (@owned { var @sil_weak Optional<C> }) -> Int {
-// CHECK: bb0(%0 : @owned ${ var @sil_weak Optional<C> }):
+// CHECK-LABEL: sil private @$S4weak19testClosureOverWeakyyFSiycfU_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> Int {
+// CHECK: bb0(%0 : @guaranteed ${ var @sil_weak Optional<C> }):
 // CHECK-NEXT:  %1 = project_box %0
 // CHECK-NEXT:  debug_value_addr %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] %1
@@ -67,7 +68,7 @@ func testClosureOverWeak() {
 class CC {
   weak var x: CC?
 
-  // CHECK-LABEL: sil hidden @_T04weak2CCC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned CC) -> @owned CC {
+  // CHECK-LABEL: sil hidden @$S4weak2CCC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned CC) -> @owned CC {
   // CHECK:  bb0([[SELF:%.*]] : @owned $CC):
   // CHECK:    [[UNINIT_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]] : $CC
   // CHECK:    [[FOO:%.*]] = alloc_box ${ var Optional<CC> }, var, name "foo"
@@ -79,8 +80,13 @@ class CC {
   // CHECK:    store [[VALUE]] to [init] [[PB]] : $*Optional<CC>
   // CHECK:    end_borrow [[BORROWED_UNINIT_SELF]] from [[UNINIT_SELF]]
   // CHECK:    destroy_value [[FOO]]
-  // CHECK: } // end sil function '_T04weak2CCC{{[_0-9a-zA-Z]*}}fc'
+  // CHECK: } // end sil function '$S4weak2CCC{{[_0-9a-zA-Z]*}}fc'
   init() {
     var foo = x
   }
+}
+
+func testNoneWeak() {
+  weak var x: CC? = nil
+  weak var y: CC? = .none
 }

@@ -18,11 +18,11 @@ extension NSOpenGLGlobalOption {
   public var globalValue: GLint {
     get {
       var value: GLint = 0
-      NSOpenGLGetOption(self, &value)
+      __NSOpenGLGetOption(self, &value)
       return value
     }
     set {
-      NSOpenGLSetOption(self, newValue)
+      __NSOpenGLSetOption(self, newValue)
     }
   }
 }
@@ -32,7 +32,7 @@ extension NSOpenGLContext {
   public static var openGLVersion: (major: GLint, minor: GLint) {
     var major: GLint = 0
     var minor: GLint = 0
-    NSOpenGLGetVersion(&major, &minor)
+    __NSOpenGLGetVersion(&major, &minor)
     return (major: major, minor: minor)
   }
 }

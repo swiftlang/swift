@@ -755,7 +755,7 @@ void EagerSpecializerTransform::run() {
       SpecializedFuncs.push_back(NewFunc);
 
       if (SA->isExported()) {
-        NewFunc->setKeepAsPublic(true);
+        NewFunc->setLinkage(SILLinkage::Public);
         continue;
       }
     }

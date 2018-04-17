@@ -117,6 +117,12 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI)
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
   NumElements += unsigned(isDerivedClassSelf());
+
+  // Make sure we track /something/ in a cross-module struct initializer.
+  if (NumElements == 0 && isCrossModuleStructInitSelf()) {
+    NumElements = 1;
+    HasDummyElement = true;
+  }
 }
 
 SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
@@ -446,14 +452,12 @@ getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B, SILLocation Loc,
 }
 
 /// Given an RValue of aggregate type, compute the values of the elements by
-/// emitting a series of tuple_element instructions.
+/// emitting a destructure.
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V->getType().castTo<TupleType>();
-  for (auto Index : indices(TT->getElements())) {
-    ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
-  }
+  auto *DTI = B.createDestructureTuple(Loc, V);
+  copy(DTI->getResults(), std::back_inserter(ElementVals));
 }
 
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
@@ -562,6 +566,8 @@ private:
   void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
                       DIUseKind Kind);
   void collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo);
+  void collectDestructureTupleResultUses(DestructureTupleResult *DTR,
+                                         unsigned BaseEltNo);
   void collectStructElementUses(StructElementAddrInst *SEAI,
                                 unsigned BaseEltNo);
 };
@@ -609,6 +615,33 @@ void ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
   }
 
   collectUses(TEAI, BaseEltNo);
+}
+
+/// Given a destructure_tuple, compute the new BaseEltNo implicit in the
+/// selected member, and recursively add uses of the instruction.
+void ElementUseCollector::collectDestructureTupleResultUses(
+    DestructureTupleResult *DTR, unsigned BaseEltNo) {
+
+  // If we're walking into a tuple within a struct or enum, don't adjust the
+  // BaseElt.  The uses hanging off the tuple_element_addr are going to be
+  // counted as uses of the struct or enum itself.
+  if (InStructSubElement || InEnumSubElement)
+    return collectUses(DTR, BaseEltNo);
+
+  assert(!IsSelfOfNonDelegatingInitializer && "self doesn't have tuple type");
+
+  // tuple_element_addr P, 42 indexes into the current tuple element.
+  // Recursively process its uses with the adjusted element number.
+  unsigned FieldNo = DTR->getIndex();
+  auto T = DTR->getParent()->getOperand()->getType();
+  if (T.is<TupleType>()) {
+    for (unsigned i = 0; i != FieldNo; ++i) {
+      SILType EltTy = T.getTupleElementType(i);
+      BaseEltNo += getElementCountRec(Module, EltTy, false);
+    }
+  }
+
+  collectUses(DTR, BaseEltNo);
 }
 
 void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
@@ -1024,8 +1057,15 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Now that we've scalarized some stuff, recurse down into the newly created
     // element address computations to recursively process it.  This can cause
     // further scalarization.
-    for (auto EltPtr : ElementAddrs)
-      collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseEltNo);
+    for (SILValue EltPtr : ElementAddrs) {
+      if (auto *TEAI = dyn_cast<TupleElementAddrInst>(EltPtr)) {
+        collectTupleElementUses(TEAI, BaseEltNo);
+        continue;
+      }
+
+      auto *DTRI = cast<DestructureTupleResult>(EltPtr);
+      collectDestructureTupleResultUses(DTRI, BaseEltNo);
+    }
   }
 }
 
@@ -1072,7 +1112,9 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   //
   // Handle each of these in turn.
-  for (auto *Op : MUI->getUses()) {
+  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  while (!Uses.empty()) {
+    Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
 
     // Stores to self.
@@ -1088,8 +1130,14 @@ void ElementUseCollector::collectClassSelfUses() {
         }
 
         // A store of a load from the box is ignored.
-        // FIXME: SILGen should not emit these.
-        if (auto *LI = dyn_cast<LoadInst>(SI->getSrc()))
+        // SILGen emits these if delegation to another initializer was
+        // interrupted before the initializer was called.
+        SILValue src = SI->getSrc();
+        // Look through conversions.
+        while (auto conversion = dyn_cast<ConversionInst>(src))
+          src = conversion->getConverted();
+        
+        if (auto *LI = dyn_cast<LoadInst>(src))
           if (LI->getOperand() == MUI)
             continue;
 
@@ -1102,6 +1150,14 @@ void ElementUseCollector::collectClassSelfUses() {
     // Ignore end_borrows. These can only come from us being the source of a
     // load_borrow.
     if (isa<EndBorrowInst>(User))
+      continue;
+
+    // Recurse through begin_access.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(User)) {
+      Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
+      continue;
+    }
+    if (isa<EndAccessInst>(User))
       continue;
 
     // Loads of the box produce self, so collect uses from them.
@@ -1333,8 +1389,8 @@ void ElementUseCollector::collectClassSelfUses(
       continue;
     }
 
-    // Skip end_borrow.
-    if (isa<EndBorrowInst>(User))
+    // Skip end_borrow and end_access.
+    if (isa<EndBorrowInst>(User) || isa<EndAccessInst>(User))
       continue;
 
     // ref_element_addr P, #field lookups up a field.
@@ -1371,10 +1427,9 @@ void ElementUseCollector::collectClassSelfUses(
 
     // Look through begin_borrow, upcast, unchecked_ref_cast
     // and copy_value.
-    if (isa<BeginBorrowInst>(User) ||
-        isa<UpcastInst>(User) ||
-        isa<UncheckedRefCastInst>(User) ||
-        isa<CopyValueInst>(User)) {
+    if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User)
+        || isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User)
+        || isa<CopyValueInst>(User)) {
       auto value = cast<SingleValueInstruction>(User);
       std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
@@ -1452,7 +1507,9 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  for (auto *Op : MUI->getUses()) {
+  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  while (!Uses.empty()) {
+    Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
 
     // Ignore end_borrow. If we see an end_borrow it can only come from a
@@ -1460,10 +1517,18 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
     if (isa<EndBorrowInst>(User))
       continue;
 
+    // Recurse through begin_access.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(User)) {
+      Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
+      continue;
+    }
+    if (isa<EndAccessInst>(User))
+      continue;
+
     // Stores to self.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
       if (Op->getOperandNumber() == 1) {
-        // The initial store of 'self' into the box at the start of the
+        // A store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
           if (Arg->getParent() == MUI->getParent()) {
@@ -1473,8 +1538,14 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
         }
 
         // A store of a load from the box is ignored.
-        // FIXME: SILGen should not emit these.
-        if (auto *LI = dyn_cast<LoadInst>(SI->getSrc()))
+        // SILGen emits these if delegation to another initializer was
+        // interrupted before the initializer was called.
+        SILValue src = SI->getSrc();
+        // Look through conversions.
+        while (auto conversion = dyn_cast<ConversionInst>(src))
+          src = conversion->getConverted();
+        
+        if (auto *LI = dyn_cast<LoadInst>(src))
           if (LI->getOperand() == MUI)
             continue;
 

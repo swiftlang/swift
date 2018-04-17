@@ -116,7 +116,7 @@ In order to allow for cross-module optimizations for modules that are distribute
 
 Resilient types are required to have opaque layout when exposed outside their resilience domain. Inside a resilience domain, this requirement is lifted and their layout may be statically known or opaque as determined by their type (see [previous section](#opaque-layout)).
 
-Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How how this will impact the ABI is still under investigation [[SR-3911](https://bugs.swift.org/browse/SR-3911)].
+Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How this will impact the ABI is still under investigation [[SR-3911](https://bugs.swift.org/browse/SR-3911)].
 
 
 #### <a name="abstraction-levels"></a>Abstraction Levels
@@ -266,7 +266,7 @@ Alternatively, we may decide to perform inter-module calls through opaque *thunk
 
 ### Protocol and Existential Metadata
 
-#####<a name="witness-tables"></a>Protocol Witness Tables
+##### <a name="witness-tables"></a>Protocol Witness Tables
 
 The protocol witness table is a function table of a type's conformance to the protocol's interfaces. If the protocol also has an associated type requirement, then the witness table will store the metadata for the associated type. Protocol witness tables are used with [existential containers](#existential-containers) where the run time type is not known.
 

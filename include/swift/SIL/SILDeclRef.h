@@ -20,7 +20,6 @@
 #define SWIFT_SIL_SILDeclRef_H
 
 #include "swift/AST/ClangNode.h"
-#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/DenseMap.h"
@@ -66,8 +65,6 @@ bool requiresForeignEntryPoint(ValueDecl *vd);
 /// True if the entry point is natively foreign.
 bool requiresForeignToNativeThunk(ValueDecl *vd);
 
-unsigned getNaturalUncurryLevel(ValueDecl *vd);
-
 enum ForDefinition_t : bool {
   NotForDefinition = false,
   ForDefinition = true
@@ -83,8 +80,8 @@ enum ForDefinition_t : bool {
 /// declaration, such as uncurry levels of a function, the allocating and
 /// initializing entry points of a constructor, etc.
 struct SILDeclRef {
-  typedef llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *> Loc;
-  
+  using Loc = llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *>;
+
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
   enum class Kind : unsigned {
@@ -116,10 +113,6 @@ struct SILDeclRef {
     /// accessor for the global VarDecl in loc.
     GlobalAccessor,
 
-    /// GlobalGetter - this constant references the lazy-initializing
-    /// getter for the global VarDecl.
-    GlobalGetter,
-
     /// References the generator for a default argument of a function.
     DefaultArgGenerator,
 
@@ -146,8 +139,6 @@ struct SILDeclRef {
   Loc loc;
   /// The Kind of this SILDeclRef.
   Kind kind : 4;
-  /// The required resilience expansion of the declaration.
-  unsigned Expansion : 1;
   /// True if the SILDeclRef is a curry thunk.
   unsigned isCurried : 1;
   /// True if this references a foreign entry point for the referenced decl.
@@ -159,14 +150,12 @@ struct SILDeclRef {
   unsigned defaultArgIndex : 10;
   
   /// Produces a null SILDeclRef.
-  SILDeclRef() : loc(), kind(Kind::Func), Expansion(0),
+  SILDeclRef() : loc(), kind(Kind::Func),
                  isCurried(0), isForeign(0), isDirectReference(0),
                  defaultArgIndex(0) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
-                      ResilienceExpansion expansion
-                        = ResilienceExpansion::Minimal,
                       bool isCurried = false,
                       bool isForeign = false);
   
@@ -187,8 +176,6 @@ struct SILDeclRef {
   /// (Self) -> (Args...) -> Result, rather than a direct reference to
   /// the actual method whose lowered type is (Args..., Self) -> Result.
   explicit SILDeclRef(Loc loc,
-                      ResilienceExpansion expansion
-                        = ResilienceExpansion::Minimal,
                       bool isCurried = false,
                       bool isForeign = false);
 
@@ -228,6 +215,10 @@ struct SILDeclRef {
   bool isFunc() const {
     return kind == Kind::Func;
   }
+
+  /// True if the SILDeclRef references a setter function.
+  bool isSetter() const;
+
   /// True if the SILDeclRef references a constructor entry point.
   bool isConstructor() const {
     return kind == Kind::Allocator || kind == Kind::Initializer;
@@ -242,7 +233,7 @@ struct SILDeclRef {
   }
   /// True if the SILDeclRef references a global variable accessor.
   bool isGlobal() const {
-    return kind == Kind::GlobalAccessor || kind == Kind::GlobalGetter;
+    return kind == Kind::GlobalAccessor;
   }
   /// True if the SILDeclRef references the generator for a default argument of
   /// a function.
@@ -283,15 +274,13 @@ struct SILDeclRef {
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(loc.getOpaqueValue(),
                               static_cast<int>(kind),
-                              Expansion, isCurried,
-                              isForeign, isDirectReference,
+                              isCurried, isForeign, isDirectReference,
                               defaultArgIndex);
   }
 
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
-      && Expansion == rhs.Expansion
       && isCurried == rhs.isCurried
       && isForeign == rhs.isForeign
       && isDirectReference == rhs.isDirectReference
@@ -304,11 +293,7 @@ struct SILDeclRef {
   void print(llvm::raw_ostream &os) const;
   void dump() const;
 
-  unsigned getUncurryLevel() const;
-
-  ResilienceExpansion getResilienceExpansion() const {
-    return ResilienceExpansion(Expansion);
-  }
+  unsigned getParameterListCount() const;
   
   // Returns the SILDeclRef for an entity at a shallower uncurry level.
   SILDeclRef asCurried(bool curried = true) const {
@@ -316,7 +301,7 @@ struct SILDeclRef {
     // Curry thunks are never foreign.
     bool willBeForeign = isForeign && !curried;
     bool willBeDirect = isDirectReference;
-    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion,
+    return SILDeclRef(loc.getOpaqueValue(), kind,
                       curried, willBeDirect, willBeForeign,
                       defaultArgIndex);
   }
@@ -325,7 +310,7 @@ struct SILDeclRef {
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
     assert(!isCurried);
-    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion,
+    return SILDeclRef(loc.getOpaqueValue(), kind,
                       isCurried, isDirectReference, foreign, defaultArgIndex);
   }
   
@@ -345,6 +330,10 @@ struct SILDeclRef {
   /// to foreign C or ObjC calling convention.
   bool isNativeToForeignThunk() const;
 
+  /// True if the decl ref references a method which introduces a new vtable
+  /// entry.
+  bool requiresNewVTableEntry() const;
+
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const;
@@ -353,6 +342,11 @@ struct SILDeclRef {
   /// overrides. This may be different from "getOverridden" because some
   /// declarations do not always have vtable entries.
   SILDeclRef getNextOverriddenVTableEntry() const;
+
+  /// Return the most derived override which requires a new vtable entry.
+  /// If the method does not override anything or no override is vtable
+  /// dispatched, will return the least derived method.
+  SILDeclRef getOverriddenVTableEntry() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
@@ -379,14 +373,12 @@ private:
   /// Produces a SILDeclRef from an opaque value.
   explicit SILDeclRef(void *opaqueLoc,
                       Kind kind,
-                      unsigned rawExpansion,
                       bool isCurried,
                       bool isDirectReference,
                       bool isForeign,
                       unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
       kind(kind),
-      Expansion(rawExpansion),
       isCurried(isCurried),
       isForeign(isForeign), isDirectReference(isDirectReference),
       defaultArgIndex(defaultArgIndex)
@@ -408,17 +400,16 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   using SILDeclRef = swift::SILDeclRef;
   using Kind = SILDeclRef::Kind;
   using Loc = SILDeclRef::Loc;
-  using ResilienceExpansion = swift::ResilienceExpansion;
   using PointerInfo = DenseMapInfo<void*>;
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
   static SILDeclRef getEmptyKey() {
     return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func,
-                      0, false, false, false, 0);
+                      false, false, false, 0);
   }
   static SILDeclRef getTombstoneKey() {
     return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func,
-                      0, false, false, false, 0);
+                      false, false, false, 0);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());

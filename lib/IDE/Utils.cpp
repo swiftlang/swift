@@ -908,9 +908,11 @@ public:
       getBufferIdentifierForLoc(Range.getStart())).getValue();
     if (BufferId == InterestedId) {
       HasChange = true;
-      RewriteBuf.ReplaceText(
-                             SM.getLocOffsetInBuffer(Range.getStart(), BufferId),
-                             Range.str().size(), Text);
+      auto StartLoc = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
+      if (!Range.getByteLength())
+          RewriteBuf.InsertText(StartLoc, Text);
+      else
+          RewriteBuf.ReplaceText(StartLoc, Range.str().size(), Text);
     }
   }
 
@@ -938,6 +940,10 @@ swift::ide::SourceEditOutputConsumer::~SourceEditOutputConsumer() { delete &Impl
 void swift::ide::SourceEditOutputConsumer::
 accept(SourceManager &SM, RegionType RegionType,
        ArrayRef<Replacement> Replacements) {
+  // ignore mismatched or
+  if (RegionType == RegionType::Unmatched || RegionType == RegionType::Mismatch)
+    return;
+
   for (const auto &Replacement : Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
   }

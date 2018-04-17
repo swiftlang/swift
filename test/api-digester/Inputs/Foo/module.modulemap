@@ -1,0 +1,3 @@
+module Foo {
+  header "foo.h"
+}

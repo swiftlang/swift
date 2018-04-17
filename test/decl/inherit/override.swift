@@ -4,22 +4,22 @@
 @objc class ObjCClassB : ObjCClassA {}
 
 class A { 
-  func f1() { } // expected-note{{overridden declaration is here}}
-  func f2() -> A { } // expected-note{{overridden declaration is here}}
+  func f1() { } // expected-note{{overri}}
+  func f2() -> A { } // expected-note{{overri}}
 
-  @objc func f3() { } // expected-note{{overridden declaration is here}}
-  @objc func f4() -> ObjCClassA { } // expected-note{{overridden declaration is here}}
-  @objc var v1: Int { return 0 } // expected-note{{overridden declaration is here}}
-  @objc var v2: Int { return 0 } // expected-note{{overridden declaration is here}}
-  @objc var v3: Int = 0 // expected-note{{overridden declaration is here}}
+  @objc func f3() { } // expected-note{{overri}}
+  @objc func f4() -> ObjCClassA { } // expected-note{{overri}}
+  @objc var v1: Int { return 0 } // expected-note{{overri}}
+  @objc var v2: Int { return 0 } // expected-note{{overri}}
+  @objc var v3: Int = 0 // expected-note{{overri}}
 
   dynamic func f3D() { } // expected-error{{'dynamic' instance method 'f3D()' must also be '@objc'}}{{3-3=@objc }}
   dynamic func f4D() -> ObjCClassA { } // expected-error{{'dynamic' instance method 'f4D()' must also be '@objc'}}{{3-3=@objc }}
 }
 
 extension A {
-  func f5() { } // expected-note{{overridden declaration is here}}
-  func f6() -> A { } // expected-note{{overridden declaration is here}}
+  func f5() { } // expected-note{{overri}}
+  func f6() -> A { } // expected-note{{overri}}
 
   @objc func f7() { }
   @objc func f8() -> ObjCClassA { }
@@ -28,8 +28,8 @@ extension A {
 class B : A { }
 
 extension B { 
-  func f1() { }  // expected-error{{overriding declarations in extensions is not supported}}
-  func f2() -> B { } // expected-error{{overriding declarations in extensions is not supported}}
+  func f1() { }  // expected-error{{overri}}
+  func f2() -> B { } // expected-error{{overri}}
 
   override func f3() { } // expected-error{{cannot override a non-dynamic class declaration from an extension}}
   override func f4() -> ObjCClassB { } // expected-error{{cannot override a non-dynamic class declaration from an extension}}
@@ -46,7 +46,7 @@ extension B {
   override func f3D() { }
   override func f4D() -> ObjCClassB { }
 
-  func f5() { }  // expected-error{{overriding declarations in extensions is not supported}}
+  func f5() { }  // expected-error{{overridi}}
   func f6() -> A { }  // expected-error{{overriding declarations in extensions is not supported}}
 
   @objc override func f7() { }

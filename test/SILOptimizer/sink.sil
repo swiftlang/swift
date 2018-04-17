@@ -239,12 +239,12 @@ bb1:
 }
 
 sil_vtable X {
-  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: _TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
 }
 
 sil_vtable Y {
-  #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: _TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer.1: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
 }
 

@@ -78,8 +78,6 @@ class Outer {
   let a: Int = E.a // expected-error {{cannot convert value of type 'Outer.E' to specified type 'Int'}}
 
   enum E : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
-  // expected-error@-1 {{'Outer.E' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'Array<Int>' is not Equatable}}
     case a
   }
 }
@@ -108,7 +106,7 @@ func rdar32431736() {
 
 enum E_32431165 : String {
   case foo = "foo"
-  case bar = "bar" // expected-note {{did you mean 'bar'?}}
+  case bar = "bar" // expected-note {{'bar' declared here}}
 }
 
 func rdar32431165_1(_: E_32431165) {}
@@ -116,7 +114,7 @@ func rdar32431165_1(_: Int) {}
 func rdar32431165_1(_: Int, _: E_32431165) {}
 
 rdar32431165_1(E_32431165.baz)
-// expected-error@-1 {{type 'E_32431165' has no member 'baz'}}
+// expected-error@-1 {{type 'E_32431165' has no member 'baz'; did you mean 'bar'?}}
 
 rdar32431165_1(.baz)
 // expected-error@-1 {{reference to member 'baz' cannot be resolved without a contextual type}}
@@ -146,3 +144,11 @@ func rdar32432253(_ condition: Bool = false) {
   let _ = choice == "bar"
   // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{11-11=}} {{17-17=.rawValue}}
 }
+
+
+struct NotEquatable { }
+
+enum ArrayOfNewEquatable : Array<NotEquatable> { }
+// expected-error@-1{{raw type 'Array<NotEquatable>' is not expressible by any literal}}
+// expected-error@-2{{'ArrayOfNewEquatable' declares raw type 'Array<NotEquatable>', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-error@-3{{RawRepresentable conformance cannot be synthesized because raw type 'Array<NotEquatable>' is not Equatable}}

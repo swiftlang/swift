@@ -236,9 +236,10 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   // larger OutputType (the actual memory object must be large enough to hold
   // both types). However, such address casts cannot be converted to value
   // casts.
-  if (!SILType::canUnsafeCastValue(InputTy, OutputTy, UADCI->getModule()))
+  if (!SILType::canPerformABICompatibleUnsafeCastValue(InputTy, OutputTy,
+                                                       UADCI->getModule())) {
     return nullptr;
-
+  }
   // For each user U of the unchecked_addr_cast...
   for (auto U : getNonDebugUses(UADCI))
     // Check if it is load. If it is not a load, bail...
@@ -301,6 +302,20 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
 
   return nullptr;
 }
+
+
+SILInstruction *
+SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
+  // Fold noop casts through Builtin.BridgeObject.
+  // (bridge_object_to_ref (unchecked-ref-cast x BridgeObject) y)
+  //  -> (unchecked-ref-cast x y)
+  if (auto URC = dyn_cast<UncheckedRefCastInst>(BORI->getOperand()))
+    return Builder.createUncheckedRefCast(BORI->getLoc(), URC->getOperand(),
+                                          BORI->getType());
+  return nullptr;
+}
+
+
 
 SILInstruction *
 SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
@@ -504,6 +519,19 @@ visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
   return nullptr;
 }
 
+SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
+    ConvertEscapeToNoEscapeInst *Cvt) {
+  auto *OrigThinToThick =
+      dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted());
+  if (!OrigThinToThick)
+    return nullptr;
+  auto origFunType = OrigThinToThick->getType().getAs<SILFunctionType>();
+  auto NewTy = origFunType->getWithExtInfo(origFunType->getExtInfo().withNoEscape(true));
+
+  return Builder.createThinToThickFunction(
+      OrigThinToThick->getLoc(), OrigThinToThick->getOperand(),
+      SILType::getPrimitiveObjectType(NewTy));
+}
 /// Replace a convert_function that only has refcounting uses with its
 /// operand.
 SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) {

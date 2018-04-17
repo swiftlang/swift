@@ -20,7 +20,8 @@
   (fill-column . 80)
   (c-file-style . "swift"))
  (c++-mode
-  (whitespace-style face lines indentation:space))
+  (whitespace-style face lines indentation:space)
+  (flycheck-clang-language-standard . "c++14"))
  (c-mode
   (whitespace-style face lines indentation:space))
  (objc-mode

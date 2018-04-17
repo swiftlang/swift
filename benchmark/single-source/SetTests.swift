@@ -33,8 +33,8 @@ public func run_SetIsSubsetOf(_ N: Int) {
   var otherSet = Set<Int>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Int(truncatingBitPattern: Random()))
-    otherSet.insert(Int(truncatingBitPattern: Random()))
+    set.insert(Int(truncatingIfNeeded: Random()))
+    otherSet.insert(Int(truncatingIfNeeded: Random()))
   }
 
   var isSubset = false
@@ -62,8 +62,8 @@ public func run_SetExclusiveOr(_ N: Int) {
   var otherSet = Set<Int>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Int(truncatingBitPattern: Random()))
-    otherSet.insert(Int(truncatingBitPattern: Random()))
+    set.insert(Int(truncatingIfNeeded: Random()))
+    otherSet.insert(Int(truncatingIfNeeded: Random()))
   }
 
   var xor = Set<Int>()
@@ -83,8 +83,8 @@ public func run_SetUnion(_ N: Int) {
   var otherSet = Set<Int>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Int(truncatingBitPattern: Random()))
-    otherSet.insert(Int(truncatingBitPattern: Random()))
+    set.insert(Int(truncatingIfNeeded: Random()))
+    otherSet.insert(Int(truncatingIfNeeded: Random()))
   }
 
   var or = Set<Int>()
@@ -104,8 +104,8 @@ public func run_SetIntersect(_ N: Int) {
   var otherSet = Set<Int>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Int(truncatingBitPattern: Random()))
-    otherSet.insert(Int(truncatingBitPattern: Random()))
+    set.insert(Int(truncatingIfNeeded: Random()))
+    otherSet.insert(Int(truncatingIfNeeded: Random()))
   }
 
   var and = Set<Int>()
@@ -141,8 +141,8 @@ public func run_SetIsSubsetOf_OfObjects(_ N: Int) {
   var otherSet = Set<Box<Int>>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingBitPattern: Random())))
-    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+    set.insert(Box(Int(truncatingIfNeeded: Random())))
+    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
   }
 
   var isSubset = false
@@ -170,8 +170,8 @@ public func run_SetExclusiveOr_OfObjects(_ N: Int) {
   var otherSet = Set<Box<Int>>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingBitPattern: Random())))
-    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+    set.insert(Box(Int(truncatingIfNeeded: Random())))
+    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
   }
 
   var xor = Set<Box<Int>>()
@@ -191,8 +191,8 @@ public func run_SetUnion_OfObjects(_ N: Int) {
   var otherSet = Set<Box<Int>>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingBitPattern: Random())))
-    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+    set.insert(Box(Int(truncatingIfNeeded: Random())))
+    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
   }
 
   var or = Set<Box<Int>>()
@@ -212,8 +212,8 @@ public func run_SetIntersect_OfObjects(_ N: Int) {
   var otherSet = Set<Box<Int>>(minimumCapacity: size)
 
   for _ in 0 ..< size {
-    set.insert(Box(Int(truncatingBitPattern: Random())))
-    otherSet.insert(Box(Int(truncatingBitPattern: Random())))
+    set.insert(Box(Int(truncatingIfNeeded: Random())))
+    otherSet.insert(Box(Int(truncatingIfNeeded: Random())))
   }
 
   var and = Set<Box<Int>>()

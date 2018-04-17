@@ -37,9 +37,9 @@ set(SWIFTLIB_ESSENTIAL
   Character.swift
   CharacterUnicodeScalars.swift
   CocoaArray.swift
-  Codable.swift
+  Codable.swift.gyb
   Collection.swift
-  CollectionAlgorithms.swift.gyb
+  CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
   ClosedRange.swift
@@ -47,22 +47,20 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
-  DoubleWidth.swift.gyb
-  DropWhile.swift.gyb
+  Dictionary.swift
+  DropWhile.swift
   Dump.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
-  Existential.swift
-  Filter.swift.gyb
+  Filter.swift
   FixedArray.swift.gyb
   FlatMap.swift
-  Flatten.swift.gyb
+  Flatten.swift
   FloatingPoint.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   Hashable.swift
-  HashedCollections.swift.gyb
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
   AnyHashable.swift
@@ -72,36 +70,36 @@ set(SWIFTLIB_ESSENTIAL
   HeapBuffer.swift
   ICU.swift
   ImplicitlyUnwrappedOptional.swift
-  Indices.swift.gyb
+  Indices.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift.gyb
   Join.swift
   KeyPath.swift
-  LazyCollection.swift.gyb
+  LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
   ManagedBuffer.swift
-  Map.swift.gyb
+  Map.swift
   MemoryLayout.swift
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
-  NewtypeWrapper.swift.gyb
-  ObjCMirrors.swift
+  NewtypeWrapper.swift
+  NormalizedCodeUnitIterator.swift
   ObjectIdentifier.swift
   Optional.swift
   OptionSet.swift
   OutputStream.swift
   Pointer.swift
   Policy.swift
-  PrefixWhile.swift.gyb
+  PrefixWhile.swift
   Print.swift
   RandomAccessCollection.swift
-  Range.swift.gyb
-  RangeReplaceableCollection.swift.gyb
-  ReflectionLegacy.swift
+  Range.swift
+  RangeReplaceableCollection.swift
+  ReflectionMirror.swift
   Repeat.swift
   REPL.swift
   Reverse.swift
@@ -110,12 +108,14 @@ set(SWIFTLIB_ESSENTIAL
   SipHash.swift.gyb
   SentinelCollection.swift
   Sequence.swift
-  SequenceAlgorithms.swift.gyb
+  SequenceAlgorithms.swift
   SequenceWrapper.swift
+  Set.swift
   SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift
-  Slice.swift.gyb
+  Slice.swift
+  SmallString.swift
   Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb
@@ -123,18 +123,24 @@ set(SWIFTLIB_ESSENTIAL
   StringHashable.swift  # ORDER DEPENDENCY: Must precede String.swift
   String.swift
   StringBridge.swift
-  StringBuffer.swift
   StringComparable.swift
-  StringCore.swift
+  StringComparison.swift
+  StringGuts.swift
+  StringGutsVisitor.swift
+  StringObject.swift
+  StringProtocol.swift
   StringIndex.swift
   StringInterpolation.swift
   StringLegacy.swift
-  StringRangeReplaceableCollection.swift.gyb
+  StringRangeReplaceableCollection.swift
+  StringStorage.swift
   StringSwitch.swift
   StringIndexConversions.swift
+  StringNormalization.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
+  StringVariant.swift
   Substring.swift.gyb
   SwiftNativeNSArray.swift
   ThreadLocalStorage.swift
@@ -143,6 +149,8 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeEncoding.swift
   UnicodeParser.swift
   Unmanaged.swift
+  UnmanagedOpaqueString.swift
+  UnmanagedString.swift
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
@@ -153,6 +161,7 @@ set(SWIFTLIB_ESSENTIAL
   UTF16.swift
   UTF32.swift
   Unicode.swift # ORDER DEPENDENCY: must follow new unicode support
+  StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
   )
@@ -166,6 +175,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   ExistentialCollection.swift.gyb
   Mirror.swift
+  PlaygroundDisplay.swift
   CommandLine.swift
   SliceBuffer.swift
   Tuple.swift.gyb
@@ -227,6 +237,9 @@ endif()
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
+if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
+  list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
+endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
@@ -249,7 +262,6 @@ add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STD
   # and the generated directory as dependencies.
   FILE_DEPENDS
     copy_shim_headers "${SWIFTLIB_DIR}/shims"
-    section_magic
     ${GROUP_INFO_JSON_FILE}
   SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
   LINK_FLAGS ${swift_core_link_flags}

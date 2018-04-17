@@ -238,6 +238,9 @@ public:
 
   virtual bool handleSourceText(StringRef Text) = 0;
 
+  virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
+  virtual bool syntaxTreeEnabled() = 0;
+
   virtual void finished() {}
 };
 
@@ -286,7 +289,7 @@ struct CursorInfoData {
   StringRef ModuleInterfaceName;
   /// This is an (offset,length) pair.
   /// It is set only if the declaration has a source location.
-  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
+  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc = None;
   /// Set only if the declaration has a source location.
   StringRef Filename;
   /// For methods this lists the USRs of the overrides in the class hierarchy.
@@ -537,7 +540,7 @@ public:
                                          ArrayRef<const char *> Args,
                                          bool UsingSwiftArgs,
                                          bool SynthesizedExtensions,
-                                         Optional<unsigned> swiftVersion) = 0;
+                                         StringRef swiftVersion) = 0;
 
   virtual void editorOpenSwiftSourceInterface(StringRef Name,
                                               StringRef SourceName,

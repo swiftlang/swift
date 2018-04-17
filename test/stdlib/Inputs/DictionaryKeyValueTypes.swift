@@ -25,6 +25,31 @@ func equalsUnordered<T : Comparable>(_ lhs: [T], _ rhs: [T]) -> Bool {
   return lhs.sorted().elementsEqual(rhs.sorted())
 }
 
+// A COW wrapper type that holds an Int.
+struct TestValueCOWTy {
+  
+  class Base {
+    var value: Int
+    init(_ value: Int) { self.value = value }
+  }
+
+  private var base: Base
+  init(_ value: Int = 0) { self.base = Base(value) }
+
+  var value: Int {
+    get { return base.value }
+    set {
+      if !isKnownUniquelyReferenced(&base) {
+        base = Base(newValue)
+      } else {
+        base.value = newValue
+      }
+    }
+  }
+
+  var baseAddress: Int { return unsafeBitCast(base, to: Int.self) }
+}
+
 var _keyCount = _stdlib_AtomicInt(0)
 var _keySerial = _stdlib_AtomicInt(0)
 

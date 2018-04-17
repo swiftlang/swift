@@ -211,6 +211,8 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   // against the operand or can use the value in some way.
   case TermKind::ThrowInst:
   case TermKind::ReturnInst:
+  case TermKind::UnwindInst:
+  case TermKind::YieldInst:
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumInst:

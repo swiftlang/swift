@@ -22,6 +22,7 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Statistic.h"
+#include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
@@ -149,8 +150,8 @@ static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
-           bool EnableStructure, bool EnableDiagnostics, bool SyntacticOnly,
-           ArrayRef<const char *> Args);
+           bool EnableStructure, bool EnableDiagnostics, bool EnableSyntaxTree,
+           bool SyntacticOnly, ArrayRef<const char *> Args);
 
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
@@ -163,7 +164,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
                           bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
-                          Optional<unsigned> swiftVersion);
+                          StringRef swiftVersion);
 
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
@@ -184,7 +185,8 @@ editorClose(StringRef Name, bool RemoveCache);
 static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
                   unsigned Length, bool EnableSyntaxMap, bool EnableStructure,
-                  bool EnableDiagnostics, bool SyntacticOnly);
+                  bool EnableDiagnostics, bool EnableSyntaxTree,
+                  bool SyntacticOnly);
 
 static void
 editorApplyFormatOptions(StringRef Name, RequestDict &FmtOptions);
@@ -230,7 +232,9 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
 static bool isSemanticEditorDisabled();
 
 static void fillDictionaryForDiagnosticInfo(
-    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info);
+
+static void enableCompileNotifications(bool value);
 
 static void handleRequestImpl(sourcekitd_object_t Req,
                               ResponseReceiver Receiver);
@@ -357,6 +361,15 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     return Rec(mangleSimpleClassNames(ModuleClassPairs));
   }
 
+  if (ReqUID == RequestEnableCompileNotifications) {
+    int64_t value = true;
+    if (Req.getInt64(KeyValue, value, /*isOptional=*/false)) {
+      return Rec(createErrorRequestInvalid("missing 'key.value'"));
+    }
+    enableCompileNotifications(value);
+    return Rec(ResponseBuilder().createResponse());
+  }
+
   // Just accept 'source.request.buildsettings.register' for now, don't do
   // anything else.
   // FIXME: Heavy WIP here.
@@ -401,10 +414,13 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
+    int64_t EnableSyntaxTree = false;
+    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
     return Rec(editorOpen(*Name, InputBuf.get(), EnableSyntaxMap, EnableStructure,
-                          EnableDiagnostics, SyntacticOnly, Args));
+                          EnableDiagnostics, EnableSyntaxTree, SyntacticOnly,
+                          Args));
   }
   if (ReqUID == RequestEditorClose) {
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -434,11 +450,14 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableStructure, EnableStructure, /*isOptional=*/true);
     int64_t EnableDiagnostics = true;
     Req.getInt64(KeyEnableDiagnostics, EnableDiagnostics, /*isOptional=*/true);
+    int64_t EnableSyntaxTree = false;
+    Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length,
                                  EnableSyntaxMap, EnableStructure,
-                                 EnableDiagnostics, SyntacticOnly));
+                                 EnableDiagnostics, EnableSyntaxTree,
+                                 SyntacticOnly));
   }
   if (ReqUID == RequestEditorFormatText) {
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -491,10 +510,15 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
     Optional<int64_t> UsingSwiftArgs = Req.getOptionalInt64(KeyUsingSwiftArgs);
-    Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
-    Optional<unsigned> swiftVer;
-    if (swiftVerVal.hasValue())
-      swiftVer = *swiftVerVal;
+    std::string swiftVer;
+    Optional<StringRef> swiftVerValStr = Req.getString(KeySwiftVersion);
+    if (swiftVerValStr.hasValue()) {
+      swiftVer = swiftVerValStr.getValue();
+    } else {
+      Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
+      if (swiftVerVal.hasValue())
+        swiftVer = std::to_string(*swiftVerVal);
+    }
     return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
                                          UsingSwiftArgs.getValueOr(false),
                                          SynthesizedExtension, swiftVer));
@@ -720,6 +744,9 @@ handleSemanticRequest(RequestDict Req,
 
   llvm::SmallString<64> ErrBuf;
 
+  if (isSemanticEditorDisabled())
+      return Rec(createErrorRequestFailed("semantic editor is disabled"));
+
   if (ReqUID == RequestCodeComplete) {
     std::unique_ptr<llvm::MemoryBuffer>
     InputBuf = getInputBufForRequest(SourceFile, SourceText, ErrBuf);
@@ -766,9 +793,6 @@ handleSemanticRequest(RequestDict Req,
     if (HashOpt.hasValue()) Hash = *HashOpt;
     return Rec(indexSource(*SourceFile, Args, Hash));
   }
-
-  if (isSemanticEditorDisabled())
-      return Rec(createErrorRequestFailed("semantic editor is disabled"));
 
   if (ReqUID == RequestCursorInfo) {
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
@@ -1206,13 +1230,6 @@ public:
 };
 } // end anonymous namespace
 
-static bool isSwiftPrefixed(StringRef MangledName) {
-  if (MangledName.size() < 2)
-    return false;
-  return MangledName[0] == '_' &&
-         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
-}
-
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified) {
   swift::Demangle::DemangleOptions DemangleOptions;
@@ -1222,7 +1239,7 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
   }
 
   auto getDemangledName = [&](StringRef MangledName) -> std::string {
-    if (!isSwiftPrefixed(MangledName))
+    if (!swift::Demangle::isSwiftSymbol(MangledName))
       return std::string(); // Not a mangled name
 
     std::string Result = swift::Demangle::demangleSymbolAsString(
@@ -1442,30 +1459,7 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
     Arr = TopDict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
@@ -1982,22 +1976,25 @@ class SKEditorConsumer : public EditorConsumer {
   bool EnableSyntaxMap;
   bool EnableStructure;
   bool EnableDiagnostics;
+  bool EnableSyntaxTree;
   bool SyntacticOnly;
 
 public:
   SKEditorConsumer(bool EnableSyntaxMap, bool EnableStructure,
-                   bool EnableDiagnostics, bool SyntacticOnly)
+                   bool EnableDiagnostics, bool EnableSyntaxTree,
+                   bool SyntacticOnly)
       : EnableSyntaxMap(EnableSyntaxMap), EnableStructure(EnableStructure),
-        EnableDiagnostics(EnableDiagnostics), SyntacticOnly(SyntacticOnly) {
+        EnableDiagnostics(EnableDiagnostics), EnableSyntaxTree(EnableSyntaxTree),
+        SyntacticOnly(SyntacticOnly) {
 
     Dict = RespBuilder.getDictionary();
   }
 
   SKEditorConsumer(ResponseReceiver RespReceiver, bool EnableSyntaxMap,
                    bool EnableStructure, bool EnableDiagnostics,
-                   bool SyntacticOnly)
+                   bool EnableSyntaxTree, bool SyntacticOnly)
   : SKEditorConsumer(EnableSyntaxMap, EnableStructure,
-                     EnableDiagnostics, SyntacticOnly) {
+                     EnableDiagnostics, EnableSyntaxTree, SyntacticOnly) {
     this->RespReceiver = RespReceiver;
   }
 
@@ -2047,7 +2044,8 @@ public:
                         UIdent DiagStage) override;
 
   bool handleSourceText(StringRef Text) override;
-
+  bool handleSerializedSyntaxTree(StringRef Text) override;
+  virtual bool syntaxTreeEnabled() override;
   void finished() override {
     if (RespReceiver)
       RespReceiver(createResponse());
@@ -2058,10 +2056,10 @@ public:
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
-           bool EnableStructure, bool EnableDiagnostics, bool SyntacticOnly,
-           ArrayRef<const char *> Args) {
+           bool EnableStructure, bool EnableDiagnostics, bool EnableSyntaxTree,
+           bool SyntacticOnly, ArrayRef<const char *> Args) {
   SKEditorConsumer EditC(EnableSyntaxMap, EnableStructure,
-                         EnableDiagnostics, SyntacticOnly);
+                         EnableDiagnostics, EnableSyntaxTree, SyntacticOnly);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpen(Name, Buf, EnableSyntaxMap, EditC, Args);
   return EditC.createResponse();
@@ -2075,6 +2073,7 @@ editorOpenInterface(StringRef Name, StringRef ModuleName,
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
+                         /*EnableSyntaxTree=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args,
@@ -2093,6 +2092,7 @@ editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
                                                   /*EnableSyntaxMap=*/true,
                                                   /*EnableStructure=*/true,
                                                   /*EnableDiagnostics=*/false,
+                                                  /*EnableSyntaxTree=*/false,
                                                   /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, EditC);
@@ -2105,6 +2105,7 @@ editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
                                                   /*EnableSyntaxMap=*/true,
                                                   /*EnableStructure=*/true,
                                                   /*EnableDiagnostics=*/false,
+                                                  /*EnableSyntaxTree=*/false,
                                                   /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenTypeInterface(*EditC, Args, TypeUsr);
@@ -2114,6 +2115,7 @@ static sourcekitd_response_t editorExtractTextFromComment(StringRef Source) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/false,
                          /*EnableStructure=*/false,
                          /*EnableDiagnostics=*/false,
+                         /*EnableSyntaxTree=*/false,
                          /*SyntacticOnly=*/true);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorExtractTextFromComment(Source, EditC);
@@ -2124,6 +2126,7 @@ static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/false,
                          /*EnableStructure=*/false,
                          /*EnableDiagnostics=*/false,
+                         /*EnableSyntaxTree=*/false,
                          /*SyntacticOnly=*/true);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorConvertMarkupToXML(Source, EditC);
@@ -2135,10 +2138,11 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
                           bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
-                          Optional<unsigned> swiftVersion) {
+                          StringRef swiftVersion) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
+                         /*EnableSyntaxTree=*/false,
                          /*SyntacticOnly=*/false);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenHeaderInterface(EditC, Name, HeaderName, Args, UsingSwiftArgs,
@@ -2157,9 +2161,10 @@ editorClose(StringRef Name, bool RemoveCache) {
 static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
                   unsigned Length, bool EnableSyntaxMap, bool EnableStructure,
-                  bool EnableDiagnostics, bool SyntacticOnly) {
+                  bool EnableDiagnostics, bool EnableSyntaxTree,
+                  bool SyntacticOnly) {
   SKEditorConsumer EditC(EnableSyntaxMap, EnableStructure,
-                         EnableDiagnostics, SyntacticOnly);
+                         EnableDiagnostics, EnableSyntaxTree, SyntacticOnly);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorReplaceText(Name, Buf, Offset, Length, EditC);
   return EditC.createResponse();
@@ -2174,7 +2179,7 @@ editorApplyFormatOptions(StringRef Name, RequestDict &FmtOptions) {
 
 static sourcekitd_response_t
 editorFormatText(StringRef Name, unsigned Line, unsigned Length) {
-  SKEditorConsumer EditC(false, false, false,
+  SKEditorConsumer EditC(false, false, false, false,
                          /*SyntacticOnly=*/true);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorFormatText(Name, Line, Length, EditC);
@@ -2183,7 +2188,7 @@ editorFormatText(StringRef Name, unsigned Line, unsigned Length) {
 
 static sourcekitd_response_t
 editorExpandPlaceholder(StringRef Name, unsigned Offset, unsigned Length) {
-  SKEditorConsumer EditC(false, false, false,
+  SKEditorConsumer EditC(false, false, false, false,
                          /*SyntacticOnly=*/true);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorExpandPlaceholder(Name, Offset, Length, EditC);
@@ -2208,6 +2213,7 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
     Dict.setCustomBuffer(KeySubStructure, CustomBufferKind::DocStructureArray,
                          DocStructure.createBuffer());
   }
+
 
   return RespBuilder.createResponse();
 }
@@ -2299,7 +2305,38 @@ bool SKEditorConsumer::recordFormattedText(StringRef Text) {
   return true;
 }
 
+static void fillDictionaryForDiagnosticInfoBase(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+
 static void fillDictionaryForDiagnosticInfo(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info) {
+
+  UIdent SeverityUID;
+  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
+  static UIdent UIDKindDiagError(KindDiagError.str());
+  switch (Info.Severity) {
+  case DiagnosticSeverityKind::Warning:
+    SeverityUID = UIDKindDiagWarning;
+    break;
+  case DiagnosticSeverityKind::Error:
+    SeverityUID = UIDKindDiagError;
+    break;
+  }
+
+  Elem.set(KeySeverity, SeverityUID);
+  fillDictionaryForDiagnosticInfoBase(Elem, Info);
+
+  if (!Info.Notes.empty()) {
+    auto NotesArr = Elem.setArray(KeyDiagnostics);
+    for (auto &NoteDiag : Info.Notes) {
+      auto NoteElem = NotesArr.appendDictionary();
+      NoteElem.set(KeySeverity, KindDiagNote);
+      fillDictionaryForDiagnosticInfoBase(NoteElem, NoteDiag);
+    }
+  }
+}
+
+static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
   Elem.set(KeyDescription, Info.Description);
@@ -2347,36 +2384,23 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
     Arr = Dict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   Elem.set(KeyDiagnosticStage, DiagStage);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
 bool SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
+  return true;
+}
+
+bool SKEditorConsumer::syntaxTreeEnabled() {
+  return EnableSyntaxTree;
+}
+
+bool SKEditorConsumer::handleSerializedSyntaxTree(StringRef Text) {
+  if (EnableSyntaxTree)
+    Dict.set(KeySerializedSyntaxTree, Text);
   return true;
 }
 
@@ -2656,4 +2680,70 @@ static bool isSemanticEditorDisabled() {
 
   assert(Toggle != SemaInfoToggle::None);
   return Toggle == SemaInfoToggle::Disable;
+}
+
+namespace {
+class CompileTrackingConsumer final : public trace::TraceConsumer {
+public:
+  void operationStarted(uint64_t OpId, trace::OperationKind OpKind,
+                        const trace::SwiftInvocation &Inv,
+                        const trace::StringPairs &OpArgs) override;
+  void operationFinished(uint64_t OpId, trace::OperationKind OpKind,
+                         ArrayRef<DiagnosticEntryInfo> Diagnostics) override;
+  swift::OptionSet<trace::OperationKind> desiredOperations() override {
+    return swift::OptionSet<trace::OperationKind>() |
+           trace::OperationKind::PerformSema |
+           trace::OperationKind::CodeCompletion;
+  }
+};
+} // end anonymous namespace
+
+void CompileTrackingConsumer::operationStarted(
+    uint64_t OpId, trace::OperationKind OpKind,
+    const trace::SwiftInvocation &Inv, const trace::StringPairs &OpArgs) {
+  if (!desiredOperations().contains(OpKind))
+    return;
+
+  static UIdent CompileWillStartUID("source.notification.compile-will-start");
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  Dict.set(KeyNotification, CompileWillStartUID);
+  Dict.set(KeyCompileID, std::to_string(OpId));
+  Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
+  // FIXME: OperationKind
+  Dict.set(KeyCompilerArgs, Inv.Args.Args);
+  sourcekitd::postNotification(RespBuilder.createResponse());
+}
+
+void CompileTrackingConsumer::operationFinished(
+    uint64_t OpId, trace::OperationKind OpKind,
+    ArrayRef<DiagnosticEntryInfo> Diagnostics) {
+  if (!desiredOperations().contains(OpKind))
+    return;
+
+  static UIdent CompileDidFinishUID("source.notification.compile-did-finish");
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  Dict.set(KeyNotification, CompileDidFinishUID);
+  Dict.set(KeyCompileID, std::to_string(OpId));
+  auto DiagArray = Dict.setArray(KeyDiagnostics);
+  for (const auto &DiagInfo : Diagnostics) {
+    fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
+  }
+
+  sourcekitd::postNotification(RespBuilder.createResponse());
+}
+
+static void enableCompileNotifications(bool value) {
+  static std::atomic<bool> status{false};
+  if (status.exchange(value) == value) {
+    return; // Unchanged.
+  }
+
+  static CompileTrackingConsumer compileConsumer;
+  if (value) {
+    trace::registerConsumer(&compileConsumer);
+  } else {
+    trace::unregisterConsumer(&compileConsumer);
+  }
 }

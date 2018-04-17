@@ -26,11 +26,14 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   // First, get a mangled name for the declaration.
   std::string mangledName;
 
-  if (auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>()) {
-    mangledName = SILGenName->Name;
-  } else {
-    Mangle::ASTMangler NewMangler;
-    mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
+  {
+    auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>();
+    if (SILGenName && !SILGenName->Name.empty()) {
+      mangledName = SILGenName->Name;
+    } else {
+      Mangle::ASTMangler NewMangler;
+      mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
+    }
   }
 
   // Check if it is already created, and update linkage if necessary.
@@ -291,20 +294,5 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   auto *ret = B.createReturn(global, addr);
   (void)ret;
   assert(ret->getDebugScope() && "instruction without scope");
-}
-
-void SILGenFunction::emitGlobalGetter(VarDecl *global,
-                                      SILGlobalVariable *onceToken,
-                                      SILFunction *onceFunc) {
-  emitOnceCall(*this, global, onceToken, onceFunc);
-
-  auto *silG = SGM.getSILGlobalVariable(global, NotForDefinition);
-  SILValue addr = B.createGlobalAddr(global, silG);
-
-  auto refType = global->getInterfaceType()->getCanonicalType();
-  ManagedValue value = emitLoad(global, addr, getTypeLowering(refType),
-                                SGFContext(), IsNotTake);
-  SILValue result = value.forward(*this);
-  B.createReturn(global, result);
 }
 

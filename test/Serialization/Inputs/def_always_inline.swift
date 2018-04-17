@@ -2,8 +2,9 @@
   return x
 }
 
+@_fixed_layout
 public struct AlwaysInlineInitStruct {
-  @_versioned
+  @usableFromInline
   var x: Bool
 
   @inline(__always)

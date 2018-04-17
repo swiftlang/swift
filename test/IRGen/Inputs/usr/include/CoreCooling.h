@@ -8,3 +8,5 @@ CCRefrigeratorRef CCRefrigeratorCreate(CCPowerSupplyRef power);
 
 void CCRefrigeratorOpen(CCRefrigeratorRef fridge);
 void CCRefrigeratorClose(CCRefrigeratorRef fridge);
+
+typedef struct __attribute__((objc_bridge(id))) __CCRefrigerator *CCMutableRefrigeratorRef;

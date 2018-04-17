@@ -12,18 +12,19 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
   {
     auto LiteralToken = SyntaxFactory::makeIntegerLiteral("100", {}, {});
     auto Sign = SyntaxFactory::makePrefixOperator("-", {}, {});
-    auto Literal = SyntaxFactory::makeIntegerLiteralExpr(Sign, LiteralToken);
+    auto Literal = SyntaxFactory::makePrefixOperatorExpr(Sign,
+      SyntaxFactory::makeIntegerLiteralExpr(LiteralToken));
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     Literal.print(OS);
     ASSERT_EQ(OS.str().str(), "-100");
-    ASSERT_EQ(Literal.getKind(), SyntaxKind::IntegerLiteralExpr);
+    ASSERT_EQ(Literal.getKind(), SyntaxKind::PrefixOperatorExpr);
   }
   {
     auto LiteralToken = SyntaxFactory::makeIntegerLiteral("1_000", {}, {});
     auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
-    auto Literal = SyntaxFactory::makeIntegerLiteralExpr(NoSign, LiteralToken);
+    auto Literal = SyntaxFactory::makeIntegerLiteralExpr(LiteralToken);
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -31,11 +32,10 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "1_000");
   }
   {
-    auto Literal = SyntaxFactory::makeBlankIntegerLiteralExpr()
-    .withSign(TokenSyntax::missingToken(tok::oper_prefix, ""))
-    .withDigits(SyntaxFactory::makeIntegerLiteral("0", {}, {
-      Trivia::spaces(4)
-    }));
+    auto Literal = SyntaxFactory::makeBlankPrefixOperatorExpr()
+    .withOperatorToken(TokenSyntax::missingToken(tok::oper_prefix, ""))
+    .withPostfixExpression(SyntaxFactory::makeIntegerLiteralExpr(
+      SyntaxFactory::makeIntegerLiteral("0", {}, { Trivia::spaces(4) })));
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -46,8 +46,8 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
     auto LiteralToken =
       SyntaxFactory::makeIntegerLiteral("1_000_000_000_000", {}, {});
     auto PlusSign = SyntaxFactory::makePrefixOperator("+", {}, {});
-    auto OneThousand = SyntaxFactory::makeIntegerLiteralExpr(PlusSign,
-                                                             LiteralToken);
+    auto OneThousand = SyntaxFactory::makePrefixOperatorExpr(PlusSign,
+      SyntaxFactory::makeIntegerLiteralExpr(LiteralToken));
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -62,7 +62,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
   {
     auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
     auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-    auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+    auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
     auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
     GenericArgumentClauseSyntaxBuilder ArgBuilder;
     ArgBuilder
@@ -92,7 +92,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
 TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder
@@ -129,7 +129,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
 TEST(ExprSyntaxTests, SymbolicReferenceExprWithAPIs) {
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
   auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
-  auto IntType = SyntaxFactory::makeTypeIdentifier(Int, None, None, None);
+  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
   ArgBuilder
@@ -272,13 +272,13 @@ FunctionCallArgumentListSyntax getLabellessArgumentList() {
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto TwoDigits = SyntaxFactory::makeIntegerLiteral("2", {}, {});
   auto ThreeDigits = SyntaxFactory::makeIntegerLiteral("3", {}, {});
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits);
   auto NoLabel = TokenSyntax::missingToken(tok::identifier, "");
   auto NoColon = TokenSyntax::missingToken(tok::colon, ":");
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
-  auto Two = SyntaxFactory::makeIntegerLiteralExpr(NoSign, TwoDigits);
-  auto Three = SyntaxFactory::makeIntegerLiteralExpr(NoSign, ThreeDigits);
+  auto Two = SyntaxFactory::makeIntegerLiteralExpr(TwoDigits);
+  auto Three = SyntaxFactory::makeIntegerLiteralExpr(ThreeDigits);
 
   auto OneArg = SyntaxFactory::makeFunctionCallArgument(NoLabel, NoColon, One,
                                                         Comma);
@@ -401,7 +401,7 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
   auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
 
   auto Call = SyntaxFactory::makeFunctionCallExpr(SymbolicRef, LeftParen,
-                                                  ArgList, RightParen);
+                                                  ArgList, RightParen, None);
 
   {
     auto GottenExpression1 = Call.getCalledExpression();
@@ -413,8 +413,8 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
     ASSERT_EQ(OS.str().str(), "foo");
   }
 
-  ASSERT_EQ(LeftParen.getRaw(), Call.getLeftParen().getRaw());
-  ASSERT_EQ(RightParen.getRaw(), Call.getRightParen().getRaw());
+  ASSERT_EQ(LeftParen.getRaw(), Call.getLeftParen()->getRaw());
+  ASSERT_EQ(RightParen.getRaw(), Call.getRightParen()->getRaw());
 
   {
     auto GottenArgs1 = Call.getArgumentList();
@@ -436,7 +436,7 @@ TEST(ExprSyntaxTests, FunctionCallExprMakeAPIs) {
 
   {
     auto Call = SyntaxFactory::makeFunctionCallExpr(SymbolicRef, LeftParen,
-                                                    ArgList, RightParen);
+                                                    ArgList, RightParen, None);
     llvm::SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     Call.print(OS);
@@ -507,7 +507,7 @@ TEST(ExprSyntaxTests, FunctionCallExprBuilderAPIs) {
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
   auto TwoDigits = SyntaxFactory::makeIntegerLiteral("2", {}, {});
   auto ThreeDigits = SyntaxFactory::makeIntegerLiteral("3", {}, {});
-  auto One = SyntaxFactory::makeIntegerLiteralExpr(NoSign, OneDigits);
+  auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits);
   auto NoLabel = TokenSyntax::missingToken(tok::identifier, "");
   auto NoColon = TokenSyntax::missingToken(tok::colon, ":");
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));

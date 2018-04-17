@@ -13,11 +13,11 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
-#include "swift/Driver/Action.h"
-#include "swift/Driver/Types.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/Option/Option.h"
+#include "swift/Driver/Action.h"
+#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Option/Option.h"
 
 #include <memory>
 
@@ -83,6 +83,34 @@ protected:
     /// arguments.
     const char *getTemporaryFilePath(const llvm::Twine &name,
                                      StringRef suffix = "") const;
+
+    /// For frontend, merge-module, and link invocations.
+    bool shouldUseInputFileList() const;
+
+    bool shouldUsePrimaryInputFileListInFrontendInvocation() const;
+
+    bool shouldUseMainOutputFileListInFrontendInvocation() const;
+
+    bool shouldUseSupplementaryOutputFileMapInFrontendInvocation() const;
+
+    /// Reify the existing behavior that SingleCompile compile actions do not
+    /// filter, but batch-mode and single-file compilations do. Some clients are
+    /// relying on this (i.e., they pass inputs that don't have ".swift" as an
+    /// extension.) It would be nice to eliminate this distinction someday.
+    bool shouldFilterFrontendInputsByType() const;
+
+    const char *computeFrontendModeForCompile() const;
+
+    void addFrontendInputAndOutputArguments(
+        llvm::opt::ArgStringList &Arguments,
+        std::vector<FilelistInfo> &FilelistInfos) const;
+
+  private:
+    void addFrontendCommandLineInputArguments(
+        bool mayHavePrimaryInputs, bool useFileList, bool usePrimaryFileList,
+        bool filterByType, llvm::opt::ArgStringList &arguments) const;
+    void addFrontendSupplementaryOutputArguments(
+        llvm::opt::ArgStringList &arguments) const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.
@@ -90,7 +118,7 @@ protected:
     const char *ExecutableName;
     llvm::opt::ArgStringList Arguments;
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
-    FilelistInfo FilelistInfo;
+    std::vector<FilelistInfo> FilelistInfos;
 
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
@@ -166,18 +194,43 @@ public:
                                     std::unique_ptr<CommandOutput> output,
                                     const OutputInfo &OI) const;
 
+  /// Return true iff the input \c Job \p A is an acceptable candidate for
+  /// batching together into a BatchJob, via a call to \c
+  /// constructBatchJob. This is true when the \c Job is a built from a \c
+  /// CompileJobAction in a \c Compilation \p C running in \c
+  /// OutputInfo::Mode::StandardCompile output mode, with a single \c TY_Swift
+  /// \c InputAction.
+  bool jobIsBatchable(const Compilation &C, const Job *A) const;
+
+  /// Equivalence relation that holds iff the two input Jobs \p A and \p B are
+  /// acceptable candidates for combining together into a \c BatchJob, via a
+  /// call to \c constructBatchJob. This is true when each job independently
+  /// satisfies \c jobIsBatchable, and the two jobs have identical executables,
+  /// output types and environments (i.e. they are identical aside from their
+  /// inputs).
+  bool jobsAreBatchCombinable(const Compilation &C, const Job *A,
+                              const Job *B) const;
+
+  /// Construct a \c BatchJob that subsumes the work of a set of Jobs. Any pair
+  /// of elements in \p Jobs are assumed to satisfy the equivalence relation \c
+  /// jobsAreBatchCombinable, i.e. they should all be "the same" job in in all
+  /// ways other than their choices of inputs.
+  std::unique_ptr<Job> constructBatchJob(ArrayRef<const Job *> Jobs,
+                                         Compilation &C) const;
+
   /// Return the default language type to use for the given extension.
   /// If the extension is empty or is otherwise not recognized, return
   /// the invalid type \c TY_INVALID.
-  virtual types::ID lookupTypeForExtension(StringRef Ext) const;
+  virtual file_types::ID lookupTypeForExtension(StringRef Ext) const;
 
   /// Check whether a clang library with a given name exists.
   ///
   /// \param args Invocation arguments.
   /// \param sanitizer Sanitizer name.
+  /// \param shared Whether the library is shared
   virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                         StringRef sanitizer) const;
-
+                                         StringRef sanitizer,
+                                         bool shared=true) const;
 };
 } // end namespace driver
 } // end namespace swift

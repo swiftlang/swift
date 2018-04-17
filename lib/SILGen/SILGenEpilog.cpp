@@ -67,36 +67,36 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
   return SGF.B.createTuple(loc, resultType, directResults);
 }
 
-std::pair<Optional<SILValue>, SILLocation>
-SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
-  assert(ReturnDest.getBlock() && "no epilog bb prepared?!");
-  SILBasicBlock *epilogBB = ReturnDest.getBlock();
-  SILLocation ImplicitReturnFromTopLevel =
-    ImplicitReturnLocation::getImplicitReturnLoc(TopLevel);
-  SmallVector<SILValue, 4> directResults;
-  Optional<SILLocation> returnLoc = None;
+static Optional<SILLocation>
+prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
+                              SILBasicBlock *epilogBB,
+                              SmallVectorImpl<SILValue> &directResults) {
+  SILLocation implicitReturnFromTopLevel =
+      ImplicitReturnLocation::getImplicitReturnLoc(topLevel);
 
-  // If the current BB isn't terminated, and we require a return, then we
+  // If the current BB we are inserting into isn't terminated, and we require a
+  // return, then we
   // are not allowed to fall off the end of the function and can't reach here.
-  if (NeedsReturn && B.hasValidInsertionPoint())
-    B.createUnreachable(ImplicitReturnFromTopLevel);
+  if (SGF.NeedsReturn && SGF.B.hasValidInsertionPoint())
+    SGF.B.createUnreachable(implicitReturnFromTopLevel);
 
   if (epilogBB->pred_empty()) {
     // If the epilog was not branched to at all, kill the BB and
     // just emit the epilog into the current BB.
     while (!epilogBB->empty())
       epilogBB->back().eraseFromParent();
-    eraseBasicBlock(epilogBB);
+    SGF.eraseBasicBlock(epilogBB);
 
     // If the current bb is terminated then the epilog is just unreachable.
-    if (!B.hasValidInsertionPoint())
-      return { None, TopLevel };
+    if (!SGF.B.hasValidInsertionPoint())
+      return None;
 
     // We emit the epilog at the current insertion point.
-    returnLoc = ImplicitReturnFromTopLevel;
+    return implicitReturnFromTopLevel;
+  }
 
-  } else if (std::next(epilogBB->pred_begin()) == epilogBB->pred_end()
-             && !B.hasValidInsertionPoint()) {
+  if (std::next(epilogBB->pred_begin()) == epilogBB->pred_end() &&
+      !SGF.B.hasValidInsertionPoint()) {
     // If the epilog has a single predecessor and there's no current insertion
     // point to fall through from, then we can weld the epilog to that
     // predecessor BB.
@@ -113,14 +113,15 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
       epilogBB->getArgument(index)->replaceAllUsesWith(result);
     }
 
+    Optional<SILLocation> returnLoc;
     // If we are optimizing, we should use the return location from the single,
     // previously processed, return statement if any.
     if (predBranch->getLoc().is<ReturnLocation>()) {
       returnLoc = predBranch->getLoc();
     } else {
-      returnLoc = ImplicitReturnFromTopLevel;
+      returnLoc = implicitReturnFromTopLevel;
     }
-    
+
     // Kill the branch to the now-dead epilog BB.
     pred->erase(predBranch);
 
@@ -128,37 +129,55 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     pred->spliceAtEnd(epilogBB);
 
     // Finally we can erase the epilog BB.
-    eraseBasicBlock(epilogBB);
+    SGF.eraseBasicBlock(epilogBB);
 
     // Emit the epilog into its former predecessor.
-    B.setInsertionPoint(pred);
-  } else {
-    // Move the epilog block to the end of the ordinary section.
-    auto endOfOrdinarySection = StartOfPostmatter;
-    B.moveBlockTo(epilogBB, endOfOrdinarySection);
-
-    // Emit the epilog into the epilog bb. Its arguments are the
-    // direct results.
-    directResults.append(epilogBB->args_begin(), epilogBB->args_end());
-
-    // If we are falling through from the current block, the return is implicit.
-    B.emitBlock(epilogBB, ImplicitReturnFromTopLevel);
+    SGF.B.setInsertionPoint(pred);
+    return returnLoc;
   }
-  
-  // Emit top-level cleanups into the epilog block.
-  assert(!Cleanups.hasAnyActiveCleanups(getCleanupsDepth(),
-                                        ReturnDest.getDepth()) &&
-         "emitting epilog in wrong scope");
 
-  auto cleanupLoc = CleanupLocation::get(TopLevel);
-  Cleanups.emitCleanupsForReturn(cleanupLoc);
+  // Move the epilog block to the end of the ordinary section.
+  auto endOfOrdinarySection = SGF.StartOfPostmatter;
+  SGF.B.moveBlockTo(epilogBB, endOfOrdinarySection);
+
+  // Emit the epilog into the epilog bb. Its arguments are the
+  // direct results.
+  directResults.append(epilogBB->args_begin(), epilogBB->args_end());
+
+  // If we are falling through from the current block, the return is implicit.
+  SGF.B.emitBlock(epilogBB, implicitReturnFromTopLevel);
 
   // If the return location is known to be that of an already
   // processed return, use it. (This will get triggered when the
   // epilog logic is simplified.)
   //
   // Otherwise make the ret instruction part of the cleanups.
-  if (!returnLoc) returnLoc = cleanupLoc;
+  auto cleanupLoc = CleanupLocation::get(topLevel);
+  return cleanupLoc;
+}
+
+std::pair<Optional<SILValue>, SILLocation>
+SILGenFunction::emitEpilogBB(SILLocation topLevel) {
+  assert(ReturnDest.getBlock() && "no epilog bb prepared?!");
+  SILBasicBlock *epilogBB = ReturnDest.getBlock();
+  SmallVector<SILValue, 8> directResults;
+
+  // Prepare the epilog block for emission. If we need to actually emit the
+  // block, we return a real SILLocation. Otherwise, the epilog block is
+  // actually unreachable and we can just return early.
+  auto returnLoc =
+      prepareForEpilogBlockEmission(*this, topLevel, epilogBB, directResults);
+  if (!returnLoc.hasValue()) {
+    return {None, topLevel};
+  }
+
+  // Emit top-level cleanups into the epilog block.
+  assert(!Cleanups.hasAnyActiveCleanups(getCleanupsDepth(),
+                                        ReturnDest.getDepth()) &&
+         "emitting epilog in wrong scope");
+
+  auto cleanupLoc = CleanupLocation::get(topLevel);
+  Cleanups.emitCleanupsForReturn(cleanupLoc);
 
   // Build the return value.  We don't do this if there are no direct
   // results; this can happen for void functions, but also happens when
@@ -167,10 +186,10 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   SILValue returnValue;
   if (!directResults.empty()) {
     assert(directResults.size() == F.getConventions().getNumDirectSILResults());
-    returnValue = buildReturnValue(*this, TopLevel, directResults);
+    returnValue = buildReturnValue(*this, topLevel, directResults);
   }
 
-  return { returnValue, *returnLoc };
+  return {returnValue, *returnLoc};
 }
 
 SILLocation SILGenFunction::

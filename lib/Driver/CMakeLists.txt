@@ -5,18 +5,17 @@ set(swiftDriver_sources
   Driver.cpp
   FrontendUtil.cpp
   Job.cpp
-  OutputFileMap.cpp
   ParseableOutput.cpp
+  PrettyStackTrace.cpp
   ToolChain.cpp
   ToolChains.cpp
-  Types.cpp
   )
 
 set(swiftDriver_targetDefines)
 
 add_swift_library(swiftDriver STATIC
   ${swiftDriver_sources}
-  DEPENDS swift-syntax-generated-headers SwiftOptions
+  DEPENDS SwiftOptions
   LINK_LIBRARIES swiftAST swiftBasic swiftFrontend swiftOption)
 
 # Generate the static-stdlib-args.lnk file used by -static-stdlib option

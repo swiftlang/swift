@@ -153,7 +153,7 @@ bool StackNesting::solve() {
 static SILInstruction *createDealloc(AllocationInst *Alloc,
                                      SILInstruction *InsertionPoint,
                                      SILLocation Location) {
-  SILBuilder B(InsertionPoint);
+  SILBuilderWithScope B(InsertionPoint);
   switch (Alloc->getKind()) {
     case SILInstructionKind::AllocStackInst:
       return B.createDeallocStack(Location, Alloc);

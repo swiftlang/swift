@@ -19,6 +19,9 @@ __attribute__((swift_name("SomeClass.applyOptions(self:_:)")))
 void IAMSomeClassApplyOptions(IAMSomeClass * _Nonnull someClass, 
                               IAMSomeClassOptions options);
 
+__attribute__((swift_name("SomeClass.doIt(self:)")))
+void IAMSomeClassDoIt(IAMSomeClass * _Nonnull someClass);
+
 @interface UnavailableDefaultInit : NSObject
 -(instancetype)init __attribute__((availability(swift,unavailable)));
 @end
@@ -39,6 +42,11 @@ extern NSString * _Nullable PKPandaCuddlynessFactor __attribute__((swift_name("P
 
 __attribute__((swift_name("Panda")))
 @interface PKPanda : NSObject
+@end
+
+typedef NSString *IncompleteImportTargetName __attribute__((swift_wrapper(struct)));
+
+@interface IncompleteImportTarget : NSObject
 @end
 
 #pragma clang assume_nonnull end

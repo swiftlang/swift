@@ -1,7 +1,8 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_struct.swiftmodule -module-name resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -I %t -emit-module -emit-module-path=%t/resilient_class.swiftmodule -module-name resilient_class %S/../Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -emit-silgen -parse-as-library -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name super -emit-silgen -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
 
@@ -31,11 +32,11 @@ public class Parent {
 }
 
 public class Child : Parent {
-  // CHECK-LABEL: sil @_T05super5ChildC8propertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK-LABEL: sil @$S5super5ChildC8propertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : $Child):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
-  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_T05super6ParentC8propertySSvg : $@convention(method) (@guaranteed Parent) -> @owned String
+  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @$S5super6ParentC8propertySSvg : $@convention(method) (@guaranteed Parent) -> @owned String
   // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
   // CHECK:         destroy_value [[CASTED_SELF_COPY]]
   // CHECK:         return [[RESULT]]
@@ -43,11 +44,11 @@ public class Child : Parent {
     return super.property
   }
 
-  // CHECK-LABEL: sil @_T05super5ChildC13otherPropertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
+  // CHECK-LABEL: sil @$S5super5ChildC13otherPropertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : $Child):
   // CHECK:         [[COPIED_SELF:%.*]] = copy_value [[SELF]]
   // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
-  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @_T05super6ParentC13finalPropertySSvg
+  // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @$S5super6ParentC13finalPropertySSvg
   // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
   // CHECK:         destroy_value [[CASTED_SELF_COPY]]
   // CHECK:         return [[RESULT]]
@@ -57,31 +58,31 @@ public class Child : Parent {
 }
 
 public class Grandchild : Child {
-  // CHECK-LABEL: sil @_T05super10GrandchildC06onlyInB0yyF
+  // CHECK-LABEL: sil @$S5super10GrandchildC06onlyInB0yyF
   public func onlyInGrandchild() {
-    // CHECK: function_ref @_T05super6ParentC012methodOnlyInB0yyF : $@convention(method) (@guaranteed Parent) -> ()
+    // CHECK: function_ref @$S5super6ParentC012methodOnlyInB0yyF : $@convention(method) (@guaranteed Parent) -> ()
     super.methodOnlyInParent()
-    // CHECK: function_ref @_T05super6ParentC017finalMethodOnlyInB0yyF
+    // CHECK: function_ref @$S5super6ParentC017finalMethodOnlyInB0yyF
     super.finalMethodOnlyInParent()
   }
 
-  // CHECK-LABEL: sil @_T05super10GrandchildC6methodyyF
+  // CHECK-LABEL: sil @$S5super10GrandchildC6methodyyF
   public override func method() {
-    // CHECK: function_ref @_T05super6ParentC6methodyyF : $@convention(method) (@guaranteed Parent) -> ()
+    // CHECK: function_ref @$S5super6ParentC6methodyyF : $@convention(method) (@guaranteed Parent) -> ()
     super.method()
   }
 }
 
 public class GreatGrandchild : Grandchild {
-  // CHECK-LABEL: sil @_T05super15GreatGrandchildC6methodyyF
+  // CHECK-LABEL: sil @$S5super15GreatGrandchildC6methodyyF
   public override func method() {
-    // CHECK: function_ref @_T05super10GrandchildC6methodyyF : $@convention(method) (@guaranteed Grandchild) -> ()
+    // CHECK: function_ref @$S5super10GrandchildC6methodyyF : $@convention(method) (@guaranteed Grandchild) -> ()
     super.method()
   }
 }
 
 public class ChildToResilientParent : ResilientOutsideParent {
-  // CHECK-LABEL: sil @_T05super22ChildToResilientParentC6methodyyF : $@convention(method) (@guaranteed ChildToResilientParent) -> ()
+  // CHECK-LABEL: sil @$S5super22ChildToResilientParentC6methodyyF : $@convention(method) (@guaranteed ChildToResilientParent) -> ()
   public override func method() {
     // CHECK: bb0([[SELF:%.*]] : $ChildToResilientParent):
     // CHECK:   [[COPY_SELF:%.*]] = copy_value [[SELF]]
@@ -93,9 +94,9 @@ public class ChildToResilientParent : ResilientOutsideParent {
     // CHECK:   apply [[FUNC]]([[UPCAST_SELF]])
     super.method()
   }
-  // CHECK: } // end sil function '_T05super22ChildToResilientParentC6methodyyF'
+  // CHECK: } // end sil function '$S5super22ChildToResilientParentC6methodyyF'
 
-  // CHECK-LABEL: sil @_T05super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> ()
+  // CHECK-LABEL: sil @$S5super22ChildToResilientParentC11classMethodyyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> ()
   public override class func classMethod() {
     // CHECK: bb0([[METASELF:%.*]] : $@thick ChildToResilientParent.Type):
     // CHECK:   [[UPCAST_METASELF:%.*]] = upcast [[METASELF]]
@@ -103,9 +104,9 @@ public class ChildToResilientParent : ResilientOutsideParent {
     // CHECK:   apply [[FUNC]]([[UPCAST_METASELF]])
     super.classMethod()
   }
-  // CHECK: } // end sil function '_T05super22ChildToResilientParentC11classMethodyyFZ'
+  // CHECK: } // end sil function '$S5super22ChildToResilientParentC11classMethodyyFZ'
 
-  // CHECK-LABEL: sil @_T05super22ChildToResilientParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> @owned ChildToResilientParent
+  // CHECK-LABEL: sil @$S5super22ChildToResilientParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToResilientParent.Type) -> @owned ChildToResilientParent
   public class func returnsSelf() -> Self {
     // CHECK: bb0([[METASELF:%.*]] : $@thick ChildToResilientParent.Type):
     // CHECK:   [[CAST_METASELF:%.*]] = unchecked_trivial_bit_cast [[METASELF]] : $@thick ChildToResilientParent.Type to $@thick @dynamic_self ChildToResilientParent.Type
@@ -115,11 +116,11 @@ public class ChildToResilientParent : ResilientOutsideParent {
     // CHECK: unreachable
     super.classMethod()
   }
-  // CHECK: } // end sil function '_T05super22ChildToResilientParentC11returnsSelfACXDyFZ'
+  // CHECK: } // end sil function '$S5super22ChildToResilientParentC11returnsSelfACXDyFZ'
 }
 
 public class ChildToFixedParent : OutsideParent {
-  // CHECK-LABEL: sil @_T05super18ChildToFixedParentC6methodyyF : $@convention(method) (@guaranteed ChildToFixedParent) -> ()
+  // CHECK-LABEL: sil @$S5super18ChildToFixedParentC6methodyyF : $@convention(method) (@guaranteed ChildToFixedParent) -> ()
   public override func method() {
     // CHECK: bb0([[SELF:%.*]] : $ChildToFixedParent):
     // CHECK:   [[COPY_SELF:%.*]] = copy_value [[SELF]]
@@ -131,9 +132,9 @@ public class ChildToFixedParent : OutsideParent {
     // CHECK:   apply [[FUNC]]([[UPCAST_COPY_SELF]])
     super.method()
   }
-  // CHECK: } // end sil function '_T05super18ChildToFixedParentC6methodyyF'
+  // CHECK: } // end sil function '$S5super18ChildToFixedParentC6methodyyF'
 
-  // CHECK-LABEL: sil @_T05super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> ()
+  // CHECK-LABEL: sil @$S5super18ChildToFixedParentC11classMethodyyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> ()
   public override class func classMethod() {
     // CHECK: bb0([[SELF:%.*]] : $@thick ChildToFixedParent.Type):
     // CHECK:   [[UPCAST_SELF:%.*]] = upcast [[SELF]]
@@ -141,9 +142,9 @@ public class ChildToFixedParent : OutsideParent {
     // CHECK:   apply [[FUNC]]([[UPCAST_SELF]])
     super.classMethod()
   }
-  // CHECK: } // end sil function '_T05super18ChildToFixedParentC11classMethodyyFZ'
+  // CHECK: } // end sil function '$S5super18ChildToFixedParentC11classMethodyyFZ'
 
-  // CHECK-LABEL: sil @_T05super18ChildToFixedParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> @owned ChildToFixedParent
+  // CHECK-LABEL: sil @$S5super18ChildToFixedParentC11returnsSelfACXDyFZ : $@convention(method) (@thick ChildToFixedParent.Type) -> @owned ChildToFixedParent
   public class func returnsSelf() -> Self {
     // CHECK: bb0([[SELF:%.*]] : $@thick ChildToFixedParent.Type):
     // CHECK:   [[FIRST_CAST:%.*]] = unchecked_trivial_bit_cast [[SELF]]
@@ -153,7 +154,7 @@ public class ChildToFixedParent : OutsideParent {
     // CHECK:   unreachable
     super.classMethod()
   }
-  // CHECK: } // end sil function '_T05super18ChildToFixedParentC11returnsSelfACXDyFZ'
+  // CHECK: } // end sil function '$S5super18ChildToFixedParentC11returnsSelfACXDyFZ'
 }
 
 public extension ResilientOutsideChild {
@@ -172,30 +173,30 @@ public class GenericBase<T> {
 
 public class GenericDerived<T> : GenericBase<T> {
   public override func method() {
-    // CHECK-LABEL: sil private @_T05super14GenericDerivedC6methodyyFyycfU_ : $@convention(thin) <T> (@owned GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyFyyXEfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     {
       super.method()
     }()
-    // CHECK: } // end sil function '_T05super14GenericDerivedC6methodyyFyycfU_'
+    // CHECK: } // end sil function '$S5super14GenericDerivedC6methodyyFyyXEfU_'
 
-    // CHECK-LABEL: sil private @_T05super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@owned GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
-    // CHECK: } // end sil function '_T05super14GenericDerivedC6methodyyF13localFunctionL_yylF'
+    // CHECK: } // end sil function '$S5super14GenericDerivedC6methodyyF13localFunctionL_yylF'
     func localFunction() {
       super.method()
     }
     localFunction()
 
-    // CHECK-LABEL: sil private @_T05super14GenericDerivedC6methodyyF15genericFunctionL_yqd__r__lF : $@convention(thin) <T><U> (@in U, @owned GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private @$S5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF : $@convention(thin) <T><U> (@in_guaranteed U, @guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     func genericFunction<U>(_: U) {
       super.method()
     }
-    // CHECK: } // end sil function '_T05super14GenericDerivedC6methodyyF15genericFunctionL_yqd__r__lF'
+    // CHECK: } // end sil function '$S5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF'
     genericFunction(0)
   }
 }

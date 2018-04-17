@@ -116,43 +116,40 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   return create(C, params);
 }
 
-/// Return a TupleType or ParenType for this parameter list, written in terms
-/// of contextual archetypes.
-Type ParameterList::getType(const ASTContext &C) const {
+/// Return a TupleType or ParenType for this parameter list,
+/// based on types provided by a callback.
+Type ParameterList::getType(
+    const ASTContext &C, llvm::function_ref<Type(ParamDecl *)> getType) const {
   if (size() == 0)
     return TupleType::getEmpty(C);
-  
+
   SmallVector<TupleTypeElt, 8> argumentInfo;
-  
+
   for (auto P : *this) {
-    auto type = P->getType();
-    
+    auto type = getType(P);
     argumentInfo.emplace_back(
         type->getInOutObjectType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic(), P->isShared()).withInOut(P->isInOut()));
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
+                                              P->getValueOwnership()));
   }
 
   return TupleType::get(argumentInfo, C);
 }
 
 /// Return a TupleType or ParenType for this parameter list, written in terms
+/// of contextual archetypes.
+Type ParameterList::getType(const ASTContext &C) const {
+  return getType(C, [](ParamDecl *P) { return P->getType(); });
+}
+
+/// Return a TupleType or ParenType for this parameter list, written in terms
 /// of interface types.
 Type ParameterList::getInterfaceType(const ASTContext &C) const {
-  if (size() == 0)
-    return TupleType::getEmpty(C);
-
-  SmallVector<TupleTypeElt, 8> argumentInfo;
-
-  for (auto P : *this) {
+  return getType(C, [](ParamDecl *P) {
     auto type = P->getInterfaceType();
     assert(!type->hasArchetype());
-
-    argumentInfo.emplace_back(
-        type->getInOutObjectType(), P->getArgumentName(),
-        ParameterTypeFlags::fromParameterType(type, P->isVariadic(), P->isShared()).withInOut(P->isInOut()));
-  }
-
-  return TupleType::get(argumentInfo, C);
+    return type;
+  });
 }
 
 

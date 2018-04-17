@@ -425,19 +425,33 @@ number of ways:
   generic function with ``function_ref`` will give a value of
   generic function type.
 
+- A SIL function type may be declared ``@noescape``. This is required for any
+  function type passed to a parameter not declared with ``@escaping``
+  declaration modifier. ``@noescape`` function types may be either
+  ``@convention(thin)`` or ``@callee_guaranteed``. They have an
+  unowned context--the context's lifetime must be independently guaranteed.
+
 - A SIL function type declares its conventional treatment of its
   context value:
 
   - If it is ``@convention(thin)``, the function requires no context value.
+    Such types may also be declared ``@noescape``, which trivially has no effect
+    passing the context value.
 
-  - If it is ``@callee_owned``, the context value is treated as an
-    owned direct parameter.
+  - If it is ``@callee_guaranteed``, the context value is treated as a direct
+    parameter. This implies ``@convention(thick)``. If the function type is also
+    ``@noescape``, then the context value is unowned, otherwise it is
+    guaranteed.
 
-  - If it is ``@callee_guaranteed``, the context value is treated as
-    a guaranteed direct parameter.
+  - If it is ``@callee_owned``, the context value is treated as an owned direct
+    parameter. This implies ``@convention(thick)`` and is mutually exclusive
+    with ``@noescape``.
 
-  - Otherwise, the context value is treated as an unowned direct
-    parameter.
+  - If it is ``@convention(block)``, the context value is treated as an unowned
+    direct parameter.
+
+  - Other function type conventions are described in ``Properties of Types`` and
+    ``Calling Convention``.
 
 - A SIL function type declares the conventions for its parameters.
   The parameters are written as an unlabeled tuple; the elements of that
@@ -549,14 +563,6 @@ the caller.  A non-autoreleased ``apply`` of a function that is defined
 with an autoreleased result has the effect of performing an
 autorelease in the callee.
 
-- The ``@noescape`` declaration attribute on Swift parameters (which is valid only
-  on parameters of function type, and is implied by the ``@autoclosure`` attribute)
-  is turned into a ``@noescape`` type attribute on SIL arguments.  ``@noescape``
-  indicates that the lifetime of the closure parameter will not be extended by
-  the callee (e.g. the pointer will not be stored in a global variable).  It
-  corresponds to the LLVM "nocapture" attribute in terms of semantics (but is
-  limited to only work with parameters of function type in Swift).
-
 - SIL function types may provide an optional error result, written by
   placing ``@error`` on a result.  An error result is always
   implicitly ``@owned``.  Only functions with a native calling
@@ -581,6 +587,46 @@ autorelease in the callee.
     explicit error-handling mechanism based on the imported API.  The
     importer only imports non-native methods and types as ``throws``
     when it is possible to do this automatically.
+
+Coroutine Types
+```````````````
+
+A coroutine is a function which can suspend itself and return control to
+its caller without terminating the function.  That is, it does not need to
+obey a strict stack discipline.
+
+SIL supports two kinds of coroutine: ``@yield_many`` and ``@yield_once``.
+Either of these attributes may be written before a function type to
+indicate that it is a coroutine type.
+
+A coroutine type may declare any number of *yielded values*, which is to
+say, values which are provided to the caller at a yield point.  Yielded
+values are written in the result list of a function type, prefixed by
+the ``@yields`` attribute.  A yielded value may have a convention attribute,
+taken from the set of parameter attributes and interpreted as if the yield
+site were calling back to the calling function.
+
+Currently, a coroutine may not have normal results.
+
+Coroutine functions may be used in many of the same ways as normal
+function values.  However, they cannot be called with the standard
+``apply`` or ``try_apply`` instructions.  A non-throwing yield-once
+coroutine can be called with the ``begin_apply`` instruction.  There
+is no support yet for calling a throwing yield-once coroutine or for
+calling a yield-many coroutine of any kind.
+
+Coroutines may contain the special ``yield`` and ``unwind`` instructions.
+
+A ``@yield_many`` coroutine may yield as many times as it desires.
+A ``@yield_once`` coroutine may yield exactly once before returning,
+although it may also ``throw`` before reaching that point.
+
+This coroutine representation is well-suited to coroutines whose control
+flow is tightly integrated with their callers and which intend to pass
+information back and forth.  This matches the needs of generalized
+accessor and generator features in Swift.  It is not a particularly good
+match for ``async``/``await``-style features; a simpler representation
+would probably do fine for that.
 
 Properties of Types
 ```````````````````
@@ -664,6 +710,7 @@ types. Function types are transformed in order to encode additional attributes:
   - ``@convention(thick)`` indicates a "thick" function reference, which
     uses the Swift calling convention and carries a reference-counted context
     object used to represent captures or other state required by the function.
+    This attribute is implied by ``@callee_owned`` or ``@callee_guaranteed``.
   - ``@convention(block)`` indicates an Objective-C compatible block reference.
     The function value is represented as a reference to the block object,
     which is an ``id``-compatible Objective-C object that embeds its invocation
@@ -1229,7 +1276,7 @@ composed of literals. The static initializer is represented as a list of
 literal and aggregate instructions where the last instruction is the top-level
 value of the static initializer::
 
-  sil_global hidden @_T04test3varSiv : $Int {
+  sil_global hidden @$S4test3varSiv : $Int {
     %0 = integer_literal $Builtin.Int64, 27
     %initval = struct $Int (%0 : $Builtin.Int64)
   }
@@ -2271,6 +2318,7 @@ mark_uninitialized
   sil-instruction ::= 'mark_uninitialized' '[' mu_kind ']' sil-operand
   mu_kind ::= 'var'
   mu_kind ::= 'rootself'
+  mu_kind ::= 'crossmodulerootself'
   mu_kind ::= 'derivedself'
   mu_kind ::= 'derivedselfonly'
   mu_kind ::= 'delegatingself'
@@ -2288,6 +2336,9 @@ the mark_uninitialized instruction refers to:
 
 - ``var``: designates the start of a normal variable live range
 - ``rootself``: designates ``self`` in a struct, enum, or root class
+- ``crossmodulerootself``: same as ``rootself``, but in a case where it's not
+    really safe to treat ``self`` as a root because the original module might add
+    more stored properties. This is only used for Swift 4 compatibility.
 - ``derivedself``: designates ``self`` in a derived (non-root) class
 - ``derivedselfonly``: designates ``self`` in a derived (non-root) class whose stored properties have already been initialized
 - ``delegatingself``: designates ``self`` on a struct, enum, or class in a delegating constructor (one that calls self.init)
@@ -2804,6 +2855,19 @@ memory object or a reference to a pinned object. Returns 1 if the
 strong reference count is 1 or the object has been marked pinned by
 strong_pin.
 
+is_escaping_closure
+```````````````````
+
+::
+  sil-instruction ::= 'is_escaping_closure' sil-operand
+
+  %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+  // %0 must be an escaping swift closure.
+  // %1 will be of type Builtin.Int1
+
+Checks whether the context reference is not nil and bigger than one and returns
+true if it is.
+
 copy_block
 ``````````
 ::
@@ -3099,6 +3163,102 @@ consumes the callee value at +1 strong retain count.
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments and return value is
 given with these generic substitutions applied.
+
+begin_apply
+```````````
+::
+
+  sil-instruction ::= 'begin_apply' '[nothrow]'? sil-value
+                        sil-apply-substitution-list?
+                        '(' (sil-value (',' sil-value)*)? ')'
+                        ':' sil-type
+
+  (%anyAddr, %float, %token) = begin_apply %0() : $@yield_once () -> (@yields @inout %Any, @yields Float)
+  // %anyAddr : $*Any
+  // %float : $Float
+  // %token is a token
+
+Transfers control to coroutine ``%0``, passing it the given arguments.
+The rules for the application generally follow the rules for ``apply``,
+except:
+
+- the callee value must have a ``yield_once`` coroutine type,
+
+- control returns to this function not when the coroutine performs a
+  ``return``, but when it performs a ``yield``, and
+
+- the instruction results are derived from the yields of the coroutine
+  instead of its normal results.
+
+The final result of a ``begin_apply`` is a "token", a special value which
+can only be used as the operand of an ``end_apply`` or ``abort_apply``
+instruction.  Before this second instruction is executed, the coroutine
+is said to be "suspended", and the token represents a reference to its
+suspended activation record.
+
+The other results of the instruction correspond to the yields in the
+coroutine type.  In general, the rules of a yield are similar to the rules
+for a parameter, interpreted as if the coroutine caller (the one
+executing the ``begin_apply``) were being "called" by the ``yield``:
+
+- If a yield has an indirect convention, the corresponding result will
+  have an address type; otherwise it has an object type.  For example,
+  a result corresponding to an ``@in Any`` yield will have type ``$Any``.
+
+- The convention attributes are the same as the parameter convention
+  attributes, interpreted as if the ``yield`` were the "call" and the
+  ``begin_apply`` marked the entry to the "callee".  For example,
+  an ``@in Any`` yield transfers ownership of the ``Any`` value
+  reference from the coroutine to the caller, which must destroy
+  or move the value from that position before ending or aborting the
+  coroutine.
+
+A ``begin_apply`` must be uniquely either ended or aborted before
+exiting the function or looping to an earlier portion of the function.
+
+When throwing coroutines are supported, there will need to be a
+``try_begin_apply`` instruction.
+
+abort_apply
+```````````
+::
+
+  sil-instruction ::= 'abort_apply' sil-value
+
+  abort_apply %token
+
+Aborts the given coroutine activation, which is currently suspended at
+a ``yield`` instruction.  Transfers control to the coroutine and takes
+the ``unwind`` path from the ``yield``.  Control is transferred back
+when the coroutine reaches an ``unwind`` instruction.
+
+The operand must always be the token result of a ``begin_apply``
+instruction, which is why it need not specify a type.
+
+Throwing coroutines will not require a new instruction for aborting
+a coroutine; a coroutine is not allowed to throw when it is being aborted.
+
+end_apply
+`````````
+::
+
+  sil-instruction ::= 'end_apply' sil-value
+
+  end_apply %token
+
+Ends the given coroutine activation, which is currently suspended at
+a ``yield`` instruction.  Transfers control to the coroutine and takes
+the ``resume`` path from the ``yield``.  Control is transferred back
+when the coroutine reaches a ``return`` instruction.
+
+The operand must always be the token result of a ``begin_apply``
+instruction, which is why it need not specify a type.
+
+``end_apply`` currently has no instruction results.  If coroutines were
+allowed to have normal results, they would be producted by ``end_apply``.
+
+When throwing coroutines are supported, there will need to be a
+``try_end_apply`` instruction.
 
 partial_apply
 `````````````
@@ -3574,7 +3734,7 @@ destructure_struct
    // %0 must be a struct of type $S
    // %eltN must have the same type as the Nth field of $S
 
-Given a struct, split the struct into its constituant fields.
+Given a struct, split the struct into its constituent fields.
 
 object
 ``````
@@ -3589,7 +3749,7 @@ object
 
 Constructs a statically initialized object. This instruction can only appear
 as final instruction in a global variable static initializer list.
-  
+
 ref_element_addr
 ````````````````
 ::
@@ -3886,7 +4046,7 @@ container may use one of several representations:
   Said value might be replaced with one of the _addr instructions above
   before IR generation.
   The following instructions manipulate "loadable" opaque existential containers:
-  
+
   * `init_existential_value`_
   * `open_existential_value`_
   * `deinit_existential_value`_
@@ -4465,7 +4625,30 @@ in the following ways:
   subclass of the source type's corresponding tuple element.
 
 The function types may also differ in attributes, except that the
-``convention`` attribute cannot be changed.
+``convention`` attribute cannot be changed and the ``@noescape`` attribute must
+not change for functions with context.
+
+A ``convert_function`` cannot be used to change a thick type's ``@noescape``
+attribute (``@noescape`` function types with context are not ABI compatible with
+escaping function types with context) -- however, thin function types with and
+without ``@noescape`` are ABI compatible because they have no context. To
+convert from an escaping to a ``@noescape`` thick function type use
+``convert_escape_to_noescape``.
+
+convert_escape_to_noescape
+```````````````````````````
+::
+
+  sil-instruction ::= 'convert_escape_to_noescape' sil-operand 'to' sil-type
+  %1 = convert_escape_to_noescape %0 : $T -> U to $@noescape T' -> U'
+  // %0 must be of a function type $T -> U ABI-compatible with $T' -> U'
+  //   (see convert_function)
+  // %1 will be of the trivial type $@noescape T -> U
+
+Converts an escaping (non-trivial) function type to an ``@noescape`` trivial
+function type. Something must guarantee the lifetime of the input ``%0`` for the
+duration of the use ``%1``.
+
 
 thin_function_to_pointer
 ````````````````````````
@@ -4476,6 +4659,19 @@ pointer_to_thin_function
 ````````````````````````
 
 TODO
+
+classify_bridge_object
+``````````````````````
+::
+
+  sil-instruction ::= 'classify_bridge_object' sil-operand
+
+  %1 = classify_bridge_object %0 : $Builtin.BridgeObject
+  // %1 will be of type (Builtin.Int1, Builtin.Int1)
+
+Decodes the bit representation of the specified ``Builtin.BridgeObject`` value,
+returning two bits: the first indicates whether the object is an Objective-C
+object, the second indicates whether it is an Objective-C tagged pointer value.
 
 ref_to_bridge_object
 ````````````````````
@@ -4698,6 +4894,10 @@ the current function was invoked with a ``try_apply` instruction, control
 resumes at the normal destination, and the value of the basic block argument
 will be the operand of this ``return`` instruction.
 
+If the current function is a ``yield_once`` coroutine, there must not be
+a path from the entry block to a ``return`` which does not pass through
+a ``yield`` instruction. This rule does not apply in the ``raw`` SIL stage.
+
 ``return`` does not retain or release its operand or any other values.
 
 A function must not contain more than one ``return`` instruction.
@@ -4713,13 +4913,57 @@ throw
 
 Exits the current function and returns control to the calling
 function. The current function must have an error result, and so the
-function must have been invoked with a ``try_apply` instruction.
+function must have been invoked with a ``try_apply`` instruction.
 Control will resume in the error destination of that instruction, and
 the basic block argument will be the operand of the ``throw``.
 
 ``throw`` does not retain or release its operand or any other values.
 
 A function must not contain more than one ``throw`` instruction.
+
+yield
+`````
+::
+
+  sil-terminator ::= 'yield' sil-yield-values
+                       ',' 'resume' sil-identifier
+                       ',' 'unwind' sil-identifier
+  sil-yield-values ::= sil-operand
+  sil-yield-values ::= '(' (sil-operand (',' sil-operand)*)? ')'
+
+Temporarily suspends the current function and provides the given
+values to the calling function. The current function must be a coroutine,
+and the yield values must match the yield types of the coroutine.
+If the calling function resumes the coroutine normally, control passes to
+the ``resume`` destination. If the calling function aborts the coroutine,
+control passes to the ``unwind`` destination.
+
+The ``resume`` and ``unwind`` destination blocks must be uniquely
+referenced by the ``yield`` instruction.  This prevents them from becoming
+critical edges.
+
+In a ``yield_once`` coroutine, there must not be a control flow path leading
+from the ``resume`` edge to another ``yield`` instruction in this function.
+This rule does not apply in the ``raw`` SIL stage.
+
+There must not be a control flow path leading from the ``unwind`` edge to
+a ``return`` instruction, to a ``throw`` instruction, or to any block
+reachable from the entry block via a path that does not pass through
+an ``unwind`` edge. That is, the blocks reachable from ``unwind`` edges
+must jointly form a disjoint subfunction of the coroutine.
+
+unwind
+``````
+::
+
+  sil-terminator ::= 'unwind'
+
+Exits the current function and returns control to the calling function,
+completing an unwind from a ``yield``. The current function must be a
+coroutine.
+
+``unwind`` is only permitted in blocks reachable from the ``unwind`` edges
+of ``yield`` instructions.
 
 br
 ``

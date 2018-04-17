@@ -6,10 +6,14 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import argparse
+
 import multiprocessing
 
-from build_swift import defaults
+from swift_build_support.swift_build_support import host
+from swift_build_support.swift_build_support import targets
+
+from .. import argparse
+from .. import defaults
 
 
 __all__ = [
@@ -65,7 +69,6 @@ EXPECTED_DEFAULTS = {
     'build_lldb': False,
     'build_ninja': False,
     'build_osx': True,
-    'build_playgroundlogger': False,
     'build_playgroundsupport': False,
     'build_runtime_with_host_compiler': False,
     'build_stdlib_deployment_targets': ['all'],
@@ -103,15 +106,16 @@ EXPECTED_DEFAULTS = {
         defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
     'darwin_deployment_version_watchos':
         defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
-    'darwin_xcrun_toolchain':
-        defaults.DARWIN_XCRUN_TOOLCHAIN,
+    'darwin_xcrun_toolchain': None,
     'distcc': False,
     'dry_run': False,
     'enable_asan': False,
     'enable_lsan': False,
     'enable_sil_ownership': False,
+    'disable_guaranteed_normal_arguments': False,
+    'enable_stdlibcore_exclusivity_checking': False,
     'enable_tsan': False,
-    'enable_tsan_runtime': None,
+    'enable_tsan_runtime': False,
     'enable_ubsan': False,
     'export_compile_commands': False,
     'extra_cmake_options': [],
@@ -122,12 +126,9 @@ EXPECTED_DEFAULTS = {
     'host_cxx': None,
     'host_libtool': None,
     'host_lipo': None,
-    # FIXME: determine actual default value rather than hardcode
-    'host_target': 'macosx-x86_64',
+    'host_target': targets.StdlibDeploymentTarget.host_target().name,
     'host_test': False,
-    # FIXME: determine actual default value rather than hardcode
-    'install_prefix': '/Applications/Xcode.app/Contents/Developer/Toolchains/'
-                      'XcodeDefault.xctoolchain/usr',
+    'install_prefix': targets.install_prefix(),
     'install_symroot': None,
     'ios': False,
     'ios_all': False,
@@ -135,24 +136,29 @@ EXPECTED_DEFAULTS = {
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
     'lit_args': '-sv',
-    'lldb_assertions': None,
+    'llbuild_assertions': True,
+    'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
+    'lldb_build_with_xcode': '1',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
-    'llvm_max_parallel_lto_link_jobs': 0,
+    'llvm_max_parallel_lto_link_jobs':
+        host.max_lto_link_job_counts()['llvm'],
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
     'long_test': False,
     'lto_type': None,
     'show_sdks': False,
     'skip_build': False,
     'stdlib_deployment_targets': None,
+    'stress_test': False,
     'swift_analyze_code_coverage': defaults.SWIFT_ANALYZE_CODE_COVERAGE,
     'swift_assertions': True,
     'swift_build_variant': 'Debug',
     'swift_compiler_version': None,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
-    'swift_tools_max_parallel_lto_link_jobs': 0,
+    'swift_tools_max_parallel_lto_link_jobs':
+        host.max_lto_link_job_counts()['swift'],
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'symbols_package': None,
     'test': None,
@@ -326,6 +332,10 @@ EXPECTED_OPTIONS = [
               dest='libdispatch_build_variant', value='Debug'),
     SetOption('--debug-libicu', dest='libicu_build_variant', value='Debug'),
     SetOption('--debug-lldb', dest='lldb_build_variant', value='Debug'),
+    SetOption('--lldb-build-with-xcode', dest='lldb_build_with_xcode',
+              value='1'),
+    SetOption('--lldb-build-with-cmake', dest='lldb_build_with_xcode',
+              value='0'),
     SetOption('--debug-llvm', dest='llvm_build_variant', value='Debug'),
     SetOption('--debug-swift', dest='swift_build_variant', value='Debug'),
     SetOption('--debug-swift-stdlib',
@@ -349,6 +359,7 @@ EXPECTED_OPTIONS = [
     SetOption('--cmark-assertions', value=True),
     SetOption('--lldb-assertions', value=True),
     SetOption('--llvm-assertions', value=True),
+    SetOption('--llbuild-assertions', value=True),
     SetOption('--swift-assertions', value=True),
     SetOption('--swift-stdlib-assertions', value=True),
     SetOption('-T', dest='validation_test', value=True),
@@ -360,6 +371,8 @@ EXPECTED_OPTIONS = [
     SetOption('--no-assertions', dest='assertions', value=False),
     SetOption('--no-lldb-assertions', dest='lldb_assertions', value=False),
     SetOption('--no-llvm-assertions', dest='llvm_assertions', value=False),
+    SetOption('--no-llbuild-assertions',
+              dest='llbuild_assertions', value=False),
     SetOption('--no-swift-assertions', dest='swift_assertions', value=False),
     SetOption('--no-swift-stdlib-assertions',
               dest='swift_stdlib_assertions', value=False),
@@ -371,11 +384,12 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
     SetTrueOption('--enable-sil-ownership'),
+    SetTrueOption('--disable-guaranteed-normal-arguments'),
+    SetTrueOption('--enable-stdlibcore-exclusivity-checking'),
     SetTrueOption('--force-optimized-typechecker'),
     SetTrueOption('--ios'),
     SetTrueOption('--llbuild', dest='build_llbuild'),
     SetTrueOption('--lldb', dest='build_lldb'),
-    SetTrueOption('--playgroundlogger', dest='build_playgroundlogger'),
     SetTrueOption('--playgroundsupport', dest='build_playgroundsupport'),
     SetTrueOption('--skip-build'),
     SetTrueOption('--swiftpm', dest='build_swiftpm'),
@@ -403,6 +417,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--enable-asan'),
     EnableOption('--enable-lsan'),
     EnableOption('--enable-tsan'),
+    EnableOption('--enable-tsan-runtime'),
     EnableOption('--enable-ubsan'),
     EnableOption('--export-compile-commands'),
     EnableOption('--foundation', dest='build_foundation'),
@@ -411,6 +426,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--libicu', dest='build_libicu'),
     EnableOption('--long-test'),
     EnableOption('--show-sdks'),
+    EnableOption('--stress-test'),
     EnableOption('--test'),
     EnableOption('--test-optimize-for-size'),
     EnableOption('--test-optimized'),
@@ -473,7 +489,6 @@ EXPECTED_OPTIONS = [
     StrOption('--darwin-deployment-version-tvos'),
     StrOption('--darwin-deployment-version-watchos'),
     StrOption('--darwin-xcrun-toolchain'),
-    StrOption('--enable-tsan-runtime'),
     StrOption('--host-target'),
     StrOption('--lit-args'),
     StrOption('--llvm-targets-to-build'),

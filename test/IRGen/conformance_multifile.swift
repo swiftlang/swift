@@ -2,7 +2,7 @@
 
 func g<U>(_ f : (E) throws -> (U)) {}
 
-// CHECK: _T021conformance_multifile1tyyF
+// CHECK: $S21conformance_multifile1tyyF
 func t() {
   g(E2.Filter)
 }

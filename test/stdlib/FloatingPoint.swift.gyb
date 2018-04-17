@@ -49,7 +49,7 @@ extension Float80 {
       Builtin.zextOrBitCast_Int64_Int80((64 as Int64)._value))
     result = Builtin.or_Int80(
       result, Builtin.zextOrBitCast_Int64_Int80(bitPattern.significand._value))
-    self = Float80(_bits: Builtin.bitcast_Int80_FPIEEE80(result))
+    self = Float80(Builtin.bitcast_Int80_FPIEEE80(result))
   }
 }
 
@@ -79,6 +79,134 @@ func expectBitwiseEqual(
 % end
 
 var FloatingPoint = TestSuite("FloatingPoint")
+
+FloatingPoint.test("BinaryFloatingPoint/genericIntegerConversion") {
+  expectTrue(Double._convert(from: 0) == (value: 0, exact: true))
+
+  expectTrue(Double._convert(from: 1) == (value: 1, exact: true))
+  expectTrue(Double._convert(from: -1) == (value: -1, exact: true))
+
+  expectTrue(Double._convert(from: 42) == (value: 42, exact: true))
+  expectTrue(Double._convert(from: -42) == (value: -42, exact: true))
+
+  expectTrue(Double._convert(from: 100) == (value: 100, exact: true))
+  expectTrue(Double._convert(from: -100) == (value: -100, exact: true))
+
+  expectEqual(Double._convert(from: Int64.max).value, Double(Int64.max))
+  expectEqual(Double._convert(from: Int64.min).value, Double(Int64.min))
+
+  var x = ((Int64.max >> 11) + 1) << 11
+  expectEqual(Double._convert(from: x).value, Double(x))
+  x = (Int64.max >> 12) << 12 + 1
+  expectEqual(Double._convert(from: x).value, Double(x))
+  x = Int64.min + 1
+  expectEqual(Double._convert(from: x).value, Double(x))
+
+  expectEqual(Float._convert(from: Int64.max).value, Float(Int64.max))
+  expectEqual(Float._convert(from: Int64.min).value, Float(Int64.min))
+
+// FIXME: DoubleWidth is no longer part of the standard library
+#if false
+  expectEqual(Float._convert(from: DoubleWidth<UInt64>.max).value, .infinity)
+  expectEqual(
+    Float._convert(from: DoubleWidth<DoubleWidth<Int64>>.max).value, .infinity)
+  expectEqual(
+    Float._convert(from: DoubleWidth<DoubleWidth<Int64>>.min).value, -.infinity)
+#endif
+}
+
+FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
+  expectTrue(Double._convert(from: 0 as Float) == (value: 0, exact: true))
+  expectTrue(Double._convert(from: -0.0 as Float) == (value: -0.0, exact: true))
+  expectTrue(Double._convert(from: 1 as Float) == (value: 1, exact: true))
+  expectTrue(Double._convert(from: -1 as Float) == (value: -1, exact: true))
+  expectTrue(
+    Double._convert(from: Float.infinity) == (value: .infinity, exact: true))
+  expectTrue(
+    Double._convert(from: -Float.infinity) == (value: -.infinity, exact: true))
+  expectTrue(Double._convert(from: Float.nan).value.isNaN)
+  expectTrue(Float._convert(from: Double.nan).value.isNaN)
+  expectFalse(Double._convert(from: Float.nan).value.isSignalingNaN)
+  expectFalse(Float._convert(from: Double.nan).value.isSignalingNaN)
+  expectTrue(Double._convert(from: Float.signalingNaN).value.isNaN)
+  expectTrue(Float._convert(from: Double.signalingNaN).value.isNaN)
+
+  let x = Float(bitPattern: Float.nan.bitPattern | 0xf)
+  expectEqual(
+    Float._convert(from: Double._convert(from: x).value).value.bitPattern,
+    x.bitPattern)
+  var y = Double(bitPattern: Double.nan.bitPattern | 0xf)
+  expectEqual(
+    Double._convert(from: Float._convert(from: y).value).value.bitPattern,
+    y.bitPattern)
+  y = Double(bitPattern: Double.nan.bitPattern | (1 << 32 - 1))
+  expectNotEqual(
+    Double._convert(from: Float._convert(from: y).value).value.bitPattern,
+    y.bitPattern)
+  expectTrue(Float._convert(from: y).value.isNaN)
+  expectFalse(Float._convert(from: y).exact)
+
+  expectTrue(
+    Float._convert(from: Double.leastNonzeroMagnitude) ==
+      (value: 0, exact: false))
+  expectTrue(
+    Float._convert(from: -Double.leastNonzeroMagnitude) ==
+      (value: -0.0, exact: false))
+  expectTrue(
+    Double._convert(from: Double.leastNonzeroMagnitude) ==
+      (value: .leastNonzeroMagnitude, exact: true))
+  expectTrue(
+    Double._convert(from: -Double.leastNonzeroMagnitude) ==
+      (value: -.leastNonzeroMagnitude, exact: true))
+
+  y = Double._convert(from: Float.leastNonzeroMagnitude).value / 2
+  expectTrue(Float._convert(from: y) == (value: 0, exact: false))
+  y.negate()
+  expectTrue(Float._convert(from: y) == (value: -0.0, exact: false))
+  y.negate()
+  y = y.nextUp
+  expectTrue(
+    Float._convert(from: y) == (value: .leastNonzeroMagnitude, exact: false))
+  y.negate()
+  expectTrue(
+    Float._convert(from: y) == (value: -.leastNonzeroMagnitude, exact: false))
+
+  expectEqual(
+    Float._convert(from: Double.leastNormalMagnitude).value,
+    Float(Double.leastNormalMagnitude))
+  expectEqual(
+    Float._convert(from: -Double.leastNormalMagnitude).value,
+    Float(-Double.leastNormalMagnitude))
+
+  expectEqual(Float._convert(from: Double.pi).value, 3.14159265)
+
+  y = Double._convert(from: Float._convert(from: Double.pi).value).value.nextUp
+  expectEqual(Float._convert(from: y).value, 3.14159265)
+  y.negate()
+  expectEqual(Float._convert(from: y).value, -3.14159265)
+
+  expectTrue(
+    Float._convert(from: Double.greatestFiniteMagnitude) ==
+      (value: .infinity, exact: false))
+  expectTrue(
+    Float._convert(from: -Double.greatestFiniteMagnitude) ==
+      (value: -.infinity, exact: false))
+  expectTrue(
+    Double._convert(from: Double.greatestFiniteMagnitude) ==
+      (value: .greatestFiniteMagnitude, exact: true))
+  expectTrue(
+    Double._convert(from: -Double.greatestFiniteMagnitude) ==
+      (value: -.greatestFiniteMagnitude, exact: true))
+
+  expectEqual(
+    Float._convert(
+      from: Double._convert(from: Float.greatestFiniteMagnitude).value).value,
+    Float.greatestFiniteMagnitude)
+  expectEqual(
+    Float._convert(
+      from: Double._convert(from: Float.leastNonzeroMagnitude).value).value,
+    Float.leastNonzeroMagnitude)
+}
 
 func positiveOne<T: ExpressibleByIntegerLiteral>() -> T {
   return 1
@@ -404,7 +532,6 @@ FloatingPoint.test("${Self}.significandWidth") {
 %end
 
 let floatNextUpDownTests: [(Float, Float)] = [
-  (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
   (0x1.ffff_fe__p-1, 1.0), (1.0, 0x1.0000_02__p+0),
   (0.0, .leastNonzeroMagnitude),
@@ -428,7 +555,6 @@ FloatingPoint.test("Float.nextUp, .nextDown")
 }
 
 let doubleNextUpDownTests: [(Double, Double)] = [
-  (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
   (0x1.ffff_ffff_ffff_fp-1, 1.0), (1.0, 0x1.0000_0000_0000_1p+0),
   (0.0, .leastNonzeroMagnitude),
@@ -450,6 +576,16 @@ FloatingPoint.test("Double.nextUp, .nextDown")
   expectBitwiseEqual(-succ, (-prev).nextDown)
   expectBitwiseEqual(-prev, (-succ).nextUp)
 }
+
+%for Self in ['Float', 'Double']:
+FloatingPoint.test("${Self}.nextUp, .nextDown/nan") {
+  let x = ${Self}.nan
+  expectTrue(x.nextUp.isNaN)
+  expectTrue(x.nextDown.isNaN)
+  expectTrue((-x).nextDown.isNaN)
+  expectTrue((-x).nextUp.isNaN)
+}
+%end
 
 #if arch(i386) || arch(x86_64)
 

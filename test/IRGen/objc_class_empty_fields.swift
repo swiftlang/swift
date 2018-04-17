@@ -5,7 +5,7 @@
 // SR-1055
 
 // CHECK-64: @_DATA__TtC23objc_class_empty_fields14OneEnumWrapper = private constant { {{.*}}* } { i32 {{[0-9]+}}, i32 16, i32 24
-// CHECK-32: @_DATA__TtC23objc_class_empty_fields14OneEnumWrapper = private constant { {{.*}}* } { i32 {{[0-9]+}}, i32 12, i32 16
+// CHECK-32: @_DATA__TtC23objc_class_empty_fields14OneEnumWrapper = private constant { {{.*}}* } { i32 {{[0-9]+}}, i32 8, i32 12
 
 enum OneCaseEnum {
     case X

@@ -123,7 +123,7 @@ func test004() {
 func test005() {
   do {} catch Error4.E2#^CATCH3^#
 // CATCH3: Begin completions
-// CATCH3: Pattern/ExprSpecific:               ({#Int32#})[#Error4#]{{; name=.+$}}
+// CATCH3: Pattern/CurrModule:               ({#Int32#})[#Error4#]{{; name=.+$}}
 // CATCH3: End completions
 }
 

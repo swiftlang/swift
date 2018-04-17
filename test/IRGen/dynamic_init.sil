@@ -11,13 +11,13 @@ class C {
   required init()
 }
 
-sil @_T012dynamic_init1CCACycACmcfC : $@convention(method) (@thick C.Type) -> @owned C
-sil @_T012dynamic_init1CCACycACmcfc : $@convention(method) (@owned C) -> @owned C
-sil @_T012dynamic_init1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
-sil @_T012dynamic_init1CCfD : $@convention(method) (@owned C) -> ()
+sil @$S12dynamic_init1CCACycACmcfC : $@convention(method) (@thick C.Type) -> @owned C
+sil @$S12dynamic_init1CCACycACmcfc : $@convention(method) (@owned C) -> @owned C
+sil @$S12dynamic_init1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
+sil @$S12dynamic_init1CCfD : $@convention(method) (@owned C) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T012dynamic_init15testDynamicInityAA1CCm2cm_tF
-sil @_T012dynamic_init15testDynamicInityAA1CCm2cm_tF : $@convention(method) (@thick C.Type) -> () {
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S12dynamic_init15testDynamicInityAA1CCm2cm_tF"
+sil @$S12dynamic_init15testDynamicInityAA1CCm2cm_tF : $@convention(method) (@thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META:%[0-9]+]] = bitcast %swift.type* %0 to %T12dynamic_init1CC* (%swift.type*)**
   // CHECK:   [[VTABLE_OFFSET:%[0-9]+]] = getelementptr inbounds %T12dynamic_init1CC* (%swift.type*)*, %T12dynamic_init1CC* (%swift.type*)** [[META]], i64 10
@@ -25,7 +25,7 @@ bb0(%0 : $@thick C.Type):
   %2 = class_method %0 : $@thick C.Type, #C.init!allocator.1 : (C.Type) -> () -> C, $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:   [[RESULT:%[0-9]+]] = call swiftcc %T12dynamic_init1CC* [[CTOR]](%swift.type* swiftself %0)
   %3 = apply %2(%0) : $@convention(method) (@thick C.Type) -> @owned C
-  // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_rt_swift_release to void (%T12dynamic_init1CC*)*)(%T12dynamic_init1CC* [[RESULT]])
+  // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T12dynamic_init1CC*)*)(%T12dynamic_init1CC* [[RESULT]])
   strong_release %3 : $C
   // CHECK: ret void
   %5 = tuple ()
@@ -33,5 +33,5 @@ bb0(%0 : $@thick C.Type):
 }
 
 sil_vtable C {
-  #C.init!allocator.1: _T012dynamic_init1CCACycACmcfC // dynamic_init.C.__allocating_init (dynamic_init.C.Type)() -> dynamic_init.C
+  #C.init!allocator.1: @$S12dynamic_init1CCACycACmcfC // dynamic_init.C.__allocating_init (dynamic_init.C.Type)() -> dynamic_init.C
 }

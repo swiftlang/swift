@@ -38,11 +38,6 @@ static bool requiresHeapHeader(LayoutKind kind) {
   llvm_unreachable("bad layout kind!");
 }
 
-/// Return the size of the standard heap header.
-Size irgen::getHeapHeaderSize(IRGenModule &IGM) {
-  return IGM.getPointerSize() + Size(8);
-}
-
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
                            LayoutKind layoutKind,
@@ -54,7 +49,7 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
 
   // Fill in the Elements array.
   for (auto type : types)
-    Elements.push_back(ElementLayout::getIncomplete(*type));
+    Elements.push_back(ElementLayout::getIncomplete(*type, *type));
 
   assert(typeToFill == nullptr || typeToFill->isOpaque());
 
@@ -158,7 +153,7 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                const llvm::Twine &suffix) const {
   switch (getKind()) {
   case Kind::Empty:
-    return getType().getUndefAddress();
+    return getTypeForAccess().getUndefAddress();
 
   case Kind::Fixed:
     return IGF.Builder.CreateStructGEP(baseAddr,
@@ -170,13 +165,13 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
     assert(offsets.hasValue());
     llvm::Value *offset =
       offsets.getValue()->getOffsetForIndex(IGF, getNonFixedElementIndex());
-    return IGF.emitByteOffsetGEP(baseAddr.getAddress(), offset, getType(),
+    return IGF.emitByteOffsetGEP(baseAddr.getAddress(), offset, getTypeForAccess(),
                                  baseAddr.getAddress()->getName() + suffix);
   }
 
   case Kind::InitialNonFixedSize:
     return IGF.Builder.CreateBitCast(baseAddr,
-                                 getType().getStorageType()->getPointerTo(),
+                                 getTypeForAccess().getStorageType()->getPointerTo(),
                                  baseAddr.getAddress()->getName() + suffix);
   }
   llvm_unreachable("bad element layout kind");
@@ -184,7 +179,7 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
 
 void StructLayoutBuilder::addHeapHeader() {
   assert(StructFields.empty() && "adding heap header at a non-zero offset");
-  CurSize = getHeapHeaderSize(IGM);
+  CurSize = IGM.RefCountedStructSize;
   CurAlignment = IGM.getPointerAlignment();
   StructFields.push_back(IGM.RefCountedStructTy);
 }
@@ -212,7 +207,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
 
 bool StructLayoutBuilder::addField(ElementLayout &elt,
                                   LayoutStrategy strategy) {
-  auto &eltTI = elt.getType();
+  auto &eltTI = elt.getTypeForLayout();
   IsKnownPOD &= eltTI.isPOD(ResilienceExpansion::Maximal);
   IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
@@ -220,6 +215,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
     addEmptyElement(elt);
     // If the element type is empty, it adds nothing.
+    NextNonFixedOffsetIndex++;
     return false;
   }
   // TODO: consider using different layout rules.
@@ -239,7 +235,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
 }
 
 void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
-  auto &eltTI = cast<FixedTypeInfo>(elt.getType());
+  auto &eltTI = cast<FixedTypeInfo>(elt.getTypeForLayout());
 
   // Note that, even in the presence of elements with non-fixed
   // size, we continue to compute the minimum size and alignment
@@ -306,7 +302,7 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal),
+  elt.completeEmpty(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal),
                     CurSize);
 }
 
@@ -314,11 +310,11 @@ void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
 /// aggregate.
 void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   assert(isFixedLayout());
-  auto &eltTI = cast<FixedTypeInfo>(elt.getType());
+  auto &eltTI = cast<FixedTypeInfo>(elt.getTypeForLayout());
 
-  elt.completeFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
+  elt.completeFixed(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal),
                     CurSize, StructFields.size());
-  StructFields.push_back(elt.getType().getStorageType());
+  StructFields.push_back(elt.getTypeForLayout().getStorageType());
   
   // Carry over the spare bits from the element.
   CurSpareBits.append(eltTI.getSpareBits());
@@ -327,7 +323,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
 /// Add an element at a non-fixed offset to the aggregate.
 void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
-  elt.completeNonFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
+  elt.completeNonFixed(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal),
                        NextNonFixedOffsetIndex);
   CurSpareBits.clear();
 }
@@ -335,9 +331,9 @@ void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
 /// Add a non-fixed-size element to the aggregate at offset zero.
 void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt) {
   assert(isFixedLayout());
-  assert(!isa<FixedTypeInfo>(elt.getType()));
+  assert(!isa<FixedTypeInfo>(elt.getTypeForLayout()));
   assert(CurSize.isZero());
-  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceExpansion::Maximal));
+  elt.completeInitialNonFixedSize(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal));
   CurSpareBits.clear();
 }
 

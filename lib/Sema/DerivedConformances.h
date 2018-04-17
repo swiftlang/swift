@@ -22,11 +22,14 @@
 
 namespace swift {
   class Decl;
-  class FuncDecl;
+  class DeclRefExpr;
+  class AccessorDecl;
   class NominalTypeDecl;
+  class PatternBindingDecl;
   class Type;
   class TypeChecker;
   class ValueDecl;
+  class VarDecl;
   
 namespace DerivedConformance {
 
@@ -67,6 +70,25 @@ bool derivesProtocolConformance(TypeChecker &tc,
 ValueDecl *getDerivableRequirement(TypeChecker &tc,
                                    NominalTypeDecl *nominal,
                                    ValueDecl *requirement);
+
+
+/// Derive a CaseIterable requirement for an enum if it has no associated
+/// values for any of its cases.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *deriveCaseIterable(TypeChecker &tc,
+                              Decl *parentDecl,
+                              NominalTypeDecl *type,
+                              ValueDecl *requirement);
+
+/// Derive a CaseIterable type witness for an enum if it has no associated
+/// values for any of its cases.
+///
+/// \returns the derived member, which will also be added to the type.
+Type deriveCaseIterable(TypeChecker &tc,
+                        Decl *parentDecl,
+                        NominalTypeDecl *type,
+                        AssociatedTypeDecl *assocType);
 
 /// Derive a RawRepresentable requirement for an enum, if it has a valid
 /// raw type and raw values for all of its cases.
@@ -160,33 +182,30 @@ ValueDecl *deriveDecodable(TypeChecker &tc,
                            NominalTypeDecl *type,
                            ValueDecl *requirement);
 
-/// Declare a getter for a derived property.
-FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
-                                       Decl *parentDecl,
-                                       NominalTypeDecl *typeDecl,
-                                       Type propertyInterfaceType,
-                                       Type propertyContextType,
-                                       bool isStatic,
-                                       bool isFinal);
-
-/// Declare a read-only property with an existing getter.
+/// Declare a read-only property.
 std::pair<VarDecl *, PatternBindingDecl *>
-declareDerivedReadOnlyProperty(TypeChecker &tc,
-                               Decl *parentDecl,
-                               NominalTypeDecl *typeDecl,
-                               Identifier name,
-                               Type propertyInterfaceType,
-                               Type propertyContextType,
-                               FuncDecl *getterDecl,
-                               bool isStatic,
-                               bool isFinal);
+declareDerivedProperty(TypeChecker &tc,
+                       Decl *parentDecl,
+                       NominalTypeDecl *typeDecl,
+                       Identifier name,
+                       Type propertyInterfaceType,
+                       Type propertyContextType,
+                       bool isStatic,
+                       bool isFinal);
 
+/// Add a getter to a derived property.  The property becomes read-only.
+AccessorDecl *addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
+                                                 VarDecl *property,
+                                                 Type propertyContextType);
+
+/// Declare a getter for a derived property.
+/// The getter will not be added to the property yet.
+AccessorDecl *declareDerivedPropertyGetter(TypeChecker &tc,
+                                           VarDecl *property,
+                                           Type propertyContextType);
 
 /// Build a reference to the 'self' decl of a derived function.
 DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);
-
-/// Copy access from the source decl to the destination decl.
-void copyFormalAccess(ValueDecl *dest, ValueDecl *source);
 
 }
   

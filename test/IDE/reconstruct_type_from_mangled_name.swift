@@ -64,22 +64,22 @@ class Myclass2 {
 
     arr1.append(1)
 // FIXME: missing append()
-// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyxF
-// CHECK: type: (@lvalue Array<Int>) -> (Int) -> ()
+// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxF
+// CHECK: type: (inout Array<Int>) -> (Int) -> ()
 
     var arr2 : [Mystruct1]
 // CHECK: decl: var arr2: [Mystruct1]
 // CHECK: type: Array<Mystruct1>
 
     arr2.append(Mystruct1())
-// CHECK: type: (@lvalue Array<Mystruct1>) -> (Mystruct1) -> ()
+// CHECK: type: (inout Array<Mystruct1>) -> (Mystruct1) -> ()
 
     var arr3 : [Myclass1]
 // CHECK: decl: var arr3: [Myclass1]
 // CHECK: type: Array<Myclass1>
 
     arr3.append(Myclass1())
-// CHECK: type: (@lvalue Array<Myclass1>) -> (Myclass1) -> ()
+// CHECK: type: (inout Array<Myclass1>) -> (Myclass1) -> ()
 
     _ = Myclass2.init()
 // CHECK: dref: init()
@@ -116,7 +116,7 @@ func f2() {
   e.method()
 // CHECK: (MyEnum) -> (MyEnum) -> Int
   e.compare(e)
-// CHECK: (@lvalue MyEnum) -> () -> ()
+// CHECK: (inout MyEnum) -> () -> ()
   e.mutatingMethod()
 }
 
@@ -204,7 +204,7 @@ func foo4(p: P1 & P2 & Myclass1) {
 }
 
 func genericFunction<T : AnyObject>(t: T) {
-// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunctionyx1t_tRlzClF1TL_xmfp
+// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunction1tyx_tRlzClF1TL_xmfp
   genericFunction(t: t)
 }
 
@@ -257,9 +257,27 @@ func hasLocalDecls() {
 
   // FIXME
   // CHECK: decl: FAILURE for 'LocalType'
-  // The following is the implicit ctor
-  // CHECK: decl: FAILURE for ''
-  struct LocalType {}
+  struct LocalType {
+    // CHECK: FAILURE for 'localMethod'
+    func localMethod() {}
+
+    // CHECK: FAILURE for 'subscript'
+    subscript(x: Int) { get {} set {} }
+
+    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: FAILURE for ''
+    // CHECK: decl: FAILURE for ''
+
+  }
+
+  // FIXME
+  // CHECK: decl: FAILURE for 'LocalClass'
+  class LocalClass {
+    // CHECK: FAILURE for 'deinit'
+    deinit {}
+
+    // CHECK: decl: FAILURE for ''
+  }
 
   // CHECK: decl: FAILURE for 'LocalAlias'
   typealias LocalAlias = LocalType
@@ -267,6 +285,50 @@ func hasLocalDecls() {
 
 fileprivate struct VeryPrivateData {}
 
-// FIXME
-// CHECK: decl: FAILURE for 'privateFunction'
+// CHECK: decl: fileprivate func privateFunction(_ d: VeryPrivateData) for 'privateFunction'
 fileprivate func privateFunction(_ d: VeryPrivateData) {}
+
+struct HasSubscript {
+  // CHECK: decl: subscript(t: Int) -> Int { get set }
+  subscript(_ t: Int) -> Int {
+    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icig
+    get {
+      return t
+    }
+    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icis
+    set {}
+  }
+}
+
+// FIXME
+// CHECK: decl: FAILURE	for 'T' usr=s:14swift_ide_test19HasGenericSubscriptV1Txmfp
+struct HasGenericSubscript<T> {
+  // CHECK: subscript<U>(t: T) -> U { get set }	for 'subscript' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xclui
+  // FIXME
+  // CHECK: decl: FAILURE	for 'U'
+  // FIXME
+  // CHECK: decl: FAILURE	for 't'
+  subscript<U>(_ t: T) -> U {
+
+    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluig
+    // FIXME
+    // CHECK: dref: FAILURE	for 't'
+    get {
+      return t as! U
+    }
+
+    // FIXME
+    // CHECK: dref: FAILURE	for 'U'
+    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
+    set {}
+  }
+}
+
+private
+// CHECK: decl: private func patatino<T>(_ vers1: T, _ vers2: T) -> Bool where T : Comparable for
+func patatino<T: Comparable>(_ vers1: T, _ vers2: T) -> Bool {
+  // CHECK: decl: FAILURE   for 'T' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF1TL_xmfp decl
+  // CHECK: decl: let vers1: T      for 'vers1' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF5vers1L_xvp
+  // CHECK: decl: let vers2: T      for 'vers2' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF5vers2L_xvp
+  return vers1 < vers2;
+}

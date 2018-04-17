@@ -38,7 +38,6 @@ DataTestSuite.test("associated types") {
     iteratorType: Data.Iterator.self,
     subSequenceType: Subject.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
 

@@ -98,6 +98,7 @@ public:
                            BufID, 
                            /* Offset = */ 0,
                            /* EndOffset = */ 0,
+                           /* Diags = */nullptr,
                            /* KeepComments = */ true,
                            /* TokenizeInterpolatedString = */ true,
                            SplitTokens);
@@ -155,7 +156,7 @@ TEST_F(TokenizerTest, ProperlySplitTokens) {
      "integer_literal: 100\n"
      "r_brace: }\n"
      "kw_func: func\n"
-     "identifier: ⊕\n"
+     "oper_binary_spaced: ⊕\n"
      "oper_binary_unspaced: <\n"
      "identifier: T\n"
      "oper_binary_unspaced: >\n"

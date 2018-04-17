@@ -68,6 +68,8 @@ enum Optional<T> {
   case some(T)
 }
 
+class Klass {}
+
 sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
 sil @user_int : $@convention(thin) (Int) -> ()
 sil @optional_user : $@convention(thin) (Optional<Builtin.Int32>) -> ()
@@ -659,7 +661,7 @@ bb4:
 
 sil @virtual_callee : $@convention(method) (@guaranteed Test) -> UInt64
 sil_vtable Test {
-  #Test.testing!1: virtual_callee
+  #Test.testing!1: @virtual_callee
 }
 
 // CHECK-LABEL: sil @sink_retains_from_preds : $@convention(thin) (Builtin.NativeObject) -> () {
@@ -1593,3 +1595,41 @@ bb3(%20 : $Int):                                  // Preds: bb1 bb2
   return %23 : $()                                // id: %25
 }
 
+// Make sure that we properly perform global blotting of values and do not crash
+// on this code. This will only fail reliably in ASAN builds of swift in such a
+// case.
+sil @test_global_blotting : $@convention(thin) () -> () {
+bbBegin:
+  %0a = enum $Optional<Klass>, #Optional.none!enumelt
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb8(%0a : $Optional<Klass>)
+
+bb2:
+  %0 = enum $Optional<Klass>, #Optional.none!enumelt
+  cond_br undef, bb7, bb3
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  br bb9
+
+bb7:
+  br bb8(%0 : $Optional<Klass>)
+
+bb8(%result : $Optional<Klass>):
+  release_value %result : $Optional<Klass>
+  br bb9
+
+bb9:
+  %9999 = tuple()
+  return %9999 : $()
+}

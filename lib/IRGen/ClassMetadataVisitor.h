@@ -35,7 +35,7 @@ class IRGenModule;
 template <class Impl> class ClassMetadataVisitor
     : public NominalMetadataVisitor<Impl>,
       public SILVTableVisitor<Impl> {
-  typedef NominalMetadataVisitor<Impl> super;
+  using super = NominalMetadataVisitor<Impl>;
 
 protected:
   using super::IGM;
@@ -45,7 +45,7 @@ protected:
   ClassDecl *const Target;
 
   ClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target)
-    : super(IGM), SILVTableVisitor<Impl>(IGM.getSILTypes()), Target(target) {}
+    : super(IGM), Target(target) {}
 
 public:
   void layout() {
@@ -90,24 +90,30 @@ public:
 private:
   /// Add fields associated with the given class and its bases.
   void addClassMembers(ClassDecl *theClass, Type type) {
-    // Add any fields associated with the superclass.
-    // NB: We don't apply superclass substitutions to members because we want
-    // consistent metadata layout between generic superclasses and concrete
-    // subclasses.
+    // Visit the superclass first.
     if (Type superclass = type->getSuperclass()) {
-      ClassDecl *superclassDecl = superclass->getClassOrBoundGenericClass();
-      // Skip superclass fields if superclass is resilient.
-      // FIXME: Needs runtime support to ensure the field offset vector is
-      // populated correctly.
-      if (!IGM.Context.LangOpts.EnableClassResilience ||
-          !IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+        // Runtime metadata instantiation will initialize our field offset
+        // vector and vtable entries.
+        //
+        // Metadata access needs to access our fields relative to a
+        // global variable.
+        asImpl().noteResilientSuperclass();
+      } else {
+        // NB: We don't apply superclass substitutions to members because we want
+        // consistent metadata layout between generic superclasses and concrete
+        // subclasses.
         addClassMembers(superclassDecl, superclass);
       }
     }
 
+    // Note that we have to emit a global variable storing the metadata
+    // start offset, or access remaining fields relative to one.
+    asImpl().noteStartOfImmediateMembers(theClass);
+
     // Add space for the generic parameters, if applicable.
-    // Note that we only add references for the immediate parameters;
-    // parameters for the parent context are handled by the parent.
+    // This must always be the first item in the immediate members.
     asImpl().addGenericFields(theClass, type, theClass);
 
     // Add vtable entries.
@@ -127,15 +133,23 @@ private:
     // But we currently always give classes field-offset vectors,
     // whether they need them or not.
     asImpl().noteStartOfFieldOffsets(theClass);
-    for (auto field : theClass->getStoredProperties()) {
+    for (auto field :
+           theClass->getStoredPropertiesAndMissingMemberPlaceholders()) {
       addFieldEntries(field);
     }
     asImpl().noteEndOfFieldOffsets(theClass);
   }
   
 private:
-  void addFieldEntries(VarDecl *field) {
-    asImpl().addFieldOffset(field);
+  void addFieldEntries(Decl *field) {
+    if (auto var = dyn_cast<VarDecl>(field)) {
+      asImpl().addFieldOffset(var);
+      return;
+    }
+    if (auto placeholder = dyn_cast<MissingMemberDecl>(field)) {
+      asImpl().addFieldOffsetPlaceholders(placeholder);
+      return;
+    }
   }
 };
 
@@ -143,7 +157,8 @@ private:
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class ClassMetadataScanner : public ClassMetadataVisitor<Impl> {
-  typedef ClassMetadataVisitor<Impl> super;
+  using super = ClassMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 
@@ -171,6 +186,12 @@ public:
   }
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
   void addFieldOffset(VarDecl *var) { addPointer(); }
+  void addFieldOffsetPlaceholders(MissingMemberDecl *mmd) {
+    for (unsigned i = 0, e = mmd->getNumberOfFieldOffsetVectorEntries();
+         i < e; ++i) {
+      addPointer();
+    }
+  }
   void addGenericArgument(CanType argument, ClassDecl *forClass) {
     addPointer();
   }

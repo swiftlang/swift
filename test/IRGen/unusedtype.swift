@@ -3,9 +3,9 @@
 // RUN: %FileCheck -check-prefix=CHECK-REFLECTION %s < %t.ll
 
 // No global metadata, witness tables, etc. Only reflection metadata should not be optimized away
-// CHECK-NOT: @_T0{{.*[^F] =}}
-// CHECK-REFLECTION: @[[C:[0-9]+]] = private constant {{.*}} c"10unusedtype13MicroSequenceV\00"
-// CHECK-REFLECTION: @_T010unusedtype13MicroSequenceVMF = {{.*}} [[C]]
+// CHECK-NOT: @"$S{{.*[^F] =}}"
+// CHECK-REFLECTION: @[[C:.*]] = linkonce_odr hidden constant {{.*}} @"$S10unusedtype13MicroSequenceVMn"
+// CHECK-REFLECTION: @"$S10unusedtype13MicroSequenceVMF" = {{.*}} @[[C]]
 
 // No conformance records
 // CHECK-NOT: protocol_conformances

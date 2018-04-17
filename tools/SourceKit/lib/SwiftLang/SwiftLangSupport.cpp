@@ -103,9 +103,9 @@ public:
 } // anonymous namespace
 
 UIdent UIdentVisitor::visitFuncDecl(const FuncDecl *D) {
-  if (D->isAccessor()) {
-    return SwiftLangSupport::getUIDForAccessor(D->getAccessorStorageDecl(),
-                                               D->getAccessorKind(),
+  if (auto AD = dyn_cast<AccessorDecl>(D)) {
+    return SwiftLangSupport::getUIDForAccessor(AD->getStorage(),
+                                               AD->getAccessorKind(),
                                                IsRef);
   }
 
@@ -212,8 +212,6 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            AccessorKind AccKind,
                                            bool IsRef) {
   switch (AccKind) {
-  case AccessorKind::NotAccessor:
-    llvm_unreachable("expected accessor");
   case AccessorKind::IsMaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   case AccessorKind::IsGetter:
@@ -341,6 +339,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
     return KindBuildConfigKeyword;
   case SyntaxNodeKind::BuildConfigId:
     return KindBuildConfigId;
+  case SyntaxNodeKind::PoundDirectiveKeyword:
+    return KindPoundDirectiveKeyword;
   case SyntaxNodeKind::AttributeId:
     return KindAttributeId;
   case SyntaxNodeKind::AttributeBuiltin:
@@ -395,6 +395,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindDeclSubscript;
     case SyntaxStructureKind::AssociatedType:
       return KindDeclAssociatedType;
+    case SyntaxStructureKind::GenericTypeParam:
+      return KindDeclGenericTypeParam;
     case SyntaxStructureKind::Parameter:
       return KindDeclVarParam;
     case SyntaxStructureKind::ForEachStatement:
@@ -423,6 +425,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
       return KindExprObjectLiteral;
     case SyntaxStructureKind::TupleExpression:
       return KindExprTuple;
+    case SyntaxStructureKind::ClosureExpression:
+      return KindExprClosure;
     case SyntaxStructureKind::Argument:
       return KindExprArg;
   }
@@ -451,6 +455,8 @@ getUIDForRangeKind(swift::ide::RangeKind Kind) {
     case swift::ide::RangeKind::SingleStatement: return KindRangeSingleStatement;
     case swift::ide::RangeKind::SingleDecl: return KindRangeSingleDeclaration;
     case swift::ide::RangeKind::MultiStatement: return KindRangeMultiStatement;
+    case swift::ide::RangeKind::MultiTypeMemberDecl:
+      return KindRangeMultiTypeMemberDeclaration;
     case swift::ide::RangeKind::PartOfExpression: return KindRangeInvalid;
     case swift::ide::RangeKind::Invalid: return KindRangeInvalid;
   }
@@ -480,6 +486,8 @@ getUIDForRefactoringRangeKind(ide::RefactoringRangeKind Kind) {
     return KindRenameRangeKeywordBase;
   case ide::RefactoringRangeKind::ParameterName:
     return KindRenameRangeParam;
+  case ide::RefactoringRangeKind::NoncollapsibleParameterName:
+    return KindRenameRangeNoncollapsibleParam;
   case ide::RefactoringRangeKind::DeclArgumentLabel:
     return KindRenameRangeDeclArgLabel;
   case ide::RefactoringRangeKind::CallArgumentLabel:

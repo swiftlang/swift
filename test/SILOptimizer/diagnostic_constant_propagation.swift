@@ -1,14 +1,12 @@
-// FIXME(integer): with new integer protocols implemented the overflows are no
-// longer caught: <rdar://problem/29937936>
-// XFAIL: *
-
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-
-// REQUIRES: PTRSIZE=64
-
-// FIXME: <rdar://problem/19508336> Extend test/SILOptimizer/diagnostic_constant_propagation.swift to 32-bit platforms
-
+//
 // These are tests for diagnostics produced by constant propagation pass.
+// Due to the change in the implementation of Integer initializers some of the
+// tests here that must fail don't currently. Such tests have comments
+// describing the desirable behavior. They are false negatives now but have
+// to be addressed in the future.
+// References: <rdar://problem/29937936>, <rdar://problem/29939484>,
+// <https://bugs.swift.org/browse/SR-5964>, <rdar://problem/39120081>
 
 func testArithmeticOverflow() {
   let xu8 : UInt8 = 250
@@ -27,18 +25,20 @@ func testArithmeticOverflow() {
   xu8_2 += 40 // expected-error {{arithmetic operation '240 + 40' (on type 'UInt8') results in an overflow}}
 
   var _ : UInt8 = 230 - 240 // expected-error {{arithmetic operation '230 - 240' (on type 'UInt8') results in an overflow}}
-  
+
   var xu8_3 : UInt8 = 240   // Global (cross block) analysis.
   for _ in 0..<10 {}
   xu8_3 += 40 // expected-error {{arithmetic operation '240 + 40' (on type 'UInt8') results in an overflow}}
   var _ : UInt8 = 240 + 5 + 15 // expected-error {{arithmetic operation '245 + 15' (on type 'UInt8') results in an overflow}}
-  
-  // TODO: We should remove the second init for Int8 - see rdar://problem/19224768
-  _ = Int8(126) + Int8(1+1) // expected-error {{arithmetic operation '126 + 2' (on type 'Int8') results in an overflow}}
-//  DISABLED FOR NOW
-//  asserts in the shift operators confuse constant propagation
-//  var csh1: Int8 = (1 << 7) - 1 // expected - error {{arithmetic operation '-128 - 1' (on type 'Int8') results in an overflow}}
-//  var csh2: Int8 = (-1 & ~(1<<7))+1 // expected - error {{arithmetic operation '127 + 1' (on type 'Int8') results in an overflow}}
+
+  var _ = Int8(126) + Int8(1+1) // FIXME: false negative: overflow that is not
+    // caught by diagnostics (see also <rdar://problem/39120081>).
+
+  var _: Int8 = (1 << 7) - 1 // FIXME: false negative: should expect an error
+    // like {{arithmetic operation '-128 - 1' (on type 'Int8') results in an overflow}}
+  // Note: asserts in the shift operators confuse constant propagation
+  var _: Int8 = (-1 & ~(1<<7))+1 // FIXME: false negative: should expect an error
+    // like {{arithmetic operation '127 + 1' (on type 'Int8') results in an overflow}}
 }
 
 @_transparent 
@@ -79,7 +79,8 @@ func testConvertOverflow() {
   let uint32_plus_two  : UInt32 = (2)
   var _ /*uint64_minus_two*/ : UInt64 = (-2) // expected-error {{negative integer '-2' overflows when stored into unsigned type 'UInt64'}}
   var _ /*uint64_plus_two*/  : UInt64 = (2)
-  var _ /*convert_s_to_u_minus_two*/ = UInt8(int_minus_two)  // expected-error {{integer overflows when converted from 'Int' to 'UInt8'}}
+  var _ /*convert_s_to_u_minus_two*/ = UInt8(int_minus_two)  // FIXME: false negative:
+    // overflow that is not caught by diagnostics.
   var _ /*convert_s_to_u_plus_two*/  = UInt8(int_plus_two)
   var _ /*convert_u_to_s_plus_two*/  = Int8(uint32_plus_two)
 
@@ -94,7 +95,8 @@ func testConvertOverflow() {
   let int_minus_128 = -128
   var _ /*int8_min_conv*/     = Int8(int_minus_128)
   let int_minus_129 = -129
-  var _ /*int8_min_m1_conv*/  = Int8(int_minus_129) // expected-error {{integer overflows when converted from 'Int' to 'Int8'}}
+  var _ /*int8_min_m1_conv*/  = Int8(int_minus_129) // FIXME: false negative:
+    // overflow that is not caught by diagnostics (see also <rdar://problem/39120081>).
 
   var _ /*int8_max*/     : Int8 = (127)
   var _ /*int8_max_p1*/  : Int8 = (128) // expected-error {{integer literal '128' overflows when stored into 'Int8'}}
@@ -106,8 +108,9 @@ func testConvertOverflow() {
   var _ /*int64_max_p1*/ : Int64 = (9223372036854775808) // expected-error {{integer literal '9223372036854775808' overflows when stored into 'Int64'}}
   var _ /*int16_max_conv*/    = Int16(UInt64(int16_max))
   let uint64_plus_32768 : UInt64 = 32768
-  var _ /*int16_max_p1_conv*/ = Int16(uint64_plus_32768) // expected-error {{integer overflows when converted from 'UInt64' to 'Int16'}}
-  
+  var _ /*int16_max_p1_conv*/ = Int16(uint64_plus_32768) // FIXME: false negative:
+    // overflow that is not caught by diagnostics (see also <rdar://problem/39120081>)
+
   var _ /*int8_max_pa*/      : Int8   = -13333; //expected-error{{integer literal '-13333' overflows when stored into 'Int8}}
   var _ /*int32_max_p_hex*/  : Int32  = 0xFFFF_FFFF; //expected-error{{integer literal '4294967295' overflows when stored into 'Int32'}}
   var _ /*uint32_max_hex*/   : UInt32 = 0xFFFF_FFFF
@@ -137,13 +140,16 @@ func testConvertOverflow() {
   let uint16_255 : UInt16 = 255
   var _ /*uint8_max_conv*/    = UInt8(uint16_255)
   let uint16_256 : UInt16 = 256
-  var _ /*uint8_max_p1_conv*/ = UInt8(uint16_256) // expected-error {{integer overflows when converted from 'UInt16' to 'UInt8'}}
+  var _ /*uint8_max_p1_conv*/ = UInt8(uint16_256) // FIXME: false negative:
+    // overflow that is not caught by diagnostics (see also <rdar://problem/39120081>)
 
   // Check same size int conversions.
   let int8_minus_1 : Int8 = -1
-  let _ /*ssint8_neg*/    = UInt8(int8_minus_1) // expected-error {{negative integer cannot be converted to unsigned type 'UInt8'}}
+  let _ /*ssint8_neg*/    = UInt8(int8_minus_1) // FIXME: false negative:
+    // overflow that is not caught by diagnostics (see also <rdar://problem/39120081>)
   let uint8_128 : UInt8 = 128
-  let _ /*ssint8_toobig*/ = Int8(uint8_128) // expected-error {{integer overflows when converted from 'UInt8' to 'Int8'}}
+  let _ /*ssint8_toobig*/ = Int8(uint8_128) // FIXME: false negative: overflow
+    // that is not caught by diagnostics (see also <rdar://problem/39120081>)
   let uint8_127 : UInt8 = 127
   let _ /*ssint8_good*/   = Int8(uint8_127)
   let int8_127 : Int8 = 127
@@ -151,11 +157,14 @@ func testConvertOverflow() {
   let _ /*ssint8_zero*/   = UInt8(int8_zero)
   let uint8_zero : UInt8 = 0
   let _ /*ssint8_zero2*/  = Int8(uint8_zero)
-  
+
   // Check signed to unsigned extending size conversions.
-  UInt16(Int8(-1)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt16'}} // expected-warning{{unused}}
-  UInt64(Int16(-200)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt64'}} // expected-warning{{unused}}
-  UInt64(Int32(-200)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt64'}} // expected-warning{{unused}}
+  var _ = UInt16(Int8(-1)) // FIXME: false negative: overflow that is not caught
+    // (see also <rdar://problem/39120081>)
+  var _ = UInt64(Int16(-200)) // FIXME: false negative: overflow that is not
+    // caught by diagnostics (see also <rdar://problem/39120081>)
+  var _ = UInt64(Int32(-200)) // FIXME: false negative: overflow that is not
+    // caught by diagnostics (see also <rdar://problem/39120081>)
   Int16(Int8(-1)) // expected-warning{{unused}}
   Int64(Int16(-200)) // expected-warning{{unused}}
   Int64(Int32(-200)) // expected-warning{{unused}}
@@ -220,37 +229,30 @@ func intConversionWrapperForLiteral() -> Int8 {
   return 255 // expected-error {{integer literal '255' overflows when stored into 'Int8'}}
 }
 func testFallBackDiagnosticMessages() {
-  _ = intConversionWrapperForUSCheckedConversion(255, 30) // expected-error {{integer overflows when converted from unsigned 'Builtin.Int8' to signed 'Builtin.Int8'}}
+  _ = intConversionWrapperForUSCheckedConversion(255, 30) // FIXME: false negative:
+    // uncaught overflow error. See the function `intConversionWrapperForLiteral`
+    // definition (see also <rdar://problem/39120081>).
   _ = intConversionWrapperForLiteral() // expected-error {{integer literal '255' overflows when stored into signed 'Builtin.Int8'}}
 }
 
-// XXX FIXME -- blocked by: 15735295 Need [su]{div,rem}_with_overflow IR
-/*
 func testDivision() {
-  var i  : Int = 3 / 3
-  var id : Int = 3 / 0 // expected -error{{division by zero}}
-  var ir : Int = 3 % 0 // expected -error{{division by zero}}
+  var _  : Int = 3 / 3
+  var _ : Int = 3 / 0 // expected-error{{division by zero}}
+  var _ : Int = 3 % 0 // expected-error{{division by zero}}
 
-  var uzero : UInt8 = 0
-  var uone : UInt8 = 1
-  var u  : UInt8 = uzero / uone
-  var ud : UInt8 = uone / uzero // expected -error{{division by zero}}
-  var ur : UInt8 = uone % uzero // expected -error{{division by zero}}
+  let uzero : UInt8 = 0
+  let uone : UInt8 = 1
+  var _ : UInt8 = uzero / uone
+  var _ : UInt8 = uone / uzero // expected-error{{division by zero}}
+  var _ : UInt8 = uone % uzero // expected-error{{division by zero}}
 
-  var f : Float = 3.0 / 0.0
+  var _ : Float = 3.0 / 0.0
 
-  var minusOne : Int32 = -1
-  var overflow : Int32 = -2147483648 / minusOne // expected -error{{division '-2147483648 / -1' results in an overflow}}
+  let minusOne : Int32 = -1
+  var _ : Int32 = -2147483648 / minusOne // expected-error{{division '-2147483648 / -1' results in an overflow}}
 }
-*/
 
 func testPostIncOverflow() {
-  var   s_max = Int.max
-  s_max += 1  // expected-error {{arithmetic operation '9223372036854775807 + 1' (on type 'Int') results in an overflow}}
-
-  var   u_max = UInt.max
-  u_max += 1 // expected-error {{arithmetic operation '18446744073709551615 + 1' (on type 'UInt') results in an overflow}}
-
   var  s8_max = Int8.max
   s8_max += 1 // expected-error {{arithmetic operation '127 + 1' (on type 'Int8') results in an overflow}}
 
@@ -277,12 +279,6 @@ func testPostIncOverflow() {
 }
 
 func testPostDecOverflow() {
-  var   s_min = Int.min
-  s_min -= 1  // expected-error {{arithmetic operation '-9223372036854775808 - 1' (on type 'Int') results in an overflow}}
-
-  var   u_min = UInt.min
-  u_min -= 1 // expected-error {{arithmetic operation '0 - 1' (on type 'UInt') results in an overflow}}
-
   var  s8_min = Int8.min
   s8_min -= 1 // expected-error {{arithmetic operation '-128 - 1' (on type 'Int8') results in an overflow}}
 

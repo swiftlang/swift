@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: stress_test
 
 import StdlibUnittest
 import SwiftPrivatePthreadExtras
@@ -13,8 +14,8 @@ import Glibc
 var StringTestSuite = TestSuite("String")
 
 extension String {
-  var capacityInBytes: Int {
-    return _core.nativeBuffer!.capacity
+  var capacity: Int {
+    return _guts.capacity
   }
 }
 
@@ -51,7 +52,7 @@ func sliceConcurrentAppendThread(_ tid: ThreadID) {
       sharedString = ""
       sharedString.append("abc")
       sharedString.reserveCapacity(16)
-      expectLE(16, sharedString.capacityInBytes)
+      expectLE(16, sharedString.capacity)
     }
 
     barrier()
@@ -109,9 +110,8 @@ StringTestSuite.test("SliceConcurrentAppend") {
   ret = _stdlib_pthread_barrier_destroy(barrierVar!)
   expectEqual(0, ret)
 
-  barrierVar!.deinitialize()
-  barrierVar!.deallocate(capacity: 1)
+  barrierVar!.deinitialize(count: 1)
+  barrierVar!.deallocate()
 }
 
 runAllTests()
-

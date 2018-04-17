@@ -1198,10 +1198,10 @@ extension TestSuite {
 
     // FIXME: swift-3-indexing-model -
     //   enhance the following for negative direction?
-    //          advance(i: Index, by n: IndexDistance) -> Index
+    //          advance(i: Index, by n: Int) -> Index
     //          advance(
-    //             i: Index, by n: IndexDistance, limitedBy: Index) -> Index
-    //          distance(from start: Index, to end: Index) -> IndexDistance
+    //             i: Index, by n: Int, limitedBy: Index) -> Index
+    //          distance(from start: Index, to end: Index) -> Int
 
     //===------------------------------------------------------------------===//
     // last
@@ -1556,7 +1556,7 @@ extension TestSuite {
       return
     }
 
-    func toCollection(_ r: CountableRange<Int>) -> C {
+    func toCollection(_ r: Range<Int>) -> C {
       return makeCollection(r.map { wrapValue(OpaqueValue($0)) })
     }
 

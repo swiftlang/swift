@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-run %t/a.out3
 // RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
 // REQUIRES: executable_test
@@ -24,7 +24,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.2, *) {
   }
 
   IntentsTestSuite.test("extension/\(swiftVersion)") {
-    expectEqual("IntentsErrorDomain", INIntentError._nsErrorDomain)
+    expectEqual("IntentsErrorDomain", INIntentError.errorDomain)
   }
 }
 
@@ -72,6 +72,34 @@ if #available(iOS 10.0, watchOS 3.2, *) {
     }
   }
 
+}
+#endif
+
+#if os(iOS)
+if #available(iOS 11.0, *) {
+  IntentsTestSuite.test("INSetProfileInCarIntent Initializers/\(swiftVersion)") {
+#if swift(>=4)
+    _ = INSetProfileInCarIntent()
+    _ = INSetProfileInCarIntent(isDefaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileName: nil)
+    _ = INSetProfileInCarIntent(profileName: nil, isDefaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, isDefaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, profileName: nil)
+    _ = INSetProfileInCarIntent(
+      profileNumber: nil, profileName: nil, isDefaultProfile: nil)
+#else
+    _ = INSetProfileInCarIntent()
+    _ = INSetProfileInCarIntent(defaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileName: nil)
+    _ = INSetProfileInCarIntent(profileName: nil, defaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, defaultProfile: nil)
+    _ = INSetProfileInCarIntent(profileNumber: nil, profileName: nil)
+    _ = INSetProfileInCarIntent(
+      profileNumber: nil, profileName: nil, defaultProfile: nil)
+#endif
+  }
 }
 #endif
 

@@ -34,19 +34,30 @@ public enum BadEnum {
   case problematic(Any, WrappedInt)
   case alsoOkay(Any, Any, Any)
 
-  static public func ==(a: BadEnum, b: BadEnum) -> Bool {
+  public static func ==(a: BadEnum, b: BadEnum) -> Bool {
     return false
   }
 }
 // CHECK-LABEL: enum BadEnum {
 // CHECK-RECOVERY-NOT: enum BadEnum
 
+public enum GenericBadEnum<T: HasAssoc> where T.Assoc == WrappedInt {
+  case noPayload
+  case perfectlyOkayPayload(Int)
+
+  public static func ==(a: GenericBadEnum<T>, b: GenericBadEnum<T>) -> Bool {
+    return false
+  }
+}
+// CHECK-LABEL: enum GenericBadEnum<T> where T : HasAssoc, T.Assoc == WrappedInt {
+// CHECK-RECOVERY-NOT: enum GenericBadEnum
+
 public enum OkayEnum {
   case noPayload
   case plainOldAlias(Any, UnwrappedInt)
   case other(Int)
 
-  static public func ==(a: OkayEnum, b: OkayEnum) -> Bool {
+  public static func ==(a: OkayEnum, b: OkayEnum) -> Bool {
     return false
   }
 }
@@ -83,9 +94,17 @@ public enum OkayEnumWithSelfRefs {
 // CHECK-RECOVERY-NEXT:   case nested(OkayEnumWithSelfRefs.Nested)
 // CHECK-RECOVERY-NEXT: }
 
+public protocol HasAssoc {
+  associatedtype Assoc
+}
+
 public func producesBadEnum() -> BadEnum { return .noPayload }
 // CHECK-LABEL: func producesBadEnum() -> BadEnum
 // CHECK-RECOVERY-NOT: func producesBadEnum() -> BadEnum
+
+public func producesGenericBadEnum<T>() -> GenericBadEnum<T> { return .noPayload }
+// CHECK-LABEL: func producesGenericBadEnum<T>() -> GenericBadEnum<T>
+// CHECK-RECOVERY-NOT: func producesGenericBadEnum
 
 public func producesOkayEnum() -> OkayEnum { return .noPayload }
 // CHECK-LABEL: func producesOkayEnum() -> OkayEnum

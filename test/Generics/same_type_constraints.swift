@@ -371,3 +371,10 @@ struct StructTakingP1<T: P1> { }
 func resultTypeSuppress<T: P1>() -> StructTakingP1<T> {
   return StructTakingP1()
 }
+
+// Check directly-concrete same-type constraints
+typealias NotAnInt = Double
+
+extension X11 where NotAnInt == Int { }
+// expected-warning@-1{{neither type in same-type constraint ('NotAnInt' (aka 'Double') or 'Int') refers to a generic parameter or associated type}}
+// expected-error@-2{{generic signature requires types 'NotAnInt' (aka 'Double') and 'Int' to be the same}}

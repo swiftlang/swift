@@ -179,6 +179,54 @@ static inline Offset measureRelativeOffset(A *referent, B *base) {
 /// direct or indirect, and uses the low bit of the (assumed at least
 /// 2-byte-aligned) pointer to differentiate.
 template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
+class RelativeIndirectPointer {
+private:
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
+
+  /// The relative offset of the pointer's memory from the `this` pointer.
+  /// This is an indirect reference.
+  Offset RelativeOffset;
+
+  /// RelativePointers should appear in statically-generated metadata. They
+  /// shouldn't be constructed or copied.
+  RelativeIndirectPointer() = delete;
+  RelativeIndirectPointer(RelativeIndirectPointer &&) = delete;
+  RelativeIndirectPointer(const RelativeIndirectPointer &) = delete;
+  RelativeIndirectPointer &operator=(RelativeIndirectPointer &&)
+    = delete;
+  RelativeIndirectPointer &operator=(const RelativeIndirectPointer &)
+    = delete;
+
+public:
+  const ValueTy *get() const & {
+    // Check for null.
+    if (Nullable && RelativeOffset == 0)
+      return nullptr;
+
+    uintptr_t address = detail::applyRelativeOffset(this, RelativeOffset);
+    return *reinterpret_cast<const ValueTy * const *>(address);
+  }
+
+  /// A zero relative offset encodes a null reference.
+  bool isNull() const & {
+    return RelativeOffset == 0;
+  }
+
+  operator const ValueTy* () const & {
+    return get();
+  }
+
+  const ValueTy *operator->() const & {
+    return get();
+  }
+};
+
+/// A relative reference to an object stored in memory. The reference may be
+/// direct or indirect, and uses the low bit of the (assumed at least
+/// 2-byte-aligned) pointer to differentiate.
+template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
 class RelativeIndirectablePointer {
 private:
   static_assert(std::is_integral<Offset>::value &&
@@ -257,6 +305,76 @@ public:
 
   const ValueTy *operator->() const & {
     return get();
+  }
+};
+
+/// A relative reference to an aligned object stored in memory. The reference
+/// may be direct or indirect, and uses the low bit of the (assumed at least
+/// 2-byte-aligned) pointer to differentiate. The remaining low bits store
+/// an additional tiny integer value.
+template<typename ValueTy, typename IntTy, bool Nullable = false,
+         typename Offset = int32_t>
+class RelativeIndirectablePointerIntPair {
+private:
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
+
+  /// The relative offset of the pointer's memory from the `this` pointer.
+  /// If the low bit is clear, this is a direct reference; otherwise, it is
+  /// an indirect reference.
+  Offset RelativeOffsetPlusIndirectAndInt;
+
+  /// RelativePointers should appear in statically-generated metadata. They
+  /// shouldn't be constructed or copied.
+  RelativeIndirectablePointerIntPair() = delete;
+  RelativeIndirectablePointerIntPair(
+                           RelativeIndirectablePointerIntPair &&) = delete;
+  RelativeIndirectablePointerIntPair(
+                      const RelativeIndirectablePointerIntPair &) = delete;
+  RelativeIndirectablePointerIntPair& operator=(
+                           RelativeIndirectablePointerIntPair &&) = delete;
+  RelativeIndirectablePointerIntPair &operator=(
+                      const RelativeIndirectablePointerIntPair &) = delete;
+
+  // Retrieve the mask for the stored integer value.
+  static Offset getIntMask() {
+    return (alignof(Offset) - 1) & ~(Offset)0x01;
+  }
+
+public:
+  const ValueTy *getPointer() const & {
+    static_assert(alignof(ValueTy) >= 2 && alignof(Offset) >= 2,
+                  "alignment of value and offset must be at least 2 to "
+                  "make room for indirectable flag");
+
+    Offset offset = (RelativeOffsetPlusIndirectAndInt & ~getIntMask());
+
+    // Check for null.
+    if (Nullable && offset == 0)
+      return nullptr;
+
+    Offset offsetPlusIndirect = offset;
+    uintptr_t address = detail::applyRelativeOffset(this,
+                                                    offsetPlusIndirect & ~1);
+
+    // If the low bit is set, then this is an indirect address. Otherwise,
+    // it's direct.
+    if (offsetPlusIndirect & 1) {
+      return *reinterpret_cast<const ValueTy * const *>(address);
+    } else {
+      return reinterpret_cast<const ValueTy *>(address);
+    }
+  }
+
+  /// A zero relative offset encodes a null reference.
+  bool isNull() const & {
+    Offset offset = (RelativeOffsetPlusIndirectAndInt & ~getIntMask());
+    return offset == 0;
+  }
+
+  IntTy getInt() const & {
+    return IntTy((RelativeOffsetPlusIndirectAndInt & getIntMask()) >> 1);
   }
 };
 
@@ -398,9 +516,6 @@ class RelativeDirectPointerIntPair {
     = delete;
 
   static Offset getMask() {
-    static_assert(alignof(PointeeTy) >= alignof(Offset),
-                 "pointee alignment must be at least as strict as offset type");
-
     return alignof(Offset) - 1;
   }
 
@@ -422,6 +537,10 @@ public:
 
   IntTy getInt() const & {
     return IntTy(RelativeOffsetPlusInt & getMask());
+  }
+  
+  Offset getOpaqueValue() const & {
+    return RelativeOffsetPlusInt;
   }
 };
 

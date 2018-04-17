@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // XFAIL: linux
-// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -935,7 +935,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // Check for a single prefixing hyphen
     let negative = source.hasPrefix("-")
     if negative {
-      source = String(source.characters.dropFirst())
+      source = String(source.dropFirst())
     }
 
     // Loop through characters, multiplying

@@ -84,16 +84,9 @@ bool swift::ArraySemanticsCall::isValidSignature() {
       auto *AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
       if (!AllocBufferAI)
         return false;
-
       auto *AllocFn = AllocBufferAI->getReferencedFunction();
-      if (!AllocFn)
-        return false;
-
-      StringRef AllocFuncName = AllocFn->getName();
-      if (AllocFuncName != "swift_bufferAllocate")
-        return false;
-
-      if (!hasOneNonDebugUse(AllocBufferAI))
+      if (!AllocFn || AllocFn->getName() != "swift_bufferAllocate" ||
+          !hasOneNonDebugUse(AllocBufferAI))
         return false;
     }
     return true;

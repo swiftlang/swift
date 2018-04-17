@@ -1,5 +1,8 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
 
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
 sil_stage canonical
 
 import Builtin
@@ -36,9 +39,9 @@ sil @_TFC4main3Bar3boofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> Int6
 sil @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@convention(objc_method) (Bar) -> ()
 
 sil_vtable Bar {
-  #Bar.boo!1: _TFC4main3Bar3boofS0_FT_T_
-  #Bar.foo!1: _TFC4main3Bar3foofS0_FT_T_
-  #Bar.foo_objc!1: _TFC4main3Bar3foofS0_FT_T_
+  #Bar.boo!1: @_TFC4main3Bar3boofS0_FT_T_
+  #Bar.foo!1: @_TFC4main3Bar3foofS0_FT_T_
+  #Bar.foo_objc!1: @_TFC4main3Bar3foofS0_FT_T_
 }
 
 sil @looprotate : $@convention(thin) (Int32, @owned Bar) -> Int32 {

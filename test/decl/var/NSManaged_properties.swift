@@ -8,7 +8,7 @@ class X : NSObject {
   func foo() -> X { return self }
 }
 
-@NSManaged struct SomeStruct {} // expected-error {{@NSManaged cannot be applied to this declaration}}
+@NSManaged struct SomeStruct {} // expected-error {{'@NSManaged' attribute cannot be applied to this declaration}}
 
 @NSManaged var global: Int // expected-error {{@NSManaged only allowed on an instance property or method}}
 

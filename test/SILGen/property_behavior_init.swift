@@ -24,7 +24,7 @@ struct Foo {
   // TODO
   // var xx: (Int, Int) __behavior diBehavior
 
-  // CHECK-LABEL: sil hidden @_T022property_behavior_init3FooV{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden @$S22property_behavior_init3FooV{{[_0-9a-zA-Z]*}}fC
   // CHECK:       bb0([[X:%.*]] : @trivial $Int,
   init(x: Int) {
     // CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [rootself]
@@ -43,20 +43,20 @@ struct Foo {
 
     // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB_BOX]]
     // CHECK: [[SELF:%.*]] = load [trivial] [[READ]]
-    // CHECK: [[GETTER:%.*]] = function_ref @_T022property_behavior_init3FooV1xSivg
+    // CHECK: [[GETTER:%.*]] = function_ref @$S22property_behavior_init3FooV1xSivg
     // CHECK: apply [[GETTER]]([[SELF]])
     _ = self.x
 
-    // CHECK: [[WHACK:%.*]] = function_ref @_T022property_behavior_init5whackyxzlF
     // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
     // CHECK: [[INOUT:%.*]] = alloc_stack
     // CHECK: [[SELF:%.*]] = load [trivial] [[WRITE]]
-    // CHECK: [[GETTER:%.*]] = function_ref @_T022property_behavior_init3FooV1xSivg
+    // CHECK: [[GETTER:%.*]] = function_ref @$S22property_behavior_init3FooV1xSivg
     // CHECK: [[VALUE:%.*]] = apply [[GETTER]]([[SELF]])
     // CHECK: store [[VALUE]] to [trivial] [[INOUT]]
+    // CHECK: [[WHACK:%.*]] = function_ref @$S22property_behavior_init5whackyyxzlF
     // CHECK: apply [[WHACK]]<Int>([[INOUT]])
     // CHECK: [[VALUE:%.*]] = load [trivial] [[INOUT]]
-    // CHECK: [[SETTER:%.*]] = function_ref @_T022property_behavior_init3FooV1xSivs
+    // CHECK: [[SETTER:%.*]] = function_ref @$S22property_behavior_init3FooV1xSivs
     // CHECK: apply [[SETTER]]([[VALUE]], [[WRITE]])
     whack(&self.x)
   }

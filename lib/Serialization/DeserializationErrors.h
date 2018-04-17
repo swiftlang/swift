@@ -37,6 +37,7 @@ class XRefTracePath {
       Accessor,
       Extension,
       GenericParam,
+      PrivateDiscriminator,
       Unknown
     };
 
@@ -55,11 +56,12 @@ class XRefTracePath {
       : kind(K),
         data(llvm::PointerLikeTypeTraits<T>::getAsVoidPointer(value)) {}
 
-    Identifier getAsIdentifier() const {
+    DeclBaseName getAsBaseName() const {
       switch (kind) {
       case Kind::Value:
       case Kind::Operator:
-        return getDataAs<Identifier>();
+      case Kind::PrivateDiscriminator:
+        return getDataAs<DeclBaseName>();
       case Kind::Type:
       case Kind::OperatorFilter:
       case Kind::Accessor:
@@ -73,7 +75,7 @@ class XRefTracePath {
     void print(raw_ostream &os) const {
       switch (kind) {
       case Kind::Value:
-        os << getDataAs<Identifier>();
+        os << getDataAs<DeclBaseName>();
         break;
       case Kind::Type:
         os << "with type " << getDataAs<Type>();
@@ -137,6 +139,9 @@ class XRefTracePath {
       case Kind::GenericParam:
         os << "generic param #" << getDataAs<uintptr_t>();
         break;
+      case Kind::PrivateDiscriminator:
+        os << "(in " << getDataAs<Identifier>() << ")";
+        break;
       case Kind::Unknown:
         os << "unknown xref kind " << getDataAs<uintptr_t>();
         break;
@@ -180,17 +185,21 @@ public:
     path.push_back({ PathPiece::Kind::GenericParam, index });
   }
 
+  void addPrivateDiscriminator(Identifier name) {
+    path.push_back({ PathPiece::Kind::PrivateDiscriminator, name });
+  }
+
   void addUnknown(uintptr_t kind) {
     path.push_back({ PathPiece::Kind::Unknown, kind });
   }
 
-  Identifier getLastName() const {
+  DeclBaseName getLastName() const {
     for (auto &piece : reversed(path)) {
-      Identifier result = piece.getAsIdentifier();
+      DeclBaseName result = piece.getAsBaseName();
       if (!result.empty())
         return result;
     }
-    return Identifier();
+    return DeclBaseName();
   }
 
   void removeLast() {
@@ -216,6 +225,7 @@ public:
     DesignatedInitializer = 1 << 0,
     NeedsVTableEntry = 1 << 1,
     NeedsAllocatingVTableEntry = 1 << 2,
+    NeedsFieldOffsetVectorEntry = 1 << 3,
   };
   using Flags = OptionSet<Flag>;
 
@@ -236,6 +246,9 @@ public:
   }
   bool needsAllocatingVTableEntry() const {
     return flags.contains(Flag::NeedsAllocatingVTableEntry);
+  }
+  bool needsFieldOffsetVectorEntry() const {
+    return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
   }
 
   bool isA(const void *const ClassID) const override {

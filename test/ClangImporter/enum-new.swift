@@ -1,17 +1,17 @@
-// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-new.h -verify
+// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-new.h -verify -enable-nonfrozen-enum-exhaustivity-diagnostics
 // REQUIRES: OS=macosx
 
 _ = .Red as Color
 _ = .Cyan as MoreColor
 
 func test() {
-  switch getColor() {
+  switch getColor() { // expected-warning {{switch must be exhaustive}} expected-note{{handle unknown values using "@unknown default"}}
   case .Red, .Blue, .Green: break
-  } // no-error
+  }
 
-  switch getMoreColor() {
+  switch getMoreColor() { // expected-warning {{switch must be exhaustive}} expected-note{{handle unknown values using "@unknown default"}}
   case .Yellow, .Magenta, .Black, .Cyan: break
-  } // no-error
+  }
 
   switch getColorOptions() { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
   case ColorOptions.Pastel: break

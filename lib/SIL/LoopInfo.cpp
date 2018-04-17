@@ -81,6 +81,9 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
   if (isa<ThrowInst>(I))
     return false;
 
+  if (isa<BeginAccessInst>(I))
+    return false;
+
   assert(I->isTriviallyDuplicatable() &&
     "Code here must match isTriviallyDuplicatable in SILInstruction");
   return true;

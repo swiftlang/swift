@@ -26,9 +26,16 @@
 ///     // "Humperdinck"
 ///     // "Humperdinck"
 @_fixed_layout
-public struct Repeated<Element> : RandomAccessCollection {
+public struct Repeated<Element> {
+  /// The number of elements in this collection.
+  public let count: Int
 
-  public typealias Indices = CountableRange<Int>
+  /// The value of every element in this collection.
+  public let repeatedValue: Element
+}
+
+extension Repeated: RandomAccessCollection {
+  public typealias Indices = Range<Int>
 
   /// A type that represents a valid position in the collection.
   ///
@@ -38,8 +45,7 @@ public struct Repeated<Element> : RandomAccessCollection {
 
   /// Creates an instance that contains `count` elements having the
   /// value `repeatedValue`.
-  @_versioned
-  @_inlineable
+  @inlinable
   internal init(_repeating repeatedValue: Element, count: Int) {
     _precondition(count >= 0, "Repetition count should be non-negative")
     self.count = count
@@ -50,7 +56,7 @@ public struct Repeated<Element> : RandomAccessCollection {
   ///
   /// In a `Repeated` collection, `startIndex` is always equal to zero. If the
   /// collection is empty, `startIndex` is equal to `endIndex`.
-  @_inlineable
+  @inlinable
   public var startIndex: Index {
     return 0
   }
@@ -60,7 +66,7 @@ public struct Repeated<Element> : RandomAccessCollection {
   ///
   /// In a `Repeated` collection, `endIndex` is always equal to `count`. If the
   /// collection is empty, `endIndex` is equal to `startIndex`.
-  @_inlineable
+  @inlinable
   public var endIndex: Index {
     return count
   }
@@ -70,17 +76,11 @@ public struct Repeated<Element> : RandomAccessCollection {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
-  @_inlineable
+  @inlinable
   public subscript(position: Int) -> Element {
     _precondition(position >= 0 && position < count, "Index out of range")
     return repeatedValue
   }
-
-  /// The number of elements in this collection.
-  public let count: Int
-
-  /// The value of every element in this collection.
-  public let repeatedValue: Element
 }
 
 /// Creates a collection containing the specified number of the given element.
@@ -103,7 +103,7 @@ public struct Repeated<Element> : RandomAccessCollection {
 ///   - count: The number of times to repeat `element`.
 /// - Returns: A collection that contains `count` elements that are all
 ///   `element`.
-@_inlineable
+@inlinable
 public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
   return Repeated(_repeating: element, count: n)
 }

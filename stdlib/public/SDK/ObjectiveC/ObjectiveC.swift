@@ -25,7 +25,7 @@ import _SwiftObjectiveCOverlayShims
 /// ObjCBool.
 @_fixed_layout
 public struct ObjCBool : ExpressibleByBooleanLiteral {
-#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+#if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var _value: Int8
 
@@ -48,7 +48,7 @@ public struct ObjCBool : ExpressibleByBooleanLiteral {
 
   /// The value of `self`, expressed as a `Bool`.
   public var boolValue: Bool {
-#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+#if os(macOS) || (os(iOS) && (arch(i386) || arch(arm)))
     return _value != 0
 #else
     return _value
@@ -112,11 +112,11 @@ public struct Selector : ExpressibleByStringLiteral {
   }
 }
 
-public func ==(lhs: Selector, rhs: Selector) -> Bool {
-  return sel_isEqual(lhs, rhs)
-}
-
 extension Selector : Equatable, Hashable {
+  public static func ==(lhs: Selector, rhs: Selector) -> Bool {
+    return sel_isEqual(lhs, rhs)
+  }
+
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
@@ -199,6 +199,10 @@ public var NO: ObjCBool {
 // FIXME: what about NSObjectProtocol?
 
 extension NSObject : Equatable, Hashable {
+  public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
+    return lhs.isEqual(rhs)
+  }
+
   /// The hash value.
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
@@ -210,10 +214,6 @@ extension NSObject : Equatable, Hashable {
   open var hashValue: Int {
     return hash
   }
-}
-
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
 }
 
 extension NSObject : CVarArg {

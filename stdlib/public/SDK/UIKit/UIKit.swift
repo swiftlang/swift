@@ -39,23 +39,67 @@ public extension UIOffset {
 // Equatable types.
 //===----------------------------------------------------------------------===//
 
-@_transparent // @fragile
-public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
-  return lhs.top == rhs.top &&
-         lhs.left == rhs.left &&
-         lhs.bottom == rhs.bottom &&
-         lhs.right == rhs.right
+extension UIEdgeInsets : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
+    return lhs.top == rhs.top &&
+           lhs.left == rhs.left &&
+           lhs.bottom == rhs.bottom &&
+           lhs.right == rhs.right
+  }
 }
 
-extension UIEdgeInsets : Equatable {}
-
-@_transparent // @fragile
-public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
-  return lhs.horizontal == rhs.horizontal &&
-         lhs.vertical == rhs.vertical
+extension UIOffset : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
+    return lhs.horizontal == rhs.horizontal &&
+           lhs.vertical == rhs.vertical
+  }
 }
 
-extension UIOffset : Equatable {}
+//===----------------------------------------------------------------------===//
+// Numeric backed types
+//===----------------------------------------------------------------------===//
+
+@available(swift 4)
+public protocol _UIKitNumericRawRepresentable : RawRepresentable, Comparable where RawValue: Comparable & Numeric {}
+
+extension _UIKitNumericRawRepresentable {
+
+  public static func <(lhs: Self, rhs: Self) -> Bool {
+    return lhs.rawValue < rhs.rawValue
+  }
+
+  public static func +(lhs: Self, rhs: RawValue) -> Self {
+    return Self(rawValue: lhs.rawValue + rhs)!
+  }
+
+  public static func +(lhs: RawValue, rhs: Self) -> Self {
+    return Self(rawValue: lhs + rhs.rawValue)!
+  }
+
+  public static func -(lhs: Self, rhs: RawValue) -> Self {
+    return Self(rawValue: lhs.rawValue - rhs)!
+  }
+
+  public static func -(lhs: Self, rhs: Self) -> RawValue {
+    return lhs.rawValue - rhs.rawValue
+  }
+
+  public static func +=(lhs: inout Self, rhs: RawValue) {
+    lhs = Self(rawValue: lhs.rawValue + rhs)!
+  }
+
+  public static func -=(lhs: inout Self, rhs: RawValue) {
+    lhs = Self(rawValue: lhs.rawValue - rhs)!
+  }
+}
+
+extension UIFont.Weight : _UIKitNumericRawRepresentable {}
+
+#if !os(watchOS)
+extension UILayoutPriority : _UIKitNumericRawRepresentable {}
+#endif
 
 // These are un-imported macros in UIKit.
 
@@ -185,6 +229,7 @@ internal struct _UIViewQuickLookState {
 }
 
 extension UIView : _DefaultCustomPlaygroundQuickLookable {
+  @available(*, deprecated, message: "UIView._defaultCustomPlaygroundQuickLook will be removed in a future Swift version")
   public var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook {
     if _UIViewQuickLookState.views.contains(self) {
       return .view(UIImage())
@@ -247,6 +292,7 @@ extension UIFontTextStyle {
 
 #if !os(watchOS) // UIContentSizeCategory not available on watchOS
 extension UIContentSizeCategory {
+
     @available(iOS 11.0, tvOS 11.0,  *)
     public var isAccessibilityCategory: Bool {
         return __UIContentSizeCategoryIsAccessibilityCategory(self)

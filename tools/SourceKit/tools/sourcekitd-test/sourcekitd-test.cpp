@@ -117,6 +117,27 @@ struct AsyncResponseInfo {
 
 static std::vector<AsyncResponseInfo> asyncResponses;
 
+struct NotificationBuffer {
+  std::vector<sourcekitd_response_t> notes;
+  /// Add a notification to the buffer, taking ownership of it. Must be called
+  /// from the main queue.
+  void add(sourcekitd_response_t note) {
+    notes.push_back(note);
+  }
+  /// Call the given handler for all notifications currently buffered.
+  void handleNotifications(llvm::function_ref<void(sourcekitd_response_t)> f) {
+    // Notifications are handled on the main queue.
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      for (auto note : notes) {
+        f(note);
+        sourcekitd_response_dispose(note);
+      }
+      notes.clear();
+    });
+  }
+};
+static NotificationBuffer notificationBuffer;
+
 static int skt_main(int argc, const char **argv);
 
 int main(int argc, const char **argv) {
@@ -151,6 +172,12 @@ static int skt_main(int argc, const char **argv) {
 #define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
 
+  auto printBufferedNotifications = []{
+    notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
+      sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
+    });
+  };
+
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
@@ -168,6 +195,7 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_shutdown();
       return ret;
     }
+    printBufferedNotifications();
     Args = Args.slice(i+1);
   }
 
@@ -187,6 +215,7 @@ static int skt_main(int argc, const char **argv) {
       return 1;
     }
   }
+  printBufferedNotifications();
 
   sourcekitd_shutdown();
   return 0;
@@ -340,6 +369,24 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   case SourceKitRequest::MangleSimpleClasses:
     prepareMangleRequest(Req, Opts);
     break;
+
+  case SourceKitRequest::EnableCompileNotifications: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestEnableCompileNotifications);
+    int64_t value = 1;
+    for (auto &Opt : Opts.RequestOptions) {
+      auto KeyValue = StringRef(Opt).split('=');
+      if (KeyValue.first == "value") {
+        KeyValue.second.getAsInteger(0, value);
+      } else {
+        llvm::errs() << "unknown parameter '" << KeyValue.first
+                     << "' in -req-opts";
+        return 1;
+      }
+    }
+    sourcekitd_request_dictionary_set_int64(Req, KeyValue, value);
+    break;
+  }
 
   case SourceKitRequest::Index:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndex);
@@ -528,6 +575,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, true);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -536,6 +584,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, true);
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -544,6 +593,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -553,6 +603,15 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    break;
+
+  case SourceKitRequest::SyntaxTree:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SourceFile.c_str());
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, true);
+    sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, true);
     break;
 
   case SourceKitRequest::DocInfo:
@@ -731,9 +790,18 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
                                             *Opts.CancelOnSubsequentRequest);
   }
 
-  if (Opts.SwiftVersion.hasValue()) {
-    sourcekitd_request_dictionary_set_int64(Req, KeySwiftVersion,
-                                             Opts.SwiftVersion.getValue());
+  if (!Opts.SwiftVersion.empty()) {
+    if (Opts.PassVersionAsString) {
+      sourcekitd_request_dictionary_set_string(Req, KeySwiftVersion,
+                                               Opts.SwiftVersion.c_str());
+    } else {
+      unsigned ver;
+      if (StringRef(Opts.SwiftVersion).getAsInteger(10, ver)) {
+        llvm::errs() << "error: expected integer for 'swift-version'\n";
+        return true;
+      }
+      sourcekitd_request_dictionary_set_int64(Req, KeySwiftVersion, ver);
+    }
   }
 
   if (Opts.PrintRequest)
@@ -798,10 +866,23 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::PrintDiags:
       llvm_unreachable("print-annotations/print-diags is handled elsewhere");
 
+    case SourceKitRequest::EnableCompileNotifications:
+      // Ignore the response.  If it was an error it is handled above.
+      break;
+
     case SourceKitRequest::Open:
-    case SourceKitRequest::Edit:
       getSemanticInfo(Info, SourceFile);
       KeepResponseAlive = true;
+      break;
+
+    case SourceKitRequest::Edit:
+      if (Opts.Length == 0 && Opts.ReplaceText->empty()) {
+        // Length=0, replace="" is a nop and will not trigger sema.
+        sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+      } else {
+        getSemanticInfo(Info, SourceFile);
+        KeepResponseAlive = true;
+      }
       break;
 
     case SourceKitRequest::DemangleNames:
@@ -875,6 +956,13 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printFoundUSR(Info, SourceBuf.get(), llvm::outs());
       break;
 
+    case SourceKitRequest::SyntaxTree: {
+      // Print only the serialized syntax tree.
+      llvm::outs() << sourcekitd_variant_dictionary_get_string(
+        sourcekitd_response_get_value(Resp), KeySerializedSyntaxTree);
+      llvm::outs() << '\n';
+      break;
+    }
     case SourceKitRequest::SyntaxMap:
     case SourceKitRequest::Structure:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
@@ -897,7 +985,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                                                 EnableSyntaxMax);
         sourcekitd_request_dictionary_set_int64(EdReq, KeyEnableStructure,
                                                 EnableSubStructure);
-        sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly, !Opts.UsedSema);
+        sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly,
+                                                !Opts.UsedSema);
 
         sourcekitd_response_t EdResp = sourcekitd_send_request_sync(EdReq);
         sourcekitd_response_description_dump_filedesc(EdResp, STDOUT_FILENO);
@@ -1019,9 +1108,10 @@ static void notification_receiver(sourcekitd_response_t resp) {
   sourcekitd_variant_t payload = sourcekitd_response_get_value(resp);
   sourcekitd_uid_t note =
       sourcekitd_variant_dictionary_get_uid(payload, KeyNotification);
-  semaName = sourcekitd_variant_dictionary_get_string(payload, KeyName);
 
   if (note == NoteDocUpdate) {
+    semaName = sourcekitd_variant_dictionary_get_string(payload, KeyName);
+
     sourcekitd_object_t edReq = sourcekitd_request_dictionary_create(nullptr,
                                                                 nullptr, 0);
     sourcekitd_request_dictionary_set_uid(edReq, KeyRequest,
@@ -1031,6 +1121,8 @@ static void notification_receiver(sourcekitd_response_t resp) {
     semaResponse = sourcekitd_send_request_sync(edReq);
     sourcekitd_request_release(edReq);
     semaSemaphore.signal();
+  } else {
+    notificationBuffer.add(resp);
   }
 }
 
@@ -1571,10 +1663,13 @@ static void prepareDemangleRequest(sourcekitd_object_t Req,
     llvm::StringRef inputContents = input.get()->getBuffer();
 
     // This doesn't handle Unicode symbols, but maybe that's okay.
-    llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
+    // Also accept the future mangling prefix.
+    llvm::Regex maybeSymbol("(_T|_?\\$[Ss])[_a-zA-Z0-9$.]+");
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       addName(matches.front());
+      auto offset = matches.front().data() - inputContents.data();
+      inputContents = inputContents.substr(offset + matches.front().size());
     }
 
   } else {

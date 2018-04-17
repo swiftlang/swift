@@ -73,7 +73,7 @@ bb0:
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @testLargeGlobal()
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[INT]] 32, [[INT]] 7)
+  // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_slowAlloc([[INT]] 32, [[INT]] 7)
   // CHECK: store i8* [[ALLOC]], i8** bitcast ([[BUFFER]]* @largeGlobal to i8**), align 1
   alloc_global @largeGlobal
 
@@ -106,11 +106,12 @@ bb0:
 // CHECK-LABEL: define {{.*}} @testOtherGlobal
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @_T016resilient_struct4SizeVMa()
-  // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+  // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
     alloc_global @otherGlobal
 
-  // CHECK: call %swift.opaque* @__swift_project_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
+  // CHECK: call %swift.opaque* @__swift_project_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
   %addr = global_addr @otherGlobal : $*Size
 
   %tuple = tuple ()
@@ -139,7 +140,7 @@ bb0:
 // CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
 // CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
-// CHECK:   [[PTR:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
+// CHECK:   [[PTR:%.*]] = call noalias i8* @swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
 // CHECK:   store i8* [[PTR]], i8** [[ADDR]]
 // CHECK:   [[OUTLINEADDR:%.*]] = bitcast i8* [[PTR]] to %swift.opaque*

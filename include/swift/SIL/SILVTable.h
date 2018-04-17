@@ -121,7 +121,15 @@ public:
   ClassDecl *getClass() const { return Class; }
 
   /// Returns true if this vtable is going to be (or was) serialized.
-  IsSerialized_t isSerialized() const;
+  IsSerialized_t isSerialized() const {
+    return Serialized ? IsSerialized : IsNotSerialized;
+  }
+
+  /// Sets the serialized flag.
+  void setSerialized(IsSerialized_t serialized) {
+    assert(serialized != IsSerializable);
+    Serialized = (serialized ? 1 : 0);
+  }
 
   /// Return all of the method entries.
   ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
@@ -166,7 +174,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILVTable> :
 public ilist_default_traits<::swift::SILVTable> {
-  typedef ::swift::SILVTable SILVTable;
+  using SILVTable = ::swift::SILVTable;
 
   static void deleteNode(SILVTable *VT) { VT->~SILVTable(); }
 

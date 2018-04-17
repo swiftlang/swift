@@ -48,7 +48,7 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
-  if (Orig->hasUnqualifiedOwnership()) {
+  if (!Orig->hasQualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
   return NewF;
@@ -111,9 +111,10 @@ void GenericCloner::populateCloned() {
           // Try to create a new debug_value from an existing debug_value_addr.
           for (Operand *ArgUse : OrigArg->getUses()) {
             if (auto *DVAI = dyn_cast<DebugValueAddrInst>(ArgUse->getUser())) {
-              getBuilder().setCurrentDebugScope(remapScope(DVAI->getDebugScope()));
+              getBuilder().setCurrentDebugScope(
+                  remapScope(DVAI->getDebugScope()));
               getBuilder().createDebugValue(DVAI->getLoc(), NewArg,
-                                            DVAI->getVarInfo());
+                                            *DVAI->getVarInfo());
               getBuilder().setCurrentDebugScope(nullptr);
               break;
             }

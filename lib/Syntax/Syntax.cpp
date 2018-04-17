@@ -12,6 +12,7 @@
 
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxData.h"
+#include "swift/Syntax/SyntaxVisitor.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -21,11 +22,12 @@ RC<RawSyntax> Syntax::getRaw() const {
 }
 
 SyntaxKind Syntax::getKind() const {
-  return getRaw()->Kind;
+  return getRaw()->getKind();
 }
 
 void Syntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
-  getRaw()->print(OS, Opts);
+  if (auto Raw = getRaw())
+    Raw->print(OS, Opts);
 }
 
 void Syntax::dump() const {
@@ -73,39 +75,80 @@ bool Syntax::isMissing() const {
 }
 
 llvm::Optional<Syntax> Syntax::getParent() const {
-  auto ParentData = getData().Parent;
-  if (ParentData == nullptr) return llvm::None;
+  auto ParentData = getData().getParent();
+  if (!ParentData) return llvm::None;
   return llvm::Optional<Syntax> {
     Syntax { Root, ParentData }
   };
 }
 
-size_t Syntax::getNumChildren() const {
-  size_t NonTokenChildren = 0;
-  for (auto Child : getRaw()->Layout) {
-    if (!Child->isToken()) {
-      ++NonTokenChildren;
-    }
-  }
-  return NonTokenChildren;
+Syntax Syntax::getRoot() const {
+  return { Root, Root.get() };
 }
 
-Syntax Syntax::getChild(const size_t N) const {
-  // The actual index of the Nth non-token child.
-  size_t ActualIndex = 0;
-  // The number of non-token children we've seen.
-  size_t NumNonTokenSeen = 0;
-  for (auto Child : getRaw()->Layout) {
-    // If we see a child that's not a token, count it.
-    if (!Child->isToken()) {
-      ++NumNonTokenSeen;
-    }
-    // If the number of children we've seen indexes the same (count - 1) as
-    // the number we're looking for, then we're done.
-    if (NumNonTokenSeen == N + 1) { break; }
+size_t Syntax::getNumChildren() const {
+  return Data->getNumChildren();
+}
 
-    // Otherwise increment the actual index and keep searching.
-    ++ActualIndex;
-  }
-  return Syntax { Root, Data->getChild(ActualIndex).get() };
+llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
+  auto ChildData = Data->getChild(N);
+  if (!ChildData)
+    return llvm::None;
+  return Syntax {Root, ChildData.get()};
+}
+
+AbsolutePosition Syntax::getAbsolutePosition() const {
+  assert(getRoot().is<SourceFileSyntax>() &&
+         "Absolute position can only be calculated for nodes which has "
+         "SourceFile root");
+  AbsolutePosition Pos;
+
+  /// This visitor collects all of the nodes before this node to calculate its
+  /// offset from the begenning of the file.
+  class Visitor: public SyntaxVisitor {
+    AbsolutePosition &Pos;
+    const SyntaxData *Target;
+    bool Found = false;
+
+  public:
+    Visitor(AbsolutePosition &Pos, const SyntaxData *Target)
+        : Pos(Pos), Target(Target) {}
+    ~Visitor() { assert(Found); }
+    void visitPre(Syntax Node) override {
+      // Check if this node is the target;
+      Found |= Node.getDataPointer() == Target;
+    }
+    void visit(TokenSyntax Node) override {
+      // Ignore missing node and ignore the nodes after this node.
+      if (Found || Node.isMissing())
+        return;
+      // Collect all the offsets.
+      Node.getRaw()->accumulateAbsolutePosition(Pos);
+    }
+  } Calculator(Pos, getDataPointer());
+
+  /// This visitor visit the first token node of this node to accumulate its
+  /// leading trivia. Therefore, the calculated absolute location will point
+  /// to the actual token start.
+  class FirstTokenFinder: public SyntaxVisitor {
+    AbsolutePosition &Pos;
+    bool Found = false;
+
+  public:
+    FirstTokenFinder(AbsolutePosition &Pos): Pos(Pos) {}
+    void visit(TokenSyntax Node) override {
+      if (Found || Node.isMissing())
+        return;
+      Found = true;
+      for (auto &Leader : Node.getRaw()->getLeadingTrivia())
+        Leader.accumulateAbsolutePosition(Pos);
+    }
+  } FTFinder(Pos);
+
+  // Visit the root to get all the nodes before this node.
+  getRoot().accept(Calculator);
+
+  // Visit this node to accumulate the leading trivia of its first token.
+  const_cast<Syntax*>(this)->accept(FTFinder);
+  return Pos;
 }

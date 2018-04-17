@@ -14,7 +14,7 @@ import Foundation
 @_exported import CoreImage  // Clang module
 
 extension CIFilter {
-#if os(OSX)
+#if os(macOS)
   // - (CIImage *)apply:(CIKernel *)k, ...
   // @objc(apply:arguments:options:)
   // func apply(_ k: CIKernel,
@@ -30,7 +30,7 @@ extension CIFilter {
 #endif
 
   @available(iOS, introduced: 8.0)
-  @available(OSX, introduced: 10.10)
+  @available(macOS, introduced: 10.10)
   convenience init?(
     name: String, elements: (String, AnyObject)...
   ) {
@@ -42,7 +42,7 @@ extension CIFilter {
   }
 }
 
-#if os(OSX)
+#if os(macOS)
 extension CISampler {
   // - (id)initWithImage:(CIImage *)im keysAndValues:key0, ...;
   convenience init(im: CIImage, elements: (String, Any)...) {

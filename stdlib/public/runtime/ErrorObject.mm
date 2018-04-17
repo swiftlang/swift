@@ -140,7 +140,7 @@ using namespace swift::hashable_support;
     return [super isEqual:other];
   }
 
-  return swift_stdlib_Hashable_isEqual_indirect(
+  return _swift_stdlib_Hashable_isEqual_indirect(
       self_->getValue(), other_->getValue(), hashableBaseType,
       hashableConformance);
 }
@@ -161,7 +161,7 @@ static Class getSwiftNativeNSErrorClass() {
 }
 
 /// Allocate a catchable error object.
-BoxPair::Return
+BoxPair
 swift::swift_allocError(const Metadata *type,
                         const WitnessTable *errorConformance,
                         OpaqueValue *initialValue,
@@ -229,22 +229,22 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // Swift source.
 
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-               MANGLE_AS_STRING(MANGLE_SYM(So7CFErrorCs5Error10FoundationWP))));
+      MANGLE_AS_STRING(MANGLE_SYM(So10CFErrorRefas5Error10FoundationWa))));
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
 
-  return reinterpret_cast<const WitnessTable *>(TheWitnessTable);
+  return reinterpret_cast<const SWIFT_CC(swift) WitnessTable *(*)()>(TheWitnessTable)();
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-           MANGLE_AS_STRING(MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWP))));
+           MANGLE_AS_STRING(MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWa))));
   assert(TheWitnessTable &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
 
-  return reinterpret_cast<const HashableWitnessTable *>(TheWitnessTable);
+  return reinterpret_cast<const SWIFT_CC(swift) HashableWitnessTable *(*)()>(TheWitnessTable)();
 }
 
 bool SwiftError::isPureNSError() const {
@@ -316,6 +316,8 @@ const HashableWitnessTable *SwiftError::getHashableConformance() const {
 /// temporary buffer. The implementation may write a reference to itself to
 /// that buffer if the error object is a toll-free-bridged NSError instead of
 /// a native Swift error, in which case the object itself is the "boxed" value.
+///
+/// This function is called by compiler-generated code.
 void
 swift::swift_getErrorValue(const SwiftError *errorObject,
                            void **scratch,
@@ -337,56 +339,62 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
   }
 }
 
-// @_silgen_name("swift_stdlib_getErrorDomainNSString")
-// public func _stdlib_getErrorDomainNSString<T : Error>
-//   (x: UnsafePointer<T>) -> AnyObject
-SWIFT_CC(swift)
-extern "C" NSString *swift_stdlib_getErrorDomainNSString(
-                                                 const OpaqueValue *error,
-                                                 const Metadata *T,
-                                                 const WitnessTable *Error);
-// @_silgen_name("swift_stdlib_getErrorCode")
-// public func _stdlib_getErrorCode<T : Error>(x: UnsafePointer<T>) -> Int
-SWIFT_CC(swift)
-extern "C" NSInteger swift_stdlib_getErrorCode(const OpaqueValue *error,
-                                               const Metadata *T,
-                                               const WitnessTable *Error);
+// internal func _getErrorDomainNSString<T : Error>
+//   (_ x: UnsafePointer<T>) -> AnyObject
+#define getErrorDomainNSString \
+  MANGLE_SYM(s23_getErrorDomainNSStringyyXlSPyxGs0B0RzlF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+NSString *getErrorDomainNSString(const OpaqueValue *error,
+                                 const Metadata *T,
+                                 const WitnessTable *Error);
 
-//@_silgen_name("swift_stdlib_getErrorUserInfoNSDictionary")
-//public func _stdlib_getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
-SWIFT_CC(swift)
-extern "C" NSDictionary *swift_stdlib_getErrorUserInfoNSDictionary(
-                           const OpaqueValue *error,
-                           const Metadata *T,
-                           const WitnessTable *Error);
+// internal func _getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int
+#define getErrorCode \
+  MANGLE_SYM(s13_getErrorCodeySiSPyxGs0B0RzlF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+NSInteger getErrorCode(const OpaqueValue *error,
+                       const Metadata *T,
+                       const WitnessTable *Error);
 
-//@_silgen_name("swift_stdlib_getErrorDefaultUserInfo")
-//public func _stdlib_getErrorDefaultUserInfo<T : Error>(_ x: T) -> AnyObject
-SWIFT_CC(swift) SWIFT_RT_ENTRY_VISIBILITY
-NSDictionary *swift_stdlib_getErrorDefaultUserInfo(
-                           OpaqueValue *error,
-                           const Metadata *T,
-                           const WitnessTable *Error) {
+// internal func _getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>) -> AnyObject
+#define getErrorUserInfoNSDictionary \
+  MANGLE_SYM(s29_getErrorUserInfoNSDictionaryyyXlSgSPyxGs0B0RzlF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+NSDictionary *getErrorUserInfoNSDictionary(
+                const OpaqueValue *error,
+                const Metadata *T,
+                const WitnessTable *Error);
+
+// @_silgen_name("_swift_stdlib_getErrorDefaultUserInfo")
+// internal func _getErrorDefaultUserInfo<T : Error>(_ x: T) -> AnyObject
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
+                                                    const Metadata *T,
+                                                    const WitnessTable *Error) {
   typedef SWIFT_CC(swift)
     NSDictionary *GetDefaultFn(const OpaqueValue *error,
                                const Metadata *T,
                                const WitnessTable *Error);
 
+  // public func Foundation._getErrorDefaultUserInfo<T: Error>(_ error: T)
+  //   -> AnyObject?
   auto foundationGetDefaultUserInfo = SWIFT_LAZY_CONSTANT(
-        reinterpret_cast<GetDefaultFn*>
-          (dlsym(RTLD_DEFAULT, "swift_Foundation_getErrorDefaultUserInfo")));
+    reinterpret_cast<GetDefaultFn*> (dlsym(RTLD_DEFAULT,
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF)))));
   if (!foundationGetDefaultUserInfo) {
-    T->vw_destroy(error);
+    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(error));
     return nullptr;
   }
 
+  // +0 Convention: In the case where we have the +1 convention, this will
+  // destroy the error for us, otherwise, it will take the value guaranteed. The
+  // conclusion is that we can leave this alone.
   return foundationGetDefaultUserInfo(error, T, Error);
 }
 
 /// Take an Error box and turn it into a valid NSError instance.
-SWIFT_CC(swift)
 id
-swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
+swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
 
   // If we already have a domain set, then we've already initialized.
@@ -401,8 +409,10 @@ swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
   // initialization of the object happens-before the domain initialization so
   // that the domain can be used alone as a flag for the initialization of the
   // object.
-  if (errorObject->domain.load(std::memory_order_acquire))
+  if (errorObject->domain.load(std::memory_order_acquire)) {
+    SWIFT_CC_PLUSZERO_GUARD([ns retain]);
     return ns;
+  }
 
   // Otherwise, calculate the domain, code, and user info, and
   // initialize the NSError.
@@ -410,10 +420,9 @@ swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
   auto type = errorObject->getType();
   auto witness = errorObject->getErrorConformance();
 
-  NSString *domain = swift_stdlib_getErrorDomainNSString(value, type, witness);
-  NSInteger code = swift_stdlib_getErrorCode(value, type, witness);
-  NSDictionary *userInfo =
-    swift_stdlib_getErrorUserInfoNSDictionary(value, type, witness);
+  NSString *domain = getErrorDomainNSString(value, type, witness);
+  NSInteger code = getErrorCode(value, type, witness);
+  NSDictionary *userInfo = getErrorUserInfoNSDictionary(value, type, witness);
 
   // Never produce an empty userInfo dictionary.
   if (!userInfo)
@@ -444,8 +453,11 @@ swift::swift_bridgeErrorToNSError(SwiftError *errorObject) {
                                                    std::memory_order_acq_rel))
     objc_release(domain);
 
+  SWIFT_CC_PLUSZERO_GUARD([ns retain]);
   return ns;
 }
+
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
 
 bool
 swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
@@ -454,26 +466,9 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
                                     const Metadata *destType,
                                     DynamicCastFlags flags) {
   Class NSErrorClass = getNSErrorClass();
-
   auto CFErrorTypeID = SWIFT_LAZY_CONSTANT(CFErrorGetTypeID());
-  // @_silgen_name("swift_stdlib_bridgeNSErrorToError")
-  // public func _stdlib_bridgeNSErrorToError<
-  //   T : _ObjectiveCBridgeableError
-  // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
-  typedef SWIFT_CC(swift)
-    bool BridgeFn(NSError *, OpaqueValue*, const Metadata *,
-                  const WitnessTable *);
-  auto bridgeNSErrorToError = SWIFT_LAZY_CONSTANT(
-        reinterpret_cast<BridgeFn*>
-          (dlsym(RTLD_DEFAULT, "swift_stdlib_bridgeNSErrorToError")));
-  // protocol _ObjectiveCBridgeableError
-  auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
-    reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,
-    MANGLE_AS_STRING(MANGLE_SYM(10Foundation26_ObjectiveCBridgeableErrorMp)))));
 
-  // If the Foundation overlay isn't loaded, then NSErrors can't be bridged.
-  if (!bridgeNSErrorToError || !TheObjectiveCBridgeableError)
-    return false;
+  NSError *srcInstance;
 
   // Is the input type an NSError?
   switch (srcType->getKind()) {
@@ -482,6 +477,19 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
     // Native class or ObjC class should be an NSError subclass.
     if (![srcType->getObjCClassObject() isSubclassOfClass: NSErrorClass])
       return false;
+    
+    srcInstance = *reinterpret_cast<NSError * const*>(src);
+    
+    // A _SwiftNativeNSError box can always be unwrapped to cast the value back
+    // out as an Error existential.
+    if (!reinterpret_cast<SwiftError*>(srcInstance)->isPureNSError()) {
+      auto theErrorProtocol = &PROTOCOL_DESCR_SYM(s5Error);
+      auto theErrorTy =
+        swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                         nullptr, 1, &theErrorProtocol);
+      return swift_dynamicCast(dest, src, theErrorTy, destType, flags);
+    }
+    
     break;
   case MetadataKind::ForeignClass: {
     // Foreign class should be CFError.
@@ -506,6 +514,25 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
     return false;
   }
 
+  // public func Foundation._bridgeNSErrorToError<
+  //   T : _ObjectiveCBridgeableError
+  // >(error: NSError, out: UnsafeMutablePointer<T>) -> Bool {
+  typedef SWIFT_CC(swift)
+    bool BridgeFn(NSError *, OpaqueValue*, const Metadata *,
+                  const WitnessTable *);
+  auto bridgeNSErrorToError = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<BridgeFn*>(dlsym(RTLD_DEFAULT,
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation21_bridgeNSErrorToError_3outSbSo0C0C_SpyxGtAA021_ObjectiveCBridgeableE0RzlF)))));
+  // protocol _ObjectiveCBridgeableError
+  auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<const ProtocolDescriptor *>(dlsym(RTLD_DEFAULT,
+    MANGLE_AS_STRING(MANGLE_SYM(10Foundation26_ObjectiveCBridgeableErrorMp)))));
+
+  // If the Foundation overlay isn't loaded, then arbitrary NSErrors can't be
+  // bridged.
+  if (!bridgeNSErrorToError || !TheObjectiveCBridgeableError)
+    return false;
+
   // Is the target type a bridgeable error?
   auto witness = swift_conformsToProtocol(destType,
                                           TheObjectiveCBridgeableError);
@@ -514,8 +541,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
     return false;
 
   // If so, attempt the bridge.
-  NSError *srcInstance = *reinterpret_cast<NSError * const*>(src);
-  objc_retain(srcInstance);
+  SWIFT_CC_PLUSONE_GUARD(objc_retain(srcInstance));
   if (bridgeNSErrorToError(srcInstance, dest, destType, witness)) {
     if (flags & DynamicCastFlags::TakeOnSuccess)
       objc_release(srcInstance);

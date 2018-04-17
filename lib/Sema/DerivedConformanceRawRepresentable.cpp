@@ -101,8 +101,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
 
-    auto labelItem =
-      CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
+    auto labelItem = CaseLabelItem(pat);
 
     auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
@@ -112,7 +111,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     body));
+                                     SourceLoc(), body));
   }
 
   auto selfRef = createSelfDeclRef(toRawDecl);
@@ -132,26 +131,20 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
   auto parentDC = cast<DeclContext>(parentDecl);
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
-  // Define the getter.
-  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                 rawInterfaceType,
-                                                 rawType,
-                                                 /*isStatic=*/false,
-                                                 /*isFinal=*/false);
-  getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl,
-                                     C.Id_rawValue,
-                                     rawInterfaceType,
-                                     rawType,
-                                     getterDecl,
-                                     /*isStatic=*/false,
-                                     /*isFinal=*/false);
-  
+    = declareDerivedProperty(tc, parentDecl, enumDecl, C.Id_rawValue,
+                             rawInterfaceType, rawType, /*isStatic=*/false,
+                             /*isFinal=*/false);
+
+  // Define the getter.
+  auto getterDecl =
+    addGetterToReadOnlyDerivedProperty(tc, propDecl, rawType);
+  getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);
@@ -220,8 +213,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
                                       nullptr, nullptr);
     litPat->setImplicit();
 
-    auto labelItem =
-      CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
+    auto labelItem = CaseLabelItem(litPat);
 
     auto eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto metaTyRef = TypeExpr::createImplicit(enumType, C);
@@ -239,21 +231,20 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
 
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     body));
+                                     SourceLoc(), body));
     Idx++;
   }
 
   auto anyPat = new (C) AnyPattern(SourceLoc());
   anyPat->setImplicit();
-  auto dfltLabelItem =
-    CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(), nullptr);
+  auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
   cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
                                    /*HasBoundDecls=*/false, SourceLoc(),
-                                   dfltBody));
+                                   SourceLoc(), dfltBody));
 
   auto rawDecl = initDecl->getParameterList(1)->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);
@@ -298,14 +289,14 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
-  auto *rawDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                    C.Id_rawValue, SourceLoc(),
-                                    C.Id_rawValue, rawType, parentDC);
+  auto *rawDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_rawValue, SourceLoc(), C.Id_rawValue, rawType, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);
   
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
   
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
@@ -349,13 +340,10 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  copyFormalAccess(initDecl, enumDecl);
+  initDecl->copyFormalAccessFrom(enumDecl);
+  initDecl->setValidationStarted();
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (enumDecl->hasClangNode())
-    tc.Context.addExternalDecl(initDecl);
+  tc.Context.addSynthesizedDecl(initDecl);
 
   cast<IterableDeclContext>(parentDecl)->addMember(initDecl);
   return initDecl;
@@ -423,7 +411,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   if (requirement->getBaseName() == tc.Context.Id_rawValue)
     return deriveRawRepresentable_raw(tc, parentDecl, enumDecl);
 
-  if (requirement->getBaseName() == tc.Context.Id_init)
+  if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveRawRepresentable_init(tc, parentDecl, enumDecl);
   
   tc.diagnose(requirement->getLoc(),

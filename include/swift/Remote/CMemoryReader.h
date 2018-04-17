@@ -21,6 +21,17 @@
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 #include "swift/Remote/MemoryReader.h"
 
+struct MemoryReaderImpl {
+  // Opaque pointer passed to all the callback functions.
+  void *reader_context;
+
+  QueryDataLayoutFunction queryDataLayout;
+  FreeBytesFunction free;
+  ReadBytesFunction readBytes;
+  GetStringLengthFunction getStringLength;
+  GetSymbolAddressFunction getSymbolAddress;
+};
+
 namespace swift {
 namespace remote {
 
@@ -31,19 +42,15 @@ class CMemoryReader final : public MemoryReader {
 
 public:
   CMemoryReader(MemoryReaderImpl Impl) : Impl(Impl) {
-    assert(this->Impl.getPointerSize && "No getPointerSize implementation");
+    assert(this->Impl.queryDataLayout && "No queryDataLayout implementation");
     assert(this->Impl.getStringLength && "No stringLength implementation");
     assert(this->Impl.readBytes && "No readBytes implementation");
-    assert(this->Impl.getPointerSize(this->Impl.reader_context) != 0 &&
-           "Invalid target pointer size");
   }
 
-  uint8_t getPointerSize() override {
-    return Impl.getPointerSize(Impl.reader_context);
-  }
-
-  uint8_t getSizeSize() override {
-    return Impl.getSizeSize(Impl.reader_context);
+  bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                       void *outBuffer) override {
+    return Impl.queryDataLayout(Impl.reader_context, type, inBuffer,
+                                outBuffer) != 0;
   }
 
   RemoteAddress getSymbolAddress(const std::string &name) override {
@@ -62,17 +69,26 @@ public:
     if (!length)
       return false;
 
-    auto buffer = std::unique_ptr<uint8_t>(new uint8_t[length + 1]);
-    if (!readBytes(address, buffer.get(), length + 1))
+    auto Buf = readBytes(address, length);
+    if (!Buf)
       return false;
-
-    dest = std::string(reinterpret_cast<const char *>(buffer.get()));
+    
+    dest = std::string(reinterpret_cast<const char *>(Buf.get()), length);
     return true;
   }
 
-  bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) override {
-    return Impl.readBytes(Impl.reader_context,
-                          address.getAddressData(), dest, size) != 0;
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
+      void *FreeContext;
+      auto Ptr = Impl.readBytes(Impl.reader_context, address.getAddressData(), size,
+                                &FreeContext);
+
+      auto Free = Impl.free;
+      if (Free == nullptr)
+        return ReadBytesResult(Ptr, [](const void *) {});
+      
+      auto ReaderContext = Impl.reader_context;
+      auto freeLambda = [=](const void *Ptr) { Free(ReaderContext, Ptr, FreeContext); };
+      return ReadBytesResult(Ptr, freeLambda);
   }
 };
 

@@ -27,7 +27,8 @@ SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
                          SILType Ty, ValueOwnershipKind OwnershipKind,
                          const ValueDecl *D)
     : ValueBase(ChildKind, Ty, IsRepresentative::Yes), ParentBB(ParentBB),
-      Decl(D), OwnershipKind(OwnershipKind) {
+      Decl(D) {
+  Bits.SILArgument.VOKind = static_cast<unsigned>(OwnershipKind);
   ParentBB->insertArgument(ParentBB->args_end(), this);
 }
 
@@ -35,7 +36,8 @@ SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
                          SILBasicBlock::arg_iterator Pos, SILType Ty,
                          ValueOwnershipKind OwnershipKind, const ValueDecl *D)
     : ValueBase(ChildKind, Ty, IsRepresentative::Yes), ParentBB(ParentBB),
-      Decl(D), OwnershipKind(OwnershipKind) {
+      Decl(D) {
+  Bits.SILArgument.VOKind = static_cast<unsigned>(OwnershipKind);
   // Function arguments need to have a decl.
   assert(
     !ParentBB->getParent()->isBare() &&
@@ -73,12 +75,14 @@ static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::UnwindInst:
     llvm_unreachable("Have terminator that implies no successors?!");
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumAddrInst:
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::DynamicMethodBranchInst:
+  case TermKind::YieldInst:
     return SILValue();
   case TermKind::BranchInst:
     return cast<const BranchInst>(TI)->getArg(Index);

@@ -18,6 +18,9 @@
 #define SWIFT_SIL_CONSTANTFOLDING_H
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "llvm/ADT/SetVector.h"
+#include <functional>
 
 namespace swift {
 
@@ -46,6 +49,52 @@ APInt constantFoldDiv(APInt lhs, APInt rhs, bool &Overflow, BuiltinValueKind ID)
   ///
   /// The \p ID must be the ID of a trunc/sext/zext builtin.
 APInt constantFoldCast(APInt val, const BuiltinInfo &BI);
+
+
+/// A utility class to do constant folding.
+class ConstantFolder {
+private:
+  /// The worklist of the constants that could be folded into their users.
+  llvm::SetVector<SILInstruction *> WorkList;
+
+  /// The assert configuration of SILOptions.
+  unsigned AssertConfiguration;
+
+  /// Print diagnostics as part of mandatory constant propagation.
+  bool EnableDiagnostics;
+
+  /// Called for each constant folded instruction.
+  std::function<void (SILInstruction *)> Callback;
+
+  bool constantFoldStringConcatenation(ApplyInst *AI);
+
+public:
+  /// The constructor.
+  ///
+  /// \param AssertConfiguration The assert configuration of SILOptions.
+  /// \param EnableDiagnostics Print diagnostics as part of mandatory constant
+  ///                          propagation.
+  /// \param Callback Called for each constant folded instruction.
+  ConstantFolder(unsigned AssertConfiguration,
+                 bool EnableDiagnostics = false,
+                 std::function<void (SILInstruction *)> Callback =
+                   [](SILInstruction *){}) :
+    AssertConfiguration(AssertConfiguration),
+    EnableDiagnostics(EnableDiagnostics),
+    Callback(Callback) { }
+
+  /// Initialize the worklist with all instructions of the function \p F.
+  void initializeWorklist(SILFunction &F);
+
+  /// Initialize the worklist with a single instruction \p I.
+  void addToWorklist(SILInstruction *I) {
+    WorkList.insert(I);
+  }
+
+  /// Constant fold everything in the worklist and transitively all uses of
+  /// folded instructions.
+  SILAnalysis::InvalidationKind processWorkList();
+};
 
 } // end namespace swift
 

@@ -26,15 +26,15 @@ public struct _FDInputStream {
   public mutating func getline() -> String? {
     if let newlineIndex =
       _buffer[0..<_bufferUsed].index(of: UInt8(Unicode.Scalar("\n").value)) {
-      let result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<newlineIndex])
+      let result = String._fromWellFormedUTF8CodeUnitSequence(
+        _buffer[0..<newlineIndex])
       _buffer.removeSubrange(0...newlineIndex)
       _bufferUsed -= newlineIndex + 1
       return result
     }
     if isEOF && _bufferUsed > 0 {
-      let result = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: _buffer[0..<_bufferUsed])
+      let result = String._fromWellFormedUTF8CodeUnitSequence(
+        _buffer[0..<_bufferUsed])
       _buffer.removeAll()
       _bufferUsed = 0
       return result
@@ -52,12 +52,12 @@ public struct _FDInputStream {
         bufferFree += 1
       }
     }
+    let fd = self.fd
     let readResult: __swift_ssize_t = _buffer.withUnsafeMutableBufferPointer {
       (_buffer) in
-      let fd = self.fd
       let addr = _buffer.baseAddress! + self._bufferUsed
       let size = bufferFree
-      return _swift_stdlib_read(fd, addr, size)
+      return _stdlib_read(fd, addr, size)
     }
     if readResult == 0 {
       isEOF = true
@@ -73,7 +73,7 @@ public struct _FDInputStream {
     if isClosed {
       return
     }
-    let result = _swift_stdlib_close(fd)
+    let result = _stdlib_close(fd)
     if result < 0 {
       fatalError("close() returned an error")
     }
@@ -106,7 +106,7 @@ public struct _FDOutputStream : TextOutputStream {
       var writtenBytes = 0
       let bufferSize = utf8CStr.count - 1
       while writtenBytes != bufferSize {
-        let result = _swift_stdlib_write(
+        let result = _stdlib_write(
           self.fd, UnsafeRawPointer(utf8CStr.baseAddress! + Int(writtenBytes)),
           bufferSize - writtenBytes)
         if result < 0 {
@@ -121,7 +121,7 @@ public struct _FDOutputStream : TextOutputStream {
     if isClosed {
       return
     }
-    let result = _swift_stdlib_close(fd)
+    let result = _stdlib_close(fd)
     if result < 0 {
       fatalError("close() returned an error")
     }

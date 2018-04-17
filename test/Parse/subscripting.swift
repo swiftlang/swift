@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-struct X { }
+struct X { } // expected-note {{did you mean}}
 
 // Simple examples
 struct X1 {
@@ -101,10 +101,10 @@ struct A1 {
   subscript (i : Int) // expected-error{{expected '->' for subscript element type}}
      Int {
     get {
-      return stored
+      return stored // expected-error{{use of unresolved identifier}}
     }
     set {
-      stored = value
+      stored = newValue// expected-error{{use of unresolved identifier}}
     }
   }
 }
@@ -116,13 +116,14 @@ struct A2 {
       return stored
     }
     set {
-      stored = value
+      stored = newValue // expected-error{{use of unresolved identifier}}
     }
   }
 }
 
 struct A3 {
   subscript(i : Int) // expected-error {{expected '->' for subscript element type}}
+                     // expected-error@-1 {{expected subscripting element type}}
   {
     get {
       return i
@@ -132,6 +133,7 @@ struct A3 {
 
 struct A4 {
   subscript(i : Int) { // expected-error {{expected '->' for subscript element type}}
+                       // expected-error@-1 {{expected subscripting element type}}
     get {
       return i
     }
@@ -144,8 +146,10 @@ struct A5 {
 
 struct A6 {
   subscript(i: Int)(j: Int) -> Int { // expected-error {{expected '->' for subscript element type}}
+                                     // expected-error@-1 {{function types cannot have argument labels}}
+                                     // expected-note@-2 {{did you mean}}
     get {
-      return i + j
+      return i + j // expected-error {{use of unresolved identifier}}
     }
   }
 }
@@ -184,6 +188,9 @@ struct A9 {
 
 struct A10 {
   subscript x(i: Int) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
+    return 0
+  }
+  subscript x<T>(i: T) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
     return 0
   }
 }

@@ -9,7 +9,7 @@ import Swift
 class Foo {}
 sil_vtable Foo {}
 
-sil @_T010objc_block3FooCfD : $Foo -> ()
+sil @$S10objc_block3FooCfD : $Foo -> ()
 
 sil @call_block : $@convention(thin) (@convention(block) Foo -> Foo, Foo) -> Foo {
 entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
@@ -18,13 +18,13 @@ entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
 }
 // CHECK-LABEL: define{{( protected)?}} swiftcc %T10objc_block3FooC* @call_block(%objc_block*, %T10objc_block3FooC*) {{.*}} {
 // CHECK:       entry:
-// CHECK:         %2 = getelementptr inbounds %objc_block, %objc_block* %0, i32 0, i32 3
-// CHECK:         %3 = load i8*, i8** %2
-// CHECK:         %4 = bitcast i8* %3 to i8* (%objc_block*, i8*)*
-// CHECK:         %5 = bitcast %T10objc_block3FooC* %1 to i8*
-// CHECK:         %6 = call i8* %4(%objc_block* %0, i8* %5)
-// CHECK:         %7 = bitcast i8* %6 to %T10objc_block3FooC*
-// CHECK:         ret %T10objc_block3FooC* %7
+// CHECK:         [[T0:%.*]] = getelementptr inbounds %objc_block, %objc_block* %0, i32 0, i32 3
+// CHECK:         [[T1:%.*]] = load i8*, i8** [[T0]]
+// CHECK:         [[T2:%.*]] = bitcast i8* [[T1]] to i8* (%objc_block*, i8*)*
+// CHECK:         [[T3:%.*]] = bitcast %T10objc_block3FooC* %1 to i8*
+// CHECK:         [[T4:%.*]] = call i8* [[T2]](%objc_block* %0, i8* [[T3]])
+// CHECK:         [[T5:%.*]] = bitcast i8* [[T4]] to %T10objc_block3FooC*
+// CHECK:         ret %T10objc_block3FooC* [[T5]]
 // CHECK:       }
 
 sil @generic : $@convention(thin) <T> (@in T) -> ()
@@ -38,5 +38,4 @@ entry(%b : $*@convention(block) () -> ()):
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
 // --                                                                               0x100_0001 = block convention, 1 arg
-// CHECK:         call %swift.type* @swift_getFunctionTypeMetadata(i8** %3)
-
+// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 65536, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$SytN", i32 0, i32 1))

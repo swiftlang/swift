@@ -27,7 +27,7 @@ namespace api {
 
 // The node kind appearing in the tree that describes the content of the SDK
 enum class SDKNodeKind: uint8_t {
-#define NODE_KIND(NAME) NAME,
+#define NODE_KIND(NAME, VALUE) NAME,
 #include "DigesterEnums.def"
 };
 
@@ -123,6 +123,20 @@ public:
     switch (DiffKind) {
     case NodeAnnotation::GetterToProperty:
     case NodeAnnotation::SetterToProperty:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  bool isStringRepresentableChange() const {
+    switch(DiffKind) {
+    case NodeAnnotation::DictionaryKeyUpdate:
+    case NodeAnnotation::OptionalDictionaryKeyUpdate:
+    case NodeAnnotation::ArrayMemberUpdate:
+    case NodeAnnotation::OptionalArrayMemberUpdate:
+    case NodeAnnotation::SimpleStringRepresentableUpdate:
+    case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
       return true;
     default:
       return false;
@@ -347,7 +361,8 @@ namespace json {
 template<>
 struct ScalarEnumerationTraits<ide::api::SDKNodeKind> {
   static void enumeration(Output &out, ide::api::SDKNodeKind &value) {
-#define NODE_KIND(X) out.enumCase(value, #X, ide::api::SDKNodeKind::X);
+#define NODE_KIND(KEY, VALUE)                                                 \
+    out.enumCase(value, #VALUE, ide::api::SDKNodeKind::KEY);
 #include "swift/IDE/DigesterEnums.def"
   }
 };

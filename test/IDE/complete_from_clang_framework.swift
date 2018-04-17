@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=SWIFT_COMPLETIONS | %FileCheck %s -check-prefix=SWIFT_COMPLETIONS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=SWIFT_COMPLETIONS | %FileCheck %s -check-prefix=SWIFT_COMPLETIONS
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FW_UNQUAL_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FW_UNQUAL_1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO_HELPER < %t.compl.txt
@@ -8,27 +8,25 @@
 // RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_BOTH_FOO_BAR < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_FOO_1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_FOO_SUB < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_FOO_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_BAR_1 > %t.compl.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_BAR_1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_1 < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_BAR < %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_BAR_NEGATIVE < %t.compl.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_QUAL_FOO_2 | %FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_QUAL_FOO_2 | %FileCheck %s -check-prefix=CLANG_QUAL_FOO_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_1 | %FileCheck %s -check-prefix=FUNCTION_CALL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=FUNCTION_CALL_2 | %FileCheck %s -check-prefix=FUNCTION_CALL_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FUNCTION_CALL_1 | %FileCheck %s -check-prefix=FUNCTION_CALL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=FUNCTION_CALL_2 | %FileCheck %s -check-prefix=FUNCTION_CALL_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_STRUCT_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_STRUCT_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_CLASS_MEMBERS_2 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
-
-// XFAIL: linux
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_STRUCT_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_STRUCT_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_CLASS_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_CLASS_MEMBERS_2 | %FileCheck %s -check-prefix=CLANG_CLASS_MEMBERS_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -enable-objc-interop -code-completion-token=CLANG_INSTANCE_MEMBERS_1 | %FileCheck %s -check-prefix=CLANG_INSTANCE_MEMBERS_1
 
 import Foo
 // Don't import FooHelper directly in this test!
@@ -228,14 +226,14 @@ func testCompleteModuleQualifiedBar1() {
 func testCompleteFunctionCall1() {
   fooFunc1#^FUNCTION_CALL_1^#
 // FUNCTION_CALL_1: Begin completions
-// FUNCTION_CALL_1-NEXT: Pattern/ExprSpecific: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_1-NEXT: Pattern/CurrModule: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_1-NEXT: End completions
 }
 
 func testCompleteFunctionCall2() {
   fooFunc1AnonymousParam#^FUNCTION_CALL_2^#
 // FUNCTION_CALL_2: Begin completions
-// FUNCTION_CALL_2-NEXT: Pattern/ExprSpecific: ({#Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_2-NEXT: Pattern/CurrModule: ({#Int32#})[#Int32#]{{; name=.+$}}
 // FUNCTION_CALL_2-NEXT: End completions
 }
 
@@ -254,7 +252,7 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc0({#self: FooClassBase#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFunc1({#(anObject): Any!#})[#FooClassBase!#]{{; name=.+$}}
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any!) -> FooClassBase!#]{{; name=.+$}}
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any?) -> FooClassBase?#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ()[#FooClassBase!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#FooClassBase!#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseInstanceFuncOverridden()[#Void#]{{; name=.+$}}
@@ -262,13 +260,13 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .fooBaseClassFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal:      ({#(x): Int32#})[#FooClassBase!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth3()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth3({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth3({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth2()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth2({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth2({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     .nonInternalMeth()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .nonInternalMeth({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .nonInternalMeth({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth1()[#Any!#]
-// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth1({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: End completions
 }
 
@@ -290,17 +288,17 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseInstanceFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .fooBaseInstanceFunc0({#self: FooClassBase#})[#() -> Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseInstanceFunc1({#(anObject): Any!#})[#FooClassBase!#]{{; name=.+$}}
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any!) -> FooClassBase!#]{{; name=.+$}}
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .fooBaseInstanceFunc1({#self: FooClassBase#})[#(Any?) -> FooClassBase?#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseInstanceFuncOverridden()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .fooBaseClassFunc0()[#Void#]{{; name=.+$}}
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth3()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth3({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth3({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth2()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth2({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth2({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           .nonInternalMeth()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .nonInternalMeth({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .nonInternalMeth({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth1()[#Any!#]
-// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1({#self: FooClassBase#})[#() -> Any!#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: End completions
 }
 

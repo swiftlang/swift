@@ -41,12 +41,14 @@ namespace swift {
   class SILDebugScope;
   class SILType;
   class SourceLoc;
+  enum class MetadataState : size_t;
 
 namespace Lowering {
   class TypeConverter;
 }
   
 namespace irgen {
+  class DynamicMetadataRequest;
   class Explosion;
   class FunctionRef;
   class HeapLayout;
@@ -54,6 +56,7 @@ namespace irgen {
   class IRGenModule;
   class LinkEntity;
   class LocalTypeDataCache;
+  class MetadataResponse;
   class Scope;
   class TypeInfo;
   enum class ValueWitness : unsigned;
@@ -66,6 +69,10 @@ public:
   IRGenModule &IGM;
   IRBuilder Builder;
 
+  /// If != OptimizationMode::NotSet, the optimization mode specified with an
+  /// function attribute.
+  OptimizationMode OptMode;
+
   llvm::Function *CurFn;
   ModuleDecl *getSwiftModule() const;
   SILModule &getSILModule() const;
@@ -73,6 +80,7 @@ public:
   const IRGenOptions &getOptions() const;
 
   IRGenFunction(IRGenModule &IGM, llvm::Function *fn,
+                OptimizationMode Mode = OptimizationMode::NotSet,
                 const SILDebugScope *DbgScope = nullptr,
                 Optional<SILLocation> DbgLoc = None);
   ~IRGenFunction();
@@ -85,7 +93,7 @@ public:
 public:
   Explosion collectParameters();
   void emitScalarReturn(SILType resultTy, Explosion &scalars,
-                        bool isSwiftCCReturn);
+                        bool isSwiftCCReturn, bool isOutlined);
   void emitScalarReturn(llvm::Type *resultTy, Explosion &scalars);
   
   void emitBBForReturn();
@@ -100,6 +108,21 @@ public:
 
   /// Set the error result slot.
   void setErrorResultSlot(llvm::Value *address);
+
+  /// Are we currently emitting a coroutine?
+  bool isCoroutine() {
+    return CoroutineHandle != nullptr;
+  }
+  llvm::Value *getCoroutineHandle() {
+    assert(isCoroutine());
+    return CoroutineHandle;
+  }
+
+  void setCoroutineHandle(llvm::Value *handle) {
+    assert(CoroutineHandle == nullptr && "already set handle");
+    assert(handle != nullptr && "setting a null handle");
+    CoroutineHandle = handle;
+  }
   
 private:
   void emitPrologue();
@@ -108,14 +131,31 @@ private:
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   llvm::Value *ErrorResultSlot = nullptr;
+  llvm::Value *CoroutineHandle = nullptr;
 
 //--- Helper methods -----------------------------------------------------------
 public:
+
+  /// Returns the optimization mode for the function. If no mode is set for the
+  /// function, returns the global mode, i.e. the mode in IRGenOptions.
+  OptimizationMode getEffectiveOptimizationMode() const;
+
+  /// Returns true if this function should be optimized for size.
+  bool optimizeForSize() const {
+    return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
+  }
+
   Address createAlloca(llvm::Type *ty, Alignment align,
-                       const llvm::Twine &name);
-  Address createAlloca(llvm::Type *ty, llvm::Value *ArraySize, Alignment align,
-                       const llvm::Twine &name);
+                       const llvm::Twine &name = "");
+  Address createAlloca(llvm::Type *ty, llvm::Value *arraySize, Alignment align,
+                       const llvm::Twine &name = "");
   Address createFixedSizeBufferAlloca(const llvm::Twine &name);
+
+  StackAddress emitDynamicAlloca(SILType type, const llvm::Twine &name = "");
+  StackAddress emitDynamicAlloca(llvm::Type *eltTy, llvm::Value *arraySize,
+                                 Alignment align,
+                                 const llvm::Twine &name = "");
+  void emitDeallocateDynamicAlloca(StackAddress address);
 
   llvm::BasicBlock *createBasicBlock(const llvm::Twine &Name);
   const TypeInfo &getTypeInfoForUnlowered(Type subst);
@@ -187,6 +227,12 @@ public:
 
   llvm::Value *emitAllocEmptyBoxCall();
 
+  // Emit a call to the given generic type metadata access function.
+  MetadataResponse emitGenericTypeMetadataAccessFunctionCall(
+                                          llvm::Function *accessFunction,
+                                          ArrayRef<llvm::Value *> args,
+                                          DynamicMetadataRequest request);
+
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
   // abstraction difference, the metadata contains the layout information for
@@ -194,12 +240,14 @@ public:
   // correct for all uses of reabstractable values in opaque contexts.
   llvm::Value *emitTypeMetadataRef(CanType type);
 
-  // Emit a reference to a type layout record for the given type. The referenced
-  // data is enough to lay out an aggregate containing a value of the type, but
-  // can't uniquely represent the type or perform value witness operations on
-  // it.
-  llvm::Value *emitTypeLayoutRef(SILType type);
-  
+  /// Emit a reference to the canonical type metadata record for the given
+  /// formal type.  The metadata is only required to be abstract; that is,
+  /// you cannot use the result for layout.
+  llvm::Value *emitAbstractTypeMetadataRef(CanType type);
+
+  MetadataResponse emitTypeMetadataRef(CanType type,
+                                       DynamicMetadataRequest request);
+
   // Emit a reference to a metadata object that can be used for layout, but
   // cannot be used to identify a type. This will produce a layout appropriate
   // to the abstraction level of the given type. It may be able to avoid runtime
@@ -210,9 +258,13 @@ public:
   // here, since for some types it's easier to get a shared reference to one
   // than a metadata reference, and it would be more type-safe.
   llvm::Value *emitTypeMetadataRefForLayout(SILType type);
+  llvm::Value *emitTypeMetadataRefForLayout(SILType type,
+                                            DynamicMetadataRequest request);
   
-  llvm::Value *emitValueWitnessTableRef(CanType type);
   llvm::Value *emitValueWitnessTableRef(SILType type,
+                                        llvm::Value **metadataSlot = nullptr);
+  llvm::Value *emitValueWitnessTableRef(SILType type,
+                                        DynamicMetadataRequest request,
                                         llvm::Value **metadataSlot = nullptr);
   llvm::Value *emitValueWitnessTableRefForMetadata(llvm::Value *metadata);
   
@@ -233,6 +285,9 @@ public:
   void setInvariantLoad(llvm::LoadInst *load);
   /// Mark a load as dereferenceable to `size` bytes.
   void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
+
+  /// Emit a non-mergeable trap call, optionally followed by a terminator.
+  void emitTrap(bool EmitUnreachable);
 
 private:
   llvm::Instruction *AllocaIP;
@@ -390,6 +445,8 @@ public:
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
                                 bool isNonNull, bool checkPinned);
 
+  llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc);
+
 //--- Expression emission ------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
@@ -399,63 +456,107 @@ public:
 
   void bindArchetype(ArchetypeType *type,
                      llvm::Value *metadata,
+                     MetadataState metadataState,
                      ArrayRef<llvm::Value*> wtables);
 
 //--- Type emission ------------------------------------------------------------
 public:
-  /// Look up a local type data reference, returning null if no entry was
-  /// found.  This will emit code to materialize the reference if an
-  /// "abstract" entry is present.
-  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeDataKind kind) {
-    return tryGetLocalTypeData(LocalTypeDataKey{type, kind});
-  }
-  llvm::Value *tryGetLocalTypeData(LocalTypeDataKey key);
+  /// Look up a local type metadata reference, returning a null response
+  /// if no entry was found which can satisfy the request.  This may need
+  /// emit code to materialize the reference.
+  ///
+  /// This does a look up for a formal ("AST") type.  If you are looking for
+  /// type metadata that will work for working with a representation
+  /// ("lowered", "SIL") type, use getGetLocalTypeMetadataForLayout.
+  MetadataResponse tryGetLocalTypeMetadata(CanType type,
+                                           DynamicMetadataRequest request);
 
   /// Look up a local type data reference, returning null if no entry was
-  /// found or if the only viable entries are abstract.  This will never
-  /// emit code.
-  llvm::Value *tryGetConcreteLocalTypeData(LocalTypeDataKey key);
+  /// found.  This may need to emit code to materialize the reference.
+  ///
+  /// The data kind cannot be for type metadata; use tryGetLocalTypeMetadata
+  /// for that.
+  llvm::Value *tryGetLocalTypeData(CanType type, LocalTypeDataKind kind);
 
-  /// Retrieve a local type data reference which is known to exist.
-  llvm::Value *getLocalTypeData(CanType type, LocalTypeDataKind kind);
-
-  /// Add a local type-metadata reference at a point which definitely
-  /// dominates all of its uses.
-  void setUnscopedLocalTypeData(CanType type, LocalTypeDataKind kind,
-                                llvm::Value *data) {
-    setUnscopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
-  }
-  void setUnscopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
-  
-  /// Add a local type-metadata reference, valid at the current insertion
-  /// point.
-  void setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
-                              llvm::Value *data) {
-    setScopedLocalTypeData(LocalTypeDataKey{type, kind}, data);
-  }
-  void setScopedLocalTypeData(LocalTypeDataKey key, llvm::Value *data);
-
-  /// The same as tryGetLocalTypeData, just for the Layout metadata.
+  /// The same as tryGetLocalTypeMetadata, but for representation-compatible
+  /// "layout" metadata.  The returned metadata may not be for a type that
+  /// has anything to do with the formal type that was lowered to the given
+  /// type; however, it is guaranteed to have equivalent characteristics
+  /// in terms of layout, spare bits, POD-ness, and so on.
   ///
   /// We use a separate function name for this to clarify that you should
-  /// only ever be looking type metadata for a lowered SILType for the
-  /// purposes of local layout (e.g. of a tuple).
-  llvm::Value *tryGetLocalTypeDataForLayout(SILType type,
-                                            LocalTypeDataKind kind) {
-    return tryGetLocalTypeData(type.getSwiftRValueType(), kind);
-  }
+  /// only ever be looking for type metadata for a lowered SILType for the
+  /// purposes of local manipulation, such as the layout of a type or
+  /// emitting a value-copy.
+  MetadataResponse tryGetLocalTypeMetadataForLayout(SILType type,
+                                           DynamicMetadataRequest request);
 
-  /// Add a local type-metadata reference, which is valid for the containing
-  /// block.
+  /// The same as tryGetForLocalTypeData, but for representation-compatible
+  /// "layout" metadata.  See the comment on tryGetLocalTypeMetadataForLayout.
+  ///
+  /// The data kind cannot be for type metadata; use
+  /// tryGetLocalTypeMetadataForLayout for that.
+  llvm::Value *tryGetLocalTypeDataForLayout(SILType type,
+                                            LocalTypeDataKind kind);
+
+  /// Add a local type metadata reference at a point which definitely
+  /// dominates all of its uses.
+  void setUnscopedLocalTypeMetadata(CanType type,
+                                    MetadataResponse response);
+
+  /// Add a local type data reference at a point which definitely
+  /// dominates all of its uses.
+  ///
+  /// The data kind cannot be for type metadata; use
+  /// setUnscopedLocalTypeMetadata for that.
+  void setUnscopedLocalTypeData(CanType type, LocalTypeDataKind kind,
+                                llvm::Value *data);
+
+  /// Add a local type metadata reference that is valid at the current
+  /// insertion point.
+  void setScopedLocalTypeMetadata(CanType type, MetadataResponse value);
+
+  /// Add a local type data reference that is valid at the current
+  /// insertion point.
+  ///
+  /// The data kind cannot be for type metadata; use setScopedLocalTypeMetadata
+  /// for that.
+  void setScopedLocalTypeData(CanType type, LocalTypeDataKind kind,
+                              llvm::Value *data);
+
+  /// The same as setScopedLocalTypeMetadata, but for representation-compatible
+  /// "layout" metadata.  See the comment on tryGetLocalTypeMetadataForLayout.
+  void setScopedLocalTypeMetadataForLayout(SILType type, MetadataResponse value);
+
+  /// The same as setScopedLocalTypeData, but for representation-compatible
+  /// "layout" metadata.  See the comment on tryGetLocalTypeMetadataForLayout.
+  ///
+  /// The data kind cannot be for type metadata; use
+  /// setScopedLocalTypeMetadataForLayout for that.
   void setScopedLocalTypeDataForLayout(SILType type, LocalTypeDataKind kind,
-                                       llvm::Value *data) {
-    setScopedLocalTypeData(type.getSwiftRValueType(), kind, data);
-  }
+                                       llvm::Value *data);
+
+  // These are for the private use of the LocalTypeData subsystem.
+  MetadataResponse tryGetLocalTypeMetadata(LocalTypeDataKey key,
+                                           DynamicMetadataRequest request);
+  llvm::Value *tryGetLocalTypeData(LocalTypeDataKey key);
+  MetadataResponse tryGetConcreteLocalTypeData(LocalTypeDataKey key,
+                                               DynamicMetadataRequest request);
+  void setUnscopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
+  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
 
   /// Given a concrete type metadata node, add all the local type data
   /// that we can reach from it.
   void bindLocalTypeDataFromTypeMetadata(CanType type, IsExact_t isExact,
-                                         llvm::Value *metadata);
+                                         llvm::Value *metadata,
+                                         MetadataState metadataState);
+
+  /// Given the witness table parameter, bind local type data for
+  /// the witness table itself and any conditional requirements.
+  void bindLocalTypeDataFromSelfWitnessTable(
+                const ProtocolConformance *conformance,
+                llvm::Value *selfTable,
+                llvm::function_ref<CanType (CanType)> mapTypeIntoContext);
 
   void setDominanceResolver(DominanceResolverFunction resolver) {
     assert(DominanceResolver == nullptr);
@@ -555,12 +656,6 @@ public:
   llvm::Value *getLocalSelfMetadata();
   void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
 
-public:
-  //--- Outlined Function Support -------------------------------------------
-public:
-  bool isInOutlinedFunction();
-  void setInOutlinedFunction();
-
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
   void destroyLocalTypeData();
@@ -577,10 +672,6 @@ private:
   llvm::Value *LocalSelf = nullptr;
   
   LocalSelfKind SelfKind;
-
-  /// Flag indiacting wherever we are in the middle of creating
-  /// an outlined address type function
-  bool inOutlinedFunction;
 };
 
 using ConditionalDominanceScope = IRGenFunction::ConditionalDominanceScope;

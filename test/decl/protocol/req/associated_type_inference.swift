@@ -149,7 +149,8 @@ struct XSubP0b : SubscriptP0 {
 
 struct XSubP0c : SubscriptP0 {
 // expected-error@-1 {{type 'XSubP0c' does not conform to protocol 'SubscriptP0'}}
-  subscript (i: Index) -> Element { get { } } // expected-error{{reference to invalid associated type 'Element' of type 'XSubP0c'}}
+  subscript (i: Index) -> Element { get { } }
+  // expected-error@-1 {{reference to invalid associated type 'Element' of type 'XSubP0c'}}
 }
 
 struct XSubP0d : SubscriptP0 {
@@ -400,3 +401,103 @@ struct P14a<Value>: P14 { }
 
 struct P14b<Value> { }
 extension P14b: P14 { }
+
+// Associated type defaults in overridden associated types.
+struct X15 { }
+struct OtherX15 { }
+
+protocol P15a {
+  associatedtype A = X15
+}
+
+protocol P15b : P15a {
+  associatedtype A
+}
+
+protocol P15c : P15b {
+  associatedtype A
+}
+
+protocol P15d {
+  associatedtype A = X15
+}
+
+protocol P15e : P15b, P15d {
+  associatedtype A
+}
+
+protocol P15f {
+  associatedtype A = OtherX15
+}
+
+protocol P15g: P15c, P15f {
+  associatedtype A // expected-note{{protocol requires nested type 'A'; do you want to add it?}}
+}
+
+
+struct X15a : P15a { }
+struct X15b : P15b { }
+struct X15c : P15c { }
+struct X15d : P15d { }
+
+// Ambiguity.
+// FIXME: Better diagnostic here?
+struct X15g : P15g { } // expected-error{{type 'X15g' does not conform to protocol 'P15g'}}
+
+// Associated type defaults in overidden associated types that require
+// substitution.
+struct X16<T> { }
+
+protocol P16 {
+  associatedtype A = X16<Self>
+}
+
+protocol P16a : P16 {
+  associatedtype A
+}
+
+protocol P16b : P16a {
+  associatedtype A
+}
+
+struct X16b : P16b { }
+
+// Refined protocols that tie associated types to a fixed type.
+protocol P17 {
+  associatedtype T
+}
+
+protocol Q17 : P17 where T == Int { }
+
+struct S17 : Q17 { }
+
+// Typealiases from protocol extensions should not inhibit associated type
+// inference.
+protocol P18 {
+  associatedtype A
+}
+
+protocol P19 : P18 {
+  associatedtype B
+}
+
+extension P18 where Self: P19 {
+  typealias A = B
+}
+
+struct X18<A> : P18 { }
+
+// rdar://problem/16316115
+protocol HasAssoc {
+  associatedtype Assoc
+}
+
+struct DefaultAssoc {}
+
+protocol RefinesAssocWithDefault: HasAssoc {
+  associatedtype Assoc = DefaultAssoc
+}
+
+struct Foo: RefinesAssocWithDefault {
+}
+

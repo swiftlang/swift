@@ -39,11 +39,18 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
         return enumDecl->hasRawType();
 
         // Enums without associated values can implicitly derive Equatable and
-        // Hashable conformance.
+        // Hashable conformances.
       case KnownProtocolKind::Equatable:
         return canDeriveEquatable(tc, enumDecl, protocol);
       case KnownProtocolKind::Hashable:
         return canDeriveHashable(tc, enumDecl, protocol);
+        // "Simple" enums without availability attributes can explicitly derive
+        // a CaseIterable conformance.
+        //
+        // FIXME: Lift the availability restriction.
+      case KnownProtocolKind::CaseIterable:
+        return !enumDecl->hasPotentiallyUnavailableCaseValue()
+            && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
         // @objc enums can explicitly derive their _BridgedNSError conformance.
       case KnownProtocolKind::BridgedNSError:
@@ -135,6 +142,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     if (name.isSimpleName(ctx.Id_hashValue))
       return getRequirement(KnownProtocolKind::Hashable);
 
+    // CaseIterable.allValues
+    if (name.isSimpleName(ctx.Id_allCases))
+      return getRequirement(KnownProtocolKind::CaseIterable);
+
     // _BridgedNSError._nsErrorDomain
     if (name.isSimpleName(ctx.Id_nsErrorDomain))
       return getRequirement(KnownProtocolKind::BridgedNSError);
@@ -192,6 +203,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     if (name.isSimpleName(ctx.Id_RawValue))
       return getRequirement(KnownProtocolKind::RawRepresentable);
 
+    // CaseIterable.AllCases
+    if (name.isSimpleName(ctx.Id_AllCases))
+      return getRequirement(KnownProtocolKind::CaseIterable);
+
     return nullptr;
   }
 
@@ -206,28 +221,42 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
   return new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
 }
 
-FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
-                                                 Decl *parentDecl,
-                                                 NominalTypeDecl *typeDecl,
-                                                 Type propertyInterfaceType,
-                                                 Type propertyContextType,
-                                                 bool isStatic,
-                                                 bool isFinal) {
+AccessorDecl *DerivedConformance::
+addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
+                                   VarDecl *property,
+                                   Type propertyContextType) {
+  auto getter =
+    declareDerivedPropertyGetter(tc, property, propertyContextType);
+
+  property->makeComputed(SourceLoc(), getter, nullptr, nullptr, SourceLoc());
+
+  return getter;
+}
+
+AccessorDecl *
+DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
+                                                 VarDecl *property,
+                                                 Type propertyContextType) {
+  bool isStatic = property->isStatic();
+  bool isFinal = property->isFinal();
+
   auto &C = tc.Context;
-  auto parentDC = cast<DeclContext>(parentDecl);
+  auto parentDC = property->getDeclContext();
   auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
   ParameterList *params[] = {
     ParameterList::createWithoutLoc(selfDecl),
     ParameterList::createEmpty(C)
   };
+
+  Type propertyInterfaceType = property->getInterfaceType();
   
-  FuncDecl *getterDecl =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                     /*FuncLoc=*/SourceLoc(), DeclName(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*AccessorKeywordLoc=*/SourceLoc(),
-                     nullptr, params,
-                     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
+  auto getterDecl = AccessorDecl::create(C,
+    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+    AccessorKind::IsGetter, AddressorKind::NotAddressor, property,
+    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+    /*GenericParams=*/nullptr, params,
+    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
 
@@ -251,27 +280,22 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     interfaceType = FunctionType::get({selfParam}, interfaceType,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
-  copyFormalAccess(getterDecl, typeDecl);
+  getterDecl->copyFormalAccessFrom(property);
+  getterDecl->setValidationStarted();
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (isa<ClangModuleUnit>(parentDC->getModuleScopeContext()))
-    tc.Context.addExternalDecl(getterDecl);
+  tc.Context.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }
 
 std::pair<VarDecl *, PatternBindingDecl *>
-DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
-                                                   Decl *parentDecl,
-                                                   NominalTypeDecl *typeDecl,
-                                                   Identifier name,
-                                                   Type propertyInterfaceType,
-                                                   Type propertyContextType,
-                                                   FuncDecl *getterDecl,
-                                                   bool isStatic,
-                                                   bool isFinal) {
+DerivedConformance::declareDerivedProperty(TypeChecker &tc, Decl *parentDecl,
+                                           NominalTypeDecl *typeDecl,
+                                           Identifier name,
+                                           Type propertyInterfaceType,
+                                           Type propertyContextType,
+                                           bool isStatic,
+                                           bool isFinal) {
   auto &C = tc.Context;
   auto parentDC = cast<DeclContext>(parentDecl);
 
@@ -279,10 +303,9 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       propertyContextType, parentDC);
   propDecl->setImplicit();
-  propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
-                         SourceLoc());
-  copyFormalAccess(propDecl, typeDecl);
+  propDecl->copyFormalAccessFrom(typeDecl);
   propDecl->setInterfaceType(propertyInterfaceType);
+  propDecl->setValidationStarted();
 
   // If this is supposed to be a final property, mark it as such.
   assert(isFinal || !parentDC->getAsClassOrClassExtensionContext());
@@ -292,9 +315,11 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
+
   propPat = new (C) TypedPattern(propPat,
                                  TypeLoc::withoutLoc(propertyContextType),
                                  /*implicit*/ true);
+  propPat->setType(propertyContextType);
 
   auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
                                            StaticSpellingKind::None,
@@ -303,15 +328,4 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   pbDecl->setImplicit();
 
   return {propDecl, pbDecl};
-}
-
-void DerivedConformance::copyFormalAccess(ValueDecl *dest, ValueDecl *source) {
-  dest->setAccess(source->getFormalAccess());
-
-  // Inherit the @_versioned attribute.
-  if (source->getAttrs().hasAttribute<VersionedAttr>()) {
-    auto &ctx = source->getASTContext();
-    auto *clonedAttr = new (ctx) VersionedAttr(/*implicit=*/true);
-    dest->getAttrs().add(clonedAttr);
-  }
 }

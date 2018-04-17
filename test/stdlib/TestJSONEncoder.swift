@@ -409,6 +409,311 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                    nonConformingFloatDecodingStrategy: decodingStrategy)
   }
 
+  // MARK: - Key Strategy Tests
+  private struct EncodeMe : Encodable {
+    var keyName: String
+    func encode(to coder: Encoder) throws {
+      var c = coder.container(keyedBy: _TestKey.self)
+      try c.encode("test", forKey: _TestKey(stringValue: keyName)!)
+    }
+  }
+
+  func testEncodingKeyStrategySnake() {
+    let toSnakeCaseTests = [
+      ("simpleOneTwo", "simple_one_two"),
+      ("myURL", "my_url"),
+      ("singleCharacterAtEndX", "single_character_at_end_x"),
+      ("thisIsAnXMLProperty", "this_is_an_xml_property"),
+      ("single", "single"), // no underscore
+      ("", ""), // don't die on empty string
+      ("a", "a"), // single character
+      ("aA", "a_a"), // two characters
+      ("version4Thing", "version4_thing"), // numerics
+      ("partCAPS", "part_caps"), // only insert underscore before first all caps
+      ("partCAPSLowerAGAIN", "part_caps_lower_again"), // switch back and forth caps.
+      ("manyWordsInThisThing", "many_words_in_this_thing"), // simple lowercase + underscore + more
+      ("asdfĆqer", "asdf_ćqer"),
+      ("already_snake_case", "already_snake_case"),
+      ("dataPoint22", "data_point22"),
+      ("dataPoint22Word", "data_point22_word"),
+      ("_oneTwoThree", "_one_two_three"),
+      ("oneTwoThree_", "one_two_three_"),
+      ("__oneTwoThree", "__one_two_three"),
+      ("oneTwoThree__", "one_two_three__"),
+      ("_oneTwoThree_", "_one_two_three_"),
+      ("__oneTwoThree", "__one_two_three"),
+      ("__oneTwoThree__", "__one_two_three__"),
+      ("_test", "_test"),
+      ("_test_", "_test_"),
+      ("__test", "__test"),
+      ("test__", "test__"),
+      ("m͉̟̹y̦̳G͍͚͎̳r̤͉̤͕ͅea̲͕t͇̥̼͖U͇̝̠R͙̻̥͓̣L̥̖͎͓̪̫ͅR̩͖̩eq͈͓u̞e̱s̙t̤̺ͅ", "m͉̟̹y̦̳_g͍͚͎̳r̤͉̤͕ͅea̲͕t͇̥̼͖_u͇̝̠r͙̻̥͓̣l̥̖͎͓̪̫ͅ_r̩͖̩eq͈͓u̞e̱s̙t̤̺ͅ"), // because Itai wanted to test this
+      ("🐧🐟", "🐧🐟") // fishy emoji example?
+    ]
+
+    for test in toSnakeCaseTests {
+      let expected = "{\"\(test.1)\":\"test\"}"
+      let encoded = EncodeMe(keyName: test.0)
+      
+      let encoder = JSONEncoder()
+      encoder.keyEncodingStrategy = .convertToSnakeCase
+      let resultData = try! encoder.encode(encoded)
+      let resultString = String(bytes: resultData, encoding: .utf8)
+      
+      expectEqual(expected, resultString)
+    }
+  }
+  
+  func testEncodingKeyStrategyCustom() {
+    let expected = "{\"QQQhello\":\"test\"}"
+    let encoded = EncodeMe(keyName: "hello")
+    
+    let encoder = JSONEncoder()
+    let customKeyConversion = { (_ path : [CodingKey]) -> CodingKey in
+      let key = _TestKey(stringValue: "QQQ" + path.last!.stringValue)!
+      return key
+    }
+    encoder.keyEncodingStrategy = .custom(customKeyConversion)
+    let resultData = try! encoder.encode(encoded)
+    let resultString = String(bytes: resultData, encoding: .utf8)
+    
+    expectEqual(expected, resultString)
+  }
+  
+  private struct EncodeNested : Encodable {
+    let nestedValue: EncodeMe
+  }
+  
+  private struct EncodeNestedNested : Encodable {
+    let outerValue: EncodeNested
+  }
+  
+  func testEncodingKeyStrategyPath() {
+    // Make sure a more complex path shows up the way we want
+    // Make sure the path reflects keys in the Swift, not the resulting ones in the JSON
+    let expected = "{\"QQQouterValue\":{\"QQQnestedValue\":{\"QQQhelloWorld\":\"test\"}}}"
+    let encoded = EncodeNestedNested(outerValue: EncodeNested(nestedValue: EncodeMe(keyName: "helloWorld")))
+    
+    let encoder = JSONEncoder()
+    var callCount = 0
+    
+    let customKeyConversion = { (_ path : [CodingKey]) -> CodingKey in
+      // This should be called three times:
+      // 1. to convert 'outerValue' to something
+      // 2. to convert 'nestedValue' to something
+      // 3. to convert 'helloWorld' to something
+      callCount = callCount + 1
+      
+      if path.count == 0 {
+        expectUnreachable("The path should always have at least one entry")
+      } else if path.count == 1 {
+        expectEqual(["outerValue"], path.map { $0.stringValue })
+      } else if path.count == 2 {
+        expectEqual(["outerValue", "nestedValue"], path.map { $0.stringValue })
+      } else if path.count == 3 {
+        expectEqual(["outerValue", "nestedValue", "helloWorld"], path.map { $0.stringValue })
+      } else {
+        expectUnreachable("The path mysteriously had more entries")
+      }
+      
+      let key = _TestKey(stringValue: "QQQ" + path.last!.stringValue)!
+      return key
+    }
+    encoder.keyEncodingStrategy = .custom(customKeyConversion)
+    let resultData = try! encoder.encode(encoded)
+    let resultString = String(bytes: resultData, encoding: .utf8)
+    
+    expectEqual(expected, resultString)
+    expectEqual(3, callCount)
+  }
+  
+  private struct DecodeMe : Decodable {
+    let found: Bool
+    init(from coder: Decoder) throws {
+      let c = try coder.container(keyedBy: _TestKey.self)
+      // Get the key that we expect to be passed in (camel case)
+      let camelCaseKey = try c.decode(String.self, forKey: _TestKey(stringValue: "camelCaseKey")!)
+        
+      // Use the camel case key to decode from the JSON. The decoder should convert it to snake case to find it.
+      found = try c.decode(Bool.self, forKey: _TestKey(stringValue: camelCaseKey)!)
+    }
+  }
+
+  func testDecodingKeyStrategyCamel() {
+    let fromSnakeCaseTests = [
+      ("", ""), // don't die on empty string
+      ("a", "a"), // single character
+      ("ALLCAPS", "ALLCAPS"), // If no underscores, we leave the word as-is
+      ("ALL_CAPS", "allCaps"), // Conversion from screaming snake case
+      ("single", "single"), // do not capitalize anything with no underscore
+      ("snake_case", "snakeCase"), // capitalize a character
+      ("one_two_three", "oneTwoThree"), // more than one word
+      ("one_2_three", "one2Three"), // numerics
+      ("one2_three", "one2Three"), // numerics, part 2
+      ("snake_Ćase", "snakeĆase"), // do not further modify a capitalized diacritic
+      ("snake_ćase", "snakeĆase"), // capitalize a diacritic
+      ("alreadyCamelCase", "alreadyCamelCase"), // do not modify already camel case
+      ("__this_and_that", "__thisAndThat"),
+      ("_this_and_that", "_thisAndThat"),
+      ("this__and__that", "thisAndThat"),
+      ("this_and_that__", "thisAndThat__"),
+      ("this_aNd_that", "thisAndThat"),
+      ("_one_two_three", "_oneTwoThree"),
+      ("one_two_three_", "oneTwoThree_"),
+      ("__one_two_three", "__oneTwoThree"),
+      ("one_two_three__", "oneTwoThree__"),
+      ("_one_two_three_", "_oneTwoThree_"),
+      ("__one_two_three", "__oneTwoThree"),
+      ("__one_two_three__", "__oneTwoThree__"),
+      ("_test", "_test"),
+      ("_test_", "_test_"),
+      ("__test", "__test"),
+      ("test__", "test__"),
+      ("_", "_"),
+      ("__", "__"),
+      ("___", "___"),
+      ("m͉̟̹y̦̳G͍͚͎̳r̤͉̤͕ͅea̲͕t͇̥̼͖U͇̝̠R͙̻̥͓̣L̥̖͎͓̪̫ͅR̩͖̩eq͈͓u̞e̱s̙t̤̺ͅ", "m͉̟̹y̦̳G͍͚͎̳r̤͉̤͕ͅea̲͕t͇̥̼͖U͇̝̠R͙̻̥͓̣L̥̖͎͓̪̫ͅR̩͖̩eq͈͓u̞e̱s̙t̤̺ͅ"), // because Itai wanted to test this
+      ("🐧_🐟", "🐧🐟") // fishy emoji example?
+    ]
+    
+    for test in fromSnakeCaseTests {
+      // This JSON contains the camel case key that the test object should decode with, then it uses the snake case key (test.0) as the actual key for the boolean value.
+      let input = "{\"camelCaseKey\":\"\(test.1)\",\"\(test.0)\":true}".data(using: .utf8)!
+      
+      let decoder = JSONDecoder()
+      decoder.keyDecodingStrategy = .convertFromSnakeCase
+      
+      let result = try! decoder.decode(DecodeMe.self, from: input)
+      
+      expectTrue(result.found)
+    }
+  }
+  
+  private struct DecodeMe2 : Decodable { var hello: String }
+  
+  func testDecodingKeyStrategyCustom() {
+    let input = "{\"----hello\":\"test\"}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    let customKeyConversion = { (_ path: [CodingKey]) -> CodingKey in
+      // This converter removes the first 4 characters from the start of all string keys, if it has more than 4 characters
+      let string = path.last!.stringValue
+      guard string.count > 4 else { return path.last! }
+      let newString = string.substring(from: string.index(string.startIndex, offsetBy: 4, limitedBy: string.endIndex)!)
+      return _TestKey(stringValue: newString)!
+    }
+    decoder.keyDecodingStrategy = .custom(customKeyConversion)
+    let result = try! decoder.decode(DecodeMe2.self, from: input)
+    
+    expectEqual("test", result.hello)
+  }
+  
+  private struct DecodeMe3 : Codable {
+      var thisIsCamelCase : String
+  }
+    
+  func testEncodingKeyStrategySnakeGenerated() {
+    // Test that this works with a struct that has automatically generated keys
+    let input = "{\"this_is_camel_case\":\"test\"}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let result = try! decoder.decode(DecodeMe3.self, from: input)
+    
+    expectEqual("test", result.thisIsCamelCase)
+  }
+    
+  func testDecodingKeyStrategyCamelGenerated() {
+    let encoded = DecodeMe3(thisIsCamelCase: "test")
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let resultData = try! encoder.encode(encoded)
+    let resultString = String(bytes: resultData, encoding: .utf8)
+    expectEqual("{\"this_is_camel_case\":\"test\"}", resultString)
+  }
+    
+  func testKeyStrategySnakeGeneratedAndCustom() {
+    // Test that this works with a struct that has automatically generated keys
+    struct DecodeMe4 : Codable {
+        var thisIsCamelCase : String
+        var thisIsCamelCaseToo : String
+        private enum CodingKeys : String, CodingKey {
+            case thisIsCamelCase = "fooBar"
+            case thisIsCamelCaseToo
+        }
+    }
+
+    // Decoding
+    let input = "{\"foo_bar\":\"test\",\"this_is_camel_case_too\":\"test2\"}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let decodingResult = try! decoder.decode(DecodeMe4.self, from: input)
+    
+    expectEqual("test", decodingResult.thisIsCamelCase)
+    expectEqual("test2", decodingResult.thisIsCamelCaseToo)
+    
+    // Encoding
+    let encoded = DecodeMe4(thisIsCamelCase: "test", thisIsCamelCaseToo: "test2")
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let encodingResultData = try! encoder.encode(encoded)
+    let encodingResultString = String(bytes: encodingResultData, encoding: .utf8)
+    expectEqual("{\"foo_bar\":\"test\",\"this_is_camel_case_too\":\"test2\"}", encodingResultString)
+  }
+
+  func testKeyStrategyDuplicateKeys() {
+    // This test is mostly to make sure we don't assert on duplicate keys
+    struct DecodeMe5 : Codable {
+        var oneTwo : String
+        var numberOfKeys : Int
+        
+        enum CodingKeys : String, CodingKey {
+          case oneTwo
+          case oneTwoThree
+        }
+        
+        init() {
+            oneTwo = "test"
+            numberOfKeys = 0
+        }
+        
+        init(from decoder: Decoder) throws {
+          let container = try decoder.container(keyedBy: CodingKeys.self)
+          oneTwo = try container.decode(String.self, forKey: .oneTwo)
+          numberOfKeys = container.allKeys.count
+        }
+        
+        func encode(to encoder: Encoder) throws {
+          var container = encoder.container(keyedBy: CodingKeys.self)
+          try container.encode(oneTwo, forKey: .oneTwo)
+          try container.encode("test2", forKey: .oneTwoThree)
+        }
+    }
+
+    let customKeyConversion = { (_ path: [CodingKey]) -> CodingKey in
+      // All keys are the same!
+      return _TestKey(stringValue: "oneTwo")!
+    }
+    
+    // Decoding
+    // This input has a dictionary with two keys, but only one will end up in the container
+    let input = "{\"unused key 1\":\"test1\",\"unused key 2\":\"test2\"}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .custom(customKeyConversion)
+
+    let decodingResult = try! decoder.decode(DecodeMe5.self, from: input)
+    // There will be only one result for oneTwo (the second one in the json)
+    expectEqual(1, decodingResult.numberOfKeys)
+    
+    // Encoding
+    let encoded = DecodeMe5()
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .custom(customKeyConversion)
+    let decodingResultData = try! encoder.encode(encoded)
+    let decodingResultString = String(bytes: decodingResultData, encoding: .utf8)
+    
+    // There will be only one value in the result (the second one encoded)
+    expectEqual("{\"oneTwo\":\"test2\"}", decodingResultString)
+  }
+
   // MARK: - Encoder Features
   func testNestedContainerCodingPaths() {
     let encoder = JSONEncoder()
@@ -478,6 +783,135 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     _testRoundTripTypeCoercionFailure(of: [0.0, 1.0] as [Double], as: [Bool].self)
   }
 
+  func testDecodingConcreteTypeParameter() {
+      let encoder = JSONEncoder()
+      guard let json = try? encoder.encode(Employee.testValue) else {
+          expectUnreachable("Unable to encode Employee.")
+          return
+      }
+
+      let decoder = JSONDecoder()
+      guard let decoded = try? decoder.decode(Employee.self as Person.Type, from: json) else {
+          expectUnreachable("Failed to decode Employee as Person from JSON.")
+          return
+      }
+
+      expectEqual(type(of: decoded), Employee.self, "Expected decoded value to be of type Employee; got \(type(of: decoded)) instead.")
+  }
+
+  // MARK: - Encoder State
+  // SR-6078
+  func testEncoderStateThrowOnEncode() {
+    struct ReferencingEncoderWrapper<T : Encodable> : Encodable {
+      let value: T
+      init(_ value: T) { self.value = value }
+
+      func encode(to encoder: Encoder) throws {
+        // This approximates a subclass calling into its superclass, where the superclass encodes a value that might throw.
+        // The key here is that getting the superEncoder creates a referencing encoder.
+        var container = encoder.unkeyedContainer()
+        let superEncoder = container.superEncoder()
+
+        // Pushing a nested container on leaves the referencing encoder with multiple containers.
+        var nestedContainer = superEncoder.unkeyedContainer()
+        try nestedContainer.encode(value)
+      }
+    }
+
+    // The structure that would be encoded here looks like
+    //
+    //   [[[Float.infinity]]]
+    //
+    // The wrapper asks for an unkeyed container ([^]), gets a super encoder, and creates a nested container into that ([[^]]).
+    // We then encode an array into that ([[[^]]]), which happens to be a value that causes us to throw an error.
+    //
+    // The issue at hand reproduces when you have a referencing encoder (superEncoder() creates one) that has a container on the stack (unkeyedContainer() adds one) that encodes a value going through box_() (Array does that) that encodes something which throws (Float.infinity does that).
+    // When reproducing, this will cause a test failure via fatalError().
+    _ = try? JSONEncoder().encode(ReferencingEncoderWrapper([Float.infinity]))
+  }
+
+  func testEncoderStateThrowOnEncodeCustomDate() {
+    // This test is identical to testEncoderStateThrowOnEncode, except throwing via a custom Date closure.
+    struct ReferencingEncoderWrapper<T : Encodable> : Encodable {
+      let value: T
+      init(_ value: T) { self.value = value }
+      func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        let superEncoder = container.superEncoder()
+        var nestedContainer = superEncoder.unkeyedContainer()
+        try nestedContainer.encode(value)
+      }
+    }
+
+    // The closure needs to push a container before throwing an error to trigger.
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .custom({ _, encoder in
+      let _ = encoder.unkeyedContainer()
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    _ = try? encoder.encode(ReferencingEncoderWrapper(Date()))
+  }
+
+  func testEncoderStateThrowOnEncodeCustomData() {
+    // This test is identical to testEncoderStateThrowOnEncode, except throwing via a custom Data closure.
+    struct ReferencingEncoderWrapper<T : Encodable> : Encodable {
+      let value: T
+      init(_ value: T) { self.value = value }
+      func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        let superEncoder = container.superEncoder()
+        var nestedContainer = superEncoder.unkeyedContainer()
+        try nestedContainer.encode(value)
+      }
+    }
+
+    // The closure needs to push a container before throwing an error to trigger.
+    let encoder = JSONEncoder()
+    encoder.dataEncodingStrategy = .custom({ _, encoder in
+      let _ = encoder.unkeyedContainer()
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    _ = try? encoder.encode(ReferencingEncoderWrapper(Data()))
+  }
+
+  // MARK: - Decoder State
+  // SR-6048
+  func testDecoderStateThrowOnDecode() {
+    // The container stack here starts as [[1,2,3]]. Attempting to decode as [String] matches the outer layer (Array), and begins decoding the array.
+    // Once Array decoding begins, 1 is pushed onto the container stack ([[1,2,3], 1]), and 1 is attempted to be decoded as String. This throws a .typeMismatch, but the container is not popped off the stack.
+    // When attempting to decode [Int], the container stack is still ([[1,2,3], 1]), and 1 fails to decode as [Int].
+    let json = "[1,2,3]".data(using: .utf8)!
+    let _ = try! JSONDecoder().decode(EitherDecodable<[String], [Int]>.self, from: json)
+  }
+
+  func testDecoderStateThrowOnDecodeCustomDate() {
+    // This test is identical to testDecoderStateThrowOnDecode, except we're going to fail because our closure throws an error, not because we hit a type mismatch.
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .custom({ decoder in
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    let json = "{\"value\": 1}".data(using: .utf8)!
+    let _ = try! decoder.decode(EitherDecodable<TopLevelWrapper<Date>, TopLevelWrapper<Int>>.self, from: json)
+  }
+
+  func testDecoderStateThrowOnDecodeCustomData() {
+    // This test is identical to testDecoderStateThrowOnDecode, except we're going to fail because our closure throws an error, not because we hit a type mismatch.
+    let decoder = JSONDecoder()
+    decoder.dataDecodingStrategy = .custom({ decoder in
+      enum CustomError : Error { case foo }
+      throw CustomError.foo
+    })
+
+    let json = "{\"value\": 1}".data(using: .utf8)!
+    let _ = try! decoder.decode(EitherDecodable<TopLevelWrapper<Data>, TopLevelWrapper<Int>>.self, from: json)
+  }
+
   // MARK: - Helper Functions
   private var _jsonEmptyDictionary: Data {
     return "{}".data(using: .utf8)!
@@ -497,6 +931,8 @@ class TestJSONEncoder : TestJSONEncoderSuper {
                                  dateDecodingStrategy: JSONDecoder.DateDecodingStrategy = .deferredToDate,
                                  dataEncodingStrategy: JSONEncoder.DataEncodingStrategy = .base64,
                                  dataDecodingStrategy: JSONDecoder.DataDecodingStrategy = .base64,
+                                 keyEncodingStrategy: JSONEncoder.KeyEncodingStrategy = .useDefaultKeys,
+                                 keyDecodingStrategy: JSONDecoder.KeyDecodingStrategy = .useDefaultKeys,
                                  nonConformingFloatEncodingStrategy: JSONEncoder.NonConformingFloatEncodingStrategy = .throw,
                                  nonConformingFloatDecodingStrategy: JSONDecoder.NonConformingFloatDecodingStrategy = .throw) where T : Codable, T : Equatable {
     var payload: Data! = nil
@@ -506,6 +942,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       encoder.dateEncodingStrategy = dateEncodingStrategy
       encoder.dataEncodingStrategy = dataEncodingStrategy
       encoder.nonConformingFloatEncodingStrategy = nonConformingFloatEncodingStrategy
+      encoder.keyEncodingStrategy = keyEncodingStrategy
       payload = try encoder.encode(value)
     } catch {
       expectUnreachable("Failed to encode \(T.self) to JSON: \(error)")
@@ -520,6 +957,7 @@ class TestJSONEncoder : TestJSONEncoderSuper {
       decoder.dateDecodingStrategy = dateDecodingStrategy
       decoder.dataDecodingStrategy = dataDecodingStrategy
       decoder.nonConformingFloatDecodingStrategy = nonConformingFloatDecodingStrategy
+      decoder.keyDecodingStrategy = keyDecodingStrategy
       let decoded = try decoder.decode(T.self, from: payload)
       expectEqual(decoded, value, "\(T.self) did not round-trip to an equal value.")
     } catch {
@@ -1066,6 +1504,20 @@ fileprivate struct DoubleNaNPlaceholder : Codable, Equatable {
   }
 }
 
+fileprivate enum EitherDecodable<T : Decodable, U : Decodable> : Decodable {
+  case t(T)
+  case u(U)
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    do {
+      self = .t(try container.decode(T.self))
+    } catch {
+      self = .u(try container.decode(U.self))
+    }
+  }
+}
+
 // MARK: - Run Tests
 
 #if !FOUNDATION_XCTEST
@@ -1099,10 +1551,26 @@ JSONEncoderTests.test("testEncodingDataCustom") { TestJSONEncoder().testEncoding
 JSONEncoderTests.test("testEncodingDataCustomEmpty") { TestJSONEncoder().testEncodingDataCustomEmpty() }
 JSONEncoderTests.test("testEncodingNonConformingFloats") { TestJSONEncoder().testEncodingNonConformingFloats() }
 JSONEncoderTests.test("testEncodingNonConformingFloatStrings") { TestJSONEncoder().testEncodingNonConformingFloatStrings() }
+JSONEncoderTests.test("testEncodingKeyStrategySnake") { TestJSONEncoder().testEncodingKeyStrategySnake() }
+JSONEncoderTests.test("testEncodingKeyStrategyCustom") { TestJSONEncoder().testEncodingKeyStrategyCustom() }
+JSONEncoderTests.test("testEncodingKeyStrategyPath") { TestJSONEncoder().testEncodingKeyStrategyPath() }
+JSONEncoderTests.test("testDecodingKeyStrategyCamel") { TestJSONEncoder().testDecodingKeyStrategyCamel() }
+JSONEncoderTests.test("testDecodingKeyStrategyCustom") { TestJSONEncoder().testDecodingKeyStrategyCustom() }
+JSONEncoderTests.test("testEncodingKeyStrategySnakeGenerated") { TestJSONEncoder().testEncodingKeyStrategySnakeGenerated() }
+JSONEncoderTests.test("testDecodingKeyStrategyCamelGenerated") { TestJSONEncoder().testDecodingKeyStrategyCamelGenerated() }
+JSONEncoderTests.test("testKeyStrategySnakeGeneratedAndCustom") { TestJSONEncoder().testKeyStrategySnakeGeneratedAndCustom() }
+JSONEncoderTests.test("testKeyStrategyDuplicateKeys") { TestJSONEncoder().testKeyStrategyDuplicateKeys() }
 JSONEncoderTests.test("testNestedContainerCodingPaths") { TestJSONEncoder().testNestedContainerCodingPaths() }
 JSONEncoderTests.test("testSuperEncoderCodingPaths") { TestJSONEncoder().testSuperEncoderCodingPaths() }
 JSONEncoderTests.test("testInterceptDecimal") { TestJSONEncoder().testInterceptDecimal() }
 JSONEncoderTests.test("testInterceptURL") { TestJSONEncoder().testInterceptURL() }
 JSONEncoderTests.test("testTypeCoercion") { TestJSONEncoder().testTypeCoercion() }
+JSONEncoderTests.test("testDecodingConcreteTypeParameter") { TestJSONEncoder().testDecodingConcreteTypeParameter() }
+JSONEncoderTests.test("testEncoderStateThrowOnEncode") { TestJSONEncoder().testEncoderStateThrowOnEncode() }
+JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomDate") { TestJSONEncoder().testEncoderStateThrowOnEncodeCustomDate() }
+JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomData") { TestJSONEncoder().testEncoderStateThrowOnEncodeCustomData() }
+JSONEncoderTests.test("testDecoderStateThrowOnDecode") { TestJSONEncoder().testDecoderStateThrowOnDecode() }
+JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomDate") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomDate() }
+JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomData") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomData() }
 runAllTests()
 #endif

@@ -253,24 +253,20 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   init(_ value: ${src_ty.stdlib_name})
 
 % end
-  /*  TODO: Implement the following APIs once a revised integer protocol is
-      introduced that allows for them to be implemented. In particular, we
-      need to have an "index of most significant bit" operation and "get
-      absolute value as unsigned type" operation on the Integer protocol.
+  /// Creates a new value, rounded to the closest possible representation.
+  ///
+  /// If two representable values are equally close, the result is the value
+  /// with more trailing zeros in its significand bit pattern.
+  ///
+  /// - Parameter value: The integer to convert to a floating-point value.
+  init<Source : BinaryInteger>(_ value: Source)
 
-  /// Creates the closest representable value to the given integer.
+  /// Creates a new value, if the given integer can be represented exactly.
   ///
-  /// - Parameter value: The integer to represent as a floating-point value.
-  init<Source: Integer>(_ value: Source)
-
-  /// Creates a value that exactly represents the given integer.
+  /// If the given integer cannot be represented exactly, the result is `nil`.
   ///
-  /// If the given integer is outside the representable range of the type, the
-  /// result is `nil`.
-  ///
-  /// - Parameter value: The integer to represent as a floating-point value.
-  init?<Source: Integer>(exactly value: Source)
-  */
+  /// - Parameter value: The integer to convert to a floating-point value.
+  init?<Source : BinaryInteger>(exactly value: Source)
 
   /// The radix, or base of exponentiation, for a floating-point type.
   ///
@@ -688,7 +684,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
   ///
   /// If this value and `other` are finite numbers, the remainder is in the
   /// closed range `-abs(other / 2)...abs(other / 2)`. The
-  /// `remainder(dividingBy:)` method is always exact.
+  /// `formRemainder(dividingBy:)` method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
   mutating func formRemainder(dividingBy other: Self)
@@ -1222,6 +1218,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
 }
 
 /// The sign of a floating-point value.
+@_frozen // FIXME(sil-serialize-all)
 public enum FloatingPointSign: Int {
   /// The sign for a positive value.
   case plus
@@ -1231,6 +1228,7 @@ public enum FloatingPointSign: Int {
 }
 
 /// The IEEE 754 floating-point classes.
+@_frozen // FIXME(sil-serialize-all)
 public enum FloatingPointClassification {
   /// A signaling NaN ("not a number").
   ///
@@ -1396,31 +1394,31 @@ public enum FloatingPointRoundingRule {
 }
 
 extension FloatingPoint {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs.isEqual(to: rhs)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLess(than: rhs)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLessThanOrEqualTo(rhs)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLess(than: lhs)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLessThanOrEqualTo(lhs)
@@ -1464,39 +1462,41 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
-  /// - Parameter value: A floating-point value.
+  /// - Parameter value: A floating-point value to be converted.
   init(_ value: Float)
 
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
-  /// - Parameter value: A floating-point value.
+  /// - Parameter value: A floating-point value to be converted.
   init(_ value: Double)
 
 #if !os(Windows) && (arch(i386) || arch(x86_64))
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
-  /// - Parameter value: A floating-point value.
+  /// - Parameter value: A floating-point value to be converted.
   init(_ value: Float80)
 #endif
 
-  /*  TODO: Implement these once it becomes possible to do so (requires revised
-      Integer protocol).
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
-  /// - Parameter value: A floating-point value.
-  init<Source: BinaryFloatingPoint>(_ value: Source)
+  /// If two representable values are equally close, the result is the value
+  /// with more trailing zeros in its significand bit pattern.
+  ///
+  /// - Parameter value: A floating-point value to be converted.
+  init<Source : BinaryFloatingPoint>(_ value: Source)
 
-  /// Creates a new instance equivalent to the exact given value.
+  /// Creates a new instance from the given value, if it can be represented
+  /// exactly.
   ///
-  /// If the value you pass as `value` can't be represented exactly, the result
-  /// of this initializer is `nil`.
+  /// If the given floating-point value cannot be represented exactly, the
+  /// result is `nil`. A value that is NaN ("not a number") cannot be
+  /// represented exactly if its payload cannot be encoded exactly.
   ///
-  /// - Parameter value: A floating-point value to represent.
-  init?<Source: BinaryFloatingPoint>(exactly value: Source)
-  */
+  /// - Parameter value: A floating-point value to be converted.
+  init?<Source : BinaryFloatingPoint>(exactly value: Source)
 
   /// The number of bits used to represent the type's exponent.
   ///
@@ -1609,9 +1609,9 @@ extension FloatingPoint {
   /// The positive difference between 1.0 and the next greater representable
   /// number. The `ulpOfOne` constant corresponds to the C macros
   /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static var ulpOfOne: Self {
-    return Self(1).ulp
+    return (1 as Self).ulp
   }
 
   /// Returns this value rounded to an integral value using the specified
@@ -1647,7 +1647,7 @@ extension FloatingPoint {
   ///
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var lhs = self
@@ -1677,7 +1677,7 @@ extension FloatingPoint {
   ///
   /// - Returns: The nearest integral value, or, if two integral values are
   ///   equally close, the integral value with greater magnitude.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded() -> Self {
     return rounded(.toNearestOrAwayFromZero)
@@ -1702,7 +1702,7 @@ extension FloatingPoint {
   ///
   /// To specify an alternative rule for rounding, use the `round(_:)` method
   /// instead.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public mutating func round() {
     round(.toNearestOrAwayFromZero)
@@ -1718,7 +1718,7 @@ extension FloatingPoint {
   /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
   /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var nextDown: Self {
     return -(-self).nextUp
@@ -1755,7 +1755,7 @@ extension FloatingPoint {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1795,7 +1795,7 @@ extension FloatingPoint {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1817,7 +1817,7 @@ extension FloatingPoint {
   ///     // distance == 5.0
   ///
   /// - Returns: The square root of the value.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func squareRoot( ) -> Self {
     var lhs = self
@@ -1838,7 +1838,7 @@ extension FloatingPoint {
   ///   - lhs: One of the values to multiply before adding to this value.
   ///   - rhs: The other value to multiply.
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
@@ -1873,7 +1873,7 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: The minimum of `x` and `y`, or whichever is a number if the
   ///   other is NaN.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func minimum(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1910,7 +1910,7 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: The greater of `x` and `y`, or whichever is a number if the
   ///   other is NaN.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func maximum(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1949,7 +1949,7 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: Whichever of `x` or `y` has lesser magnitude, or whichever is
   ///   a number if the other is NaN.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func minimumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -1988,7 +1988,7 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: Whichever of `x` or `y` has greater magnitude, or whichever is
   ///   a number if the other is NaN.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func maximumMagnitude(_ x: Self, _ y: Self) -> Self {
     if x.isSignalingNaN || y.isSignalingNaN {
       //  Produce a quiet NaN matching platform arithmetic behavior.
@@ -2004,7 +2004,7 @@ extension FloatingPoint {
   /// described by the [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var floatingPointClass: FloatingPointClassification {
     if isSignalingNaN { return .signalingNaN }
     if isNaN { return .quietNaN }
@@ -2045,11 +2045,248 @@ extension BinaryFloatingPoint {
   ///     initializer has the same sign as `signOf`.
   ///   - magnitudeOf: A value from which to use the magnitude. The result of
   ///     the initializer has the same magnitude as `magnitudeOf`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(signOf: Self, magnitudeOf: Self) {
     self.init(sign: signOf.sign,
       exponentBitPattern: magnitudeOf.exponentBitPattern,
       significandBitPattern: magnitudeOf.significandBitPattern)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public // @testable
+  static func _convert<Source : BinaryInteger>(
+    from source: Source
+  ) -> (value: Self, exact: Bool) {
+    guard _fastPath(source != 0) else { return (0, true) }
+
+    let magnitude = source.magnitude
+
+    let exponent = Int(magnitude._binaryLogarithm())
+    let exemplar = Self.greatestFiniteMagnitude
+    guard _fastPath(exponent <= exemplar.exponent) else {
+      return Source.isSigned && source < 0
+        ? (-.infinity, false)
+        : (.infinity, false)
+    }
+    let exponentBitPattern =
+      (1 as Self).exponentBitPattern /* (i.e., bias) */
+        + Self.RawExponent(exponent)
+
+    let maxSignificandWidth = exemplar.significandWidth
+    let shift = maxSignificandWidth &- exponent
+    let significandBitPattern = shift >= 0
+      ? Self.RawSignificand(magnitude) << shift & exemplar.significandBitPattern
+      : Self.RawSignificand(
+        magnitude >> -shift & Source.Magnitude(exemplar.significandBitPattern))
+
+    let value = Self(
+      sign: Source.isSigned && source < 0 ? .minus : .plus,
+      exponentBitPattern: exponentBitPattern,
+      significandBitPattern: significandBitPattern)
+
+    if exponent &- magnitude.trailingZeroBitCount <= maxSignificandWidth {
+      return (value, true)
+    }
+    // We promise to round to the closest representation, and if two
+    // representable values are equally close, the value with more trailing
+    // zeros in its significand bit pattern. Therefore, we must take a look at
+    // the bits that we've just truncated.
+    let ulp = (1 as Source.Magnitude) << -shift
+    let truncatedBits = magnitude & (ulp - 1)
+    if truncatedBits < ulp / 2 {
+      return (value, false)
+    }
+    let rounded = Source.isSigned && source < 0 ? value.nextDown : value.nextUp
+    guard _fastPath(
+      truncatedBits != ulp / 2 ||
+        exponentBitPattern.trailingZeroBitCount <
+          rounded.exponentBitPattern.trailingZeroBitCount) else {
+      return (value, false)
+    }
+    return (rounded, false)
+  }
+
+  /// Creates a new value, rounded to the closest possible representation.
+  ///
+  /// If two representable values are equally close, the result is the value
+  /// with more trailing zeros in its significand bit pattern.
+  ///
+  /// - Parameter value: The integer to convert to a floating-point value.
+  @inlinable // FIXME(sil-serialize-all)
+  public init<Source : BinaryInteger>(_ value: Source) {
+    self = Self._convert(from: value).value
+  }
+
+  /// Creates a new value, if the given integer can be represented exactly.
+  ///
+  /// If the given integer cannot be represented exactly, the result is `nil`.
+  ///
+  /// - Parameter value: The integer to convert to a floating-point value.
+  @inlinable // FIXME(sil-serialize-all)
+  public init?<Source : BinaryInteger>(exactly value: Source) {
+    let (value_, exact) = Self._convert(from: value)
+    guard exact else { return nil }
+    self = value_
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public // @testable
+  static func _convert<Source : BinaryFloatingPoint>(
+    from source: Source
+  ) -> (value: Self, exact: Bool) {
+    guard _fastPath(!source.isZero) else {
+      return (source.sign == .minus ? -0.0 : 0, true)
+    }
+
+    guard _fastPath(source.isFinite) else {
+      if source.isInfinite {
+        return (source.sign == .minus ? -.infinity : .infinity, true)
+      }
+      // IEEE 754 requires that any NaN payload be propagated, if possible.
+      let payload_ =
+        source.significandBitPattern &
+          ~(Source.nan.significandBitPattern |
+            Source.signalingNaN.significandBitPattern)
+      let mask =
+        Self.greatestFiniteMagnitude.significandBitPattern &
+          ~(Self.nan.significandBitPattern |
+            Self.signalingNaN.significandBitPattern)
+      let payload = Self.RawSignificand(truncatingIfNeeded: payload_) & mask
+      // Although .signalingNaN.exponentBitPattern == .nan.exponentBitPattern,
+      // we do not *need* to rely on this relation, and therefore we do not.
+      let value = source.isSignalingNaN
+        ? Self(
+          sign: source.sign,
+          exponentBitPattern: Self.signalingNaN.exponentBitPattern,
+          significandBitPattern: payload |
+            Self.signalingNaN.significandBitPattern)
+        : Self(
+          sign: source.sign,
+          exponentBitPattern: Self.nan.exponentBitPattern,
+          significandBitPattern: payload | Self.nan.significandBitPattern)
+      return payload_ == payload ? (value, true) : (value, false)
+    }
+
+    let exponent = source.exponent
+    var exemplar = Self.leastNormalMagnitude
+    let exponentBitPattern: Self.RawExponent
+    let leadingBitIndex: Int
+    let shift: Int
+    let significandBitPattern: Self.RawSignificand
+
+    if exponent < exemplar.exponent {
+      // The floating-point result is either zero or subnormal.
+      exemplar = Self.leastNonzeroMagnitude
+      let minExponent = exemplar.exponent
+      if exponent + 1 < minExponent {
+        return (source.sign == .minus ? -0.0 : 0, false)
+      }
+      if _slowPath(exponent + 1 == minExponent) {
+        // Although the most significant bit (MSB) of a subnormal source
+        // significand is explicit, Swift BinaryFloatingPoint APIs actually
+        // omit any explicit MSB from the count represented in
+        // significandWidth. For instance:
+        //
+        //   Double.leastNonzeroMagnitude.significandWidth == 0
+        //
+        // Therefore, we do not need to adjust our work here for a subnormal
+        // source.
+        return source.significandWidth == 0
+          ? (source.sign == .minus ? -0.0 : 0, false)
+          : (source.sign == .minus ? -exemplar : exemplar, false)
+      }
+
+      exponentBitPattern = 0 as Self.RawExponent
+      leadingBitIndex = Int(Self.Exponent(exponent) - minExponent)
+      shift =
+        leadingBitIndex &-
+        (source.significandWidth &+
+          source.significandBitPattern.trailingZeroBitCount)
+      let leadingBit = source.isNormal
+        ? (1 as Self.RawSignificand) << leadingBitIndex
+        : 0
+      significandBitPattern = leadingBit | (shift >= 0
+        ? Self.RawSignificand(source.significandBitPattern) << shift
+        : Self.RawSignificand(source.significandBitPattern >> -shift))
+    } else {
+      // The floating-point result is either normal or infinite.
+      exemplar = Self.greatestFiniteMagnitude
+      if exponent > exemplar.exponent {
+        return (source.sign == .minus ? -.infinity : .infinity, false)
+      }
+
+      exponentBitPattern = exponent < 0
+        ? (1 as Self).exponentBitPattern - Self.RawExponent(-exponent)
+        : (1 as Self).exponentBitPattern + Self.RawExponent(exponent)
+      leadingBitIndex = exemplar.significandWidth
+      shift =
+        leadingBitIndex &-
+          (source.significandWidth &+
+            source.significandBitPattern.trailingZeroBitCount)
+      let sourceLeadingBit = source.isSubnormal
+        ? (1 as Source.RawSignificand) <<
+          (source.significandWidth &+
+            source.significandBitPattern.trailingZeroBitCount)
+        : 0
+      significandBitPattern = shift >= 0
+        ? Self.RawSignificand(
+          sourceLeadingBit ^ source.significandBitPattern) << shift
+        : Self.RawSignificand(
+          (sourceLeadingBit ^ source.significandBitPattern) >> -shift)
+    }
+
+    let value = Self(
+      sign: source.sign,
+      exponentBitPattern: exponentBitPattern,
+      significandBitPattern: significandBitPattern)
+
+    if source.significandWidth <= leadingBitIndex {
+      return (value, true)
+    }
+    // We promise to round to the closest representation, and if two
+    // representable values are equally close, the value with more trailing
+    // zeros in its significand bit pattern. Therefore, we must take a look at
+    // the bits that we've just truncated.
+    let ulp = (1 as Source.RawSignificand) << -shift
+    let truncatedBits = source.significandBitPattern & (ulp - 1)
+    if truncatedBits < ulp / 2 {
+      return (value, false)
+    }
+    let rounded = source.sign == .minus ? value.nextDown : value.nextUp
+    guard _fastPath(
+      truncatedBits != ulp / 2 ||
+        exponentBitPattern.trailingZeroBitCount <
+          rounded.exponentBitPattern.trailingZeroBitCount) else {
+      return (value, false)
+    }
+    return (rounded, false)
+  }
+
+  /// Creates a new instance from the given value, rounded to the closest
+  /// possible representation.
+  ///
+  /// If two representable values are equally close, the result is the value
+  /// with more trailing zeros in its significand bit pattern.
+  ///
+  /// - Parameter value: A floating-point value to be converted.
+  @inlinable // FIXME(sil-serialize-all)
+  public init<Source : BinaryFloatingPoint>(_ value: Source) {
+    self = Self._convert(from: value).value
+  }
+
+  /// Creates a new instance from the given value, if it can be represented
+  /// exactly.
+  ///
+  /// If the given floating-point value cannot be represented exactly, the
+  /// result is `nil`. A value that is NaN ("not a number") cannot be
+  /// represented exactly if its payload cannot be encoded exactly.
+  ///
+  /// - Parameter value: A floating-point value to be converted.
+  @inlinable // FIXME(sil-serialize-all)
+  public init?<Source : BinaryFloatingPoint>(exactly value: Source) {
+    let (value_, exact) = Self._convert(from: value)
+    guard exact else { return nil }
+    self = value_
   }
 
   /// Returns a Boolean value indicating whether this instance should precede
@@ -2074,7 +2311,7 @@ extension BinaryFloatingPoint {
   /// - Parameter other: A floating-point value to compare to this value.
   /// - Returns: `true` if this value is ordered below or the same as `other`
   ///   in a total ordering of the floating-point type; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool {
     // Quick return when possible.
     if self < other { return true }
@@ -2138,62 +2375,62 @@ extension BinaryFloatingPoint {
 }
 
 /// Returns the absolute value of `x`.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
   return x.magnitude
 }
 
 extension FloatingPoint {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public func negated() -> Self {
     return -self
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public func adding(_ other: Self) -> Self {
     return self + other
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public mutating func add(_ other: Self) {
     self += other
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public func subtracting(_ other: Self) -> Self {
     return self - other
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public mutating func subtract(_ other: Self) {
     self -= other
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public func multiplied(by other: Self) -> Self {
     return self * other
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public mutating func multiply(by other: Self) {
     self *= other
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public func divided(by other: Self) -> Self {
     return self / other
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
   public mutating func divide(by other: Self) {
     self /= other

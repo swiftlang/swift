@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-selection -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-ownership -access-enforcement-selection -enforce-exclusivity=checked %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -7,7 +7,7 @@ sil_stage raw
 
 // Test undef begin_access operands.
 // CHECK-LABEL: sil hidden @undefStack : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
-// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK: bb0(%0 : @trivial $Builtin.Int64):
 // CHECK: unreachable
 // CHECK: bb1:
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] undef : $*Builtin.Int64
@@ -20,7 +20,7 @@ sil_stage raw
 // CHECK: end_access [[READ]] : $*Builtin.Int64
 // CHECK-LABEL: } // end sil function 'undefStack'
 sil hidden @undefStack : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
-bb0(%0 : $Builtin.Int64):
+bb0(%0 : @trivial $Builtin.Int64):
   unreachable
 
 bb1:
@@ -85,6 +85,7 @@ sil @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Bui
 // CHECK:  return %{{.*}} : $()
 // CHECK-LABEL:} // end sil function 'escapeAsArgumentToPartialApply'
 sil hidden @escapeAsArgumentToPartialApply : $@convention(thin) () -> () {
+bb0:
   %2 = alloc_box ${ var Builtin.Int64 }, var, name "x"
   %3 = project_box %2 : ${ var Builtin.Int64 }, 0
   %4 = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
@@ -136,7 +137,8 @@ sil hidden @copyBox : $@convention(thin) () -> () {
 }
 
 sil @closure : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
-bb0(%0 : ${var Builtin.Int64}):
+bb0(%0 : @owned ${ var Builtin.Int64 }):
+  destroy_value %0 : ${ var Builtin.Int64 }
   %empty = tuple ()
   return %empty : $()
 }
@@ -160,6 +162,7 @@ bb0:
 
 bb1:
   end_access %write : $*Builtin.Int64
+  destroy_value %box : ${ var Builtin.Int64 }
   %empty = tuple ()
   return %empty : $()
 
@@ -179,4 +182,82 @@ bb0:
   %f = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
   %closure = partial_apply %f(%var) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
   unreachable
+}
+
+// Borrowed closure can be statically checked.
+//
+// CHECK-LABEL: sil @borrowedClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+// CHECK: begin_access [read] [static]
+// CHECK-LABEL: } // end sil function 'borrowedClosure'
+sil @borrowedClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : @trivial $*Builtin.Int64):
+  %access = begin_access [read] [unknown] %0 : $*Builtin.Int64
+  %val = load [trivial] %access : $*Builtin.Int64
+  end_access %access : $*Builtin.Int64
+  %empty = tuple ()
+  return %empty : $()
+}
+
+// Borrow an escaping closure. The closure body will be dynamically checked.
+sil @borrowClosure : $@convention(thin) () -> () {
+  %box = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %addr = project_box %box : ${ var Builtin.Int64 }, 0
+  // box escapes.
+  %copy = copy_value %box : ${ var Builtin.Int64 }
+
+  %f = function_ref @borrowedClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply %f(%addr) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+
+  // closure is borrowed.
+  %borrow = begin_borrow %closure : $@callee_owned () -> ()
+  %closure_copy = copy_value %borrow : $@callee_owned () -> ()
+  end_borrow %borrow from %closure : $@callee_owned () -> (), $@callee_owned () -> ()
+
+  destroy_value %closure_copy : $@callee_owned () -> ()
+  destroy_value %closure : $@callee_owned () -> ()
+  destroy_value %copy : ${ var Builtin.Int64 }
+  destroy_value %box : ${ var Builtin.Int64 }
+  %empty = tuple ()
+  return %empty : $()
+}
+
+sil @dontAssert : $@convention(thin) (Builtin.Int64) -> (@out Builtin.Int64) {
+bb0(%0 : @trivial $*Builtin.Int64, %1 : @trivial $Builtin.Int64):
+  store %1 to [trivial] %0 : $*Builtin.Int64
+  %f = function_ref @closureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply %f(%0) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  unreachable
+}
+
+sil [canonical] @serializedClosureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : @trivial $*Builtin.Int64):
+  %2 = begin_access [read] [unknown] %0 : $*Builtin.Int64
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  end_access %2 : $*Builtin.Int64
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// A begin_access may not be used by a partial_apply or a nested
+// begin_access prior to mandatory inlining. Nonetheless, this does
+// occur in deserialzied SIL. This SIL is only well-formed because the
+// function is marked [canonical].
+sil [canonical] @accessAroundClosure : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %2 = copy_value %1 : ${ var Builtin.Int64 }
+  %3 = project_box %1 : ${ var Builtin.Int64 }, 0
+  // outer access (presumably its uses were mandatory inlined)
+  %4 = begin_access [modify] [static] %3 : $*Builtin.Int64
+  %5 = function_ref @serializedClosureCapturingByStorageAddress : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %6 = partial_apply %5(%4) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %7 = begin_access [modify] [static] %4 : $*Builtin.Int64
+  %8 = function_ref @takesInoutAndClosure : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  %9 = apply %8(%7, %6) : $@convention(thin) (@inout Builtin.Int64, @owned @callee_owned () -> ()) -> ()
+  end_access %7 : $*Builtin.Int64
+  end_access %4 : $*Builtin.Int64
+  destroy_value %2 : ${ var Builtin.Int64 }
+  destroy_value %1 : ${ var Builtin.Int64 }
+  %10 = tuple ()
+  return %10 : $()
 }

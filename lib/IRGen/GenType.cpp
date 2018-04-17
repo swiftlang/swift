@@ -39,6 +39,7 @@
 #include "GenOpaque.h"
 #include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
+#include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
@@ -51,25 +52,33 @@ using namespace swift;
 using namespace irgen;
 
 llvm::DenseMap<TypeBase*, TypeCacheEntry> &
-TypeConverter::Types_t::getCacheFor(TypeBase *t) {
-  return t->hasTypeParameter() ? DependentCache : IndependentCache;
+TypeConverter::Types_t::getCacheFor(bool isDependent, bool completelyFragile) {
+  if (completelyFragile) {
+    return (isDependent
+            ? FragileDependentCache
+            : FragileIndependentCache);
+  }
+
+  return (isDependent
+          ? DependentCache
+          : IndependentCache);
 }
 
-void TypeInfo:: assign(IRGenFunction &IGF, Address dest, Address src,
-                       IsTake_t isTake, SILType T) const {
+void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
+                      IsTake_t isTake, SILType T, bool isOutlined) const {
   if (isTake) {
-    assignWithTake(IGF, dest, src, T);
+    assignWithTake(IGF, dest, src, T, isOutlined);
   } else {
-    assignWithCopy(IGF, dest, src, T);
+    assignWithCopy(IGF, dest, src, T, isOutlined);
   }
 }
 
 void TypeInfo::initialize(IRGenFunction &IGF, Address dest, Address src,
-                          IsTake_t isTake, SILType T) const {
+                          IsTake_t isTake, SILType T, bool isOutlined) const {
   if (isTake) {
-    initializeWithTake(IGF, dest, src, T);
+    initializeWithTake(IGF, dest, src, T, isOutlined);
   } else {
-    initializeWithCopy(IGF, dest, src, T);
+    initializeWithCopy(IGF, dest, src, T, isOutlined);
   }
 }
 
@@ -125,10 +134,9 @@ TypeInfo::nativeParameterValueSchema(IRGenModule &IGM) const {
 /// Copy a value from one object to a new object, directly taking
 /// responsibility for anything it might have.  This is like C++
 /// move-initialization, except the old object will not be destroyed.
-void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
-                                       Address destAddr,
-                                       Address srcAddr,
-                                       SILType T) const {
+void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF, Address destAddr,
+                                       Address srcAddr, SILType T,
+                                       bool isOutlined) const {
   assert(isBitwiseTakable(ResilienceExpansion::Maximal)
         && "non-bitwise-takable type must override default initializeWithTake");
   
@@ -139,7 +147,7 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
     auto &loadableTI = cast<LoadableTypeInfo>(*this);
     Explosion copy;
     loadableTI.loadAsTake(IGF, srcAddr, copy);
-    loadableTI.initialize(IGF, copy, destAddr);
+    loadableTI.initialize(IGF, copy, destAddr, isOutlined);
     return;
   }
 
@@ -149,24 +157,25 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
 
 /// Copy a value from one object to a new object.  This is just the
 /// default implementation.
-void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
-                                          Address destAddr,
-                                          Address srcAddr,
-                                          SILType T) const {
+void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                                          Address srcAddr, SILType T,
+                                          bool isOutlined) const {
   // Use memcpy if that's legal.
   if (isPOD(ResilienceExpansion::Maximal)) {
-    return initializeWithTake(IGF, destAddr, srcAddr, T);
+    return initializeWithTake(IGF, destAddr, srcAddr, T, isOutlined);
   }
 
   // Otherwise explode and re-implode.
-  if (IGF.isInOutlinedFunction()) {
+  if (isOutlined) {
     Explosion copy;
     loadAsCopy(IGF, srcAddr, copy);
-    initialize(IGF, copy, destAddr);
+    initialize(IGF, copy, destAddr, true);
   } else {
-    IGF.IGM.generateCallToOutlinedCopyAddr(
-        IGF, *this, destAddr, srcAddr, T,
-        &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+    OutliningMetadataCollector collector(IGF);
+    // No need to collect anything because we assume loadable types can be
+    // loaded without enums.
+    collector.emitCallToOutlinedCopy(
+        destAddr, srcAddr, T, *this, IsInitialization, IsNotTake);
   }
 }
 
@@ -348,7 +357,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
 }
 
 static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
-                                         size_t fixedSize,
+                                         Size fixedSize,
                                          llvm::Value *numEmptyCases) {
   // We can use the payload area with a tag bit set somewhere outside of the
   // payload area to represent cases. See how many bytes we need to cover
@@ -373,12 +382,12 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   auto *int32Ty = IGM.Int32Ty;
 
   auto *one = llvm::ConstantInt::get(int32Ty, 1U);
-  if (fixedSize >= 4) {
+  if (fixedSize >= Size(4)) {
     return one;
   }
 
   auto *entryBB = Builder.GetInsertBlock();
-  llvm::Value *size = asSizeConstant(IGM, Size(fixedSize));
+  llvm::Value *size = asSizeConstant(IGM, fixedSize);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
   size = Builder.CreateTrunc(size, int32Ty); // We know size < 4.
 
@@ -420,7 +429,7 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   auto &Builder = IGF.Builder;
 
   auto *size = getSize(IGF, T);
-  auto fixedSize = getFixedSize().getValue();
+  Size fixedSize = getFixedSize();
   auto *numExtraInhabitants =
       llvm::ConstantInt::get(IGM.Int32Ty, getFixedExtraInhabitantCount(IGM));
 
@@ -446,8 +455,8 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
 
   // There are extra tag bits to check.
   Builder.emitBlock(extraTagBitsBB);
-  llvm::Value *extraTagBits = Builder.CreateAlloca(IGM.Int32Ty, nullptr);
-  Builder.CreateStore(zero, extraTagBits, Alignment(0));
+  Address extraTagBitsSlot = IGF.createAlloca(IGM.Int32Ty, Alignment(4));
+  Builder.CreateStore(zero, extraTagBitsSlot);
 
   // Compute the number of extra tag bytes.
   auto *emptyCases = Builder.CreateSub(numEmptyCases, numExtraInhabitants);
@@ -458,13 +467,14 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   auto *valueAddr =
       Builder.CreateBitOrPointerCast(enumAddr.getAddress(), IGM.Int8PtrTy);
   auto *extraTagBitsAddr =
-      Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr, fixedSize);
+      Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr,
+                                         fixedSize.getValue());
 
   // TODO: big endian.
   Builder.CreateMemCpy(
-      Builder.CreateBitOrPointerCast(extraTagBits, IGM.Int8PtrTy),
+      Builder.CreateBitCast(extraTagBitsSlot, IGM.Int8PtrTy).getAddress(),
       extraTagBitsAddr, numExtraTagBytes, 1);
-  extraTagBits = Builder.CreateLoad(extraTagBits, Alignment(0));
+  auto extraTagBits = Builder.CreateLoad(extraTagBitsSlot);
 
   extraTagBitsBB = llvm::BasicBlock::Create(Ctx);
   Builder.CreateCondBr(Builder.CreateICmpEQ(extraTagBits, zero),
@@ -475,8 +485,8 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.emitBlock(extraTagBitsBB);
 
   auto *truncSize = Builder.CreateTrunc(size, IGM.Int32Ty);
-  llvm::Value *caseIndexFromValue = Builder.CreateAlloca(IGM.Int32Ty, nullptr);
-  Builder.CreateStore(zero, caseIndexFromValue, Alignment(0));
+  Address caseIndexFromValueSlot = IGF.createAlloca(IGM.Int32Ty, Alignment(4));
+  Builder.CreateStore(zero, caseIndexFromValueSlot);
 
   auto *caseIndexFromExtraTagBits = Builder.CreateSelect(
       Builder.CreateICmpUGE(truncSize, four), zero,
@@ -485,9 +495,10 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
 
   // TODO: big endian.
   Builder.CreateMemCpy(
-      Builder.CreateBitOrPointerCast(caseIndexFromValue, IGM.Int8PtrTy),
-      valueAddr, std::min(Size(4U).getValue(), fixedSize), 1);
-  caseIndexFromValue = Builder.CreateLoad(caseIndexFromValue, Alignment(0));
+      Builder.CreateBitCast(caseIndexFromValueSlot, IGM.Int8PtrTy),
+      Address(valueAddr, Alignment(1)),
+      std::min(Size(4U), fixedSize));
+  auto caseIndexFromValue = Builder.CreateLoad(caseIndexFromValueSlot);
 
   auto *result1 = Builder.CreateAdd(
       numExtraInhabitants,
@@ -517,13 +528,14 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   result->addIncoming(result0, noExtraTagBitsBB);
   result->addIncoming(result1, extraTagBitsBB);
   result->addIncoming(result2, singleCaseEnumBB);
-  return result;
+
+  return Builder.CreateAdd(result, llvm::ConstantInt::get(IGM.Int32Ty, 1));
 }
 
 /// Emit a speciaize memory operation for a \p size of 0 to 4 bytes.
 static void emitSpecializedMemOperation(
     IRGenFunction &IGF,
-    llvm::function_ref<void(IRBuilder &, uint64_t)> emitMemOpFn,
+    llvm::function_ref<void(IRBuilder &, Size)> emitMemOpFn,
     llvm::Value *size) {
   auto &IGM = IGF.IGM;
   auto &Ctx = IGF.IGM.getLLVMContext();
@@ -551,37 +563,37 @@ static void emitSpecializedMemOperation(
   Builder.CreateCondBr(isTwo, twoBB, fourBB);
 
   Builder.emitBlock(oneBB);
-  emitMemOpFn(Builder, 1);
+  emitMemOpFn(Builder, Size(1));
   Builder.CreateBr(returnBB);
 
   Builder.emitBlock(twoBB);
-  emitMemOpFn(Builder, 2);
+  emitMemOpFn(Builder, Size(2));
   Builder.CreateBr(returnBB);
 
   Builder.emitBlock(fourBB);
-  emitMemOpFn(Builder, 4);
+  emitMemOpFn(Builder, Size(4));
   Builder.CreateBr(returnBB);
 
   Builder.emitBlock(returnBB);
 }
 
 /// Emit a memset of zero operation for a \p size of 0 to 4 bytes.
-static void emitMemZero(IRGenFunction &IGF, llvm::Value *addr,
+static void emitMemZero(IRGenFunction &IGF, Address addr,
                         llvm::Value *size) {
   auto *zeroByte = llvm::ConstantInt::get(IGF.IGM.Int8Ty, 0U);
   emitSpecializedMemOperation(IGF,
-                              [=](IRBuilder &B, uint64_t numBytes) {
-                                B.CreateMemSet(addr, zeroByte, numBytes, 1);
+                              [=](IRBuilder &B, Size numBytes) {
+                                B.CreateMemSet(addr, zeroByte, numBytes);
                               },
                               size);
 }
 
 /// Emit a memcpy operation for a \p size of 0 to 4 bytes.
-static void emitMemCpy(IRGenFunction &IGF, llvm::Value *to, llvm::Value *from,
+static void emitMemCpy(IRGenFunction &IGF, Address to, Address from,
                        llvm::Value *size) {
   emitSpecializedMemOperation(IGF,
-                              [=](IRBuilder &B, uint64_t numBytes) {
-                                B.CreateMemCpy(to, from, numBytes, 1);
+                              [=](IRBuilder &B, Size numBytes) {
+                                B.CreateMemCpy(to, from, numBytes);
                               },
                               size);
 }
@@ -601,12 +613,11 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   auto *four = llvm::ConstantInt::get(int32Ty, 4U);
   auto *eight = llvm::ConstantInt::get(int32Ty, 8U);
 
-  auto fixedSize = getFixedSize().getValue();
+  auto fixedSize = getFixedSize();
 
-  auto *valueAddr =
-      Builder.CreateBitOrPointerCast(enumAddr.getAddress(), IGM.Int8PtrTy);
-  auto *extraTagBitsAddr =
-      Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr, fixedSize);
+  Address valueAddr = Builder.CreateElementBitCast(enumAddr, IGM.Int8Ty);
+  Address extraTagBitsAddr =
+    Builder.CreateConstByteArrayGEP(valueAddr, fixedSize);
 
   auto *numExtraInhabitants =
       llvm::ConstantInt::get(IGM.Int32Ty, getFixedExtraInhabitantCount(IGM));
@@ -637,7 +648,7 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   auto *isExtraTagBitsCaseBB = llvm::BasicBlock::Create(Ctx);
   auto *isPayloadOrInhabitantCaseBB = llvm::BasicBlock::Create(Ctx);
   auto *isPayloadOrExtraInhabitant =
-      Builder.CreateICmpSLT(whichCase, numExtraInhabitants);
+      Builder.CreateICmpULE(whichCase, numExtraInhabitants);
   Builder.CreateCondBr(isPayloadOrExtraInhabitant, isPayloadOrInhabitantCaseBB,
                        isExtraTagBitsCaseBB);
 
@@ -648,20 +659,26 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   isPayloadOrInhabitantCaseBB = Builder.GetInsertBlock();
   auto *storeInhabitantBB = llvm::BasicBlock::Create(Ctx);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
-  auto *isPayload = Builder.CreateICmpEQ(
-      whichCase, llvm::ConstantInt::getSigned(int32Ty, -1));
+  auto *isPayload = Builder.CreateICmpEQ(whichCase, zero);
   Builder.CreateCondBr(isPayload, returnBB, storeInhabitantBB);
 
   Builder.emitBlock(storeInhabitantBB);
-  if (mayHaveExtraInhabitants(IGM))
-    storeExtraInhabitant(IGF, whichCase, enumAddr, T);
+  if (mayHaveExtraInhabitants(IGM)) {
+    // Store an index in the range [0..ElementsWithNoPayload-1].
+    auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
+    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T);
+  }
   Builder.CreateBr(returnBB);
 
   // There are extra tag bits to consider.
   Builder.emitBlock(isExtraTagBitsCaseBB);
 
-  // Write the extra tag bytes.
-  auto *caseIndex = Builder.CreateSub(whichCase, numExtraInhabitants);
+  // Write the extra tag bytes. At this point we know we have an no payload case
+  // and therefore the index we should store is in the range
+  // [0..ElementsWithNoPayload-1].
+  auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
+  auto *caseIndex =
+      Builder.CreateSub(nonPayloadElementIndex, numExtraInhabitants);
   auto *truncSize = Builder.CreateTrunc(size, IGM.Int32Ty);
   auto *isFourBytesPayload = Builder.CreateICmpUGE(truncSize, four);
   auto *payloadGE4BB = Builder.GetInsertBlock();
@@ -687,21 +704,20 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   payloadIndex->addIncoming(caseIndex, payloadGE4BB);
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
-  auto *payloadIndexAddr = Builder.CreateAlloca(int32Ty, nullptr);
-  Builder.CreateStore(payloadIndex, payloadIndexAddr, Alignment(0));
-  auto *extraTagIndexAddr = Builder.CreateAlloca(int32Ty, nullptr);
-  Builder.CreateStore(extraTagIndex, extraTagIndexAddr, Alignment(0));
+  Address payloadIndexAddr = IGF.createAlloca(int32Ty, Alignment(4));
+  Builder.CreateStore(payloadIndex, payloadIndexAddr);
+  Address extraTagIndexAddr = IGF.createAlloca(int32Ty, Alignment(4));
+  Builder.CreateStore(extraTagIndex, extraTagIndexAddr);
   // TODO: big endian
   Builder.CreateMemCpy(
       valueAddr,
-      Builder.CreateBitOrPointerCast(payloadIndexAddr, IGM.Int8PtrTy),
-      std::min(Size(4U).getValue(), fixedSize), 1);
-  auto *extraZeroAddr =
-      Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr, 4);
-  if (fixedSize > 4)
+      Builder.CreateBitCast(payloadIndexAddr, IGM.Int8PtrTy),
+      std::min(Size(4U), fixedSize));
+  Address extraZeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, Size(4));
+  if (fixedSize > Size(4))
     Builder.CreateMemSet(
         extraZeroAddr, llvm::ConstantInt::get(IGM.Int8Ty, 0),
-        Builder.CreateSub(size, llvm::ConstantInt::get(size->getType(), 4)), 1);
+        Builder.CreateSub(size, llvm::ConstantInt::get(size->getType(), 4)));
   emitMemCpy(IGF, extraTagBitsAddr, extraTagIndexAddr, numExtraTagBytes);
   Builder.CreateBr(returnBB);
 
@@ -797,16 +813,17 @@ namespace {
                     Explosion &e) const override {}
     void loadAsTake(IRGenFunction &IGF, Address addr,
                     Explosion &e) const override {}
-    void assign(IRGenFunction &IGF, Explosion &e,
-                Address addr) const override {}
-    void initialize(IRGenFunction &IGF, Explosion &e,
-                    Address addr) const override {}
+    void assign(IRGenFunction &IGF, Explosion &e, Address addr,
+                bool isOutlined) const override {}
+    void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
+                    bool isOutlined) const override {}
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest, Atomicity atomicity) const override {}
     void consume(IRGenFunction &IGF, Explosion &src,
                  Atomicity atomicity) const override {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
-    void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {}
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {}
     void packIntoEnumPayload(IRGenFunction &IGF, EnumPayload &payload,
                              Explosion &src, unsigned offset) const override {}
     void unpackFromEnumPayload(IRGenFunction &IGF,
@@ -908,14 +925,14 @@ namespace {
       addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       explosion.add(IGF.Builder.CreateLoad(addr));
     }
-    
-    void assign(IRGenFunction &IGF, Explosion &explosion,
-                Address addr) const override {
-      initialize(IGF, explosion, addr);
+
+    void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
+                bool isOutlined) const override {
+      initialize(IGF, explosion, addr, isOutlined);
     }
-    
-    void initialize(IRGenFunction &IGF, Explosion &explosion,
-                    Address addr) const override {
+
+    void initialize(IRGenFunction &IGF, Explosion &explosion, Address addr,
+                    bool isOutlined) const override {
       addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       IGF.Builder.CreateStore(explosion.claimNext(), addr);
     }
@@ -939,7 +956,8 @@ namespace {
       explosion.claimNext();
     }
 
-    void destroy(IRGenFunction &IGF, Address address, SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
       /* nop */
     }
     
@@ -979,28 +997,30 @@ namespace {
       : IndirectTypeInfo(storage, size, std::move(spareBits), align,
                          IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest,
-                        Address src, SILType T) const override {
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
-    void assignWithTake(IRGenFunction &IGF, Address dest,
-                        Address src, SILType T) const override {
+    void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
-                            Address srcAddr, SILType T) const override {
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
-    void destroy(IRGenFunction &IGF, Address address,
-                 SILType T) const override {
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
   };
@@ -1068,6 +1088,11 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   // Push the generic context down to the SIL TypeConverter, so we can share
   // archetypes with SIL.
   IGM.getSILTypes().pushGenericContext(signature);
+
+  // Clear the dependent type info cache since we have a new active signature
+  // now.
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
@@ -1077,7 +1102,8 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   // Pop the SIL TypeConverter's generic context too.
   IGM.getSILTypes().popGenericContext(signature);
   
-  Types.DependentCache.clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
@@ -1094,8 +1120,9 @@ GenericEnvironment *IRGenModule::getGenericEnvironment() {
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
   assert(key->isCanonical());
   assert(!key->hasTypeParameter());
-  assert(!Types.IndependentCache.count(key) && "entry already exists for type!");
-  Types.IndependentCache.insert(std::make_pair(key, type));
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+  assert(!Cache.count(key) && "entry already exists for type!");
+  Cache.insert(std::make_pair(key, type));
 }
 
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
@@ -1358,7 +1385,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
 
   // Map the archetype out of its own generic environment and into the
   // canonical generic environment.
-  auto interfaceType = genericEnv->mapTypeOutOfContext(t);
+  auto interfaceType = t->getInterfaceType();
   auto exemplar = canGenericEnv->mapTypeIntoContext(interfaceType)
                     ->castTo<ArchetypeType>();
   assert(isExemplarArchetype(exemplar));
@@ -1386,9 +1413,20 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   }
 }
 
+void TypeConverter::pushCompletelyFragile() {
+  assert(!CompletelyFragile);
+  CompletelyFragile = true;
+}
+
+void TypeConverter::popCompletelyFragile() {
+  assert(CompletelyFragile);
+  CompletelyFragile = false;
+}
+
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
-  auto &Cache = Types.getCacheFor(canonicalTy.getPointer());
+  auto &Cache = Types.getCacheFor(canonicalTy->hasTypeParameter(),
+                                  CompletelyFragile);
 
   {
     auto it = Cache.find(canonicalTy.getPointer());
@@ -1414,8 +1452,9 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != canonicalTy) {
-    auto it = Types.IndependentCache.find(exemplarTy.getPointer());
-    if (it != Types.IndependentCache.end()) {
+    auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+    auto it = Cache.find(exemplarTy.getPointer());
+    if (it != Cache.end()) {
       // Record the object under the original type.
       auto result = it->second;
       Cache[canonicalTy.getPointer()] = result;
@@ -1443,8 +1482,11 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
     entry = convertedTI;
   };
   insertEntry(Cache[canonicalTy.getPointer()]);
-  if (canonicalTy != exemplarTy)
-    insertEntry(Types.IndependentCache[exemplarTy.getPointer()]);
+  if (canonicalTy != exemplarTy) {
+    auto &IndependentCache = Types.getCacheFor(/*isDependent*/ false,
+                                               CompletelyFragile);
+    insertEntry(IndependentCache[exemplarTy.getPointer()]);
+  }
   
   // If the type info hasn't been added to the list of types, do so.
   if (!convertedTI->NextConverted) {
@@ -1636,6 +1678,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertBlockStorageType(cast<SILBlockStorageType>(ty));
   case TypeKind::SILBox:
     return convertBoxType(cast<SILBoxType>(ty));
+  case TypeKind::SILToken:
+    llvm_unreachable("should not be asking for representation of a SILToken");
   }
   }
   llvm_unreachable("bad type kind");
@@ -1657,7 +1701,7 @@ const TypeInfo *
 TypeConverter::convertUnownedStorageType(UnownedStorageType *refType) {
   // The type may be optional.
   CanType referent(refType->getReferentType());
-  if (auto referentObj = referent.getAnyOptionalObjectType())
+  if (auto referentObj = referent.getOptionalObjectType())
     referent = referentObj;
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
@@ -1670,7 +1714,7 @@ const TypeInfo *
 TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
   // The type may be optional.
   CanType referent(refType->getReferentType());
-  if (auto referentObj = referent.getAnyOptionalObjectType())
+  if (auto referentObj = referent.getOptionalObjectType())
     referent = referentObj;
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
@@ -1682,7 +1726,7 @@ TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
 const TypeInfo *
 TypeConverter::convertWeakStorageType(WeakStorageType *refType) {
   CanType referent =
-    CanType(refType->getReferentType()->getAnyOptionalObjectType());
+      CanType(refType->getReferentType()->getOptionalObjectType());
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
   return referentTI.createWeakStorageType(*this);
@@ -1837,7 +1881,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->hasUnboundGenericType());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto &Cache = Types.IndependentCache;
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
   auto entry = Cache.find(key);
   if (entry != Cache.end())
     return entry->second;
@@ -2060,20 +2104,6 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   llvm_unreachable("impossible width value");
 }
 
-llvm::Value *IRGenFunction::getLocalSelfMetadata() {
-  assert(LocalSelf && "no local self metadata");
-  switch (SelfKind) {
-  case SwiftMetatype:
-    return LocalSelf;
-  case ObjCMetatype:
-    return emitObjCMetadataRefForMetadata(*this, LocalSelf);
-  case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
-  }
-
-  llvm_unreachable("Not a valid LocalSelfKind.");
-}
-
 void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
                                          IRGenFunction::LocalSelfKind kind) {
   assert(!LocalSelf && "already have local self metadata");
@@ -2082,18 +2112,6 @@ void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
 }
 
 #ifndef NDEBUG
-CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const {
-  for (auto &mapping : Types.IndependentCache) {
-    if (auto fwd = mapping.second.dyn_cast<llvm::Type*>())
-      if (fwd == t)
-        return CanType(mapping.first);
-    if (auto *ti = mapping.second.dyn_cast<const TypeInfo *>())
-      if (ti->getStorageType() == t)
-        return CanType(mapping.first);
-  }
-  return CanType();
-}
-
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   auto genericEnv = arch->getGenericEnvironment();
   if (!genericEnv) return true;

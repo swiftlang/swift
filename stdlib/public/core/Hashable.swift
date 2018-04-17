@@ -28,17 +28,32 @@
 /// equal hash values are not necessarily equal to each other.
 ///
 /// - Important: Hash values are not guaranteed to be equal across different
-///   executions of your program. Do not save hash values to use in a
-///   future execution.
+///   executions of your program. Do not save hash values to use in a future
+///   execution.
 ///
 /// Conforming to the Hashable Protocol
 /// ===================================
 ///
 /// To use your own custom type in a set or as the key type of a dictionary,
-/// add `Hashable` conformance to your type by providing a `hashValue`
-/// property. The `Hashable` protocol inherits from the `Equatable` protocol,
-/// so you must also add an equal-to operator (`==`) function for your
-/// custom type.
+/// add `Hashable` conformance to your type. The `Hashable` protocol inherits
+/// from the `Equatable` protocol, so you must also satisfy that protocol's
+/// requirements.
+///
+/// A custom type's `Hashable` and `Equatable` requirements are automatically
+/// synthesized by the compiler when you declare `Hashable` conformance in the
+/// type's original declaration and your type meets these criteria:
+///
+/// - For a `struct`, all its stored properties must conform to `Hashable`.
+/// - For an `enum`, all its associated values must conform to `Hashable`. (An
+///   `enum` without associated values has `Hashable` conformance even without
+///   the declaration.)
+///
+/// To customize your type's `Hashable` conformance, to adopt `Hashable` in a
+/// type that doesn't meet the criteria listed above, or to extend an existing
+/// type to conform to `Hashable`, implement the `hashValue` property in your
+/// custom type. To ensure that your type meets the semantic requirements of
+/// the `Hashable` and `Equatable` protocols, it's a good idea to also
+/// customize your type's `Equatable` conformance to match.
 ///
 /// As an example, consider a `GridPoint` type that describes a location in a
 /// grid of buttons. Here's the initial declaration of the `GridPoint` type:
@@ -68,7 +83,7 @@
 /// point's `x` property with the hash value of its `y` property multiplied by
 /// a prime constant.
 ///
-/// - Note: The above example above is a reasonably good hash function for a
+/// - Note: The example above is a reasonably good hash function for a
 ///   simple type. If you're writing a hash function for a custom type, choose
 ///   a hashing algorithm that is appropriate for the kinds of data your type
 ///   comprises. Set and dictionary performance depends on hash values that
@@ -93,26 +108,39 @@ public protocol Hashable : Equatable {
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
+
+  /// Feed bits to be hashed into the hash function represented by `hasher`.
+  func _hash(into hasher: inout _Hasher)
 }
 
-public enum _RuntimeHelpers {}
-
-extension _RuntimeHelpers {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_silgen_name("swift_stdlib_Hashable_isEqual_indirect")
-  public static func Hashable_isEqual_indirect<T : Hashable>(
-    _ lhs: UnsafePointer<T>,
-    _ rhs: UnsafePointer<T>
-  ) -> Bool {
-    return lhs.pointee == rhs.pointee
-  }
-
-  @_inlineable // FIXME(sil-serialize-all)
-  @_silgen_name("swift_stdlib_Hashable_hashValue_indirect")
-  public static func Hashable_hashValue_indirect<T : Hashable>(
-    _ value: UnsafePointer<T>
-  ) -> Int {
-    return value.pointee.hashValue
+extension Hashable {
+  @inline(__always)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(self.hashValue)
   }
 }
 
+// Called by synthesized `hashValue` implementations.
+@inline(__always)
+public func _hashValue<H: Hashable>(for value: H) -> Int {
+  var hasher = _Hasher()
+  hasher.append(value)
+  return hasher.finalize()
+}
+
+// Called by the SwiftValue implementation.
+@_silgen_name("_swift_stdlib_Hashable_isEqual_indirect")
+internal func Hashable_isEqual_indirect<T : Hashable>(
+  _ lhs: UnsafePointer<T>,
+  _ rhs: UnsafePointer<T>
+) -> Bool {
+  return lhs.pointee == rhs.pointee
+}
+
+// Called by the SwiftValue implementation.
+@_silgen_name("_swift_stdlib_Hashable_hashValue_indirect")
+internal func Hashable_hashValue_indirect<T : Hashable>(
+  _ value: UnsafePointer<T>
+) -> Int {
+  return value.pointee.hashValue
+}

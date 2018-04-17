@@ -49,8 +49,6 @@ func withInoutT<T>(_ x: inout T, body: (_ x: inout T) -> Void) {
 %     end
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${array_type}" == "ArraySlice" },
-                 reason: "rdar://33358110"))
   .code {
   var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
@@ -122,8 +120,6 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Int)/COW")
 }
 
 ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW")
-  .xfail(.custom({ _isStdlibDebugConfiguration() && "${array_type}" == "ArraySlice" },
-                 reason: "rdar://33358110"))
   .code {
   var a: ${array_type}<${array_type}<${element_type}>> = [[
     ${element_type}(10), ${element_type}(20), ${element_type}(30),
@@ -612,7 +608,7 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
   }
 
-  buffer.deallocate(capacity: 3)
+  buffer.deallocate()
   _fixLifetime(a)
 
   expectAutoreleasedKeysAndValues(unopt: (0, 3))
@@ -886,7 +882,7 @@ ArrayTestSuite.test("BridgedToObjC/Custom/getObjects") {
     expectEqual(idValue2, unsafeBitCast(a.object(at: 2) as AnyObject, to: UInt.self))
   }
 
-  buffer.deallocate(capacity: 3)
+  buffer.deallocate()
   _fixLifetime(a)
 
   expectEqual(3, TestBridgedValueTy.bridgeOperations)
@@ -1152,4 +1148,3 @@ ArrayTestSuite.tearDown {
 #endif // _runtime(_ObjC)
 
 runAllTests()
-

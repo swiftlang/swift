@@ -40,24 +40,37 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayOfRef
     single-source/ArraySetElement
     single-source/ArraySubscript
+    single-source/BinaryFloatingPointConversionFromBinaryInteger
+    single-source/BinaryFloatingPointProperties
     single-source/BitCount
     single-source/ByteSwap
+    single-source/COWTree
     single-source/CString
+    single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
+    single-source/ChainedFilterMap
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
+    single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/Combos
+    single-source/DataBenchmarks
     single-source/DeadArray
+    single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
     single-source/DictTest3
+    single-source/DictTest4
     single-source/DictionaryBridge
+    single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
+    single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
+    single-source/DoubleWidthDivision
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
@@ -65,6 +78,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic
@@ -74,6 +88,8 @@ set(SWIFT_BENCH_MODULES
     single-source/Join
     single-source/LazyFilter
     single-source/LinkedList
+    single-source/LuhnAlgoEager
+    single-source/LuhnAlgoLazy
     single-source/MapReduce
     single-source/Memset
     single-source/MonteCarloE
@@ -81,6 +97,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSDictionaryCastToSwift
     single-source/NSError
     single-source/NSStringConversion
+    single-source/NibbleSort
     single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging
@@ -91,7 +108,9 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverPartiallyAppliedMethod
     single-source/ObserverUnappliedMethod
     single-source/OpenClose
+    single-source/PartialApplyDynamicType
     single-source/Phonebook
+    single-source/PointerArithmetics
     single-source/PolymorphicCalls
     single-source/PopFront
     single-source/PopFrontGeneric
@@ -100,13 +119,18 @@ set(SWIFT_BENCH_MODULES
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
+    single-source/Queue
     single-source/RC4
     single-source/RGBHistogram
     single-source/RangeAssignment
     single-source/RangeIteration
+    single-source/RangeReplaceableCollectionPlusDefault
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
+    single-source/RemoveWhere
     single-source/ReversedCollections
+    single-source/RomanNumbers
+    single-source/SequenceAlgos
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
@@ -118,10 +142,12 @@ set(SWIFT_BENCH_MODULES
     single-source/StrComplexWalk
     single-source/StrToInt
     single-source/StringBuilder
+    single-source/StringComparison
     single-source/StringEdits
     single-source/StringEnum
     single-source/StringInterpolation
     single-source/StringMatch
+    single-source/StringRemoveDupes
     single-source/StringTests
     single-source/StringWalk
     single-source/Substring
@@ -131,6 +157,7 @@ set(SWIFT_BENCH_MODULES
     single-source/TypeFlood
     single-source/UTF8Decode
     single-source/Walsh
+    single-source/WordCount
     single-source/XorLoop
 )
 
@@ -203,6 +230,17 @@ if(NOT SWIFT_OPTIMIZATION_LEVELS)
                                 ${SWIFT_EXTRA_BENCH_CONFIGS})
 endif()
 
+set(SWIFT_BENCHMARK_EXTRA_FLAGS "" CACHE STRING
+    "Extra options to pass to swiftc when building the benchmarks")
+
+if (SWIFT_BENCHMARK_BUILT_STANDALONE)
+  # This option's value must match the value of the same option used when
+  # building the swift runtime.
+  option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
+    FALSE)
+endif()
+
 set(SWIFT_BENCHMARK_NUM_O_ITERATIONS "" CACHE STRING
     "Number of iterations to perform when running -O benchmarks via cmake")
 set(SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS "" CACHE STRING
@@ -210,6 +248,24 @@ set(SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS "" CACHE STRING
 
 # Options for the default (= empty) configuration
 set(BENCHOPTS "-whole-module-optimization")
+
+option(SWIFT_BENCHMARK_GENERATE_OPT_VIEW
+  "Produce optimization view for benchmarks"
+  FALSE)
+
+set(SWIFT_BENCHMARK_OPT_VIEWER "" CACHE FILEPATH
+  "Path to opt-viewer")
+
+if(SWIFT_BENCHMARK_OPT_VIEWER)
+  # If the path to the opt-viewer was specified manually and we have no access
+  # to the LLVM tree, assume we have the modules for the opt-viewer installed.
+  if(SWIFT_BENCHMARK_BUILT_STANDALONE)
+    set(LLVM_HAVE_OPT_VIEWER_MODULES 1)
+  endif()
+else()
+  set (SWIFT_BENCHMARK_OPT_VIEWER
+    "${LLVM_BUILD_MAIN_SRC_DIR}/tools/opt-viewer/opt-viewer.py")
+endif()
 
 # Options for other configurations
 set(BENCHOPTS_MULTITHREADED
@@ -249,6 +305,7 @@ message("--")
 message("-- Swift Benchmark Suite:")
 message("--   SWIFT_BENCHMARK_BUILT_STANDALONE = ${SWIFT_BENCHMARK_BUILT_STANDALONE}")
 message("--   SWIFT_EXEC = ${SWIFT_EXEC}")
+message("--   SWIFT_BENCHMARK_EXTRA_FLAGS = ${SWIFT_BENCHMARK_EXTRA_FLAGS}")
 message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
 message("--   CLANG_EXEC = ${CLANG_EXEC}")
 message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")

@@ -18,7 +18,10 @@ import platform
 import sys
 import time
 
+from build_swift import defaults
 from build_swift import driver_arguments
+from build_swift import presets
+from build_swift.migration import migrate_swift_sdks
 
 from swift_build_support.swift_build_support import (
     arguments,
@@ -31,16 +34,12 @@ from swift_build_support.swift_build_support import (
     targets,
     workspace
 )
-
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
     SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
-    get_all_preset_names,
-    get_preset_options,
 )
-
 from swift_build_support.swift_build_support.cmake import CMake
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
@@ -155,11 +154,12 @@ class HostSpecificConfiguration(object):
                     test = False
 
             if build:
-                # Validation and long tests require building the full standard
-                # library, whereas the other targets can build a slightly
-                # smaller subset which is faster to build.
+                # Validation, long, and stress tests require building the full
+                # standard library, whereas the other targets can build a
+                # slightly smaller subset which is faster to build.
                 if args.build_swift_stdlib_unittest_extra or \
-                        args.validation_test or args.long_test:
+                        args.validation_test or args.long_test or \
+                        args.stress_test:
                     self.swift_stdlib_build_targets.append(
                         "swift-stdlib-" + name)
                 else:
@@ -185,12 +185,15 @@ class HostSpecificConfiguration(object):
                 else:
                     suffix = ""
                 subset_suffix = ""
-                if args.validation_test and args.long_test:
+                if args.validation_test and args.long_test and \
+                        args.stress_test:
                     subset_suffix = "-all"
                 elif args.validation_test:
                     subset_suffix = "-validation"
                 elif args.long_test:
                     subset_suffix = "-only_long"
+                elif args.stress_test:
+                    subset_suffix = "-only_stress"
                 else:
                     subset_suffix = ""
                 self.swift_test_run_targets.append("check-swift{}{}-{}".format(
@@ -412,10 +415,13 @@ class BuildScriptInvocation(object):
         # Set an appropriate default umask.
         os.umask(0o022)
 
+        if 'SDKROOT' in os.environ:
+            print('NOTE: Environment variable SDKROOT is set to "{}"'
+                  .format(os.environ['SDKROOT']))
+
         # Unset environment variables that might affect how tools behave.
         for v in [
                 'MAKEFLAGS',
-                'SDKROOT',
                 'MACOSX_DEPLOYMENT_TARGET',
                 'IPHONEOS_DEPLOYMENT_TARGET',
                 'TVOS_DEPLOYMENT_TARGET',
@@ -474,16 +480,22 @@ class BuildScriptInvocation(object):
             "--swift-build-type", args.swift_build_variant,
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
+            "--lldb-build-with-xcode", args.lldb_build_with_xcode,
             "--foundation-build-type", args.foundation_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
             "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--swiftpm-build-type", args.build_variant,
+            "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
             "--swift-analyze-code-coverage", str(
                 args.swift_analyze_code_coverage).lower(),
+            "--llbuild-enable-assertions", str(
+                args.llbuild_assertions).lower(),
+            "--lldb-assertions", str(
+                args.lldb_assertions).lower(),
             "--cmake-generator", args.cmake_generator,
             "--build-jobs", str(args.build_jobs),
             "--common-cmake-options=%s" % ' '.join(
@@ -550,6 +562,8 @@ class BuildScriptInvocation(object):
             # have a separate bot that checks for leaks.
             if platform.system() == 'Linux':
                 os.environ['ASAN_OPTIONS'] = 'detect_leaks=0'
+        if args.enable_ubsan:
+            impl_args += ["--enable-ubsan"]
 
         # If we have lsan, we need to export our suppression list. The actual
         # passing in of the LSAN flag is done via the normal cmake method. We
@@ -589,8 +603,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-libicu"]
         if not args.build_swiftpm:
             impl_args += ["--skip-build-swiftpm"]
-        if not args.build_playgroundlogger:
-            impl_args += ["--skip-build-playgroundlogger"]
         if not args.build_playgroundsupport:
             impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
@@ -627,7 +639,7 @@ class BuildScriptInvocation(object):
         if not args.build_android:
             impl_args += ["--skip-build-android"]
 
-        if not args.test and not args.long_test:
+        if not args.test and not args.long_test and not args.stress_test:
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += ["--skip-test-cmark",
@@ -638,7 +650,6 @@ class BuildScriptInvocation(object):
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",
                           "--skip-test-libicu",
-                          "--skip-test-playgroundlogger",
                           "--skip-test-playgroundsupport"]
         if not args.test_linux:
             impl_args += ["--skip-test-linux"]
@@ -670,6 +681,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--validation-test"]
         if args.long_test:
             impl_args += ["--long-test"]
+        if args.stress_test:
+            impl_args += ["--stress-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:
@@ -973,15 +986,25 @@ def main_preset():
 
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
-            os.path.join(HOME, ".swift-build-presets"),
             os.path.join(
                 SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils",
                 "build-presets.ini")
         ]
 
+        user_presets_file = os.path.join(HOME, '.swift-build-presets')
+        if os.path.isfile(user_presets_file):
+            args.preset_file_names.append(user_presets_file)
+
+    preset_parser = presets.PresetParser()
+
+    try:
+        preset_parser.read(args.preset_file_names)
+    except presets.Error as e:
+        diagnostics.fatal(e.message)
+
     if args.show_presets:
-        for name in sorted(get_all_preset_names(args.preset_file_names),
-                           key=str.lower):
+        for name in sorted(preset_parser.preset_names(),
+                           key=lambda name: name.lower()):
             print(name)
         return 0
 
@@ -989,26 +1012,30 @@ def main_preset():
         diagnostics.fatal("missing --preset option")
 
     args.preset_substitutions = {}
-
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
 
-    preset_args = get_preset_options(
-        args.preset_substitutions, args.preset_file_names, args.preset)
+    try:
+        preset = preset_parser.get_preset(args.preset,
+                                          vars=args.preset_substitutions)
+    except presets.Error as e:
+        diagnostics.fatal(e.message)
+
+    preset_args = migrate_swift_sdks(preset.format_args())
 
     build_script_args = [sys.argv[0]]
     if args.dry_run:
         build_script_args += ["--dry-run"]
+
     build_script_args += preset_args
     if args.distcc:
         build_script_args += ["--distcc"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
 
-    diagnostics.note(
-        "using preset '" + args.preset + "', which expands to \n\n" +
-        shell.quote_command(build_script_args) + "\n")
+    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
+        args.preset, shell.quote_command(build_script_args)))
 
     if args.expand_build_script_invocation:
         return 0
@@ -1038,6 +1065,13 @@ def main_normal():
     shell.dry_run = args.dry_run
 
     # Prepare and validate toolchain
+    if args.darwin_xcrun_toolchain is None:
+        xcrun_toolchain = os.environ.get('TOOLCHAINS',
+                                         defaults.DARWIN_XCRUN_TOOLCHAIN)
+
+        diagnostics.note('Using toolchain {}'.format(xcrun_toolchain))
+        args.darwin_xcrun_toolchain = xcrun_toolchain
+
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
     os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
 

@@ -97,6 +97,10 @@ class SILPerformanceInliner {
     /// specialization for a call.
     GenericSpecializationBenefit = RemovedCallBenefit + 300,
 
+    /// The benefit of inlining class methods with -Osize.
+    /// We only inline very small class methods with -Osize.
+    OSizeClassMethodBenefit = 5,
+
     /// Approximately up to this cost level a function can be inlined without
     /// increasing the code size.
     TrivialFunctionThreshold = 18,
@@ -111,7 +115,7 @@ class SILPerformanceInliner {
     DefaultApplyLength = 10
   };
 
-  SILOptions::SILOptMode OptMode;
+  OptimizationMode OptMode;
 
 #ifndef NDEBUG
   SILFunction *LastPrintedCaller = nullptr;
@@ -161,7 +165,7 @@ class SILPerformanceInliner {
 public:
   SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
                         SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
-                        SILOptions::SILOptMode OptMode, OptRemark::Emitter &ORE)
+                        OptimizationMode OptMode, OptRemark::Emitter &ORE)
       : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA), ORE(ORE),
         OptMode(OptMode) {}
 
@@ -243,7 +247,8 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = RemovedCallBenefit;
 
   // Osize heuristic.
-  if (OptMode == SILOptions::SILOptMode::OptimizeForSize) {
+  bool isClassMethodAtOsize = false;
+  if (OptMode == OptimizationMode::ForSize) {
     // Don't inline into thunks.
     if (AI.getFunction()->isThunk())
       return false;
@@ -253,9 +258,8 @@ bool SILPerformanceInliner::isProfitableToInline(
       auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType();
       if (SelfTy->mayHaveSuperclass() &&
           Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
-        return false;
+        isClassMethodAtOsize = true;
     }
-
     // Use command line option to control inlining in Osize mode.
     const uint64_t CallerBaseBenefitReductionFactor = AI.getFunction()->getModule().getOptions().CallerBaseBenefitReductionFactor;
     BaseBenefit = BaseBenefit / CallerBaseBenefitReductionFactor;
@@ -263,8 +267,13 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   // It is always OK to inline a simple call.
   // TODO: May be consider also the size of the callee?
-  if (isPureCall(AI, SEA))
+  if (isPureCall(AI, SEA)) {
+    DEBUG(
+      dumpCaller(AI.getFunction());
+      llvm::dbgs() << "    pure-call decision " << Callee->getName() << '\n';
+    );
     return true;
+  }
 
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
@@ -293,13 +302,7 @@ bool SILPerformanceInliner::isProfitableToInline(
       ->getSubstitutionMap(AI.getSubstitutions());
   }
 
-  // For some reason -Ounchecked can accept a higher base benefit without
-  // increasing the code size too much.
-  if (OptMode == SILOptions::SILOptMode::OptimizeUnchecked)
-    BaseBenefit *= 2;
-
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
-  //  Benefit = 1;
 
   // Go through all blocks of the function, accumulate the cost and find
   // benefits.
@@ -437,13 +440,17 @@ bool SILPerformanceInliner::isProfitableToInline(
     return profileBasedDecision(AI, Benefit, Callee, CalleeCost,
                                 NumCallerBlocks, bbIt);
   }
+  if (isClassMethodAtOsize && Benefit > OSizeClassMethodBenefit) {
+    Benefit = OSizeClassMethodBenefit;
+  }
 
   // This is the final inlining decision.
   if (CalleeCost > Benefit) {
     ORE.emit([&]() {
       using namespace OptRemark;
       return RemarkMissed("NoInlinedCost", *AI.getInstruction())
-             << "Not profitable to inline (cost = " << NV("Cost", CalleeCost)
+             << "Not profitable to inline function " << NV("Callee", Callee)
+             << " (cost = " << NV("Cost", CalleeCost)
              << ", benefit = " << NV("Benefit", Benefit) << ")";
     });
     return false;
@@ -905,7 +912,7 @@ public:
       return;
     }
 
-    auto OptMode = getFunction()->getModule().getOptions().Optimization;
+    auto OptMode = getFunction()->getEffectiveOptimizationMode();
 
     SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA, OptMode, ORE);
 

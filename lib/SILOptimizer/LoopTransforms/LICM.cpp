@@ -72,6 +72,7 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
 
   for (unsigned Idx = 0, End = AI->getNumArguments(); Idx < End; ++Idx) {
     auto &ArgEffect = E.getParameterEffects()[Idx];
+    assert(!ArgEffect.mayRelease() && "apply should only read from memory");
     if (!ArgEffect.mayRead())
       continue;
 

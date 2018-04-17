@@ -55,8 +55,8 @@ public func parseArgs(_ validOptions: [String]? = nil)
       continue
     }
     // Attempt to split it into two components separated by an equals sign.
-    let components = arg.components(separatedBy: "=")
-    let optionName = components[0]
+    let components = arg.split(separator: "=")
+    let optionName = String(components[0])
     if validOptions != nil && !validOptions!.contains(optionName) {
       print("Invalid option: \(arg)")
       return nil
@@ -64,7 +64,7 @@ public func parseArgs(_ validOptions: [String]? = nil)
     var optionVal : String
     switch components.count {
       case 1: optionVal = ""
-      case 2: optionVal = components[1]
+      case 2: optionVal = String(components[1])
       default:
       // If we do not have two components at this point, we can not have
       // an option switch. This is an invalid argument. Bail!

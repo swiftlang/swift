@@ -34,7 +34,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
 
-  typedef SILClonerWithScopes<ImplClass> super;
+  using super = SILClonerWithScopes<ImplClass>;
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     llvm_unreachable("Clients need to explicitly call a base class impl!");
@@ -170,7 +170,11 @@ public:
 
 protected:
   SILType remapType(SILType Ty) {
-    return Ty.subst(Original.getModule(), SubsMap);
+    SILType &Sty = TypeCache[Ty];
+    if (!Sty) {
+      Sty = Ty.subst(Original.getModule(), SubsMap);
+    }
+    return Sty;
   }
 
   CanType remapASTType(CanType ty) {
@@ -286,6 +290,8 @@ protected:
   ModuleDecl *SwiftMod;
   /// The substitutions list for the specialization.
   SubstitutionMap SubsMap;
+  /// Cache for substituted types.
+  llvm::DenseMap<SILType, SILType> TypeCache;
   /// The original function to specialize.
   SILFunction &Original;
   /// The substitutions used at the call site.

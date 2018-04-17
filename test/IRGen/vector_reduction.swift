@@ -7,7 +7,7 @@
 
 // We were missing target transform info and not vectorizing the loop below.
 
-// CHECK: xor <2 x i64>
+// CHECK: xor <{{(2|4|8)}} x i64>
 
 public func f(a: UnsafePointer<Int>, b: UnsafePointer<Int>, count: Int) -> Int {
   var c = 0

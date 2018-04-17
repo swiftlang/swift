@@ -28,9 +28,9 @@ public func call_foobar() {
 var a = UnsafeMutablePointer<Int>.allocate(capacity: 1)
 a.initialize(to: 5)
 a.deinitialize(count: 1)
-a.deallocate(capacity: 1)
+a.deallocate()
 print(a.pointee)
 a.deinitialize(count: 1)
-a.deallocate(capacity: 1)
+a.deallocate()
 
 // CHECK: AddressSanitizer: heap-use-after-free

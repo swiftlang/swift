@@ -328,33 +328,33 @@ bb0(%0 : $public_base):
 }
 
 sil_vtable private_base {
-  #private_base.foo!1: private_base_foo
+  #private_base.foo!1: @private_base_foo
 }
 
 sil_vtable private_derived {
-  #private_base.foo!1: private_derived_foo
+  #private_base.foo!1: @private_derived_foo
 }
 
 sil_vtable internal_base {
-  #internal_base.foo!1: internal_base_foo
-  #internal_base.bar!1: internal_base_bar
+  #internal_base.foo!1: @internal_base_foo
+  #internal_base.bar!1: @internal_base_bar
 }
 
 sil_vtable internal_derived {
-  #internal_base.foo!1: internal_derived_foo
-  #internal_base.bar!1: internal_derived_bar
+  #internal_base.foo!1: @internal_derived_foo
+  #internal_base.bar!1: @internal_derived_bar
 }
 
 sil_vtable public_base {
-  #public_base.foo!1: public_base_foo
-  #public_base.bar!1: public_base_bar
-  #public_base.baz!1: public_base_baz
+  #public_base.foo!1: @public_base_foo
+  #public_base.bar!1: @public_base_bar
+  #public_base.baz!1: @public_base_baz
 }
 
 sil_vtable public_derived {
-  #public_base.foo!1: public_derived_foo
-  #public_base.bar!1: public_derived_bar
-  #public_base.baz!1: public_derived_baz
+  #public_base.foo!1: @public_derived_foo
+  #public_base.bar!1: @public_derived_bar
+  #public_base.baz!1: @public_derived_baz
 }
 
 private protocol private_proto_1 {
@@ -568,19 +568,19 @@ bb0(%0 : $*T):
 
 
 sil_vtable private_proto_private_class {
-  #private_proto_private_class.theMethod!1: private_proto_private_class_theMethod
+  #private_proto_private_class.theMethod!1: @private_proto_private_class_theMethod
 }
 
 sil_vtable private_proto_internal_class {
-  #private_proto_internal_class.theMethod!1: private_proto_internal_class_theMethod
+  #private_proto_internal_class.theMethod!1: @private_proto_internal_class_theMethod
 }
 
 sil_vtable private_proto_public_class {
-  #private_proto_public_class.theMethod!1: private_proto_public_class_theMethod
+  #private_proto_public_class.theMethod!1: @private_proto_public_class_theMethod
 }
 
 sil_vtable private_proto_public_class_private_method {
-  #private_proto_public_class_private_method.theMethod!1: private_proto_public_class_private_method_theMethod
+  #private_proto_public_class_private_method.theMethod!1: @private_proto_public_class_private_method_theMethod
 }
 
 sil_witness_table private private_proto_private_class: private_proto_1 module witness {
@@ -656,13 +656,50 @@ sil @SomeChildItem_initializer : $@convention(method) (InitVal, @owned SomeChild
 sil @SomeChildItem_destructor : $@convention(method) (@owned SomeChildItem) -> ()
 
 sil_vtable SomeItem {
-  #SomeItem.init!allocator.1: SomeItem_allocator
-  #SomeItem.init!initializer.1: SomeItem_initializer
-  #SomeItem.deinit!deallocator: SomeItem_destructor
+  #SomeItem.init!allocator.1: @SomeItem_allocator
+  #SomeItem.init!initializer.1: @SomeItem_initializer
+  #SomeItem.deinit!deallocator: @SomeItem_destructor
 }
 
 sil_vtable SomeChildItem {
-  #SomeItem.init!allocator.1: SomeChildItem_allocator
-  #SomeItem.init!initializer.1: SomeChildItem_initializer
-  #SomeChildItem.deinit!deallocator: SomeChildItem_destructor
+  #SomeItem.init!allocator.1: @SomeChildItem_allocator
+  #SomeItem.init!initializer.1: @SomeChildItem_initializer
+  #SomeChildItem.deinit!deallocator: @SomeChildItem_destructor
 }
+
+public protocol PublicProtocol {
+  func foo()
+}
+
+struct SingleConformance : PublicProtocol {
+  func foo()
+}
+
+public func testit(p: PublicProtocol)
+
+sil private [transparent] [thunk] @foo_impl : $@convention(witness_method: PublicProtocol) (@in_guaranteed SingleConformance) -> () {
+bb0(%0 : $*SingleConformance):
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK: Function call site:
+// CHECK:   witness_method $@opened{{.*}} PublicProtocol
+// CHECK:   apply {{.*}} PublicProtocol
+// CHECK-NOWMO: Incomplete callee list? : Yes
+// CHECK-WMO: Incomplete callee list? : Yes
+// CHECK: Known callees:
+sil @call_foo : $@convention(thin) (@in PublicProtocol) -> () {
+bb0(%0 : $*PublicProtocol):
+  %5 = open_existential_addr immutable_access %0 : $*PublicProtocol to $*@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol
+  %6 = witness_method $@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol, #PublicProtocol.foo!1 : <Self where Self : PublicProtocol> (Self) -> () -> (), %5 : $*@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol>(%5) : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0 : $*PublicProtocol
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil_witness_table hidden SingleConformance: PublicProtocol module nix {
+  method #PublicProtocol.foo!1: <Self where Self : PublicProtocol> (Self) -> () -> () : @foo_impl
+}
+

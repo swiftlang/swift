@@ -48,3 +48,24 @@ class ConformsToKeySubscriptProto2 : KeySubscriptProto2 {
     set { }
   }
 }
+
+func testOverridesWithoutBase(
+  o1: KeySubscriptOverrideGetter,
+  o2: KeySubscriptOverrideSetter,
+  o3: KeySubscriptReversedOverrideGetter,
+  o4: KeySubscriptReversedOverrideSetter
+) {
+  // rdar://problem/36033356 failed specifically when the base class was never
+  // subscripted, so please don't mention the base classes here.
+  _ = o1["abc"]
+  o1["abc"] = "xyz"
+
+  _ = o2["abc"]
+  o2["abc"] = "xyz"
+
+  _ = o3["abc"]
+  o3["abc"] = "xyz"
+
+  _ = o4["abc"]
+  o4["abc"] = "xyz"
+}

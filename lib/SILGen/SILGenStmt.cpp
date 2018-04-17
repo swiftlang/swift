@@ -16,7 +16,7 @@
 #include "RValue.h"
 #include "SILGen.h"
 #include "Scope.h"
-#include "SwitchCaseFullExpr.h"
+#include "SwitchEnumBuilder.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILArgument.h"
@@ -388,7 +388,8 @@ void SILGenFunction::emitReturnExpr(SILLocation branchLoc,
   } else {
     // SILValue return.
     FullExpr scope(Cleanups, CleanupLocation(ret));
-    emitRValue(ret).forwardAll(*this, directResults);
+    RValue RV = emitRValue(ret).ensurePlusOne(*this, CleanupLocation(ret));
+    std::move(RV).forwardAll(*this, directResults);
   }
   Cleanups.emitBranchAndCleanups(ReturnDest, branchLoc, directResults);
 }
@@ -498,8 +499,8 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
     // Enter a scope for any bound pattern variables.
     LexicalScope trueScope(SGF, S);
 
-    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getThenStmt());
-    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S->getElseStmt());
+    auto NumTrueTaken = SGF.loadProfilerCount(S->getThenStmt());
+    auto NumFalseTaken = SGF.loadProfilerCount(S->getElseStmt());
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S, NumTrueTaken,
                           NumFalseTaken);
@@ -550,7 +551,7 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
     // Move the insertion point to the 'body' block temporarily and emit it.
     // Note that we don't push break/continue locations since they aren't valid
     // in this statement.
-    SavedInsertionPoint savedIP(SGF, bodyBB.getBlock());
+    SILGenSavedInsertionPoint savedIP(SGF, bodyBB.getBlock());
     SGF.emitProfilerIncrement(S->getBody());
     SGF.emitStmt(S->getBody());
 
@@ -563,8 +564,8 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
 
   // Emit the condition bindings, branching to the bodyBB if they fail.  Since
   // we didn't push a scope, the bound variables are live after this statement.
-  auto NumFalseTaken = SGF.SGM.loadProfilerCount(S->getBody());
-  auto NumNonTaken = SGF.SGM.loadProfilerCount(S);
+  auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
+  auto NumNonTaken = SGF.loadProfilerCount(S);
   SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
 }
 
@@ -589,8 +590,8 @@ void StmtEmitter::visitWhileStmt(WhileStmt *S) {
     // Enter a scope for any bound pattern variables.
     Scope conditionScope(SGF.Cleanups, S);
 
-    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getBody());
-    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S);
+    auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.loadProfilerCount(S);
     SGF.emitStmtCondition(S->getCond(), breakDest, S, NumTrueTaken, NumFalseTaken);
     
     // In the success path, emit the body of the while.
@@ -691,7 +692,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // has no predecessors, and SGF.ThrowDest may not be valid either.
   if (auto *BB = getOrEraseBlock(SGF, throwDest)) {
     // Move the insertion point to the throw destination.
-    SavedInsertionPoint savedIP(SGF, BB, FunctionSection::Postmatter);
+    SILGenSavedInsertionPoint savedIP(SGF, BB, FunctionSection::Postmatter);
 
     // The exception cleanup should be getting forwarded around
     // correctly anyway, but push a scope to ensure it gets popped.
@@ -743,8 +744,8 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
   if (SGF.B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
     // to the continuation block.
-    auto NumTrueTaken = SGF.SGM.loadProfilerCount(S->getBody());
-    auto NumFalseTaken = SGF.SGM.loadProfilerCount(S);
+    auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
+    auto NumFalseTaken = SGF.loadProfilerCount(S);
     Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false,
                                        /*invertValue*/ false, /*contArgs*/ {},
                                        NumTrueTaken, NumFalseTaken);
@@ -797,36 +798,27 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+    // Create the initialization outside of the innerForScope so that the
+    // innerForScope doesn't clean it up.
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
-    SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
-    nextBufOrValue =
-        ManagedValue::forUnmanaged(nextInit->getManagedAddress().forward(SGF));
-  } else {
-    // SEMANTIC SIL TODO: I am doing this to match previous behavior. We need to
-    // forward tmp below to ensure that we do not prematurely destroy the
-    // induction variable at the end of scope. I tried to use the
-    // CleanupRestorationScope and dormant, but it seemingly did not work and I
-    // do not have time to look into this now = (.
-    SILValue tmpValue;
-    bool hasCleanup;
     {
-      Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
-      ManagedValue tmp = SGF.emitRValueAsSingleValue(S->getIteratorNext());
-      hasCleanup = tmp.hasCleanup();
-      tmpValue = tmp.forward(SGF);
+      Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+      SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
     }
-    nextBufOrValue = hasCleanup ? SGF.emitManagedRValueWithCleanup(tmpValue)
-                                : ManagedValue::forUnmanaged(tmpValue);
+    nextBufOrValue = nextInit->getManagedAddress();
+
+  } else {
+    Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+    nextBufOrValue = innerForScope.popPreservingValue(
+        SGF.emitRValueAsSingleValue(S->getIteratorNext()));
   }
 
   SILBasicBlock *failExitingBlock = createBasicBlock();
   SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrValue);
 
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalSomeDecl(), createBasicBlock(),
-      loopDest.getBlock(),
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+  switchEnumBuilder.addOptionalSomeCase(
+      createBasicBlock(), loopDest.getBlock(),
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         SGF.emitProfilerIncrement(S->getBody());
 
         // Emit the loop body.
@@ -849,14 +841,12 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           // *NOTE* If we do not have an address only value, then inputValue is
           // *already properly unwrapped.
           if (optTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
-            inputValue =
-                SGF.emitManagedBufferWithCleanup(nextBufOrValue.getValue());
             inputValue = SGF.emitUncheckedGetOptionalValueFrom(
                 S, inputValue, optTL, SGFContext(initLoopVars.get()));
           }
 
           if (!inputValue.isInContext())
-            RValue(SGF, S, optTy.getAnyOptionalObjectType(), inputValue)
+            RValue(SGF, S, optTy.getOptionalObjectType(), inputValue)
                 .forwardInto(SGF, S, initLoopVars.get());
 
           // Now that the pattern has been initialized, check any where
@@ -877,27 +867,28 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
         // If we emitted an unreachable in the body, we will not have a valid
         // insertion point. Just return early.
-        if (!SGF.B.hasValidInsertionPoint())
+        if (!SGF.B.hasValidInsertionPoint()) {
+          scope.unreachableExit();
           return;
+        }
 
         // Otherwise, associate the loop body's closing brace with this branch.
         RegularLocation L(S->getBody());
         L.pointToEnd();
         scope.exitAndBranch(L);
       },
-      SGF.SGM.loadProfilerCount(S->getBody()));
+      SGF.loadProfilerCount(S->getBody()));
 
   // We add loop fail block, just to be defensive about intermediate
   // transformations performing cleanups at scope.exit(). We still jump to the
   // contBlock.
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalNoneDecl(), createBasicBlock(),
-      failExitingBlock,
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+  switchEnumBuilder.addOptionalNoneCase(
+      createBasicBlock(), failExitingBlock,
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);
       },
-      SGF.SGM.loadProfilerCount(S));
+      SGF.loadProfilerCount(S));
 
   std::move(switchEnumBuilder).emit();
 
@@ -976,7 +967,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                            ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
-  SavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
+  SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
 
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.

@@ -1,12 +1,21 @@
-// RUN: %target-run-simple-swift
-// REQUIRES: executable_test
+// RUN: %empty-directory(%t)
+// RUN: if [ %target-runtime == "objc" ]; \
+// RUN: then \
+// RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
+// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String; \
+// RUN: else \
+// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String; \
+// RUN: fi
 
+// RUN: %target-run %t/String
+// REQUIRES: executable_test
 // XFAIL: interpret
 
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 #if _runtime(_ObjC)
+import NSSlowString
 import Foundation  // For NSRange
 #endif
 
@@ -31,32 +40,72 @@ extension String {
 }
 
 extension String {
-  var bufferID: UInt {
-    return unsafeBitCast(_core._owner, to: UInt.self)
-  }
   var nativeCapacity: Int {
-    return _core.nativeBuffer!.capacity
+    precondition(_guts._isNative)
+    return _guts.capacity
   }
   var capacity: Int {
-    return _core.nativeBuffer?.capacity ?? 0
+    return _guts.capacity
   }
-  func _rawIdentifier() -> (UInt, UInt) {
-    let triple = unsafeBitCast(self, to: (UInt, UInt, UInt).self)
-    let minusCount = (triple.0, triple.2)
-    return minusCount
+  var unusedCapacity: Int {
+    return Swift.max(0, _guts.capacity - _guts.count)
+  }
+  var bufferID: ObjectIdentifier? {
+    return _rawIdentifier()
+  }
+  func _rawIdentifier() -> ObjectIdentifier? {
+    return _guts._objectIdentifier
   }
 }
 
 extension Substring {
-  var bufferID: UInt {
-    return _ephemeralContent.bufferID
+  var bufferID: ObjectIdentifier? {
+    return _wholeString.bufferID
+  }
+}
+
+// A thin wrapper around _StringGuts implementing RangeReplaceableCollection
+struct StringGutsCollection: RangeReplaceableCollection, RandomAccessCollection {
+  typealias Element = UTF16.CodeUnit
+  typealias Index = Int
+  typealias Indices = CountableRange<Int>
+
+  init(_ guts: _StringGuts) {
+    self._guts = guts
+  }
+
+  init() {
+    self.init(_StringGuts())
+  }
+
+  var _guts: _StringGuts
+
+  var startIndex: Index { return 0 }
+  var endIndex: Index { return _guts.count }
+  var indices: Indices { return startIndex..<endIndex }
+
+  subscript(position: Index) -> Element { return _guts[position] }
+
+  mutating func replaceSubrange<C>(
+    _ subrange: Range<Index>,
+    with newElements: C
+  ) where C : Collection, C.Element == Element {
+    _guts.replaceSubrange(subrange, with: newElements)
+  }
+
+  mutating func reserveCapacity(_ n: Int) {
+    _guts.reserveCapacity(n)
   }
 }
 
 var StringTests = TestSuite("StringTests")
 
 StringTests.test("sizeof") {
-  expectEqual(3 * MemoryLayout<Int>.size, MemoryLayout<String>.size)
+#if arch(i386) || arch(arm)
+  expectEqual(12, MemoryLayout<String>.size)
+#else
+  expectEqual(16, MemoryLayout<String>.size)
+#endif
 }
 
 StringTests.test("AssociatedTypes-UTF8View") {
@@ -66,8 +115,7 @@ StringTests.test("AssociatedTypes-UTF8View") {
     iteratorType: View.Iterator.self,
     subSequenceType: Substring.UTF8View.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
-    indicesType: DefaultBidirectionalIndices<View>.self)
+    indicesType: DefaultIndices<View>.self)
 }
 
 StringTests.test("AssociatedTypes-UTF16View") {
@@ -77,7 +125,6 @@ StringTests.test("AssociatedTypes-UTF16View") {
     iteratorType: IndexingIterator<View>.self,
     subSequenceType: Substring.UTF16View.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
     indicesType: View.Indices.self)
 }
 
@@ -88,8 +135,7 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
     iteratorType: View.Iterator.self,
     subSequenceType: Substring.UnicodeScalarView.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
-    indicesType: DefaultBidirectionalIndices<View>.self)
+    indicesType: DefaultIndices<View>.self)
 }
 
 StringTests.test("AssociatedTypes-CharacterView") {
@@ -99,8 +145,7 @@ StringTests.test("AssociatedTypes-CharacterView") {
     iteratorType: IndexingIterator<View>.self,
     subSequenceType: View.self,
     indexType: View.Index.self,
-    indexDistanceType: Int.self,
-    indicesType: DefaultBidirectionalIndices<View>.self)
+    indicesType: DefaultIndices<View>.self)
 }
 
 func checkUnicodeScalarViewIteration(
@@ -148,7 +193,7 @@ StringTests.test("unicodeScalars") {
   checkUnicodeScalarViewIteration([ 0x10ffff ], "\u{0010ffff}")
 }
 
-StringTests.test("indexComparability") {
+StringTests.test("Index/Comparable") {
   let empty = ""
   expectTrue(empty.startIndex == empty.endIndex)
   expectFalse(empty.startIndex != empty.endIndex)
@@ -164,6 +209,13 @@ StringTests.test("indexComparability") {
   expectFalse(nonEmpty.startIndex >= nonEmpty.endIndex)
   expectFalse(nonEmpty.startIndex > nonEmpty.endIndex)
   expectTrue(nonEmpty.startIndex < nonEmpty.endIndex)
+}
+
+StringTests.test("Index/Hashable") {
+  let s = "abcdef"
+  let t = Set(s.indices)
+  expectEqual(s.count, t.count)
+  expectTrue(t.contains(s.startIndex))
 }
 
 StringTests.test("ForeignIndexes/Valid") {
@@ -254,6 +306,28 @@ StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
   expectEqual("uvw", acceptor[donor.startIndex..<donor.index(_nth: 3)])
 
   let r = donor.index(_nth: 4)..<donor.index(_nth: 5)
+  expectCrashLater()
+  _ = acceptor[r]
+}
+
+StringTests.test("ForeignIndexes/subscript(ClosedRange)/OutOfBoundsTrap/1") {
+  let donor = "abcdef"
+  let acceptor = "uvw"
+
+  expectEqual("uvw", acceptor[donor.startIndex...donor.index(_nth: 2)])
+
+  let r = donor.startIndex...donor.index(_nth: 3)
+  expectCrashLater()
+  _ = acceptor[r]
+}
+
+StringTests.test("ForeignIndexes/subscript(ClosedRange)/OutOfBoundsTrap/2") {
+  let donor = "abcdef"
+  let acceptor = "uvw"
+
+  expectEqual("uvw", acceptor[donor.startIndex...donor.index(_nth: 2)])
+
+  let r = donor.index(_nth: 3)...donor.index(_nth: 5)
   expectCrashLater()
   _ = acceptor[r]
 }
@@ -408,6 +482,90 @@ StringTests.test("literalConcatenation") {
   }
 }
 
+StringTests.test("substringDoesNotCopy/Swift3")
+  .xfail(.always("Swift 3 compatibility: Self-sliced Strings are copied"))
+  .code {
+
+  let size = 16
+  for sliceStart in [0, 2, 8, size] {
+    for sliceEnd in [0, 2, 8, sliceStart + 1] {
+      if sliceStart > size || sliceEnd > size || sliceEnd < sliceStart {
+        continue
+      }
+      var s0 = String(repeating: "x", count: size)
+      let originalIdentity = s0.bufferID
+      s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
+      expectEqual(originalIdentity, s0.bufferID)
+    }
+  }
+}
+
+StringTests.test("substringDoesNotCopy/Swift4") {
+
+  let size = 16
+  for sliceStart in [0, 2, 8, size] {
+    for sliceEnd in [0, 2, 8, sliceStart + 1] {
+      if sliceStart > size || sliceEnd > size || sliceEnd < sliceStart {
+        continue
+      }
+      let s0 = String(repeating: "x", count: size)
+      let originalIdentity = s0.bufferID
+      let s1 = Substring(
+        _base: s0,
+        s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd))
+      expectEqual(s1.bufferID, originalIdentity)
+    }
+  }
+}
+
+StringTests.test("appendToEmptyString") {
+  let x = "Bumfuzzle"
+  expectNil(x.bufferID)
+
+  // Appending to empty string literal should replace it.
+  var a1 = ""
+  a1 += x
+  expectNil(a1.bufferID)
+
+  // Appending to native string should keep the existing buffer.
+  var b1 = ""
+  b1.reserveCapacity(20)
+  let b1ID = b1.bufferID
+  b1 += x
+  expectEqual(b1.bufferID, b1ID)
+
+  // .append(_:) should have the same behavior as +=
+  var a2 = ""
+  a2.append(x)
+  expectNil(a2.bufferID)
+
+  var b2 = ""
+  b2.reserveCapacity(20)
+  let b2ID = b2.bufferID
+  b2.append(x)
+  expectEqual(b2.bufferID, b2ID)
+}
+
+StringTests.test("Swift3Slice/Empty") {
+  let size = 5
+  let s = String(repeating: "x", count: size)
+  for i in 0 ... size {
+    let slice = s[s.index(_nth: i)..<s.index(_nth: i)]
+    // Most Swift 3 substrings are extracted into their own buffer,
+    // but empty substrings get turned into the empty string singleton
+    expectNil(slice.bufferID)
+  }
+}
+
+StringTests.test("Swift3Slice/Full") {
+  let size = 5
+  let s = String(repeating: "x", count: size)
+  let slice = s[s.startIndex..<s.endIndex]
+  // Most Swift 3 substrings are extracted into their own buffer,
+  // but if the substring covers the full original string, it is used instead.
+  expectEqual(slice.bufferID, s.bufferID)
+}
+
 StringTests.test("appendToSubstring") {
   for initialSize in 1..<16 {
     for sliceStart in [0, 2, 8, initialSize] {
@@ -417,13 +575,8 @@ StringTests.test("appendToSubstring") {
           continue
         }
         var s0 = String(repeating: "x", count: initialSize)
-        let originalIdentity = s0.bufferID
         s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
-        expectEqual(originalIdentity, s0.bufferID)
         s0 += "x"
-        if sliceStart == sliceEnd {
-          expectEqual(0, s0.bufferID)
-        }
         expectEqual(
           String(
             repeating: "x",
@@ -434,7 +587,9 @@ StringTests.test("appendToSubstring") {
   }
 }
 
-StringTests.test("appendToSubstringBug") {
+StringTests.test("appendToSubstringBug")
+  .xfail(.always("Swift 3 compatibility: Self-sliced Strings are copied"))
+  .code {
   // String used to have a heap overflow bug when one attempted to append to a
   // substring that pointed to the end of a string buffer.
   //
@@ -450,22 +605,15 @@ StringTests.test("appendToSubstringBug") {
   // unused capacity (length of the prefix "abcdef" plus truly unused elements
   // at the end).
 
-  func unusedCapacity(_ s: String) -> Int {
-    let core = s._core
-    guard let buf = core.nativeBuffer else { return 0 }
-    let offset = (core._baseAddress! - buf.start) / core.elementWidth
-    return buf.capacity - core.count - offset
-  }
-  
   func stringWithUnusedCapacity() -> (String, Int) {
     var s0 = String(repeating: "x", count: 17)
-    if unusedCapacity(s0) == 0 { s0 += "y" }
-    let cap = unusedCapacity(s0)
+    if s0.unusedCapacity == 0 { s0 += "y" }
+    let cap = s0.unusedCapacity
     expectNotEqual(0, cap)
     
     // This sorta checks for the original bug
     expectEqual(
-      cap, unusedCapacity(s0[s0.index(_nth: 1)..<s0.endIndex]))
+      cap, s0[s0.index(_nth: 1)..<s0.endIndex].unusedCapacity)
     
     return (s0, cap)
   }
@@ -683,7 +831,10 @@ StringTests.test("COW/replaceSubrange/end") {
     expectNotEqual(literalIdentity, str.bufferID)
     let heapStrIdentity1 = str.bufferID
 
-    var slice = str[str.startIndex..<str.index(_nth: 7)]
+    // FIXME: We have to use Swift 4's Substring to get the desired storage
+    // semantics; in Swift 3 mode, self-sliced strings get allocated a new
+    // buffer immediately.
+    var slice = Substring(_base: str, str.startIndex..<str.index(_nth: 7))
     expectEqual(heapStrIdentity1, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
 
@@ -712,11 +863,11 @@ func asciiString<
 where S.Iterator.Element == Character {
   var s = String()
   s.append(contentsOf: content)
-  expectEqual(1, s._core.elementWidth)
+  expectTrue(s._guts.isSingleByte)
   return s
 }
 
-StringTests.test("stringCoreExtensibility")
+StringTests.test("stringGutsExtensibility")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
@@ -728,12 +879,12 @@ StringTests.test("stringCoreExtensibility")
       for boundary in 0..<count {
         
         var x = (
-            k == 0 ? asciiString("b".characters)
+            k == 0 ? asciiString("b")
           : k == 1 ? ("b" as NSString as String)
           : ("b" as NSMutableString as String)
-        )._core
+        )._guts
 
-        if k == 0 { expectEqual(1, x.elementWidth) }
+        if k == 0 { expectTrue(x.isSingleByte) }
         
         for i in 0..<count {
           x.append(contentsOf:
@@ -747,7 +898,7 @@ StringTests.test("stringCoreExtensibility")
           + Array(repeatElement(ascii, count: 3*boundary))
           + repeatElement(nonAscii, count: 3*(count - boundary))
           + repeatElement(ascii, count: 2),
-          x
+          StringGutsCollection(x)
         )
       }
     }
@@ -757,32 +908,47 @@ StringTests.test("stringCoreExtensibility")
 #endif
 }
 
-StringTests.test("stringCoreReserve")
+StringTests.test("stringGutsReserve")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
-  for k in 0...5 {
+  for k in 0...7 {
     var base: String
     var startedNative: Bool
     let shared: String = "X"
 
+    // Managed native, unmanaged native, or small
+    func isSwiftNative(_ s: String) -> Bool {
+      return s._guts._isNative || s._guts._isSmall || s._guts._isUnmanaged
+    }
+
     switch k {
     case 0: (base, startedNative) = (String(), true)
-    case 1: (base, startedNative) = (asciiString("x".characters), true)
+    case 1: (base, startedNative) = (asciiString("x"), true)
     case 2: (base, startedNative) = ("Ξ", true)
+#if arch(i386) || arch(arm)
     case 3: (base, startedNative) = ("x" as NSString as String, false)
     case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
+#else
+    case 3: (base, startedNative) = ("x" as NSString as String, true)
+    case 4: (base, startedNative) = ("x" as NSMutableString as String, true)
+#endif
     case 5: (base, startedNative) = (shared, true)
+    case 6: (base, startedNative) = ("xá" as NSString as String, false)
+    case 7: (base, startedNative) = ("xá" as NSMutableString as String, false)
     default:
       fatalError("case unhandled!")
     }
-    expectEqual(!base._core.hasCocoaBuffer, startedNative)
+    expectEqual(isSwiftNative(base), startedNative)
     
     let originalBuffer = base.bufferID
-    let startedUnique = startedNative && base._core._owner != nil
-      && isKnownUniquelyReferenced(&base._core._owner!)
+    let isUnique = base._guts.isUniqueNative()
+    let startedUnique =
+      startedNative &&
+      base._guts._objectIdentifier != nil &&
+      isUnique
     
-    base._core.reserveCapacity(0)
+    base.reserveCapacity(0)
     // Now it's unique
     
     // If it was already native and unique, no reallocation
@@ -796,11 +962,11 @@ StringTests.test("stringCoreReserve")
     // Reserving up to the capacity in a unique native buffer is a no-op
     let nativeBuffer = base.bufferID
     let currentCapacity = base.capacity
-    base._core.reserveCapacity(currentCapacity)
+    base.reserveCapacity(currentCapacity)
     expectEqual(nativeBuffer, base.bufferID)
 
     // Reserving more capacity should reallocate
-    base._core.reserveCapacity(currentCapacity + 1)
+    base.reserveCapacity(currentCapacity + 1)
     expectNotEqual(nativeBuffer, base.bufferID)
 
     // None of this should change the string contents
@@ -810,6 +976,7 @@ StringTests.test("stringCoreReserve")
     case 1,3,4: expected = "x"
     case 2: expected = "Ξ"
     case 5: expected = shared
+    case 6,7: expected = "xá"
     default:
       fatalError("case unhandled!")
     }
@@ -820,28 +987,32 @@ StringTests.test("stringCoreReserve")
 #endif
 }
 
-func makeStringCore(_ base: String) -> _StringCore {
-  var x = _StringCore()
+func makeStringGuts(_ base: String) -> _StringGuts {
+  var x = _StringGuts()
   // make sure some - but not all - replacements will have to grow the buffer
-  x.reserveCapacity(base._core.count * 3 / 2)
-  x.append(contentsOf: base._core)
-  // In case the core was widened and lost its capacity
-  x.reserveCapacity(base._core.count * 3 / 2)
+  x.reserveCapacity(base._guts.count * 3 / 2)
+  let capacity = x.capacity
+  x.append(base._guts)
+  // Widening the guts should not make it lose its capacity,
+  // but the allocator may decide to get more storage.
+  expectGE(x.capacity, capacity)
   return x
 }
 
-StringTests.test("StringCoreReplace") {
+StringTests.test("StringGutsReplace") {
   let narrow = "01234567890"
   let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
+      let g1 = makeStringGuts(s1)
+      let g2 = makeStringGuts(s2 + s2)
       checkRangeReplaceable(
-        { makeStringCore(s1) },
-        { makeStringCore(s2 + s2)[0..<$0] }
+        { StringGutsCollection(g1) },
+        { StringGutsCollection(g2)[0..<$0] }
       )
       checkRangeReplaceable(
-        { makeStringCore(s1) },
-        { Array(makeStringCore(s2 + s2)[0..<$0]) }
+        { StringGutsCollection(g1) },
+        { Array(StringGutsCollection(g2))[0..<$0] }
       )
     }
   }
@@ -853,13 +1024,16 @@ StringTests.test("CharacterViewReplace") {
   
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
+      let g1 = makeStringGuts(s1)
+      let g2 = makeStringGuts(s2 + s2)
       checkRangeReplaceable(
-        { String.CharacterView(makeStringCore(s1)) },
-        { String.CharacterView(makeStringCore(s2 + s2)[0..<$0]) }
+        { () -> String._CharacterView in
+          String._CharacterView(String(g1)) },
+        { String._CharacterView(String(g2._extractSlice(0..<$0))) }
       )
       checkRangeReplaceable(
-        { String.CharacterView(makeStringCore(s1)) },
-        { Array(String.CharacterView(makeStringCore(s2 + s2)[0..<$0])) }
+        { String._CharacterView(String(g1)) },
+        { Array(String._CharacterView(String(g2)))[0..<$0] }
       )
     }
   }
@@ -871,12 +1045,12 @@ StringTests.test("UnicodeScalarViewReplace") {
   for s1 in [narrow, wide] {
     for s2 in [narrow, wide] {
       checkRangeReplaceable(
-        { String(makeStringCore(s1)).unicodeScalars },
-        { String(makeStringCore(s2 + s2)[0..<$0]).unicodeScalars }
+        { String(makeStringGuts(s1)).unicodeScalars },
+        { String(makeStringGuts(s2 + s2)._extractSlice(0..<$0)).unicodeScalars }
       )
       checkRangeReplaceable(
-        { String(makeStringCore(s1)).unicodeScalars },
-        { Array(String(makeStringCore(s2 + s2)[0..<$0]).unicodeScalars) }
+        { String(makeStringGuts(s1)).unicodeScalars },
+        { Array(String(makeStringGuts(s2 + s2)).unicodeScalars)[0..<$0] }
       )
     }
   }
@@ -892,10 +1066,10 @@ StringTests.test("reserveCapacity") {
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
-  print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
+  print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._guts.byteWidth)")
   let id1 = s.bufferID
   s.insert(contentsOf: repeatElement(x, count: oldCap + 2), at: s.endIndex)
-  print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
+  print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._guts.byteWidth)")
   expectEqual(id1, s.bufferID)
   s.insert(contentsOf: repeatElement(x, count: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
@@ -928,7 +1102,7 @@ StringTests.test("toInt") {
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(&chars)
-    let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
+    let str = String._fromWellFormedUTF8CodeUnitSequence(chars)
     expectNil(Int(str))
   }
 
@@ -986,7 +1160,7 @@ StringTests.test("growth") {
     s2 = s
   }
   expectEqual(s2, s)
-  expectLE(s.nativeCapacity, 34)
+  expectLE(s.nativeCapacity, 40)
 }
 
 StringTests.test("Construction") {
@@ -994,10 +1168,15 @@ StringTests.test("Construction") {
 }
 
 StringTests.test("Conversions") {
+  // Whether we are natively ASCII or small ASCII
+  func isKnownASCII(_ s: String) -> Bool {
+    return s._guts.isASCII ||
+      (s._guts._isSmall && s._guts._smallUTF8String.isASCII)
+  }
   do {
     let c: Character = "a"
     let x = String(c)
-    expectTrue(x._core.isASCII)
+    expectTrue(isKnownASCII(x))
 
     let s: String = "a"
     expectEqual(s, x)
@@ -1006,27 +1185,13 @@ StringTests.test("Conversions") {
   do {
     let c: Character = "\u{B977}"
     let x = String(c)
-    expectFalse(x._core.isASCII)
+    expectFalse(isKnownASCII(x))
 
     let s: String = "\u{B977}"
     expectEqual(s, x)
   }
 }
 
-// Check the internal functions are correct for ASCII values
-StringTests.test(
-  "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y")
-  .skip(.nativeRuntime("String._compareASCII undefined without _runtime(_ObjC)"))
-  .code {
-#if _runtime(_ObjC)
-  let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
-  expectEqualMethodsForDomain(
-    asciiDomain, asciiDomain, 
-    String._compareDeterministicUnicodeCollation, String._compareASCII)
-#else
-  expectUnreachable()
-#endif
-}
 
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
 import Glibc
@@ -1274,12 +1439,12 @@ StringTests.test("String.append(_: Character)") {
     for prefix in ["", " "] {
       let base = baseStrings[baseIdx]
       for inputIdx in baseCharacters.indices {
-        let input = (prefix + String(baseCharacters[inputIdx])).characters.last!
+        let input = (prefix + String(baseCharacters[inputIdx])).last!
         var s = base
         s.append(input)
         expectEqualSequence(
-          Array(base.characters) + [input],
-          Array(s.characters),
+          Array(base) + [input],
+          Array(s),
           "baseIdx=\(baseIdx) inputIdx=\(inputIdx)")
       }
     }
@@ -1488,9 +1653,9 @@ let removeSubrangeTests = [
 StringTests.test("String.replaceSubrange()/characters/range") {
   for test in replaceSubrangeTests {
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.range(in: c)
-    let newCharacters : [Character] = Array(test.newElements.characters)
+    let newCharacters : [Character] = Array(test.newElements)
     theString.replaceSubrange(rangeToReplace, with: newCharacters)
     expectEqual(
       test.expected,
@@ -1502,7 +1667,7 @@ StringTests.test("String.replaceSubrange()/characters/range") {
 StringTests.test("String.replaceSubrange()/string/range") {
   for test in replaceSubrangeTests {
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.range(in: c)
     theString.replaceSubrange(rangeToReplace, with: test.newElements)
     expectEqual(
@@ -1518,9 +1683,9 @@ StringTests.test("String.replaceSubrange()/characters/closedRange") {
       continue
     }
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.closedRange(in: c)
-    let newCharacters = Array(test.newElements.characters)
+    let newCharacters = Array(test.newElements)
     theString.replaceSubrange(rangeToReplace, with: newCharacters)
     expectEqual(
       closedExpected,
@@ -1535,7 +1700,7 @@ StringTests.test("String.replaceSubrange()/string/closedRange") {
       continue
     }
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToReplace = test.rangeSelection.closedRange(in: c)
     theString.replaceSubrange(rangeToReplace, with: test.newElements)
     expectEqual(
@@ -1548,7 +1713,7 @@ StringTests.test("String.replaceSubrange()/string/closedRange") {
 StringTests.test("String.removeSubrange()/range") {
   for test in removeSubrangeTests {
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToRemove = test.rangeSelection.range(in: c)
     theString.removeSubrange(rangeToRemove)
     expectEqual(
@@ -1565,7 +1730,7 @@ StringTests.test("String.removeSubrange()/closedRange") {
       default: break
     }
     var theString = test.original
-    let c = test.original.characters
+    let c = test.original
     let rangeToRemove = test.rangeSelection.closedRange(in: c)
     theString.removeSubrange(rangeToRemove)
     expectEqual(
@@ -1581,8 +1746,8 @@ StringTests.test("String.removeSubrange()/closedRange") {
 
 public let testSuffix = "z"
 StringTests.test("COW.Smoke") {
-  var s1 = "Cypseloides" + testSuffix
-  var identity1 = s1._rawIdentifier()
+  var s1 = "COW Smoke Cypseloides" + testSuffix
+  let identity1 = s1._rawIdentifier()
   
   var s2 = s1
   expectEqual(identity1, s2._rawIdentifier())
@@ -1603,18 +1768,18 @@ struct COWStringTest {
 }
 
 var testCases: [COWStringTest] {
-  return [ COWStringTest(test: "abcdefg", name: "ASCII"),
+  return [ COWStringTest(test: "abcdefghijklmnopqrxtuvwxyz", name: "ASCII"),
            COWStringTest(test: "🐮🐄🤠", name: "Unicode") 
          ]
 }
 
 for test in testCases {
   StringTests.test("COW.\(test.name).IndexesDontAffectUniquenessCheck") {
-    var s = test.test + testSuffix
+    let s = test.test + testSuffix
     let identity1 = s._rawIdentifier()
   
-    var startIndex = s.startIndex
-    var endIndex = s.endIndex
+    let startIndex = s.startIndex
+    let endIndex = s.endIndex
     expectNotEqual(startIndex, endIndex)
     expectLT(startIndex, endIndex)
     expectLE(startIndex, endIndex)
@@ -1631,10 +1796,10 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).SubscriptWithIndexDoesNotReallocate") {
-    var s = test.test + testSuffix
-    var identity1 = s._rawIdentifier()
+    let s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
 
-    var startIndex = s.startIndex
+    let startIndex = s.startIndex
     let empty = startIndex == s.endIndex
     expectNotEqual((s.startIndex < s.endIndex), empty)
     expectLE(s.startIndex, s.endIndex)
@@ -1648,7 +1813,7 @@ for test in testCases {
   StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
     do {
       var s = test.test + testSuffix
-      var identity1 = s._rawIdentifier()
+      let identity1 = s._rawIdentifier()
 
       let index1 = s.startIndex
       expectEqual(identity1, s._rawIdentifier())
@@ -1658,18 +1823,18 @@ for test in testCases {
     }
 
     do {
-      var s1 = test.test + testSuffix
-      var identity1 = s1._rawIdentifier()
+      let s1 = test.test + testSuffix
+      let identity1 = s1._rawIdentifier()
 
       var s2 = s1
       expectEqual(identity1, s1._rawIdentifier())
       expectEqual(identity1, s2._rawIdentifier())
 
-      var index1 = s1.startIndex
+      let index1 = s1.startIndex
       expectEqual(identity1, s1._rawIdentifier())
       expectEqual(identity1, s2._rawIdentifier())
 
-      let removed = s2.remove(at: index1)
+      let _ = s2.remove(at: index1)
 
       expectEqual(identity1, s1._rawIdentifier())
       expectTrue(identity1 == s2._rawIdentifier())
@@ -1684,14 +1849,14 @@ for test in testCases {
       expectGT(s.count, 0)
 
       s.removeAll()
-      var identity1 = s._rawIdentifier()
+      let identity1 = s._rawIdentifier()
       expectEqual(0, s.count)
       expectEqual(identity1, s._rawIdentifier())
     }
 
     do {
       var s = test.test + testSuffix
-      var identity1 = s._rawIdentifier()
+      let identity1 = s._rawIdentifier()
       expectGT(s.count, 3)
 
       s.removeAll(keepingCapacity: true)
@@ -1700,13 +1865,13 @@ for test in testCases {
     }
 
     do {
-      var s1 = test.test + testSuffix
-      var identity1 = s1._rawIdentifier()
+      let s1 = test.test + testSuffix
+      let identity1 = s1._rawIdentifier()
       expectGT(s1.count, 0)
 
       var s2 = s1
       s2.removeAll()
-      var identity2 = s2._rawIdentifier()
+      let identity2 = s2._rawIdentifier()
       expectEqual(identity1, s1._rawIdentifier())
       expectTrue(identity2 != identity1)
       expectGT(s1.count, 0)
@@ -1718,13 +1883,13 @@ for test in testCases {
     }
 
     do {
-      var s1 = test.test + testSuffix
-      var identity1 = s1._rawIdentifier()
+      let s1 = test.test + testSuffix
+      let identity1 = s1._rawIdentifier()
       expectGT(s1.count, 0)
 
       var s2 = s1
       s2.removeAll(keepingCapacity: true)
-      var identity2 = s2._rawIdentifier()
+      let identity2 = s2._rawIdentifier()
       expectEqual(identity1, s1._rawIdentifier())
       expectTrue(identity2 != identity1)
       expectGT(s1.count, 0)
@@ -1739,8 +1904,8 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).CountDoesNotReallocate") {
-    var s = test.test + testSuffix
-    var identity1 = s._rawIdentifier()
+    let s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
 
     expectGT(s.count, 0)
     expectEqual(identity1, s._rawIdentifier())
@@ -1749,8 +1914,8 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).GenerateDoesNotReallocate") {
-    var s = test.test + testSuffix
-    var identity1 = s._rawIdentifier()
+    let s = test.test + testSuffix
+    let identity1 = s._rawIdentifier()
 
     var iter = s.makeIterator()
     var copy = String()
@@ -1764,11 +1929,11 @@ for test in testCases {
 
 for test in testCases {
   StringTests.test("COW.\(test.name).EqualityTestDoesNotReallocate") {
-    var s1 = test.test + testSuffix
-    var identity1 = s1._rawIdentifier()
+    let s1 = test.test + testSuffix
+    let identity1 = s1._rawIdentifier()
 
     var s2 = test.test + testSuffix
-    var identity2 = s2._rawIdentifier()
+    let identity2 = s2._rawIdentifier()
 
     expectEqual(s1, s2)
     expectEqual(identity1, s1._rawIdentifier())
@@ -1778,6 +1943,161 @@ for test in testCases {
     expectNotEqual(s1, s2)
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity2, s2._rawIdentifier())
+  }
+}
+
+struct ComparisonTestCase {  
+  var strings: [String]
+  // var test: (String, String) -> Void
+  var comparison: _Ordering
+  
+  init(_ strings: [String], _ comparison: _Ordering) {
+    self.strings = strings
+    self.comparison = comparison
+  }
+  
+  func test() {
+    for pair in zip(strings, strings[1...]) {
+      switch comparison {
+      case .less:
+        expectLT(pair.0, pair.1)
+      case .greater:
+        expectGT(pair.0, pair.1)
+      case .equal:
+        expectEqual(pair.0, pair.1)
+      }
+    }
+  }
+  
+  func testOpaqueStrings() {
+#if _runtime(_ObjC)
+    let opaqueStrings = strings.map { NSSlowString(string: $0) as String }
+    for pair in zip(opaqueStrings, opaqueStrings[1...]) {
+      switch comparison {
+      case .less:
+        expectLT(pair.0, pair.1)
+      case .greater:
+        expectGT(pair.0, pair.1)
+      case .equal:
+        expectEqual(pair.0, pair.1)
+      }
+    }
+#endif
+  }
+  
+  func testOpaqueSubstrings() {
+#if _runtime(_ObjC)
+    for pair in zip(strings, strings[1...]) {
+      let string1 = pair.0.dropLast()
+      let string2 = pair.1
+      let opaqueString = (NSSlowString(string: pair.0) as String).dropLast()
+      
+      guard string1.count > 0 else { return }
+      
+      let expectedResult: _Ordering = string1 < string2 ? .less : (string1 > string2 ? .greater : .equal)
+      let opaqueResult: _Ordering = opaqueString < string2 ? .less : (opaqueString > string2 ? .greater : .equal)
+      
+      expectEqual(opaqueResult, expectedResult)
+    }
+#endif
+  }
+}
+
+let comparisonTestCases = [
+  ComparisonTestCase(["a", "a"], .equal),
+  ComparisonTestCase(["abcdefg", "abcdefg"], .equal),
+  ComparisonTestCase(["", "Z", "a", "b", "c", "\u{00c5}", "á"], .less),
+
+  ComparisonTestCase(["ábcdefg", "ábcdefgh", "ábcdefghi"], .less),
+  ComparisonTestCase(["abcdefg", "abcdefgh", "abcdefghi"], .less),
+
+  ComparisonTestCase(["á", "\u{0061}\u{0301}"], .equal),
+  ComparisonTestCase(["à", "\u{0061}\u{0301}", "â", "\u{e3}", "a\u{0308}"], .less),
+  
+  // Exploding scalars AND exploding segments
+  ComparisonTestCase(["\u{fa2}", "\u{fa1}\u{fb7}"], .equal),
+  ComparisonTestCase([
+    "\u{fa2}\u{fa2}\u{fa2}\u{fa2}",
+    "\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}"
+    ], .equal),
+  ComparisonTestCase([
+    "\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}",
+    "\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}"
+    ], .equal),
+  ComparisonTestCase([
+    "a\u{fa2}\u{fa2}a\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}\u{fa2}",
+    "a\u{fa1}\u{fb7}\u{fa1}\u{fb7}a\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}\u{fa1}\u{fb7}"
+    ], .equal),
+
+  ComparisonTestCase(["a\u{301}\u{0301}", "\u{e1}"], .greater),
+  ComparisonTestCase(["😀", "😀"], .equal),
+  ComparisonTestCase(["\u{2f9df}", "\u{8f38}"], .equal),
+  ComparisonTestCase([
+    "a",
+    "\u{2f9df}", // D87E DDDF as written, but normalizes to 8f38
+    "\u{2f9df}\u{2f9df}", // D87E DDDF as written, but normalizes to 8f38
+    "👨🏻", // D83D DC68 D83C DFFB
+    "👨🏻‍⚕️", // D83D DC68 D83C DFFB 200D 2695 FE0F
+    "👩‍⚕️", // D83D DC69 200D 2695 FE0F
+    "👩🏾", // D83D DC69 D83C DFFE
+    "👩🏾‍⚕", // D83D DC69 D83C DFFE 200D 2695 FE0F
+    "😀", // D83D DE00
+    "😅", // D83D DE05
+    "🧀" // D83E DDC0 -- aka a really big scalar
+  ], .less),
+
+  
+  ComparisonTestCase(["f̛̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦ͘͜͟͢͝͞͠͡", "ơ̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͥͦͧͨͩͪͫͬͭͮ͘"], .less),
+  ComparisonTestCase(["\u{f90b}", "\u{5587}"], .equal),
+  
+  ComparisonTestCase(["a\u{1D160}a", "a\u{1D158}\u{1D1C7}"], .less),
+  
+  ComparisonTestCase(["\u{212b}", "\u{00c5}"], .equal),
+  ComparisonTestCase([
+    "A",
+    "a",
+    "aa",
+    "ae",
+    "ae🧀",
+    "az",
+    "aze\u{300}",
+    "ae\u{301}",
+    "ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}ae\u{301}",
+    "ae\u{302}",
+    "ae\u{302}{303}",
+    "ae\u{302}🧀",
+    "ae\u{303}",
+    "\u{f90b}\u{f90c}\u{f90d}", // Normalizes to BMP scalars
+    "🧀", // D83E DDC0 -- aka a really big scalar
+    "\u{FFEE}" // half width CJK dot
+  ], .less),
+  
+  ComparisonTestCase(["ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .greater),
+  ComparisonTestCase(["ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡", "aì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .greater),
+  ComparisonTestCase(["ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .equal)
+]
+
+for test in comparisonTestCases {
+  StringTests.test("Comparison.\(test.strings)") {
+    test.test()
+  }
+
+  StringTests.test("Comparison.OpaqueString.\(test.strings)")
+    .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+    .code {
+    test.testOpaqueStrings()
+  }
+
+  StringTests.test("Comparison.OpaqueSubstring.\(test.strings)")
+    .skip(.linuxAny(reason: "NSSlowString requires ObjC interop"))
+    .code {
+    test.testOpaqueSubstrings()
   }
 }
 

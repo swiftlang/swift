@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=BoolBridgingTests -function-definitions=false -print-regular-comments -skip-unavailable -F %S/Inputs/mock-sdk > %t.txt
-// RUN: diff -u <(tail +9 %s) %t.txt
+// RUN: diff -u <(tail -n +9 %s) %t.txt
 
 // REQUIRES: objc_interop
 
@@ -42,13 +42,13 @@ func testCBoolFnToBlockTypedef(_: @escaping CBoolFn) -> CBoolBlock
 func testObjCBoolFnToBlockTypedef(_: @escaping ObjCBoolFn) -> ObjCBoolBlock
 func testDarwinBooleanFnToBlockTypedef(_: @escaping DarwinBooleanFn) -> DarwinBooleanBlock
 
-typealias CBoolFnToBlockType = (CBoolFn) -> CBoolBlock
-typealias ObjCBoolFnToBlockType = (ObjCBoolFn) -> ObjCBoolBlock
-typealias DarwinBooleanFnToBlockType = (DarwinBooleanFn) -> DarwinBooleanBlock
+typealias CBoolFnToBlockType = (CBoolFn) -> (Bool) -> Bool
+typealias ObjCBoolFnToBlockType = (ObjCBoolFn) -> (ObjCBool) -> ObjCBool
+typealias DarwinBooleanFnToBlockType = (DarwinBooleanFn) -> (DarwinBoolean) -> DarwinBoolean
 
-var globalObjCBoolFnToBlockFP: @convention(c) (ObjCBoolFn) -> @convention(block) (ObjCBool) -> ObjCBool
-var globalObjCBoolFnToBlockFPP: UnsafeMutablePointer<@convention(c) (ObjCBoolFn) -> @convention(block) (ObjCBool) -> ObjCBool>?
-var globalObjCBoolFnToBlockBP: @convention(block) (ObjCBoolFn) -> @convention(block) (ObjCBool) -> ObjCBool
+var globalObjCBoolFnToBlockFP: @convention(c) (ObjCBoolFn) -> (ObjCBool) -> ObjCBool
+var globalObjCBoolFnToBlockFPP: UnsafeMutablePointer<@convention(c) (ObjCBoolFn) -> (ObjCBool) -> ObjCBool>?
+var globalObjCBoolFnToBlockBP: @convention(block) (ObjCBoolFn) -> (ObjCBool) -> ObjCBool
 
 var globalCBoolFn: CBoolFn
 var globalObjCBoolFn: ObjCBoolFn

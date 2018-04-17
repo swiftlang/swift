@@ -1,10 +1,11 @@
-// RUN: %target-swift-frontend -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name cf -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import CoreCooling
 
-// CHECK: sil hidden @_T02cf8useEmAllySo16CCMagnetismModelCF :
+// CHECK: sil hidden @$S2cf8useEmAllyySo16CCMagnetismModelCF :
 // CHECK: bb0([[ARG:%.*]] : $CCMagnetismModel):
 func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCPowerSupplyGetDefault : $@convention(c) () -> @autoreleased Optional<CCPowerSupply>
@@ -28,28 +29,22 @@ func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCRefrigeratorDestroy : $@convention(c) (@owned Optional<CCRefrigerator>) -> ()
   CCRefrigeratorDestroy(clone)
 
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>!, $@convention(objc_method) (CCMagnetismModel) -> Optional<Unmanaged<CCRefrigerator>>
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>?, $@convention(objc_method) (CCMagnetismModel) -> Optional<Unmanaged<CCRefrigerator>>
   let f0 = model.refrigerator()
 
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator?, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
   let f1 = model.getRefrigerator()
 
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.takeRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @owned Optional<CCRefrigerator>
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.takeRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator?, $@convention(objc_method) (CCMagnetismModel) -> @owned Optional<CCRefrigerator>
   let f2 = model.takeRefrigerator()
 
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.borrowRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator!, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.borrowRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator?, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
   let f3 = model.borrowRefrigerator()
 
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.setRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> (), $@convention(objc_method) (Optional<CCRefrigerator>, CCMagnetismModel) -> ()
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.setRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator?) -> (), $@convention(objc_method) (Optional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.setRefrigerator(copy)
 
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK: objc_method [[BORROWED_ARG]] : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator!) -> (), $@convention(objc_method) (@owned Optional<CCRefrigerator>, CCMagnetismModel) -> ()
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!1.foreign : (CCMagnetismModel) -> (CCRefrigerator?) -> (), $@convention(objc_method) (@owned Optional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.giveRefrigerator(copy)
 
   // rdar://16846555
@@ -65,23 +60,23 @@ protocol Impedance {
 
 extension CCImpedance: Impedance {}
 
-// CHECK-LABEL: sil private [transparent] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] @_T0SC11CCImpedanceV4realSdvg
-// CHECK-LABEL: sil private [transparent] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzvgTW
-// CHECK-LABEL: sil shared [transparent] [serializable] @_T0SC11CCImpedanceV4imagSdvg
+// CHECK-LABEL: sil private [transparent] [thunk] @$SSo11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSo11CCImpedanceV4realSdvg
+// CHECK-LABEL: sil private [transparent] [thunk] @$SSo11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzvgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] @$SSo11CCImpedanceV4imagSdvg
 
 class MyMagnetism : CCMagnetismModel {
-  // CHECK-LABEL: sil hidden [thunk] @_T02cf11MyMagnetismC15getRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @$S2cf11MyMagnetismC15getRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
   override func getRefrigerator() -> CCRefrigerator {
     return super.getRefrigerator()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T02cf11MyMagnetismC16takeRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @owned CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @$S2cf11MyMagnetismC16takeRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @owned CCRefrigerator
   override func takeRefrigerator() -> CCRefrigerator {
     return super.takeRefrigerator()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_T02cf11MyMagnetismC18borrowRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @$S2cf11MyMagnetismC18borrowRefrigerator{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
   override func borrowRefrigerator() -> CCRefrigerator {
     return super.borrowRefrigerator()
   }

@@ -15,34 +15,47 @@ import Foundation
 /// A Syntax node represents a tree of nodes with tokens at the leaves.
 /// Each node has accessors for its known children, and allows efficient
 /// iteration over the children through its `children` property.
-public class Syntax: CustomStringConvertible {
-  /// The type of sequence containing the indices of present children.
-  internal typealias PresentChildIndicesSequence =
-    LazyFilterSequence<CountableRange<Int>>
+public protocol Syntax: 
+  CustomStringConvertible, TextOutputStreamable {}
 
+internal protocol _SyntaxBase: Syntax {
+  /// The type of sequence containing the indices of present children.
+  typealias PresentChildIndicesSequence =
+    LazyFilterSequence<Range<Int>>
+    
   /// The root of the tree this node is currently in.
-  internal let _root: SyntaxData
-  
+  var _root: SyntaxData { get } // Must be of type SyntaxData
+
   /// The data backing this node.
   /// - note: This is unowned, because the reference to the root data keeps it
   ///         alive. This means there is an implicit relationship -- the data
   ///         property must be a descendent of the root. This relationship must
   ///         be preserved in all circumstances where Syntax nodes are created.
-  internal unowned var data: SyntaxData
+  var _data: SyntaxData { get }
 
 #if DEBUG
-  func validate() {
-    // This is for subclasses to override to perform structural validation.
+  func validate()
+#endif
+}
+extension _SyntaxBase {
+  public func validate() {
+    // This is for implementers to override to perform structural validation.
   }
-#endif
+}
 
-  /// Creates a Syntax node from the provided root and data.
-  internal init(root: SyntaxData, data: SyntaxData) {
-    self._root = root
-    self.data = data
-#if DEBUG
-    validate()
-#endif
+extension Syntax {
+  var data: SyntaxData {
+    guard let base = self as? _SyntaxBase else {
+      fatalError("only first-class syntax nodes can conform to Syntax")
+    }
+    return base._data
+  }
+
+  var _root: SyntaxData {
+    guard let base = self as? _SyntaxBase else {
+      fatalError("only first-class syntax nodes can conform to Syntax")
+    }
+    return base._root
   }
 
   /// Access the raw syntax assuming the node is a Syntax.
@@ -55,21 +68,27 @@ public class Syntax: CustomStringConvertible {
     return SyntaxChildren(node: self)
   }
 
-  /// Whether or not this node it marked as `present`.
-  public var isPresent: Bool {
-    return raw.presence == .present
+  /// The number of children, `present` or `missing`, in this node.
+  /// This value can be used safely with `child(at:)`.
+  public var numberOfChildren: Int {
+    return data.childCaches.count
   }
 
-  /// Whether or not this node it marked as `missing`.
+  /// Whether or not this node is marked as `present`.
+  public var isPresent: Bool {
+    return raw.isPresent
+  }
+
+  /// Whether or not this node is marked as `missing`.
   public var isMissing: Bool {
-    return raw.presence == .missing
+    return raw.isMissing
   }
 
   /// Whether or not this node represents an Expression.
   public var isExpr: Bool {
     return raw.kind.isExpr
   }
-  
+
   /// Whether or not this node represents a Declaration.
   public var isDecl: Bool {
     return raw.kind.isDecl
@@ -93,7 +112,7 @@ public class Syntax: CustomStringConvertible {
   /// The parent of this syntax node, or `nil` if this node is the root.
   public var parent: Syntax? {
     guard let parentData = data.parent else { return nil }
-    return Syntax.make(root: _root, data: parentData)
+    return makeSyntax(root: _root, data: parentData)
   }
 
   /// The index of this node in the parent's children.
@@ -101,17 +120,63 @@ public class Syntax: CustomStringConvertible {
     return data.indexInParent
   }
 
+  /// The absolute position of the starting point of this node. If the first token
+  /// is with leading trivia, the position points to the start of the leading
+  /// trivia.
+  public var position: AbsolutePosition {
+    return data.position
+  }
+
+  /// The absolute position of the starting point of this node, skipping any
+  /// leading trivia attached to the first token syntax.
+  public var positionAfterSkippingLeadingTrivia: AbsolutePosition {
+    return data.positionAfterSkippingLeadingTrivia
+  }
+
+  /// The textual byte length of this node including leading and trailing trivia.
+  public var byteSize: Int {
+    return data.byteSize
+  }
+
+  /// The leading trivia of this syntax node. Leading trivia is attached to
+  /// the first token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var leadingTrivia: Trivia? {
+    return raw.leadingTrivia
+  }
+
+  /// The trailing trivia of this syntax node. Trailing trivia is attached to
+  /// the last token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var trailingTrivia: Trivia? {
+    return raw.trailingTrivia
+  }
+
+  /// When isImplicit is true, the syntax node doesn't include any
+  /// underlying tokens, e.g. an empty CodeBlockItemList.
+  public var isImplicit: Bool {
+    return leadingTrivia == nil
+  }
+
+  /// The textual byte length of this node exluding leading and trailing trivia.
+  public var byteSizeAfterTrimmingTrivia: Int {
+    return data.byteSize - (leadingTrivia?.byteSize ?? 0) -
+      (trailingTrivia?.byteSize ?? 0)
+  }
+
   /// The root of the tree in which this node resides.
   public var root: Syntax {
-    return Syntax.make(root: _root,  data: _root)
+    return makeSyntax(root: _root,  data: _root)
   }
-  
+
   /// The sequence of indices that correspond to child nodes that are not
   /// missing.
   ///
   /// This property is an implementation detail of `SyntaxChildren`.
-  internal var presentChildIndices: PresentChildIndicesSequence {
-    return raw.layout.indices.lazy.filter { self.raw.layout[$0].isPresent }
+  internal var presentChildIndices: _SyntaxBase.PresentChildIndicesSequence {
+    return raw.layout.indices.lazy.filter {
+      self.raw.layout[$0]?.isPresent == true
+    }
   }
 
   /// Gets the child at the provided index in this node's children.
@@ -120,8 +185,8 @@ public class Syntax: CustomStringConvertible {
   ///            is not a child at that index in the node.
   public func child(at index: Int) -> Syntax? {
     guard raw.layout.indices.contains(index) else { return nil }
-    if raw.layout[index].isMissing { return nil }
-    return Syntax.make(root: _root, data: data.cachedChild(at: index))
+    guard let childData = data.cachedChild(at: index) else { return nil }
+    return makeSyntax(root: _root, data: childData)
   }
 
   /// A source-accurate description of this node.
@@ -130,9 +195,7 @@ public class Syntax: CustomStringConvertible {
     self.write(to: &s)
     return s
   }
-}
-
-extension Syntax: TextOutputStreamable {
+  
   /// Prints the raw value of this node to the provided stream.
   /// - Parameter stream: The stream to which to print the raw tree.
   public func write<Target>(to target: inout Target)
@@ -141,22 +204,34 @@ extension Syntax: TextOutputStreamable {
   }
 }
 
-extension Syntax: Equatable {
-  /// Determines if two nodes are equal to each other.
-  public static func ==(lhs: Syntax, rhs: Syntax) -> Bool {
-    return lhs.data === rhs.data
-  }
+/// Determines if two nodes are equal to each other.
+public func ==(lhs: Syntax, rhs: Syntax) -> Bool {
+  return lhs.data === rhs.data
 }
 
 /// MARK: - Nodes
 
 /// A Syntax node representing a single token.
-public class TokenSyntax: Syntax {
+public struct TokenSyntax: _SyntaxBase, Hashable {
+  let _root: SyntaxData
+  unowned let _data: SyntaxData 
+
+  /// Creates a Syntax node from the provided root and data.
+  internal init(root: SyntaxData, data: SyntaxData) {
+    self._root = root
+    self._data = data
+#if DEBUG
+    validate()
+#endif
+  }
+
   /// The text of the token as written in the source code.
   public var text: String {
     return tokenKind.text
   }
-
+  
+  /// Returns a new TokenSyntax with its kind replaced
+  /// by the provided token kind.
   public func withKind(_ tokenKind: TokenKind) -> TokenSyntax {
     guard case let .token(_, leadingTrivia, trailingTrivia, presence) = raw else {
       fatalError("TokenSyntax must have token as its raw")
@@ -225,5 +300,13 @@ public class TokenSyntax: Syntax {
       fatalError("TokenSyntax must have token as its raw")
     }
     return kind
+  }
+
+  public static func ==(lhs: TokenSyntax, rhs: TokenSyntax) -> Bool {
+    return lhs._data === rhs._data
+  }
+
+  public var hashValue: Int {
+    return ObjectIdentifier(_data).hashValue
   }
 }

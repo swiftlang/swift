@@ -1,0 +1,20 @@
+func testConvertToTernaryExpr() {
+  let a = 3
+  let b = 5
+  let x: Int
+  if a < 5 {
+    x = a
+  } else {
+    x = b
+  }
+}
+func testConvertTupleToTernaryExpr() {
+  let a = 3
+  let b = 5
+  let (x, y): (Int, Int) = a < 5 ? (a, b) : (b, a)
+}
+
+
+
+
+

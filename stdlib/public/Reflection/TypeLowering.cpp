@@ -198,15 +198,15 @@ void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
 }
 
 BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
-  : TypeInfo(TypeInfoKind::Builtin,
-             descriptor->Size, descriptor->Alignment,
-             descriptor->Stride, descriptor->NumExtraInhabitants),
-    Name(descriptor->getMangledTypeName()) {}
+    : TypeInfo(TypeInfoKind::Builtin, descriptor->Size, descriptor->Alignment,
+               descriptor->Stride, descriptor->NumExtraInhabitants),
+      Name(descriptor->getMangledTypeName(0)) {}
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
-  std::vector<const ProtocolTypeRef *> Protocols;
+  std::vector<const NominalTypeRef *> Protocols;
+  const TypeRef *Superclass = nullptr;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
   bool ObjC;
@@ -222,8 +222,11 @@ class ExistentialTypeInfoBuilder {
     if (Protocols.size() != 1)
       return false;
 
+    if (Superclass)
+      return false;
+
     for (auto *P : Protocols) {
-      if (P->isError())
+      if (P->isErrorProtocol())
         return true;
     }
     return false;
@@ -237,14 +240,15 @@ class ExistentialTypeInfoBuilder {
     }
 
     for (auto *P : Protocols) {
-      const FieldDescriptor *FD = TC.getBuilder().getFieldTypeInfo(P);
-      if (FD == nullptr) {
+      std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
+          TC.getBuilder().getFieldTypeInfo(P);
+      if (FD.first == nullptr) {
         DEBUG(std::cerr << "No field descriptor: "; P->dump())
         Invalid = true;
         continue;
       }
 
-      switch (FD->Kind) {
+      switch (FD.first->Kind) {
         case FieldDescriptorKind::ObjCProtocol:
           // Objective-C protocols do not have any witness tables.
           ObjC = true;
@@ -274,40 +278,37 @@ public:
       ObjC(false), WitnessTableCount(0),
       Invalid(false) {}
 
-  void addProtocol(const ProtocolTypeRef *P) {
+  void addProtocol(const NominalTypeRef *P) {
     Protocols.push_back(P);
   }
 
   void addProtocolComposition(const ProtocolCompositionTypeRef *PC) {
-    for (auto *T : PC->getMembers()) {
-      if (auto *P = dyn_cast<ProtocolTypeRef>(T)) {
-        addProtocol(P);
-        continue;
-      }
+    for (auto *T : PC->getProtocols()) {
+      addProtocol(T);
+    }
 
-      if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(T)) {
-        addProtocolComposition(PC);
-        continue;
-      }
+    if (PC->hasExplicitAnyObject())
+      addAnyObject();
 
+    if (auto *T = PC->getSuperclass()) {
       // Anything else should either be a superclass constraint, or
       // we have an invalid typeref.
       if (!isa<NominalTypeRef>(T) &&
           !isa<BoundGenericTypeRef>(T)) {
         DEBUG(std::cerr << "Bad existential member: "; T->dump())
         Invalid = true;
-        continue;
+        return;
       }
-      auto *FD = TC.getBuilder().getFieldTypeInfo(T);
-      if (FD == nullptr) {
+      const auto &FD = TC.getBuilder().getFieldTypeInfo(T);
+      if (FD.first == nullptr) {
         DEBUG(std::cerr << "No field descriptor: "; T->dump())
         Invalid = true;
-        continue;
+        return;
       }
 
       // We have a valid superclass constraint. It only affects
       // lowering by class-constraining the entire existential.
-      switch (FD->Kind) {
+      switch (FD.first->Kind) {
       case FieldDescriptorKind::Class:
         Refcounting = ReferenceCounting::Native;
         LLVM_FALLTHROUGH;
@@ -319,12 +320,9 @@ public:
       default:
         DEBUG(std::cerr << "Bad existential member: "; T->dump())
         Invalid = true;
-        continue;
+        return;
       }
     }
-
-    if (PC->hasExplicitAnyObject())
-      addAnyObject();
   }
 
   void addAnyObject() {
@@ -680,10 +678,6 @@ public:
     return true;
   }
 
-  bool visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    return true;
-  }
-
   bool
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     return true;
@@ -802,10 +796,6 @@ public:
     for (const auto &Param : F->getParameters())
       result = combineRepresentations(result, visit(Param.getType()));
     return result;
-  }
-
-  MetatypeRepresentation visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    return MetatypeRepresentation::Thin;
   }
 
   MetatypeRepresentation
@@ -929,7 +919,9 @@ public:
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
       Kind(RecordKind::Invalid), Invalid(false) {}
 
-  const TypeInfo *build(const TypeRef *TR, const FieldDescriptor *FD) {
+  const TypeInfo *
+  build(const TypeRef *TR,
+        const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD) {
     // Sort enum into payload and no-payload cases.
     unsigned NoPayloadCases = 0;
     std::vector<FieldTypeInfo> PayloadCases;
@@ -973,7 +965,7 @@ public:
       // further.
       if (CaseTI != nullptr) {
         // Below logic should match the runtime function
-        // swift_initEnumValueWitnessTableSinglePayload().
+        // swift_initEnumMetadataSinglePayload().
         NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
         if (NumExtraInhabitants >= NoPayloadCases) {
           // Extra inhabitants can encode all no-payload cases.
@@ -1064,8 +1056,8 @@ public:
   }
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
-    auto *FD = TC.getBuilder().getFieldTypeInfo(TR);
-    if (FD == nullptr) {
+    const auto &FD = TC.getBuilder().getFieldTypeInfo(TR);
+    if (FD.first == nullptr || FD.first->isStruct()) {
       // Maybe this type is opaque -- look for a builtin
       // descriptor to see if we at least know its size
       // and alignment.
@@ -1073,11 +1065,13 @@ public:
         return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
 
       // Otherwise, we're out of luck.
-      DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
-      return nullptr;
+      if (FD.first == nullptr) {
+        DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
+        return nullptr;
+      }
     }
 
-    switch (FD->Kind) {
+    switch (FD.first->Kind) {
     case FieldDescriptorKind::Class:
       // A value of class type is a single retainable pointer.
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
@@ -1144,12 +1138,6 @@ public:
     swift_runtime_unreachable("Unhandled FunctionMetadataConvention in switch.");
   }
 
-  const TypeInfo *visitProtocolTypeRef(const ProtocolTypeRef *P) {
-    ExistentialTypeInfoBuilder builder(TC);
-    builder.addProtocol(P);
-    return builder.build();
-  }
-
   const TypeInfo *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     ExistentialTypeInfoBuilder builder(TC);
@@ -1176,9 +1164,7 @@ public:
     ExistentialTypeInfoBuilder builder(TC);
     auto *TR = EM->getInstanceType();
 
-    if (auto *P = dyn_cast<ProtocolTypeRef>(TR)) {
-      builder.addProtocol(P);
-    } else if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
+    if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
     } else {
       DEBUG(std::cerr << "Invalid existential metatype: "; EM->dump());
@@ -1318,13 +1304,14 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start) {
-  const FieldDescriptor *FD = getBuilder().getFieldTypeInfo(TR);
-  if (FD == nullptr) {
+  std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
+      getBuilder().getFieldTypeInfo(TR);
+  if (FD.first == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());
     return nullptr;
   }
 
-  switch (FD->Kind) {
+  switch (FD.first->Kind) {
   case FieldDescriptorKind::Class:
   case FieldDescriptorKind::ObjCClass: {
     // Lower the class's fields using substitutions from the

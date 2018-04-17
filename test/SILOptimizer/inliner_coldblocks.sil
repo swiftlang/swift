@@ -193,23 +193,23 @@ bb0:
   %c30 = builtin "assert_configuration"() : $Builtin.Int32
 
   %f = function_ref @update_global: $@convention(thin) () -> ()
-  // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: update_global inlined into regular_large_callee (cost = {{.*}}, benefit = {{.*}})
+  // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: "update_global" inlined into "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
   // YAML:      --- !Passed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            Inlined
+  // YAML-NEXT: Name:            sil.Inlined
   // YAML-NEXT: DebugLoc:
   // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
   // YAML-NEXT:   Line:            223
   // YAML-NEXT:   Column:          3
   // YAML-NEXT: Function:        regular_large_callee
   // YAML-NEXT: Args:
-  // YAML-NEXT:   - Callee:          update_global
+  // YAML-NEXT:   - Callee:          '"update_global"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
   // YAML-NEXT:       Line:            20
   // YAML-NEXT:       Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
-  // YAML-NEXT:   - Caller:          regular_large_callee
+  // YAML-NEXT:   - Caller:          '"regular_large_callee"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
   // YAML-NEXT:       Line:            162
@@ -233,17 +233,23 @@ bb0:
 sil @dont_inline_regular_large_callee : $@convention(thin) () -> () {
 bb0:
   %f = function_ref @regular_large_callee : $@convention(thin) () -> ()
-  // REMARKS_MISSED: inliner_coldblocks.sil:252:8: remark: Not profitable to inline (cost = {{.*}}, benefit = {{.*}})
+  // REMARKS_MISSED: inliner_coldblocks.sil:258:8: remark: Not profitable to inline function "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
   // YAML:      --- !Missed
   // YAML-NEXT: Pass:            sil-inliner
-  // YAML-NEXT: Name:            NoInlinedCost
+  // YAML-NEXT: Name:            sil.NoInlinedCost
   // YAML-NEXT: DebugLoc:
   // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
-  // YAML-NEXT:   Line:            252
+  // YAML-NEXT:   Line:            258
   // YAML-NEXT:   Column:          8
   // YAML-NEXT: Function:        dont_inline_regular_large_callee
   // YAML-NEXT: Args:
-  // YAML-NEXT:   - String:          'Not profitable to inline (cost = '
+  // YAML-NEXT:   - String:          'Not profitable to inline function '
+  // YAML-NEXT:   - Callee:          '"regular_large_callee"'
+  // YAML-NEXT:     DebugLoc:
+  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:       Line:            162
+  // YAML-NEXT:       Column:          6
+  // YAML-NEXT:   - String:          ' (cost = '
   // YAML-NEXT:   - Cost:            '{{.*}}'
   // YAML-NEXT:   - String:          ', benefit = '
   // YAML-NEXT:   - Benefit:         '{{.*}}'

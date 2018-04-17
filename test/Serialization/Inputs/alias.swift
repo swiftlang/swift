@@ -34,3 +34,5 @@ extension ProtoWrapper {
 
 public struct Outer { public typealias G<T> = T }
 public typealias GG = Outer.G
+
+public typealias GInt = Outer.G<Int>

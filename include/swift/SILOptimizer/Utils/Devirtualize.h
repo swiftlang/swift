@@ -31,6 +31,9 @@
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
+namespace OptRemark {
+class Emitter;
+}
 
 /// A pair representing results of devirtualization.
 ///  - The first element is the value representing the result of the
@@ -48,18 +51,38 @@ namespace swift {
 /// between optional types.
 typedef std::pair<ValueBase *, ApplySite> DevirtualizationResult;
 
+/// Compute all subclasses of a given class.
+///
+/// \p CHA class hierarchy analysis
+/// \p CD class declaration
+/// \p ClassType type of the instance
+/// \p M SILModule
+/// \p Subs a container to be used for storing the set of subclasses
+void getAllSubclasses(ClassHierarchyAnalysis *CHA,
+                      ClassDecl *CD,
+                      SILType ClassType,
+                      SILModule &M,
+                      ClassHierarchyAnalysis::ClassList &Subs);
+
 DevirtualizationResult tryDevirtualizeApply(ApplySite AI,
-                                            ClassHierarchyAnalysis *CHA);
+                                            ClassHierarchyAnalysis *CHA,
+                                            OptRemark::Emitter *ORE = nullptr);
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
-bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType);
+bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType,
+                                OptRemark::Emitter *ORE = nullptr,
+                                bool isEffectivelyFinalMethod = false);
 SILFunction *getTargetClassMethod(SILModule &M, SILType ClassOrMetatypeType,
                                   MethodInst *MI);
 DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
-                                               SILValue ClassInstance);
-DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
-                                                  SILValue ClassInstance);
-DevirtualizationResult tryDevirtualizeWitnessMethod(ApplySite AI);
+                                               SILValue ClassInstance,
+                                               OptRemark::Emitter *ORE);
+DevirtualizationResult
+tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
+                           OptRemark::Emitter *ORE,
+                           bool isEffectivelyFinalMethod = false);
+DevirtualizationResult
+tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
 }
 
 #endif

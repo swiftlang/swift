@@ -105,6 +105,752 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 }
 
 //===----------------------------------------------------------------------===//
+//                             Enum Tag Dataflow
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class EnumCaseDataflowContext;
+
+using EnumBBCaseList =
+    llvm::SmallVector<std::pair<SILBasicBlock *, EnumElementDecl *>, 2>;
+
+/// Class that performs enum tag state dataflow on the given BB.
+class BBEnumTagDataflowState
+    : public SILInstructionVisitor<BBEnumTagDataflowState, bool> {
+  EnumCaseDataflowContext *Context;
+  NullablePtr<SILBasicBlock> BB;
+
+  SmallBlotMapVector<unsigned, EnumElementDecl *, 4> ValueToCaseMap;
+  SmallBlotMapVector<unsigned, EnumBBCaseList, 4> EnumToEnumBBCaseListMap;
+
+public:
+  BBEnumTagDataflowState() = default;
+  BBEnumTagDataflowState(const BBEnumTagDataflowState &Other) = default;
+  ~BBEnumTagDataflowState() = default;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+
+  bool init(EnumCaseDataflowContext &Context, SILBasicBlock *NewBB);
+
+  SILBasicBlock *getBB() { return BB.get(); }
+
+  using iterator = decltype(ValueToCaseMap)::iterator;
+  iterator begin() { return ValueToCaseMap.getItems().begin(); }
+  iterator end() { return ValueToCaseMap.getItems().begin(); }
+
+  void clear() { ValueToCaseMap.clear(); }
+
+  bool visitSILInstruction(SILInstruction *I) { return false; }
+
+  bool visitEnumInst(EnumInst *EI);
+  bool visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
+  bool visitRetainValueInst(RetainValueInst *RVI);
+  bool visitReleaseValueInst(ReleaseValueInst *RVI);
+  bool process();
+  bool hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA);
+  bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
+                                        RCIdentityFunctionInfo *RCIA);
+  void handlePredSwitchEnum(SwitchEnumInst *S);
+  void handlePredCondSelectEnum(CondBranchInst *CondBr);
+
+  /// Helper method which initializes this state map with the data from the
+  /// first predecessor BB.
+  ///
+  /// We will be performing an intersection in a later step of the merging.
+  bool initWithFirstPred(SILBasicBlock *FirstPredBB);
+
+  /// Top level merging function for predecessors.
+  void mergePredecessorStates();
+
+  /// If we have a single predecessor, see if the predecessor's terminator was a
+  /// switch_enum or a (cond_br + select_enum). If so, track in this block the
+  /// enum state of the operand.
+  void mergeSinglePredTermInfoIntoState(SILBasicBlock *Pred);
+
+private:
+  EnumCaseDataflowContext &getContext() const;
+  unsigned getIDForValue(SILValue V) const;
+  SILValue getValueForID(unsigned ID) const;
+};
+
+/// Map all blocks to BBEnumTagDataflowState in RPO order.
+class EnumCaseDataflowContext {
+  PostOrderFunctionInfo *PO;
+  std::vector<BBEnumTagDataflowState> BBToStateVec;
+  std::vector<SILValue> IDToEnumValueMap;
+  llvm::DenseMap<SILValue, unsigned> EnumValueToIDMap;
+
+public:
+  EnumCaseDataflowContext(PostOrderFunctionInfo *PO) : PO(PO), BBToStateVec() {
+    BBToStateVec.resize(PO->size());
+    unsigned RPOIdx = 0;
+    for (SILBasicBlock *BB : PO->getReversePostOrder()) {
+      BBToStateVec[RPOIdx].init(*this, BB);
+      ++RPOIdx;
+    }
+  }
+
+  /// Return true if we have a valid value for the given ID;
+  bool hasValueForID(unsigned ID) const {
+    return ID < IDToEnumValueMap.size() && IDToEnumValueMap[ID];
+  }
+
+  SILValue getValueForID(unsigned ID) const { return IDToEnumValueMap[ID]; }
+
+  unsigned getIDForValue(SILValue V) const {
+    // We are being a little tricky here. Here is what is happening:
+    //
+    // 1. When we start we do not know if we are already tracking V, so we
+    // prepare /as if/ V was new.
+    //
+    // 2. When we perform the insertion, if V already has a value associated
+    // with it, we return the iterator to that value. The iterator contains
+    // inside of it the actual index.
+    //
+    // 3. Otherwise, we initialize V in EnumValueToIDMap with NewID. Rather than
+    // re-accessing the iterator, we just return the value we have already
+    // computed.
+    unsigned NewID = IDToEnumValueMap.size();
+    auto &This = const_cast<EnumCaseDataflowContext &>(*this);
+    auto Iter = This.EnumValueToIDMap.insert({V, NewID});
+    if (!Iter.second)
+      return Iter.first->second;
+    This.IDToEnumValueMap.emplace_back(V);
+    return NewID;
+  }
+
+  void blotValue(SILValue V) {
+    unsigned ID = getIDForValue(V);
+    IDToEnumValueMap[ID] = SILValue();
+  }
+
+  unsigned size() const { return BBToStateVec.size(); }
+  BBEnumTagDataflowState &getRPOState(unsigned RPOIdx) {
+    return BBToStateVec[RPOIdx];
+  }
+  /// \return BBEnumTagDataflowState or NULL for unreachable blocks.
+  BBEnumTagDataflowState *getBBState(SILBasicBlock *BB) {
+    if (auto ID = PO->getRPONumber(BB)) {
+      return &getRPOState(*ID);
+    }
+    return nullptr;
+  }
+};
+
+} // end anonymous namespace
+
+EnumCaseDataflowContext &BBEnumTagDataflowState::getContext() const {
+  // Context and BB are initialized together, so we only need to check one.
+  assert(BB.isNonNull() && "Uninitialized state?!");
+  return *Context;
+}
+
+unsigned BBEnumTagDataflowState::getIDForValue(SILValue V) const {
+  return getContext().getIDForValue(V);
+}
+
+SILValue BBEnumTagDataflowState::getValueForID(unsigned ID) const {
+  return getContext().getValueForID(ID);
+}
+
+void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
+
+  // Find the tag associated with our BB and set the state of the
+  // enum we switch on to that value. This is important so we can determine
+  // covering switches for enums that have cases without payload.
+
+  // Next check if we are the target of a default switch_enum case. If we are,
+  // no interesting information can be extracted, so bail...
+  if (S->hasDefault() && S->getDefaultBB() == getBB())
+    return;
+
+  // Otherwise, attempt to find the tag associated with this BB in the switch
+  // enum...
+  for (unsigned i = 0, e = S->getNumCases(); i != e; ++i) {
+    auto P = S->getCase(i);
+
+    // If this case of the switch is not matched up with this BB, skip the
+    // case...
+    if (P.second != getBB())
+      continue;
+
+    // Ok, we found the case for our BB. If we don't have an enum tag (which can
+    // happen if we have a default statement), return. There is nothing more we
+    // can do.
+    if (!P.first)
+      return;
+
+    // Ok, we have a matching BB and a matching enum tag. Set the state and
+    // return.
+    ValueToCaseMap[getIDForValue(S->getOperand())] = P.first;
+    return;
+  }
+  llvm_unreachable("A successor of a switch_enum terminated BB should be in "
+                   "the switch_enum.");
+}
+
+void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
+
+  auto *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
+  if (!EITI)
+    return;
+
+  NullablePtr<EnumElementDecl> TrueElement = EITI->getSingleTrueElement();
+  if (TrueElement.isNull())
+    return;
+
+  // Find the tag associated with our BB and set the state of the
+  // enum we switch on to that value. This is important so we can determine
+  // covering switches for enums that have cases without payload.
+
+  // Check if we are the true case, ie, we know that we are the given tag.
+  const auto &Operand = EITI->getEnumOperand();
+  if (CondBr->getTrueBB() == getBB()) {
+    ValueToCaseMap[getIDForValue(Operand)] = TrueElement.get();
+    return;
+  }
+
+  // If the enum only has 2 values and its tag isn't the true branch, then we
+  // know the true branch must be the other tag.
+  if (EnumDecl *E = Operand->getType().getEnumOrBoundGenericEnum()) {
+    // Look for a single other element on this enum.
+    EnumElementDecl *OtherElt = nullptr;
+    for (EnumElementDecl *Elt : E->getAllElements()) {
+      // Skip the case where we find the select_enum element
+      if (Elt == TrueElement.get())
+        continue;
+      // If we find another element, then we must have more than 2, so bail.
+      if (OtherElt)
+        return;
+      OtherElt = Elt;
+    }
+    // Only a single enum element?  How would this even get here?  We should
+    // handle it in SILCombine.
+    if (!OtherElt)
+      return;
+    // FIXME: Can we ever not be the false BB here?
+    if (CondBr->getTrueBB() != getBB()) {
+      ValueToCaseMap[getIDForValue(Operand)] = OtherElt;
+      return;
+    }
+  }
+}
+
+bool BBEnumTagDataflowState::initWithFirstPred(SILBasicBlock *FirstPredBB) {
+  // Try to look up the state for the first pred BB.
+  BBEnumTagDataflowState *FirstPredState = getContext().getBBState(FirstPredBB);
+
+  // If we fail, we found an unreachable block, bail.
+  if (FirstPredState == nullptr) {
+    DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
+    return false;
+  }
+
+  // Ok, our state is in the map, copy in the predecessors value to case map.
+  ValueToCaseMap = FirstPredState->ValueToCaseMap;
+
+  // If we are predecessors only successor, we can potentially hoist releases
+  // into it, so associate the first pred BB and the case for each value that we
+  // are tracking with it.
+  //
+  // TODO: I am writing this too fast. Clean this up later.
+  if (FirstPredBB->getSingleSuccessorBlock()) {
+    for (auto P : ValueToCaseMap.getItems()) {
+      if (!P.hasValue())
+        continue;
+      EnumToEnumBBCaseListMap[P->first].push_back({FirstPredBB, P->second});
+    }
+  }
+
+  return true;
+}
+
+void BBEnumTagDataflowState::mergeSinglePredTermInfoIntoState(
+    SILBasicBlock *Pred) {
+  // Grab the terminator of our one predecessor and if it is a switch enum, mix
+  // it into this state.
+  TermInst *PredTerm = Pred->getTerminator();
+  if (auto *S = dyn_cast<SwitchEnumInst>(PredTerm)) {
+    handlePredSwitchEnum(S);
+    return;
+  }
+
+  auto *CondBr = dyn_cast<CondBranchInst>(PredTerm);
+  if (!CondBr)
+    return;
+
+  handlePredCondSelectEnum(CondBr);
+}
+
+void BBEnumTagDataflowState::mergePredecessorStates() {
+
+  // If we have no predecessors, there is nothing to do so return early...
+  if (getBB()->pred_empty()) {
+    DEBUG(llvm::dbgs() << "            No Preds.\n");
+    return;
+  }
+
+  auto PI = getBB()->pred_begin(), PE = getBB()->pred_end();
+  if (*PI == getBB()) {
+    DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
+    return;
+  }
+
+  // Grab the first predecessor BB.
+  SILBasicBlock *FirstPred = *PI;
+  ++PI;
+
+  // Attempt to initialize our state with our first predecessor's state by just
+  // copying. We will be doing an intersection with all of the other BB.
+  if (!initWithFirstPred(FirstPred))
+    return;
+
+  // If we only have one predecessor see if we can gain any information and or
+  // knowledge from the terminator of our one predecessor. There is nothing more
+  // that we can do, return.
+  //
+  // This enables us to get enum information from switch_enum and cond_br about
+  // the value that an enum can take in our block. This is a common case that
+  // comes up.
+  if (PI == PE) {
+    mergeSinglePredTermInfoIntoState(FirstPred);
+    return;
+  }
+
+  DEBUG(llvm::dbgs() << "            Merging in rest of predecessors...\n");
+
+  // Enum values that while merging we found conflicting values for. We blot
+  // them after the loop in order to ensure that we can still find the ends of
+  // switch regions.
+  llvm::SmallVector<unsigned, 4> CurBBValuesToBlot;
+
+  // If we do not find state for a specific value in any of our predecessor BBs,
+  // we cannot be the end of a switch region since we cannot cover our
+  // predecessor BBs with enum decls. Blot after the loop.
+  llvm::SmallVector<unsigned, 4> PredBBValuesToBlot;
+
+  // And for each remaining predecessor...
+  do {
+    // If we loop on ourselves, bail...
+    if (*PI == getBB()) {
+      DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
+      return;
+    }
+
+    // Grab the predecessors state...
+    SILBasicBlock *PredBB = *PI;
+
+    BBEnumTagDataflowState *PredBBState = getContext().getBBState(PredBB);
+    if (PredBBState == nullptr) {
+      DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
+      return;
+    }
+
+    ++PI;
+
+    // Then for each (SILValue, Enum Tag) that we are tracking...
+    for (auto P : ValueToCaseMap.getItems()) {
+      // If this SILValue was blotted, there is nothing left to do, we found
+      // some sort of conflicting definition and are being conservative.
+      if (!P.hasValue())
+        continue;
+
+      // Then attempt to look up the enum state associated in our SILValue in
+      // the predecessor we are processing.
+      auto PredIter = PredBBState->ValueToCaseMap.find(P->first);
+
+      // If we cannot find the state associated with this SILValue in this
+      // predecessor or the ID in the corresponding predecessor was blotted, we
+      // cannot find a covering switch for this BB or forward any enum tag
+      // information for this enum value.
+      if (PredIter == PredBBState->ValueToCaseMap.end() ||
+          !(*PredIter).hasValue()) {
+        // Otherwise, we are conservative and do not forward the EnumTag that we
+        // are tracking. Blot it!
+        DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
+        CurBBValuesToBlot.push_back(P->first);
+        PredBBValuesToBlot.push_back(P->first);
+        continue;
+      }
+
+      // Then try to lookup the actual value associated with the ID. If we do
+      // not find one, then the enum was destroyed by another part of the pass.
+      SILValue PredValue = getValueForID((*PredIter)->first);
+      if (!PredValue)
+        continue;
+
+      // Check if out predecessor has any other successors. If that is true we
+      // clear all the state since we cannot hoist safely.
+      if (!PredBB->getSingleSuccessorBlock()) {
+        EnumToEnumBBCaseListMap.clear();
+        DEBUG(llvm::dbgs() << "                Predecessor has other "
+                              "successors. Clearing BB cast list map.\n");
+      } else {
+        // Otherwise, add this case to our predecessor case list. We will unique
+        // this after we have finished processing all predecessors.
+        auto Case = std::make_pair(PredBB, (*PredIter)->second);
+        EnumToEnumBBCaseListMap[(*PredIter)->first].push_back(Case);
+      }
+
+      // And the states match, the enum state propagates to this BB.
+      if ((*PredIter)->second == P->second)
+        continue;
+
+      // Otherwise, we are conservative and do not forward the EnumTag that we
+      // are tracking. Blot it!
+      DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
+      CurBBValuesToBlot.push_back(P->first);
+    }
+  } while (PI != PE);
+
+  for (unsigned ID : CurBBValuesToBlot) {
+    ValueToCaseMap.erase(ID);
+  }
+  for (unsigned ID : PredBBValuesToBlot) {
+    EnumToEnumBBCaseListMap.erase(ID);
+  }
+}
+
+bool BBEnumTagDataflowState::visitEnumInst(EnumInst *EI) {
+  unsigned ID = getIDForValue(SILValue(EI));
+  DEBUG(llvm::dbgs() << "    Storing enum into map. ID: " << ID
+                     << ". Value: " << *EI);
+  ValueToCaseMap[ID] = EI->getElement();
+  return false;
+}
+
+bool BBEnumTagDataflowState::visitUncheckedEnumDataInst(
+    UncheckedEnumDataInst *UEDI) {
+  unsigned ID = getIDForValue(UEDI->getOperand());
+  DEBUG(llvm::dbgs() << "    Storing unchecked enum data into map. ID: " << ID
+                     << ". Value: " << *UEDI);
+  ValueToCaseMap[ID] = UEDI->getElement();
+  return false;
+}
+
+bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
+  auto FindResult = ValueToCaseMap.find(getIDForValue(RVI->getOperand()));
+  if (FindResult == ValueToCaseMap.end())
+    return false;
+
+  // If we do not have any argument, kill the retain_value.
+  if (!(*FindResult)->second->hasAssociatedValues()) {
+    RVI->eraseFromParent();
+    return true;
+  }
+
+  DEBUG(llvm::dbgs() << "    Found RetainValue: " << *RVI);
+  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
+                     << (*FindResult)->first);
+
+  SILBuilderWithScope Builder(RVI);
+  createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
+  RVI->eraseFromParent();
+  return true;
+}
+
+bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
+  auto FindResult = ValueToCaseMap.find(getIDForValue(RVI->getOperand()));
+  if (FindResult == ValueToCaseMap.end())
+    return false;
+
+  // If we do not have any argument, just delete the release value.
+  if (!(*FindResult)->second->hasAssociatedValues()) {
+    RVI->eraseFromParent();
+    return true;
+  }
+
+  DEBUG(llvm::dbgs() << "    Found ReleaseValue: " << *RVI);
+  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
+                     << (*FindResult)->first);
+
+  SILBuilderWithScope Builder(RVI);
+  createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
+  RVI->eraseFromParent();
+  return true;
+}
+
+bool BBEnumTagDataflowState::process() {
+  bool Changed = false;
+
+  auto SI = getBB()->begin();
+  while (SI != getBB()->end()) {
+    SILInstruction *I = &*SI;
+    ++SI;
+    Changed |= visit(I);
+  }
+
+  return Changed;
+}
+
+bool BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(
+    AliasAnalysis *AA) {
+  bool Changed = false;
+  unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
+
+  for (auto II = getBB()->begin(), IE = getBB()->end(); II != IE;) {
+    auto *RVI = dyn_cast<ReleaseValueInst>(&*II);
+    ++II;
+
+    // If this instruction is not a release, skip it...
+    if (!RVI)
+      continue;
+
+    DEBUG(llvm::dbgs() << "        Visiting release: " << *RVI);
+
+    // Grab the operand of the release value inst.
+    SILValue Op = RVI->getOperand();
+
+    // Lookup the [(BB, EnumTag)] list for this operand.
+    unsigned ID = getIDForValue(Op);
+    auto R = EnumToEnumBBCaseListMap.find(ID);
+    // If we don't have one, skip this release value inst.
+    if (R == EnumToEnumBBCaseListMap.end()) {
+      DEBUG(llvm::dbgs() << "            Could not find [(BB, EnumTag)] "
+                            "list for release_value's operand. Bailing!\n");
+      continue;
+    }
+
+    auto &EnumBBCaseList = (*R)->second;
+    // If we don't have an enum tag for each predecessor of this BB, bail since
+    // we do not know how to handle that BB.
+    if (EnumBBCaseList.size() != NumPreds) {
+      DEBUG(llvm::dbgs() << "            Found [(BB, EnumTag)] list for "
+                            "release_value's operand, but we do not have an "
+                            "enum tag for each predecessor. Bailing!\n");
+      DEBUG(llvm::dbgs() << "            List:\n");
+      DEBUG(for (auto P
+                 : EnumBBCaseList) {
+        llvm::dbgs() << "                ";
+        P.second->dump(llvm::dbgs());
+      });
+      continue;
+    }
+
+    // Finally ensure that we have no users of this operand preceding the
+    // release_value in this BB. If we have users like that we cannot hoist the
+    // release past them unless we know that there is an additional set of
+    // releases that together post-dominate this release. If we cannot do this,
+    // skip this release.
+    //
+    // TODO: We need information from the ARC optimizer to prove that property
+    // if we are going to use it.
+    if (valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
+                                          SILBasicBlock::iterator(RVI), AA)) {
+      DEBUG(llvm::dbgs() << "            Release value has use that stops "
+                            "hoisting! Bailing!\n");
+      continue;
+    }
+
+    DEBUG(llvm::dbgs() << "            Its safe to perform the "
+                          "transformation!\n");
+
+    // Otherwise perform the transformation.
+    for (auto P : EnumBBCaseList) {
+      // If we don't have an argument for this case, there is nothing to
+      // do... continue...
+      if (!P.second->hasAssociatedValues())
+        continue;
+
+      // Otherwise create the release_value before the terminator of the
+      // predecessor.
+      assert(P.first->getSingleSuccessorBlock() &&
+             "Cannot hoist release into BB that has multiple successors");
+      SILBuilderWithScope Builder(P.first->getTerminator(), RVI);
+      createRefCountOpForPayload(Builder, RVI, P.second);
+    }
+
+    RVI->eraseFromParent();
+    ++NumHoisted;
+    Changed = true;
+  }
+
+  return Changed;
+}
+
+static SILInstruction *findLastSinkableMatchingEnumValueRCIncrementInPred(
+    AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILValue EnumValue,
+    SILBasicBlock *BB) {
+  // Otherwise, see if we can find a retain_value or strong_retain associated
+  // with that enum in the relevant predecessor.
+  auto FirstInc = std::find_if(
+      BB->rbegin(), BB->rend(),
+      [&RCIA, &EnumValue](const SILInstruction &I) -> bool {
+        // If I is not an increment, ignore it.
+        if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
+          return false;
+
+        // Otherwise, if the increments operand stripped of RC identity
+        // preserving
+        // ops matches EnumValue, it is the first increment we are interested
+        // in.
+        return EnumValue == RCIA->getRCIdentityRoot(I.getOperand(0));
+      });
+
+  // If we do not find a ref count increment in the relevant BB, skip this
+  // enum since there is nothing we can do.
+  if (FirstInc == BB->rend())
+    return nullptr;
+
+  // Otherwise, see if there are any instructions in between FirstPredInc and
+  // the end of the given basic block that could decrement first pred. If such
+  // an instruction exists, we cannot perform this optimization so continue.
+  if (valueHasARCDecrementOrCheckInInstructionRange(
+          EnumValue, (*FirstInc).getIterator(),
+          BB->getTerminator()->getIterator(), AA))
+    return nullptr;
+
+  return &*FirstInc;
+}
+
+static bool findRetainsSinkableFromSwitchRegionForEnum(
+    AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILValue EnumValue,
+    EnumBBCaseList &Map, SmallVectorImpl<SILInstruction *> &DeleteList) {
+
+  // For each predecessor with argument type...
+  for (auto &P : Map) {
+    SILBasicBlock *PredBB = P.first;
+    EnumElementDecl *Decl = P.second;
+
+    // If the case does not have an argument type, skip the predecessor since
+    // there will not be a retain to sink.
+    if (!Decl->hasAssociatedValues())
+      continue;
+
+    // Ok, we found a payloaded predecessor. Look backwards through the
+    // predecessor for the first ref count increment on EnumValue. If there
+    // are no ref count decrements in between the increment and the terminator
+    // of the BB, then we can sink the retain out of the switch enum.
+    auto *Inc = findLastSinkableMatchingEnumValueRCIncrementInPred(
+        AA, RCIA, EnumValue, PredBB);
+    // If we do not find such an increment, there is nothing we can do, bail.
+    if (!Inc)
+      return false;
+
+    // Otherwise add the increment to the delete list.
+    DeleteList.push_back(Inc);
+  }
+
+  // If we were able to process each predecessor successfully, return true.
+  return true;
+}
+
+bool BBEnumTagDataflowState::sinkIncrementsOutOfSwitchRegions(
+    AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA) {
+  bool Changed = false;
+  unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
+  llvm::SmallVector<SILInstruction *, 4> DeleteList;
+
+  // For each (EnumValue, [(BB, EnumTag)]) that we are tracking...
+  for (auto &P : EnumToEnumBBCaseListMap) {
+    // Clear our delete list.
+    DeleteList.clear();
+
+    // If EnumValue is null, we deleted this entry. There is nothing to do for
+    // this value... Skip it.
+    if (!P.hasValue())
+      continue;
+
+    // Look up the actual enum value using our index to make sure that other
+    // parts of the pass have not destroyed the value. In such a case, just
+    // continue.
+    SILValue EnumValue = getContext().getValueForID(P->first);
+    if (!EnumValue)
+      continue;
+    EnumValue = RCIA->getRCIdentityRoot(EnumValue);
+    EnumBBCaseList &Map = P->second;
+
+    // If we do not have a tag associated with this enum value for each
+    // predecessor, we are not a switch region exit for this enum value. Skip
+    // this value.
+    if (Map.size() != NumPreds)
+      continue;
+
+    // Look through our predecessors for a set of ref count increments on our
+    // enum value for every payloaded case that *could* be sunk. If we miss an
+    // increment from any of the payloaded case there is nothing we can do here,
+    // so skip this enum value.
+    if (!findRetainsSinkableFromSwitchRegionForEnum(AA, RCIA, EnumValue, Map,
+                                                    DeleteList))
+      continue;
+
+    // If we do not have any payload arguments, then we should have an empty
+    // delete list and there is nothing to do here.
+    if (DeleteList.empty())
+      continue;
+
+    // Ok, we can perform this transformation! Insert the new retain_value and
+    // delete all of the ref count increments from the predecessor BBs.
+    //
+    // TODO: Which debug loc should we use here? Using one of the locs from the
+    // delete list seems reasonable for now...
+    SILBuilder Builder(getBB()->begin());
+    Builder.createRetainValue(
+        DeleteList[0]->getLoc(), EnumValue,
+        cast<RefCountingInst>(DeleteList[0])->getAtomicity());
+    for (auto *I : DeleteList)
+      I->eraseFromParent();
+    ++NumSunk;
+    Changed = true;
+  }
+
+  return Changed;
+}
+
+void BBEnumTagDataflowState::dump() const {
+#ifndef NDEBUG
+  llvm::dbgs() << "Dumping state for BB" << BB.get()->getDebugID() << "\n";
+  llvm::dbgs() << "Block States:\n";
+  for (auto &P : ValueToCaseMap) {
+    if (!P.hasValue()) {
+      llvm::dbgs() << "  Skipping blotted value.\n";
+      continue;
+    }
+    unsigned ID = P->first;
+    SILValue V = getContext().getValueForID(ID);
+    if (!V) {
+      llvm::dbgs() << "  ID: " << ID << ". Value: BLOTTED.\n";
+      continue;
+    }
+    llvm::dbgs() << "  ID: " << ID << ". Value: " << V;
+  }
+
+  llvm::dbgs() << "Predecessor States:\n";
+  // For each (EnumValue, [(BB, EnumTag)]) that we are tracking...
+  for (auto &P : EnumToEnumBBCaseListMap) {
+    if (!P.hasValue()) {
+      llvm::dbgs() << "  Skipping blotted value.\n";
+      continue;
+    }
+    unsigned ID = P->first;
+    SILValue V = getContext().getValueForID(ID);
+    if (!V) {
+      llvm::dbgs() << "  ID: " << ID << ". Value: BLOTTED.\n";
+      continue;
+    }
+    llvm::dbgs() << "  ID: " << ID << ". Value: " << V;
+    llvm::dbgs() << "  Case List:\n";
+    for (auto &P2 : P->second) {
+      llvm::dbgs() << "    BB" << P2.first->getDebugID() << ": ";
+      P2.second->dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+    llvm::dbgs() << "  End Case List.\n";
+  }
+#endif
+}
+
+bool BBEnumTagDataflowState::init(EnumCaseDataflowContext &NewContext,
+                                  SILBasicBlock *NewBB) {
+  assert(NewBB && "NewBB should not be null");
+  Context = &NewContext;
+  BB = NewBB;
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //                            Generic Sinking Code
 //===----------------------------------------------------------------------===//
 
@@ -114,7 +860,8 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
   if (BB->pred_empty())
     return false;
 
-  // Only try to hoist the first instruction. RRCM should have hoisted the release
+  // Only try to hoist the first instruction. RRCM should have hoisted the
+  // release
   // to the beginning of the block if it can.
   auto Head = &*BB->begin();
   // Make sure it is a release instruction.
@@ -127,14 +874,15 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
     return false;
 
   // Make sure the release will not be blocked by the terminator instructions
-  // Make sure the terminator does not block, nor is a branch with multiple targets.
+  // Make sure the terminator does not block, nor is a branch with multiple
+  // targets.
   for (auto P : BB->getPredecessorBlocks()) {
     if (!isa<BranchInst>(P->getTerminator()))
       return false;
   }
 
   // Make sure we can get all the incoming values.
-  llvm::SmallVector<SILValue , 4> PredValues;
+  llvm::SmallVector<SILValue, 4> PredValues;
   if (!SA->getIncomingValues(PredValues))
     return false;
 
@@ -174,10 +922,10 @@ using ValueToBBArgIdxMap = llvm::DenseMap<ValueInBlock, int>;
 enum OperandRelation {
   /// Uninitialized state.
   NotDeterminedYet,
-  
+
   /// The original operand values are equal.
   AlwaysEqual,
-  
+
   /// The operand values are equal after replacing with the successor block
   /// arguments.
   EqualAfterMove
@@ -205,7 +953,8 @@ static SILValue findValueShallowRoot(const SILValue &In) {
   if (auto *Arg = dyn_cast<SILArgument>(In)) {
     SILBasicBlock *Parent = Arg->getParent();
     SILBasicBlock *Pred = Parent->getSinglePredecessorBlock();
-    if (!Pred) return In;
+    if (!Pred)
+      return In;
 
     // If the terminator is a cast instruction then use the pre-cast value.
     if (auto CCBI = dyn_cast<CheckedCastBranchInst>(Pred->getTerminator())) {
@@ -231,7 +980,6 @@ static SILValue findValueShallowRoot(const SILValue &In) {
     if (auto CBI = dyn_cast<CondBranchInst>(Pred->getTerminator())) {
       return CBI->getArgForDestBB(Parent, Arg);
     }
-
   }
   return In;
 }
@@ -240,16 +988,16 @@ static SILValue findValueShallowRoot(const SILValue &In) {
 /// \p BB starting at the end of the block, stopping on sink barriers.
 /// The \p opRelation must be consistent for all operand comparisons.
 SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
-                                   const ValueToBBArgIdxMap &valueToArgIdxMap,
-                                   OperandRelation &opRelation) {
+                                     const ValueToBBArgIdxMap &valueToArgIdxMap,
+                                     OperandRelation &opRelation) {
   int SkipBudget = SinkSearchWindow;
 
   SILBasicBlock::iterator InstToSink = BB->getTerminator()->getIterator();
   SILBasicBlock *IdenBlock = Iden->getParent();
-  
+
   // The compare function for instruction operands.
   auto operandCompare = [&](const SILValue &Op1, const SILValue &Op2) -> bool {
-    
+
     if (opRelation != EqualAfterMove && Op1 == Op2) {
       // The trivial case.
       opRelation = AlwaysEqual;
@@ -271,7 +1019,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
     }
     return false;
   };
-  
+
   while (SkipBudget) {
     // If we found a sinkable instruction that is identical to our goal
     // then return it.
@@ -400,7 +1148,7 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
 }
 
 // Try to sink values from the Nth argument \p ArgNum.
-static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
+static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, unsigned ArgNum) {
   assert(ArgNum < BB->getNumArguments() && "Invalid argument");
 
   // Find the first predecessor, the first terminator and the Nth argument.
@@ -415,7 +1163,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     return false;
 
   // The list of identical instructions.
-  SmallVector<SingleValueInstruction*, 8> Clones;
+  SmallVector<SingleValueInstruction *, 8> Clones;
   Clones.push_back(FSI);
 
   // Don't move instructions that are sensitive to their location.
@@ -423,8 +1171,8 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   // If this instruction can read memory, we try to be conservatively not to
   // move it, as there may be instructions that can clobber the read memory
   // from current place to the place where it is moved to.
-  if (FSI->mayReadFromMemory() || (FSI->mayHaveSideEffects() &&
-      !isa<AllocationInst>(FSI)))
+  if (FSI->mayReadFromMemory() ||
+      (FSI->mayHaveSideEffects() && !isa<AllocationInst>(FSI)))
     return false;
 
   // If the instructions are different, but only in terms of a cheap operand
@@ -524,17 +1272,20 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
 
   // The argument is no longer in use. Replace all incoming inputs with undef
   // and try to delete the instruction.
-  for (auto S : Clones)
+  for (auto S : Clones) {
     if (S != FSI) {
       deleteAllDebugUses(S);
       S->replaceAllUsesWith(Undef);
       auto DeadArgInst = cast<SILInstruction>(S);
-      recursivelyDeleteTriviallyDeadInstructions(DeadArgInst);
+      for (SILValue Result : DeadArgInst->getResults()) {
+        Context.blotValue(Result);
+      }
+      DeadArgInst->eraseFromParent();
     }
+  }
 
   return true;
 }
-
 
 /// Try to sink literals that are passed to arguments that are coming from
 /// multiple predecessors.
@@ -553,7 +1304,8 @@ static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
 }
 
 /// Try to sink identical arguments coming from multiple predecessors.
-static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
+static bool sinkArgumentsFromPredecessors(EnumCaseDataflowContext &Context,
+                                          SILBasicBlock *BB) {
   if (BB->pred_empty() || BB->getSinglePredecessorBlock())
     return false;
 
@@ -565,7 +1317,7 @@ static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
   // Try to sink values from each of the arguments to the basic block.
   bool Changed = false;
   for (int i = 0, e = BB->getNumArguments(); i < e; ++i)
-    Changed |= sinkArgument(BB, i);
+    Changed |= sinkArgument(Context, BB, i);
 
   return Changed;
 }
@@ -578,23 +1330,24 @@ static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
 /// values that come from basic block arguments with the caller values and
 /// strip casts.
 static bool canonicalizeRefCountInstrs(SILBasicBlock *BB) {
- bool Changed = false;
- for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
-   if (!isa<StrongReleaseInst>(I) && !isa<StrongRetainInst>(I))
-     continue;
+  bool Changed = false;
+  for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
+    if (!isa<StrongReleaseInst>(I) && !isa<StrongRetainInst>(I))
+      continue;
 
-   SILValue Ref = I->getOperand(0);
-   SILValue Root = findValueShallowRoot(Ref);
-   if (Ref != Root) {
-     I->setOperand(0, Root);
-     Changed = true;
-   }
- }
+    SILValue Ref = I->getOperand(0);
+    SILValue Root = findValueShallowRoot(Ref);
+    if (Ref != Root) {
+      I->setOperand(0, Root);
+      Changed = true;
+    }
+  }
 
- return Changed;
+  return Changed;
 }
 
-static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
+static bool sinkCodeFromPredecessors(EnumCaseDataflowContext &Context,
+                                     SILBasicBlock *BB) {
   bool Changed = false;
   if (BB->pred_empty())
     return Changed;
@@ -681,6 +1434,9 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
         Changed = true;
         for (auto I : Dups) {
           I->replaceAllUsesPairwiseWith(&*InstToSink);
+          for (SILValue Result : I->getResults()) {
+            Context.blotValue(Result);
+          }
           I->eraseFromParent();
           NumSunk++;
         }
@@ -733,8 +1489,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
   // not move it.
   auto SwitchIter = Switch->getIterator();
   if (auto B = valueHasARCDecrementOrCheckInInstructionRange(Ptr, RV,
-                                                             SwitchIter,
-                                                             AA)) {
+                                                             SwitchIter, AA)) {
     RV->moveBefore(&**B);
     return true;
   }
@@ -795,7 +1550,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   NullablePtr<EnumElementDecl> TrueElement = SEI->getSingleTrueElement();
   if (TrueElement.isNull())
     return false;
-  
+
   // Next go over all instructions after I in the basic block. If none of them
   // can decrement our ptr value, we can move the retain over the ref count
   // inst. If any of them do potentially decrement the ref count of Ptr, we can
@@ -814,7 +1569,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
   if (RCIA->getRCIdentityRoot(Ptr) !=
       RCIA->getRCIdentityRoot(SEI->getEnumOperand()))
     return false;
-  
+
   // Work out which enum element is the true branch, and which is false.
   // If the enum only has 2 values and its tag isn't the true branch, then we
   // know the true branch must be the other tag.
@@ -887,17 +1642,18 @@ static bool tryTosinkIncrementsIntoSwitchRegions(SILBasicBlock::iterator T,
 
 /// Try sink a retain as far as possible.  This is either to successor BBs,
 /// or as far down the current BB as possible
-static bool sinkIncrementsIntoSwitchRegions(SILBasicBlock *BB, AliasAnalysis *AA,
+static bool sinkIncrementsIntoSwitchRegions(SILBasicBlock *BB,
+                                            AliasAnalysis *AA,
                                             RCIdentityFunctionInfo *RCIA) {
   // Make sure that each one of our successors only has one predecessor,
   // us.
   // If that condition is not true, we can still sink to the end of this BB,
   // but not to successors.
-  bool CanSinkToSuccessor = std::none_of(BB->succ_begin(), BB->succ_end(),
-    [](const SILSuccessor &S) -> bool {
-      SILBasicBlock *SuccBB = S.getBB();
-      return !SuccBB || !SuccBB->getSinglePredecessorBlock();
-  });
+  bool CanSinkToSuccessor = std::none_of(
+      BB->succ_begin(), BB->succ_end(), [](const SILSuccessor &S) -> bool {
+        SILBasicBlock *SuccBB = S.getBB();
+        return !SuccBB || !SuccBB->getSinglePredecessorBlock();
+      });
 
   SILInstruction *S = BB->getTerminator();
   auto SI = S->getIterator(), SE = BB->begin();
@@ -920,649 +1676,13 @@ static bool sinkIncrementsIntoSwitchRegions(SILBasicBlock *BB, AliasAnalysis *AA
     //      terminator, sink the ref count inst into either our successors.
     //   2. If there are such decrements, move the retain right before that
     //      decrement.
-    Changed |= tryTosinkIncrementsIntoSwitchRegions(S->getIterator(),
-                                                    Inst->getIterator(),
-                                                    CanSinkToSuccessor, 
-                                                    AA, RCIA);
+    Changed |= tryTosinkIncrementsIntoSwitchRegions(
+        S->getIterator(), Inst->getIterator(), CanSinkToSuccessor, AA, RCIA);
   }
 
   // Handle the first instruction in the BB.
-  Changed |=
-      tryTosinkIncrementsIntoSwitchRegions(S->getIterator(), SI,
-                                           CanSinkToSuccessor, AA, RCIA);
-  return Changed;
-}
-
-//===----------------------------------------------------------------------===//
-//                             Enum Tag Dataflow
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class BBToDataflowStateMap;
-
-using EnumBBCaseList = llvm::SmallVector<std::pair<SILBasicBlock *,
-                                                   EnumElementDecl *>, 2>;
-
-/// Class that performs enum tag state dataflow on the given BB.
-class BBEnumTagDataflowState
-    : public SILInstructionVisitor<BBEnumTagDataflowState, bool> {
-  NullablePtr<SILBasicBlock> BB;
-
-  using ValueToCaseSmallBlotMapVectorTy =
-    SmallBlotMapVector<SILValue, EnumElementDecl *, 4>;
-  ValueToCaseSmallBlotMapVectorTy ValueToCaseMap;
-
-  using EnumToEnumBBCaseListMapTy =
-    SmallBlotMapVector<SILValue, EnumBBCaseList, 4>;
-
-  EnumToEnumBBCaseListMapTy EnumToEnumBBCaseListMap;
-
-public:
-  BBEnumTagDataflowState() = default;
-  BBEnumTagDataflowState(const BBEnumTagDataflowState &Other) = default;
-  ~BBEnumTagDataflowState() = default;
-
-  bool init(SILBasicBlock *NewBB) {
-    assert(NewBB && "NewBB should not be null");
-    BB = NewBB;
-    return true;
-  }
-
-  SILBasicBlock *getBB() { return BB.get(); }
-
-  using iterator = decltype(ValueToCaseMap)::iterator;
-  iterator begin() { return ValueToCaseMap.getItems().begin(); }
-  iterator end() { return ValueToCaseMap.getItems().begin(); }
-
-  void clear() { ValueToCaseMap.clear(); }
-
-  bool visitSILInstruction(SILInstruction *I) { return false; }
-
-  bool visitEnumInst(EnumInst *EI) {
-    DEBUG(llvm::dbgs() << "    Storing enum into map: " << *EI);
-    ValueToCaseMap[SILValue(EI)] = EI->getElement();
-    return false;
-  }
-
-  bool visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
-    DEBUG(
-        llvm::dbgs() << "    Storing unchecked enum data into map: " << *UEDI);
-    ValueToCaseMap[SILValue(UEDI->getOperand())] = UEDI->getElement();
-    return false;
-  }
-
-  bool visitRetainValueInst(RetainValueInst *RVI);
-  bool visitReleaseValueInst(ReleaseValueInst *RVI);
-  bool process();
-  bool hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA);
-  bool sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
-                                        RCIdentityFunctionInfo *RCIA);
-  void handlePredSwitchEnum(SwitchEnumInst *S);
-  void handlePredCondSelectEnum(CondBranchInst *CondBr);
-
-  /// Helper method which initializes this state map with the data from the
-  /// first predecessor BB.
-  ///
-  /// We will be performing an intersection in a later step of the merging.
-  bool initWithFirstPred(BBToDataflowStateMap &BBToStateMap,
-                         SILBasicBlock *FirstPredBB);
-
-  /// Top level merging function for predecessors.
-  void mergePredecessorStates(BBToDataflowStateMap &BBToStateMap);
-
-  /// 
-  void mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
-                                        SILBasicBlock *Pred);
-
-};
-
-/// Map all blocks to BBEnumTagDataflowState in RPO order.
-class BBToDataflowStateMap {
-  PostOrderFunctionInfo *PO;
-  std::vector<BBEnumTagDataflowState> BBToStateVec;
-public:
-  BBToDataflowStateMap(PostOrderFunctionInfo *PO) : PO(PO), BBToStateVec() {
-    BBToStateVec.resize(PO->size());
-    unsigned RPOIdx = 0;
-    for (SILBasicBlock *BB : PO->getReversePostOrder()) {
-      BBToStateVec[RPOIdx].init(BB);
-      ++RPOIdx;
-    }
-  }
-  unsigned size() const {
-    return BBToStateVec.size();
-  }
-  BBEnumTagDataflowState &getRPOState(unsigned RPOIdx) {
-    return BBToStateVec[RPOIdx];
-  }
-  /// \return BBEnumTagDataflowState or NULL for unreachable blocks.
-  BBEnumTagDataflowState *getBBState(SILBasicBlock *BB) {
-    if (auto ID = PO->getRPONumber(BB)) {
-      return &getRPOState(*ID);
-    }
-    return nullptr;
-  }
-};
-
-} // end anonymous namespace
-
-void BBEnumTagDataflowState::handlePredSwitchEnum(SwitchEnumInst *S) {
-
-  // Find the tag associated with our BB and set the state of the
-  // enum we switch on to that value. This is important so we can determine
-  // covering switches for enums that have cases without payload.
-
-  // Next check if we are the target of a default switch_enum case. If we are,
-  // no interesting information can be extracted, so bail...
-  if (S->hasDefault() && S->getDefaultBB() == getBB())
-    return;
-
-  // Otherwise, attempt to find the tag associated with this BB in the switch
-  // enum...
-  for (unsigned i = 0, e = S->getNumCases(); i != e; ++i) {
-    auto P = S->getCase(i);
-
-    // If this case of the switch is not matched up with this BB, skip the
-    // case...
-    if (P.second != getBB())
-      continue;
-
-    // Ok, we found the case for our BB. If we don't have an enum tag (which can
-    // happen if we have a default statement), return. There is nothing more we
-    // can do.
-    if (!P.first)
-      return;
-
-    // Ok, we have a matching BB and a matching enum tag. Set the state and
-    // return.
-    ValueToCaseMap[S->getOperand()] = P.first;
-    return;
-  }
-  llvm_unreachable("A successor of a switch_enum terminated BB should be in "
-                   "the switch_enum.");
-}
-
-void BBEnumTagDataflowState::handlePredCondSelectEnum(CondBranchInst *CondBr) {
-
-  auto *EITI = dyn_cast<SelectEnumInst>(CondBr->getCondition());
-  if (!EITI)
-    return;
-
-  NullablePtr<EnumElementDecl> TrueElement = EITI->getSingleTrueElement();
-  if (TrueElement.isNull())
-    return;
-
-  // Find the tag associated with our BB and set the state of the
-  // enum we switch on to that value. This is important so we can determine
-  // covering switches for enums that have cases without payload.
-
-  // Check if we are the true case, ie, we know that we are the given tag.
-  const auto &Operand = EITI->getEnumOperand();
-  if (CondBr->getTrueBB() == getBB()) {
-    ValueToCaseMap[Operand] = TrueElement.get();
-    return;
-  }
-
-  // If the enum only has 2 values and its tag isn't the true branch, then we
-  // know the true branch must be the other tag.
-  if (EnumDecl *E = Operand->getType().getEnumOrBoundGenericEnum()) {
-    // Look for a single other element on this enum.
-    EnumElementDecl *OtherElt = nullptr;
-    for (EnumElementDecl *Elt : E->getAllElements()) {
-      // Skip the case where we find the select_enum element
-      if (Elt == TrueElement.get())
-        continue;
-      // If we find another element, then we must have more than 2, so bail.
-      if (OtherElt)
-        return;
-      OtherElt = Elt;
-    }
-    // Only a single enum element?  How would this even get here?  We should
-    // handle it in SILCombine.
-    if (!OtherElt)
-      return;
-    // FIXME: Can we ever not be the false BB here?
-    if (CondBr->getTrueBB() != getBB()) {
-      ValueToCaseMap[Operand] = OtherElt;
-      return;
-    }
-  }
-}
-
-bool
-BBEnumTagDataflowState::
-initWithFirstPred(BBToDataflowStateMap &BBToStateMap,
-                  SILBasicBlock *FirstPredBB) {
-  // Try to look up the state for the first pred BB.
-  BBEnumTagDataflowState *FirstPredState = BBToStateMap.getBBState(FirstPredBB);
-
-  // If we fail, we found an unreachable block, bail.
-  if (FirstPredState == nullptr) {
-    DEBUG(llvm::dbgs() << "        Found an unreachable block!\n");
-    return false;
-  }
-
-  // Ok, our state is in the map, copy in the predecessors value to case map.
-  ValueToCaseMap = FirstPredState->ValueToCaseMap;
-
-  // If we are predecessors only successor, we can potentially hoist releases
-  // into it, so associate the first pred BB and the case for each value that we
-  // are tracking with it.
-  //
-  // TODO: I am writing this too fast. Clean this up later.
-  if (FirstPredBB->getSingleSuccessorBlock()) {
-    for (auto P : ValueToCaseMap.getItems()) {
-      if (!P.hasValue())
-        continue;
-      EnumToEnumBBCaseListMap[P->first].push_back({FirstPredBB, P->second});
-    }
-  }
-
-  return true;
-}
-
-void
-BBEnumTagDataflowState::
-mergeSinglePredTermInfoIntoState(BBToDataflowStateMap &BBToStateMap,
-                                 SILBasicBlock *Pred) {
-  // Grab the terminator of our one predecessor and if it is a switch enum, mix
-  // it into this state.
-  TermInst *PredTerm = Pred->getTerminator();
-  if (auto *S = dyn_cast<SwitchEnumInst>(PredTerm)) {
-    handlePredSwitchEnum(S);
-    return;
-  }
-
-  auto *CondBr = dyn_cast<CondBranchInst>(PredTerm);
-  if (!CondBr)
-    return;
-
-  handlePredCondSelectEnum(CondBr);
-}
-
-void
-BBEnumTagDataflowState::
-mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
-
-  // If we have no predecessors, there is nothing to do so return early...
-  if (getBB()->pred_empty()) {
-    DEBUG(llvm::dbgs() << "            No Preds.\n");
-    return;
-  }
-
-  auto PI = getBB()->pred_begin(), PE = getBB()->pred_end();
-  if (*PI == getBB()) {
-    DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
-    return;
-  }
-
-  // Grab the first predecessor BB.
-  SILBasicBlock *FirstPred = *PI;
-  ++PI;
-
-  // Attempt to initialize our state with our first predecessor's state by just
-  // copying. We will be doing an intersection with all of the other BB.
-  if (!initWithFirstPred(BBToStateMap, FirstPred))
-    return;
-
-  // If we only have one predecessor see if we can gain any information and or
-  // knowledge from the terminator of our one predecessor. There is nothing more
-  // that we can do, return.
-  //
-  // This enables us to get enum information from switch_enum and cond_br about
-  // the value that an enum can take in our block. This is a common case that
-  // comes up.
-  if (PI == PE) {
-    mergeSinglePredTermInfoIntoState(BBToStateMap, FirstPred);
-    return;
-  }
-
-  DEBUG(llvm::dbgs() << "            Merging in rest of predecessors...\n");
-
-  // Enum values that while merging we found conflicting values for. We blot
-  // them after the loop in order to ensure that we can still find the ends of
-  // switch regions.
-  llvm::SmallVector<SILValue, 4> CurBBValuesToBlot;
-
-  // If we do not find state for a specific value in any of our predecessor BBs,
-  // we cannot be the end of a switch region since we cannot cover our
-  // predecessor BBs with enum decls. Blot after the loop.
-  llvm::SmallVector<SILValue, 4> PredBBValuesToBlot;
-
-  // And for each remaining predecessor...
-  do {
-    // If we loop on ourselves, bail...
-    if (*PI == getBB()) {
-      DEBUG(llvm::dbgs() << "            Found a self loop. Bailing!\n");
-      return;
-    }
-
-    // Grab the predecessors state...
-    SILBasicBlock *PredBB = *PI;
-
-    BBEnumTagDataflowState *PredBBState = BBToStateMap.getBBState(PredBB);
-    if (PredBBState == nullptr) {
-      DEBUG(llvm::dbgs() << "            Found an unreachable block!\n");
-      return;
-    }
-
-    ++PI;
-
-    // Then for each (SILValue, Enum Tag) that we are tracking...
-    for (auto P : ValueToCaseMap.getItems()) {
-      // If this SILValue was blotted, there is nothing left to do, we found
-      // some sort of conflicting definition and are being conservative.
-      if (!P.hasValue())
-        continue;
-
-      // Then attempt to look up the enum state associated in our SILValue in
-      // the predecessor we are processing.
-      auto PredValue = PredBBState->ValueToCaseMap.find(P->first);
-
-      // If we cannot find the state associated with this SILValue in this
-      // predecessor or the value in the corresponding predecessor was blotted,
-      // we cannot find a covering switch for this BB or forward any enum tag
-      // information for this enum value.
-      if (PredValue == PredBBState->ValueToCaseMap.end() || !(*PredValue)->first) {
-        // Otherwise, we are conservative and do not forward the EnumTag that we
-        // are tracking. Blot it!
-        DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
-        CurBBValuesToBlot.push_back(P->first);
-        PredBBValuesToBlot.push_back(P->first);
-        continue;
-      }
-
-      // Check if out predecessor has any other successors. If that is true we
-      // clear all the state since we cannot hoist safely.
-      if (!PredBB->getSingleSuccessorBlock()) {
-        EnumToEnumBBCaseListMap.clear();
-        DEBUG(llvm::dbgs() << "                Predecessor has other "
-              "successors. Clearing BB cast list map.\n");
-      } else {
-        // Otherwise, add this case to our predecessor case list. We will unique
-        // this after we have finished processing all predecessors.
-        auto Case = std::make_pair(PredBB, (*PredValue)->second);
-        EnumToEnumBBCaseListMap[(*PredValue)->first].push_back(Case);
-      }
-
-      // And the states match, the enum state propagates to this BB.
-      if ((*PredValue)->second == P->second)
-        continue;
-
-      // Otherwise, we are conservative and do not forward the EnumTag that we
-      // are tracking. Blot it!
-      DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
-      CurBBValuesToBlot.push_back(P->first);
-    }
-  } while (PI != PE);
-
-  for (SILValue V : CurBBValuesToBlot) {
-    ValueToCaseMap.blot(V);
-  }
-  for (SILValue V : PredBBValuesToBlot) {
-    EnumToEnumBBCaseListMap.blot(V);
-  }
-}
-
-bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
-  auto FindResult = ValueToCaseMap.find(RVI->getOperand());
-  if (FindResult == ValueToCaseMap.end())
-    return false;
-
-  // If we do not have any argument, kill the retain_value.
-  if (!(*FindResult)->second->hasAssociatedValues()) {
-    RVI->eraseFromParent();
-    return true;
-  }
-
-  DEBUG(llvm::dbgs() << "    Found RetainValue: " << *RVI);
-  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << (*FindResult)->first);
-
-  SILBuilderWithScope Builder(RVI);
-  createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
-  RVI->eraseFromParent();
-  return true;
-}
-
-bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
-  auto FindResult = ValueToCaseMap.find(RVI->getOperand());
-  if (FindResult == ValueToCaseMap.end())
-    return false;
-
-  // If we do not have any argument, just delete the release value.
-  if (!(*FindResult)->second->hasAssociatedValues()) {
-    RVI->eraseFromParent();
-    return true;
-  }
-
-  DEBUG(llvm::dbgs() << "    Found ReleaseValue: " << *RVI);
-  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << (*FindResult)->first);
-
-  SILBuilderWithScope Builder(RVI);
-  createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
-  RVI->eraseFromParent();
-  return true;
-}
-
-bool BBEnumTagDataflowState::process() {
-  bool Changed = false;
-
-  auto SI = getBB()->begin();
-  while (SI != getBB()->end()) {
-    SILInstruction *I = &*SI;
-    ++SI;
-    Changed |= visit(I);
-  }
-
-  return Changed;
-}
-
-bool
-BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
-  bool Changed = false;
-  unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
-
-  for (auto II = getBB()->begin(), IE = getBB()->end(); II != IE;) {
-    auto *RVI = dyn_cast<ReleaseValueInst>(&*II);
-    ++II;
-
-    // If this instruction is not a release, skip it...
-    if (!RVI)
-      continue;
-
-    DEBUG(llvm::dbgs() << "        Visiting release: " << *RVI);
-
-    // Grab the operand of the release value inst.
-    SILValue Op = RVI->getOperand();
-
-    // Lookup the [(BB, EnumTag)] list for this operand.
-    auto R = EnumToEnumBBCaseListMap.find(Op);
-    // If we don't have one, skip this release value inst.
-    if (R == EnumToEnumBBCaseListMap.end()) {
-      DEBUG(llvm::dbgs() << "            Could not find [(BB, EnumTag)] "
-            "list for release_value's operand. Bailing!\n");
-      continue;
-    }
-
-    auto &EnumBBCaseList = (*R)->second;
-    // If we don't have an enum tag for each predecessor of this BB, bail since
-    // we do not know how to handle that BB.
-    if (EnumBBCaseList.size() != NumPreds) {
-      DEBUG(llvm::dbgs() << "            Found [(BB, EnumTag)] "
-            "list for release_value's operand, but we do not have an enum tag "
-            "for each predecessor. Bailing!\n");
-      DEBUG(llvm::dbgs() << "            List:\n");
-      DEBUG(for (auto P : EnumBBCaseList) {
-          llvm::dbgs() << "                "; P.second->dump(llvm::dbgs());
-        });
-      continue;
-    }
-
-    // Finally ensure that we have no users of this operand preceding the
-    // release_value in this BB. If we have users like that we cannot hoist the
-    // release past them unless we know that there is an additional set of
-    // releases that together post-dominate this release. If we cannot do this,
-    // skip this release.
-    //
-    // TODO: We need information from the ARC optimizer to prove that property
-    // if we are going to use it.
-    if (valueHasARCUsesInInstructionRange(Op, getBB()->begin(),
-                                          SILBasicBlock::iterator(RVI),
-                                          AA)) {
-      DEBUG(llvm::dbgs() << "            Release value has use that stops "
-            "hoisting! Bailing!\n");
-      continue;
-    }
-
-    DEBUG(llvm::dbgs() << "            Its safe to perform the "
-          "transformation!\n");
-
-    // Otherwise perform the transformation.
-    for (auto P : EnumBBCaseList) {
-      // If we don't have an argument for this case, there is nothing to
-      // do... continue...
-      if (!P.second->hasAssociatedValues())
-        continue;
-
-      // Otherwise create the release_value before the terminator of the
-      // predecessor.
-      assert(P.first->getSingleSuccessorBlock() &&
-             "Cannot hoist release into BB that has multiple successors");
-      SILBuilderWithScope Builder(P.first->getTerminator(), RVI);
-      createRefCountOpForPayload(Builder, RVI, P.second);
-    }
-
-    RVI->eraseFromParent();
-    ++NumHoisted;
-    Changed = true;
-  }
-
-  return Changed;
-}
-
-static SILInstruction *
-findLastSinkableMatchingEnumValueRCIncrementInPred(AliasAnalysis *AA,
-                                                   RCIdentityFunctionInfo *RCIA,
-                                                   SILValue EnumValue,
-                                                   SILBasicBlock *BB) {
-    // Otherwise, see if we can find a retain_value or strong_retain associated
-    // with that enum in the relevant predecessor.
-    auto FirstInc = std::find_if(BB->rbegin(), BB->rend(),
-      [&RCIA, &EnumValue](const SILInstruction &I) -> bool {
-      // If I is not an increment, ignore it.
-      if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
-        return false;
-
-      // Otherwise, if the increments operand stripped of RC identity preserving
-      // ops matches EnumValue, it is the first increment we are interested in.
-      return EnumValue == RCIA->getRCIdentityRoot(I.getOperand(0));
-    });
-
-    // If we do not find a ref count increment in the relevant BB, skip this
-    // enum since there is nothing we can do.
-    if (FirstInc == BB->rend())
-      return nullptr;
-
-    // Otherwise, see if there are any instructions in between FirstPredInc and
-    // the end of the given basic block that could decrement first pred. If such
-    // an instruction exists, we cannot perform this optimization so continue.
-    if (valueHasARCDecrementOrCheckInInstructionRange(
-            EnumValue, (*FirstInc).getIterator(),
-            BB->getTerminator()->getIterator(), AA))
-      return nullptr;
-
-    return &*FirstInc;
-}
-
-static bool
-findRetainsSinkableFromSwitchRegionForEnum(
-  AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILValue EnumValue,
-  EnumBBCaseList &Map, SmallVectorImpl<SILInstruction *> &DeleteList) {
-
-  // For each predecessor with argument type...
-  for (auto &P : Map) {
-    SILBasicBlock *PredBB = P.first;
-    EnumElementDecl *Decl = P.second;
-
-    // If the case does not have an argument type, skip the predecessor since
-    // there will not be a retain to sink.
-    if (!Decl->hasAssociatedValues())
-      continue;
-
-    // Ok, we found a payloaded predecessor. Look backwards through the
-    // predecessor for the first ref count increment on EnumValue. If there
-    // are no ref count decrements in between the increment and the terminator
-    // of the BB, then we can sink the retain out of the switch enum.
-    auto *Inc = findLastSinkableMatchingEnumValueRCIncrementInPred(AA,
-                                                                   RCIA,
-                                                                   EnumValue,
-                                                                   PredBB);
-    // If we do not find such an increment, there is nothing we can do, bail.
-    if (!Inc)
-      return false;
-
-    // Otherwise add the increment to the delete list.
-    DeleteList.push_back(Inc);
-  }
-
-  // If we were able to process each predecessor successfully, return true.
-  return true;
-}
-
-bool
-BBEnumTagDataflowState::
-sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
-                                 RCIdentityFunctionInfo *RCIA) {
-  bool Changed = false;
-  unsigned NumPreds = std::distance(getBB()->pred_begin(), getBB()->pred_end());
-  llvm::SmallVector<SILInstruction *, 4> DeleteList;
-
-  // For each (EnumValue, [(BB, EnumTag)]) that we are tracking...
-  for (auto &P : EnumToEnumBBCaseListMap) {
-    // Clear our delete list.
-    DeleteList.clear();
-
-    // If EnumValue is null, we deleted this entry. There is nothing to do for
-    // this value... Skip it.
-    if (!P.hasValue())
-      continue;
-    SILValue EnumValue = RCIA->getRCIdentityRoot(P->first);
-    EnumBBCaseList &Map = P->second;
-
-    // If we do not have a tag associated with this enum value for each
-    // predecessor, we are not a switch region exit for this enum value. Skip
-    // this value.
-    if (Map.size() != NumPreds)
-      continue;
-
-    // Look through our predecessors for a set of ref count increments on our
-    // enum value for every payloaded case that *could* be sunk. If we miss an
-    // increment from any of the payloaded case there is nothing we can do here,
-    // so skip this enum value.
-    if (!findRetainsSinkableFromSwitchRegionForEnum(AA, RCIA, EnumValue, Map,
-                                                    DeleteList))
-      continue;
-
-    // If we do not have any payload arguments, then we should have an empty
-    // delete list and there is nothing to do here.
-    if (DeleteList.empty())
-      continue;
-
-    // Ok, we can perform this transformation! Insert the new retain_value and
-    // delete all of the ref count increments from the predecessor BBs.
-    //
-    // TODO: Which debug loc should we use here? Using one of the locs from the
-    // delete list seems reasonable for now...
-    SILBuilder Builder(getBB()->begin());
-    Builder.createRetainValue(DeleteList[0]->getLoc(), EnumValue,
-                              cast<RefCountingInst>(DeleteList[0])->getAtomicity());
-    for (auto *I : DeleteList)
-      I->eraseFromParent();
-    ++NumSunk;
-    Changed = true;
-  }
-
+  Changed |= tryTosinkIncrementsIntoSwitchRegions(S->getIterator(), SI,
+                                                  CanSinkToSuccessor, AA, RCIA);
   return Changed;
 }
 
@@ -1577,7 +1697,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
 
   bool Changed = false;
 
-  BBToDataflowStateMap BBToStateMap(PO);
+  EnumCaseDataflowContext BBToStateMap(PO);
   for (unsigned RPOIdx = 0, RPOEnd = BBToStateMap.size(); RPOIdx < RPOEnd;
        ++RPOIdx) {
 
@@ -1596,7 +1716,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     // predecessors to avoid memory invalidation issues due to copying in the
     // dense map.
     DEBUG(llvm::dbgs() << "    Merging predecessors!\n");
-    State.mergePredecessorStates(BBToStateMap);
+    State.mergePredecessorStates();
 
     // If our predecessors cover any of our enum values, attempt to hoist
     // releases up the CFG onto enum payloads or sink retains out of switch
@@ -1621,8 +1741,8 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     // predecessors since the hoisted releases will be on the enum payload
     // instead of the enum itself.
     Changed |= canonicalizeRefCountInstrs(State.getBB());
-    Changed |= sinkCodeFromPredecessors(State.getBB());
-    Changed |= sinkArgumentsFromPredecessors(State.getBB());
+    Changed |= sinkCodeFromPredecessors(BBToStateMap, State.getBB());
+    Changed |= sinkArgumentsFromPredecessors(BBToStateMap, State.getBB());
     Changed |= sinkLiteralsFromPredecessors(State.getBB());
     // Try to hoist release of a SILArgument to predecessors.
     Changed |= hoistSILArgumentReleaseInst(State.getBB());

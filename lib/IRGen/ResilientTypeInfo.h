@@ -47,8 +47,8 @@ protected:
                                  IsNotPOD, IsNotBitwiseTakable) {}
 
 public:
-  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const override {
+  void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
     emitAssignWithCopyCall(IGF, T, dest, src);
   }
 
@@ -70,8 +70,8 @@ public:
     emitAssignArrayWithCopyBackToFrontCall(IGF, T, dest, src, count);
   }
 
-  void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
-                      SILType T) const override {
+  void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                      bool isOutlined) const override {
     emitAssignWithTakeCall(IGF, T, dest, src);
   }
 
@@ -94,8 +94,8 @@ public:
     return this->getAddressForPointer(addr);
   }
 
-  void initializeWithCopy(IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) const override {
+  void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
     emitInitializeWithCopyCall(IGF, T, dest, src);
   }
 
@@ -105,8 +105,8 @@ public:
     emitInitializeArrayWithCopyCall(IGF, T, dest, src, count);
   }
 
-  void initializeWithTake(IRGenFunction &IGF,
-                        Address dest, Address src, SILType T) const override {
+  void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
+                          SILType T, bool isOutlined) const override {
     emitInitializeWithTakeCall(IGF, T, dest, src);
   }
 
@@ -130,7 +130,8 @@ public:
     emitInitializeArrayWithTakeBackToFrontCall(IGF, T, dest, src, count);
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
+  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+               bool isOutlined) const override {
     emitDestroyCall(IGF, T, addr);
   }
 
@@ -154,15 +155,6 @@ public:
     emitStoreExtraInhabitantCall(IGF, T, index, dest);
   }
 
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          llvm::Value *vwtable,
-                          SILType T) const override {
-    // Resilient value types and archetypes always refer to an existing type.
-    // A witness table should never be independently initialized for one.
-    llvm_unreachable("initializing value witness table for opaque type?!");
-  }
-
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                        llvm::Value *numEmptyCases,
                                        Address enumAddr,
@@ -176,6 +168,10 @@ public:
     emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases, enumAddr);
   }
 
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    collector.collectTypeMetadataForLayout(T);
+  }
 };
 
 }

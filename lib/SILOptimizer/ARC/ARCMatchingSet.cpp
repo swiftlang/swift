@@ -70,12 +70,12 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
     // We need to be known safe over all increments/decrements we are matching
     // up to ignore insertion points.
     bool BUIsKnownSafe = (*BURefCountState)->second.isKnownSafe();
-    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+    DEBUG(llvm::dbgs() << "        BOTTOM UP KNOWNSAFE: "
                        << (BUIsKnownSafe ? "true" : "false") << "\n");
     Flags.KnownSafe &= BUIsKnownSafe;
 
     bool BUCodeMotionSafe = (*BURefCountState)->second.isCodeMotionSafe();
-    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+    DEBUG(llvm::dbgs() << "        BOTTOM UP CODEMOTIONSAFE: "
                        << (BUIsKnownSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= BUCodeMotionSafe;
 
@@ -153,12 +153,12 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
     // We need to be known safe over all increments/decrements we are matching
     // up to ignore insertion points.
     bool TDIsKnownSafe = (*TDRefCountState)->second.isKnownSafe();
-    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+    DEBUG(llvm::dbgs() << "        TOP DOWN KNOWNSAFE: "
                        << (TDIsKnownSafe ? "true" : "false") << "\n");
     Flags.KnownSafe &= TDIsKnownSafe;
 
     bool TDCodeMotionSafe = (*TDRefCountState)->second.isCodeMotionSafe();
-    DEBUG(llvm::dbgs() << "        KNOWNSAFE: "
+    DEBUG(llvm::dbgs() << "        TOP DOWN CODEMOTIONSAFE: "
                        << (TDIsKnownSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= TDCodeMotionSafe;
 

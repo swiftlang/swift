@@ -55,7 +55,7 @@ func callBaseRequirement(t: ResilientBaseProtocol) -> Int {
   return t.requirement()
 }
 
-@_semantics("optimize.sil.never")
+@_optimize(none)
 func castToDerivedProtocol<T>(t: T) -> Int {
   return callBaseRequirement(t: t as! ResilientDerivedProtocol)
 }

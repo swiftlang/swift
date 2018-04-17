@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-devirtualizer"
 
+#include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
@@ -51,8 +52,8 @@ class Devirtualizer : public SILFunctionTransform {
 bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
                                                   ClassHierarchyAnalysis *CHA) {
   bool Changed = false;
-  llvm::SmallVector<SILInstruction *, 8> DeadApplies;
   llvm::SmallVector<ApplySite, 8> NewApplies;
+  OptRemark::Emitter ORE(DEBUG_TYPE, F.getModule());
 
   SmallVector<ApplySite, 16> Applies;
   for (auto &BB : F) {
@@ -68,24 +69,14 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    auto NewInstPair = tryDevirtualizeApply(Apply, CHA);
+    auto NewInstPair = tryDevirtualizeApply(Apply, CHA, &ORE);
     if (!NewInstPair.second)
       continue;
 
     Changed = true;
 
-    auto *AI = Apply.getInstruction();
-    if (!isa<TryApplyInst>(AI))
-      cast<SingleValueInstruction>(AI)->replaceAllUsesWith(NewInstPair.first);
-
-    DeadApplies.push_back(AI);
+    replaceDeadApply(Apply, NewInstPair.first);
     NewApplies.push_back(NewInstPair.second);
-  }
-
-  // Remove all the now-dead applies.
-  while (!DeadApplies.empty()) {
-    auto *AI = DeadApplies.pop_back_val();
-    recursivelyDeleteTriviallyDeadInstructions(AI, true);
   }
 
   // For each new apply, attempt to link in function bodies if we do
@@ -102,11 +93,9 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     assert(CalleeFn && "Expected devirtualized callee!");
 
     // We need to ensure that we link after devirtualizing in order to pull in
-    // everything we reference from another module. This is especially important
-    // for transparent functions, because if transparent functions are not
-    // inlined for some reason, we need to generate code for them.
-    // Note that functions, which are only referenced from witness/vtables, are
-    // not linked upfront by the SILLinker.
+    // everything we reference from another module, which may expose optimization
+    // opportunities and is also needed for correctness if we reference functions
+    // with non-public linkage. See lib/SIL/Linker.cpp for details.
     if (!CalleeFn->isDefinition())
       F.getModule().linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll);
 

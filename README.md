@@ -4,7 +4,7 @@
 
 | | **Swift** | **Package** |
 |---|:---:|:---:|
-|**macOS**         |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
+|**macOS**        |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
 |**Ubuntu 14.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
 |**Ubuntu 16.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
 |**Ubuntu 16.10** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10)|
@@ -54,7 +54,7 @@ supported host development operating systems.
 
 #### macOS
 
-To build for macOS, you need [Xcode 9.1](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 9.3](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -76,7 +76,7 @@ Instructions for installing CMake and Ninja directly can be found [below](#build
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev autoconf libtool systemtap-sdt-dev tzdata
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev autoconf libtool systemtap-sdt-dev tzdata rsync
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -114,7 +114,7 @@ options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for various platforms, running tests after builds, and more.
 
 There are two primary build systems to use: Xcode and Ninja. The Xcode build
-system allows you to work in Xcode.app, but Ninja is a bit faster and supports
+system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
 To build using Ninja, run:
@@ -143,7 +143,7 @@ information, see the inline help:
 #### Xcode
 
 To build using Xcode, specify the `--xcode` argument on any of the above commands.
-Xcode.app can be used to edit the Swift source code, but it is not currently
+Xcode can be used to edit the Swift source code, but it is not currently
 fully supported as a build environment for SDKs other than macOS. The generated
 Xcode project does not integrate with the test runner, but the tests can be run
 with the 'check-swift' target.
@@ -159,7 +159,7 @@ helps to save this directory as an environment variable for future use.
 
 #### Ninja
 
-Once the first build has completed, ninja can perform fast incremental builds of
+Once the first build has completed, Ninja can perform fast incremental builds of
 various products. These incremental builds are a big timesaver when developing
 and debugging.
 
@@ -210,17 +210,19 @@ See [docs/Testing.md](docs/Testing.md), in particular the section on [lit.py](do
 
 ## Learning More
 
-Be sure to look through the [docs/] docs directory for more information about the
-compiler. In particular, the document on [Debugging The Compiler](docs/DebuggingTheCompiler.rst),
-and [Continuous Integration.md](docs/ContinuousIntegration.md) are very helpful
-to understand before submitting your first PR.
+Be sure to look through the [docs](https://github.com/apple/swift/tree/master/docs)
+directory for more information about the compiler. In particular, the documents
+titled [Debugging the Swift Compiler](docs/DebuggingTheCompiler.rst) and
+[Continuous Integration for Swift](docs/ContinuousIntegration.md) are very
+helpful to understand before submitting your first PR.
 
 ### Building Documentation
 
 To read the compiler documentation, start by installing the
-[Sphinx](http://sphinx-doc.org) documentation generator tool by running the command:
+[Sphinx](http://sphinx-doc.org) documentation generator tool by running the
+command:
 
-`easy_install -U Sphinx`
+    easy_install -U Sphinx
 
 Once complete, you can build the Swift documentation by changing directory into
 [docs](https://github.com/apple/swift/tree/master/docs) and typing `make`. This

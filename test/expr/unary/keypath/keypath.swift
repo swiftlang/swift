@@ -269,7 +269,10 @@ struct ZwithSubscript {
   subscript(keyPath kp: PartialKeyPath<ZwithSubscript>) -> Any { return 0 }
 }
 
+struct NotZ {}
+
 func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscript,
+                          wrongType: inout NotZ,
                           kp: KeyPath<ZwithSubscript, Int>,
                           wkp: WritableKeyPath<ZwithSubscript, Int>,
                           rkp: ReferenceWritableKeyPath<ZwithSubscript, Int>) {
@@ -312,6 +315,12 @@ func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscri
   readonly[keyPath: akp] = anyqSink1 // expected-error{{cannot assign to immutable}}
   // FIXME: silently falls back to keypath application, which seems inconsistent
   writable[keyPath: akp] = anyqSink2 // expected-error{{cannot assign to immutable}}
+
+  _ = wrongType[keyPath: kp] // expected-error{{cannot be applied}}
+  _ = wrongType[keyPath: wkp] // expected-error{{cannot be applied}}
+  _ = wrongType[keyPath: rkp] // expected-error{{cannot be applied}}
+  _ = wrongType[keyPath: pkp] // expected-error{{cannot be applied}}
+  _ = wrongType[keyPath: akp]
 }
 
 func testKeyPathSubscriptMetatype(readonly: Z.Type, writable: inout Z.Type,
@@ -358,10 +367,33 @@ func testKeyPathSubscriptLValue(base: Z, kp: inout KeyPath<Z, Z>) {
   _ = base[keyPath: kp]
 }
 
-func testKeyPathSubscriptExistentialBase(base: B, kp: KeyPath<P, String>) {
-  _ = base[keyPath: kp]
-}
+func testKeyPathSubscriptExistentialBase(concreteBase: inout B,
+                                     existentialBase: inout P,
+                                     kp: KeyPath<P, String>,
+                                     wkp: WritableKeyPath<P, String>,
+                                     rkp: ReferenceWritableKeyPath<P, String>,
+                                     pkp: PartialKeyPath<P>,
+                                     s: String) {
+  _ = concreteBase[keyPath: kp]
+  _ = concreteBase[keyPath: wkp]
+  _ = concreteBase[keyPath: rkp]
+  _ = concreteBase[keyPath: pkp]
 
+  concreteBase[keyPath: kp] = s // expected-error{{}}
+  concreteBase[keyPath: wkp] = s // expected-error{{}}
+  concreteBase[keyPath: rkp] = s
+  concreteBase[keyPath: pkp] = s // expected-error{{}}
+
+  _ = existentialBase[keyPath: kp]
+  _ = existentialBase[keyPath: wkp]
+  _ = existentialBase[keyPath: rkp]
+  _ = existentialBase[keyPath: pkp]
+
+  existentialBase[keyPath: kp] = s // expected-error{{}}
+  existentialBase[keyPath: wkp] = s
+  existentialBase[keyPath: rkp] = s
+  existentialBase[keyPath: pkp] = s // expected-error{{}}
+}
 
 struct AA {
   subscript(x: Int) -> Int { return x }
@@ -451,6 +483,78 @@ func sr6106() {
       let _ = \C.a?.b
     }
   }
+}
+
+// SR-6744
+func sr6744() {
+    struct ABC {
+        let value: Int
+        func value(adding i: Int) -> Int { return value + i }
+    }
+
+    let abc = ABC(value: 0)
+    func get<T>(for kp: KeyPath<ABC, T>) -> T {
+        return abc[keyPath: kp]
+    }
+    _ = get(for: \.value)
+}
+
+struct VisibilityTesting {
+  private(set) var x: Int
+  fileprivate(set) var y: Int
+  let z: Int
+
+  // Key path exprs should not get special dispensation to write to lets
+  // in init contexts
+  init() {
+    var xRef = \VisibilityTesting.x
+    var yRef = \VisibilityTesting.y
+    var zRef = \VisibilityTesting.z
+    expect(&xRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&yRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&zRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+  }
+
+  func inPrivateContext() {
+    var xRef = \VisibilityTesting.x
+    var yRef = \VisibilityTesting.y
+    var zRef = \VisibilityTesting.z
+    expect(&xRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&yRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&zRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+  }
+}
+
+struct VisibilityTesting2 {
+  func inFilePrivateContext() {
+    var xRef = \VisibilityTesting.x
+    var yRef = \VisibilityTesting.y
+    var zRef = \VisibilityTesting.z
+    expect(&xRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+    expect(&yRef,
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    expect(&zRef,
+      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+  }
+}
+
+protocol PP {}
+class Base : PP { var i: Int = 0 }
+class Derived : Base {}
+
+func testSubtypeKeypathClass(_ keyPath: ReferenceWritableKeyPath<Base, Int>) {
+  testSubtypeKeypathClass(\Derived.i)
+}
+
+func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
+  testSubtypeKeypathProtocol(\Base.i) // expected-error {{type 'PP' has no member 'i'}}
 }
 
 func testSyntaxErrors() { // expected-note{{}}

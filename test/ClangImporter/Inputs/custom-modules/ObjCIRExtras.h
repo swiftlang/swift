@@ -62,4 +62,6 @@
 
 int global_int SWIFT_NAME(GlobalInt);
 
+@compatibility_alias SwiftNameAlias SwiftNameTest;
+
 #pragma clang assume_nonnull end

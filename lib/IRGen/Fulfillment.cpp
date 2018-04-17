@@ -18,11 +18,14 @@
 #include "Fulfillment.h"
 #include "IRGenModule.h"
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/SIL/TypeLowering.h"
 #include "GenericRequirement.h"
+#include "MetadataRequest.h"
 #include "ProtocolInfo.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace irgen;
@@ -107,6 +110,7 @@ static bool isLeafTypeMetadata(CanType type) {
 ///   metadata for the given type, false if it might be a subtype
 bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                         IsExact_t isExact,
+                                        MetadataState metadataState,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
 
@@ -116,26 +120,31 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     // If the type isn't a leaf type, also check it as an inexact match.
     bool hadFulfillment = false;
     if (!isLeafTypeMetadata(type)) {
-      hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, source,
-                                           MetadataPath(path), keys);
+      hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, metadataState,
+                                           source, MetadataPath(path), keys);
     }
 
     // Add the fulfillment.
-    hadFulfillment |= addFulfillment({type, nullptr}, source, std::move(path));
+    hadFulfillment |= addFulfillment({type, nullptr},
+                                     source, std::move(path), metadataState);
     return hadFulfillment;
   }
 
-  if (keys.isInterestingType(type)) {
+  // Search the superclass fields.  We can only do this if the metadata
+  // is complete.
+  if (metadataState == MetadataState::Complete &&
+      keys.isInterestingType(type)) {
     if (auto superclassTy = keys.getSuperclassBound(type)) {
-      return searchNominalTypeMetadata(IGM, superclassTy, source,
-                                       std::move(path), keys);
+      return searchNominalTypeMetadata(IGM, superclassTy, metadataState,
+                                       source, std::move(path), keys);
     }
   }
 
   // Inexact metadata will be a problem if we ever try to use this
   // to remember that we already have the metadata for something.
   if (isa<NominalType>(type) || isa<BoundGenericType>(type)) {
-    return searchNominalTypeMetadata(IGM, type, source, std::move(path), keys);
+    return searchNominalTypeMetadata(IGM, type, metadataState,
+                                     source, std::move(path), keys);
   }
 
   // TODO: tuples
@@ -145,18 +154,38 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   return false;
 }
 
-/// Given that we have a source for a witness table that the given type
-/// conforms to the given protocol, check to see if it fulfills anything.
+bool FulfillmentMap::searchConformance(
+    IRGenModule &IGM, const ProtocolConformance *conformance,
+    unsigned sourceIndex, MetadataPath &&path,
+    const InterestingKeysCallback &interestingKeys) {
+  bool hadFulfillment = false;
+
+  SILWitnessTable::enumerateWitnessTableConditionalConformances(
+      conformance, [&](unsigned index, CanType type, ProtocolDecl *protocol) {
+        MetadataPath conditionalPath = path;
+        conditionalPath.addConditionalConformanceComponent(index);
+        hadFulfillment |=
+            searchWitnessTable(IGM, type, protocol, sourceIndex,
+                               std::move(conditionalPath), interestingKeys);
+
+        return /*finished?*/ false;
+      });
+
+  return hadFulfillment;
+}
+
 bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
                                         CanType type, ProtocolDecl *protocol,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
+  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+
   llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
-  llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
+  llvm::SmallPtrSetImpl<ProtocolDecl *> *interestingConformances = nullptr;
 
   // If the interesting-keys set is limiting the set of interesting
   // conformances, collect that filter.
-  if (keys.isInterestingType(type) &&
+  if (keys.hasInterestingType(type) &&
       keys.hasLimitedInterestingConformances(type)) {
     // Bail out immediately if the set is empty.
     // This only makes sense because we're not trying to fulfill
@@ -173,13 +202,10 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
                             interestingConformances);
 }
 
-bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
-                                        CanType type, ProtocolDecl *protocol,
-                                        unsigned source, MetadataPath &&path,
-                                        const InterestingKeysCallback &keys,
-                                  const llvm::SmallPtrSetImpl<ProtocolDecl*> *
-                                          interestingConformances) {
-  assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
+bool FulfillmentMap::searchWitnessTable(
+    IRGenModule &IGM, CanType type, ProtocolDecl *protocol, unsigned source,
+    MetadataPath &&path, const InterestingKeysCallback &keys,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> *interestingConformances) {
 
   bool hadFulfillment = false;
 
@@ -199,7 +225,8 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
   // If we're not limiting the set of interesting conformances, or if
   // this is an interesting conformance, record it.
   if (!interestingConformances || interestingConformances->count(protocol)) {
-    hadFulfillment |= addFulfillment({type, protocol}, source, std::move(path));
+    hadFulfillment |= addFulfillment({type, protocol}, source,
+                                     std::move(path), MetadataState::Complete);
   }
 
   return hadFulfillment;
@@ -208,6 +235,7 @@ bool FulfillmentMap::searchWitnessTable(IRGenModule &IGM,
 
 bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
                                                CanType type,
+                                               MetadataState metadataState,
                                                unsigned source,
                                                MetadataPath &&path,
                                          const InterestingKeysCallback &keys) {
@@ -235,10 +263,12 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
     // If the fulfilled value is type metadata, refine the path.
     if (!conf) {
+      auto argState = getPresumedMetadataStateForTypeArgument(metadataState);
       MetadataPath argPath = path;
       argPath.addNominalTypeArgumentComponent(reqtIndex);
       hadFulfillment |=
-        searchTypeMetadata(IGM, arg, IsExact, source, std::move(argPath), keys);
+        searchTypeMetadata(IGM, arg, IsExact, argState, source,
+                           std::move(argPath), keys);
       return;
     }
 
@@ -252,24 +282,8 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
     MetadataPath argPath = path;
     argPath.addNominalTypeArgumentConformanceComponent(reqtIndex);
 
-    llvm::SmallPtrSet<ProtocolDecl*, 4> interestingConformancesBuffer;
-    llvm::SmallPtrSetImpl<ProtocolDecl*> *interestingConformances = nullptr;
-
-    // If the interesting-keys set is limiting the set of interesting
-    // conformances, collect that filter.
-    if (keys.hasLimitedInterestingConformances(arg)) {
-      // Bail out immediately if the set is empty.
-      auto requiredConformances = keys.getInterestingConformances(arg);
-      if (requiredConformances.empty()) return;
-
-      interestingConformancesBuffer.insert(requiredConformances.begin(),
-                                           requiredConformances.end());
-      interestingConformances = &interestingConformancesBuffer;
-    }
-
-    hadFulfillment |=
-      searchWitnessTable(IGM, arg, conf->getRequirement(), source,
-                         std::move(argPath), keys, interestingConformances);
+    hadFulfillment |= searchWitnessTable(IGM, arg, conf->getRequirement(),
+                                         source, std::move(argPath), keys);
   });
 
   return hadFulfillment;
@@ -277,13 +291,24 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
 /// Testify that there's a fulfillment at the given path.
 bool FulfillmentMap::addFulfillment(FulfillmentKey key,
-                                    unsigned source, MetadataPath &&path) {
+                                    unsigned source,
+                                    MetadataPath &&path,
+                                    MetadataState metadataState) {
   // Only add a fulfillment if we don't have any previous
   // fulfillment for that value or if it 's cheaper than the existing
   // fulfillment.
   auto it = Fulfillments.find(key);
   if (it != Fulfillments.end()) {
-    if (path.cost() >= it->second.Path.cost()) {
+    // If the new fulfillment is worse than the existing one, ignore it.
+    auto existingState = it->second.getState();
+    if (!isAtLeast(metadataState, existingState)) {
+      return false;
+    }
+
+    // Consider cost only if the fulfillments are equivalent in state.
+    // TODO: this is potentially suboptimal, but it generally won't matter.
+    if (metadataState == existingState && 
+        path.cost() >= it->second.Path.cost()) {
       return false;
     }
 
@@ -291,8 +316,18 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
     it->second.Path = std::move(path);
     return true;
   } else {
-    Fulfillments.insert({ key, Fulfillment(source, std::move(path)) });
+    Fulfillments.insert({ key, Fulfillment(source, std::move(path),
+                                           metadataState) });
     return true;
+  }
+}
+
+static StringRef getStateName(MetadataState state) {
+  switch (state) {
+  case MetadataState::Complete: return "complete";
+  case MetadataState::NonTransitiveComplete: return "non-transitive-complete";
+  case MetadataState::LayoutComplete: return "layout-complete";
+  case MetadataState::Abstract: return "abstract";
   }
 }
 
@@ -303,7 +338,8 @@ void FulfillmentMap::dump() const {
     if (auto proto = entry.first.second) {
       out << ", " << proto->getNameStr();
     }
-    out << ") => sources[" << entry.second.SourceIndex
+    out << ") => " << getStateName(entry.second.getState())
+        << " at sources[" << entry.second.SourceIndex
         << "]." << entry.second.Path << "\n";
   }
 }

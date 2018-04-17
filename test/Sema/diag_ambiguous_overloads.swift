@@ -2,14 +2,14 @@
 
 enum E : String {
   case foo = "foo"
-  case bar = "bar" // expected-note {{did you mean 'bar'?}}
+  case bar = "bar" // expected-note {{'bar' declared here}}
 }
 func fe(_: E) {}
 func fe(_: Int) {}
 func fe(_: Int, _: E) {}
 func fe(_: Int, _: Int) {}
 
-fe(E.baz) // expected-error {{type 'E' has no member 'baz'}}
+fe(E.baz) // expected-error {{type 'E' has no member 'baz'; did you mean 'bar'?}}
 fe(.baz) // expected-error {{reference to member 'baz' cannot be resolved without a contextual type}}
 
 // FIXME: maybe complain about .nope also?

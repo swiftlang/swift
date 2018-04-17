@@ -93,7 +93,15 @@ public:
   hash_code visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
-  
+
+  hash_code visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
+  hash_code visitValueToBridgeObjectInst(ValueToBridgeObjectInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
   hash_code visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
@@ -774,17 +782,19 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   bool Changed = false;
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
-  // not, add them to AvailableValues.
-  for (SILBasicBlock::iterator I = BB->begin(), E = BB->end(); I != E;) {
-    SILInstruction *Inst = &*I;
-    ++I;
+  // not, add them to AvailableValues. Assume the block terminator can't be
+  // erased.
+  for (SILBasicBlock::iterator nextI = BB->begin(), E = BB->end();
+       nextI != E;) {
+    SILInstruction *Inst = &*nextI;
+    ++nextI;
 
     DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
 
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
-      eraseFromParentWithDebugInsts(Inst, I);
+      eraseFromParentWithDebugInsts(Inst, nextI);
       Changed = true;
       ++NumSimplify;
       continue;
@@ -795,8 +805,11 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      cast<SingleValueInstruction>(Inst)->replaceAllUsesWith(V);
-      Inst->eraseFromParent();
+      replaceAllSimplifiedUsesAndErase(Inst, V,
+                                       [&nextI](SILInstruction *deleteI) {
+                                         if (nextI == deleteI->getIterator())
+                                           ++nextI;
+                                       });
       Changed = true;
       ++NumSimplify;
       continue;
@@ -820,10 +833,10 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       // Instructions producing a new opened archetype need a special handling,
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
-      if (!isa<OpenExistentialRefInst>(Inst) ||
-          processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
-                                    cast<OpenExistentialRefInst>(AvailInst),
-                                    I)) {
+      if (!isa<OpenExistentialRefInst>(Inst)
+          || processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
+                                       cast<OpenExistentialRefInst>(AvailInst),
+                                       nextI)) {
         Inst->replaceAllUsesPairwiseWith(AvailInst);
         Inst->eraseFromParent();
         Changed = true;
@@ -880,9 +893,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
       return false;
     return !BI->mayReadOrWriteMemory();
   }
-  if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
-    return !WMI->isVolatile();
-  }
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Inst)) {
     return !EMI->getOperand()->getType().isAddress();
   }
@@ -933,10 +943,13 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::RefToBridgeObjectInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
+  case SILInstructionKind::ClassifyBridgeObjectInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::ThinFunctionToPointerInst:
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::WitnessMethodInst:
     return true;
   default:
     return false;

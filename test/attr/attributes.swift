@@ -17,13 +17,13 @@ func f5(x: inout binary) {}
 
 @IBDesignable
 class IBDesignableClassTy {
-  @IBDesignable func foo() {} // expected-error {{@IBDesignable cannot be applied to this declaration}} {{3-17=}}
+  @IBDesignable func foo() {} // expected-error {{'@IBDesignable' attribute cannot be applied to this declaration}} {{3-17=}}
 }
 
-@IBDesignable // expected-error {{@IBDesignable cannot be applied to this declaration}} {{1-15=}}
+@IBDesignable // expected-error {{'@IBDesignable' attribute cannot be applied to this declaration}} {{1-15=}}
 struct IBDesignableStructTy {}
 
-@IBDesignable // expected-error {{@IBDesignable cannot be applied to this declaration}} {{1-15=}}
+@IBDesignable // expected-error {{'@IBDesignable' attribute cannot be applied to this declaration}} {{1-15=}}
 protocol IBDesignableProtTy {}
 
 @IBDesignable // expected-error {{@IBDesignable can only be applied to classes and extensions of classes}} {{1-15=}}
@@ -54,21 +54,21 @@ func foo(x: @convention(block) (Int) -> Int) {}
 func zim() {}
 @_transparent
 func zung<T>(_: T) {}
-@_transparent // expected-error{{@_transparent cannot be applied to stored properties}} {{1-15=}}
+@_transparent // expected-error{{'@_transparent' attribute cannot be applied to stored properties}} {{1-15=}}
 var zippity : Int
 func zoom(x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
 protocol ProtoWithTransparent {
-  @_transparent// expected-error{{@_transparent is not supported on declarations within protocols}} {{3-16=}}
+  @_transparent// expected-error{{'@_transparent' attribute is not supported on declarations within protocols}} {{3-16=}}
   func transInProto()
 }
 class TestTranspClass : ProtoWithTransparent {
-  @_transparent  // expected-error{{@_transparent is not supported on declarations within classes}} {{3-17=}}
+  @_transparent  // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   init () {}
-  @_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{3-17=}}
+  @_transparent // expected-error{{'@_transparent' attribute cannot be applied to this declaration}} {{3-17=}}
   deinit {}
-  @_transparent // expected-error{{@_transparent is not supported on declarations within classes}} {{3-17=}}
+  @_transparent // expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   class func transStatic() {}
-  @_transparent// expected-error{{@_transparent is not supported on declarations within classes}} {{3-16=}}
+  @_transparent// expected-error{{'@_transparent' attribute is not supported on declarations within classes}} {{3-16=}}
   func transInProto() {}
 }
 struct TestTranspStruct : ProtoWithTransparent{
@@ -81,25 +81,25 @@ struct TestTranspStruct : ProtoWithTransparent{
   @_transparent
   func transInProto() {}
 }
-@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
+@_transparent // expected-error{{'@_transparent' attribute cannot be applied to this declaration}} {{1-15=}}
 struct CannotHaveTransparentStruct {
   func m1() {}
 }
-@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
+@_transparent // expected-error{{'@_transparent' attribute cannot be applied to this declaration}} {{1-15=}}
 extension TestTranspClass {
   func tr1() {}
 }
-@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
+@_transparent // expected-error{{'@_transparent' attribute cannot be applied to this declaration}} {{1-15=}}
 extension TestTranspStruct {
   func tr1() {}
 }
-@_transparent // expected-error{{@_transparent cannot be applied to this declaration}} {{1-15=}}
+@_transparent // expected-error{{'@_transparent' attribute cannot be applied to this declaration}} {{1-15=}}
 extension binary {
   func tr1() {}
 }
 
 class transparentOnClassVar {
-  @_transparent var max: Int { return 0xFF }; // expected-error {{@_transparent is not supported on declarations within classes}} {{3-17=}}
+  @_transparent var max: Int { return 0xFF }; // expected-error {{'@_transparent' attribute is not supported on declarations within classes}} {{3-17=}}
   func blah () {
     var _: Int = max
   }
@@ -107,7 +107,7 @@ class transparentOnClassVar {
 
 class transparentOnClassVar2 {
   var max: Int {
-    @_transparent // expected-error {{@_transparent is not supported on declarations within classes}} {{5-19=}}
+    @_transparent // expected-error {{'@_transparent' attribute is not supported on declarations within classes}} {{5-19=}}
     get {
       return 0xFF
     }
@@ -159,7 +159,15 @@ unowned
 var weak7 : Int // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'Int'}}
 weak
 var weak8 : Class? = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated as 'weak8' is a 'weak' variable}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak8' declared here}}
+
 unowned var weak9 : Class = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated as 'weak9' is an 'unowned' variable}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak9' declared here}}
+
 weak
 var weak10 : NonClass? = Ty0() // expected-error {{'weak' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
@@ -206,13 +214,18 @@ func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Know
 var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 
 @inline(never) func nolineFunc() {}
-@inline(never) var noinlineVar : Int // expected-error {{@inline(never) cannot be applied to this declaration}} {{1-16=}}
-@inline(never) class FooClass { // expected-error {{@inline(never) cannot be applied to this declaration}} {{1-16=}}
+@inline(never) var noinlineVar : Int // expected-error {{'@inline(never)' attribute cannot be applied to this declaration}} {{1-16=}}
+@inline(never) class FooClass { // expected-error {{'@inline(never)' attribute cannot be applied to this declaration}} {{1-16=}}
 }
 
 @inline(__always) func AlwaysInlineFunc() {}
-@inline(__always) var alwaysInlineVar : Int // expected-error {{@inline(__always) cannot be applied to this declaration}} {{1-19=}}
-@inline(__always) class FooClass2 { // expected-error {{@inline(__always) cannot be applied to this declaration}} {{1-19=}}
+@inline(__always) var alwaysInlineVar : Int // expected-error {{'@inline(__always)' attribute cannot be applied to this declaration}} {{1-19=}}
+@inline(__always) class FooClass2 { // expected-error {{'@inline(__always)' attribute cannot be applied to this declaration}} {{1-19=}}
+}
+
+@_optimize(speed) func OspeedFunc() {}
+@_optimize(speed) var OpeedVar : Int // expected-error {{'@_optimize(speed)' attribute cannot be applied to stored properties}} {{1-19=}}
+@_optimize(speed) class OspeedClass { // expected-error {{'@_optimize(speed)' attribute cannot be applied to this declaration}} {{1-19=}}
 }
 
 class A {
@@ -237,9 +250,26 @@ class B {
   }
 }
 
+class C {
+  @_optimize(speed) init(a : Int) {}
+  var b : Int {
+    @_optimize(none) get {
+      return 42
+    }
+    @_optimize(size) set {
+    }
+  }
+  @_optimize(size) var c : Int // expected-error {{'@_optimize(size)' attribute cannot be applied to stored properties}}
+}
+
 class SILStored {
   @sil_stored var x : Int = 42  // expected-error {{'sil_stored' only allowed in SIL modules}}
 }
 
 @_show_in_interface protocol _underscored {}
 @_show_in_interface class _notapplicable {} // expected-error {{may only be used on 'protocol' declarations}}
+
+// Error recovery after one invalid attribute
+@_invalid_attribute_ // expected-error {{unknown attribute '_invalid_attribute_'}}
+@inline(__always)
+public func sillyFunction() {}

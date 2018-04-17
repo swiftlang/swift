@@ -34,7 +34,7 @@ func check_state(_ state : MyState) -> Int {
 public func run_OpenClose(_ N: Int) {
   var c = 0
   for _ in 1...N*10000 {
-      c += check_state(MyState.Closed)
+      c += check_state(identity(MyState.Closed))
   }
   CheckResults(c == 0)
 }

@@ -22,12 +22,14 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -65,11 +67,10 @@ TypeChecker::~TypeChecker() {
 
 void TypeChecker::handleExternalDecl(Decl *decl) {
   if (auto SD = dyn_cast<StructDecl>(decl)) {
-    addImplicitConstructors(SD);
     addImplicitStructConformances(SD);
   }
   if (auto CD = dyn_cast<ClassDecl>(decl)) {
-    addImplicitDestructor(CD);
+    CD->addImplicitDestructor();
   }
   if (auto ED = dyn_cast<EnumDecl>(decl)) {
     addImplicitEnumConformances(ED);
@@ -171,18 +172,18 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   switch (expr->getLiteralKind()) {
   case ObjectLiteralExpr::colorLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
                     { Context.getIdentifier("_colorLiteralRed"),
                       Context.getIdentifier("green"),
                       Context.getIdentifier("blue"),
                       Context.getIdentifier("alpha") });
   }
   case ObjectLiteralExpr::imageLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
                     { Context.getIdentifier("imageLiteralResourceName") });
   }
   case ObjectLiteralExpr::fileLiteral: {
-    return DeclName(Context, Context.Id_init,
+    return DeclName(Context, DeclBaseName::createConstructor(),
             { Context.getIdentifier("fileReferenceLiteralResourceName") });
   }
   }
@@ -261,13 +262,11 @@ Type TypeChecker::lookupBoolType(const DeclContext *dc) {
   return *boolType;
 }
 
-namespace swift {
-
 /// Clone the given generic parameters in the given list. We don't need any
 /// of the requirements, because they will be inferred.
-GenericParamList *cloneGenericParams(ASTContext &ctx,
-                                     DeclContext *dc,
-                                     GenericParamList *fromParams) {
+static GenericParamList *cloneGenericParams(ASTContext &ctx,
+                                            DeclContext *dc,
+                                            GenericParamList *fromParams) {
   // Clone generic parameters.
   SmallVector<GenericTypeParamDecl *, 2> toGenericParams;
   for (auto fromGP : *fromParams) {
@@ -292,12 +291,6 @@ GenericParamList *cloneGenericParams(ASTContext &ctx,
 
   return toParams;
 }
-} // namespace swift
-
-// FIXME: total hack
-GenericParamList *createProtocolGenericParams(ASTContext &ctx,
-                                              ProtocolDecl *proto,
-                                              DeclContext *dc);
 
 static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
@@ -315,8 +308,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // Validate the representation.
   // FIXME: Perform some kind of "shallow" validation here?
   TypeResolutionOptions options;
-  options |= TR_AllowUnboundGenerics;
-  options |= TR_ExtensionBinding;
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+  options |= TypeResolutionFlags::ExtensionBinding;
   if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
     ED->setInvalid();
     return;
@@ -331,7 +324,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
       if (extendedNominal) {
         extendedType = extendedNominal->getDeclaredType();
-        ED->getExtendedTypeLoc().setType(extendedType);
+        if (!isPassThroughTypealias(aliasDecl))
+          ED->getExtendedTypeLoc().setType(extendedType);
       }
     }
   }
@@ -370,7 +364,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // If the extended type is generic or is a protocol. Clone or create
   // the generic parameters.
-  if (extendedNominal->isGenericContext()) {
+  if (extendedNominal->getGenericParamsOfContext() ||
+      isa<ProtocolDecl>(extendedNominal)) {
     if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
       // For a protocol extension, build the generic parameter list.
       ED->setGenericParams(proto->createGenericParams(ED));
@@ -385,7 +380,8 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedNominal->isGenericContext()) {
+    if (!(extendedNominal->getGenericParamsOfContext() ||
+          isa<ProtocolDecl>(extendedNominal))) {
       // Only generic and protocol types are permitted to have
       // trailing where clauses.
       TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
@@ -409,11 +405,55 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
+void TypeChecker::resolveExtensionForConformanceConstruction(
+    ExtensionDecl *ext,
+    SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
+  // To be able to know the conformances that an extension declares, we just
+  // need to know which type it is connected to:
+  ::bindExtensionDecl(ext, *this);
 
-static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
+  // and the protocols which it inherits from:
+  DependentGenericTypeResolver resolver;
+  TypeResolutionOptions options = TypeResolutionFlags::GenericSignature;
+  options |= TypeResolutionFlags::InheritanceClause;
+  options |= TypeResolutionFlags::AllowUnavailableProtocol;
+  options |= TypeResolutionFlags::ResolveStructure;
+  for (auto &inherited : ext->getInherited()) {
+    // We don't want to have know about any generic params/archetypes, because
+    // that requires knowing a full generic environment for the extension (which
+    // can recur with conformance construction). Furthermore, we only *need* to
+    // resolve the protocol references, which won't involve any archetypes: an
+    // invalid inheritance like `struct Foo<T> {} extension Foo: SomeClass<T>
+    // {}` isn't relevant for conformance construction and is caught elsewhere.
+    auto type = inherited.getType();
+    if (!type)
+      type = resolveType(inherited.getTypeRepr(), ext, options, &resolver);
+
+    if (type && type->isExistentialType()) {
+      auto layout = type->getExistentialLayout();
+      for (auto proto : layout.getProtocols())
+        protocols.push_back({inherited.getLoc(), proto->getDecl()});
+    }
+  }
+}
+
+static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
+  unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
+    // Type check conformance contexts.
+    for (unsigned i = 0; i != TC.ConformanceContexts.size(); ++i) {
+      auto decl = TC.ConformanceContexts[i];
+      if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+        TC.checkConformancesInContext(ext, ext);
+      else {
+        auto *ntd = cast<NominalTypeDecl>(decl);
+        TC.checkConformancesInContext(ntd, ntd);
+      }
+    }
+    TC.ConformanceContexts.clear();
+
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
@@ -421,30 +461,18 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
 
-      // HACK: don't type-check the same function body twice.  This is
-      // supposed to be handled by just not enqueuing things twice,
-      // but that gets tricky with synthesized function bodies.
-      if (AFD->isBodyTypeChecked()) continue;
-
-      PrettyStackTraceDecl StackEntry("type-checking", AFD);
       TC.typeCheckAbstractFunctionBody(AFD);
-
-      AFD->setBodyTypeCheckedIfPresent();
     }
 
+    // Type check external definitions.
     for (unsigned n = TC.Context.ExternalDefinitions.size();
          currentExternalDef != n;
          ++currentExternalDef) {
       auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-      
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // HACK: don't type-check the same function body twice.  This is
-        // supposed to be handled by just not enqueuing things twice,
-        // but that gets tricky with synthesized function bodies.
-        if (AFD->isBodyTypeChecked()) continue;
 
-        PrettyStackTraceDecl StackEntry("type-checking", AFD);
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
         TC.typeCheckAbstractFunctionBody(AFD);
+        TC.checkFunctionErrorHandling(AFD);
         continue;
       }
       if (isa<NominalTypeDecl>(decl)) {
@@ -454,6 +482,16 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       if (isa<VarDecl>(decl))
         continue;
       llvm_unreachable("Unhandled external definition kind");
+    }
+
+    // Complete any protocol requirement signatures that were delayed
+    // because the protocol was validated via validateDeclForNameLookup().
+    while (!TC.DelayedRequirementSignatures.empty()) {
+      auto decl = TC.DelayedRequirementSignatures.pop_back_val();
+      if (decl->isInvalid() || TC.Context.hadError())
+        continue;
+
+      TC.validateDecl(decl);
     }
 
     // Validate any referenced declarations for SIL's purposes.
@@ -468,6 +506,22 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
       TC.finalizeDecl(decl);
     }
 
+    // Type check synthesized functions and their bodies.
+    for (unsigned n = SF.SynthesizedDecls.size();
+         currentSynthesizedDecl != n;
+         ++currentSynthesizedDecl) {
+      auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
+      TC.typeCheckDecl(decl);
+    }
+
+    // Ensure that the requirements of the given conformance are
+    // fully checked.
+    for (unsigned i = 0; i != TC.PartiallyCheckedConformances.size(); ++i) {
+      auto conformance = TC.PartiallyCheckedConformances[i];
+      TC.checkConformanceRequirements(conformance);
+    }
+    TC.PartiallyCheckedConformances.clear();
+
     // Complete any conformances that we used.
     for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
       auto conformance = TC.UsedConformances[i];
@@ -478,11 +532,16 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
+           currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            !TC.DeclsToFinalize.empty() ||
-           !TC.UsedConformances.empty());
+           !TC.ConformanceContexts.empty() ||
+           !TC.DelayedRequirementSignatures.empty() ||
+           !TC.UsedConformances.empty() ||
+           !TC.PartiallyCheckedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   TC.Context.LastCheckedExternalDefinition = currentExternalDef;
+  SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
   // Now that all types have been finalized, run any delayed
   // circularity checks.
@@ -513,18 +572,13 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   for (AbstractFunctionDecl *FD : TC.definedFunctions) {
     TC.checkFunctionErrorHandling(FD);
   }
-  for (auto decl : TC.Context.ExternalDefinitions) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-      TC.checkFunctionErrorHandling(fn);
-    }
-  }
 }
 
 void swift::typeCheckExternalDefinitions(SourceFile &SF) {
   assert(SF.ASTStage == SourceFile::TypeChecked);
   auto &Ctx = SF.getASTContext();
   TypeChecker TC(Ctx);
-  typeCheckFunctionsAndExternalDecls(TC);
+  typeCheckFunctionsAndExternalDecls(SF, TC);
 }
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
@@ -539,6 +593,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   auto &Ctx = SF.getASTContext();
 
   // Make sure we have a type checker.
+  //
+  // FIXME: We should never have a type checker here, but currently do when
+  // we're using immediate together with -enable-source-import.
+  //
+  // This possibility should be eliminated, since it results in duplicated
+  // work.
   Optional<TypeChecker> MyTC;
   if (!Ctx.getLazyResolver())
     MyTC.emplace(Ctx);
@@ -602,22 +662,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       }
     });
 
-    // FIXME: Check for cycles in class inheritance here?
-    
     // Type check the top-level elements of the source file.
-    for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
-      if (isa<TopLevelCodeDecl>(D))
-        continue;
-
-      TC.typeCheckDecl(D, /*isFirstPass*/true);
-    }
-
-    // At this point, we can perform general name lookup into any type.
-
-    // We don't know the types of all the global declarations in the first
-    // pass, which means we can't completely analyze everything. Perform the
-    // second pass now.
-
     bool hasTopLevelCode = false;
     for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -625,7 +670,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         // Immediately perform global name-binding etc.
         TC.typeCheckTopLevelCodeDecl(TLCD);
       } else {
-        TC.typeCheckDecl(D, /*isFirstPass*/false);
+        TC.typeCheckDecl(D);
       }
     }
 
@@ -639,7 +684,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
       TC.processREPLTopLevel(SF, TLC, StartElem);
 
-    typeCheckFunctionsAndExternalDecls(TC);
+    typeCheckFunctionsAndExternalDecls(SF, TC);
   }
 
   // Checking that benefits from having the whole module available.
@@ -658,8 +703,18 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     verify(SF);
 
     // Verify imported modules.
+    //
+    // Skip per-file verification in whole-module mode. Verifying imports
+    // between files could cause the importer to cache declarations without
+    // adding them to the ASTContext. This happens when the importer registers a
+    // declaration without a valid TypeChecker instance, as is the case during
+    // verification. A subsequent file may require that declaration to be fully
+    // imported (e.g. to synthesized a function body), but since it has already
+    // been cached, it will never be added to the ASTContext. The solution is to
+    // skip verification and avoid caching it.
 #ifndef NDEBUG
-    if (SF.Kind != SourceFileKind::REPL &&
+    if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking) &&
+        SF.Kind != SourceFileKind::REPL &&
         SF.Kind != SourceFileKind::SIL &&
         !Ctx.LangOpts.DebuggerSupport) {
       Ctx.verifyAllLoadedModules();
@@ -668,22 +723,28 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 }
 
-void swift::finishTypeCheckingFile(SourceFile &SF) {
-  auto &Ctx = SF.getASTContext();
-  TypeChecker TC(Ctx);
-
-  for (auto D : SF.Decls)
-    if (auto PD = dyn_cast<ProtocolDecl>(D))
-      TC.inferDefaultWitnesses(PD);
-}
-
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {
-  SharedTimer("performWholeModuleTypeChecking");
   auto &Ctx = SF.getASTContext();
+  FrontendStatsTracer tracer(Ctx.Stats, "perform-whole-module-type-checking");
   Ctx.diagnoseAttrsRequiringFoundation(SF);
   Ctx.diagnoseObjCMethodConflicts(SF);
   Ctx.diagnoseObjCUnsatisfiedOptReqConflicts(SF);
   Ctx.diagnoseUnintendedObjCMethodOverrides(SF);
+
+  // In whole-module mode, import verification is deferred until all files have
+  // been type checked. This avoids caching imported declarations when a valid
+  // type checker is not present. The same declaration may need to be fully
+  // imported by subsequent files.
+  //
+  // FIXME: some playgrounds tests (playground_lvalues.swift) fail with
+  // verification enabled.
+#if 0
+  if (SF.Kind != SourceFileKind::REPL &&
+      SF.Kind != SourceFileKind::SIL &&
+      !Ctx.LangOpts.DebuggerSupport) {
+    Ctx.verifyAllLoadedModules();
+  }
+#endif
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
@@ -706,11 +767,13 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   TypeResolutionOptions options;
 
   // Fine to have unbound generic types.
-  options |= TR_AllowUnboundGenerics;
-  if (isSILMode)
-    options |= TR_SILMode;
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
+  if (isSILMode) {
+    options |= TypeResolutionFlags::SILMode;
+    options |= TypeResolutionFlags::AllowIUO;
+  }
   if (isSILType)
-    options |= TR_SILType;
+    options |= TypeResolutionFlags::SILType;
 
   GenericTypeToArchetypeResolver contextResolver(GenericEnv);
 
@@ -741,7 +804,7 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   if (auto ext = dyn_cast<ExtensionDecl>(D))
     TC.validateExtension(ext);
   else
-    TC.typeCheckDecl(D, true);
+    TC.typeCheckDecl(D);
   return true;
 }
 

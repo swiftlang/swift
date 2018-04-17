@@ -17,6 +17,8 @@
 #ifndef SWIFT_DEFAULTARGUMENTKIND_H
 #define SWIFT_DEFAULTARGUMENTKIND_H
 
+#include <cstdint>
+
 namespace llvm {
 class StringRef;
 }
@@ -26,7 +28,7 @@ namespace swift {
 class Expr;
 
 /// Describes the kind of default argument a tuple pattern element has.
-enum class DefaultArgumentKind : unsigned {
+enum class DefaultArgumentKind : uint8_t {
   /// No default argument.
   None,
   /// A normal default argument.
@@ -51,14 +53,11 @@ enum class DefaultArgumentKind : unsigned {
   /// An empty dictionary literal.
   EmptyDictionary,
 };
+enum { NumDefaultArgumentKindBits = 4 };
 
 /// Retrieve the spelling of this default argument in source code, or
 /// an empty string if it has none.
 llvm::StringRef getDefaultArgumentSpelling(DefaultArgumentKind kind);
-
-/// Infer a default argument kind from an expression, if the
-/// expression is the canonical way to spell that default argument.
-DefaultArgumentKind inferDefaultArgumentKind(Expr *expr);
 
 } // end namespace swift
 

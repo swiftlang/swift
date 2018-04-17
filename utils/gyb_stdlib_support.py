@@ -22,8 +22,8 @@ def collectionForTraversal(traversal):  # noqa (N802 function name should be low
         raise ValueError("Unknown traversal %r" % traversal)
 
 
-def sliceTypeName(traversal, mutable, rangeReplaceable):  # noqa (N802)
-    name = collectionForTraversal(traversal).replace('Collection', 'Slice')
+def collectionTypeName(traversal, mutable, rangeReplaceable):  # noqa (N802)
+    name = collectionForTraversal(traversal)
     if rangeReplaceable:
         name = 'RangeReplaceable' + name
     if mutable:
@@ -38,18 +38,6 @@ def protocolsForCollectionFeatures(traversal, mutable, rangeReplaceable):  # noq
     if rangeReplaceable:
         protocols.append('RangeReplaceableCollection')
     return protocols
-
-
-def defaultIndicesForTraversal(traversal):  # noqa (N802)
-    if traversal == 'Forward':
-        return 'DefaultIndices'
-    elif traversal == 'Bidirectional':
-        return 'DefaultBidirectionalIndices'
-    elif traversal == 'RandomAccess':
-        return 'DefaultRandomAccessIndices'
-    else:
-        raise ValueError("Unknown traversal %r" % traversal)
-
 
 def documentationNameForTraversal(traversal):  # noqa (N802)
     if traversal == 'Forward':

@@ -17,7 +17,7 @@
 // RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_NO_DOT_2 > %t.opt.txt
-// RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT_RETURN < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_NO_DOT_3 > %t.opt.txt
 // RUN: %FileCheck %s -check-prefix=UN_OPT_NO_DOT_INT < %t.opt.txt
@@ -26,7 +26,7 @@
 // RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_DOT_2 > %t.opt.txt
-// RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
+// RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT_RETURN < %t.opt.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=UN_OPT_DOT_3 > %t.opt.txt
 // RUN: %FileCheck %s -check-prefix=UN_OPT_DOT_INT < %t.opt.txt
@@ -102,17 +102,27 @@ class ObjcClass {
 // UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{; name=.+$}}
 // UN_OPT_NO_DOT_FOOSTRUCT: End completions
 
+// UN_OPT_NO_DOT_FOOSTRUCT_RETURN: Begin completions
+// UN_OPT_NO_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
+// UN_OPT_NO_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{; name=.+$}}
+// UN_OPT_NO_DOT_FOOSTRUCT_RETURN: End completions
+
 // UN_OPT_DOT_FOOSTRUCT: Begin completions
 // UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{; name=.+$}}
 // UN_OPT_DOT_FOOSTRUCT: End completions
 
+// UN_OPT_DOT_FOOSTRUCT_RETURN: Begin completions
+// UN_OPT_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.instanceVar[#Int#]{{; name=.+$}}
+// UN_OPT_DOT_FOOSTRUCT_RETURN-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{; name=.+$}}
+// UN_OPT_DOT_FOOSTRUCT_RETURN: End completions
+
 // UN_OPT_NO_DOT_INT: Begin completions
-// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: .nonzeroBitCount[#Int#]{{; name=.+$}}
+// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: ?.nonzeroBitCount[#Int#]{{; name=.+$}}
 // UN_OPT_NO_DOT_INT: End completions
 
 // UN_OPT_DOT_INT: Begin completions
-// UN_OPT_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: nonzeroBitCount[#Int#]{{; name=.+$}}
+// UN_OPT_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.nonzeroBitCount[#Int#]{{; name=.+$}}
 // UN_OPT_DOT_INT: End completions
 
 // OPT_NO_DOT_OBJCCLASS: Begin completions

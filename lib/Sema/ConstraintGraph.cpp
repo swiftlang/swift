@@ -675,13 +675,39 @@ bool ConstraintGraph::contractEdges() {
 
         auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
 
-        // If the parameter is allowed to bind to `inout` let's not
-        // try to contract the edge connecting parameter declaration to
-        // it's use in the body. If parameter declaration is bound to
-        // `inout` it's use has to be bound to `l-value`, which can't
-        // happen once equivalence classes of parameter and argument are merged.
-        if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut())
-          continue;
+        // If the argument is allowed to bind to `inout`, in general,
+        // it's invalid to contract the edge between argument and parameter,
+        // but if we can prove that there are no possible bindings
+        // which result in attempt to bind `inout` type to argument
+        // type variable, we should go ahead and allow (temporary)
+        // contraction, because that greatly helps with performance.
+        // Such action is valid because argument type variable can
+        // only get its bindings from related overload, which gives
+        // us enough information to decided on l-valueness.
+        if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
+          bool isNotContractable = true;
+          if (auto bindings = CS.getPotentialBindings(tyvar1)) {
+            for (auto &binding : bindings.Bindings) {
+              auto type = binding.BindingType;
+              isNotContractable = type.findIf([&](Type nestedType) -> bool {
+                if (auto tv = nestedType->getAs<TypeVariableType>()) {
+                  if (!tv->getImpl().mustBeMaterializable())
+                    return true;
+                }
+
+                return nestedType->is<InOutType>();
+              });
+
+              // If there is at least one non-contractable binding, let's
+              // not risk contracting this edge.
+              if (isNotContractable)
+                break;
+            }
+          }
+
+          if (isNotContractable)
+            continue;
+        }
 
         auto rep1 = CS.getRepresentative(tyvar1);
         auto rep2 = CS.getRepresentative(tyvar2);

@@ -83,3 +83,7 @@ func negativeShift(_ u8: UInt8) {
 func sr5176(description: String = "unambiguous Int32.init(bitPattern:)") {
   _ = Int32(bitPattern: 0) // should compile without ambiguity
 }
+
+func sr6634(x: UnsafeBufferPointer<UInt8>) -> Int {
+  return x.lazy.filter { $0 > 127 || $0 == 0 }.count // should be unambiguous
+}

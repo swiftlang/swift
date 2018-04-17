@@ -311,4 +311,33 @@ open class D9_UnknownInitDisappearsRequiredGrandchild : D8_UnknownInitDisappears
 // CHECK-RECOVERY-NEXT: /* placeholder for init(value:) */
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
+public class E1_MethodWithDisappearingType : MethodWithDisappearingType {
+  public override func boxItUp() -> BoxedInt { fatalError() }
+}
+
+// CHECK-LABEL: class E1_MethodWithDisappearingType : MethodWithDisappearingType {
+// CHECK-NEXT: override func boxItUp() -> BoxedInt
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class E1_MethodWithDisappearingType : MethodWithDisappearingType {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+public class E2_InitializerStub : InitializerWithDisappearingType {
+  public init(unrelatedValue: Int) { fatalError() }
+}
+
+// CHECK-LABEL: class E2_InitializerStub : InitializerWithDisappearingType {
+// CHECK-NEXT: init(unrelatedValue: Int)
+// CHECK-NEXT: init(boxedInt box: BoxedInt)
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class E2_InitializerStub : InitializerWithDisappearingType {
+// CHECK-RECOVERY-NEXT: init(unrelatedValue: Int)
+// CHECK-RECOVERY-NEXT: /* placeholder for init(boxedInt:) */
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
 #endif // TEST

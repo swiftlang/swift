@@ -179,6 +179,10 @@ namespace irgen {
       return Fn.getForeignInfo();
     }
 
+    const Signature &getSignature() const {
+      return Fn.getSignature();
+    }
+
     /// If this callee has a value for the Swift context slot, return
     /// it; otherwise return non-null.
     llvm::Value *getSwiftContext() const;

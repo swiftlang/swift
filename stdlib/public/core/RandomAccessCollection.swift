@@ -38,7 +38,8 @@ public typealias RandomAccessIndexable = RandomAccessCollection
 /// collection, either the index for your custom type must conform to the
 /// `Strideable` protocol or you must implement the `index(_:offsetBy:)` and
 /// `distance(from:to:)` methods with O(1) efficiency.
-public protocol RandomAccessCollection : BidirectionalCollection
+public protocol RandomAccessCollection: BidirectionalCollection
+where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
@@ -46,15 +47,11 @@ public protocol RandomAccessCollection : BidirectionalCollection
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Index
 
-  /// A collection that represents a contiguous subrange of the collection's
-  /// elements.
-  associatedtype SubSequence : RandomAccessCollection
-    = RandomAccessSlice<Self>
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype SubSequence
 
-  /// A type that represents the indices that are valid for subscripting the
-  /// collection, in ascending order.
-  associatedtype Indices : RandomAccessCollection
-    = DefaultRandomAccessIndices<Self>
+  // FIXME(ABI): Associated type inference requires this.
+  associatedtype Indices
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -108,38 +105,6 @@ public protocol RandomAccessCollection : BidirectionalCollection
   var endIndex: Index { get }
 }
 
-/// Supply the default "slicing" `subscript` for `RandomAccessCollection`
-/// models that accept the default associated `SubSequence`,
-/// `RandomAccessSlice<Self>`.
-extension RandomAccessCollection where SubSequence == RandomAccessSlice<Self> {
-  /// Accesses a contiguous subrange of the collection's elements.
-  ///
-  /// The accessed slice uses the same indices for the same elements as the
-  /// original collection uses. Always use the slice's `startIndex` property
-  /// instead of assuming that its indices start at a particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
-  ///     print(streets[index!])
-  ///     // Prints "Evarts"
-  ///
-  /// - Parameter bounds: A range of the collection's indices. The bounds of
-  ///   the range must be valid indices of the collection.
-  @_inlineable
-  public subscript(bounds: Range<Index>) -> RandomAccessSlice<Self> {
-    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
-    return RandomAccessSlice(base: self, bounds: bounds)
-  }
-}
-
 // TODO: swift-3-indexing-model - Make sure RandomAccessCollection has
 // documented complexity guarantees, e.g. for index(_:offsetBy:).
 
@@ -188,9 +153,9 @@ extension RandomAccessCollection {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func index(
-    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
     let l = distance(from: i, to: limit)
@@ -201,15 +166,22 @@ extension RandomAccessCollection {
   }
 }
 
+// Provides an alternative default associated type witness for Indices
+// for random access collections with strideable indices.
+extension RandomAccessCollection where Index : Strideable, Index.Stride == Int {
+  @_implements(Collection, Indices)
+  public typealias _Default_Indices = Range<Index>
+}
+
 extension RandomAccessCollection
 where Index : Strideable, 
-      Index.Stride == IndexDistance,
-      Indices == CountableRange<Index> {
+      Index.Stride == Int,
+      Indices == Range<Index> {
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
-  @_inlineable
-  public var indices: CountableRange<Index> {
+  @inlinable
+  public var indices: Range<Index> {
     return startIndex..<endIndex
   }
 
@@ -218,7 +190,7 @@ where Index : Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     // FIXME: swift-3-indexing-model: tests for the trap.
     _failEarlyRangeCheck(
@@ -231,7 +203,7 @@ where Index : Strideable,
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     let result = i.advanced(by: -1)
     // FIXME: swift-3-indexing-model: tests for the trap.
@@ -262,7 +234,7 @@ where Index : Strideable,
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func index(_ i: Index, offsetBy n: Index.Stride) -> Index {
     let result = i.advanced(by: n)
     // This range check is not precise, tighter bounds exist based on `n`.
@@ -284,7 +256,7 @@ where Index : Strideable,
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Index.Stride {
     // FIXME: swift-3-indexing-model: tests for traps.
     _failEarlyRangeCheck(

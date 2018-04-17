@@ -30,20 +30,6 @@ STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
 namespace {
 
-/// Returns true if a function should be SIL serialized or emitted by IRGen.
-static bool shouldBeSerializedOrEmitted(SILFunction *F) {
-  // public_external functions are never SIL serialized or emitted by IRGen.
-  if (F->isAvailableExternally() && hasPublicVisibility(F->getLinkage()) &&
-      !F->isTransparent())
-    return false;
-
-  // [serialized] functions should always be SIL serialized.
-  if (F->isSerialized())
-    return true;
-
-  return false;
-}
-
 /// This is a base class for passes that are based on function liveness
 /// computations like e.g. dead function elimination.
 /// It provides a common logic for computing live (i.e. reachable) functions.
@@ -120,20 +106,9 @@ protected:
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
       return true;
 
-    // If function is marked as "keep-as-public", don't remove it.
-    // Change its linkage to public, so that other applications can refer to it.
-    // It is important that this transformation is done at the end of
-    // a pipeline, as it may break some optimizations.
-    if (F->isKeepAsPublic()) {
-      F->setLinkage(SILLinkage::Public);
-      DEBUG(llvm::dbgs() << "DFE: Preserve the specialization "
-                         << F->getName() << '\n');
-      return true;
-    }
-
-    // Do not consider public_external functions that do not need to be emitted
-    // into the client as anchors.
-    if (shouldBeSerializedOrEmitted(F))
+    // Global initializers are always emitted into the defining module and
+    // their bodies are never SIL serialized.
+    if (F->isGlobalInit())
       return true;
 
     return false;
@@ -202,66 +177,69 @@ protected:
           break;
 
         case SILWitnessTable::Invalid:
-        case SILWitnessTable::MissingOptional:
         case SILWitnessTable::AssociatedType:
           break;
       }
     }
 
+    for (const auto &conf : WT->getConditionalConformances()) {
+      if (conf.Conformance.isConcrete())
+        ensureAliveConformance(conf.Conformance.getConcrete());
+    }
   }
 
   /// Marks the declarations referenced by a key path pattern as alive if they
   /// aren't yet.
-  void ensureKeyPathComponentsAreAlive(KeyPathPattern *KP) {
-    for (auto &component : KP->getComponents()) {
-      switch (component.getKind()) {
-      case KeyPathPatternComponent::Kind::SettableProperty:
-        ensureAlive(component.getComputedPropertySetter());
-        LLVM_FALLTHROUGH;
-      case KeyPathPatternComponent::Kind::GettableProperty: {
-        ensureAlive(component.getComputedPropertyGetter());
-        auto id = component.getComputedPropertyId();
-        switch (id.getKind()) {
-        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
-          auto declRef = id.getDeclRef();
-          if (declRef.isForeign) {
-            // Nothing to do here: foreign functions aren't ours to be deleting.
-            // (And even if they were, they're ObjC-dispatched and thus anchored
-            // already: see isAnchorFunction)
+  void
+  ensureKeyPathComponentIsAlive(const KeyPathPatternComponent &component) {
+    switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::SettableProperty:
+      ensureAlive(component.getComputedPropertySetter());
+      LLVM_FALLTHROUGH;
+    case KeyPathPatternComponent::Kind::GettableProperty: {
+      ensureAlive(component.getComputedPropertyGetter());
+      auto id = component.getComputedPropertyId();
+      switch (id.getKind()) {
+      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+        auto declRef = id.getDeclRef();
+        if (declRef.isForeign) {
+          // Nothing to do here: foreign functions aren't ours to be deleting.
+          // (And even if they were, they're ObjC-dispatched and thus anchored
+          // already: see isAnchorFunction)
+        } else {
+          auto decl = cast<AbstractFunctionDecl>(declRef.getDecl());
+          if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+            ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
+                                   dyn_cast<FuncDecl>(decl),
+                                   clas);
+          } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
+            ensureAliveProtocolMethod(getMethodInfo(decl, /*witness*/ true));
           } else {
-            auto decl = cast<AbstractFunctionDecl>(declRef.getDecl());
-            if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-              ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
-                                     dyn_cast<FuncDecl>(decl),
-                                     clas);
-            } else if (isa<ProtocolDecl>(decl->getDeclContext())) {
-              ensureAliveProtocolMethod(getMethodInfo(decl, /*witness*/ true));
-            } else {
-              llvm_unreachable("key path keyed by a non-class, non-protocol method");
-            }
+            llvm_unreachable("key path keyed by a non-class, non-protocol method");
           }
-          break;
         }
-        case KeyPathPatternComponent::ComputedPropertyId::Function:
-          ensureAlive(id.getFunction());
-          break;
-        case KeyPathPatternComponent::ComputedPropertyId::Property:
-          break;
-        }
-
-        if (auto equals = component.getComputedPropertyIndexEquals())
-          ensureAlive(equals);
-        if (auto hash = component.getComputedPropertyIndexHash())
-          ensureAlive(hash);
-
-        continue;
+        break;
       }
-      case KeyPathPatternComponent::Kind::StoredProperty:
-      case KeyPathPatternComponent::Kind::OptionalChain:
-      case KeyPathPatternComponent::Kind::OptionalForce:
-      case KeyPathPatternComponent::Kind::OptionalWrap:
-        continue;
+      case KeyPathPatternComponent::ComputedPropertyId::Function:
+        ensureAlive(id.getFunction());
+        break;
+      case KeyPathPatternComponent::ComputedPropertyId::Property:
+        break;
       }
+
+      if (auto equals = component.getSubscriptIndexEquals())
+        ensureAlive(equals);
+      if (auto hash = component.getSubscriptIndexHash())
+        ensureAlive(hash);
+
+      break;
+    }
+    case KeyPathPatternComponent::Kind::StoredProperty:
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::External:
+      break;
     }
   }
 
@@ -387,7 +365,8 @@ protected:
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
-          ensureKeyPathComponentsAreAlive(KPI->getPattern());
+          for (auto &component : KPI->getPattern()->getComponents())
+            ensureKeyPathComponentIsAlive(component);
         }
       }
     }
@@ -530,8 +509,6 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         mi->addWitnessFunction(F, nullptr);
       }
     }
-
-
   }
 
   /// DeadFunctionElimination pass takes functions
@@ -620,6 +597,11 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         }
       }
     }
+    // Check property descriptor implementations.
+    for (SILProperty &P : Module->getPropertyList()) {
+      ensureKeyPathComponentIsAlive(P.getComponent());
+    }
+
   }
 
   /// Removes all dead methods from vtables and witness tables.

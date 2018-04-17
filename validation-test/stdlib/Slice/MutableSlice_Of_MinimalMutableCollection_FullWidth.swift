@@ -92,4 +92,38 @@ SliceTests.addMutableCollectionTests(
   isFixedLengthCollection: true
 )
 
+// rdar://problem/35760754
+
+func f<C : MutableCollection>(
+  _ elements: inout C
+) { }
+
+var CrashTests = TestSuite("MutableSliceCrash")
+
+extension TestSuite {
+  public func addMyMutableCollectionTests<C : MutableCollection>(
+    _ testNamePrefix: String = "",
+    maker: @escaping ([C.Element]) -> C
+  ) {
+
+    // this runs just fine
+    self.test("\(testNamePrefix).Direct") {
+      var c = makeCollection(elements: [])
+      f(&c[c.startIndex..<c.endIndex])
+    }
+
+    // this used to crash, even though the only difference is it's calling
+    // makeCollection via the argument to the original function
+    self.test("\(testNamePrefix).Indirect") {
+      var c = maker([])
+      f(&c[c.startIndex..<c.endIndex])
+    }
+  }
+}
+
+CrashTests.addMyMutableCollectionTests(
+  "Crasher",
+  maker: makeCollection
+)
+
 runAllTests()

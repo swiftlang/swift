@@ -33,8 +33,7 @@ else:
   try_ = ""
 }%
 
-@_inlineable
-@_versioned
+@inlinable
 internal func _insertionSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -104,7 +103,7 @@ internal func _insertionSort<C>(
 ///
 /// - Precondition: `a < b && b < c`
 /// - Postcondition: `elements[a] <= elements[b] && elements[b] <= elements[c]`
-@_inlineable
+@inlinable
 public // @testable
 func _sort3<C>(
   _ elements: inout C,
@@ -176,8 +175,7 @@ func _sort3<C>(
 ///
 /// - Precondition: The count of `range` must be >= 3:
 ///   `elements.distance(from: range.lowerBound, to: range.upperBound) >= 3`
-@_inlineable
-@_versioned
+@inlinable
 internal func _partition<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -227,7 +225,7 @@ internal func _partition<C>(
   return lo
 }
 
-@_inlineable
+@inlinable
 public // @testable
 func _introSort<C>(
   _ elements: inout C,
@@ -245,7 +243,7 @@ func _introSort<C>(
   }
   // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
   // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
-  let depthLimit = 2 * _floorLog2(Int64(count))
+  let depthLimit = 2 * count._binaryLogarithm()
   ${try_} _introSortImpl(
     &elements,
     subRange: range,
@@ -253,8 +251,7 @@ func _introSort<C>(
     depthLimit: depthLimit)
 }
 
-@_inlineable
-@_versioned
+@inlinable
 internal func _introSortImpl<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -300,8 +297,7 @@ internal func _introSortImpl<C>(
     depthLimit: depthLimit &- 1)
 }
 
-@_inlineable
-@_versioned
+@inlinable
 internal func _siftDown<C>(
   _ elements: inout C,
   index: C.Index,
@@ -343,8 +339,7 @@ internal func _siftDown<C>(
   }
 }
 
-@_inlineable
-@_versioned
+@inlinable
 internal func _heapify<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -375,8 +370,7 @@ internal func _heapify<C>(
   }
 }
 
-@_inlineable
-@_versioned
+@inlinable
 internal func _heapSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -406,10 +400,16 @@ internal func _heapSort<C>(
 % end
 // for p in preds
 
-/// Exchange the values of `a` and `b`.
+/// Exchanges the values of the two arguments.
 ///
-/// - Precondition: `a` and `b` do not alias each other.
-@_inlineable
+/// The two arguments must not alias each other. To swap two elements of a
+/// mutable collection, use the `swapAt(_:_:)` method of that collection
+/// instead of this function.
+///
+/// - Parameters:
+///   - a: The first value to swap.
+///   - b: The second value to swap.
+@inlinable
 public func swap<T>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.

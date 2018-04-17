@@ -138,8 +138,21 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return llvm::all_of(cast<ConvertFunctionInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
 
+  case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+    return llvm::all_of(cast<ConvertEscapeToNoEscapeInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
   case SILInstructionKind::PartialApplyInst:
     return partialApplyUse->get() != cast<PartialApplyInst>(user)->getCallee();
+
+  // Look through begin_borrow.
+  case SILInstructionKind::BeginBorrowInst:
+    return llvm::all_of(cast<BeginBorrowInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
+  // End borrow is always ok.
+  case SILInstructionKind::EndBorrowInst:
+    return true;
 
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::DestroyValueInst:

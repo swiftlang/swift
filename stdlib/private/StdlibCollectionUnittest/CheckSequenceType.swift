@@ -78,6 +78,33 @@ public struct ElementsEqualTest {
   }
 }
 
+public struct ElementsEqualWithPredicateTest {
+    public let expected: Bool
+    public let sequence: [Int]
+    public let other: [String]
+    public let predicate: (Int, String) -> Bool
+    public let expectedLeftoverSequence: [Int]
+    public let expectedLeftoverOther: [String]
+    public let loc: SourceLoc
+    
+    public init(
+        _ expected: Bool, _ sequence: [Int], _ other: [String],
+        _ predicate: @escaping (Int, String) -> Bool,
+        _ expectedLeftoverSequence: [Int],
+        _ expectedLeftoverOther: [String],
+        file: String = #file, line: UInt = #line,
+        comment: String = ""
+        ) {
+        self.expected = expected
+        self.sequence = sequence
+        self.other = other
+        self.predicate = predicate
+        self.expectedLeftoverSequence = expectedLeftoverSequence
+        self.expectedLeftoverOther = expectedLeftoverOther
+        self.loc = SourceLoc(file, line, comment: "test data" + comment)
+    }
+}
+
 public struct EnumerateTest {
   public let expected: [(Int, Int)]
   public let sequence: [Int]
@@ -449,6 +476,30 @@ public let elementsEqualTests: [ElementsEqualTest] = [
   ElementsEqualTest(false, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
   ElementsEqualTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
 ].flatMap { [ $0, $0.flip() ] }
+
+func elementsEqualPredicate(_ x: Int, y: String) -> Bool {
+    if let intVal = Int(y) {
+        return x == intVal
+    } else {
+        return false
+    }
+}
+
+public let elementsEqualWithPredicateTests: [ElementsEqualWithPredicateTest] = [
+    ElementsEqualWithPredicateTest(true, [], [], elementsEqualPredicate, [], []),
+    
+    ElementsEqualWithPredicateTest(false, [ 1 ], [], elementsEqualPredicate, [ 1 ], []),
+    ElementsEqualWithPredicateTest(false, [], [ "1" ], elementsEqualPredicate, [], [ "1" ]),
+    
+    ElementsEqualWithPredicateTest(false, [ 1, 2 ], [], elementsEqualPredicate, [ 1, 2 ], []),
+    ElementsEqualWithPredicateTest(false, [], [ "1", "2" ], elementsEqualPredicate, [], [ "1", "2" ]),
+    
+    ElementsEqualWithPredicateTest(false, [ 1, 2, 3, 4 ], [ "1", "2" ], elementsEqualPredicate, [ 3, 4 ], []),
+    ElementsEqualWithPredicateTest(false, [ 1, 2 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], [ "3", "4" ]),
+    
+    ElementsEqualWithPredicateTest(true, [ 1, 2, 3, 4 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], []),
+    ElementsEqualWithPredicateTest(true, [ 1, 2 ], [ "1", "2" ], elementsEqualPredicate, [], []),
+]
 
 public let enumerateTests = [
   EnumerateTest([], []),

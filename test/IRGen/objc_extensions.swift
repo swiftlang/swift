@@ -13,7 +13,7 @@ import objc_extension_base
 // Check that metadata for nested enums added in extensions to imported classes
 // gets emitted concretely.
 
-// CHECK: [[CATEGORY_NAME:@.*]] = private unnamed_addr constant [16 x i8] c"objc_extensions\00"
+// CHECK: [[CATEGORY_NAME:@.*]] = private constant [16 x i8] c"objc_extensions\00"
 // CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 
 // CHECK-LABEL: @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions" = private constant
@@ -91,7 +91,7 @@ class Hoozit : NSObject {
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blibble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR:@.*]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @_T015objc_extensions6HoozitC7blibbleyyFTo to i8*)
+// CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @"$S15objc_extensions6HoozitC7blibbleyyFTo" to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -101,13 +101,13 @@ class Hoozit : NSObject {
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blobble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*)* @_T015objc_extensions6HoozitC7blobbleyyFZTo to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*)* @"$S15objc_extensions6HoozitC7blobbleyyFZTo" to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 // CHECK-LABEL: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK:   %swift.type* {{.*}} @_T015objc_extensions6HoozitCMf,
+// CHECK:   %swift.type* {{.*}} @"$S15objc_extensions6HoozitCMf",
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   i8* null,
@@ -127,7 +127,7 @@ class SwiftOnly { }
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(wibble)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*)* @_T015objc_extensions9SwiftOnlyC6wibbleyyFTo to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*)* @"$S15objc_extensions9SwiftOnlyC6wibbleyyFTo" to i8*)
 // CHECK:   }] }, section "__DATA, __objc_const", align 8
 extension SwiftOnly {
   @objc func wibble() { }
@@ -179,14 +179,14 @@ extension NSDogcow {
   @NSManaged var woof: Int
 }
 
-// CHECK: @_T0So8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWP =
+// CHECK: @"$SSo8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWp" =
 
 class SwiftSubGizmo : SwiftBaseGizmo {
 
   // Don't crash on this call. Emit an objC method call to super.
   //
-  // CHECK-LABEL: define {{.*}} @_T015objc_extensions13SwiftSubGizmoC4frobyyF
-  // CHECK: _T015objc_extensions13SwiftSubGizmoCMa
+  // CHECK-LABEL: define {{.*}} @"$S15objc_extensions13SwiftSubGizmoC4frobyyF"
+  // CHECK: $S15objc_extensions13SwiftSubGizmoCMa
   // CHECK: objc_msgSendSuper2
   // CHECK: ret
   public override func frob() {

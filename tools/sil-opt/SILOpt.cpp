@@ -84,6 +84,10 @@ static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
+static llvm::cl::opt<bool>
+VerifyExclusivity("enable-verify-exclusivity",
+                  llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
+
 namespace {
 enum EnforceExclusivityMode {
   Unchecked, // static only
@@ -116,7 +120,8 @@ SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
         llvm::cl::init(""));
 
 static llvm::cl::opt<std::string>
-Target("target", llvm::cl::desc("target triple"));
+Target("target", llvm::cl::desc("target triple"),
+       llvm::cl::init(llvm::sys::getDefaultTargetTriple()));
 
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
@@ -195,6 +200,12 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
+static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
+    "disable-guaranteed-normal-arguments", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("Assume that the input module was compiled with "
+                   "-disable-guaranteed-normal-arguments enabled"));
+
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
 /// will emit a diagnostic.
@@ -254,7 +265,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
@@ -311,11 +323,13 @@ int main(int argc, char **argv) {
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
-    SILOpts.Optimization = SILOptions::SILOptMode::Optimize;
+    SILOpts.OptMode = OptimizationMode::ForSpeed;
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
+  SILOpts.EnableGuaranteedNormalArguments &= !DisableGuaranteedNormalArguments;
 
+  SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
     switch (EnforceExclusivity) {
     case EnforceExclusivityMode::Unchecked:
@@ -342,43 +356,19 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Load the input file.
+  serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFileOrSTDIN(InputFilename);
+      Invocation.setUpInputForSILTool(InputFilename, ModuleName,
+                                      /*alwaysSetModuleToMain*/ false,
+                                      /*bePrimary*/ !PerformWMO, extendedInfo);
   if (!FileBufOrErr) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
   }
 
-  // If it looks like we have an AST, set the source file kind to SIL and the
-  // name of the module to the file's name.
-  Invocation.addInputBuffer(FileBufOrErr.get().get());
-
-  serialization::ExtendedValidationInfo extendedInfo;
-  auto result = serialization::validateSerializedAST(
-      FileBufOrErr.get()->getBuffer(), &extendedInfo);
-  bool HasSerializedAST = result.status == serialization::Status::Valid;
-
-  if (HasSerializedAST) {
-    const StringRef Stem = ModuleName.size() ?
-                             StringRef(ModuleName) :
-                             llvm::sys::path::stem(InputFilename);
-    Invocation.setModuleName(Stem);
-    Invocation.setInputKind(InputFileKind::IFK_Swift_Library);
-  } else {
-    const StringRef Name = ModuleName.size() ? StringRef(ModuleName) : "main";
-    Invocation.setModuleName(Name);
-    Invocation.setInputKind(InputFileKind::IFK_SIL);
-  }
-
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-
-  if (!PerformWMO) {
-    Invocation.getFrontendOptions().Inputs.setPrimaryInputForInputFilename(
-        InputFilename);
-  }
 
   if (CI.setup(Invocation))
     return 1;
@@ -391,7 +381,7 @@ int main(int argc, char **argv) {
 
   // Load the SIL if we have a module. We have to do this after SILParse
   // creating the unfortunate double if statement.
-  if (HasSerializedAST) {
+  if (Invocation.hasSerializedAST()) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
     CI.setSILModule(SILModule::createEmptyModule(
@@ -438,7 +428,10 @@ int main(int argc, char **argv) {
   } else {
     auto *SILMod = CI.getSILModule();
     {
-      auto T = irgen::createIRGenModule(SILMod, getGlobalLLVMContext());
+      auto T = irgen::createIRGenModule(
+          SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
+          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(),
+          getGlobalLLVMContext());
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);
     }

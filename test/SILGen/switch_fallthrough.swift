@@ -16,91 +16,93 @@ func e() {}
 func f() {}
 func g() {}
 
-// CHECK-LABEL: sil hidden @_T018switch_fallthrough5test1yyF
+func z(_ i: Int) {}
+
+// CHECK-LABEL: sil hidden @$S18switch_fallthrough5test1yyF
 func test1() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
   // CHECK: [[YES_CASE1]]:
   case foo():
-  // CHECK:   function_ref @_T018switch_fallthrough1ayyF
+  // CHECK:   function_ref @$S18switch_fallthrough1ayyF
   // CHECK:   br [[CASE2:bb[0-9]+]]
     a()
     fallthrough
   case bar():
   // CHECK: [[CASE2]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1byyF
+  // CHECK:   function_ref @$S18switch_fallthrough1byyF
   // CHECK:   br [[CASE3:bb[0-9]+]]
     b()
     fallthrough
   case _:
   // CHECK: [[CASE3]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1cyyF
+  // CHECK:   function_ref @$S18switch_fallthrough1cyyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     c()
   }
   // CHECK: [[CONT]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1dyyF
+  // CHECK:   function_ref @$S18switch_fallthrough1dyyF
   d()
 }
 
 // Fallthrough should work even if the next case is normally unreachable
-// CHECK-LABEL: sil hidden @_T018switch_fallthrough5test2yyF
+// CHECK-LABEL: sil hidden @$S18switch_fallthrough5test2yyF
 func test2() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
   // CHECK: [[YES_CASE1]]:
   case foo():
-  // CHECK:   function_ref @_T018switch_fallthrough1ayyF
+  // CHECK:   function_ref @$S18switch_fallthrough1ayyF
   // CHECK:   br [[CASE2:bb[0-9]+]]
     a()
     fallthrough
   case _:
   // CHECK: [[CASE2]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1byyF
+  // CHECK:   function_ref @$S18switch_fallthrough1byyF
   // CHECK:   br [[CASE3:bb[0-9]+]]
     b()
     fallthrough
   case _:
   // CHECK: [[CASE3]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1cyyF
+  // CHECK:   function_ref @$S18switch_fallthrough1cyyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     c()
   }
   // CHECK: [[CONT]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1dyyF
+  // CHECK:   function_ref @$S18switch_fallthrough1dyyF
   d()
 }
 
-// CHECK-LABEL: sil hidden @_T018switch_fallthrough5test3yyF
+// CHECK-LABEL: sil hidden @$S18switch_fallthrough5test3yyF
 func test3() {
   switch (foo(), bar()) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
   // CHECK: [[YES_CASE1]]:
   case (foo(), bar()):
-  // CHECK:   function_ref @_T018switch_fallthrough1ayyF
+  // CHECK:   function_ref @$S18switch_fallthrough1ayyF
   // CHECK:   br [[CASE2:bb[0-9]+]]
     a()
     fallthrough
   case (foo(), _):
   // CHECK: [[CASE2]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1byyF
+  // CHECK:   function_ref @$S18switch_fallthrough1byyF
   // CHECK:   br [[CASE3:bb[0-9]+]]
     b()
     fallthrough
   case (_, _):
   // CHECK: [[CASE3]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1cyyF
+  // CHECK:   function_ref @$S18switch_fallthrough1cyyF
   // CHECK:   br [[CASE4:bb[0-9]+]]
     c()
     fallthrough
   case (_, _):
   // CHECK: [[CASE4]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1dyyF
+  // CHECK:   function_ref @$S18switch_fallthrough1dyyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     d()
   }
   // CHECK: [[CONT]]:
-  // CHECK:   function_ref @_T018switch_fallthrough1eyyF
+  // CHECK:   function_ref @$S18switch_fallthrough1eyyF
   e()
 }
 
@@ -134,3 +136,38 @@ func test4() {
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
 }
+
+// Fallthrough into case block with binding // CHECK-LABEL: sil hidden @$S18switch_fallthrough5test5yyF
+func test5() {
+  switch (foo(), bar()) {
+  // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
+  // CHECK: [[YES_CASE1]]:
+  case (var n, foo()):
+    // Check that the var is boxed and unboxed and the final value is the one that falls through into the next case
+    // CHECK:   [[BOX:%.*]] = alloc_box ${ var Int }, var, name "n"
+    // CHECK:   [[N_BOX:%.*]] = project_box [[BOX]] : ${ var Int }, 0
+    // CHECK:   function_ref @$S18switch_fallthrough1ayyF
+    // CHECK:   [[N:%.*]] = load [trivial] [[N_BOX]] : $*Int
+    // CHECK:   destroy_value [[BOX]] : ${ var Int }
+    // CHECK:   br [[CASE2:bb[0-9]+]]([[N]] : $Int)
+    a()
+    fallthrough
+  case (foo(), let n):
+    // CHECK:   cond_br {{%.*}}, [[YES_SECOND_CONDITION:bb[0-9]+]], {{bb[0-9]+}}
+    // CHECK: [[YES_SECOND_CONDITION]]:
+    // CHECK:   debug_value [[SECOND_N:%.*]] : $Int, let, name "n"
+    // CHECK:   br [[CASE2]]([[SECOND_N]] : $Int)
+    
+    // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : @trivial $Int):
+    // CHECK:   [[Z:%.*]] = function_ref @$S18switch_fallthrough1zyySiF
+    // CHECK    apply [[Z]]([[INCOMING_N]]) : $@convention(thin) (Int) -> ()
+    // CHECK:   br [[CONT:bb[0-9]+]]
+    z(n)
+  case (_, _):
+    break
+  }
+  // CHECK: [[CONT]]:
+  // CHECK:   function_ref @$S18switch_fallthrough1eyyF
+  e()
+}
+

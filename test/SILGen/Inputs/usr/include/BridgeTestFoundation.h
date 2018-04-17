@@ -82,6 +82,9 @@ void nonnullSetBlockResult(NSSet *_Nonnull (^block)(void));
 
 void noescapeBlock(__attribute__((noescape)) void (^block)(void));
 void escapeBlock(void (^block)(void));
+void noescapeBlock3(__attribute__((noescape)) void (^block)(NSString *s),
+                    __attribute__((noescape)) void (^block2)(NSString *s),
+                    NSString *f);
 
 void noescapeNonnullBlock(__attribute__((noescape)) void (^_Nonnull block)(void));
 void escapeNonnullBlock(void (^_Nonnull block)(void));
@@ -93,3 +96,5 @@ void escapeBlockAlias(dispatch_block_t block);
 @interface ObjectWithSplitProperty : NSObject
 @property (nonatomic, setter=private_setFlagForSomething:) BOOL flagForSomething;
 @end
+
+extern NSString * __nonnull (^ const __nonnull GlobalBlock)(NSString * __nonnull);
