@@ -43,9 +43,6 @@ public:
   int NumThreads = 0;
   
   enum LinkingMode {
-    /// Skip SIL linking.
-    LinkNone,
-
     /// Perform normal SIL linking.
     LinkNormal,
 
