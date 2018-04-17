@@ -94,12 +94,6 @@ static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
     return cast<const CheckedCastValueBranchInst>(TI)->getOperand();
   case TermKind::SwitchEnumInst:
     return cast<const SwitchEnumInst>(TI)->getOperand();
-  // SWIFT_ENABLE_TENSORFLOW
-  case TermKind::AutoDiffReverseInst:
-    // Pointless because autodiff_reverse acts like an attribute. It must be
-    // the only instruction in the parent function, so there's no predecessor to
-    // worry about.
-    return SILValue();
   }
   llvm_unreachable("Unhandled TermKind?!");
 }

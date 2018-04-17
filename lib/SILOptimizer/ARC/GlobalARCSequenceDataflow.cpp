@@ -221,8 +221,6 @@ static bool isARCSignificantTerminator(TermInst *TI) {
   case TermKind::CheckedCastBranchInst:
   case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
-  // SWIFT_ENABLE_TENSORFLOW
-  case TermKind::AutoDiffReverseInst:
     return true;
   }
 

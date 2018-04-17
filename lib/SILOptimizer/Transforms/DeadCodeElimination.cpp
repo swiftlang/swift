@@ -302,8 +302,6 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumAddrInst:
   case TermKind::CheckedCastAddrBranchInst:
-  // SWIFT_ENABLE_TENSORFLOW
-  case TermKind::AutoDiffReverseInst:
     llvm_unreachable("Unexpected argument for terminator kind!");
     break;
 
@@ -390,8 +388,6 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case TermKind::BranchInst:
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
-  // SWIFT_ENABLE_TENSORFLOW
-  case TermKind::AutoDiffReverseInst:
     return;
 
   case TermKind::ReturnInst:
