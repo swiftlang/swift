@@ -462,7 +462,7 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline() {
   SILPassPipelinePlan P;
   P.startPipeline("Address Lowering");
-  P.addSILCleanup();
+  P.addIRGenPrepare();
   P.addAddressLowering();
 
   return P;
