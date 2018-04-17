@@ -12,13 +12,13 @@
 
 #include "swift/Basic/TaskQueue.h"
 
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 
-#include <string>
 #include <cerrno>
+#include <string>
 
 #if HAVE_POSIX_SPAWN
 #include <spawn.h>
@@ -36,8 +36,8 @@
 extern char **environ;
 #else
 extern "C" {
-  // _NSGetEnviron is from crt_externs.h which is missing in the iOS SDK.
-  extern char ***_NSGetEnviron(void);
+// _NSGetEnviron is from crt_externs.h which is missing in the iOS SDK.
+extern char ***_NSGetEnviron(void);
 }
 #endif
 
@@ -58,7 +58,8 @@ class Task {
   /// Context which should be associated with this task.
   void *Context;
 
-  /// True if the errors of the Task should be stored in Errors instead of Output.
+  /// True if the errors of the Task should be stored in Errors instead of
+  /// Output.
   bool SeparateErrors;
 
   /// The pid of this Task when executing.
@@ -67,21 +68,18 @@ class Task {
   /// A pipe for reading output from the child process.
   int Pipe;
 
-  /// A pipe for reading errors from the child prcess, if SeparateErrors is true.
+  /// A pipe for reading errors from the child prcess, if SeparateErrors is
+  /// true.
   int ErrorPipe;
 
   /// The current state of the Task.
-  enum {
-    Preparing,
-    Executing,
-    Finished
-  } State;
+  enum class TaskState { Preparing, Executing, Finished } State;
 
   /// Once the Task has finished, this contains the buffered output of the Task.
   std::string Output;
 
-  /// Once the Task has finished, if SeparateErrors is true, this contains the errors
-  /// from the Task.
+  /// Once the Task has finished, if SeparateErrors is true, this contains the
+  /// errors from the Task.
   std::string Errors;
 
 public:
@@ -89,7 +87,7 @@ public:
        ArrayRef<const char *> Env, void *Context, bool SeparateErrors)
       : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
         SeparateErrors(SeparateErrors), Pid(-1), Pipe(-1), ErrorPipe(-1),
-        State(Preparing) {
+        State(TaskState::Preparing) {
     assert((Env.empty() || Env.back() == nullptr) &&
            "Env must either be empty or null-terminated!");
   }
@@ -120,8 +118,8 @@ public:
 } // end namespace swift
 
 bool Task::execute() {
-  assert(State < Executing && "This Task cannot be executed twice!");
-  State = Executing;
+  assert(State < TaskState::Executing && "This Task cannot be executed twice!");
+  State = TaskState::Executing;
 
   // Construct argv.
   SmallVector<const char *, 128> Argv;
@@ -172,9 +170,9 @@ bool Task::execute() {
   }
 
   // Spawn the subtask.
-  int spawnErr = posix_spawn(&Pid, ExecPath, &FileActions, nullptr,
-                             const_cast<char **>(argvp),
-                             const_cast<char **>(envp));
+  int spawnErr =
+      posix_spawn(&Pid, ExecPath, &FileActions, nullptr,
+                  const_cast<char **>(argvp), const_cast<char **>(envp));
 
   posix_spawn_file_actions_destroy(&FileActions);
   close(FullPipe[1]);
@@ -187,7 +185,7 @@ bool Task::execute() {
     if (SeparateErrors) {
       close(FullErrorPipe[0]);
     }
-    State = Finished;
+    State = TaskState::Finished;
     return true;
   }
 #else
@@ -198,7 +196,7 @@ bool Task::execute() {
     if (SeparateErrors) {
       close(FullErrorPipe[0]);
     }
-    State = Finished;
+    State = TaskState::Finished;
     Pid = 0;
     break;
   }
@@ -267,10 +265,10 @@ bool Task::readFromPipes() {
 }
 
 void Task::finishExecution() {
-  assert(State == Executing &&
+  assert(State == TaskState::Executing &&
          "This Task must be executing to finish execution!");
 
-  State = Finished;
+  State = TaskState::Finished;
 
   // Read the output of the command, so we can use it later.
   readFromPipes();
@@ -306,10 +304,14 @@ void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
   QueuedTasks.push(std::move(T));
 }
 
-bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
-                        TaskSignalledCallback Signalled) {
+class TaskExecutor {
+
+  std::queue<std::unique_ptr<Task>> &TasksToExecute;
+
+public:
   using PidToTaskMap = llvm::DenseMap<pid_t, std::unique_ptr<Task>>;
 
+private:
   // Stores the current executing Tasks, organized by pid.
   PidToTaskMap ExecutingTasks;
 
@@ -318,143 +320,270 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
 
   bool SubtaskFailed = false;
 
-  unsigned MaxNumberOfParallelTasks = getNumberOfParallelTasks();
+  const unsigned MaxNumberOfParallelTasks;
 
-  if (MaxNumberOfParallelTasks == 0)
-    MaxNumberOfParallelTasks = 1;
+  const TaskQueue::TaskBeganCallback BeganCallBack;
+  const TaskQueue::TaskFinishedCallback FinishedCallBack;
+  const TaskQueue::TaskSignalledCallback SignalledCallBack;
 
-  while ((!QueuedTasks.empty() && !SubtaskFailed) ||
-         !ExecutingTasks.empty()) {
-    // Enqueue additional tasks, if we have additional tasks, we aren't
-    // already at the parallel limit, and no earlier subtasks have failed.
-    while (!SubtaskFailed && !QueuedTasks.empty() &&
-           ExecutingTasks.size() < MaxNumberOfParallelTasks) {
-      std::unique_ptr<Task> T(QueuedTasks.front().release());
-      QueuedTasks.pop();
-      if (T->execute())
-        return true;
+public:
+  TaskExecutor(std::queue<std::unique_ptr<Task>> &TasksToExecute,
+               const unsigned NumberOfParallelTasks,
+               const TaskQueue::TaskBeganCallback BeganCallBack,
+               const TaskQueue::TaskFinishedCallback FinishedCallBack,
+               const TaskQueue::TaskSignalledCallback SignalledCallBack)
+      : TasksToExecute(TasksToExecute),
+        MaxNumberOfParallelTasks(
+            NumberOfParallelTasks == 0 ? 1 : NumberOfParallelTasks),
+        BeganCallBack(BeganCallBack), FinishedCallBack(FinishedCallBack),
+        SignalledCallBack(SignalledCallBack) {}
 
-      pid_t Pid = T->getPid();
+  /// Run the tasks in the queue, \return true on error.
+  bool executeTasks();
 
-      if (Began) {
-        Began(Pid, T->getContext());
-      }
-
-      PollFds.push_back({ T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0 });
-      // We should also poll T->getErrorPipe(), but this introduces timing
-      // issues with shutting down the task after reading getPipe().
-      ExecutingTasks[Pid] = std::move(T);
-    }
-
-    assert(!PollFds.empty() &&
-           "We should only call poll() if we have fds to watch!");
-    int ReadyFdCount = poll(PollFds.data(), PollFds.size(), -1);
-    if (ReadyFdCount == -1) {
-      // Recover from error, if possible.
-      if (errno == EAGAIN || errno == EINTR)
-        continue;
-      return true;
-    }
-
-    // Holds all fds which have finished during this loop iteration.
-    std::vector<int> FinishedFds;
-
-    for (struct pollfd &fd : PollFds) {
-      if (fd.revents & POLLIN || fd.revents & POLLPRI || fd.revents & POLLHUP ||
-          fd.revents & POLLERR) {
-        // An event which we care about occurred. Find the appropriate Task.
-        auto predicate = [&fd](PidToTaskMap::value_type &value) -> bool {
-          return value.second->getPipe() == fd.fd;
-        };
-
-        auto iter = std::find_if(ExecutingTasks.begin(), ExecutingTasks.end(),
-                                 predicate);
-        assert(iter != ExecutingTasks.end() &&
-               "All outstanding fds must be associated with an executing Task");
-        Task &T = *iter->second;
-        if (fd.revents & POLLIN || fd.revents & POLLPRI) {
-          // There's data available to read.
-          T.readFromPipes();
-        }
-
-        if (fd.revents & POLLHUP || fd.revents & POLLERR) {
-          // This fd was "hung up" or had an error, so we need to wait for the
-          // Task and then clean up.
-          pid_t Pid;
-          int Status;
-          do {
-            Status = 0;
-            Pid = waitpid(T.getPid(), &Status, 0);
-            assert(Pid != 0 &&
-                   "We do not pass WNOHANG, so we should always get a pid");
-            if (Pid < 0 && (errno == ECHILD || errno == EINVAL))
-              return true;
-          } while (Pid < 0);
-
-          assert(Pid == T.getPid() &&
-                 "We asked to wait for this Task, but we got another Pid!");
-
-          T.finishExecution();
-
-          if (WIFEXITED(Status)) {
-            int Result = WEXITSTATUS(Status);
-
-            if (Finished) {
-              // If we have a TaskFinishedCallback, only set SubtaskFailed to
-              // true if the callback returns StopExecution.
-              SubtaskFailed = Finished(T.getPid(), Result, T.getOutput(),
-                                       T.getErrors(), T.getContext()) ==
-                  TaskFinishedResponse::StopExecution;
-            } else if (Result != 0) {
-              // Since we don't have a TaskFinishedCallback, treat a subtask
-              // which returned a nonzero exit code as having failed.
-              SubtaskFailed = true;
-            }
-          } else if (WIFSIGNALED(Status)) {
-            // The process exited due to a signal.
-            int Signal = WTERMSIG(Status);
-
-            StringRef ErrorMsg = strsignal(Signal);
-
-            if (Signalled) {
-              TaskFinishedResponse Response =
-                  Signalled(T.getPid(), ErrorMsg, T.getOutput(), T.getErrors(),
-                            T.getContext(), Signal);
-              if (Response == TaskFinishedResponse::StopExecution)
-                // If we have a TaskCrashedCallback, only set SubtaskFailed to
-                // true if the callback returns StopExecution.
-                SubtaskFailed = true;
-            } else {
-              // Since we don't have a TaskCrashedCallback, treat a crashing
-              // subtask as having failed.
-              SubtaskFailed = true;
-            }
-          }
-
-          ExecutingTasks.erase(Pid);
-          FinishedFds.push_back(fd.fd);
-        }
-      } else if (fd.revents & POLLNVAL) {
-        // We passed an invalid fd; this should never happen,
-        // since we always mark fds as finished after calling
-        // Task::finishExecution() (which closes the Task's fd).
-        llvm_unreachable("Asked poll() to watch a closed fd");
-      }
-
-      fd.revents = 0;
-    }
-
-    // Remove any fds which we've closed from PollFds.
-    for (int fd : FinishedFds) {
-      auto predicate = [&fd] (struct pollfd &i) {
-        return i.fd == fd;
-      };
-
-      auto iter = std::find_if(PollFds.begin(), PollFds.end(), predicate);
-      assert(iter != PollFds.end() && "The finished fd must be in PollFds!");
-      PollFds.erase(iter);
-    }
+private:
+  bool isMoreWorkRemaining() const {
+    return !ExecutingTasks.empty()
+               ? true
+               : SubtaskFailed ? false : !TasksToExecute.empty();
   }
 
-  return SubtaskFailed;
+  /// Start up tasks if we aren't
+  /// already at the parallel limit, and no earlier subtasks have failed.
+  /// \return true if task execution fails.
+  bool startExecutingTasks();
+
+  /// Grab and take ownership of the next task to start. Start it, and \return a
+  /// unique pointer if no error.
+  std::unique_ptr<Task> startNextTask();
+
+  /// Enter the task and its outputs in this TaskExecutor's data structures so
+  /// it can be polled.
+  void recordTasksFdsForPolling(std::unique_ptr<Task> T);
+
+  /// \return finished Fds if no error
+  Optional<std::vector<int>> readFromAnyReadyFds();
+
+  void cleanupFds(std::vector<int>);
+
+  enum class FdStatus { hadError, finished, alive };
+  FdStatus tryReadFromFd(struct pollfd &fd);
+  FdStatus handleFdEvent(struct pollfd &fd);
+  FdStatus waitForTaskThenCleanUp(Task &T, struct pollfd &fd);
+
+  bool cleanupExitedTask(int Status, const Task &T) const;
+  bool cleanupSignalledTask(int Status, const Task &T) const;
+
+  enum class PollResult { hardError, softError, noError };
+  PollResult tryPollingFds();
+};
+
+bool TaskExecutor::executeTasks() {
+  while (isMoreWorkRemaining()) {
+    if (startExecutingTasks())
+      return true;
+    switch (tryPollingFds()) {
+    case PollResult::hardError:
+      return true;
+    case PollResult::softError:
+      continue;
+    case PollResult::noError:
+      break;
+    }
+    Optional<std::vector<int>> FinishedFds = readFromAnyReadyFds();
+    if (!FinishedFds)
+      return true;
+
+    cleanupFds(*FinishedFds);
+  }
+  return false;
+}
+
+TaskExecutor::PollResult TaskExecutor::tryPollingFds() {
+  assert(!PollFds.empty() &&
+         "We should only call poll() if we have fds to watch!");
+  int ReadyFdCount = poll(PollFds.data(), PollFds.size(), -1);
+  return ReadyFdCount != -1 ? PollResult::noError :
+                            // Recover from error, if possible.
+             errno == EAGAIN || errno == EINTR ? PollResult::softError
+                                               : PollResult::hardError;
+}
+
+bool TaskExecutor::startExecutingTasks() {
+  for (;;) {
+    if (ExecutingTasks.size() >= MaxNumberOfParallelTasks ||
+        TasksToExecute.empty())
+      return false;
+    std::unique_ptr<Task> T = startNextTask();
+    if (!T)
+      return true;
+    if (BeganCallBack)
+      BeganCallBack(T->getPid(), T->getContext());
+    recordTasksFdsForPolling(std::move(T));
+  }
+}
+
+std::unique_ptr<Task> TaskExecutor::startNextTask() {
+  std::unique_ptr<Task> T(TasksToExecute.front().release());
+  return T->execute() ? nullptr : std::move(T);
+}
+
+void TaskExecutor::recordTasksFdsForPolling(std::unique_ptr<Task> T) {
+  PollFds.push_back({T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0});
+  const int Pid = T->getPid();
+  ExecutingTasks[Pid] = std::move(T);
+  // We should also poll T->getErrorPipe(), but this introduces timing
+  // issues with shutting down the task after reading getPipe().
+
+  // FIXME: code that could look at error pipe, but the rest of this assumes
+  // one-to-one fd->Task
+  //  if (T->getErrorPipe() != -1) {
+  //    PollFds.push_back({ T->getErrorPipe(), POLLIN | POLLPRI | POLLHUP, 0 });
+  //    ExecutingTasks[T->getErrorPipe()] = std::move(T);
+  //  }
+  ExecutingTasks[Pid] = std::move(T);
+}
+
+Optional<std::vector<int>> TaskExecutor::readFromAnyReadyFds() {
+  std::vector<int> finishedFds;
+  for (struct pollfd &fd : PollFds) {
+    switch (tryReadFromFd(fd)) {
+    case FdStatus::hadError:
+      return None;
+    case FdStatus::finished:
+      finishedFds.push_back(fd.fd);
+      break;
+    case FdStatus::alive:
+      break;
+    }
+  }
+  return finishedFds;
+}
+
+TaskExecutor::FdStatus TaskExecutor::tryReadFromFd(struct pollfd &fd) {
+  if (fd.revents & POLLIN || fd.revents & POLLPRI || fd.revents & POLLHUP ||
+      fd.revents & POLLERR) {
+    FdStatus status = handleFdEvent(fd);
+    fd.revents = 0;
+    return status;
+  } else if (fd.revents & POLLNVAL) {
+    // We passed an invalid fd; this should never happen,
+    // since we always mark fds as finished after calling
+    // Task::finishExecution() (which closes the Task's fd).
+    llvm_unreachable("Asked poll() to watch a closed fd");
+  }
+  fd.revents = 0;
+  return FdStatus::alive;
+}
+
+static Task &findTask(const TaskExecutor::PidToTaskMap &ExecutingTasks,
+                      struct pollfd &fd) {
+  auto predicate =
+      [&fd](TaskExecutor::PidToTaskMap::value_type &value) -> bool {
+    return value.second->getPipe() == fd.fd;
+  };
+  auto iter =
+      std::find_if(ExecutingTasks.begin(), ExecutingTasks.end(), predicate);
+  assert(iter != ExecutingTasks.end() &&
+         "All outstanding fds must be associated with an executing Task");
+  return *iter->second;
+}
+
+TaskExecutor::FdStatus TaskExecutor::handleFdEvent(struct pollfd &fd) {
+  Task &T = findTask(ExecutingTasks, fd);
+  if (fd.revents & POLLIN || fd.revents & POLLPRI) {
+    // There's data available to read.
+    T.readFromPipes();
+  }
+  if (fd.revents & POLLHUP || fd.revents & POLLERR) {
+    // This fd was "hung up" or had an error, so we need to wait for the
+    // Task and then clean up.
+    return waitForTaskThenCleanUp(T, fd);
+  }
+  return FdStatus::alive;
+}
+
+static Optional<const int> waitForPid(const pid_t pidToWaitFor) {
+  for (;;) {
+    int Status = 0;
+    const pid_t pidFromWait = waitpid(pidToWaitFor, &Status, 0);
+    if (pidFromWait == pidToWaitFor)
+      return Status;
+    if (pidFromWait > 0)
+      llvm_unreachable(
+          "We asked to wait for this Task, but we got another Pid!");
+    if (pidFromWait == 0)
+      llvm_unreachable("We do not pass WNOHANG, so we should always get a pid");
+    if (errno == ECHILD || errno == EINVAL)
+      return None;
+  }
+}
+
+TaskExecutor::FdStatus TaskExecutor::waitForTaskThenCleanUp(Task &T,
+                                                            struct pollfd &fd) {
+  const Optional<const int> StatusIfOK = waitForPid(T.getPid());
+  if (!StatusIfOK)
+    return FdStatus::hadError;
+
+  T.finishExecution();
+  int Status = *StatusIfOK;
+  const bool hadError = WIFEXITED(Status)
+                            ? cleanupExitedTask(Status, T)
+                            : WIFSIGNALED(Status)
+                                  ? cleanupSignalledTask(Status, T)
+                                  : false /* Can this case ever happen? */;
+
+  ExecutingTasks.erase(T.getPid());
+
+  return hadError ? FdStatus::hadError : FdStatus::finished;
+}
+
+bool TaskExecutor::cleanupExitedTask(int Status, const Task &T) const {
+  const int Result = WEXITSTATUS(Status);
+  if (!FinishedCallBack) {
+    // Since we don't have a TaskFinishedCallback, treat a subtask
+    // which returned a nonzero exit code as having failed.
+    return Result != 0;
+  }
+  // If we have a TaskFinishedCallback, only have an error if the callback
+  // returns StopExecution.
+  return TaskFinishedResponse::StopExecution ==
+         FinishedCallBack(T.getPid(), Result, T.getOutput(), T.getErrors(),
+                          T.getContext());
+}
+
+bool TaskExecutor::cleanupSignalledTask(int Status, const Task &T) const {
+  // The process exited due to a signal.
+  const int Signal = WTERMSIG(Status);
+  StringRef ErrorMsg = strsignal(Signal);
+
+  if (!SignalledCallBack) {
+    // Since we don't have a TaskCrashedCallback, treat a crashing
+    // subtask as having failed.
+    return true;
+  }
+  // If we have a TaskCrashedCallback, only set SubtaskFailed to
+  // true if the callback returns StopExecution.
+  return TaskFinishedResponse::StopExecution ==
+         SignalledCallBack(T.getPid(), ErrorMsg, T.getOutput(), T.getErrors(),
+                           T.getContext(), Signal);
+}
+
+void TaskExecutor::cleanupFds(std::vector<int> FinishedFds) {
+  // Remove any fds which we've closed from PollFds.
+  for (int fd : FinishedFds) {
+    auto predicate = [&fd](struct pollfd &i) { return i.fd == fd; };
+    auto iter = std::find_if(PollFds.begin(), PollFds.end(), predicate);
+    assert(iter != PollFds.end() && "The finished fd must be in PollFds!");
+    PollFds.erase(iter);
+  }
+}
+
+bool TaskQueue::execute(TaskBeganCallback BeganCallBack,
+                        TaskFinishedCallback FinishedCallBack,
+                        TaskSignalledCallback SignalledCallBack) {
+
+  TaskExecutor TE(QueuedTasks, getNumberOfParallelTasks(), BeganCallBack,
+                  FinishedCallBack, SignalledCallBack);
+  return TE.executeTasks();
 }
