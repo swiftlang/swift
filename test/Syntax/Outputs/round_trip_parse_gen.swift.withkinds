@@ -180,7 +180,7 @@ private </DeclModifier>struct S<GenericParameterClause><<GenericParameter>A, </G
   private </DeclModifier>struct S<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>A</SimpleTypeIdentifier>, </InheritedType><InheritedType><SimpleTypeIdentifier>B </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></StructDecl>
 }</MemberDeclBlock></StructDecl><ProtocolDecl>
 
-protocol P<TypeInheritanceClause>: <InheritedType>class </InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><FunctionDecl>
+protocol P<TypeInheritanceClause>: <InheritedType><ClassRestrictionType>class </ClassRestrictionType></InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></ProtocolDecl><FunctionDecl>
 
 func foo<FunctionSignature><ParameterClause>(<FunctionParameter>_ _: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>,</FunctionParameter><FunctionParameter>
          a b: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier><InitializerClause>= <SequenceExpr><IntegerLiteralExpr>3 </IntegerLiteralExpr><BinaryOperatorExpr>+ </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr></InitializerClause>,</FunctionParameter><FunctionParameter>
