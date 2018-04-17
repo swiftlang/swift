@@ -593,7 +593,8 @@ namespace driver {
       if (Comp.SkipTaskExecution)
         TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
       else
-        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
+        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands,
+                               Comp.Stats.get()));
       if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
         IncrementalTracer = &ActualIncrementalTracer;
     }
