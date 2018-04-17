@@ -51,8 +51,7 @@ macro(copy_headers src dst)
     COMMAND
       "${CMAKE_CURRENT_SOURCE_DIR}/fix-tf-includes.sh"
       "${src}"
-      "${output_dir}/${dst}"
-    )
+      "${output_dir}/${dst}")
   list(APPEND outputs "${output_dir}/${dst}")
   set(outputs "${outputs}")
 endmacro(copy_headers)
@@ -76,6 +75,7 @@ swift_install_in_component(stdlib
 add_swift_library(swiftCTensorFlow OBJECT_LIBRARY TARGET_LIBRARY
   ctensorflow_init.cpp
   DEPENDS ctensorflow_modulemap
+  TARGET_SDKS LINUX OSX
   C_COMPILE_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}"
   INTERFACE_LINK_LIBRARIES "${TF_LIBRARIES}"
