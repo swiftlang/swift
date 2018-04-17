@@ -243,9 +243,6 @@ def stack_promotion_limit : Separate<["-"], "stack-promotion-limit">,
   HelpText<"Limit the size of stack promoted objects to the provided number "
            "of bytes.">;
 
-def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
-  HelpText<"Don't link SIL functions">;
-
 def dump_clang_diagnostics : Flag<["-"], "dump-clang-diagnostics">,
   HelpText<"Dump Clang diagnostics to stderr">;
 

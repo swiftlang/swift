@@ -114,9 +114,6 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F) {
 
 /// Process F, recursively deserializing any thing F may reference.
 bool SILLinkerVisitor::processFunction(SILFunction *F) {
-  if (Mode == LinkingMode::LinkNone)
-    return false;
-
   // If F is a declaration, first deserialize it.
   if (F->isExternalDeclaration()) {
     maybeAddFunctionToWorklist(F);
