@@ -234,7 +234,21 @@ public:
                             "expression");
     visitChildren(Node);
   }
-
+  void visit(UnknownStmtSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "statement");
+    visitChildren(Node);
+  }
+  void visit(UnknownTypeSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "type");
+    visitChildren(Node);
+  }
+  void visit(UnknownPatternSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "pattern");
+    visitChildren(Node);
+  }
   void verify(Syntax Node) {
     Node.accept(*this);
   }
