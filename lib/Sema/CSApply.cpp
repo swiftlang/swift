@@ -3034,11 +3034,11 @@ namespace {
       return expr;
     }
 
-    Expr *visitDictionaryExpr(DictionaryExpr *expr) {
-      Type openedType = cs.getType(expr);
-      Type dictionaryTy = simplifyType(openedType);
-      auto &tc = cs.getTypeChecker();
+    /// "Finish" a dictionary expression by filling in the semantic expression.
+    DictionaryExpr *finishDictionaryExpr(DictionaryExpr *expr) {
+      Type dictionaryTy = cs.getType(expr);
 
+      auto &tc = cs.getTypeChecker();
       ProtocolDecl *dictionaryProto
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::ExpressibleByDictionaryLiteral);
@@ -3075,7 +3075,7 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(cs.getType(elt));
         names.push_back(Identifier());
@@ -3108,7 +3108,14 @@ namespace {
       cs.cacheExprTypes(result);
 
       expr->setSemanticExpr(result);
+      return expr;
+    }
+
+    Expr *visitDictionaryExpr(DictionaryExpr *expr) {
+      Type openedType = cs.getType(expr);
+      Type dictionaryTy = simplifyType(openedType);
       cs.setType(expr, dictionaryTy);
+      if (!finishDictionaryExpr(expr)) return nullptr;
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
@@ -6278,8 +6285,7 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
       arrayOrSetElementType = ConstraintSystem::isSetType(toType);
     if (arrayOrSetElementType) {
       // Update the type of the array literal.
-      arrayLiteral->setType(toType);
-      cs.cacheType(arrayLiteral);
+      cs.setType(arrayLiteral, toType);
 
       // Convert the elements.
       ConstraintLocatorBuilder innerLocator =
@@ -6287,16 +6293,58 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
           ConstraintLocator::PathElement::getGenericArgument(0));
       for (auto &element : arrayLiteral->getElements()) {
         if (auto newElement = buildElementConversion(*this, expr->getLoc(),
-                                                     element->getType(),
+                                                     cs.getType(element),
                                                      *arrayOrSetElementType,
                                                      bridged, innerLocator,
                                                      element)) {
           element = newElement;
-          cs.cacheType(newElement);
         }
       }
 
       return finishArrayExpr(arrayLiteral);
+    }
+  }
+
+  // If the operand is a dictionary literal, cast the elements in-place.
+  if (auto dictLiteral = dyn_cast<DictionaryExpr>(expr)) {
+    if (auto elementType = ConstraintSystem::isDictionaryType(toType)) {
+      // Update the type of the dictionary literal.
+      cs.setType(dictLiteral, toType);
+
+      ConstraintLocatorBuilder keyLocator =
+        locator.withPathElement(
+          ConstraintLocator::PathElement::getGenericArgument(0));
+      ConstraintLocatorBuilder valueLocator =
+        locator.withPathElement(
+          ConstraintLocator::PathElement::getGenericArgument(1));
+
+      //
+      TupleTypeElt tupleTypeElts[2] =
+        { elementType->first, elementType->second };
+      auto tupleType = TupleType::get(tupleTypeElts, cs.getASTContext());
+      for (auto element : dictLiteral->getElements()) {
+        if (auto tuple = dyn_cast<TupleExpr>(element)) {
+          auto key = tuple->getElement(0);
+          if (auto newKey = buildElementConversion(*this, expr->getLoc(),
+                                                   cs.getType(key),
+                                                   elementType->first, bridged,
+                                                   valueLocator, key))
+            tuple->setElement(0, newKey);
+
+          auto value = tuple->getElement(1);
+          if (auto newValue = buildElementConversion(*this, expr->getLoc(),
+                                                     cs.getType(value),
+                                                     elementType->second,
+                                                     bridged, valueLocator,
+                                                     value)) {
+            tuple->setElement(1, newValue);
+          }
+
+          cs.setType(tuple, tupleType);
+        }
+      }
+
+      return finishDictionaryExpr(dictLiteral);
     }
   }
 

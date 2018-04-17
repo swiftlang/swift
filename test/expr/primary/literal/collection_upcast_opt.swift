@@ -22,3 +22,14 @@ struct TakesArray<T> {
 func arrayUpcast(_ x1: @escaping (P) -> Void, _ x2: @escaping (P) -> Void) {
   _ = TakesArray<X>([x1, x2])
 }
+
+struct TakesDictionary<T> {
+  init(_: [Int : (T) -> Void]) { }
+}
+
+// CHECK-LABEL: func_decl "dictionaryUpcast(_:_:)"
+// CHECK: assign_expr
+// CHECK-NOT: collection_upcast_expr
+func dictionaryUpcast(_ x1: @escaping (P) -> Void, _ x2: @escaping (P) -> Void) {
+  _ = TakesDictionary<X>([1: x1, 2: x2])
+}
