@@ -5,17 +5,6 @@ enum SomeErr : Error {
   case Err2
 }
 
-struct S {
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.S.init
-  init() {
-    do {
-      throw SomeErr.Err1
-    } catch {
-      // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 2
-    } // CHECK: [[@LINE]]:6 -> [[@LINE+1]]:4 : 1
-  }
-}
-
 // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.bar
 func bar() throws {
   // CHECK-NEXT: [[@LINE-1]]:19 -> [[@LINE+2]]:2 : 0
@@ -62,3 +51,14 @@ func foo() -> Int32 {
 }
 
 foo()
+
+struct S {
+  // CHECK: sil_coverage_map {{.*}}// __ntd_S_line:[[@LINE-1]]
+  init() {
+    do {
+      throw SomeErr.Err1
+    } catch {
+      // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 2
+    } // CHECK: [[@LINE]]:6 -> [[@LINE+1]]:4 : 1
+  }
+}
