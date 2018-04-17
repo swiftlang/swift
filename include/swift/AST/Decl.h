@@ -2304,8 +2304,14 @@ public:
                        bool treatUsableFromInlineAsPublic = false) const;
 
 
-  /// Copy the formal access level and @usableFromInline attribute from source.
-  void copyFormalAccessFrom(ValueDecl *source);
+  /// Copy the formal access level and @usableFromInline attribute from
+  /// \p source.
+  ///
+  /// If \p sourceIsParentContext is true, an access level of \c private will
+  /// be copied as \c fileprivate, to ensure that this declaration will be
+  /// available everywhere \p source is.
+  void copyFormalAccessFrom(const ValueDecl *source,
+                            bool sourceIsParentContext = false);
 
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
