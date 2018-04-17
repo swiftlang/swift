@@ -42,4 +42,12 @@ public class Container {
   public init(optionalAttributes: [String: Any]?) {}
   public func adding(attrArray: [String]) {}
   public init(optionalAttrArray: [String]?) {}
+  public func add(single: String) {}
+  public func add(singleOptional: String?) {}
+  public func getAttrArray() -> [String] { return [] }
+  public func getOptionalAttrArray() -> [String]? { return [] }
+  public func getAttrDictionary() -> [String: Any] { return [:] }
+  public func getOptionalAttrDictionary() -> [String: Any]? { return nil }
+  public func getSingleAttr() -> String { return "" }
+  public func getOptionalSingleAttr() -> String? { return nil }
 }

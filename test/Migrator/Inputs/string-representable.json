@@ -76,4 +76,92 @@
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "SimpleStringRepresentableUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "s:6Cities9ContainerC3add6singleySS_tF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "SimpleOptionalStringRepresentableUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "s:6Cities9ContainerC3add14singleOptionalySSSg_tF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "SimpleStringRepresentableUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC13getSingleAttrSSyF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "SimpleOptionalStringRepresentableUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC21getOptionalSingleAttrSSSgyF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ArrayMemberUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC12getAttrArraySaySSGyF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "OptionalArrayMemberUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC20getOptionalAttrArraySaySSGSgyF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "OptionalDictionaryKeyUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC25getOptionalAttrDictionarys0F0VySSypGSgyF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "DictionaryKeyUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC17getAttrDictionarys0E0VySSypGyF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
 ]
