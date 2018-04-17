@@ -124,6 +124,9 @@ def cancel_on_subsequent_request : Separate<["-"], "cancel-on-subsequent-request
 def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-request=">,
   Alias<cancel_on_subsequent_request>;
 
+def time_request : Flag<["-"], "time-request">,
+  HelpText<"Print the time taken to process the request">;
+
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;
 

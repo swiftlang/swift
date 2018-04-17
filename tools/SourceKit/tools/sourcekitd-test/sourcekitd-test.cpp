@@ -25,6 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
 #include <fstream>
 #include <unistd.h>
 #include <sys/param.h>
@@ -274,11 +275,31 @@ static bool readPopularAPIList(StringRef filename,
   return false;
 }
 
+namespace {
+class PrintingTimer {
+  std::string desc;
+  llvm::sys::TimePoint<> start;
+  llvm::raw_ostream &OS;
+public:
+  PrintingTimer(std::string desc, llvm::raw_ostream &OS = llvm::errs())
+      : desc(std::move(desc)), start(std::chrono::system_clock::now()), OS(OS) {
+  }
+  ~PrintingTimer() {
+    std::chrono::duration<float, std::milli> delta(
+        std::chrono::system_clock::now() - start);
+    OS << desc << ": " << llvm::formatv("{0:ms+f3}", delta) << "\n";
+  }
+};
+}
+
 /// Wrapper for sourcekitd_send_request_sync that handles printing options.
 static sourcekitd_response_t sendRequestSync(sourcekitd_object_t req,
                                              const TestOptions &opts) {
   if (opts.PrintRequest)
     sourcekitd_request_description_dump(req);
+  Optional<PrintingTimer> timer;
+  if (opts.timeRequest)
+    timer.emplace("request time");
   return sourcekitd_send_request_sync(req);
 }
 

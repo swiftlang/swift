@@ -103,6 +103,7 @@ struct TestOptions {
   bool SynthesizedExtensions = false;
   bool CollectActionables = false;
   bool isAsyncRequest = false;
+  bool timeRequest = false;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

@@ -331,6 +331,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       CancelOnSubsequentRequest = Cancel;
       break;
 
+    case OPT_time_request:
+      timeRequest = true;
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'
