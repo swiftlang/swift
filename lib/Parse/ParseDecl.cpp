@@ -921,7 +921,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
                                mode, params, primalSpec, adjointSpec,
-                               /*gradient*/None, whereClause));
+                               whereClause));
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,

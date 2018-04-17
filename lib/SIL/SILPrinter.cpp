@@ -3069,7 +3069,6 @@ void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
              [&] { OS << ", "; });
   if (!PrimalName.empty()) OS << " primal @" << PrimalName;
   if (!AdjointName.empty()) OS << " adjoint @" << AdjointName;
-  if (!GradientName.empty()) OS << " gradient @" << GradientName;
 }
 
 //===----------------------------------------------------------------------===//

@@ -101,39 +101,34 @@ private:
 /// will be synthesized by the compiler.
 /// - Just adjoint
 /// - Primal and adjoint
-/// - Primal, adjoint and gradient
 ///
 /// Example:
-///   sil [reverse_differentiable primal @foo_primal adjoint @foo_adjoint
-///     gradient @dfoo] @foo : $(Float) -> Float { ... }
+///   sil [reverse_differentiable primal @foo_primal adjoint @foo_adjoint] @foo
+///     : $(Float) -> Float { ... }
 class SILReverseDifferentiableAttr final {
   friend SILFunction;
 
 private:
-  /// The name of the primal function.
-  StringRef PrimalName, AdjointName, GradientName;
+  /// The primal and adjoint function names.
+  StringRef PrimalName, AdjointName;
   /// The number of parameters of the original function to differentiate with
   /// respect to.
   unsigned NumParamIndices;
   /// Constructor, copying parameter indices to the trailing buffer.
   SILReverseDifferentiableAttr(ArrayRef<unsigned> paramIndices,
                                StringRef primalName,
-                               StringRef adjointName,
-                               StringRef gradientName);
+                               StringRef adjointName);
 
 public:
   static SILReverseDifferentiableAttr *create(
     SILModule &M, ArrayRef<unsigned> paramIndices,
     StringRef primalName = StringRef(),
-    StringRef adjointName = StringRef(),
-    StringRef gradientName = StringRef());
+    StringRef adjointName = StringRef());
 
   StringRef getPrimalName() const { return PrimalName; }
   void setPrimalName(StringRef name) { PrimalName = name; }
   StringRef getAdjointName() const { return AdjointName; }
   void setAdjointName(StringRef name) { AdjointName = name; }
-  StringRef getGradientName() const { return GradientName; }
-  void setGradientName(StringRef name) { GradientName = name; }
 
   ArrayRef<unsigned> getParamIndices() const;
   unsigned *getParamIndicesData() {
