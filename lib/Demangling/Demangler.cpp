@@ -264,8 +264,8 @@ bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
   return isStructNode(Dem.demangleType(mangledName));
 }
 
-namespace swift {
-namespace Demangle {
+using namespace swift;
+using namespace Demangle;
 
 //////////////////////////////////
 // Node member functions        //
@@ -2682,6 +2682,3 @@ NodePointer Demangler::demangleObjCTypeName() {
 
   return Global;
 }
-
-} // namespace Demangle
-} // namespace swift
