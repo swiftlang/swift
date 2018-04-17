@@ -70,3 +70,19 @@ extension HasDefault where Self : SeriousClass {
 }
 
 extension SeriousClass : HasDefault {}
+
+// https://bugs.swift.org/browse/SR-7428
+
+protocol Node {
+  associatedtype ValueType = Int
+
+  func addChild<ChildType>(_ child: ChildType)
+    where ChildType: Node, ChildType.ValueType == Self.ValueType
+}
+
+extension Node {
+  func addChild<ChildType>(_ child: ChildType)
+    where ChildType: Node, ChildType.ValueType == Self.ValueType {}
+}
+
+class IntNode: Node {}
