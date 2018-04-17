@@ -303,7 +303,7 @@ DerivedConformance::declareDerivedProperty(TypeChecker &tc, Decl *parentDecl,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       propertyContextType, parentDC);
   propDecl->setImplicit();
-  propDecl->copyFormalAccessFrom(typeDecl);
+  propDecl->copyFormalAccessFrom(typeDecl, /*sourceIsParentContext*/true);
   propDecl->setInterfaceType(propertyInterfaceType);
   propDecl->setValidationStarted();
 

@@ -655,7 +655,7 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
                                     FunctionType::ExtInfo());
   }
   eqDecl->setInterfaceType(interfaceTy);
-  eqDecl->copyFormalAccessFrom(typeDecl);
+  eqDecl->copyFormalAccessFrom(typeDecl, /*sourceIsParentContext*/true);
   eqDecl->setValidationStarted();
 
   tc.Context.addSynthesizedDecl(eqDecl);
@@ -1044,7 +1044,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
 
   getterDecl->setInterfaceType(interfaceType);
   getterDecl->setValidationStarted();
-  getterDecl->copyFormalAccessFrom(typeDecl);
+  getterDecl->copyFormalAccessFrom(typeDecl, /*sourceIsParentContext*/true);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
@@ -1052,7 +1052,7 @@ deriveHashable_hashValue(TypeChecker &tc, Decl *parentDecl,
   hashValueDecl->setValidationStarted();
   hashValueDecl->makeComputed(SourceLoc(), getterDecl,
                               nullptr, nullptr, SourceLoc());
-  hashValueDecl->copyFormalAccessFrom(typeDecl);
+  hashValueDecl->copyFormalAccessFrom(typeDecl, /*sourceIsParentContext*/true);
 
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
   hashValuePat->setType(intType);
