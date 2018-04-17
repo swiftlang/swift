@@ -2468,7 +2468,9 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(differentiable_attr_no_parameters,none,
       "%0 has no parameters to differentiate with respect to", (DeclName))
-ERROR(differentiable_attr_gradient_overload_not_found,none,
+ERROR(differentiable_attr_primal_overload_not_found,none,
+      "%0 does not have expected parameters' type %1", (DeclName, Type))
+ERROR(differentiable_attr_adjoint_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_wrt_self_must_be_first,none,
       "'self' parameter must come first in the parameter list", ())
@@ -2481,11 +2483,12 @@ ERROR(differentiable_attr_wrt_self_instance_method_only,none,
 ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,
       "class objects and protocol existentials (%0) cannot be differentiated "
       "with respect to", (Type))
-ERROR(differentiable_attr_adjoint_not_same_type_context,none,
+ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current declaration context", (DeclName))
-ERROR(differentiable_attr_specified_adjoint_not_function,none,
-      "%0 is not a function to be used as adjoint", (DeclName))
-ERROR(differentiable_attr_ambiguous_adjoint_identifier,none,
+ERROR(differentiable_attr_specified_not_function,none,
+      "%0 is not a function to be used as %select(primal|adjoint)",
+      (DeclName, bool))
+ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in @differentiable "
       "attribute", (DeclName))
 ERROR(differentiable_attr_forward_mode_unsupported,none,

@@ -15,6 +15,22 @@ func foo(_ x: Float) -> Float { // expected-note {{did you mean 'foo'?}}
   return x * x
 }
 
+// Primal returns custom checkpoints type.
+struct CheckpointsFoo {
+  let result: Float
+}
+
+func pfoo(_ x: Float) -> CheckpointsFoo { // expected-note {{did you mean 'pfoo'?}}
+  return CheckpointsFoo(result: x * x)
+}
+func dfoo_checkpointed(_ x: Float, primal: CheckpointsFoo, seed: Float) -> Float {
+  return 2 * x
+}
+@differentiable(reverse, primal: pfoo(_:), adjoint: dfoo_checkpointed(_:primal:seed:)) // ok!
+func foo_checkpointed(_ x: Float) -> Float {
+  return x * x
+}
+
 func dbar(_ x: Float, _ y: Float, primal: Float, seed: Float) -> (Float, Float) {
   return (1, 1)
 }
@@ -157,13 +173,13 @@ func dmeow2(_ x: Float, _: Float, _: Float, _: Float, _: Float) -> (Float, Float
 // Test cross-declaration references.
 // NOTE: Cross-declaration references across files is not tested because it is
 // difficult to set up and requires creating a new test target. Since the
-// TensorFlow library will declare primals/adjoints in separate files,
-// successful compilation of the library itself is a sufficient test.
+// TensorFlow library will declare original functions/adjoints in separate
+// files, successful compilation of the library itself is a sufficient test.
 
-// Primal in struct definition, adjoint in extension.
+// Original function in struct definition, adjoint in extension.
 struct E1 {
   @differentiable(reverse, adjoint: adjoint)
-  func primal(x: Float) -> Float {
+  func original(x: Float) -> Float {
     return x
   }
 }
@@ -173,11 +189,11 @@ extension E1 {
   }
 }
 
-// Primal and adjoint in separate struct extensions.
+// Original function and adjoint in separate struct extensions.
 struct E2 {}
 extension E2 {
   @differentiable(reverse, adjoint: adjoint)
-  func primal(x: Float) -> Float {
+  func original(x: Float) -> Float {
     return x
   }
 }
@@ -187,12 +203,12 @@ extension E2 {
   }
 }
 
-// Primal and adjoint in separate struct extensions, with matching generic
-// constraints.
+// Original function and adjoint in separate struct extensions, with matching
+// generic constraints.
 struct E3<T> {}
 extension E3 where T == Float {
   @differentiable(reverse, adjoint: adjoint_same_constraint)
-  func primal(x: Float) -> Float {
+  func original(x: Float) -> Float {
     return x
   }
 }
@@ -205,7 +221,7 @@ extension E3 where T == Float {
 struct E4<T> {}
 extension E4 {
   @differentiable(reverse, adjoint: adjoint_no_constraint)
-  func primal(x: Float) -> Float {
+  func original(x: Float) -> Float {
     return x
   }
 }
@@ -215,13 +231,13 @@ extension E4 {
   }
 }
 
-// Primal and adjoint in separate struct extensions, with non-matching
-// generic constraints.
+// Original function and adjoint in separate struct extensions, with
+// non-matching generic constraints.
 struct E5<T> {}
 extension E5 {
   @differentiable(reverse, adjoint: adjoint_diff_constraint)
   // expected-error @-1 {{'adjoint_diff_constraint' does not have expected type '<T> (E5<T>) -> (Float, Float, Float) -> Float'}}
-  func primal(x: Float) -> Float {
+  func original(x: Float) -> Float {
     return x
   }
 }
@@ -231,13 +247,41 @@ extension E5 where T == Float {
   }
 }
 
-// Primal and adjoint in separate struct extensions, differentiating with
-// respect to self.
+// Original function and adjoint in separate struct extensions, differentiating
+// with respect to self.
 struct E6<T> {}
 extension E6 {
   @differentiable(reverse, withRespectTo: (self), adjoint: adjoint_wrt_self)
-  func primal123(x: Float) -> Float {
+  func original(x: Float) -> Float {
     return x
+  }
+
+  @differentiable(reverse, withRespectTo: (self), primal: primal, adjoint: adjoint_checkpointed)
+  func original2(x: Float) -> Float {
+    return x
+  }
+
+  @differentiable(reverse, withRespectTo: (self), primal: primal, adjoint: adjoint_checkpointed_mismatch)
+  // expected-error @-1 {{'adjoint_checkpointed_mismatch' does not have expected type '<T> (E6<T>) -> (Float, E6<T>.Checkpoints, Float) -> E6<T>'}}
+  func original3(x: Float) -> Float {
+    return x
+  }
+}
+extension E6 {
+  struct Checkpoints {
+    let e6: E6
+  }
+
+  func primal(x: Float) -> Checkpoints {
+    return Checkpoints(e6: self)
+  }
+
+  func adjoint_checkpointed(x: Float, _: Checkpoints, _: Float) -> E6 {
+    return self
+  }
+
+  func adjoint_checkpointed_mismatch(x: Float, _: Float, _: Float) -> E6 {
+    return self
   }
 }
 extension E6 {
@@ -255,6 +299,17 @@ func baz1<T>(_ x: T, _ y: T) -> T {
   return x
 }
 
+func pbaz1<T>(_ x: T, _ y: T) -> (T, T) {
+  return (y, x)
+}
+func dbaz1_checkpointed<T>(_ x: T, _ y: T, primal: (T, T), seed: T) -> (T, T) {
+  return (y, x)
+}
+@differentiable(reverse, primal: pbaz1(_:_:), adjoint: dbaz1_checkpointed(_:_:primal:seed:)) // ok!
+func baz1_checkpointed<T>(_ x: T, _ y: T) -> T {
+  return x
+}
+
 // Generic functions with matching constraints.
 func dbaz2<T : FloatingPoint>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
   return (1, 1)
@@ -262,6 +317,20 @@ func dbaz2<T : FloatingPoint>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
 @differentiable(reverse, adjoint: dbaz2(_:_:primal:seed:)) // ok!
 func baz2<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x + y
+}
+
+struct CheckpointsFP<T : FloatingPoint> {
+  let result: T
+}
+func pbaz2<T : FloatingPoint>(_ x: T, _ y: T) -> CheckpointsFP<T> {
+  return CheckpointsFP(result: x + y)
+}
+func dbaz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T, primal: CheckpointsFP<T>, seed: T) -> (T, T) {
+  return (1, 1)
+}
+@differentiable(reverse, primal: pbaz2(_:_:), adjoint: dbaz2_checkpointed(_:_:primal:seed:)) // ok!
+func baz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+  return x
 }
 
 // Generic functions with different constraints.
@@ -272,4 +341,19 @@ func dbaz3<T : Numeric>(_ x: T, _ y: T, primal: T, seed: T) -> (T, T) {
 // expected-error @-1 {{'dbaz3(_:_:primal:seed:)' does not have expected type '<T where T : FloatingPoint> (T, T, T, T) -> (T, T)'}}
 func baz3<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x + y
+}
+
+struct CheckpointsNumeric<T : Numeric> {
+  let result: T
+}
+func pbaz3<T : Numeric>(_ x: T, _ y: T) -> CheckpointsNumeric<T> {
+  return CheckpointsNumeric(result: x + y)
+}
+func dbaz3_checkpointed<T : Numeric>(_ x: T, _ y: T, primal: CheckpointsNumeric<T>, seed: T) -> (T, T) {
+  return (1, 1)
+}
+@differentiable(reverse, primal: pbaz3(_:_:), adjoint: dbaz3_checkpointed(_:_:primal:seed:))
+// expected-error @-1 {{'pbaz3' does not have expected parameters' type '(T, T)'}}
+func baz3_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
+  return x
 }
