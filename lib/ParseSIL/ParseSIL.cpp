@@ -933,12 +933,6 @@ static bool parseReverseDifferentiableAttr(
         diag::sil_attr_differentiable_expected_adjoint_identifier) ||
       parseFnName(AdjName))
     return true;
-  // Parse optional 'gradient'.
-  Identifier GradName;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "gradient") {
-    P.consumeToken();
-    if (parseFnName(GradName)) return true;
-  }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
@@ -946,8 +940,7 @@ static bool parseReverseDifferentiableAttr(
   // Create an AdjointAttr and we are done.
   auto *Attr =
     SILReverseDifferentiableAttr::create(SP.SILMod, ParamIndices,
-                                         PrimName.str(), AdjName.str(),
-                                         GradName.str());
+                                         PrimName.str(), AdjName.str());
   DAs.push_back(Attr);
   return false;
 }

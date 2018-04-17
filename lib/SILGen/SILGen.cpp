@@ -804,17 +804,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       assert(adjointFn && "Adjoint should've been type-checked and resolved.");
       StringRef adjName =
         getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
-      // If gradient exists, get gradient's name.
-      StringRef gradName;
-      if (auto *gradFn = diffAttr->getGradientFunction())
-        gradName = getFunction(SILDeclRef(gradFn), ForDefinition)->getName();
-      // Otherwise, create an attribute with lowered argument indices.
+      // Get lowered argument indices.
       SmallVector<unsigned, 8> indices;
       getLoweredDifferentiationIndices(*this, AFD, silOriginalFn, diffAttr,
                                        indices);
       silOriginalFn->addReverseDifferentiableAttr(
-        SILReverseDifferentiableAttr::create(M, indices, primName, adjName,
-                                             gradName));
+        SILReverseDifferentiableAttr::create(M, indices, primName, adjName));
       break;
     }
     }

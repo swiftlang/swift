@@ -658,7 +658,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
                                mode, params, primalSpec, adjointSpec,
-                               /*gradient*/None, whereClause));
+                               whereClause));
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,

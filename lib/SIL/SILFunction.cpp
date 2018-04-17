@@ -59,10 +59,9 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 SILReverseDifferentiableAttr::
 SILReverseDifferentiableAttr(ArrayRef<unsigned> paramIndices,
                              StringRef primalName,
-                             StringRef adjointName,
-                             StringRef gradientName)
+                             StringRef adjointName)
   : PrimalName(primalName), AdjointName(adjointName),
-    GradientName(gradientName), NumParamIndices(paramIndices.size()) {
+    NumParamIndices(paramIndices.size()) {
   std::copy(paramIndices.begin(), paramIndices.end(), getParamIndicesData());
 }
 
@@ -70,13 +69,12 @@ SILReverseDifferentiableAttr *
 SILReverseDifferentiableAttr::create(SILModule &M,
                                      ArrayRef<unsigned> paramIndices,
                                      StringRef primalName,
-                                     StringRef adjointName,
-                                     StringRef gradientName) {
+                                     StringRef adjointName) {
   size_t size = sizeof(SILReverseDifferentiableAttr)
     + paramIndices.size() * sizeof(unsigned);
   void *mem = M.allocate(size, alignof(SILReverseDifferentiableAttr));
   return ::new (mem) SILReverseDifferentiableAttr(paramIndices, primalName,
-                                                  adjointName, gradientName);
+                                                  adjointName);
 }
 
 ArrayRef<unsigned> SILReverseDifferentiableAttr::getParamIndices() const {
