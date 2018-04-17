@@ -316,9 +316,13 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
 
   sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
   auto Error = sourcekitd_response_is_error(Resp);
-  sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+  if (Opts.PrintResponse) {
+    sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+  }
   return Error ? 1 : 0;
 }
+
+static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
                                 TestOptions &InitOpts) {
@@ -334,11 +338,22 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.parseArgs(Args.slice(0, Optargc)))
     return 1;
 
-  if (!Opts.JsonRequestPath.empty())
-    return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
-
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
+
+  assert(Opts.repeatRequest >= 1);
+  for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
+    if (int ret = handleTestInvocation(Opts, InitOpts)) {
+      return ret;
+    }
+  }
+  return 0;
+}
+
+static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
+
+  if (!Opts.JsonRequestPath.empty())
+    return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
 
   if (Opts.Request == SourceKitRequest::DemangleNames ||
       Opts.Request == SourceKitRequest::MangleSimpleClasses)
@@ -555,7 +570,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
         }
         StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
         AllArgs.split(ArgPieces, ':');
-        if (!Args.empty()) {
+        if (!ArgPieces.empty()) {
           if (!ArgPieces.back().empty()) {
             llvm::errs() << "Swift name is malformed.\n";
             return 1;
@@ -878,6 +893,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
   if (IsError) {
     sourcekitd_response_description_dump(Resp);
 
+  } else if (!Opts.PrintResponse) {
+    // Nothing.
   } else if (Opts.PrintResponseAsJSON) {
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     char *json = sourcekitd_variant_json_description_copy(Info);
