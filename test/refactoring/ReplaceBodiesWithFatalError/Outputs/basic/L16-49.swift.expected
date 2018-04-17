@@ -16,25 +16,43 @@ func generic<T>(_: T) -> Int {
 class Foo {
     var foo: Int
 
-    var bar: Int { fatalError() }
+    var bar: Int {
+fatalError()
+}
 
     var baz: Int {
-        get { fatalError() }
-        set { fatalError() }
+        get {
+fatalError()
+}
+        set {
+fatalError()
+}
     }
 
     var qux: Int {
-        willSet { fatalError() }
-        didSet { fatalError() }
+        willSet {
+fatalError()
+}
+        didSet {
+fatalError()
+}
     }
 
-    init() { fatalError() }
+    init() {
+fatalError()
+}
 
-    func nonGeneric() -> Int { fatalError() }
+    func nonGeneric() -> Int {
+fatalError()
+}
 
-    func generic<T>(_: T) -> Int { fatalError() }
+    func generic<T>(_: T) -> Int {
+fatalError()
+}
 
-    deinit { fatalError() }
+    deinit {
+fatalError()
+}
 }
 
 extension Foo {

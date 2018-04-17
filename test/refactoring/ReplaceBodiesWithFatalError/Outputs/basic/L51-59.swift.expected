@@ -49,9 +49,13 @@ class Foo {
 }
 
 extension Foo {
-    func nonGeneric2() -> Int { fatalError() }
+    func nonGeneric2() -> Int {
+fatalError()
+}
 
-    func generic2<T>(_: T) -> Int { fatalError() }
+    func generic2<T>(_: T) -> Int {
+fatalError()
+}
 }
 
 
