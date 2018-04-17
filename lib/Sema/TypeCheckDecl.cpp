@@ -7607,7 +7607,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
            && "Decl parsing must prevent destructors outside of types!");
 
     checkDeclAttributesEarly(DD);
-    DD->copyFormalAccessFrom(enclosingClass);
+    DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
 
     configureImplicitSelf(*this, DD);
 

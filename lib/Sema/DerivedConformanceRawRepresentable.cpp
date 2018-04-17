@@ -340,7 +340,7 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  initDecl->copyFormalAccessFrom(enumDecl);
+  initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
   initDecl->setValidationStarted();
 
   tc.Context.addSynthesizedDecl(initDecl);
