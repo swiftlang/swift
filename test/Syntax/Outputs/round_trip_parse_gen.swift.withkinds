@@ -485,4 +485,9 @@ precedencegroup BazPrecedence {<PrecedenceGroupAssociativity>
 
 infix </DeclModifier>operator<++><InfixOperatorGroup>:FooPrecedence</InfixOperatorGroup></OperatorDecl><OperatorDecl><DeclModifier>
 prefix </DeclModifier>operator..<<</OperatorDecl><OperatorDecl><DeclModifier>
-postfix </DeclModifier>operator <-</OperatorDecl>
+postfix </DeclModifier>operator <-</OperatorDecl><FunctionDecl>
+
+func higherOrderFunc<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<VariableDecl>
+  let <PatternBinding><IdentifierPattern>x </IdentifierPattern><InitializerClause>= <ArrayExpr>[<ArrayElement><IntegerLiteralExpr>1</IntegerLiteralExpr>,</ArrayElement><ArrayElement><IntegerLiteralExpr>2</IntegerLiteralExpr>,</ArrayElement><ArrayElement><IntegerLiteralExpr>3</IntegerLiteralExpr></ArrayElement>]</ArrayExpr></InitializerClause></PatternBinding></VariableDecl><FunctionCallExpr><MemberAccessExpr><IdentifierExpr>
+  x</IdentifierExpr>.reduce</MemberAccessExpr>(<FunctionCallArgument><IntegerLiteralExpr>0</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>+</IdentifierExpr></FunctionCallArgument>)</FunctionCallExpr>
+}</CodeBlock></FunctionDecl>
