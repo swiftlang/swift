@@ -2835,6 +2835,11 @@ void ClangModuleUnit::collectLinkLibraries(
     ModuleDecl::LinkLibraryCallback callback) const {
   if (!clangModule)
     return;
+
+  // Skip this lib name in favor of export_as name.
+  if (clangModule->UseExportAsModuleLinkName)
+    return;
+
   for (auto clangLinkLib : clangModule->LinkLibraries) {
     LibraryKind kind;
     if (clangLinkLib.IsFramework)
