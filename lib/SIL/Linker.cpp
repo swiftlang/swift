@@ -10,6 +10,45 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// \file The SIL linker walks the call graph beginning at a starting function,
+/// deserializing functions, vtables and witness tables.
+///
+/// The behavior of the linker is controlled by a LinkMode value. The LinkMode
+/// has three possible values:
+///
+/// - LinkNone: The linker does not deserialize anything. This is only used for
+///   debugging and testing purposes, and never during normal operation.
+///
+/// - LinkNormal: The linker deserializes bodies for declarations that must be
+///   emitted into the client because they do not have definitions available
+///   externally. This includes:
+///
+///   - witness tables for imported conformances
+///
+///   - functions with shared linkage
+///
+/// - LinkAll: All reachable functions (including public functions) are
+///   deserialized, including public functions.
+///
+/// The primary entry point into the linker is the SILModule::linkFunction()
+/// function, which recursively walks the call graph starting from the given
+/// function.
+///
+/// In the mandatory pipeline (-Onone), the linker is invoked from the mandatory
+/// SIL linker pass, which pulls in just enough to allow us to emit code, using
+/// LinkNormal mode.
+///
+/// In the performance pipeline, after guaranteed optimizations but before
+/// performance optimizations, the 'performance SILLinker' pass links
+/// transitively all reachable functions, to uncover optimization opportunities
+/// that might be missed from deserializing late. The performance pipeline uses
+/// LinkAll mode.
+///
+/// *NOTE*: In LinkAll mode, we deserialize all vtables and witness tables,
+/// even those with public linkage. This is not strictly necessary, since the
+/// devirtualizer deserializes vtables and witness tables as needed. However,
+/// doing so early creates more opportunities for optimization.
+
 #define DEBUG_TYPE "sil-linker"
 #include "Linker.h"
 #include "llvm/ADT/Statistic.h"
@@ -80,7 +119,7 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 
   // If F is a declaration, first deserialize it.
   if (F->isExternalDeclaration()) {
-    addFunctionToWorklist(F);
+    maybeAddFunctionToWorklist(F);
   } else {
     Worklist.push_back(F);
   }

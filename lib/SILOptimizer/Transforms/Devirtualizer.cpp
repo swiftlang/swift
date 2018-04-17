@@ -93,11 +93,9 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     assert(CalleeFn && "Expected devirtualized callee!");
 
     // We need to ensure that we link after devirtualizing in order to pull in
-    // everything we reference from another module. This is especially important
-    // for transparent functions, because if transparent functions are not
-    // inlined for some reason, we need to generate code for them.
-    // Note that functions, which are only referenced from witness/vtables, are
-    // not linked upfront by the SILLinker.
+    // everything we reference from another module, which may expose optimization
+    // opportunities and is also needed for correctness if we reference functions
+    // with non-public linkage. See lib/SIL/Linker.cpp for details.
     if (!CalleeFn->isDefinition())
       F.getModule().linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll);
 
