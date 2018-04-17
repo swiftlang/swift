@@ -209,13 +209,6 @@ RequirementEnvironment::RequirementEnvironment(
   // Next, add each of the requirements (mapped from the requirement's
   // interface types into the abstract type parameters).
   for (auto &rawReq : reqSig->getRequirements()) {
-    // FIXME: This should not be necessary, since the constraint is redundant,
-    // but we need it to work around some crashes for now.
-    if (rawReq.getKind() == RequirementKind::Conformance &&
-        rawReq.getFirstType()->isEqual(selfType) &&
-        rawReq.getSecondType()->isEqual(proto->getDeclaredType()))
-      continue;
-
     if (auto req = rawReq.subst(reqToSyntheticEnvMap))
       builder.addRequirement(*req, source, conformanceDC->getParentModule());
   }
