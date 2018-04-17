@@ -903,6 +903,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableClassResilience = true;
   }
 
+  if (Args.hasArg(OPT_enable_resilience_bypass)) {
+    Opts.EnableResilienceBypass = true;
+  }
+
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
 
