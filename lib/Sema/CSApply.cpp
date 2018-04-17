@@ -2946,9 +2946,9 @@ namespace {
                             expr->getAccessSemantics());
     }
 
-    Expr *visitArrayExpr(ArrayExpr *expr) {
-      Type openedType = cs.getType(expr);
-      Type arrayTy = simplifyType(openedType);
+    /// "Finish" an array expression by filling in the semantic expression.
+    ArrayExpr *finishArrayExpr(ArrayExpr *expr) {
+      Type arrayTy = cs.getType(expr);
       auto &tc = cs.getTypeChecker();
 
       ProtocolDecl *arrayProto
@@ -2987,7 +2987,7 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(cs.getType(elt));
         names.push_back(Identifier());
@@ -2997,13 +2997,13 @@ namespace {
       assert(isa<TupleType>(argType.getPointer()));
 
       Expr *arg =
-          TupleExpr::create(tc.Context, SourceLoc(),
-                            expr->getElements(),
-                            names,
-                            { },
-                            SourceLoc(), /*HasTrailingClosure=*/false,
-                            /*Implicit=*/true,
-                            argType);
+        TupleExpr::create(tc.Context, SourceLoc(),
+                          expr->getElements(),
+                          names,
+                          { },
+                          SourceLoc(), /*HasTrailingClosure=*/false,
+                          /*Implicit=*/true,
+                          argType);
 
       cs.cacheExprTypes(arg);
 
@@ -3018,7 +3018,14 @@ namespace {
       cs.cacheExprTypes(result);
 
       expr->setSemanticExpr(result);
+      return expr;
+    }
+
+    Expr *visitArrayExpr(ArrayExpr *expr) {
+      Type openedType = cs.getType(expr);
+      Type arrayTy = simplifyType(openedType);
       cs.setType(expr, arrayTy);
+      if (!finishArrayExpr(expr)) return nullptr;
 
       // If the array element type was defaulted, note that in the expression.
       if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
@@ -6201,14 +6208,42 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   }
 }
 
+/// Build the conversion of an element in a collection upcast.
+static Expr *buildElementConversion(ExprRewriter &rewriter,
+                                    SourceLoc srcLoc,
+                                    Type srcType,
+                                    Type destType,
+                                    bool bridged,
+                                    ConstraintLocatorBuilder locator,
+                                    Expr *element) {
+  auto &cs = rewriter.getConstraintSystem();
+
+  Expr *conversion = nullptr;
+
+  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
+  if (bridged &&
+      tc.typeCheckCheckedCast(srcType, destType,
+                              CheckedCastContextKind::None, cs.DC,
+                              SourceLoc(), nullptr, SourceRange())
+        != CheckedCastKind::Coercion) {
+    conversion = rewriter.buildObjCBridgeExpr(element, destType, locator);
+  }
+
+  if (!conversion) {
+    conversion = rewriter.coerceToType(element, destType, locator);
+  }
+
+  return conversion;
+}
+
 static CollectionUpcastConversionExpr::ConversionPair
-buildElementConversion(ExprRewriter &rewriter,
-                       SourceLoc srcLoc,
-                       Type srcCollectionType,
-                       Type destCollectionType,
-                       bool bridged,
-                       ConstraintLocatorBuilder locator,
-                       unsigned typeArgIndex) {
+buildOpaqueElementConversion(ExprRewriter &rewriter,
+                             SourceLoc srcLoc,
+                             Type srcCollectionType,
+                             Type destCollectionType,
+                             bool bridged,
+                             ConstraintLocatorBuilder locator,
+                             unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
                                   ->getGenericArgs()[typeArgIndex];
@@ -6220,35 +6255,56 @@ buildElementConversion(ExprRewriter &rewriter,
   ASTContext &ctx = cs.getASTContext();
   auto opaque =
     rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcLoc, srcType));
-  Expr *conversion = nullptr;
 
-  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
-  if (bridged &&
-      tc.typeCheckCheckedCast(srcType, destType,
-                              CheckedCastContextKind::None, cs.DC,
-                              SourceLoc(), nullptr, SourceRange())
-        != CheckedCastKind::Coercion) {
-    conversion = rewriter.buildObjCBridgeExpr(opaque, destType,
-           locator.withPathElement(
-             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
-  }
-
-  if (!conversion) {
-    conversion = rewriter.coerceToType(opaque, destType,
-           locator.withPathElement(
-             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
-  }
+  Expr *conversion =
+    buildElementConversion(rewriter, srcLoc, srcType, destType, bridged,
+                           locator.withPathElement(
+                             ConstraintLocator::PathElement::getGenericArgument(
+                                typeArgIndex)),
+                           opaque);
 
   return { opaque, conversion };
 }
 
-Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
-                                              bool bridged,
-                                              ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::buildCollectionUpcastExpr(
+                                            Expr *expr, Type toType,
+                                            bool bridged,
+                                            ConstraintLocatorBuilder locator) {
+  // If the operand is an array literal, cast the elements in-place.
+  if (auto arrayLiteral = dyn_cast<ArrayExpr>(expr)) {
+    Optional<Type> arrayOrSetElementType =
+      ConstraintSystem::isArrayType(toType);
+    if (!arrayOrSetElementType)
+      arrayOrSetElementType = ConstraintSystem::isSetType(toType);
+    if (arrayOrSetElementType) {
+      // Update the type of the array literal.
+      arrayLiteral->setType(toType);
+      cs.cacheType(arrayLiteral);
+
+      // Convert the elements.
+      ConstraintLocatorBuilder innerLocator =
+        locator.withPathElement(
+          ConstraintLocator::PathElement::getGenericArgument(0));
+      for (auto &element : arrayLiteral->getElements()) {
+        if (auto newElement = buildElementConversion(*this, expr->getLoc(),
+                                                     element->getType(),
+                                                     *arrayOrSetElementType,
+                                                     bridged, innerLocator,
+                                                     element)) {
+          element = newElement;
+          cs.cacheType(newElement);
+        }
+      }
+
+      return finishArrayExpr(arrayLiteral);
+    }
+  }
+
   ASTContext &ctx = cs.getASTContext();
   // Build the first value conversion.
-  auto conv = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                     toType, bridged, locator, 0);
+  auto conv =
+    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                 toType, bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (ConstraintSystem::isArrayType(toType) ||
@@ -6261,8 +6317,9 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
          "Unhandled collection upcast");
 
   // Build the second value conversion.
-  auto conv2 = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                      toType, bridged, locator, 1);
+  auto conv2 =
+    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                 toType, bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
