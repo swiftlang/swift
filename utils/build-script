@@ -280,7 +280,7 @@ class BuildScriptInvocation(object):
                 if not os.path.isdir(tensorflow_dir):
                     diagnostics.fatal(
                         "--{} does not exist (was '{}')"
-                        .format(dir_name, tensorflow_dir))
+                        .format(dirname, tensorflow_dir))
                 if is_lib_dir:
                     for lib in tensorflow_libs:
                         if not os.path.exists(
