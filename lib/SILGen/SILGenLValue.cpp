@@ -1243,9 +1243,6 @@ namespace {
       SILValue buffer =
         SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
 
-      // Postpone cleanup for noescape closures.
-      PostponedCleanup postpone(SGF, true);
-
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
       std::unique_ptr<LogicalPathComponent> clonedComponent(
@@ -1303,7 +1300,6 @@ namespace {
       // access for stored properties with didSet.
       pushWriteback(SGF, loc, std::move(clonedComponent), base, materialized);
 
-      postpone.end();
       return ManagedValue::forLValue(materialized.temporary.getValue());
     }
 

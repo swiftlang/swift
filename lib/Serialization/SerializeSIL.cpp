@@ -254,7 +254,7 @@ namespace {
     void writeIndexTables();
 
     void writeConversionLikeInstruction(const SingleValueInstruction *I,
-                                        bool guaranteed);
+                                        bool guaranteed, bool escaped);
     void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
@@ -603,10 +603,11 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
 void SILSerializer::writeConversionLikeInstruction(
-    const SingleValueInstruction *I, bool guaranteed) {
+    const SingleValueInstruction *I, bool guaranteed, bool escaped) {
   assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
-  writeOneTypeOneOperandLayout(I->getKind(), guaranteed ? 1 : 0, I->getType(),
-                               I->getOperand(0));
+  writeOneTypeOneOperandLayout(I->getKind(),
+                               (guaranteed ? 1 : 0) | (escaped ? 2 : 0),
+                               I->getType(), I->getOperand(0));
 }
 
 void
@@ -1475,10 +1476,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ProjectBlockStorageInst: {
     bool guaranteed = false;
-    if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst)
+    bool escaped = false;
+    if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
+      escaped = cast<ConvertEscapeToNoEscapeInst>(SI).isEscapedByUser();
       guaranteed = cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed();
+    }
     writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI),
-                                   guaranteed);
+                                   guaranteed, escaped);
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {
