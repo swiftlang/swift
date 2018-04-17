@@ -225,10 +225,10 @@ namespace {
       
       for (auto param : canSig->getGenericParams()) {
         // Currently, there are only type parameters. The parameter is a key
-        // argument if it hasn't been grounded by a same-type constraint.
+        // argument if it's canonical in its generic context.
         asImpl().addGenericParameter(GenericParamKind::Type,
-                               /*key argument*/ !canSig->isConcreteType(param),
-                               /*extra argument*/ false);
+                 /*key argument*/ canSig->isCanonicalTypeInContext(param),
+                 /*extra argument*/ false);
       }
       
       // Pad the structure up to four bytes for the following requirements.
