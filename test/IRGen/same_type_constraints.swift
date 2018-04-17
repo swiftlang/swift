@@ -1,6 +1,12 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 // RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=OSIZE
 
+// Ensure that same-type constraints between generic arguments get reflected
+// correctly in the type context descriptor.
+// CHECK-LABEL: @"$S21same_type_constraints4SG11VA2A2P2Rzq_RszrlE13InnerTEqualsUVMn" = 
+//                  T       U(==T) V        padding
+// CHECK-SAME:    , i8 -128, i8 0, i8 -128, i8 0,
+
 // <rdar://problem/21665983> IRGen crash with protocol extension involving same-type constraint to X<T>
 public struct DefaultFoo<T> {
   var t: T?
@@ -16,7 +22,8 @@ public extension P where Foo == DefaultFoo<Self> {
   }
 }
 
-// CHECK: define{{( protected)?}} swiftcc void @"$S21same_type_constraints1PPA2A10DefaultFooVyxG0E0RtzrlE3fooAFyF"
+
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S21same_type_constraints1PPA2A10DefaultFooVyxG0E0RtzrlE3fooAFyF"
 
 // <rdar://26873036> IRGen crash with derived class declaring same-type constraint on constrained associatedtype.
 public class C1<T: Equatable> { }
