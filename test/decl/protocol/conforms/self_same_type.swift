@@ -20,3 +20,19 @@ final class C2: Q {
 class C3: Q {
   func foo<T: P>(_: T, _: C3) where T.T: C3 {}
 }
+
+// SR-7435
+protocol A {
+  associatedtype B
+  func foo<C: A>(_: C) where C.B == Self.B
+
+  func bar() -> B
+}
+
+extension A {
+  func foo<C: A>(_: C) where C.B == Self.B {}
+}
+
+class D: A {
+  func bar() -> Int { return 0 }
+}
