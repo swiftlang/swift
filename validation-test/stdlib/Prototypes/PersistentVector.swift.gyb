@@ -100,6 +100,13 @@ Memory layout:
 import Swift
 import SwiftShims
 
+// This prototype is only partially implemented, and it relies on specific hash
+// values. To keep it working, define an alternative hashing interface emulating
+// pre-SE-0206 Hashable.
+protocol LegacyHashable: Equatable {
+  var legacyHashValue: Int { get }
+}
+
 //
 // Standard library extras
 //
@@ -252,7 +259,7 @@ struct _PVSparseVectorNodeLayoutParameters {
   var keyCount: Int
 }
 
-struct _PVSparseVectorNodePointer<Key : Hashable, Value>
+struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
   : CustomReflectable {
   typealias _Self = _PVSparseVectorNodePointer
 
@@ -917,7 +924,7 @@ struct _PVSparseVectorNodePointer<Key : Hashable, Value>
   }
 }
 
-struct _PVArrayNodePointer<Key : Hashable, Value>
+struct _PVArrayNodePointer<Key : LegacyHashable, Value>
   : CustomReflectable {
 
   typealias _Self = _PVArrayNodePointer
@@ -1158,7 +1165,7 @@ struct _PVCollisionNodePointerLayoutParameters {
   var keyCount: Int
 }
 
-struct _PVCollisionNodePointer<Key : Hashable, Value>
+struct _PVCollisionNodePointer<Key : LegacyHashable, Value>
   : CustomReflectable {
 
   typealias _Self = _PVCollisionNodePointer
@@ -1461,7 +1468,7 @@ struct _PVCollisionNodePointer<Key : Hashable, Value>
   }
 }
 
-struct _PVAnyNodePointer<Key : Hashable, Value>
+struct _PVAnyNodePointer<Key : LegacyHashable, Value>
   : CustomReflectable, Equatable {
 
   let taggedPointer: UnsafeMutableRawPointer
@@ -1654,7 +1661,8 @@ func == <Key, Value> (
   return lhs.taggedPointer == rhs.taggedPointer
 }
 
-final internal class _NativePVDictionaryStorageRef<Key : Hashable, Value> {
+final internal
+class _NativePVDictionaryStorageRef<Key : LegacyHashable, Value> {
 
   var _rootNode: _PVAnyNodePointer<Key, Value>?
   var _count: Int
@@ -1675,7 +1683,7 @@ final internal class _NativePVDictionaryStorageRef<Key : Hashable, Value> {
   }
 }
 
-struct _NativePVDictionaryStorage<Key : Hashable, Value> {
+struct _NativePVDictionaryStorage<Key : LegacyHashable, Value> {
   var _storageRef: _NativePVDictionaryStorageRef<Key, Value>
 
   var _rootNode: _PVAnyNodePointer<Key, Value>? {
@@ -1715,13 +1723,13 @@ struct _NativePVDictionaryStorage<Key : Hashable, Value> {
 
   func assertingGet(key: Key) -> Value {
     let valuePointer = _rootNode!.unsafeMaybeGet(
-      key: key, hashValue: key.hashValue, depth: 0)
+      key: key, hashValue: key.legacyHashValue, depth: 0)
     return valuePointer!.pointee
   }
 
   func maybeGet(key: Key) -> Value? {
     let valuePointer = _rootNode?.unsafeMaybeGet(
-      key: key, hashValue: key.hashValue, depth: 0)
+      key: key, hashValue: key.legacyHashValue, depth: 0)
     return valuePointer.map { $0.pointee }
   }
 
@@ -1748,7 +1756,7 @@ struct _NativePVDictionaryStorage<Key : Hashable, Value> {
   }
 
   mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
-    let hashValue = key.hashValue
+    let hashValue = key.legacyHashValue
     guard let oldRootNode = _rootNode else {
       let layout = _PVSparseVectorNodeLayoutParameters(
         childNodeCount: 0,
@@ -1787,7 +1795,7 @@ struct _NativePVDictionaryStorage<Key : Hashable, Value> {
     guard let oldRootNode = _rootNode else {
       return nil
     }
-    let hashValue = key.hashValue
+    let hashValue = key.legacyHashValue
     let isUnique = isKnownUniquelyReferenced(&_storageRef)
     let (oldValue, newRootNode) = oldRootNode.removeValue(
       forKey: key,
@@ -1856,6 +1864,12 @@ Bitmap.test("setBitIndices") {
   bm[7] = true
   bm[31] = true
   expectEqualSequence([ 0, 4, 5, 7, 31 ], Array(bm.setBitIndices))
+}
+
+extension MinimalHashableValue: LegacyHashable {
+  var legacyHashValue: Int {
+    return self.value % 10000
+  }
 }
 
 var PersistentVectorTests = TestSuite("PersistentVector")
@@ -1991,10 +2005,6 @@ func testDictionary(
 ) {
   if debugDictionaryTests {
     print("---------------------------------------")
-  }
-
-  MinimalHashableValue.hashValueImpl.value = {
-    return $0 % 10000
   }
 
   typealias MyDictionary = _NativePVDictionaryStorage<
