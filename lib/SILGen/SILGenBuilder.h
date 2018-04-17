@@ -364,7 +364,7 @@ public:
   ManagedValue
   createConvertEscapeToNoEscape(SILLocation loc, ManagedValue fn,
                                 SILType resultTy,
-                                bool postponeToNoEscapeCleanup = true);
+                                bool isEscapedByUser);
 
   using SILBuilder::createStore;
   /// Forward \p value into \p address.

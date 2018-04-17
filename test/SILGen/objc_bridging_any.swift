@@ -464,7 +464,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:       [[THUNK_FN:%.*]] = function_ref @$SyXlIyBy_ypIegn_TR
   // CHECK-NEXT:  [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[BLOCK_COPY]])
-  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [[THUNK]]
+  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[THUNK]]
   // CHECK:       [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypXEF
@@ -543,7 +543,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[THUNK_FN:%.*]] = function_ref @$SyXlIyBa_ypIegr_TR
   // CHECK-NEXT:  [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[BLOCK_COPY]])
-  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [[THUNK]]
+  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[THUNK]]
   // CHECK-NEXT:  [[BORROWED_ANY_COPY:%.*]] = begin_borrow [[ANY_COPY]]
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypyXEF

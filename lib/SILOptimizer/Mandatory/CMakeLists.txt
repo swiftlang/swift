@@ -14,4 +14,5 @@ set(MANDATORY_SOURCES
   Mandatory/PredictableMemOpt.cpp
   Mandatory/ConstantPropagation.cpp
   Mandatory/SemanticARCOpts.cpp
+  Mandatory/ClosureLifetimeFixup.cpp
   PARENT_SCOPE)

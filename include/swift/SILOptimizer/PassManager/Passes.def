@@ -90,6 +90,8 @@ PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
+PASS(ClosureLifetimeFixup, "closure-lifetime-fixup",
+     "Closure Lifetime Fixup")
 PASS(CodeSinking, "code-sinking",
      "Code Sinking")
 PASS(ComputeDominanceInfo, "compute-dominance-info",
