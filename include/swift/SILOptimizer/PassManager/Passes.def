@@ -238,8 +238,8 @@ PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
-PASS(SILCleanup, "cleanup",
-     "SIL Cleanup Preparation for IRGen")
+PASS(IRGenPrepare, "irgen-prepare",
+     "Cleanup SIL in preparation for IRGen")
 PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
