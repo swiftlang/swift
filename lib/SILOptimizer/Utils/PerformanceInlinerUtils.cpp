@@ -852,8 +852,8 @@ bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
   // If a call has only constant arguments and the call is pure, i.e. has
   // no side effects, then we should always inline it.
   // This includes arguments which are objects initialized with constant values.
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  SEA->getEffects(ApplyEffects, AI);
+  FunctionSideEffects ApplyEffects;
+  SEA->getCalleeEffects(ApplyEffects, AI);
   auto GE = ApplyEffects.getGlobalEffects();
   if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
     return false;
