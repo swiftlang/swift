@@ -634,7 +634,7 @@ endfunction()
 #   Additional files this library depends on.
 #
 # EXTRA_RPATH
-#   Add the directoiries to the library's rpath.
+#   Add the directories to the library's rpath.
 #
 # DONT_EMBED_BITCODE
 #   Don't embed LLVM bitcode in this target, even if it is enabled globally.
@@ -2087,6 +2087,10 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  elseif("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX" AND NOT "${SWIFTEXE_SINGLE_SDK}" STREQUAL "ANDROID")
+    set(local_rpath "$ORIGIN:/usr/lib/swift/linux")
+  elseif("${SWIFTEXE_SINGLE_SDK}" STREQUAL "CYGWIN")
+    set(local_rpath "$ORIGIN:/usr/lib/swift/cygwin")
   endif()
 
   # Find the names of dependency library targets.
@@ -2149,6 +2153,12 @@ function(_add_swift_executable_single name)
 
   set_target_properties(${name}
       PROPERTIES FOLDER "Swift executables")
+
+  # SWIFT_ENABLE_TENSORFLOW
+  if(NOT "${local_rpath}" STREQUAL "")
+    set_target_properties("${name}" PROPERTIES INSTALL_RPATH "${local_rpath}")
+  endif()
+  set_target_properties("${name}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
 endfunction()
 
 # Add an executable for each target variant. Executables are given suffixes

@@ -60,6 +60,8 @@ _register("llvm_profdata", "llvm-profdata")
 _register("llvm_cov", "llvm-cov")
 _register("lipo", "lipo")
 _register("libtool", "libtool")
+# SWIFT_ENABLE_TENSORFLOW
+_register("bazel", "bazel")
 
 
 class Darwin(Toolchain):

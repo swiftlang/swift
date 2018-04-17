@@ -21,6 +21,8 @@ from .ninja import Ninja
 from .swift import Swift
 from .swiftpm import SwiftPM
 from .xctest import XCTest
+# SWIFT_ENABLE_TENSORFLOW
+from .tensorflow import TensorFlow
 
 __all__ = [
     'CMark',
@@ -35,4 +37,6 @@ __all__ = [
     'Swift',
     'SwiftPM',
     'XCTest',
+    # SWIFT_ENABLE_TENSORFLOW
+    'TensorFlow',
 ]
