@@ -2424,10 +2424,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Resolve the adjoint declaration.
   auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
-      // Returns true if adjoint candidate has the expected type.
-      auto adjointType = adjointCandidate->getInterfaceType()
-        ->getUnlabeledType(original->getASTContext());
-      return adjointType->isEqual(expectedAdjointFnTy);
+    // Returns true if adjoint candidate has the expected type.
+    auto adjointType = adjointCandidate->getInterfaceType()
+      ->getUnlabeledType(original->getASTContext());
+    return adjointType->isEqual(expectedAdjointFnTy);
   };
 
   auto adjointOverloadDiagnostic = [&] {

@@ -919,50 +919,6 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  void checkAutoDiffReverseInst(AutoDiffReverseInst *ADRI) {
-    // AD must be the only instruction in the parent function.
-    SILBasicBlock *BB = ADRI->getParent();
-    require(&BB->front() == ADRI && &BB->back() == ADRI,
-            "autodiff_reverse must be the only instruction in the function");
-    SILFunction *F = BB->getParent();
-    require(F->getEntryBlock() == BB && F->size() == 1,
-            "autodiff_reverse must be the only instruction in the function");
-    require(ADRI->getOriginalFunction()->isDefinition(),
-            "autodiff_reverse can only differentiate a function defined in "
-            "this module");
-    auto originalFn = ADRI->getOriginalFunction();
-    auto originalTy = originalFn->getLoweredFunctionType();
-    auto config = ADRI->getConfiguration();
-    SmallVector<unsigned, 8> allParamIndices;
-    ArrayRef<unsigned> paramIndices = config.parameterIndices;
-    // If no differentiation parameters are specified, differentiation is done
-    // with respect to all of original's parameters. For simplicity, we add all
-    // parameter indices to a temporary.
-    if (config.parameterIndices.empty()) {
-      for (unsigned i = 0, n = originalTy->getNumParameters(); i != n; ++i)
-        allParamIndices.push_back(i);
-      paramIndices = allParamIndices;
-    }
-    // Verify differentiation parameters.
-    int lastIndex = -1;
-    for (unsigned i = 0, n = paramIndices.size(); i != n; ++i) {
-      auto index = paramIndices[i];
-      require((int)index > lastIndex, "Parameter indices must be ascending");
-      auto paramTy = originalTy->getParameters()[index].getType();
-      require(!(paramTy.isAnyClassReferenceType() ||
-                paramTy.isAnyExistentialType()),
-              "Cannot differentiate with respect to reference type or "
-              "existential type");
-    }
-    // Create an expected function type.
-    auto expectedTy = originalFn->getLoweredFunctionType()
-      ->getGradientType(config, F->getModule());
-    require(F->getLoweredFunctionType()->isEqual(expectedTy),
-            "The parent function type doesn't match what autodiff_reverse "
-            "expects");
-  }
-
-  /// SWIFT_ENABLE_TENSORFLOW
   void checkGradientInst(GradientInst *GI) {
     CanSILFunctionType origFnTy = GI->getOriginalType();
     require(origFnTy, "Original function value must have function type");

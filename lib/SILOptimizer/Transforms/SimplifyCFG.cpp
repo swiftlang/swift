@@ -2336,9 +2336,6 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
       break;
-    // SWIFT_ENABLE_TENSORFLOW
-    case TermKind::AutoDiffReverseInst:
-      llvm_unreachable("not possible");
     }
     // If the block has a cond_fail, try to move it to the predecessors.
     Changed |= tryMoveCondFailToPreds(BB);

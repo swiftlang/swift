@@ -2072,9 +2072,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("todo");
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffReverseInst:
-    llvm_unreachable("not supported");
-  // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GradientInst:
     llvm_unreachable("not supported");
   }

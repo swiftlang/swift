@@ -1139,25 +1139,6 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  void visitAutoDiffReverseInst(AutoDiffReverseInst *ADRI) {
-    if (!ADRI->getParameterIndices().empty()) {
-      *this << "[wrt ";
-      interleave(ADRI->getParameterIndices(), [&](unsigned idx) {
-        *this << idx;
-      }, [&]{
-        *this << ", ";
-      });
-      *this << "] ";
-    }
-    if (ADRI->isSeedable())
-      *this << "[seedable] ";
-    if (ADRI->isPreservingResult())
-      *this << "[preserving_result] ";
-    ADRI->getOriginalFunction()->printName(PrintState.OS);
-    *this << " : " << ADRI->getOriginalFunction()->getLoweredType();
-  }
-
-  /// SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *GI) {
     if (!GI->getParameterIndices().empty()) {
       *this << "[wrt ";

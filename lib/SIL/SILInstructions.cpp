@@ -564,48 +564,6 @@ TryApplyInst *TryApplyInst::create(
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-AutoDiffReverseInst::AutoDiffReverseInst(SILDebugLocation debugLoc,
-                                         SILFunction *original,
-                                         ArrayRef<unsigned> paramIndices,
-                                         bool seedable, bool preservingResult)
-  : InstructionBase(debugLoc), Original(original),
-    NumParamIndices(paramIndices.size()), Seedable(seedable),
-    PreservingResult(preservingResult) {
-  Original->incrementRefCount();
-  std::copy(paramIndices.begin(), paramIndices.end(), getParameterIndicesData());
-}
-
-AutoDiffReverseInst::~AutoDiffReverseInst() {
-  if (Original)
-    Original->decrementRefCount();
-}
-
-AutoDiffReverseInst *
-AutoDiffReverseInst::create(SILModule &M, SILDebugLocation debugLoc,
-                            SILFunction *original,
-                            ArrayRef<unsigned> paramIndices, bool seedable,
-                            bool preservingResult) {
-  unsigned size =
-    sizeof(AutoDiffReverseInst) + paramIndices.size() * sizeof(unsigned);
-  void *buffer = M.allocateInst(size, alignof(AutoDiffReverseInst));
-  return ::new (buffer) AutoDiffReverseInst(debugLoc, original, paramIndices,
-                                            seedable, preservingResult);
-}
-
-ArrayRef<unsigned> AutoDiffReverseInst::getParameterIndices() const {
-  return {
-    const_cast<AutoDiffReverseInst *>(this)->getParameterIndicesData(),
-    NumParamIndices
-  };
-}
-
-void AutoDiffReverseInst::dropReferencedOriginalFunction() {
-  if (Original)
-    Original->decrementRefCount();
-  Original = nullptr;
-}
-
-/// SWIFT_ENABLE_TENSORFLOW
 GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
                            SILValue original, ArrayRef<unsigned> paramIndices,
                            bool seedable, bool preservingResult)
@@ -1169,8 +1127,6 @@ bool TermInst::isFunctionExiting() const {
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
   case TermKind::UnwindInst:
-  // SWIFT_ENABLE_TENSORFLOW
-  case TermKind::AutoDiffReverseInst:
     return true;
   }
 

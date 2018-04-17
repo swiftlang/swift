@@ -519,9 +519,6 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   TERMINATOR(TryApplyInst, try_apply,
              TermInst, MayHaveSideEffects, MayRelease)
-  // SWIFT_ENABLE_TENSORFLOW
-  TERMINATOR(AutoDiffReverseInst, autodiff_reverse,
-             TermInst, MayHaveSideEffects, DoesNotRelease)
   TERMINATOR(BranchInst, br,
              TermInst, None, DoesNotRelease)
   TERMINATOR(CondBranchInst, cond_br,
