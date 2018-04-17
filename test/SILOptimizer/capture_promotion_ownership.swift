@@ -1,9 +1,4 @@
-// RUN: %target-swift-frontend %s -enable-sil-ownership -disable-sil-linking -emit-sil -o - | %FileCheck %s
-
-// NOTE: We add -disable-sil-linking to the compile line to ensure that we have
-// access to declarations for standard library types, but not definitions. This
-// ensures that we are able to safely use standard library types for this test
-// without needing the standard library to be ownership correct in its body.
+// RUN: %target-swift-frontend %s -enable-sil-ownership -emit-sil -o - | %FileCheck %s
 
 class Foo {
   func foo() -> Int {
