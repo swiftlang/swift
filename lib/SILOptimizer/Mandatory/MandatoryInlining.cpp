@@ -624,19 +624,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// MandatoryInlining reruns on deserialized functions for two reasons, both
-/// unrelated to mandatory inlining:
-///
-/// 1. It recursively visits the entire call tree rooted at transparent
-/// functions. This has the effect of linking all reachable functions. If they
-/// aren't linked until the explicit SILLinker pass, then they don't benefit
-/// from rerunning optimizations like PredictableMemOps. Ideally we wouldn't
-/// need to rerun PredictableMemOps and wouldn't need to eagerly link anything
-/// in the mandatory pipeline.
-///
-/// 2. It may devirtualize non-transparent methods. It's not clear whether we
-/// really need to devirtualize this early without actually inlining, but it can
-/// unblock other optimizations in the mandatory pipeline.
+
 class MandatoryInlining : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
@@ -650,6 +638,10 @@ class MandatoryInlining : public SILModuleTransform {
     for (auto &F : *M) {
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())
+        continue;
+
+      // Skip deserialized functions.
+      if (F.wasDeserializedCanonical())
         continue;
 
       runOnFunctionRecursively(&F,
