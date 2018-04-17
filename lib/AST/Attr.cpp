@@ -533,9 +533,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "primal: " << primal->Name << ", ";
     // Print adjoint function name.
     Printer << "adjoint: " << attr->getAdjoint().Name;
-    // Print gradient function name if any.
-    if (auto gradient = attr->getGradient())
-      Printer << ", gradient: " << gradient->Name;
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
@@ -971,11 +968,10 @@ DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                                        ArrayRef<AutoDiffParameter> parameters,
                                        Optional<FunctionSpecifier> primal,
                                        FunctionSpecifier adjoint,
-                                       Optional<FunctionSpecifier> gradient,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     Mode(mode), NumParameters(parameters.size()), Primal(std::move(primal)),
-    Adjoint(adjoint), Gradient(std::move(gradient)), WhereClause(clause) {
+    Adjoint(adjoint), WhereClause(clause) {
   std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
@@ -985,15 +981,13 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            ArrayRef<AutoDiffParameter> parameters,
                            Optional<FunctionSpecifier> primal,
                            FunctionSpecifier adjoint,
-                           Optional<FunctionSpecifier> gradient,
                            TrailingWhereClause *clause) {
   unsigned numParams = parameters.size();
   unsigned size = sizeof(DifferentiableAttr) +
     numParams * sizeof(AutoDiffParameter);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(atLoc, baseRange, mode, parameters,
-                                      std::move(primal), adjoint,
-                                      std::move(gradient), clause);
+                                      std::move(primal), adjoint, clause);
 }
 
 ArrayRef<AutoDiffParameter>
