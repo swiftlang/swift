@@ -294,6 +294,27 @@ BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 /// allocated element type 'E'.
 BUILTIN_SIL_OPERATION(GetTailAddr, "getTailAddr", Integer)
 
+/// performInstantaneousReadAccess(Builtin.RawPointer, T.Type) -> ()
+/// Begin and then immediately end a read access to the given raw pointer,
+/// which will be treated as an address of type 'T'.
+BUILTIN_SIL_OPERATION(PerformInstantaneousReadAccess,
+                      "performInstantaneousReadAccess", Special)
+
+/// beginUnpairedModifyAccess(Builtin.RawPointer, Builtin.RawPointer,
+///                           T.Type) -> ()
+/// Begins but does not end a 'modify' access to the first raw pointer argument.
+/// The second raw pointer must be a pointer to an UnsafeValueBuffer, which
+/// will be used by the runtime to record the access. The lifetime of the
+/// value buffer must be longer than that of the access itself. The accessed
+/// address will be treated as having type 'T'.
+BUILTIN_SIL_OPERATION(BeginUnpairedModifyAccess, "beginUnpairedModifyAccess",
+                      Special)
+
+/// endUnpairedAccess(Builtin.RawPointer) -> ()
+/// Ends an in-progress unpaired access. The raw pointer argument must be
+/// be a pointer to an UnsafeValueBuffer that records an in progress access.
+BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
+
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.
 BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
