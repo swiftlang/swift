@@ -2310,11 +2310,21 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  if (f->getInlineStrategy() == NoInline) {
+  switch (f->getInlineStrategy()) {
+  case NoInline:
     attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::NoInline);
+    break;
+  case AlwaysInline:
+    attrs = attrs.addAttribute(signature.getType()->getContext(),
+                               llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::AlwaysInline);
+    break;
+  case InlineDefault:
+    break;
   }
+
   if (isReadOnlyFunction(f)) {
     attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,
