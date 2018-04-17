@@ -548,6 +548,7 @@ emitGlobalList(IRGenModule &IGM, ArrayRef<llvm::WeakTrackingVH> handles,
                                       init, name);
   var->setSection(section);
   var->setAlignment(alignment.getValue());
+  disableAddressSanitizer(IGM, var);
 
   // Mark the variable as used if doesn't have external linkage.
   // (Note that we'd specifically like to not put @llvm.used in itself.)
@@ -1984,6 +1985,31 @@ llvm::GlobalVariable *swift::irgen::createVariable(
   return var;
 }
 
+void swift::irgen::disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var) {
+  // Add an operand to llvm.asan.globals blacklisting this global variable.
+  llvm::Metadata *metadata[] = {
+    // The global variable to blacklist.
+    llvm::ConstantAsMetadata::get(var),
+    
+    // Source location. Optional, unnecessary here.
+    nullptr,
+    
+    // Name. Optional, unnecessary here.
+    nullptr,
+    
+    // Whether the global is dynamically initialized.
+    llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+      llvm::Type::getInt1Ty(IGM.Module.getContext()), false)),
+    
+    // Whether the global is blacklisted.
+    llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+      llvm::Type::getInt1Ty(IGM.Module.getContext()), true))};
+  
+  auto *globalNode = llvm::MDNode::get(IGM.Module.getContext(), metadata);
+  auto *asanMetadata = IGM.Module.getOrInsertNamedMetadata("llvm.asan.globals");
+  asanMetadata->addOperand(globalNode);
+}
+
 /// Emit a global declaration.
 void IRGenModule::emitGlobalDecl(Decl *D) {
   switch (D->getKind()) {
@@ -2729,6 +2755,9 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   }
 
   var->setSection(sectionName);
+  
+  disableAddressSanitizer(*this, var);
+  
   addUsedGlobal(var);
   return var;
 }
@@ -2915,8 +2944,10 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   }
 
   var->setSection(sectionName);
-  addUsedGlobal(var);
+
+  disableAddressSanitizer(*this, var);
   
+  addUsedGlobal(var);
   return var;
 }
 
@@ -2982,8 +3013,10 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   var->setInitializer(initializer);
   var->setSection(sectionName);
   var->setAlignment(4);
-  addUsedGlobal(var);
+
+  disableAddressSanitizer(*this, var);
   
+  addUsedGlobal(var);
   return var;
 }
 
@@ -3029,6 +3062,9 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
   var->setInitializer(llvm::ConstantArray::get(arrayTy, elts));
   var->setSection(sectionName);
   var->setAlignment(4);
+  
+  disableAddressSanitizer(*this, var);
+  
   addUsedGlobal(var);
   return var;
 }
