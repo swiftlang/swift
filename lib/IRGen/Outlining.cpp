@@ -35,10 +35,14 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return;
   }
 
+  CanType formalType = type.getSwiftRValueType();
+  if (isa<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(formalType))) {
+    return;
+  }
+
   // If the type is a legal formal type, add it as a formal type.
   // FIXME: does this force us to emit a more expensive metadata than we need
   // to?
-  CanType formalType = type.getSwiftRValueType();
   if (formalType->isLegalFormalType()) {
     return collectFormalTypeMetadata(formalType);
   }
@@ -53,9 +57,7 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
 
 void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
-  if (!type->hasArchetype()) {
-    return;
-  }
+  assert(type->hasArchetype());
 
   auto key = LocalTypeDataKey(type, LocalTypeDataKind::forFormalTypeMetadata());
   if (Values.count(key)) return;
