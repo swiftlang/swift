@@ -122,7 +122,9 @@ int main(int argc_, const char **argv_) {
     return 1;
   }
 
-  // Expand any response files in the command line argument vector
+  // Expand any response files in the command line argument vector - arguments
+  // may be passed through response files in the event of command line length
+  // restrictions.
   llvm::BumpPtrAllocator Allocator;
   llvm::StringSaver Saver(Allocator);
   llvm::cl::ExpandResponseFiles(
