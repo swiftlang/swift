@@ -185,7 +185,7 @@ public:
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
-    unsigned value = attr->Value;
+    auto value = attr->getValue();
     if (value == 0 || (value & (value - 1)) != 0)
       TC.diagnose(attr->getLocation(), diag::alignment_not_power_of_two);
   }
