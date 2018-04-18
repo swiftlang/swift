@@ -6703,7 +6703,8 @@ inline bool ValueDecl::isImportAsMember() const {
 inline bool Decl::isPotentiallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
-      isa<FuncDecl>(this)) {
+      isa<FuncDecl>(this) ||
+      isa<DestructorDecl>(this)) {
     return getDeclContext()->getAsClassOrClassExtensionContext();
   } else {
     return false;
