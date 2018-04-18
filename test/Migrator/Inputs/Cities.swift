@@ -38,6 +38,7 @@ public class Container {
   public var Value: String = ""
   public var attrDict: [String: Any] = [:]
   public var attrArr: [String] = []
+  public var optionalAttrDict: [String: Any]? = nil
   public func addingAttributes(_ input: [String: Any]) {}
   public func adding(attributes: [String: Any]) {}
   public func adding(optionalAttributes: [String: Any]?) {}
