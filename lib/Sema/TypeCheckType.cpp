@@ -2277,8 +2277,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     }
     
     for (auto &fieldRepr : repr->getFields()) {
-      auto fieldTy = resolveType(fieldRepr.FieldType, options);
-      fields.push_back({fieldTy->getCanonicalType(), fieldRepr.Mutable});
+      auto fieldTy = resolveType(fieldRepr.getFieldType(), options);
+      fields.push_back({fieldTy->getCanonicalType(), fieldRepr.isMutable()});
     }
   }
 
