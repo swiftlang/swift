@@ -2178,9 +2178,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       // a typealias added for an internal protocol shouldn't need to be
       // public---but that can be problematic if the same type conforms to two
       // protocols with different access levels.
-      AccessLevel aliasAccess = nominal->getFormalAccess();
-      aliasAccess = std::max(aliasAccess, AccessLevel::Internal);
-      aliasDecl->setAccess(aliasAccess);
+      aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/true);
 
       if (nominal == DC) {
         nominal->addMember(aliasDecl);

@@ -2114,11 +2114,20 @@ public:
     }
 
     void verifyChecked(ValueDecl *VD) {
-      if (!VD->hasAccess() && !VD->getDeclContext()->isLocalContext() &&
-          !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
-        dumpRef(VD);
-        Out << " does not have access";
-        abort();
+      if (VD->hasAccess()) {
+        if (VD->getFormalAccess() == AccessLevel::Open &&
+            !isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+          Out << "decl cannot be 'open'\n";
+          VD->dump(Out);
+          abort();
+        }
+      } else {
+        if (!VD->getDeclContext()->isLocalContext() &&
+            !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
+          dumpRef(VD);
+          Out << " does not have access";
+          abort();
+        }
       }
 
       // Make sure that there are no archetypes in the interface type.
