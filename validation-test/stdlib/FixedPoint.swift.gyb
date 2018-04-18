@@ -246,7 +246,7 @@ FixedPoint.test("${Self}.hashValue") {
 %     if prepare_bit_pattern(input, word_bits, self_ty.is_signed) == input:
     hasher._combine(UInt(truncatingIfNeeded: ${input} as ${"" if self_ty.is_signed else "U"}Int))
 %     else:
-    hasher._combine(input)
+    hasher._combine(UInt64(truncatingIfNeeded: input))
 %     end
     let expected = getInt(Int(truncatingIfNeeded: hasher.finalize()))
     expectEqual(expected, output, "input: \(input)")
