@@ -29,7 +29,12 @@ func foo(_ c: Container) -> String {
 
   c.attrDict = convertToSimpleAttributeDictionary(["a": "b", "a": "b", "a": "b"])
   c.attrArr = convertToSimpleAttributeArray(["key1", "key2"])
-  return c.Value.rawValue
+  _ = convertFromSimpleAttributeArray(c.attrArr)
+  _ = convertFromSimpleAttributeDictionary(c.attrDict)
+  c.adding(attributes: convertToSimpleAttributeDictionary(convertFromSimpleAttributeDictionary(c.attrDict)))
+  _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray(convertFromSimpleAttributeArray(c.attrArr)))
+  c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(convertFromOptionalSimpleAttributeDictionary(c.optionalAttrDict)))
+  return convertFromNewAttribute(c.Value)
 }
 
 // Helper function inserted by Swift 4.2 migrator.
@@ -106,4 +111,9 @@ fileprivate func convertFromSimpleAttributeArray(_ input: [SimpleAttribute]) -> 
 fileprivate func convertFromOptionalSimpleAttributeArray(_ input: [SimpleAttribute]?) -> [String]? {
 	guard let input = input else { return nil }
 	return input.map { key in key.rawValue }
+}
+
+// Helper function inserted by Swift 4.2 migrator.
+fileprivate func convertFromNewAttribute(_ input: NewAttribute) -> String {
+	return input.rawValue
 }
