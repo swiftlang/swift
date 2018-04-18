@@ -2012,6 +2012,12 @@ ERROR(decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
+ERROR(let_cannot_be_open,none,
+      "'let' properties are implicitly 'final'; use 'public' instead of "
+      "'open'", ())
+WARNING(let_cannot_be_open_swift4,none,
+        "'let' properties are implicitly 'final'; use 'public' instead of "
+        "'open'", ())
 
 WARNING(override_swift3_objc_inference,none,
         "override of %0 %1 from extension of %2 depends on deprecated "

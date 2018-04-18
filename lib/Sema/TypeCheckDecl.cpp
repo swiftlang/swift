@@ -7066,6 +7066,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
             makeFinal(Context, VD);
           }
         }
+        if (VD->isLet() && VD->getFormalAccess() == AccessLevel::Open) {
+          auto diagID = diag::let_cannot_be_open;
+          if (!Context.isSwiftVersionAtLeast(5))
+            diagID = diag::let_cannot_be_open_swift4;
+          auto inFlightDiag = diagnose(VD, diagID);
+          fixItAccess(inFlightDiag, VD, AccessLevel::Public);
+        }
         if (VD->isStatic()) {
           auto staticSpelling =
             VD->getParentPatternBinding()->getStaticSpelling();
