@@ -300,6 +300,15 @@ ERROR(shifting_all_significant_bits,none,
 ERROR(static_report_error, none,
       "static report error", ())
 
+ERROR(non_physical_addressof,none,
+      "addressof only works with purely physical lvalues; "
+      "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
+      "`withUnsafePointer` or `withUnsafeBytes`", ())
+ERROR(non_borrowed_indirect_addressof,none,
+      "addressof only works with borrowable in-memory rvalues; "
+      "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
+      "`withUnsafePointer` or `withUnsafeBytes`", ())
+
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
 
