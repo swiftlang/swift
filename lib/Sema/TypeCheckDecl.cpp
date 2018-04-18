@@ -1498,14 +1498,26 @@ void TypeChecker::computeAccessLevel(ValueDecl *D) {
     // decl. A setter attribute can also override this.
     AbstractStorageDecl *storage = accessor->getStorage();
     if (storage->hasAccess()) {
-      if (accessor->getAccessorKind() == AccessorKind::IsSetter ||
-          accessor->getAccessorKind() == AccessorKind::IsMutableAddressor ||
-          accessor->getAccessorKind() == AccessorKind::IsMaterializeForSet)
-        accessor->setAccess(storage->getSetterFormalAccess());
-      else
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+      case AccessorKind::IsAddressor:
         accessor->setAccess(storage->getFormalAccess());
+        break;
+      case AccessorKind::IsSetter:
+      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::IsMaterializeForSet:
+        accessor->setAccess(storage->getSetterFormalAccess());
+        break;
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsDidSet:
+        // These are only needed to synthesize the setter.
+        accessor->setAccess(AccessLevel::Private);
+        break;
+      }
     } else {
       computeAccessLevel(storage);
+      assert(accessor->hasAccess() &&
+             "if the accessor isn't just the getter/setter this isn't enough");
     }
   }
 
