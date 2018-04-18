@@ -447,14 +447,51 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
-                                         ArrayRef<ManagedValue> args,
+                                         Expr *argument,
                                          SGFContext C) {
-  assert(args.size() == 1 && "addressof should have a single argument");
+  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  // If the argument is inout, try forming its lvalue. This builtin only works
+  // if it's trivially physically projectable.
+  auto inout = cast<InOutExpr>(argument->getSemanticsProvidingExpr());
+  auto lv = SGF.emitLValue(inout->getSubExpr(), AccessKind::ReadWrite);
+  if (!lv.isPhysical() || !lv.isLoadingPure()) {
+    SGF.SGM.diagnose(argument->getLoc(), diag::non_physical_addressof);
+    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+  }
+  
+  auto addr = SGF.emitAddressOfLValue(argument, std::move(lv),
+                                      AccessKind::ReadWrite)
+                 .getValue();
   
   // Take the address argument and cast it to RawPointer.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
-  SILValue result = SGF.B.createAddressToPointer(loc,
-                                                 args[0].getUnmanagedValue(),
+  SILValue result = SGF.B.createAddressToPointer(loc, addr,
+                                                 rawPointerType);
+  return ManagedValue::forUnmanaged(result);
+}
+
+/// Specialized emitter for Builtin.addressOfBorrow.
+static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionList substitutions,
+                                               Expr *argument,
+                                               SGFContext C) {
+  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  SILValue addr;
+  // Try to borrow the argument at +0. We only support if it's
+  // naturally emitted borrowed in memory.
+  auto borrow = SGF.emitRValue(argument, SGFContext::AllowGuaranteedPlusZero)
+     .getAsSingleValue(SGF, argument);
+  if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
+    SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
+    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+  }
+  
+  addr = borrow.getValue();
+  
+  // Take the address argument and cast it to RawPointer.
+  SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
+  SILValue result = SGF.B.createAddressToPointer(loc, addr,
                                                  rawPointerType);
   return ManagedValue::forUnmanaged(result);
 }

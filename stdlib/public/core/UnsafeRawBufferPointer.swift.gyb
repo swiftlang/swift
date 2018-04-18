@@ -724,13 +724,17 @@ extension ${Self} {
 /// bytes of the given argument.
 ///
 /// The buffer pointer argument to the `body` closure provides a collection
-/// interface to the raw bytes of `arg`. The buffer is the size of the
-/// instance passed as `arg` and does not include any remote storage.
+/// interface to the raw bytes of `value`. The buffer is the size of the
+/// instance passed as `value` and does not include any remote storage.
 ///
 /// - Parameters:
-///   - arg: An instance to temporarily access through a mutable raw buffer
+///   - value: An instance to temporarily access through a mutable raw buffer
 ///     pointer.
-///   - body: A closure that takes a raw buffer pointer to the bytes of `arg`
+///     Note that the `inout` exclusivity rules mean that, like any other
+///     `inout` argument, `value` cannot be directly accessed by other code
+///     for the duration of `body`. Access must only occur through the pointer
+///     argument to `body` until `body` returns.
+///   - body: A closure that takes a raw buffer pointer to the bytes of `value`
 ///     as its sole argument. If the closure has a return value, that value is
 ///     also used as the return value of the `withUnsafeMutableBytes(of:_:)`
 ///     function. The buffer pointer argument is valid only for the duration
@@ -738,11 +742,11 @@ extension ${Self} {
 /// - Returns: The return value, if any, of the `body` closure.
 @inlinable
 public func withUnsafeMutableBytes<T, Result>(
-  of arg: inout T,
+  of value: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws -> Result
 ) rethrows -> Result
 {
-  return try withUnsafeMutablePointer(to: &arg) {
+  return try withUnsafeMutablePointer(to: &value) {
     return try body(UnsafeMutableRawBufferPointer(
         start: $0, count: MemoryLayout<T>.size))
   }
@@ -752,26 +756,63 @@ public func withUnsafeMutableBytes<T, Result>(
 /// the given argument.
 ///
 /// The buffer pointer argument to the `body` closure provides a collection
-/// interface to the raw bytes of `arg`. The buffer is the size of the
-/// instance passed as `arg` and does not include any remote storage.
+/// interface to the raw bytes of `value`. The buffer is the size of the
+/// instance passed as `value` and does not include any remote storage.
 ///
 /// - Parameters:
-///   - arg: An instance to temporarily access through a raw buffer pointer.
-///   - body: A closure that takes a raw buffer pointer to the bytes of `arg`
+///   - value: An instance to temporarily access through a raw buffer pointer.
+///     Note that the `inout` exclusivity rules mean that, like any other
+///     `inout` argument, `value` cannot be directly accessed by other code
+///     for the duration of `body`. Access must only occur through the pointer
+///     argument to `body` until `body` returns.
+///   - body: A closure that takes a raw buffer pointer to the bytes of `value`
 ///     as its sole argument. If the closure has a return value, that value is
 ///     also used as the return value of the `withUnsafeBytes(of:_:)`
 ///     function. The buffer pointer argument is valid only for the duration
-///     of the closure's execution.
+///     of the closure's execution. It is undefined behavior to attempt to
+///     mutate through the pointer by conversion to
+///     `UnsafeMutableRawBufferPointer` or any other mutable pointer type.
+///     If you want to mutate a value by writing through a pointer, use
+///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
 @inlinable
 public func withUnsafeBytes<T, Result>(
-  of arg: inout T,
+  of value: inout T,
   _ body: (UnsafeRawBufferPointer) throws -> Result
 ) rethrows -> Result
 {
-  return try withUnsafePointer(to: &arg) {
+  return try withUnsafePointer(to: &value) {
     try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
+}
+
+/// Invokes the given closure with a buffer pointer covering the raw bytes of
+/// the given argument.
+///
+/// The buffer pointer argument to the `body` closure provides a collection
+/// interface to the raw bytes of `value`. The buffer is the size of the
+/// instance passed as `value` and does not include any remote storage.
+///
+/// - Parameters:
+///   - value: An instance to temporarily access through a raw buffer pointer.
+///   - body: A closure that takes a raw buffer pointer to the bytes of `value`
+///     as its sole argument. If the closure has a return value, that value is
+///     also used as the return value of the `withUnsafeBytes(of:_:)`
+///     function. The buffer pointer argument is valid only for the duration
+///     of the closure's execution. It is undefined behavior to attempt to
+///     mutate through the pointer by conversion to
+///     `UnsafeMutableRawBufferPointer` or any other mutable pointer type.
+///     If you want to mutate a value by writing through a pointer, use
+///     `withUnsafeMutableBytes(of:_:)` instead.
+/// - Returns: The return value, if any, of the `body` closure.
+@_inlineable
+public func withUnsafeBytes<T, Result>(
+  of value: T,
+  _ body: (UnsafeRawBufferPointer) throws -> Result
+) rethrows -> Result {
+  let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
+  let buffer = UnsafeRawBufferPointer(start: addr, count: MemoryLayout<T>.size)
+  return try body(buffer)
 }
 
 // @available(*, deprecated, renamed: "UnsafeRawBufferPointer.Iterator")

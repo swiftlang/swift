@@ -272,10 +272,15 @@ BUILTIN_SIL_OPERATION(CastReference, "castReference", Special)
 /// reinterpretCast has type T -> U.
 BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 
-/// addressof ([inout] T) -> Builtin.RawPointer
-/// Returns a RawPointer pointing to an lvalue. The returned pointer is only
-/// valid within the scope of the statement for logical lvalues.
+/// addressof (inout T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a physical lvalue. The returned pointer is
+/// only valid for the duration of the original binding.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
+
+/// addressOfBorrow (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+BUILTIN_SIL_OPERATION(AddressOfBorrow, "addressOfBorrow", Special)
 
 /// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 ///
