@@ -3740,7 +3740,7 @@ extension ${Self} : Hashable {
     if let word = ${"" if signed else "U"}Int(exactly: self) {
       return _Hasher._hash(seed: seed, _lowWord)
     }
-    return _Hasher._hash(seed: seed, UInt64(truncatingIfNeeded: _value))
+    return _Hasher._hash(seed: seed, UInt64(_value))
     % else:
     fatalError("Unsupported integer width")
     % end
