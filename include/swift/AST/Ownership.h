@@ -19,6 +19,7 @@
 #ifndef SWIFT_OWNERSHIP_H
 #define SWIFT_OWNERSHIP_H
 
+#include "swift/Basic/InlineBitfield.h"
 #include <stdint.h>
 
 namespace swift {
@@ -38,7 +39,12 @@ enum class ReferenceOwnership : uint8_t {
 
   /// \brief an 'unowned(unsafe)' reference
   Unmanaged,
+
+  Last_Kind = Unmanaged
 };
+
+enum : unsigned { NumReferenceOwnershipBits =
+  countBitsUsed(static_cast<unsigned>(ReferenceOwnership::Last_Kind)) };
 
 /// Different kinds of value ownership supported by Swift.
 enum class ValueOwnership : uint8_t {
