@@ -3,7 +3,8 @@
 class C {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.foo
   func foo() {}
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.__allocating_init
+  // CHECK: sil_coverage_map {{.*}}// __ntd_C_line:[[@LINE-3]]:1
+  // CHECK-NEXT: [[@LINE+1]]:10 -> [[@LINE+1]]:12
   init() {}
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.C.__deallocating_deinit
   deinit {}
@@ -17,7 +18,7 @@ extension C {
 struct S {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.S.foo
   func foo() {}
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.S.init
+  // CHECK: sil_coverage_map {{.*}}// __ntd_S_line:[[@LINE-3]]:1
   init() {}
 }
 
@@ -25,6 +26,16 @@ enum E {
   case X, Y, Z
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.E.foo
   func foo() {}
-  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_class.E.init
+  // CHECK: sil_coverage_map {{.*}}// __ntd_E_line:[[@LINE-4]]:1
+  // CHECK-NEXT: [[@LINE+1]]:10 -> [[@LINE+1]]:23
   init() { self = .Y }
+}
+
+var g1: Bool = true
+
+struct S2 {
+  // CHECK: sil_coverage_map {{.*}}// __ntd_S2_line:[[@LINE-1]]:1
+  // CHECK-NEXT: [[@LINE+2]]:22 -> [[@LINE+2]]:23 : 0
+  // CHECK-NEXT: [[@LINE+1]]:26 -> [[@LINE+1]]:27 : (1 - 0)
+  var m1: Int = g1 ? 0 : 1
 }
