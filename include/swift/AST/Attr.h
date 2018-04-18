@@ -17,6 +17,7 @@
 #ifndef SWIFT_ATTR_H
 #define SWIFT_ATTR_H
 
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/STLExtras.h"
@@ -182,60 +183,82 @@ enum class DeclKind : uint8_t;
 class DeclAttribute : public AttributeBase {
   friend class DeclAttributes;
 protected:
-  class DeclAttrBitFields {
-    friend class DeclAttribute;
-
-    // The kind.
-    unsigned Kind : 8;
-
-    // Whether this attribute was implicitly added.
-    unsigned Implicit : 1;
-
-    unsigned Invalid : 1;
-  };
-  enum { NumDeclAttrBits = 10 };
-  static_assert(NumDeclAttrBits <= 32, "fits in an unsigned");
-
-  class ObjCAttrBitFields {
-    friend class ObjCAttr;
-    unsigned : NumDeclAttrBits;
-
-    /// Whether this attribute has location information that trails the main
-    /// record, which contains the locations of the parentheses and any names.
-    unsigned HasTrailingLocationInfo : 1;
-
-    /// Whether the name is implicit, produced as the result of caching.
-    unsigned ImplicitName : 1;
-
-    /// Whether the @objc was inferred using Swift 3's deprecated inference
-    /// rules.
-    unsigned Swift3Inferred : 1;
-  };
-  enum { NumObjCAttrBits = NumDeclAttrBits + 3 };
-  static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
-
-  class AccessControlAttrBitFields {
-    friend class AbstractAccessControlAttr;
-    unsigned : NumDeclAttrBits;
-
-    unsigned AccessLevel : 3;
-  };
-  enum { NumAccessControlAttrBits = NumDeclAttrBits + 3 };
-  static_assert(NumAccessControlAttrBits <= 32, "fits in an unsigned");
-
   union {
-    DeclAttrBitFields DeclAttrBits;
-    ObjCAttrBitFields ObjCAttrBits;
-    AccessControlAttrBitFields AccessControlAttrBits;
-  };
+    uint64_t OpaqueBits;
+
+    SWIFT_INLINE_BITFIELD_BASE(DeclAttribute, bitmax(NumDeclAttrKindBits,8)+1+1,
+      Kind : bitmax(NumDeclAttrKindBits,8),
+      // Whether this attribute was implicitly added.
+      Implicit : 1,
+
+      Invalid : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1+1,
+      /// Whether this attribute has location information that trails the main
+      /// record, which contains the locations of the parentheses and any names.
+      HasTrailingLocationInfo : 1,
+
+      /// Whether the name is implicit, produced as the result of caching.
+      ImplicitName : 1,
+
+      /// Whether the @objc was inferred using Swift 3's deprecated inference
+      /// rules.
+      Swift3Inferred : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(AbstractAccessControlAttr, DeclAttribute, 3,
+      AccessLevel : 3
+    );
+
+    SWIFT_INLINE_BITFIELD_FULL(AlignmentAttr, DeclAttribute, 32,
+      : NumPadBits,
+      // The alignment value.
+      Value : 32
+    );
+
+    SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
+      kind : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(EffectsAttr, DeclAttribute, NumEffectsKindBits,
+      kind : NumEffectsKindBits
+    );
+
+    SWIFT_INLINE_BITFIELD(InlineAttr, DeclAttribute, NumInlineKindBits,
+      kind : NumInlineKindBits
+    );
+
+    SWIFT_INLINE_BITFIELD(OptimizeAttr, DeclAttribute, NumOptimizationModeBits,
+      mode : NumOptimizationModeBits
+    );
+
+    SWIFT_INLINE_BITFIELD(ReferenceOwnershipAttr, DeclAttribute,
+                          NumReferenceOwnershipBits,
+      ownership : NumReferenceOwnershipBits
+    );
+
+    SWIFT_INLINE_BITFIELD_FULL(SpecializeAttr, DeclAttribute, 1+1+32,
+      exported : 1,
+      kind : 1,
+      : NumPadBits,
+      numRequirements : 32
+    );
+
+    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute,
+                          NumKnownProtocolKindBits,
+      kind : NumKnownProtocolKindBits
+    );
+  } Bits;
 
   DeclAttribute *Next = nullptr;
 
   DeclAttribute(DeclAttrKind DK, SourceLoc AtLoc, SourceRange Range,
                 bool Implicit) : AttributeBase(AtLoc, Range) {
-    DeclAttrBits.Kind = static_cast<unsigned>(DK);
-    DeclAttrBits.Implicit = Implicit;
-    DeclAttrBits.Invalid = 0;
+    Bits.OpaqueBits = 0;
+    Bits.DeclAttribute.Kind = static_cast<unsigned>(DK);
+    Bits.DeclAttribute.Implicit = Implicit;
+    Bits.DeclAttribute.Invalid = false;
   }
 
 public:
@@ -326,22 +349,22 @@ public:
 
 public:
   DeclAttrKind getKind() const {
-    return static_cast<DeclAttrKind>(DeclAttrBits.Kind);
+    return static_cast<DeclAttrKind>(Bits.DeclAttribute.Kind);
   }
 
   /// Whether this attribute was implicitly added.
-  bool isImplicit() const { return DeclAttrBits.Implicit; }
+  bool isImplicit() const { return Bits.DeclAttribute.Implicit; }
 
   /// Set whether this attribute was implicitly added.
-  void setImplicit(bool Implicit) {
-    DeclAttrBits.Implicit = Implicit;
+  void setImplicit(bool Implicit = true) {
+    Bits.DeclAttribute.Implicit = Implicit;
   }
 
   /// Returns true if this attribute was find to be invalid in some way by
   /// semantic analysis.  In that case, the attribute should not be considered,
   /// the attribute node should be only used to retrieve source information.
-  bool isInvalid() const { return DeclAttrBits.Invalid; }
-  void setInvalid() { DeclAttrBits.Invalid = true; }
+  bool isInvalid() const { return Bits.DeclAttribute.Invalid; }
+  void setInvalid() { Bits.DeclAttribute.Invalid = true; }
 
   bool isValid() const { return !isInvalid(); }
 
@@ -518,11 +541,11 @@ class AlignmentAttr : public DeclAttribute {
 public:
   AlignmentAttr(unsigned Value, SourceLoc AtLoc, SourceRange Range,
                 bool Implicit)
-    : DeclAttribute(DAK_Alignment, AtLoc, Range, Implicit),
-      Value(Value) {}
-  
-  // The alignment value.
-  const unsigned Value;
+      : DeclAttribute(DAK_Alignment, AtLoc, Range, Implicit) {
+    Bits.AlignmentAttr.Value = Value;
+  }
+
+  unsigned getValue() const { return Bits.AlignmentAttr.Value; }
   
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Alignment;
@@ -722,9 +745,9 @@ class ObjCAttr final : public DeclAttribute,
     : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
       NameData(nullptr)
   {
-    ObjCAttrBits.HasTrailingLocationInfo = false;
-    ObjCAttrBits.ImplicitName = implicitName;
-    ObjCAttrBits.Swift3Inferred = false;
+    Bits.ObjCAttr.HasTrailingLocationInfo = false;
+    Bits.ObjCAttr.ImplicitName = implicitName;
+    Bits.ObjCAttr.Swift3Inferred = false;
 
     if (name) {
       NameData = name->getOpaqueValue();
@@ -737,7 +760,7 @@ class ObjCAttr final : public DeclAttribute,
 
   /// Determine whether this attribute has trailing location information.
   bool hasTrailingLocationInfo() const {
-    return ObjCAttrBits.HasTrailingLocationInfo;
+    return Bits.ObjCAttr.HasTrailingLocationInfo;
   }
 
   /// Retrieve the trailing location information.
@@ -815,7 +838,7 @@ public:
 
   /// Determine whether the name associated with this attribute was
   /// implicit.
-  bool isNameImplicit() const { return ObjCAttrBits.ImplicitName; }
+  bool isNameImplicit() const { return Bits.ObjCAttr.ImplicitName; }
 
   /// Set the name of this entity.
   void setName(ObjCSelector name, bool implicit) {
@@ -825,23 +848,23 @@ public:
     if (hasTrailingLocationInfo() &&
         (!hasName() ||
          getName()->getNumSelectorPieces() < name.getNumSelectorPieces())) {
-      ObjCAttrBits.HasTrailingLocationInfo = false;
+      Bits.ObjCAttr.HasTrailingLocationInfo = false;
     }
 
     NameData = name.getOpaqueValue();
-    ObjCAttrBits.ImplicitName = implicit;
+    Bits.ObjCAttr.ImplicitName = implicit;
   }
 
   /// Determine whether this attribute was inferred based on Swift 3's
   /// deprecated @objc inference rules.
   bool isSwift3Inferred() const {
-    return ObjCAttrBits.Swift3Inferred;
+    return Bits.ObjCAttr.Swift3Inferred;
   }
 
   /// Set whether this attribute was inferred based on Swift 3's deprecated
   /// @objc inference rules.
   void setSwift3Inferred(bool inferred = true) {
-    ObjCAttrBits.Swift3Inferred = inferred;
+    Bits.ObjCAttr.Swift3Inferred = inferred;
   }
 
   /// Clear the name of this entity.
@@ -874,13 +897,13 @@ protected:
   AbstractAccessControlAttr(DeclAttrKind DK, SourceLoc atLoc, SourceRange range,
                             AccessLevel access, bool implicit)
       : DeclAttribute(DK, atLoc, range, implicit) {
-    AccessControlAttrBits.AccessLevel = static_cast<unsigned>(access);
+    Bits.AbstractAccessControlAttr.AccessLevel = static_cast<unsigned>(access);
     assert(getAccess() == access && "not enough bits for access control");
   }
 
 public:
   AccessLevel getAccess() const {
-    return static_cast<AccessLevel>(AccessControlAttrBits.AccessLevel);
+    return static_cast<AccessLevel>(Bits.AbstractAccessControlAttr.AccessLevel);
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -918,16 +941,16 @@ public:
 
 /// Represents an inline attribute.
 class InlineAttr : public DeclAttribute {
-  InlineKind Kind;
 public:
   InlineAttr(SourceLoc atLoc, SourceRange range, InlineKind kind)
-    : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false), 
-      Kind(kind) {}
+      : DeclAttribute(DAK_Inline, atLoc, range, /*Implicit=*/false) {
+    Bits.InlineAttr.kind = unsigned(kind);
+  }
 
   InlineAttr(InlineKind kind)
     : InlineAttr(SourceLoc(), SourceRange(), kind) {}
 
-  InlineKind getKind() const { return Kind; }
+  InlineKind getKind() const { return InlineKind(Bits.InlineAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Inline;
   }
@@ -935,16 +958,18 @@ public:
 
 /// Represents the optimize attribute.
 class OptimizeAttr : public DeclAttribute {
-  OptimizationMode Mode;
 public:
   OptimizeAttr(SourceLoc atLoc, SourceRange range, OptimizationMode mode)
-    : DeclAttribute(DAK_Optimize, atLoc, range, /*Implicit=*/false),
-      Mode(mode) {}
+      : DeclAttribute(DAK_Optimize, atLoc, range, /*Implicit=*/false) {
+    Bits.OptimizeAttr.mode = unsigned(mode);
+  }
 
   OptimizeAttr(OptimizationMode mode)
     : OptimizeAttr(SourceLoc(), SourceRange(), mode) {}
 
-  OptimizationMode getMode() const { return Mode; }
+  OptimizationMode getMode() const {
+    return OptimizationMode(Bits.OptimizeAttr.mode);
+  }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Optimize;
   }
@@ -952,16 +977,16 @@ public:
 
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
-  EffectsKind Kind;
 public:
   EffectsAttr(SourceLoc atLoc, SourceRange range, EffectsKind kind)
-  : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false),
-  Kind(kind) {}
+      : DeclAttribute(DAK_Effects, atLoc, range, /*Implicit=*/false) {
+    Bits.EffectsAttr.kind = unsigned(kind);
+  }
 
   EffectsAttr(EffectsKind kind)
   : EffectsAttr(SourceLoc(), SourceRange(), kind) {}
 
-  EffectsKind getKind() const { return Kind; }
+  EffectsKind getKind() const { return EffectsKind(Bits.EffectsAttr.kind); }
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Effects;
   }
@@ -971,18 +996,19 @@ public:
 
 /// Represents weak/unowned/unowned(unsafe) decl modifiers.
 class ReferenceOwnershipAttr : public DeclAttribute {
-  const ReferenceOwnership ownership;
-
 public:
   ReferenceOwnershipAttr(SourceRange range, ReferenceOwnership kind)
       : DeclAttribute(DAK_ReferenceOwnership, range.Start, range,
-                      /*Implicit=*/false),
-        ownership(kind) {}
+                      /*Implicit=*/false) {
+    Bits.ReferenceOwnershipAttr.ownership = unsigned(kind);
+  }
 
   ReferenceOwnershipAttr(ReferenceOwnership kind)
       : ReferenceOwnershipAttr(SourceRange(), kind) {}
 
-  ReferenceOwnership get() const { return ownership; }
+  ReferenceOwnership get() const {
+    return ReferenceOwnership(Bits.ReferenceOwnershipAttr.ownership);
+  }
 
   /// Returns a copy of this attribute without any source information.
   ReferenceOwnershipAttr *clone(ASTContext &context) const {
@@ -1045,21 +1071,22 @@ public:
 /// rather, it is introduced by the Clang importer to indicate
 /// synthesized conformances.
 class SynthesizedProtocolAttr : public DeclAttribute {
-  KnownProtocolKind ProtocolKind;
   LazyConformanceLoader *Loader;
 
 public:
   SynthesizedProtocolAttr(KnownProtocolKind protocolKind,
                           LazyConformanceLoader *Loader)
     : DeclAttribute(DAK_SynthesizedProtocol, SourceLoc(), SourceRange(),
-                    /*Implicit=*/true),
-      ProtocolKind(protocolKind), Loader(Loader)
+                    /*Implicit=*/true), Loader(Loader)
   {
+    Bits.SynthesizedProtocolAttr.kind = unsigned(protocolKind);
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
   /// synthesized.
-  KnownProtocolKind getProtocolKind() const { return ProtocolKind; }
+  KnownProtocolKind getProtocolKind() const {
+    return KnownProtocolKind(Bits.SynthesizedProtocolAttr.kind);
+  }
 
   /// Retrieve the lazy loader that will be used to populate the
   /// synthesized conformance.
@@ -1074,16 +1101,14 @@ public:
 /// type list.
 class SpecializeAttr : public DeclAttribute {
 public:
+  // NOTE: When adding new kinds, you must update the inline bitfield macro.
   enum class SpecializationKind {
     Full,
     Partial
   };
 
 private:
-  unsigned numRequirements;
   TrailingWhereClause *trailingWhereClause;
-  SpecializationKind kind;
-  bool exported;
 
   Requirement *getRequirementsData() {
     return reinterpret_cast<Requirement *>(this+1);
@@ -1113,25 +1138,25 @@ public:
   ArrayRef<Requirement> getRequirements() const;
 
   MutableArrayRef<Requirement> getRequirements() {
-    return { getRequirementsData(), numRequirements };
+    return { getRequirementsData(), Bits.SpecializeAttr.numRequirements };
   }
 
   void setRequirements(ASTContext &Ctx, ArrayRef<Requirement> requirements);
 
   bool isExported() const {
-    return exported;
+    return Bits.SpecializeAttr.exported;
   }
 
   SpecializationKind getSpecializationKind() const {
-    return kind;
+    return SpecializationKind(Bits.SpecializeAttr.kind);
   }
 
   bool isFullSpecialization() const {
-    return kind == SpecializationKind::Full;
+    return getSpecializationKind() == SpecializationKind::Full;
   }
 
   bool isPartialSpecialization() const {
-    return kind == SpecializationKind::Partial;
+    return getSpecializationKind() == SpecializationKind::Partial;
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -1214,6 +1239,7 @@ public:
 /// Used to control manglings.
 class ClangImporterSynthesizedTypeAttr : public DeclAttribute {
 public:
+  // NOTE: When adding new kinds, you must update the inline bitfield macro.
   enum class Kind : char {
     /// A struct synthesized by the importer to represent an NSError with a
     /// particular domain, as specified by an enum with the \c ns_error_domain
@@ -1236,18 +1262,22 @@ public:
   ///
   /// Must be a valid Swift identifier as well, for mangling purposes.
   const StringRef originalTypeName;
-  const Kind kind;
 
   explicit ClangImporterSynthesizedTypeAttr(StringRef originalTypeName,
                                             Kind kind)
     : DeclAttribute(DAK_ClangImporterSynthesizedType, SourceLoc(),
                     SourceRange(), /*Implicit=*/true),
-      originalTypeName(originalTypeName), kind(kind) {
+      originalTypeName(originalTypeName) {
     assert(!originalTypeName.empty());
+    Bits.ClangImporterSynthesizedTypeAttr.kind = unsigned(kind);
+  }
+
+  Kind getKind() const {
+    return Kind(Bits.ClangImporterSynthesizedTypeAttr.kind);
   }
 
   StringRef getManglingName() const {
-    return manglingNameForKind(kind);
+    return manglingNameForKind(getKind());
   }
 
   static StringRef manglingNameForKind(Kind kind) {

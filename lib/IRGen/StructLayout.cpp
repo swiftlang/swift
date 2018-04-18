@@ -114,18 +114,18 @@ void irgen::applyLayoutAttributes(IRGenModule &IGM,
     return;
   
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
-    assert(alignment->Value != 0
-           && ((alignment->Value - 1) & alignment->Value) == 0
+    auto value = alignment->getValue();
+    assert(value != 0 && ((value - 1) & value) == 0
            && "alignment not a power of two!");
     
     if (!IsFixedLayout)
       Diags.diagnose(alignment->getLocation(),
                      diag::alignment_dynamic_type_layout_unsupported);
-    else if (alignment->Value < MinimumAlign.getValue())
+    else if (value < MinimumAlign.getValue())
       Diags.diagnose(alignment->getLocation(),
                    diag::alignment_less_than_natural, MinimumAlign.getValue());
     else
-      MinimumAlign = Alignment(alignment->Value);
+      MinimumAlign = Alignment(value);
   }
 }
 

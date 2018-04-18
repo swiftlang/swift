@@ -2232,7 +2232,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     auto abbrCode = DeclTypeAbbrCodes[AlignmentDeclAttrLayout::Code];
     AlignmentDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         theAlignment->isImplicit(),
-                                        theAlignment->Value);
+                                        theAlignment->getValue());
     return;
   }
   
