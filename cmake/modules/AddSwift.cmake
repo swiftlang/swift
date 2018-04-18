@@ -227,12 +227,12 @@ function(_add_variant_c_compile_flags)
     if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
       list(APPEND result -Xclang;--dependent-lib=oldnames)
       # TODO(compnerd) handle /MT, /MTd, /MD, /MDd
-      if("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
-        list(APPEND result "-D_MD")
-        list(APPEND result -Xclang;--dependent-lib=msvcrt)
-      else()
+      if("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
         list(APPEND result "-D_MDd")
         list(APPEND result -Xclang;--dependent-lib=msvcrtd)
+      else()
+        list(APPEND result "-D_MD")
+        list(APPEND result -Xclang;--dependent-lib=msvcrt)
       endif()
     endif()
 
@@ -792,6 +792,7 @@ function(_add_swift_library_single target name)
     swift_windows_generate_sdk_vfs_overlay(SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS)
     foreach(flag ${SWIFTLIB_SINGLE_VFS_OVERLAY_FLAGS})
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;${flag})
+      list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS ${flag})
     endforeach()
     foreach(directory ${SWIFTLIB_INCLUDE})
       list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-I${directory})
@@ -1717,6 +1718,19 @@ function(add_swift_library name)
            message("DISABLING AUTOLINK FOR swiftMediaPlayer")
            list(APPEND swiftlib_link_flags_all "-Xlinker" "-ignore_auto_link")
          endif()
+       endif()
+
+       # We unconditionally removed "-z,defs" from CMAKE_SHARED_LINKER_FLAGS in 
+       # swift_common_standalone_build_config_llvm within SwiftSharedCMakeConfig.cmake,
+       # where it was added by a call to HandleLLVMOptions. 
+       #
+       # Rather than applying it to all targets and libraries, we here add it back to 
+       # supported targets and libraries only. 
+       # This is needed for ELF targets only; however, RemoteMirror needs to build 
+       # with undefined symbols.
+       if("${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" 
+          AND NOT "${name}" STREQUAL "swiftRemoteMirror")
+          list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
        endif()
 
         # Add this library variant.
