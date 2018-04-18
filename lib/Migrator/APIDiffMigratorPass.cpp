@@ -686,15 +686,14 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
     for (auto *Item: getRelatedDiffItems(RD)) {
       if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
-        switch(CI->DiffKind) {
-        case NodeAnnotation::SimpleStringRepresentableUpdate: {
-          Editor.insertBefore(ASE->getSrc()->getStartLoc(),
-            (Twine(CI->RightComment) + "(rawValue: ").str());
+        if (CI->isStringRepresentableChange() &&
+            CI->NodeKind == SDKNodeKind::DeclVar) {
+          SmallString<256> Buffer;
+          auto Func = insertHelperFunction(CI->DiffKind, CI->RightComment,
+                                           Buffer, true);
+          Editor.insert(ASE->getSrc()->getStartLoc(), (Twine(Func) + "(").str());
           Editor.insertAfterToken(ASE->getSrc()->getEndLoc(), ")");
           return true;
-        }
-        default:
-          continue;
         }
       }
     }
