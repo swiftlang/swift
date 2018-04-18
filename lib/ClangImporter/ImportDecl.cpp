@@ -105,9 +105,9 @@ static bool isInSystemModule(DeclContext *D) {
   return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
 }
 
-static AccessLevel getOverridableAccessLevel(DeclContext *dc) {
-  return (dc->getAsProtocolOrProtocolExtensionContext()
-            ? AccessLevel::Public : AccessLevel::Open);
+static AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
+  return (dc->getAsClassOrClassExtensionContext()
+            ? AccessLevel::Open : AccessLevel::Public);
 }
 
 /// Create a typedpattern(namedpattern(decl))

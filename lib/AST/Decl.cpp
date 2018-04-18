@@ -2282,7 +2282,8 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   // Inherit the @usableFromInline attribute.
   if (source->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
       !getAttrs().hasAttribute<UsableFromInlineAttr>() &&
-      !getAttrs().hasAttribute<InlinableAttr>()) {
+      !getAttrs().hasAttribute<InlinableAttr>() &&
+      DeclAttribute::canAttributeAppearOnDecl(DAK_UsableFromInline, this)) {
     auto &ctx = getASTContext();
     auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     getAttrs().add(clonedAttr);
