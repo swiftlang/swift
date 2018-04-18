@@ -802,6 +802,9 @@ class BuildScriptInvocation(object):
                 ]
 
         # SWIFT_ENABLE_TENSORFLOW
+        if not args.build_tensorflow:
+            impl_args += ["--skip-build-tensorflow"]
+
         if args.swift_enable_tensorflow:
             impl_args += [
                 "--swift-enable-tensorflow",
@@ -810,7 +813,6 @@ class BuildScriptInvocation(object):
             # If args.build-tensorflow, include/lib directories will be
             # configured automatically by build-script-impl.
             if not args.build_tensorflow:
-                impl_args += ["--skip-build-tensorflow"]
                 assert args.swift_tensorflow_host_lib_dir, \
                     "Missing --swift-tensorflow-host-lib-dir"
                 assert args.swift_tensorflow_host_include_dir, \

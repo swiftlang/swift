@@ -185,6 +185,9 @@ def _apply_default_arguments(args):
        args.swift_tensorflow_target_include_dir is not None:
         args.swift_enable_tensorflow = True
 
+    if not args.swift_enable_tensorflow:
+        args.build_tensorflow = False
+
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
