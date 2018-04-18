@@ -517,8 +517,6 @@ class BuildScriptInvocation(object):
             " ".join(args.stdlib_deployment_targets),
             "--host-cc", toolchain.cc,
             "--host-cxx", toolchain.cxx,
-            # SWIFT_ENABLE_TENSORFLOW
-            "--host-bazel", toolchain.bazel,
             "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
             "--darwin-deployment-version-osx=%s" % (
                 args.darwin_deployment_version_osx),
@@ -815,6 +813,7 @@ class BuildScriptInvocation(object):
         if args.swift_enable_tensorflow:
             impl_args += [
                 "--swift-enable-tensorflow",
+                "--host-bazel", toolchain.bazel,
             ]
             # If args.build-tensorflow, include/lib directories will be
             # configured automatically by build-script-impl.
