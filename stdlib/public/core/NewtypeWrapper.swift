@@ -15,10 +15,15 @@
 /// attribute.
 public protocol _SwiftNewtypeWrapper : RawRepresentable { }
 
-extension _SwiftNewtypeWrapper where Self.RawValue : Hashable {
+extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue : Hashable {
   @_inlineable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return rawValue.hashValue
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  public func _hash(into hasher: inout _Hasher) {
+    hasher.append(rawValue)
   }
 }
 
