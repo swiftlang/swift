@@ -27,6 +27,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
@@ -715,16 +716,32 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   CompilerInstance &CI = *Impl.Instance;
   auto clangDiags = CompilerInstance::createDiagnostics(
                                               new clang::DiagnosticOptions());
+
+  // Note: Reusing the file manager is safe; this is a component that's already
+  // reused when building PCM files for the module cache.
   clang::SourceManager clangSrcMgr(*clangDiags, CI.getFileManager());
   auto FID = clangSrcMgr.createFileID(
                         llvm::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
   clangSrcMgr.setMainFileID(FID);
+
+  // Note: Reusing the real HeaderSearch is dangerous, but it's not easy to
+  // copy. We put in some effort to reset it to the way it was below.
+  clang::HeaderSearch &headerSearchInfo =
+      CI.getPreprocessor().getHeaderSearchInfo();
+  assert(headerSearchInfo.getExternalLookup() == nullptr &&
+         "already configured an ASTReader");
+
+  // Note: Reusing the PCM cache is safe because that's already shared when
+  // building PCM files for the module cache. Using the top-level compiler
+  // instance as a module loader does seem a little dangerous but does not
+  // appear to cause problems at the moment.
   clang::Preprocessor PP(CI.getInvocation().getPreprocessorOptsPtr(),
                          *clangDiags,
                          CI.getLangOpts(),
                          clangSrcMgr,
                          CI.getPCMCache(),
-                         CI.getPreprocessor().getHeaderSearchInfo(), CI,
+                         headerSearchInfo,
+                         (clang::ModuleLoader &)CI,
                          /*IILookup=*/nullptr,
                          /*OwnsHeaderSearch=*/false);
   PP.Initialize(CI.getTarget());
@@ -732,6 +749,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                         PP.getIdentifierTable(), PP.getSelectorTable(),
                         PP.getBuiltinInfo());
 
+  // Note: Reusing the PCHContainerReader or ModuleFileExtensions could be
+  // dangerous.
   std::unique_ptr<clang::ASTReader> Reader(new clang::ASTReader(
       PP, &ctx, CI.getPCHContainerReader(),
       CI.getFrontendOpts().ModuleFileExtensions,
@@ -740,6 +759,12 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
       /*AllowPCHWithCompilerErrors*/ false,
       /*AllowConfigurationMismatch*/ false,
       /*ValidateSystemInputs*/ true));
+  SWIFT_DEFER {
+    assert(headerSearchInfo.getExternalLookup() == Reader.get() ||
+           headerSearchInfo.getExternalLookup() == nullptr);
+    headerSearchInfo.SetExternalLookup(nullptr);
+    headerSearchInfo.SetExternalSource(nullptr);
+  };
   ctx.InitBuiltinTypes(CI.getTarget());
 
   auto result = Reader->ReadAST(PCHFilename,
