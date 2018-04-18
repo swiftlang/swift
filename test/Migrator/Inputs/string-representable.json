@@ -164,4 +164,26 @@
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "DictionaryKeyUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC8attrDicts10DictionaryVySSypGvp",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
+    {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "ArrayMemberUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities9ContainerC7attrArrSaySSGvp",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "SimpleAttribute",
+    "ModuleName": "Cities"
+  },
 ]

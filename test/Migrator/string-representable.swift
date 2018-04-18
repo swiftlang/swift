@@ -27,5 +27,7 @@ func foo(_ c: Container) -> String {
   c.addingAttributes(c.getAttrDictionary())
   c.adding(optionalAttributes: c.getAttrDictionary())
 
+  c.attrDict = ["a": "b", "a": "b", "a": "b"]
+  c.attrArr = ["key1", "key2"]
   return c.Value
 }
