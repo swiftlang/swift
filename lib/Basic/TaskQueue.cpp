@@ -29,8 +29,10 @@ using namespace swift::sys;
 #include "Default/TaskQueue.inc"
 #endif
 
-TaskQueue::TaskQueue(unsigned NumberOfParallelTasks)
-  : NumberOfParallelTasks(NumberOfParallelTasks) {}
+TaskQueue::TaskQueue(unsigned NumberOfParallelTasks,
+                     UnifiedStatsReporter *USR)
+  : NumberOfParallelTasks(NumberOfParallelTasks),
+    Stats(USR){}
 
 TaskQueue::~TaskQueue() = default;
 

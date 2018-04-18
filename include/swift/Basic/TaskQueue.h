@@ -23,6 +23,7 @@
 #include <queue>
 
 namespace swift {
+class UnifiedStatsReporter;
 namespace sys {
 
 class Task; // forward declared to allow for platform-specific implementations
@@ -46,13 +47,18 @@ class TaskQueue {
   /// The number of tasks to execute in parallel.
   unsigned NumberOfParallelTasks;
 
+  /// Optional place to count I/O and subprocess events.
+  UnifiedStatsReporter *Stats;
+
 public:
   /// \brief Create a new TaskQueue instance.
   ///
   /// \param NumberOfParallelTasks indicates the number of tasks which should
   /// be run in parallel. If 0, the TaskQueue will choose the most appropriate
   /// number of parallel tasks for the current system.
-  TaskQueue(unsigned NumberOfParallelTasks = 0);
+  /// \param Optional stats reporter to count I/O and subprocess events.
+  TaskQueue(unsigned NumberOfParallelTasks = 0,
+            UnifiedStatsReporter *USR = nullptr);
   virtual ~TaskQueue();
 
   // TODO: remove once -Wdocumentation stops warning for \param, \returns on
