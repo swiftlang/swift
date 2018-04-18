@@ -677,11 +677,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
-  bool handleAssignDestMigration(Expr *E) {
-    auto *ASE = dyn_cast<AssignExpr>(E);
-    if (!ASE || !ASE->getDest() || !ASE->getSrc())
-      return false;
-    auto *RD = getReferencedDecl(ASE->getDest());
+  bool wrapAttributeReference(Expr* Reference, Expr* WrapperTarget,
+                              bool FromString) {
+    auto *RD = getReferencedDecl(Reference);
     if (!RD)
       return false;
     for (auto *Item: getRelatedDiffItems(RD)) {
@@ -690,14 +688,25 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
             CI->NodeKind == SDKNodeKind::DeclVar) {
           SmallString<256> Buffer;
           auto Func = insertHelperFunction(CI->DiffKind, CI->RightComment,
-                                           Buffer, true);
-          Editor.insert(ASE->getSrc()->getStartLoc(), (Twine(Func) + "(").str());
-          Editor.insertAfterToken(ASE->getSrc()->getEndLoc(), ")");
+                                           Buffer, FromString);
+          Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
+          Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
           return true;
         }
       }
     }
     return false;
+  }
+
+  bool handleAssignDestMigration(Expr *E) {
+    auto *ASE = dyn_cast<AssignExpr>(E);
+    if (!ASE || !ASE->getDest() || !ASE->getSrc())
+      return false;
+    return wrapAttributeReference(ASE->getDest(), ASE->getSrc(), true);
+  }
+
+  bool handleAttributeReference(Expr *E) {
+    return wrapAttributeReference(E, E, false);
   }
 
   StringRef insertHelperFunction(NodeAnnotation Anno, StringRef NewType,
@@ -817,7 +826,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   bool walkToExprPre(Expr *E) override {
     if (handleQualifiedReplacement(E))
       return false;
-    if (handleAssignDestMigration(E))
+    if (handleAssignDestMigration(E) || handleAttributeReference(E))
       return false;
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();

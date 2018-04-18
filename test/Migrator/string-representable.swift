@@ -29,5 +29,10 @@ func foo(_ c: Container) -> String {
 
   c.attrDict = ["a": "b", "a": "b", "a": "b"]
   c.attrArr = ["key1", "key2"]
+  _ = c.attrArr
+  _ = c.attrDict
+  c.adding(attributes: c.attrDict)
+  _ = Container(optionalAttrArray: c.attrArr)
+  c.adding(optionalAttributes: c.optionalAttrDict)
   return c.Value
 }
