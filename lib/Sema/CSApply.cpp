@@ -543,6 +543,25 @@ namespace {
     /// look-through.
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy);
 
+    /// Peephole an array upcast.
+    void peepholeArrayUpcast(ArrayExpr *expr, Type toType, bool bridged,
+                             Type elementType,
+                             ConstraintLocatorBuilder locator);
+
+    /// Peephole a dictionary upcast.
+    void peepholeDictionaryUpcast(DictionaryExpr *expr, Type toType,
+                                  bool bridged, Type keyType,
+                                  Type valueType,
+                                  ConstraintLocatorBuilder locator);
+
+    /// Try to peephole the collection upcast, eliminating the need for
+    /// a separate collection-upcast expression.
+    ///
+    /// \returns true if the peephole operation succeeded, in which case
+    /// \c expr already subsumes the upcast.
+    bool peepholeCollectionUpcast(Expr *expr, Type toType,  bool bridged,
+                                  ConstraintLocatorBuilder locator);
+
     /// \brief Build a collection upcast expression.
     ///
     /// \param bridged Whether this is a bridging conversion, meaning that the
@@ -2946,9 +2965,9 @@ namespace {
                             expr->getAccessSemantics());
     }
 
-    Expr *visitArrayExpr(ArrayExpr *expr) {
-      Type openedType = cs.getType(expr);
-      Type arrayTy = simplifyType(openedType);
+    /// "Finish" an array expression by filling in the semantic expression.
+    ArrayExpr *finishArrayExpr(ArrayExpr *expr) {
+      Type arrayTy = cs.getType(expr);
       auto &tc = cs.getTypeChecker();
 
       ProtocolDecl *arrayProto
@@ -2987,7 +3006,7 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(cs.getType(elt));
         names.push_back(Identifier());
@@ -2997,13 +3016,13 @@ namespace {
       assert(isa<TupleType>(argType.getPointer()));
 
       Expr *arg =
-          TupleExpr::create(tc.Context, SourceLoc(),
-                            expr->getElements(),
-                            names,
-                            { },
-                            SourceLoc(), /*HasTrailingClosure=*/false,
-                            /*Implicit=*/true,
-                            argType);
+        TupleExpr::create(tc.Context, SourceLoc(),
+                          expr->getElements(),
+                          names,
+                          { },
+                          SourceLoc(), /*HasTrailingClosure=*/false,
+                          /*Implicit=*/true,
+                          argType);
 
       cs.cacheExprTypes(arg);
 
@@ -3018,7 +3037,14 @@ namespace {
       cs.cacheExprTypes(result);
 
       expr->setSemanticExpr(result);
+      return expr;
+    }
+
+    Expr *visitArrayExpr(ArrayExpr *expr) {
+      Type openedType = cs.getType(expr);
+      Type arrayTy = simplifyType(openedType);
       cs.setType(expr, arrayTy);
+      if (!finishArrayExpr(expr)) return nullptr;
 
       // If the array element type was defaulted, note that in the expression.
       if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
@@ -3027,11 +3053,11 @@ namespace {
       return expr;
     }
 
-    Expr *visitDictionaryExpr(DictionaryExpr *expr) {
-      Type openedType = cs.getType(expr);
-      Type dictionaryTy = simplifyType(openedType);
-      auto &tc = cs.getTypeChecker();
+    /// "Finish" a dictionary expression by filling in the semantic expression.
+    DictionaryExpr *finishDictionaryExpr(DictionaryExpr *expr) {
+      Type dictionaryTy = cs.getType(expr);
 
+      auto &tc = cs.getTypeChecker();
       ProtocolDecl *dictionaryProto
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::ExpressibleByDictionaryLiteral);
@@ -3068,7 +3094,7 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(cs.getType(elt));
         names.push_back(Identifier());
@@ -3101,7 +3127,14 @@ namespace {
       cs.cacheExprTypes(result);
 
       expr->setSemanticExpr(result);
+      return expr;
+    }
+
+    Expr *visitDictionaryExpr(DictionaryExpr *expr) {
+      Type openedType = cs.getType(expr);
+      Type dictionaryTy = simplifyType(openedType);
       cs.setType(expr, dictionaryTy);
+      if (!finishDictionaryExpr(expr)) return nullptr;
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
@@ -6201,14 +6234,38 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   }
 }
 
+/// Build the conversion of an element in a collection upcast.
+static Expr *buildElementConversion(ExprRewriter &rewriter,
+                                    SourceLoc srcLoc,
+                                    Type srcType,
+                                    Type destType,
+                                    bool bridged,
+                                    ConstraintLocatorBuilder locator,
+                                    Expr *element) {
+  auto &cs = rewriter.getConstraintSystem();
+
+  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
+  if (bridged &&
+      tc.typeCheckCheckedCast(srcType, destType,
+                              CheckedCastContextKind::None, cs.DC,
+                              SourceLoc(), nullptr, SourceRange())
+        != CheckedCastKind::Coercion) {
+    if (auto conversion =
+          rewriter.buildObjCBridgeExpr(element, destType, locator))
+        return conversion;
+  }
+
+  return rewriter.coerceToType(element, destType, locator);
+}
+
 static CollectionUpcastConversionExpr::ConversionPair
-buildElementConversion(ExprRewriter &rewriter,
-                       SourceLoc srcLoc,
-                       Type srcCollectionType,
-                       Type destCollectionType,
-                       bool bridged,
-                       ConstraintLocatorBuilder locator,
-                       unsigned typeArgIndex) {
+buildOpaqueElementConversion(ExprRewriter &rewriter,
+                             SourceLoc srcLoc,
+                             Type srcCollectionType,
+                             Type destCollectionType,
+                             bool bridged,
+                             ConstraintLocatorBuilder locator,
+                             unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
                                   ->getGenericArgs()[typeArgIndex];
@@ -6220,35 +6277,138 @@ buildElementConversion(ExprRewriter &rewriter,
   ASTContext &ctx = cs.getASTContext();
   auto opaque =
     rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcLoc, srcType));
-  Expr *conversion = nullptr;
 
-  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
-  if (bridged &&
-      tc.typeCheckCheckedCast(srcType, destType,
-                              CheckedCastContextKind::None, cs.DC,
-                              SourceLoc(), nullptr, SourceRange())
-        != CheckedCastKind::Coercion) {
-    conversion = rewriter.buildObjCBridgeExpr(opaque, destType,
-           locator.withPathElement(
-             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
-  }
-
-  if (!conversion) {
-    conversion = rewriter.coerceToType(opaque, destType,
-           locator.withPathElement(
-             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
-  }
+  Expr *conversion =
+    buildElementConversion(rewriter, srcLoc, srcType, destType, bridged,
+                           locator.withPathElement(
+                             ConstraintLocator::PathElement::getGenericArgument(
+                                typeArgIndex)),
+                           opaque);
 
   return { opaque, conversion };
 }
 
-Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
-                                              bool bridged,
-                                              ConstraintLocatorBuilder locator) {
+void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
+                                       bool bridged, Type elementType,
+                                       ConstraintLocatorBuilder locator) {
+  // Update the type of the array literal.
+  cs.setType(expr, toType);
+
+  // Convert the elements.
+  ConstraintLocatorBuilder innerLocator =
+    locator.withPathElement(
+                        ConstraintLocator::PathElement::getGenericArgument(0));
+  for (auto &element : expr->getElements()) {
+    if (auto newElement = buildElementConversion(*this, expr->getLoc(),
+                                                 cs.getType(element),
+                                                 elementType,
+                                                 bridged, innerLocator,
+                                                 element)) {
+      element = newElement;
+    }
+  }
+
+  (void)finishArrayExpr(expr);
+}
+
+void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
+                                            Type toType, bool bridged,
+                                            Type keyType, Type valueType,
+                                            ConstraintLocatorBuilder locator) {
+  // Update the type of the dictionary literal.
+  cs.setType(expr, toType);
+
+  ConstraintLocatorBuilder keyLocator =
+    locator.withPathElement(
+      ConstraintLocator::PathElement::getGenericArgument(0));
+  ConstraintLocatorBuilder valueLocator =
+    locator.withPathElement(
+      ConstraintLocator::PathElement::getGenericArgument(1));
+
+  // Convert the elements.
+  TupleTypeElt tupleTypeElts[2] = { keyType, valueType };
+  auto tupleType = TupleType::get(tupleTypeElts, cs.getASTContext());
+  for (auto element : expr->getElements()) {
+    if (auto tuple = dyn_cast<TupleExpr>(element)) {
+      auto key = tuple->getElement(0);
+      if (auto newKey = buildElementConversion(*this, expr->getLoc(),
+                                               cs.getType(key), keyType,
+                                               bridged, valueLocator, key))
+        tuple->setElement(0, newKey);
+
+      auto value = tuple->getElement(1);
+      if (auto newValue = buildElementConversion(*this, expr->getLoc(),
+                                                 cs.getType(value), valueType,
+                                                 bridged, valueLocator,
+                                                 value)) {
+        tuple->setElement(1, newValue);
+      }
+
+      cs.setType(tuple, tupleType);
+    }
+  }
+
+  (void)finishDictionaryExpr(expr);
+}
+
+bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
+                                            bool bridged,
+                                            ConstraintLocatorBuilder locator) {
+  // Recurse into parenthesized expressions.
+  if (auto paren = dyn_cast<ParenExpr>(expr)) {
+    // If we can't peephole the subexpression, we're done.
+    if (!peepholeCollectionUpcast(paren->getSubExpr(), toType, bridged,
+                                  locator))
+      return false;
+
+    // Update the type of this expression.
+    cs.setType(paren, ParenType::get(cs.getASTContext(),
+                                     cs.getType(paren->getSubExpr())));
+    return true;
+  }
+
+  // Array literals.
+  if (auto arrayLiteral = dyn_cast<ArrayExpr>(expr)) {
+    if (Optional<Type> elementType = ConstraintSystem::isArrayType(toType)) {
+      peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
+      return true;
+    }
+
+    if (Optional<Type> elementType = ConstraintSystem::isSetType(toType)) {
+      peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
+      return true;
+    }
+
+    return false;
+  }
+
+  // Dictionary literals.
+  if (auto dictLiteral = dyn_cast<DictionaryExpr>(expr)) {
+    if (auto elementType = ConstraintSystem::isDictionaryType(toType)) {
+      peepholeDictionaryUpcast(dictLiteral, toType, bridged,
+                               elementType->first, elementType->second,
+                               locator);
+      return true;
+    }
+
+    return false;
+  }
+
+  return false;
+}
+
+Expr *ExprRewriter::buildCollectionUpcastExpr(
+                                            Expr *expr, Type toType,
+                                            bool bridged,
+                                            ConstraintLocatorBuilder locator) {
+  if (peepholeCollectionUpcast(expr, toType, bridged, locator))
+    return expr;
+
   ASTContext &ctx = cs.getASTContext();
   // Build the first value conversion.
-  auto conv = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                     toType, bridged, locator, 0);
+  auto conv =
+    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                 toType, bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (ConstraintSystem::isArrayType(toType) ||
@@ -6261,8 +6421,9 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
          "Unhandled collection upcast");
 
   // Build the second value conversion.
-  auto conv2 = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                      toType, bridged, locator, 1);
+  auto conv2 =
+    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                 toType, bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
