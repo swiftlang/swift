@@ -2,7 +2,7 @@
 // RUN: %FileCheck %s < %t.ast
 
 // Verify that upcasts of array literals upcast the individual elements in place
-// rather than
+// rather than introducing a collection_upcast_expr.
 
 protocol P { }
 struct X : P { }

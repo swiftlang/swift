@@ -554,7 +554,7 @@ namespace {
                                   Type valueType,
                                   ConstraintLocatorBuilder locator);
 
-    /// Try to peephole the collection upcast, eliminating that need for
+    /// Try to peephole the collection upcast, eliminating the need for
     /// a separate collection-upcast expression.
     ///
     /// \returns true if the peephole operation succeeded, in which case
@@ -6244,22 +6244,18 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
                                     Expr *element) {
   auto &cs = rewriter.getConstraintSystem();
 
-  Expr *conversion = nullptr;
-
   auto &tc = rewriter.getConstraintSystem().getTypeChecker();
   if (bridged &&
       tc.typeCheckCheckedCast(srcType, destType,
                               CheckedCastContextKind::None, cs.DC,
                               SourceLoc(), nullptr, SourceRange())
         != CheckedCastKind::Coercion) {
-    conversion = rewriter.buildObjCBridgeExpr(element, destType, locator);
+    if (auto conversion =
+          rewriter.buildObjCBridgeExpr(element, destType, locator))
+        return conversion;
   }
 
-  if (!conversion) {
-    conversion = rewriter.coerceToType(element, destType, locator);
-  }
-
-  return conversion;
+  return rewriter.coerceToType(element, destType, locator);
 }
 
 static CollectionUpcastConversionExpr::ConversionPair
