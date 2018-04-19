@@ -173,7 +173,8 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
   case SyntaxKind::OptionalChainingExpr:
   case SyntaxKind::ForcedValueExpr:
   case SyntaxKind::PostfixUnaryExpr:
-  case SyntaxKind::TernaryExpr: {
+  case SyntaxKind::TernaryExpr:
+  case SyntaxKind::AvailabilityLabeledArgument: {
     auto Pair = SyntaxFactory::countChildren(Kind);
     assert(Pair.first == Pair.second);
     createNodeInPlace(Kind, Pair.first);

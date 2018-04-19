@@ -3475,6 +3475,8 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 ///     "swift" version-tuple
 ParserResult<LanguageVersionConstraintAvailabilitySpec>
 Parser::parseLanguageVersionConstraintSpec() {
+  SyntaxParsingContext VersionRestrictionContext(
+      SyntaxContext, SyntaxKind::AvailabilityVersionRestriction);
   SourceLoc SwiftLoc;
   clang::VersionTuple Version;
   SourceRange VersionRange;
@@ -3498,6 +3500,9 @@ Parser::parseLanguageVersionConstraintSpec() {
 ///     identifier version-comparison version-tuple
 ParserResult<PlatformVersionConstraintAvailabilitySpec>
 Parser::parsePlatformVersionConstraintSpec() {
+  SyntaxParsingContext VersionRestrictionContext(
+      SyntaxContext, SyntaxKind::AvailabilityVersionRestriction);
+
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
