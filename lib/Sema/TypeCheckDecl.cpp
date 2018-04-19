@@ -8745,36 +8745,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   bool FoundMemberwiseInitializedProperty = false;
   bool SuppressDefaultInitializer = false;
   bool SuppressMemberwiseInitializer = false;
-  bool FoundSynthesizedInit = false;
   bool FoundDesignatedInit = false;
-
-  // Before we look for constructors, we need to make sure that all synthesized
-  // initializers are properly synthesized.
-  //
-  // NOTE: Lookups of synthesized initializers MUST come after
-  //       decl->setAddedImplicitInitializers() in case synthesis requires
-  //       protocol conformance checking, which might be recursive here.
-  // FIXME: Disable this code and prevent _any_ implicit constructors from doing
-  //        this. Investigate why this hasn't worked otherwise.
-  DeclName synthesizedInitializers[1] = {
-    // init(from:) is synthesized by derived conformance to Decodable.
-    DeclName(Context, DeclBaseName::createConstructor(), Context.Id_from)
-  };
-
-  auto initializerIsSynthesized = [=](ConstructorDecl *initializer) {
-    if (!initializer->isImplicit())
-      return false;
-
-    for (auto &name : synthesizedInitializers)
-      if (initializer->getFullName() == name)
-        return true;
-
-    return false;
-  };
-
-  for (auto &name : synthesizedInitializers) {
-    synthesizeMemberForLookup(decl, name);
-  }
 
   SmallPtrSet<CanType, 4> initializerParamTypes;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
@@ -8797,13 +8768,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   } else {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        // Synthesized initializers others than the default initializer should
-        // not prevent default initializer synthesis.
-        if (initializerIsSynthesized(ctor)) {
-          FoundSynthesizedInit = true;
-        } else if (ctor->isDesignatedInit()) {
+        // Initializers that were synthesized to fulfill derived conformances
+        // should not prevent default initializer synthesis.
+        if (ctor->isDesignatedInit() && !ctor->isSynthesized())
           FoundDesignatedInit = true;
-        }
 
         if (isa<StructDecl>(decl))
           continue;
@@ -8900,12 +8868,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
   if (classDecl->hasSuperclass()) {
-    bool canInheritInitializers = !FoundDesignatedInit;
+    bool canInheritInitializers = (!SuppressDefaultInitializer &&
+                                   !FoundDesignatedInit);
 
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (SuppressDefaultInitializer && !FoundDesignatedInit
-        && !FoundSynthesizedInit && !classDecl->hasClangNode()) {
+    if (SuppressDefaultInitializer && !FoundDesignatedInit &&
+        !classDecl->hasClangNode()) {
       return;
     }
 
