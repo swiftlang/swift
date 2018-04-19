@@ -2954,9 +2954,19 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
   auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
   ManagedValue origVal = visit(origExpr, C).getAsSingleValue(SGF, loc);
   auto origSILTy = origVal.getType().getAs<SILFunctionType>();
-  // Lower Swift parameter indices to SIL parameter indices.
+  // Lower Swift parameters to SIL parameters.
+  auto diffParams = E->getParameters();
+  // If no differentiation parameters are specified, differentiation is done
+  // with respect to all of original's parameters.
+  if (E->getParameters().empty()) {
+    SmallVector<AutoDiffParameter, 8> allParamIndices;
+    for (unsigned i = 0, n = origTy->getNumParams(); i != n; ++i)
+      allParamIndices.push_back(
+        AutoDiffParameter::getIndexParameter(E->getStartLoc(), i));
+    diffParams = allParamIndices;
+  }
   SmallVector<unsigned, 8> loweredParamIndices;
-  for (auto param : E->getParameters()) {
+  for (auto param : diffParams) {
     switch (param.getKind()) {
     case swift::AutoDiffParameter::Kind::Index: {
       auto silParamIndices =

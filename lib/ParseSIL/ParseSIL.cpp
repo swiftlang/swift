@@ -2637,27 +2637,27 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GradientInst: {
-    // Parse optional [wrt ...].
+    // Parse [wrt ...].
     SmallVector<unsigned, 8> paramIndices;
-    if (P.consumeIf(tok::l_square)) {
-      if (parseVerbatim("wrt")) return true;
-      auto parseIndex = [&] {
-        unsigned index;
-        SourceLoc indexLoc;
-        if (P.parseUnsignedInteger(index, indexLoc,
-              diag::sil_reverse_autodiff_expected_parameter_index))
-          return true;
-        paramIndices.push_back(index);
-        return false;
-      };
+    if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
+        parseVerbatim("wrt"))
+      return true;
+    auto parseIndex = [&] {
+      unsigned index;
+      SourceLoc indexLoc;
+      if (P.parseUnsignedInteger(index, indexLoc,
+                           diag::sil_reverse_autodiff_expected_parameter_index))
+        return true;
+      paramIndices.push_back(index);
+      return false;
+    };
+    if (parseIndex())
+      return true;
+    while (P.consumeIf(tok::comma))
       if (parseIndex())
         return true;
-      while (P.consumeIf(tok::comma))
-        if (parseIndex())
-          return true;
-      if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
-        return true;
-    }
+    if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+      return true;
     // Parse optional [seedable] and optional [preserving_result].
     bool seedable = false;
     bool preservingResult = false;
