@@ -2635,36 +2635,14 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
   if (D->isFinal() && !isNSManaged)
     return;
 
-  // Variables declared with 'let' cannot be 'dynamic'.
-  if (auto VD = dyn_cast<VarDecl>(D)) {
-    auto staticSpelling = VD->getParentPatternBinding()->getStaticSpelling();
-
-    // The presence of 'static' blocks the inference of 'dynamic'.
-    if (staticSpelling == StaticSpellingKind::KeywordStatic)
-      return;
-
-    if (VD->isLet() && !isNSManaged)
-      return;
-  }
-
   // Accessors should not infer 'dynamic' on their own; they can get it from
   // their storage decls.
-  if (auto FD = dyn_cast<FuncDecl>(D)) {
-    if (isa<AccessorDecl>(FD))
-      return;
+  if (isa<AccessorDecl>(D))
+    return;
 
-    auto staticSpelling = FD->getStaticSpelling();
-
-    // The presence of 'static' bocks the inference of 'dynamic'.
-    if (staticSpelling == StaticSpellingKind::KeywordStatic)
-      return;
-  }
-
-  // The presence of 'final' on a class prevents 'dynamic'.
+  // Only classes can use 'dynamic'.
   auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
-  if (!classDecl) return;
-  if (!isNSManaged && classDecl->isFinal() &&
-      !classDecl->requiresStoredPropertyInits())
+  if (!classDecl)
     return;
 
   // Add the 'dynamic' attribute.
@@ -7107,17 +7085,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
 
-      // Infer 'dynamic' before touching accessors.
-      inferDynamic(Context, VD);
-
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
       auto staticSpelling =
           VD->getParentPatternBinding()->getStaticSpelling();
       inferFinalAndDiagnoseIfNeeded(*this, VD, staticSpelling);
 
-      if (VD->isLet() &&
-          VD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      if (VD->isLet() && isa<ClassDecl>(nominalDecl)) {
         makeFinal(Context, VD);
 
         if (VD->getFormalAccess() == AccessLevel::Open) {
@@ -7130,6 +7104,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           fixItAccess(inFlightDiag, D, AccessLevel::Public);
         }
       }
+
+      // Infer 'dynamic' after 'final' but before touching accessors.
+      inferDynamic(Context, VD);
     }
 
     // Perform accessor-related validation.
@@ -7427,6 +7404,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                                                      errorConvention)))
         isObjC = None;
       markAsObjC(*this, FD, isObjC, errorConvention);
+
+      inferFinalAndDiagnoseIfNeeded(*this, FD, FD->getStaticSpelling());
+      inferDynamic(Context, FD);
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
@@ -7440,11 +7420,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
     }
-
-    inferDynamic(Context, FD);
-
-    // If this is a class member, mark it final if the class is final.
-    inferFinalAndDiagnoseIfNeeded(*this, FD, FD->getStaticSpelling());
 
     checkDeclAttributes(FD);
 
