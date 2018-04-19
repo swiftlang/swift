@@ -303,7 +303,7 @@ function(_add_variant_swift_compile_flags
   set(result ${${result_var_name}})
 
   # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
-  if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+  if (NOT "${sdk}" STREQUAL "WINDOWS")
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
