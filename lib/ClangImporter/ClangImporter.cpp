@@ -568,6 +568,20 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     }
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Include platform-specific standard library modulemaps.
+  SmallString<128> platformSpecificModuleMapDir;
+  platformSpecificModuleMapDir = searchPathOpts.RuntimeResourcePath;
+  llvm::sys::path::append(
+    platformSpecificModuleMapDir,
+    swift::getPlatformNameForTriple(triple),
+    swift::getMajorArchitectureName(triple),
+    "modulemaps");
+  if (llvm::sys::fs::exists(platformSpecificModuleMapDir)) {
+    invocationArgStrs.push_back("-I");
+    invocationArgStrs.push_back(platformSpecificModuleMapDir.str());
+  }
+
   if (searchPathOpts.SDKPath.empty()) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
