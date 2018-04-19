@@ -33,7 +33,8 @@
 @#^KEYWORD2^#
 func method(){}
 
-// KEYWORD2:                  Begin completions, 11 items
+// SWIFT_ENABLE_TENSORFLOW
+// KEYWORD2:                  Begin completions, 13 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
@@ -45,6 +46,8 @@ func method(){}
 // KEYWORD2-NEXT:             Keyword/None:                       warn_unqualified_access[#Func Attribute#]; name=warn_unqualified_access{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       usableFromInline[#Func Attribute#]; name=usableFromInline
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
+// SWIFT_ENABLE_TENSORFLOW
+// KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // KEYWORD2-NEXT:             End completions
 
 @#^KEYWORD3^#
@@ -83,7 +86,8 @@ struct S{}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST:                  Begin completions, 21 items
+// SWIFT_ENABLE_TENSORFLOW
+// KEYWORD_LAST:                  Begin completions, 23 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
@@ -105,4 +109,6 @@ struct S{}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
+// SWIFT_ENABLE_TENSORFLOW
+// KEYWORD_LAST-NEXT:             Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
 // KEYWORD_LAST-NEXT:             End completions
