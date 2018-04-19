@@ -6,6 +6,12 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_no_asserts
 
+// SWIFT_ENABLE_TENSORFLOW
+// Optimizations are currently enabled for -Oplayground, causing the original
+// PLAYGROUND checks to fail.
+// Until optimizations are no longer needed for deabstraction/partitioning, the
+// PLAYGROUND checks will temporarily be changed to match the RELEASE checks.
+
 func test_assert(x: Int, y: Int) -> Int {
   assert(x >= y , "x smaller than y")
   return x + y
@@ -35,10 +41,11 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG: cond_fail
 // DEBUG: return
 
+// SWIFT_ENABLE_TENSORFLOW: temporarily change PLAYGROUND checks to match RELEASE checks.
 // In playground mode keep user asserts and runtime checks.
 // PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions11test_assert1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
-// PLAYGROUND: "x smaller than y"
-// PLAYGROUND: "Assertion failed"
+// PLAYGROUND-NOT: "x smaller than y"
+// PLAYGROUND-NOT: "Assertion failed"
 // PLAYGROUND: cond_fail
 
 // In release mode remove user asserts and keep runtime checks.
@@ -61,12 +68,13 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
-// In playground mode keep verbose fatal errors.
+// SWIFT_ENABLE_TENSORFLOW: temporarily change PLAYGROUND checks to match RELEASE checks.
+// In playground mode keep succinct fatal errors (trap).
 // PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions10test_fatal1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
-// PLAYGROUND-DAG: "Human nature ..."
-// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC:.*fatalErrorMessage.*]] : $@convention(thin)
-// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
-// PLAYGROUND: unreachable
+// PLAYGROUND-NOT: "Human nature ..."
+// PLAYGROUND-NOT: "Fatal error"
+// PLAYGROUND: cond_fail
+// PLAYGROUND: return
 
 // In release mode keep succinct fatal errors (trap).
 // RELEASE-LABEL: sil hidden @$S19OptimizationOptions10test_fatal1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
@@ -91,13 +99,13 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG: unreachable
 // DEBUG: return
 
-// In playground mode keep verbose library precondition checks.
+// SWIFT_ENABLE_TENSORFLOW: temporarily change PLAYGROUND checks to match RELEASE checks.
+// In playground mode keep succinct library precondition checks (trap).
 // PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions23test_precondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
-// PLAYGROUND-DAG: "Fatal error"
-// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
-// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
-// PLAYGROUND: unreachable
-// PLAYGROUND: return
+// PLAYGROUND-NOT:  "Fatal error"
+// PLAYGROUND:  %[[V2:.+]] = builtin "xor_Int1"(%{{.+}}, %{{.+}})
+// PLAYGROUND:  cond_fail %[[V2]]
+// PLAYGROUND:  return
 
 // In release mode keep succinct library precondition checks (trap).
 // RELEASE-LABEL: sil hidden @$S19OptimizationOptions23test_precondition_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
@@ -122,12 +130,13 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // DEBUG: apply %[[FATAL_ERROR]]({{.*}})
 // DEBUG: unreachable
 
-// In playground mode keep verbose partial safety checks.
+// SWIFT_ENABLE_TENSORFLOW: temporarily change PLAYGROUND checks to match RELEASE checks.
+// In playground mode remove partial safety checks.
 // PLAYGROUND-LABEL: sil hidden @$S19OptimizationOptions25test_partial_safety_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
-// PLAYGROUND-DAG: "Fatal error"
-// PLAYGROUND-DAG: %[[FATAL_ERROR:.+]] = function_ref @[[FATAL_ERROR_FUNC]]
-// PLAYGROUND: apply %[[FATAL_ERROR]]({{.*}})
-// PLAYGROUND: unreachable
+// PLAYGROUND-NOT:  "Fatal error"
+// PLAYGROUND-NOT:  builtin "int_trap"
+// PLAYGROUND-NOT:  unreachable
+// PLAYGROUND: return
 
 // In release mode remove partial safety checks.
 // RELEASE-LABEL: sil hidden @$S19OptimizationOptions25test_partial_safety_check1x1yS2i_SitF : $@convention(thin) (Int, Int) -> Int {
