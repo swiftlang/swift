@@ -11,7 +11,7 @@ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6
 ## Upgrade CMake
 You'll need to upgrade your CMake toolchain to a supported version by building a local copy. The minimum required version of CMake may change, and may not be available on Ubuntu 14.04 in the future.
 ```bash
-wget http://www.cmake.org/files/v3.5/cmake-3.5.2.tar.gz
+wget https://cmake.org/files/v3.5/cmake-3.5.2.tar.gz
 tar xf cmake-3.5.2.tar.gz
 cd cmake-3.5.2
 ./configure
