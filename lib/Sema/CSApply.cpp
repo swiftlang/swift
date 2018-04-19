@@ -2801,6 +2801,15 @@ namespace {
       }
 
       auto selected = *selectedElt;
+      if (!selected.choice.getBaseType()) {
+        // This is one of the "outer alternatives", meaning the innermost
+        // methods didn't work out.
+        return buildDeclRef(selected.choice, nameLoc, selected.openedFullType,
+                            memberLocator, implicit,
+                            selected.choice.getFunctionRefKind(),
+                            AccessSemantics::Ordinary);
+      }
+
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
         base = cs.coerceToRValue(base);
