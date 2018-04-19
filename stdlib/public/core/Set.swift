@@ -494,7 +494,7 @@ extension Set: Hashable {
     for member in self {
       hash ^= _hashValue(for: member)
     }
-    hasher.append(hash)
+    hasher.combine(hash)
   }
 }
 
@@ -2041,8 +2041,8 @@ extension _NativeSetBuffer where Element: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(seed: _storage.seed)
-    hasher.append(k)
+    var hasher = _Hasher(_seed: _storage.seed)
+    hasher.combine(k)
     return hasher.finalize() & _bucketMask
   }
 

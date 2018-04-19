@@ -198,7 +198,7 @@ extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(base)
+    hasher.combine(base)
   }
 }
 

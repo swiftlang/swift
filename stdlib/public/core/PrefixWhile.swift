@@ -211,9 +211,9 @@ extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
   public func _hash(into hasher: inout _Hasher) {
     switch _value {
     case .index(let value):
-      hasher.append(value)
+      hasher.combine(value)
     case .pastEnd:
-      hasher.append(Int.max)
+      hasher.combine(Int.max)
     }
   }
 }

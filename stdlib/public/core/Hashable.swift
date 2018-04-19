@@ -114,17 +114,19 @@ public protocol Hashable : Equatable {
 }
 
 extension Hashable {
+  @inlinable
   @inline(__always)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(self.hashValue)
+    hasher.combine(self.hashValue)
   }
 }
 
 // Called by synthesized `hashValue` implementations.
+@inlinable
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
   var hasher = _Hasher()
-  hasher.append(value)
+  hasher.combine(value)
   return hasher.finalize()
 }
 
