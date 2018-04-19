@@ -8878,8 +8878,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-    if (!FoundDesignatedInit && !SuppressMemberwiseInitializer
-        && !structDecl->hasUnreferenceableStorage()) {
+    assert(!structDecl->hasUnreferenceableStorage() &&
+           "User-defined structs cannot have unreferenceable storage");
+
+    if (!FoundDesignatedInit && !SuppressMemberwiseInitializer) {
       // For a struct with memberwise initialized properties, we add a
       // memberwise init.
       if (FoundMemberwiseInitializedProperty) {
