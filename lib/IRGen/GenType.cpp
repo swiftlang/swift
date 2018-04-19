@@ -1064,7 +1064,15 @@ static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()),
-    FirstProtocol(invalidProtocolInfo()) {}
+    FirstProtocol(invalidProtocolInfo()) {
+  // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
+  // the size of resilient types. Of course this is not the right long term
+  // solution, because it won't work once the swiftmodule file is not in
+  // sync with the binary module. Once LLDB can calculate type layouts at
+  // runtime (using remote mirrors or some other mechanism), we can remove this.
+  if (IGM.IRGen.Opts.EnableResilienceBypass)
+    CompletelyFragile = true;
+}
 
 TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.

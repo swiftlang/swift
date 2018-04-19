@@ -222,17 +222,21 @@ public:
 
 /// An RAII interface for forcing types to be lowered bypassing resilience.
 class CompletelyFragileScope {
+  bool State;
   TypeConverter &TC;
 public:
   CompletelyFragileScope(TypeConverter &TC) : TC(TC) {
-    TC.pushCompletelyFragile();
+    State = TC.isCompletelyFragile();
+    if (!State)
+      TC.pushCompletelyFragile();
   }
 
   CompletelyFragileScope(IRGenModule &IGM)
     : CompletelyFragileScope(IGM.Types) {}
 
   ~CompletelyFragileScope() {
-    TC.popCompletelyFragile();
+    if (!State)
+      TC.popCompletelyFragile();
   }
 };
 
