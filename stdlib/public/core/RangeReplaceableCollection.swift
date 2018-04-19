@@ -458,6 +458,12 @@ extension RangeReplaceableCollection {
       append(element)
     }
   }
+  
+  @inlinable
+  public mutating func append<C : Collection>(contentsOf newElements: C)
+    where C.Element == Element {
+      replaceSubrange(endIndex..<endIndex, with: newElements)
+  }
 
   /// Inserts a new element into the collection at the specified position.
   ///
