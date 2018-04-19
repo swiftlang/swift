@@ -1213,6 +1213,7 @@ static void validatePatternBindingEntries(TypeChecker &tc,
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isFinal()) {
+    assert(isa<ClassDecl>(D) || D->isPotentiallyOverridable());
     D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
   }
 }
@@ -1221,6 +1222,57 @@ void swift::makeDynamic(ASTContext &ctx, ValueDecl *D) {
   if (D && !D->isDynamic()) {
     D->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit=*/true));
   }
+}
+
+namespace {
+// The raw values of this enum must be kept in sync with
+// diag::implicitly_final_cannot_be_open.
+enum class ImplicitlyFinalReason : unsigned {
+  /// A property was declared with 'let'.
+  Let,
+  /// The containing class is final.
+  FinalClass,
+  /// A member was declared as 'static'.
+  Static
+};
+}
+
+static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
+                                          StaticSpellingKind staticSpelling) {
+  auto cls = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!cls)
+    return;
+
+  // Are there any reasons to infer 'final'? Prefer 'static' over the class
+  // being final for the purposes of diagnostics.
+  Optional<ImplicitlyFinalReason> reason;
+  if (staticSpelling == StaticSpellingKind::KeywordStatic) {
+    reason = ImplicitlyFinalReason::Static;
+
+    if (auto finalAttr = D->getAttrs().getAttribute<FinalAttr>()) {
+      auto finalRange = finalAttr->getRange();
+      if (finalRange.isValid()) {
+        TC.diagnose(finalRange.Start, diag::static_decl_already_final)
+        .fixItRemove(finalRange);
+      }
+    }
+  } else if (cls->isFinal()) {
+    reason = ImplicitlyFinalReason::FinalClass;
+  }
+
+  if (!reason)
+    return;
+
+  if (D->getFormalAccess() == AccessLevel::Open) {
+    auto diagID = diag::implicitly_final_cannot_be_open;
+    if (!TC.Context.isSwiftVersionAtLeast(5))
+      diagID = diag::implicitly_final_cannot_be_open_swift4;
+    auto inFlightDiag = TC.diagnose(D, diagID,
+                                    static_cast<unsigned>(reason.getValue()));
+    fixItAccess(inFlightDiag, D, AccessLevel::Public);
+  }
+
+  makeFinal(TC.Context, D);
 }
 
 /// Configure the implicit 'self' parameter of a function, setting its type,
@@ -7060,33 +7112,22 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
-      if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
-        if (cls->isFinal() || VD->isLet()) {
-          if (!VD->isFinal()) {
-            makeFinal(Context, VD);
-          }
-        }
-        if (VD->isLet() && VD->getFormalAccess() == AccessLevel::Open) {
-          auto diagID = diag::let_cannot_be_open;
+      auto staticSpelling =
+          VD->getParentPatternBinding()->getStaticSpelling();
+      inferFinalAndDiagnoseIfNeeded(*this, VD, staticSpelling);
+
+      if (VD->isLet() &&
+          VD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+        makeFinal(Context, VD);
+
+        if (VD->getFormalAccess() == AccessLevel::Open) {
+          auto diagID = diag::implicitly_final_cannot_be_open;
           if (!Context.isSwiftVersionAtLeast(5))
-            diagID = diag::let_cannot_be_open_swift4;
-          auto inFlightDiag = diagnose(VD, diagID);
-          fixItAccess(inFlightDiag, VD, AccessLevel::Public);
-        }
-        if (VD->isStatic()) {
-          auto staticSpelling =
-            VD->getParentPatternBinding()->getStaticSpelling();
-          if (staticSpelling == StaticSpellingKind::KeywordStatic) {
-            auto finalAttr = VD->getAttrs().getAttribute<FinalAttr>();
-            if (finalAttr) {
-              auto finalRange = finalAttr->getRange();
-              if (finalRange.isValid())
-                diagnose(finalRange.Start, diag::decl_already_final)
-                .highlight(finalRange)
-                .fixItRemove(finalRange);
-            }
-            makeFinal(Context, VD);
-          }
+            diagID = diag::implicitly_final_cannot_be_open_swift4;
+          auto inFlightDiag =
+              diagnose(D, diagID,
+                       static_cast<unsigned>(ImplicitlyFinalReason::Let));
+          fixItAccess(inFlightDiag, D, AccessLevel::Public);
         }
       }
     }
@@ -7403,24 +7444,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     inferDynamic(Context, FD);
 
     // If this is a class member, mark it final if the class is final.
-    if (auto cls = FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (cls->isFinal() && !FD->isFinal()) {
-        makeFinal(Context, FD);
-      }
-      // static func declarations in classes are synonyms
-      // for `class final func` declarations.
-      if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
-        auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
-        if (finalAttr) {
-          auto finalRange = finalAttr->getRange();
-          if (finalRange.isValid())
-            diagnose(finalRange.Start, diag::decl_already_final)
-              .highlight(finalRange)
-              .fixItRemove(finalRange);
-        }
-        makeFinal(Context, FD);
-      }
-    }
+    inferFinalAndDiagnoseIfNeeded(*this, FD, FD->getStaticSpelling());
 
     checkDeclAttributes(FD);
 
@@ -7736,11 +7760,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Member subscripts need some special validation logic.
     if (auto nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
       // If this is a class member, mark it final if the class is final.
-      if (auto cls = dyn_cast<ClassDecl>(nominalDecl)) {
-        if (cls->isFinal() && !SD->isFinal()) {
-          makeFinal(Context, SD);
-        }
-      }
+      inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
 
       // A subscript is ObjC-compatible if it's explicitly @objc, or a
       // member of an ObjC-compatible class or protocol.

@@ -2008,16 +2008,18 @@ ERROR(override_mutable_covariant_property,none,
 ERROR(override_mutable_covariant_subscript,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
-ERROR(decl_already_final,none,
+ERROR(static_decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
-ERROR(let_cannot_be_open,none,
-      "'let' properties are implicitly 'final'; use 'public' instead of "
-      "'open'", ())
-WARNING(let_cannot_be_open_swift4,none,
-        "'let' properties are implicitly 'final'; use 'public' instead of "
-        "'open'", ())
+ERROR(implicitly_final_cannot_be_open,none,
+      "%select{'let' properties|members of 'final' classes|"
+      "static declarations}0 are implicitly 'final'; use 'public' instead of "
+      "'open'", (unsigned))
+WARNING(implicitly_final_cannot_be_open_swift4,none,
+        "%select{'let' properties|members of 'final' classes|"
+        "static declarations}0 are implicitly 'final'; use 'public' instead of "
+        "'open'", (unsigned))
 
 WARNING(override_swift3_objc_inference,none,
         "override of %0 %1 from extension of %2 depends on deprecated "
