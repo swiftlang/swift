@@ -48,6 +48,12 @@ HashingTestSuite.test("Hasher/DefaultKey") {
 
   let defaultHash = _hashValue(for: value)
 
+  var rawHash = value._rawHashValue(seed: Hasher._seed)
+  expectEqual(rawHash, defaultHash)
+
+  var oneShotHash = Hasher._hash(seed: Hasher._seed, value)
+  expectEqual(oneShotHash, defaultHash)
+
   var defaultHasher = Hasher()
   defaultHasher._combine(value)
   expectEqual(defaultHasher.finalize(), defaultHash)
