@@ -1272,14 +1272,9 @@ public:
     auto config = GI->getConfiguration();
     SmallVector<unsigned, 8> allParamIndices;
     ArrayRef<unsigned> paramIndices = config.parameterIndices;
-    // If no differentiation parameters are specified, differentiation is done
-    // with respect to all of original's parameters. For simplicity, we add all
-    // parameter indices to a temporary.
-    if (config.parameterIndices.empty()) {
-      for (unsigned i = 0, n = origFnTy->getNumParameters(); i != n; ++i)
-        allParamIndices.push_back(i);
-      paramIndices = allParamIndices;
-    }
+    require(!config.parameterIndices.empty(),
+            "Parameter indices cannot be empty; they must be explicitly "
+            "specified");
     // Verify differentiation parameters.
     int lastIndex = -1;
     for (unsigned i = 0, n = paramIndices.size(); i != n; ++i) {
