@@ -600,6 +600,7 @@ public extension PyValue {
 // require an instance named "Python", which is unconventional, but does what we
 // need.
 /// The Python interface.
+@_fixed_layout
 public let Python = PythonInterface()
 
 @_fixed_layout
