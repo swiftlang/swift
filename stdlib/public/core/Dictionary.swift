@@ -1453,12 +1453,27 @@ extension Dictionary: Hashable where Value: Hashable {
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
-      var elementHasher = Hasher()
+      // Note that we use a copy of the outer hasher here. This makes collisions
+      // dependent on its state, eliminating static collision patterns.
+      var elementHasher = hasher
       elementHasher.combine(k)
       elementHasher.combine(v)
       commutativeHash ^= elementHasher._finalize()
     }
     hasher.combine(commutativeHash)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    var commutativeHash = 0
+    let hasher = Hasher(_seed: seed)
+    for (k, v) in self {
+      var elementHasher = hasher
+      elementHasher.combine(k)
+      elementHasher.combine(v)
+      commutativeHash ^= elementHasher._finalize()
+    }
+    return commutativeHash
   }
 }
 
@@ -4323,11 +4338,6 @@ extension Dictionary.Index {
       _preconditionFailure("Comparing indexes from different sets")
   #endif
     }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
   }
 
   @inlinable // FIXME(sil-serialize-all)

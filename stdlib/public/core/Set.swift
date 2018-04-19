@@ -487,11 +487,16 @@ extension Set: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
+    hasher.combine(_rawHashValue(seed: hasher._generateSeed()))
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
     var hash = 0
     for member in self {
-      hash ^= _hashValue(for: member)
+      hash ^= member._rawHashValue(seed: seed)
     }
-    hasher.combine(hash)
+    return hash
   }
 }
 
@@ -3645,11 +3650,6 @@ extension Set.Index {
       _preconditionFailure("Comparing indexes from different sets")
   #endif
     }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
   }
 
   @inlinable // FIXME(sil-serialize-all)
