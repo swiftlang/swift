@@ -300,9 +300,17 @@ static CodingKeysValidity hasValidCodingKeysEnum(TypeChecker &tc,
   if (!tc.conformsToProtocol(codingKeysType, codingKeyProto,
                              target->getDeclContext(),
                              ConformanceCheckFlags::Used)) {
-    tc.diagnose(codingKeysTypeDecl->getLoc(),
-                diag::codable_codingkeys_type_does_not_conform_here,
+    // If CodingKeys is a typealias which doesn't point to a valid nominal type,
+    // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
+    // the location of the usage, since there isn't an underlying type to
+    // diagnose on.
+    SourceLoc loc = codingKeysTypeDecl ?
+                    codingKeysTypeDecl->getLoc() :
+                    cast<TypeDecl>(result)->getLoc();
+
+    tc.diagnose(loc, diag::codable_codingkeys_type_does_not_conform_here,
                 proto->getDeclaredType());
+
     return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
   }
 
