@@ -32,30 +32,11 @@ struct SwiftArguments {
 };
 
 enum class OperationKind : uint64_t {
-  SimpleParse = 1 << 0,
-  PerformSema = 1 << 1,
-  AnnotAndDiag = 1 << 2,
+  PerformSema = 1 << 0,
+  IndexSource = 1 << 1,
+  CodeCompletion = 1 << 2,
 
-  ReadSyntaxInfo = 1 << 3,
-  ReadDiagnostics = 1 << 4,
-  ReadSemanticInfo = 1 << 5,
-
-  IndexModule = 1 << 6,
-  IndexSource = 1 << 7,
-
-  CursorInfoForIFaceGen = 1 << 8,
-  CursorInfoForSource = 1 << 9,
-
-  ExpandPlaceholder = 1 << 10,
-  FormatText = 1 << 11,
-  RelatedIdents = 1 << 12,
-  CodeCompletion = 1 << 13,
-  OpenInterface = 1 << 14,
-  OpenHeaderInterface = 1 << 15,
-
-  CodeCompletionInit = 1 << 16,
-
-  Last = CodeCompletionInit,
+  Last = CodeCompletion,
   All = (Last << 1) - 1
 };
 
@@ -63,11 +44,6 @@ typedef std::vector<std::pair<std::string, std::string>> StringPairs;
 
 struct SwiftInvocation {
   SwiftArguments Args;
-  StringPairs Files;
-
-  void addFile(std::string FileName, std::string Text) {
-    Files.push_back(std::make_pair(std::move(FileName), std::move(Text)));
-  }
 };
   
 class TraceConsumer {

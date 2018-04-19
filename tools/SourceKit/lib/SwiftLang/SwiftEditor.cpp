@@ -681,23 +681,8 @@ public:
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
   }
 
-  void initArgsAndPrimaryFile(trace::SwiftInvocation &Info) {
-    Info.Args.PrimaryFile = PrimaryFile;
-    Info.Args.Args = Args;
-  }
-
   void parse() {
     auto &P = Parser->getParser();
-
-    trace::TracedOperation TracedOp(trace::OperationKind::SimpleParse);
-    if (TracedOp.enabled()) {
-      trace::SwiftInvocation Info;
-      initArgsAndPrimaryFile(Info);
-      auto Text = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)->getBuffer();
-      Info.Files.push_back(std::make_pair(PrimaryFile, Text));
-      TracedOp.start(Info);
-    }
-
     bool Done = false;
     while (!Done) {
       P.parseTopLevel();
@@ -988,20 +973,9 @@ public:
     }
     unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
 
-    trace::TracedOperation TracedOp(trace::OperationKind::AnnotAndDiag);
-    if (TracedOp.enabled()) {
-      trace::SwiftInvocation SwiftArgs;
-      SemaInfoRef->getInvocation()->raw(SwiftArgs.Args.Args,
-                                        SwiftArgs.Args.PrimaryFile);
-      trace::initTraceFiles(SwiftArgs, CompIns);
-      TracedOp.start(SwiftArgs);
-    }
-
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
     Annotator.walk(AstUnit->getPrimarySourceFile());
     SemaToks = std::move(Annotator.SemaToks);
-
-    TracedOp.finish();
 
     SemaInfoRef->
       updateSemanticInfo(std::move(SemaToks),
@@ -1066,22 +1040,7 @@ struct SwiftEditorDocument::Implementation {
     : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
       SemanticInfo = new SwiftDocumentSemanticInfo(FilePath, LangSupport);
   }
-
-  void buildSwiftInv(trace::SwiftInvocation &Inv);
 };
-
-void SwiftEditorDocument::Implementation::buildSwiftInv(
-                                                  trace::SwiftInvocation &Inv) {
-  if (SemanticInfo->getInvocation()) {
-    std::string PrimaryFile; // Ignored, FilePath will be used
-    SemanticInfo->getInvocation()->raw(Inv.Args.Args, PrimaryFile);
-  }
-  Inv.Args.PrimaryFile = FilePath;
-  auto &SM = SyntaxInfo->getSourceManager();
-  auto ID = SyntaxInfo->getBufferID();
-  auto Text = SM.getLLVMSourceMgr().getMemoryBuffer(ID)->getBuffer();
-  Inv.Files.push_back(std::make_pair(FilePath, Text));
-}
 
 namespace  {
 
@@ -1816,13 +1775,6 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
 void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
-  trace::TracedOperation TracedOp(trace::OperationKind::ReadSyntaxInfo);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation Info;
-    Impl.buildSwiftInv(Info);
-    TracedOp.start(Info);
-  }
-
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
@@ -1868,13 +1820,6 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                                            EditorConsumer& Consumer) {
-  trace::TracedOperation TracedOp(trace::OperationKind::ReadSemanticInfo);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation Info;
-    Impl.buildSwiftInv(Info);
-    TracedOp.start(Info);
-  }
-
   std::vector<SwiftSemanticToken> SemaToks;
   Optional<std::vector<DiagnosticEntryInfo>> SemaDiags;
   Impl.SemanticInfo->readSemanticInfo(Snapshot, SemaToks, SemaDiags,
@@ -1929,26 +1874,6 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   auto SyntaxInfo = Impl.getSyntaxInfo();
   SourceFile &SF = SyntaxInfo->getSourceFile();
   SourceManager &SM = SyntaxInfo->getSourceManager();
-  unsigned BufID = SyntaxInfo->getBufferID();
-
-  trace::TracedOperation TracedOp(trace::OperationKind::FormatText);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    // Compiler arguments do not matter
-    auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);
-    SwiftArgs.Args.PrimaryFile = Buf->getBufferIdentifier();
-    SwiftArgs.addFile(SwiftArgs.Args.PrimaryFile, Buf->getBuffer());
-    trace::StringPairs OpArgs = {
-      std::make_pair("Line", std::to_string(Line)),
-      std::make_pair("Length", std::to_string(Length)),
-      std::make_pair("IndentWidth",
-                     std::to_string(Impl.FormatOptions.IndentWidth)),
-      std::make_pair("TabWidth",
-                     std::to_string(Impl.FormatOptions.TabWidth)),
-      std::make_pair("UseTabs",
-                     std::to_string(Impl.FormatOptions.UseTabs))};
-    TracedOp.start(SwiftArgs, OpArgs);
-  }
 
   LineRange inputRange = LineRange(Line, Length);
   CodeFormatOptions Options = getFormatOptions();
@@ -1979,18 +1904,6 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
   if (Length < (PlaceholderStartLen + PlaceholderEndLen)) {
     Consumer.handleRequestError("Invalid Length parameter");
     return;
-  }
-
-  trace::TracedOperation TracedOp(trace::OperationKind::ExpandPlaceholder);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SyntaxInfo->initArgsAndPrimaryFile(SwiftArgs);
-    auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);
-    SwiftArgs.addFile(Buf->getBufferIdentifier(), Buf->getBuffer());
-    trace::StringPairs OpArgs = {
-      std::make_pair("Offset", std::to_string(Offset)),
-      std::make_pair("Length", std::to_string(Length))};
-    TracedOp.start(SwiftArgs, OpArgs);
   }
 
   PlaceholderExpansionScanner Scanner(SM);

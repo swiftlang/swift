@@ -516,9 +516,6 @@ namespace trace {
   void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                      StringRef InputFile,
                      ArrayRef<const char *> Args);
-
-  void initTraceFiles(trace::SwiftInvocation &SwiftArgs,
-                      swift::CompilerInstance &CI);
 }
 
 /// When we cannot build any more clang modules, close the .pcm / files to
