@@ -197,5 +197,6 @@ LAST_DECL(PostfixOperator)
 #undef VALUE_DECL
 #undef DECL_RANGE
 #undef ABSTRACT_DECL
+#undef OPERATOR_DECL
 #undef DECL
 #undef LAST_DECL

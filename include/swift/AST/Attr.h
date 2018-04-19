@@ -182,6 +182,7 @@ enum class DeclKind : uint8_t;
   /// Represents one declaration attribute.
 class DeclAttribute : public AttributeBase {
   friend class DeclAttributes;
+
 protected:
   union {
     uint64_t OpaqueBits;
@@ -261,84 +262,65 @@ protected:
     Bits.DeclAttribute.Invalid = false;
   }
 
+private:
+  // NOTE: We cannot use DeclKind due to layering. Even if we could, there is no
+  // guarantee that the first DeclKind starts at zero. This is only used to
+  // build "OnXYZ" flags.
+  enum class DeclKindIndex : unsigned {
+#define DECL(Name, _) Name,
+#define LAST_DECL(Name) Last_Decl = Name
+#include "swift/AST/DeclNodes.def"
+  };
+
 public:
-  enum DeclAttrOptions {
+  enum DeclAttrOptions : uint64_t {
+    // There is one entry for each DeclKind, and some higher level buckets
+    // below. These are used in Attr.def to control which kinds of declarations
+    // an attribute can be attached to.
+#define DECL(Name, _) On##Name = 1ull << unsigned(DeclKindIndex::Name),
+#include "swift/AST/DeclNodes.def"
+
+    // More coarse-grained aggregations for use in Attr.def.
+    OnOperator = 0
+#define DECL(Name, _)
+#define OPERATOR_DECL(Name, _) |On##Name
+#include "swift/AST/DeclNodes.def"
+    ,
+
+    OnAnyDecl = 0
+#define DECL(Name, _) |On##Name
+#include "swift/AST/DeclNodes.def"
+    ,
+
     /// True if multiple instances of this attribute are allowed on a single
     /// declaration.
-    AllowMultipleAttributes = 1 << 0,
+    AllowMultipleAttributes = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 1),
 
     /// True if this is a decl modifier - i.e., that it should not be spelled
     /// with an @.
-    DeclModifier = 1 << 1,
+    DeclModifier = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 2),
 
     /// True if this is a long attribute that should be printed on its own line.
     ///
     /// Currently has no effect on DeclModifier attributes.
-    LongAttribute = 1 << 2,
+    LongAttribute = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 3),
 
     /// True if this shouldn't be serialized.
-    NotSerialized = 1 << 3,
+    NotSerialized = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 4),
     
     /// True if this attribute is only valid when parsing a .sil file.
-    SILOnly = 1 << 4,
+    SILOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 5),
 
     /// The attribute should be reported by parser as unknown.
-    RejectByParser = 1 << 5,
+    RejectByParser = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 6),
 
     /// Whether client code cannot use the attribute.
-    UserInaccessible = 1 << 6,
-
-    // There is one entry for each DeclKind here, and some higher level buckets
-    // down below.  These are used in Attr.def to control which kinds of
-    // declarations an attribute can be attached to.
-    OnPrecedenceGroup  = 1 << 7,
-    OnImport           = 1 << 8,
-    OnExtension        = 1 << 9,
-    OnPatternBinding   = 1 << 10,
-    OnEnumCase         = 1 << 11,
-    OnTopLevelCode     = 1 << 12,
-    OnIfConfig         = 1 << 13,
-    OnInfixOperator    = 1 << 14,  // "infix operator"
-    OnPrefixOperator   = 1 << 15,  // "prefix operator"
-    OnPostfixOperator  = 1 << 16,  // "postfix operator"
-
-    OnEnum             = 1 << 17,
-    OnStruct           = 1 << 18,
-    OnClass            = 1 << 19,
-    OnProtocol         = 1 << 20,
-    OnTypeAlias        = 1 << 21,
-    OnVar              = 1 << 22,
-    OnSubscript        = 1 << 23,
-
-    OnConstructor      = 1 << 24,
-    OnDestructor       = 1 << 25,
-    OnFunc             = 1 << 26,
-    OnAccessor         = OnFunc,
-    OnEnumElement      = 1 << 27,
-
-    OnGenericTypeParam = 1 << 28,
-    OnAssociatedType   = 1 << 29,
-    OnParam            = 1 << 30,
-    OnModule           = 1 << 31,
-
-    // Cannot have any attributes.
-    OnMissingMember = 0,
-    OnPoundDiagnostic = 0,
-
-    // More coarse-grained aggregations for use in Attr.def.
-    OnOperator = OnInfixOperator|OnPrefixOperator|OnPostfixOperator,
-
-    OnAnyDecl = OnImport|OnExtension|OnPatternBinding|OnEnumCase|
-                OnTopLevelCode|OnIfConfig|OnInfixOperator|OnPrefixOperator|
-                OnPostfixOperator|OnEnum|OnStruct|OnClass|OnProtocol|
-                OnTypeAlias|OnVar|OnSubscript|OnConstructor|OnDestructor|
-                OnFunc|OnEnumElement|OnGenericTypeParam|OnAssociatedType|
-                OnParam|OnPrecedenceGroup
+    UserInaccessible = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 7),
   };
 
-  static unsigned getOptions(DeclAttrKind DK);
+  static uint64_t getOptions(DeclAttrKind DK);
 
-  unsigned getOptions() const {
+  uint64_t getOptions() const {
     return getOptions(getKind());
   }
 

@@ -738,7 +738,7 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     // Otherwise, this attribute cannot be applied to this declaration.  If the
     // attribute is only valid on one kind of declaration (which is pretty
     // common) give a specific helpful error.
-    unsigned PossibleDeclKinds = attr->getOptions() & DeclAttribute::OnAnyDecl;
+    auto PossibleDeclKinds = attr->getOptions() & DeclAttribute::OnAnyDecl;
     StringRef OnlyKind;
     switch (PossibleDeclKinds) {
     case DeclAttribute::OnImport:
@@ -747,7 +747,10 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     case DeclAttribute::OnVar:
       OnlyKind = "var";
       break;
+    // FIXME: Update Attr.def to use OnAccessor.
     case DeclAttribute::OnFunc:
+    case DeclAttribute::OnAccessor:
+    case DeclAttribute::OnFunc | DeclAttribute::OnAccessor:
       OnlyKind = "func";
       break;
     case DeclAttribute::OnClass:
