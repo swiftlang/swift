@@ -154,12 +154,12 @@ extension Bool : Equatable, Hashable {
   ///   program runs.
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append((self ? 1 : 0) as UInt8)
+    hasher.combine((self ? 1 : 0) as UInt8)
   }
 
   @inlinable // FIXME(sil-serialize-all)

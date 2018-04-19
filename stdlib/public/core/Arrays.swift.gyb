@@ -2265,14 +2265,24 @@ extension ${Self} : Equatable where Element : Equatable {
 extension ${Self}: Hashable where Element: Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  // not @inlinable
   public func _hash(into hasher: inout _Hasher) {
+    hasher.combine(count) // discriminator
     for element in self {
-      hasher.append(element)
+      hasher.combine(element)
     }
+  }
+
+  // not @inlinable
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    var hasher = _Hasher(_seed: seed)
+    for element in self {
+      hasher.combine(element)
+    }
+    return hasher.finalize()
   }
 }
 

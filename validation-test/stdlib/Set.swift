@@ -442,13 +442,13 @@ SetTestSuite.test("COW.Fast.ContainsDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectFalse(s2.contains(MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -488,13 +488,13 @@ SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate")
   do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectFalse(s2.contains(MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -619,13 +619,13 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(s2.index(of: MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -655,13 +655,13 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectNil(s2.index(of: MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -3470,6 +3470,27 @@ SetTestSuite.test("Hashable") {
   let ss11 = Set([Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
   let ss2 = Set([Set([9090] as [Int])])
   checkHashable([ss1, ss11, ss2], equalityOracle: { $0 == $1 })
+
+  // Set should hash itself in a way that ensures instances get correctly
+  // delineated even when they are nested in other commutative collections.
+  // These are different Sets, so they should produce different hashes:
+  let remix: [Set<Set<Int>>] = [
+    [[1, 2], [3, 4]],
+    [[1, 3], [2, 4]],
+    [[1, 4], [2, 3]],
+  ]
+  checkHashable(remix, equalityOracle: { $0 == $1 })
+
+  // Set ordering is not guaranteed to be consistent across equal instances. In
+  // particular, ordering is highly sensitive to the size of the allocated
+  // storage buffer.
+  var variants: [Set<Int>] = []
+  for i in 4 ..< 12 {
+    var set: Set<Int> = [1, 2, 3, 4, 5, 6]
+    set.reserveCapacity(1 << i)
+    variants.append(set)
+  }
+  checkHashable(variants, equalityOracle: { _, _ in true })
 }
 
 //===---

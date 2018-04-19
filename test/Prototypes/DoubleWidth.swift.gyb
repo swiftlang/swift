@@ -144,13 +144,13 @@ extension DoubleWidth : Comparable {
 extension DoubleWidth : Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(low)
-    hasher.append(high)
+    hasher.combine(low)
+    hasher.combine(high)
   }
 }
 

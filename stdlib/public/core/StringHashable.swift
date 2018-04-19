@@ -12,168 +12,176 @@
 
 import SwiftShims
 
-func _emptyASCIIHashBuffer() -> _UIntBuffer<UInt64, UInt8> {
-  var buffer = _UIntBuffer<UInt64, UInt8>()
-  // We don't want the unused bits of a partially filled buffer to collide
-  // with trailing nuls when hashing
-  buffer._storage = UInt64.max
-  return buffer
-}
-
-internal struct ASCIIHasher {
-  private var buffer = _emptyASCIIHashBuffer()
-
-  internal mutating func consume() -> UInt64? {
-    if !buffer.isEmpty {
-      defer { resetBuffer() }
-      return buffer._storage
-    }
-    return nil
-  }
-
-  private mutating func resetBuffer() {
-    buffer = _emptyASCIIHashBuffer()
-  }
-
-  internal mutating func append(_ c: UInt8) -> UInt64? {
-    if buffer.count < buffer.capacity {
-      buffer.append(c)
-    }
-
-    if buffer.count == buffer.capacity {
-      defer { resetBuffer() }
-      return buffer._storage
-    }
-    return nil
-  }
-}
-
 extension _UnmanagedString where CodeUnit == UInt8 {
-  // NOT @usableFromInline
-  @effects(releasenone)
-  internal func hashASCII(into hasher: inout _Hasher) {
-    var asciiHasher = ASCIIHasher()
-    for c in self {
-      if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: c)) {
-        hasher.append(combined)
-      }
-    }
-
-    if let combined = asciiHasher.consume() {
-      hasher.append(combined)
-    }
+  internal func hashASCII(into core: inout _Hasher.Core) {
+    core.combine(bytes: rawBuffer)
   }
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
-  // NOT @usableFromInline
-  internal func hashUTF16(into hasher: inout _Hasher) {
-    var asciiHasher = ASCIIHasher()
-
+  internal func hashUTF16(into core: inout _Hasher.Core) {
     for i in self.indices {
       let cu = self[i]
       let cuIsASCII = cu <= 0x7F
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
-      guard cuIsASCII && isSingleSegmentScalar else {
-        if let combined = asciiHasher.consume() {
-          hasher.append(combined)
-        }
-
-        let codeUnitSequence = IteratorSequence(
-          _NormalizedCodeUnitIterator(self[i..<endIndex])
-        )
-        for element in codeUnitSequence {
-          hasher.append(UInt(element))
+      if cuIsASCII && isSingleSegmentScalar {
+        core.combine(UInt8(truncatingIfNeeded: cu))
+      } else {
+        for encodedScalar in Unicode._ParsingIterator(
+          codeUnits: _NormalizedCodeUnitIterator(self[i..<endIndex]),
+          parser: Unicode.UTF16.ForwardParser()
+        ) {
+          let transcoded = Unicode.UTF8.transcode(
+            encodedScalar, from: Unicode.UTF16.self
+          ).unsafelyUnwrapped // never fails
+          let (bytes, count) = transcoded._bytes
+          core.combine(bytes: bytes, count: count)
         }
         return
       }
-
-      if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: cu)) {
-        hasher.append(combined)
-      }
-    }
-
-    if let combined = asciiHasher.consume() {
-      hasher.append(combined)
     }
   }
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  @effects(releasenone)
-  @usableFromInline
-  internal func computeHashValue(into hasher: inout _Hasher) {
-    self.hashASCII(into: &hasher)
+  internal func hash(into hasher: inout _Hasher) {
+    self.hashASCII(into: &hasher._core)
+    hasher._core.combine(0xFF as UInt8) // terminator
+  }
+
+  internal func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    return _Hasher._hash(seed: seed, bytes: rawBuffer)
   }
 }
 
 extension _UnmanagedString where CodeUnit == UInt16 {
-  @effects(releasenone)
-  @usableFromInline
-  internal func computeHashValue(into hasher: inout _Hasher) {
-    self.hashUTF16(into: &hasher)
+  internal func hash(into hasher: inout _Hasher) {
+    self.hashUTF16(into: &hasher._core)
+    hasher._core.combine(0xFF as UInt8) // terminator
+  }
+
+  internal func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    var core = _Hasher.Core(seed: seed)
+    self.hashUTF16(into: &core)
+    return Int(truncatingIfNeeded: core.finalize())
   }
 }
 
 extension _UnmanagedOpaqueString {
-  @usableFromInline
-  internal func computeHashValue(into hasher: inout _Hasher) {
-    self.hashUTF16(into: &hasher)
+  internal func hash(into hasher: inout _Hasher) {
+    self.hashUTF16(into: &hasher._core)
+    hasher._core.combine(0xFF as UInt8) // terminator
+  }
+
+  internal func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    var core = _Hasher.Core(seed: seed)
+    self.hashUTF16(into: &core)
+    return Int(truncatingIfNeeded: core.finalize())
   }
 }
 
 extension _SmallUTF8String {
-  @inlinable
-  internal func computeHashValue(into hasher: inout _Hasher) {
+  internal func hash(into hasher: inout _Hasher) {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
     if isASCII {
-      return self.withUnmanagedASCII { $0.computeHashValue(into: &hasher) }
+      self.withUnmanagedASCII { $0.hash(into: &hasher) }
+      return
     }
-    return self.withUnmanagedUTF16 { $0.computeHashValue(into: &hasher) }
+    self.withUnmanagedUTF16 { $0.hash(into: &hasher) }
+#endif // 64-bit
+  }
+
+  internal func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+#if arch(i386) || arch(arm)
+    unsupportedOn32bit()
+#else
+    if isASCII {
+      return self.withUnmanagedASCII { $0._unsafeHashValue(seed: seed) }
+    }
+    return self.withUnmanagedUTF16 { $0._unsafeHashValue(seed: seed) }
 #endif // 64-bit
   }
 }
 
 extension _StringGuts {
+  @effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(into hasher: inout _Hasher) {
     if _isSmall {
-      return _smallUTF8String.computeHashValue(into: &hasher)
+      _smallUTF8String.hash(into: &hasher)
+      return
     }
 
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
-      _asOpaque().computeHashValue(into: &hasher)
+      _asOpaque().hash(into: &hasher)
       return
     }
     if isASCII {
-      _unmanagedASCIIView.computeHashValue(into: &hasher)
+      _unmanagedASCIIView.hash(into: &hasher)
       return
     }
-    _unmanagedUTF16View.computeHashValue(into: &hasher)
+    _unmanagedUTF16View.hash(into: &hasher)
   }
 
+  @effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  @effects(releasenone) // FIXME: Is this guaranteed in the opaque case?
   internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
     if _isSmall {
-      return _smallUTF8String[range].computeHashValue(into: &hasher)
+      _smallUTF8String[range].hash(into: &hasher)
+      return
     }
 
     defer { _fixLifetime(self) }
     if _slowPath(_isOpaque) {
-      _asOpaque()[range].computeHashValue(into: &hasher)
+      _asOpaque()[range].hash(into: &hasher)
       return
     }
     if isASCII {
-      _unmanagedASCIIView[range].computeHashValue(into: &hasher)
+      _unmanagedASCIIView[range].hash(into: &hasher)
       return
     }
-    _unmanagedUTF16View[range].computeHashValue(into: &hasher)
+    _unmanagedUTF16View[range].hash(into: &hasher)
+  }
+
+  @effects(releasenone) // FIXME: Is this valid in the opaque case?
+  @usableFromInline
+  internal func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    if _isSmall {
+      return _smallUTF8String._unsafeHashValue(seed: seed)
+    }
+
+    defer { _fixLifetime(self) }
+    if _slowPath(_isOpaque) {
+      return _asOpaque()._unsafeHashValue(seed: seed)
+    }
+    if isASCII {
+      return _unmanagedASCIIView._unsafeHashValue(seed: seed)
+    }
+    return _unmanagedUTF16View._unsafeHashValue(seed: seed)
+  }
+
+  @effects(releasenone) // FIXME: Is this valid in the opaque case?
+  @usableFromInline
+  internal func _unsafeHashValue(
+    _ range: Range<Int>,
+    seed: (UInt64, UInt64)
+  ) -> Int {
+    if _isSmall {
+      return _smallUTF8String[range]._unsafeHashValue(seed: seed)
+    }
+
+    defer { _fixLifetime(self) }
+    if _slowPath(_isOpaque) {
+      return _asOpaque()[range]._unsafeHashValue(seed: seed)
+    }
+    if isASCII {
+      return _unmanagedASCIIView[range]._unsafeHashValue(seed: seed)
+    }
+    return _unmanagedUTF16View[range]._unsafeHashValue(seed: seed)
   }
 }
 
@@ -184,23 +192,33 @@ extension String : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @inlinable
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable
   public func _hash(into hasher: inout _Hasher) {
     _guts._hash(into: &hasher)
   }
+
+  @inlinable
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    return _guts._unsafeHashValue(seed: seed)
+  }
 }
 
 extension StringProtocol {
   @inlinable
   public var hashValue : Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable
   public func _hash(into hasher: inout _Hasher) {
     _wholeString._guts._hash(_encodedOffsetRange, into: &hasher)
+  }
+
+  @inlinable
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    return _wholeString._guts._unsafeHashValue(_encodedOffsetRange, seed: seed)
   }
 }

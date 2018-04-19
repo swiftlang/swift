@@ -1527,25 +1527,36 @@ extension ${Self} : Hashable {
   /// your program. Do not save hash values to use during a future execution.
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    var v = self
-    if isZero {
-      // To satisfy the axiom that equality implies hash equality, we need to
-      // finesse the hash value of -0.0 to match +0.0.
-      v = 0
-    }
+    // To satisfy the axiom that equality implies hash equality, we need to
+    // finesse the hash value of -0.0 to match +0.0.
+    let v = isZero ? 0 : self
   %if bits == 80:
-    hasher.append(v._representation.signAndExponent)
-    hasher.append(v.significandBitPattern)
+    hasher.combine(v._representation.signAndExponent)
+    hasher.combine(v.significandBitPattern)
   %else:
-    hasher.append(v.bitPattern)
+    hasher.combine(v.bitPattern)
   %end
   }
 
+  @inlinable // FIXME(sil-serialize-all)
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    let v = isZero ? 0 : self
+  %if bits == 80:
+    var hasher = _Hasher(_seed: seed)
+    hasher.combine(v._representation.signAndExponent)
+    hasher.combine(v.significandBitPattern)
+    return hasher.finalize()
+  %elif bits == 64:
+    return _Hasher._hash(seed: seed, v.bitPattern)
+  %elif bits == 32:
+    return _Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: 4)
+  %end
+  }
 }
 
 extension ${Self} {

@@ -231,13 +231,13 @@ extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(_outer)
-    hasher.append(_inner)
+    hasher.combine(_outer)
+    hasher.combine(_inner)
   }
 }
 

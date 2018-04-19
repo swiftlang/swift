@@ -904,13 +904,19 @@ extension ${Self}: Hashable {
   /// program runs.
   @inlinable
   public var hashValue: Int {
-    return _hashValue(for: self)
+    return _unsafeHashValue()
   }
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
-    hasher.append(Int(bitPattern: self))
+    hasher.combine(UInt(bitPattern: self))
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _unsafeHashValue(seed: (UInt64, UInt64)) -> Int {
+    return _Hasher._hash(seed: seed, UInt(bitPattern: self))
+  }
+
 }
 
 extension ${Self}: Strideable {

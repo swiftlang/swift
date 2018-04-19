@@ -21,8 +21,6 @@
 // ensure that hash values differ between executions.
 //
 
-import SwiftShims
-
 @_frozen // FIXME(sil-serialize-all)
 public // @testable
 enum _HashingDetail {
@@ -156,142 +154,38 @@ func _combineHashValues(_ firstValue: Int, _ secondValue: Int) -> Int {
 
 // FIXME(hasher): This hasher emulates Swift 4.1 hashValues. It is purely for
 // benchmarking; to be removed.
-internal struct _LegacyHasher {
+internal struct _LegacyHasherCore: _HasherCore {
   internal var _hash: Int
 
   @inline(__always)
-  internal init(key: (UInt64, UInt64) = (0, 0)) { // key is ignored
+  internal init(seed: (UInt64, UInt64) = (0, 0)) { // seed is ignored
     _hash = 0
   }
 
   @inline(__always)
-  internal mutating func append(_ value: Int) {
+  internal mutating func compress(_ value: UInt64) {
+    let value = (UInt64.bitWidth > Int.bitWidth
+      ? Int(truncatingIfNeeded: value ^ (value &>> 32))
+      : Int(truncatingIfNeeded: value))
     _hash = (_hash == 0 ? value : _combineHashValues(_hash, value))
   }
 
   @inline(__always)
-  internal mutating func append(_ value: UInt) {
-    append(Int(bitPattern: value))
-  }
-
-  @inline(__always)
-  internal mutating func append(_ value: UInt32) {
-    append(Int(truncatingIfNeeded: value))
-  }
-
-  @inline(__always)
-  internal mutating func append(_ value: UInt64) {
-    if UInt64.bitWidth > Int.bitWidth {
-      append(Int(truncatingIfNeeded: value ^ (value &>> 32)))
-    } else {
-      append(Int(truncatingIfNeeded: value))
+  internal mutating func finalize(tailAndByteCount: UInt64) -> UInt64 {
+    let count = (tailAndByteCount &>> 56) & 7
+    if count > 0 {
+      compress(tailAndByteCount & ((1 &<< (count &<< 3)) - 1))
     }
-  }
-
-  @inline(__always)
-  internal mutating func finalize() -> UInt64 {
     return UInt64(
       _truncatingBits: UInt(bitPattern: _mixInt(_hash))._lowWord)
   }
-}
 
-
-// NOT @_fixed_layout
-@_fixed_layout // FIXME - remove - radar 38549901
-public struct _Hasher {
-  internal typealias Core = _SipHash13
-
-  // NOT @usableFromInline
-  internal var _core: Core
-
-  // NOT @inlinable
-  @effects(releasenone)
-  public init() {
-    self._core = Core(key: _Hasher._seed)
-  }
-
-  // NOT @inlinable
-  @effects(releasenone)
-  public init(seed: (UInt64, UInt64)) {
-    self._core = Core(key: seed)
-  }
-
-  /// Indicates whether we're running in an environment where hashing needs to
-  /// be deterministic. If this is true, the hash seed is not random, and hash
-  /// tables do not apply per-instance perturbation that is not repeatable.
-  /// This is not recommended for production use, but it is useful in certain
-  /// test environments where randomization may lead to unwanted nondeterminism
-  /// of test results.
-  public // SPI
-  static var _isDeterministic: Bool {
-    @inlinable
-    @inline(__always)
-    get {
-      return _swift_stdlib_Hashing_parameters.deterministic;
-    }
-  }
-
-  /// The 128-bit hash seed used to initialize the hasher state. Initialized
-  /// once during process startup.
-  public // SPI
-  static var _seed: (UInt64, UInt64) {
-    @inlinable
-    @inline(__always)
-    get {
-      // The seed itself is defined in C++ code so that it is initialized during
-      // static construction.  Almost every Swift program uses hash tables, so
-      // initializing the seed during the startup seems to be the right
-      // trade-off.
-      return (
-        _swift_stdlib_Hashing_parameters.seed0,
-        _swift_stdlib_Hashing_parameters.seed1)
-    }
-  }
-
-  @inlinable
   @inline(__always)
-  public mutating func append<H: Hashable>(_ value: H) {
-    value._hash(into: &self)
-  }
-
-  // NOT @inlinable
-  @effects(releasenone)
-  public mutating func append(bits: UInt) {
-    _core.append(bits)
-  }
-  // NOT @inlinable
-  @effects(releasenone)
-  public mutating func append(bits: UInt32) {
-    _core.append(bits)
-  }
-  // NOT @inlinable
-  @effects(releasenone)
-  public mutating func append(bits: UInt64) {
-    _core.append(bits)
-  }
-
-  // NOT @inlinable
-  @effects(releasenone)
-  public mutating func append(bits: Int) {
-    _core.append(UInt(bitPattern: bits))
-  }
-  // NOT @inlinable
-  @effects(releasenone)
-  public mutating func append(bits: Int32) {
-    _core.append(UInt32(bitPattern: bits))
-  }
-  // NOT @inlinable
-  @effects(releasenone)
-  public mutating func append(bits: Int64) {
-    _core.append(UInt64(bitPattern: bits))
-  }
-
-  // NOT @inlinable
-  @effects(releasenone)
-  public mutating func finalize() -> Int {
-    return Int(truncatingIfNeeded: _core.finalize())
+  func _generateSeed() -> (UInt64, UInt64) {
+    return (0, 0)
   }
 }
+
 
 /// This protocol is only used for compile-time checks that
 /// every buffer type implements all required operations.
