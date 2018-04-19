@@ -2,8 +2,8 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-silgen -verify %s | %FileCheck %s
 
 @_silgen_name("foo")
-public func foo(_ x: Float) -> Float {
-  return x * x
+public func foo(_ x: Float, _ y: Float) -> Float {
+  return x * y
 }
 
 @_silgen_name("foo_indir_ret")
@@ -24,5 +24,5 @@ let _ = #gradient(of: foo, withRespectTo: .0)
 // let _: (Float, Float, [Int]) -> (Float, Float) = #gradient(of: foo_indir_ret, withRespectTo: .0, .1)
 
 // CHECK-LABEL: sil @main :
-// CHECK: %{{[0-9]+}} = gradient %{{[0-9]+}} : $@callee_guaranteed (Float) -> Float
-// CHECK: %{{[0-9]+}} = gradient [wrt 0] %{{[0-9]+}} : $@callee_guaranteed (Float) -> Float
+// CHECK: %{{[0-9]+}} = gradient [wrt 0, 1] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
+// CHECK: %{{[0-9]+}} = gradient [wrt 0] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float

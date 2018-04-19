@@ -579,6 +579,12 @@ SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
                                          ArrayRef<unsigned> paramIndices,
                                          bool seedable,
                                          bool preservingResult) {
+  // If parameter indices are empty, return an invalid type (empty tuple type).
+  // An "empty parameter indices" will be produced during verification.
+  if (paramIndices.empty()) {
+    auto invalidTy = TupleType::get({}, module.getASTContext());
+    return SILType::getPrimitiveObjectType(CanType(invalidTy));
+  }
   SILReverseAutoDiffConfiguration config =
     { paramIndices, seedable, preservingResult };
   auto origFnTy = original->getType().getAs<SILFunctionType>();
