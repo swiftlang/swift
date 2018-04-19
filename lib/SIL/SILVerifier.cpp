@@ -4257,10 +4257,10 @@ public:
       require(currentIdx > lastIndex, "Parameter indices not ascending.");
       lastIndex = currentIdx;
     }
-    // TODO: Verify if the specified primal/adjoint/gradient function has the
-    // right signature. SIL function verification runs right after a function
-    // is parsed.
-    // However, the adjoint function may come after the this function.  Without
+    // TODO: Verify if the specified primal/adjoint function has the right
+    // signature. SIL function verification runs right after a function is
+    // parsed.
+    // However, the adjoint function may come after the this function. Without
     // changing the compiler too much, is there a way to verify this at a module
     // level, after everything is parsed?
   }
