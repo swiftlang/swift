@@ -707,17 +707,6 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
     return;
   }
 
-  trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    // NOTE: do not use primary file
-    // NOTE: do not use files
-    TracedOp.start(SwiftArgs,
-                   {std::make_pair("Name", Name),
-                    std::make_pair("ModuleName", ModuleName)});
-  }
-
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
 
   std::string ErrMsg;
@@ -783,16 +772,6 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
     Consumer->handleRequestError(Error.c_str());
     return;
   }
-  trace::TracedOperation TracedOp(trace::OperationKind::OpenInterface);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    // NOTE: do not use primary file
-    // NOTE: do not use files
-    TracedOp.start(SwiftArgs,
-                   {std::make_pair("Name", Name),
-                     std::make_pair("SourceName", SourceName)});
-  }
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
@@ -824,17 +803,6 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   if (!UsingSwiftArgs && initInvocationByClangArguments(Args, Invocation, Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
-  }
-
-  trace::TracedOperation TracedOp(trace::OperationKind::OpenHeaderInterface);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    // NOTE: do not use primary file
-    // NOTE: do not use files
-    TracedOp.start(SwiftArgs,
-                   {std::make_pair("Name", Name),
-                    std::make_pair("HeaderName", HeaderName)});
   }
 
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;

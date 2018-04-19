@@ -158,18 +158,6 @@ static void indexModule(llvm::MemoryBuffer *Input,
                         IndexingConsumer &IdxConsumer,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
-  trace::TracedOperation TracedOp(trace::OperationKind::IndexModule);
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    SwiftArgs.Args.PrimaryFile = Input->getBufferIdentifier();
-    SwiftArgs.addFile(Input->getBufferIdentifier(), Input->getBuffer());
-    trace::StringPairs OpArgs;
-    OpArgs.push_back(std::make_pair("ModuleName", ModuleName));
-    OpArgs.push_back(std::make_pair("Hash", Hash));
-    TracedOp.start(SwiftArgs, OpArgs);
-  }
-
   ASTContext &Ctx = CI.getASTContext();
   std::unique_ptr<SerializedModuleLoader> Loader;
   ModuleDecl *Mod = nullptr;
@@ -215,18 +203,6 @@ void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                           ArrayRef<const char *> Args) {
   SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
   SwiftArgs.Args.PrimaryFile = InputFile;
-}
-
-void trace::initTraceFiles(trace::SwiftInvocation &SwiftArgs,
-                           swift::CompilerInstance &CI) {
-  auto &SM = CI.getSourceMgr();
-  auto Ids = CI.getInputBufferIDs();
-  std::for_each(Ids.begin(), Ids.end(),
-                [&] (unsigned Id) {
-                  auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(Id);
-                  SwiftArgs.addFile(Buf->getBufferIdentifier(),
-                                    Buf->getBuffer());
-                });
 }
 
 void SwiftLangSupport::indexSource(StringRef InputFile,
@@ -296,7 +272,6 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile, Args);
-    trace::initTraceFiles(SwiftArgs, CI);
     TracedOp.start(SwiftArgs);
   }
 

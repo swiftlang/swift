@@ -803,11 +803,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   for (auto &Content : Contents) {
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
-
-    if (TracedOp.enabled()) {
-      TraceInfo.addFile(Content.Buffer->getBufferIdentifier(),
-                        Content.Buffer->getBuffer());
-    }
   }
   auto &CompIns = ASTRef->Impl.CompInst;
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;
