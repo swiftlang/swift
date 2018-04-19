@@ -7,15 +7,15 @@ add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   # filename.
   StdlibCollectionUnittest.swift
 
-  CheckCollectionInstance.swift.gyb
-  CheckCollectionType.swift.gyb
-  CheckMutableCollectionType.swift.gyb
+  CheckCollectionInstance.swift
+  CheckCollectionType.swift
+  CheckMutableCollectionType.swift
   CheckRangeReplaceableCollectionType.swift
   CheckRangeReplaceableSliceType.swift
-  CheckSequenceInstance.swift.gyb
+  CheckSequenceInstance.swift
   CheckSequenceType.swift
-  LoggingWrappers.swift.gyb
-  MinimalCollections.swift.gyb
+  LoggingWrappers.swift
+  MinimalCollections.swift
   RangeSelection.swift
   ../../public/core/WriteBackMutableSlice.swift
 

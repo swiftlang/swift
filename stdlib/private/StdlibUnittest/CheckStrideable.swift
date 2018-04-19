@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-%{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
-}%
-
 public func checkStrideable<S : Strideable>(
   instances: [S],
   distances: [S.Stride],
   distanceOracle: (Int, Int) -> S.Stride,
-  ${TRACE}
+
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
   for i in instances.indices {
     let first = instances[i]

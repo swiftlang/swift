@@ -5,10 +5,6 @@
 // RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out --locale ru_RU.UTF-8
 // REQUIRES: executable_test
 
-%{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
-}%
-
 import StdlibUnittest
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
@@ -347,11 +343,22 @@ let PrintTests = TestSuite("FloatingPointPrinting")
 // Verify that a particular value provides a specific description string.
 // Also check that the generated strings actually satisfy our
 // accuracy requirements.
-fileprivate func expectDescription(_ expected: String, _ object: ${FloatType}, ${TRACE}) {
-  expectEqual(expected, object.description, ${trace})
-  expectEqual(expected, object.debugDescription, ${trace})
-  expectAccurateDescription(object, ${trace})
- }
+fileprivate func expectDescription(_ expected: String, _ object: ${FloatType},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  expectEqual(expected, object.description,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectEqual(expected, object.debugDescription,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectAccurateDescription(object,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
 
 // Verify our key requirements:
 //
@@ -364,7 +371,12 @@ fileprivate func expectDescription(_ expected: String, _ object: ${FloatType}, $
 // * Close. If there is more than one accurate and short value, we want the one
 //   that is closest (as an infinitely-precise real number) to the original
 //   binary float (interpreted as an infinitely-precise real number).
-fileprivate func expectAccurateDescription(_ object: ${FloatType}, ${TRACE}) {
+fileprivate func expectAccurateDescription(_ object: ${FloatType},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
   if !object.isFinite {
     return
   }
@@ -376,11 +388,15 @@ fileprivate func expectAccurateDescription(_ object: ${FloatType}, ${TRACE}) {
   let text = object.debugDescription
   if let roundTrip = ${FloatType}(text) {
     if object != roundTrip {
-      expectationFailure("Round-trip inaccuracy: \(object) != \(roundTrip)", trace: ${trace})
+      expectationFailure("Round-trip inaccuracy: \(object) != \(roundTrip)",
+        trace: message(),
+        stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
       return
     }
   } else {
-    expectationFailure("Failed to parse \(text)", trace: ${trace})
+    expectationFailure("Failed to parse \(text)",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
     return
   }
 
@@ -397,9 +413,16 @@ fileprivate func expectAccurateDescription(_ object: ${FloatType}, ${TRACE}) {
 % end
 
 // Special helper for NaN values
-fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T: FloatingPoint & CustomDebugStringConvertible & CustomStringConvertible {
+fileprivate func expectNaN<T>(_ expected: String, _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where T: FloatingPoint & CustomDebugStringConvertible & CustomStringConvertible {
   // Regular description always returns "nan"
-  expectEqual("nan", object.description, ${trace})
+  expectEqual("nan", object.description,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
   // debugDescription prints full details about NaNs, which is tricky to test
   // because NaNs often get truncated: various implementations force all NaNs
@@ -409,7 +432,9 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T
 #if arch(x86_64)
   // Verify the exact debugDescription value only on x86_64, where we
   // know the exact expected String:
-  expectEqual(expected, object.debugDescription, ${trace})
+  expectEqual(expected, object.debugDescription,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 #endif
 
   // On all platforms, we verify that the generated debugDescription text
@@ -428,7 +453,9 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T
 
   // Fixed text "nan"
   if actual.prefix(3) != "nan" {
-    expectationFailure("Badly formatted NaN debug description (expected 'nan'): \(object.debugDescription)", trace: ${trace})
+    expectationFailure("Badly formatted NaN debug description (expected 'nan'): \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
     return
   }
   actual = String(actual.dropFirst(3))
@@ -439,7 +466,9 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T
     while !actual.isEmpty {
       if actual.hasPrefix(")") {
         if actual != ")" {
-          expectationFailure("Malformed NaN: extra text after payload: \(object.debugDescription)", trace: ${trace})
+          expectationFailure("Malformed NaN: extra text after payload: \(object.debugDescription)", trace:
+            message(),
+            stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         }
         return
       } else {
@@ -447,9 +476,13 @@ fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T
       }
       actual = String(actual.dropFirst())
     }
-    expectationFailure("Malformed NaN: no closing parenthesis after payload: \(object.debugDescription)", trace: ${trace})
+    expectationFailure("Malformed NaN: no closing parenthesis after payload: \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   } else if !actual.isEmpty {
-    expectationFailure("Badly formatted NaN debug description has invalid text after 'nan'.  Expected '(0x': \(object.debugDescription)", trace: ${trace})
+    expectationFailure("Badly formatted NaN debug description has invalid text after 'nan'.  Expected '(0x': \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 

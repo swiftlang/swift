@@ -111,7 +111,6 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
       "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_unittest_support.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/__init__.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Child.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/kinds.py"

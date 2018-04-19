@@ -446,7 +446,8 @@ self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semant
     var c = makeWrappedCollection(test.collection)
     var result = c._withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> OpaqueValue<Array<OpaqueValue<Int>>> in
-      return OpaqueValue(bufferPointer.map(extractValue))
+      let value = OpaqueValue(bufferPointer.map(extractValue))
+      return value
     }
     expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
     if withUnsafeMutableBufferPointerIsSupported {
@@ -492,7 +493,7 @@ func checkSortedPredicateThrow(
   expectEqualSequence(
     elements.map { $0.value },
     c.map { extract($0).value })
-   
+
   // If `sorted` throws then result will be empty else
   // returned result must be sorted.
   if thrown {
@@ -511,33 +512,18 @@ func checkSortedPredicateThrow(
   }
 }
 
-% for predicate in [False, True]:
-
-self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
+self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/WhereElementIsComparable") {
   let sequence = [ 5, 4, 3, 2, 1 ]
-%   if predicate:
-  let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.count).map {
-      OpaqueValue($0, identity: $1)
-    }
-  let c = makeWrappedCollection(elements)
-%   else:
   let elements: [MinimalComparableValue] =
     zip(sequence, 0..<sequence.count).map {
       MinimalComparableValue($0, identity: $1)
     }
   let c = makeWrappedCollectionWithComparableElement(elements)
-%   end
 
   var lc = LoggingMutableCollection(wrapping: c)
 
-%   if predicate:
-  let result = lc.sorted { extractValue($0).value < extractValue($1).value }
-  let extractedResult = result.map(extractValue)
-%   else:
   let result = lc.sorted()
   let extractedResult = result.map(extractValueFromComparable)
-%   end
 
   // This sort operation is not in-place.
   // The collection is copied into an array before sorting.
@@ -550,26 +536,12 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
   expectEqualSequence([ 1, 2, 3, 4, 5 ], extractedResult.map { $0.value })
 }
 
-func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+func checkSort_WhereElementIsComparable(
   sequence: [Int],
   equalImpl: @escaping ((Int, Int) -> Bool),
   lessImpl: @escaping ((Int, Int) -> Bool),
   verifyOrder: Bool
 ) {
-%   if predicate:
-  let extract = extractValue
-  let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.count).map {
-      OpaqueValue($0, identity: $1)
-    }
-  let c = makeWrappedCollection(elements)
-  let closureLifetimeTracker = LifetimeTracked(0)
-  let result = c.sorted {
-    (lhs, rhs) in
-    _blackHole(closureLifetimeTracker)
-    return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
-  }
-%   else:
   MinimalComparableValue.equalImpl.value = equalImpl
   MinimalComparableValue.lessImpl.value = lessImpl
 
@@ -580,7 +552,6 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
     }
   let c = makeWrappedCollectionWithComparableElement(elements)
   let result = c.sorted()
-%   end
 
   // Check that the original collection is unchanged.
   expectEqualSequence(
@@ -606,10 +577,10 @@ func checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   }
 }
 
-self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
+self.test("\(testNamePrefix).sorted/WhereElementIsComparable") {
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
-      checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+      checkSort_WhereElementIsComparable(
         sequence: sequence,
         equalImpl: { $0 == $1 },
         lessImpl: { $0 < $1 },
@@ -618,11 +589,11 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
   }
 }
 
-self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings") {
+self.test("\(testNamePrefix).sorted/WhereElementIsComparable/InvalidOrderings") {
   withInvalidOrderings { (comparisonPredicate: @escaping (Int, Int) -> Bool) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
-        checkSort_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+        checkSort_WhereElementIsComparable(
           sequence: sequence,
           equalImpl: {
             !comparisonPredicate($0, $1) &&
@@ -659,7 +630,127 @@ self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElements") {
   }
 }
 
-% end
+
+self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/Predicate") {
+  let sequence = [ 5, 4, 3, 2, 1 ]
+  let elements: [OpaqueValue<Int>] =
+    zip(sequence, 0..<sequence.count).map {
+      OpaqueValue($0, identity: $1)
+    }
+  let c = makeWrappedCollection(elements)
+
+  var lc = LoggingMutableCollection(wrapping: c)
+
+  let result = lc.sorted { extractValue($0).value < extractValue($1).value }
+  let extractedResult = result.map(extractValue)
+
+  // This sort operation is not in-place.
+  // The collection is copied into an array before sorting.
+  expectEqual(
+    0, lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)])
+  expectEqual(
+    0,
+    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)])
+
+  expectEqualSequence([ 1, 2, 3, 4, 5 ], extractedResult.map { $0.value })
+}
+
+func checkSort_Predicate(
+  sequence: [Int],
+  equalImpl: @escaping ((Int, Int) -> Bool),
+  lessImpl: @escaping ((Int, Int) -> Bool),
+  verifyOrder: Bool
+) {
+  let extract = extractValue
+  let elements: [OpaqueValue<Int>] =
+    zip(sequence, 0..<sequence.count).map {
+      OpaqueValue($0, identity: $1)
+    }
+  let c = makeWrappedCollection(elements)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  let result = c.sorted {
+    (lhs, rhs) in
+    _blackHole(closureLifetimeTracker)
+    return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
+  }
+
+  // Check that the original collection is unchanged.
+  expectEqualSequence(
+    elements.map { $0.value },
+    c.map { extract($0).value })
+
+  let extractedResult = result.map(extract)
+
+  // Check that we didn't lose any elements.
+  expectEqualsUnordered(
+    0..<sequence.count,
+    extractedResult.map { $0.identity })
+
+  // Check that the elements are sorted.
+  if verifyOrder {
+    for i in extractedResult.indices {
+      if i != extractedResult.index(before: extractedResult.endIndex) {
+        let first = extractedResult[i].value
+        let second = extractedResult[extractedResult.index(after: i)].value
+        expectFalse(lessImpl(second, first))
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sorted/Predicate") {
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+      checkSort_Predicate(
+        sequence: sequence,
+        equalImpl: { $0 == $1 },
+        lessImpl: { $0 < $1 },
+        verifyOrder: true)
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sorted/Predicate/InvalidOrderings") {
+  withInvalidOrderings { (comparisonPredicate: @escaping (Int, Int) -> Bool) in
+    for i in 0..<7 {
+      forAllPermutations(i) { (sequence) in
+        checkSort_Predicate(
+          sequence: sequence,
+          equalImpl: {
+            !comparisonPredicate($0, $1) &&
+            !comparisonPredicate($1, $0)
+          },
+          lessImpl: comparisonPredicate,
+          verifyOrder: false)
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sorted/ThrowingPredicate") {
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+      for i in 0..<sequence.count {
+      checkSortedPredicateThrow(
+       sequence: sequence,
+       lessImpl: { $0 < $1 },
+       throwIndex: i)
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElements") {
+  for sequence in largeElementSortTests {
+      for i in 0..<sequence.count {
+      checkSortedPredicateThrow(
+       sequence: sequence,
+       lessImpl: { $0 < $1 },
+       throwIndex: i)
+    }
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // partition(by:)
@@ -993,36 +1084,20 @@ func checkSortPredicateThrow(
       return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
     }
   } catch {}
-  
+
   //Check no element should lost and added
   expectEqualsUnordered(
     sequence,
     c.map { extract($0).value })
 }
 
-% for predicate in [False, True]:
 
-func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+func checkSortInPlace_WhereElementIsComparable(
   sequence: [Int],
   equalImpl: @escaping ((Int, Int) -> Bool),
   lessImpl: @escaping ((Int, Int) -> Bool),
   verifyOrder: Bool
 ) {
-%   if predicate:
-  let extract = extractValue
-  let elements: [OpaqueValue<Int>] =
-    zip(sequence, 0..<sequence.count).map {
-      OpaqueValue($0, identity: $1)
-    }
-
-  var c = makeWrappedCollection(elements)
-  let closureLifetimeTracker = LifetimeTracked(0)
-  c.sort {
-    (lhs, rhs) in
-    _blackHole(closureLifetimeTracker)
-    return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
-  }
-%   else:
   MinimalComparableValue.equalImpl.value = equalImpl
   MinimalComparableValue.lessImpl.value = lessImpl
 
@@ -1034,7 +1109,6 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
 
   var c = makeWrappedCollectionWithComparableElement(elements)
   c.sort()
-%   end
 
   let extractedResult = c.map(extract)
 
@@ -1055,10 +1129,10 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
   }
 }
 
-self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
+self.test("\(testNamePrefix).sort/WhereElementIsEquatable") {
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
-      checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+      checkSortInPlace_WhereElementIsComparable(
         sequence: sequence,
         equalImpl: { $0 == $1 },
         lessImpl: { $0 < $1 },
@@ -1067,11 +1141,11 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
   }
 }
 
-self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
+self.test("\(testNamePrefix).sort/WhereElementIsEquatable/InvalidOrderings") {
   withInvalidOrderings { (comparisonPredicate : @escaping (Int, Int) -> Bool) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
-        checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
+        checkSortInPlace_WhereElementIsComparable(
           sequence: sequence,
           equalImpl: {
             !comparisonPredicate($0, $1) &&
@@ -1107,8 +1181,99 @@ self.test("\(testNamePrefix).sort/ThrowingPredicateWithLargeNumberElements") {
     }
   }
 }
- 
-% end
+
+
+func checkSortInPlace_Predicate(
+  sequence: [Int],
+  equalImpl: @escaping ((Int, Int) -> Bool),
+  lessImpl: @escaping ((Int, Int) -> Bool),
+  verifyOrder: Bool
+) {
+  let extract = extractValue
+  let elements: [OpaqueValue<Int>] =
+    zip(sequence, 0..<sequence.count).map {
+      OpaqueValue($0, identity: $1)
+    }
+
+  var c = makeWrappedCollection(elements)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  c.sort {
+    (lhs, rhs) in
+    _blackHole(closureLifetimeTracker)
+    return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
+  }
+
+  let extractedResult = c.map(extract)
+
+  // Check that we didn't lose any elements.
+  expectEqualsUnordered(
+    0..<sequence.count,
+    extractedResult.map { $0.identity })
+
+  // Check that the elements are sorted.
+  if verifyOrder {
+    for i in extractedResult.indices {
+      if i != extractedResult.index(before: extractedResult.endIndex) {
+        let first = extractedResult[i].value
+        let second = extractedResult[extractedResult.index(after: i)].value
+        expectFalse(lessImpl(second, first))
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sort/Predicate") {
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+      checkSortInPlace_Predicate(
+        sequence: sequence,
+        equalImpl: { $0 == $1 },
+        lessImpl: { $0 < $1 },
+        verifyOrder: true)
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sort/Predicate/InvalidOrderings") {
+  withInvalidOrderings { (comparisonPredicate : @escaping (Int, Int) -> Bool) in
+    for i in 0..<7 {
+      forAllPermutations(i) { (sequence) in
+        checkSortInPlace_Predicate(
+          sequence: sequence,
+          equalImpl: {
+            !comparisonPredicate($0, $1) &&
+            !comparisonPredicate($1, $0)
+          },
+          lessImpl: comparisonPredicate,
+          verifyOrder: false)
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sort/ThrowingPredicate") {
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+      for i in 0..<sequence.count {
+        checkSortPredicateThrow(
+         sequence: sequence,
+         lessImpl: { $0 < $1 },
+         throwIndex: i)
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sort/ThrowingPredicateWithLargeNumberElements") {
+  for sequence in largeElementSortTests {
+    for i in 0..<sequence.count {
+      checkSortPredicateThrow(
+        sequence: sequence,
+        lessImpl: { $0 < $1 },
+        throwIndex: i)
+    }
+  }
+}
 
 //===----------------------------------------------------------------------===//
 

@@ -1,4 +1,4 @@
-//===--- StringConvertible.swift.gyb --------------------------*- swift -*-===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,9 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-%{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
-}%
 
 /// A type that has different `CustomStringConvertible` and
 /// `CustomDebugStringConvertible` representations.
@@ -110,43 +107,68 @@ extension CustomPrintableValue : CustomDebugStringConvertible {
 }
 
 public func expectPrinted<T>(
-  expectedOneOf patterns: [String], _ object: T, ${TRACE}
+  expectedOneOf patterns: [String], _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
   let actual = String(describing: object)
   if !patterns.contains(actual) {
     expectationFailure(
       "expected: any of \(String(reflecting: patterns))\n"
       + "actual: \(String(reflecting: actual))",
-      trace: ${trace})
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
 public func expectPrinted<T>(
-  _ expected: String, _ object: T, ${TRACE}
+  _ expected: String, _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
-  expectPrinted(expectedOneOf: [expected], object, ${trace})
+  expectPrinted(expectedOneOf: [expected], object, message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
 public func expectDebugPrinted<T>(
-  expectedOneOf patterns: [String], _ object: T, ${TRACE}
+  expectedOneOf patterns: [String], _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
-  expectPrinted(expectedOneOf: patterns, String(reflecting: object), ${trace})
+  expectPrinted(expectedOneOf: patterns, String(reflecting: object), message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
 public func expectDebugPrinted<T>(
-  _ expected: String, _ object: T, ${TRACE}
+  _ expected: String, _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
-  expectDebugPrinted(expectedOneOf: [expected], object, ${trace})
+  expectDebugPrinted(expectedOneOf: [expected], object, message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
 public func expectDumped<T>(
-  _ expected: String, _ object: T, ${TRACE}
+  _ expected: String, _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
   var actual = ""
   dump(object, to: &actual)
-  expectEqual(expected, actual, ${trace})
+  expectEqual(expected, actual, message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
-// ${'Local Variables'}:
+// Local Variables:
 // eval: (read-only-mode 1)
 // End:
