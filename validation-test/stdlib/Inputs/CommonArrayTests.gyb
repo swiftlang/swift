@@ -421,6 +421,5 @@ ${Suite}.test("${ArrayType}/AssociatedTypes") {
     iteratorType: IndexingIterator<Collection>.self,
     subSequenceType: CollectionSlice.self,
     indexType: Int.self,
-    indexDistanceType: Int.self,
     indicesType: CountableRange<Int>.self)
 }
