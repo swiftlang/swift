@@ -1,4 +1,4 @@
-//===--- MinimalTypes.swift -----------------------------------*- swift -*-===//
+//===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -103,14 +103,12 @@ public func < (
   return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
 }
 
-% for (kind, decl_keyword) in [ ('Value', 'struct'), ('Class', 'class') ]:
-%   Self = 'MinimalHashable%s' % kind
 
 /// A type that conforms only to `Equatable` and `Hashable`.
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public ${decl_keyword} ${Self} : Equatable, Hashable {
+public struct MinimalHashableValue : Equatable, Hashable {
   public static var timesEqualEqualWasCalled: Int = 0
   public static var timesHashValueWasCalled: Int = 0
 
@@ -133,37 +131,75 @@ public ${decl_keyword} ${Self} : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    ${Self}.timesHashValueWasCalled += 1
-    return ${Self}.hashValueImpl.value(value)
+    MinimalHashableValue.timesHashValueWasCalled += 1
+    return MinimalHashableValue.hashValueImpl.value(value)
   }
 }
 
 public func == (
-  lhs: ${Self},
-  rhs: ${Self}
+  lhs: MinimalHashableValue,
+  rhs: MinimalHashableValue
 ) -> Bool {
-  ${Self}.timesEqualEqualWasCalled += 1
-  return ${Self}.equalImpl.value(lhs.value, rhs.value)
+  MinimalHashableValue.timesEqualEqualWasCalled += 1
+  return MinimalHashableValue.equalImpl.value(lhs.value, rhs.value)
 }
 
-% end
-
-% for (kind, decl_keyword) in [ ('Value', 'struct'), ('Class', 'class') ]:
-%   Self = 'GenericMinimalHashable%s' % kind
-
-public var ${Self}_timesEqualEqualWasCalled: Int = 0
-public var ${Self}_timesHashValueWasCalled: Int = 0
-
-public var ${Self}_equalImpl = ResettableValue<(Any, Any) -> Bool>(
-  { _, _ in fatalError("${Self}_equalImpl is not set yet"); () })
-public var ${Self}_hashValueImpl = ResettableValue<(Any) -> Int>(
-  { _ in fatalError("${Self}_hashValueImpl is not set yet"); () })
 
 /// A type that conforms only to `Equatable` and `Hashable`.
 ///
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
-public ${decl_keyword} ${Self}<Wrapped> : Equatable, Hashable {
+public class MinimalHashableClass : Equatable, Hashable {
+  public static var timesEqualEqualWasCalled: Int = 0
+  public static var timesHashValueWasCalled: Int = 0
+
+  public static var equalImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
+  public static var hashValueImpl =
+    ResettableValue<(Int) -> Int>({ $0.hashValue })
+
+  public var value: Int
+  public var identity: Int
+
+  public init(_ value: Int) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Int, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+
+  public var hashValue: Int {
+    MinimalHashableClass.timesHashValueWasCalled += 1
+    return MinimalHashableClass.hashValueImpl.value(value)
+  }
+}
+
+public func == (
+  lhs: MinimalHashableClass,
+  rhs: MinimalHashableClass
+) -> Bool {
+  MinimalHashableClass.timesEqualEqualWasCalled += 1
+  return MinimalHashableClass.equalImpl.value(lhs.value, rhs.value)
+}
+
+
+
+public var GenericMinimalHashableValue_timesEqualEqualWasCalled: Int = 0
+public var GenericMinimalHashableValue_timesHashValueWasCalled: Int = 0
+
+public var GenericMinimalHashableValue_equalImpl = ResettableValue<(Any, Any) -> Bool>(
+  { _, _ in fatalError("GenericMinimalHashableValue_equalImpl is not set yet"); () })
+public var GenericMinimalHashableValue_hashValueImpl = ResettableValue<(Any) -> Int>(
+  { _ in fatalError("GenericMinimalHashableValue_hashValueImpl is not set yet"); () })
+
+/// A type that conforms only to `Equatable` and `Hashable`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public struct GenericMinimalHashableValue<Wrapped> : Equatable, Hashable {
   public var value: Wrapped
   public var identity: Int
 
@@ -178,20 +214,60 @@ public ${decl_keyword} ${Self}<Wrapped> : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    ${Self}_timesHashValueWasCalled += 1
-    return ${Self}_hashValueImpl.value(value)
+    GenericMinimalHashableValue_timesHashValueWasCalled += 1
+    return GenericMinimalHashableValue_hashValueImpl.value(value)
   }
 }
 
 public func == <Wrapped>(
-  lhs: ${Self}<Wrapped>,
-  rhs: ${Self}<Wrapped>
+  lhs: GenericMinimalHashableValue<Wrapped>,
+  rhs: GenericMinimalHashableValue<Wrapped>
 ) -> Bool {
-  ${Self}_timesEqualEqualWasCalled += 1
-  return ${Self}_equalImpl.value(lhs.value, rhs.value)
+  GenericMinimalHashableValue_timesEqualEqualWasCalled += 1
+  return GenericMinimalHashableValue_equalImpl.value(lhs.value, rhs.value)
 }
 
-% end
+
+public var GenericMinimalHashableClass_timesEqualEqualWasCalled: Int = 0
+public var GenericMinimalHashableClass_timesHashValueWasCalled: Int = 0
+
+public var GenericMinimalHashableClass_equalImpl = ResettableValue<(Any, Any) -> Bool>(
+  { _, _ in fatalError("GenericMinimalHashableClass_equalImpl is not set yet"); () })
+public var GenericMinimalHashableClass_hashValueImpl = ResettableValue<(Any) -> Int>(
+  { _ in fatalError("GenericMinimalHashableClass_hashValueImpl is not set yet"); () })
+
+/// A type that conforms only to `Equatable` and `Hashable`.
+///
+/// This type can be used to check that generic functions don't rely on any
+/// other conformances.
+public class GenericMinimalHashableClass<Wrapped> : Equatable, Hashable {
+  public var value: Wrapped
+  public var identity: Int
+
+  public init(_ value: Wrapped) {
+    self.value = value
+    self.identity = 0
+  }
+
+  public init(_ value: Wrapped, identity: Int) {
+    self.value = value
+    self.identity = identity
+  }
+
+  public var hashValue: Int {
+    GenericMinimalHashableClass_timesHashValueWasCalled += 1
+    return GenericMinimalHashableClass_hashValueImpl.value(value)
+  }
+}
+
+public func == <Wrapped>(
+  lhs: GenericMinimalHashableClass<Wrapped>,
+  rhs: GenericMinimalHashableClass<Wrapped>
+) -> Bool {
+  GenericMinimalHashableClass_timesEqualEqualWasCalled += 1
+  return GenericMinimalHashableClass_equalImpl.value(lhs.value, rhs.value)
+}
+
 
 /// A type that conforms only to `Equatable`, `Comparable`, and `Strideable`.
 ///
@@ -250,6 +326,6 @@ public func < (
   return MinimalStrideableValue.lessImpl.value(lhs.value, rhs.value)
 }
 
-// ${'Local Variables'}:
+// Local Variables:
 // eval: (read-only-mode 1)
 // End:
