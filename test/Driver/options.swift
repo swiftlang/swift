@@ -129,3 +129,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -assume-single-threaded %s | %FileCheck -check-prefix=ASSUME_SINGLE_THREADED %s
 // ASSUME_SINGLE_THREADED: swift
 // ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded
+
+// RUN: not %swiftc_driver -incremental -autolink-force-load %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
+// RUN: not %swiftc_driver -autolink-force-load -incremental %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
+// AUTOLINK_FORCE_LOAD: error: '-autolink-force-load' is not supported with '-incremental'
