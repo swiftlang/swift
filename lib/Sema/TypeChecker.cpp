@@ -450,6 +450,10 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       else {
         auto *ntd = cast<NominalTypeDecl>(decl);
         TC.checkConformancesInContext(ntd, ntd);
+
+        // Finally, we can check classes for missing initializers.
+        if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
+          TC.maybeDiagnoseClassWithoutInitializers(classDecl);
       }
     }
     TC.ConformanceContexts.clear();

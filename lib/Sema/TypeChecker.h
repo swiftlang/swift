@@ -1535,6 +1535,10 @@ public:
   /// Retrieve the set of inherited protocols for this protocol type.
   llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
+  /// Diagnose if the class has no designated initializers.
+  void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
+
+  ///
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);

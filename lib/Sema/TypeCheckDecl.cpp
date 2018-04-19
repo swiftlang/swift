@@ -8575,6 +8575,27 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   }
 }
 
+void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
+  // Some heuristics to skip emitting a diagnostic if the class is already
+  // irreperably busted.
+  if (classDecl->isInvalid() ||
+      classDecl->inheritsSuperclassInitializers(nullptr))
+    return;
+
+  auto *superclassDecl = classDecl->getSuperclassDecl();
+  if (superclassDecl &&
+      superclassDecl->hasMissingDesignatedInitializers())
+    return;
+
+  for (auto member : classDecl->lookupDirect(DeclBaseName::createConstructor())) {
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (ctor && ctor->isDesignatedInit())
+      return;
+  }
+
+  diagnoseClassWithoutInitializers(*this, classDecl);
+}
+
 /// Diagnose a missing required initializer.
 static void diagnoseMissingRequiredInitializer(
               TypeChecker &TC,
@@ -8697,16 +8718,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.
   if (isa<ClassDecl>(decl)) {
-    bool alreadyValidatingCtor = false;
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         validateDecl(ctor);
         if (!ctor->hasValidSignature())
-          alreadyValidatingCtor = true;
+          return;
       }
     }
-    if (alreadyValidatingCtor)
-      return;
   }
 
   decl->setAddedImplicitInitializers();
@@ -8875,7 +8893,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // stored properties.
     if (SuppressDefaultInitializer && !FoundDesignatedInit
         && !FoundSynthesizedInit && !classDecl->hasClangNode()) {
-      diagnoseClassWithoutInitializers(*this, classDecl);
       return;
     }
 
@@ -8976,12 +8993,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // constructor.
 
     // ... unless there are uninitialized stored properties.
-    if (SuppressDefaultInitializer) {
-      if (!FoundSynthesizedInit)
-        diagnoseClassWithoutInitializers(*this, classDecl);
-
+    if (SuppressDefaultInitializer)
       return;
-    }
 
     defineDefaultConstructor(decl);
   }
