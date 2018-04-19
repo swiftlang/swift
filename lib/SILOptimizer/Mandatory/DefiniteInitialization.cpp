@@ -2975,6 +2975,9 @@ static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *SEI) {
    if (SuccNone == Succ)
      return Succ;
 
+   if (!SuccNone)
+     return nullptr;
+
    SuccNone = SuccNone->getSingleSuccessorBlock();
    if (SuccNone == Succ)
      return Succ;
