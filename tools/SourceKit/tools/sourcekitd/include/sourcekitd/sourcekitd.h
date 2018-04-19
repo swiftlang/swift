@@ -351,7 +351,7 @@ SOURCEKITD_PUBLIC SOURCEKITD_NONNULL1 SOURCEKITD_WARN_RESULT
 sourcekitd_variant_t
 sourcekitd_response_get_value(sourcekitd_response_t resp);
 
-SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 sourcekitd_variant_type_t
 sourcekitd_variant_get_type(sourcekitd_variant_t obj);
 
