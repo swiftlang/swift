@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/ADT/APSInt.h"
 
 #define DEBUG_TYPE "constant-folding"
 
@@ -971,12 +972,30 @@ case BuiltinValueKind::id:
     if (!V)
       return nullptr;
     APFloat TruncVal = V->getValue();
-    Type DestTy = Builtin.Types[1];
+
     bool losesInfo;
+    auto *destType = Builtin.Types[1]->castTo<BuiltinFloatType>();
     APFloat::opStatus ConversionStatus = TruncVal.convert(
-        DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics(),
+        destType->getAPFloatSemantics(),
         APFloat::rmNearestTiesToEven, &losesInfo);
     SILLocation Loc = BI->getLoc();
+
+    if (ResultsInError.hasValue()) {
+      if(ConversionStatus & APFloat::opStatus::opOverflow ||
+          ConversionStatus & APFloat::opStatus::opUnderflow) {
+        SmallString<10> inputValStr;
+        // Note that here TruncVal stores the truncated value.
+        // So use V->getValue() to retrieve the input FP value.
+        V->getValue().toString(inputValStr);
+
+        auto diagId = (ConversionStatus & APFloat::opStatus::opOverflow) ?
+            diag::float_trunc_overflow : diag::float_trunc_underflow;
+        diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
+                 diagId, inputValStr, destType->getBitWidth());
+        ResultsInError = Optional<bool>(true);
+        return nullptr;
+      }
+    }
 
     // Check if conversion was successful.
     if (ConversionStatus != APFloat::opStatus::opOK &&
@@ -987,6 +1006,83 @@ case BuiltinValueKind::id:
     // The call to the builtin should be replaced with the constant value.
     SILBuilderWithScope B(BI);
     return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
+  }
+
+  case BuiltinValueKind::FPToSI: {
+    auto *V = dyn_cast<FloatLiteralInst>(Args[0]);
+    if (!V)
+      return nullptr;
+    APFloat fpVal = V->getValue();
+    auto *destTy = Builtin.Types[1]->castTo<BuiltinIntegerType>();
+
+    llvm::APSInt resInt(destTy->getFixedWidth(), /*isUnsigned=*/ false);
+    bool isExact = false;
+    APFloat::opStatus status =
+      fpVal.convertToInteger(resInt, APFloat::rmTowardZero, &isExact);
+
+    if (ResultsInError.hasValue()) {
+      if(status & APFloat::opStatus::opInvalidOp) {
+        SmallString<10> fpStr;
+        fpVal.toString(fpStr);
+        diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
+                 diag::float_to_int_overflow, fpStr,
+                 destTy->getFixedWidth(), "signed");
+        ResultsInError = Optional<bool>(true);
+        return nullptr;
+      }
+    }
+    // Do not fold if any of the flags are set.
+    if (status != APFloat::opStatus::opOK &&
+        status != APFloat::opStatus::opInexact) {
+      return nullptr;
+    }
+    // The call to the builtin should be replaced with the constant value.
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), resInt);
+  }
+
+  case BuiltinValueKind::FPToUI: {
+    auto *V = dyn_cast<FloatLiteralInst>(Args[0]);
+    if (!V)
+      return nullptr;
+    APFloat fpVal = V->getValue();
+
+    // fpVal should be non-negative. Otherwise, report an error.
+    if(ResultsInError.hasValue() && fpVal.isNegative() && !fpVal.isZero()) {
+      SmallString<10> fpStr;
+      fpVal.toString(fpStr);
+      diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
+               diag::negative_fp_literal_overflow_unsigned, fpStr);
+      ResultsInError = Optional<bool>(true);
+      return nullptr;
+    }
+
+    auto *destTy = Builtin.Types[1]->castTo<BuiltinIntegerType>();
+
+    llvm::APSInt resInt(destTy->getFixedWidth(), /*isUnsigned=*/ true);
+    bool isExact = false;
+    APFloat::opStatus status =
+      fpVal.convertToInteger(resInt, APFloat::rmTowardZero, &isExact);
+
+    if (ResultsInError.hasValue()) {
+      if(status & APFloat::opStatus::opInvalidOp) {
+        SmallString<10> fpStr;
+        fpVal.toString(fpStr);
+        diagnose(M.getASTContext(), BI->getLoc().getSourceLoc(),
+                 diag::float_to_int_overflow, fpStr,
+                 destTy->getFixedWidth(), "unsigned");
+        ResultsInError = Optional<bool>(true);
+        return nullptr;
+      }
+    }
+    // Do not fold if any of the flags are set
+    if (status != APFloat::opStatus::opOK &&
+        status != APFloat::opStatus::opInexact) {
+      return nullptr;
+    }
+    // The call to the builtin should be replaced with the constant value.
+    SILBuilderWithScope B(BI);
+    return B.createIntegerLiteral(BI->getLoc(), BI->getType(), resInt);
   }
 
   case BuiltinValueKind::AssumeNonNegative: {
@@ -1099,6 +1195,17 @@ bool ConstantFolder::constantFoldStringConcatenation(ApplyInst *AI) {
 void ConstantFolder::initializeWorklist(SILFunction &F) {
   for (auto &BB : F) {
     for (auto &I : BB) {
+      // Check if `I` is a floating-point literal instruction that assigns
+      // `inf` value. This means the input has a large number that overflows
+      // even Float80. So we throw a diagnostic error and ignore this instr.
+      if (auto floatLit = dyn_cast<FloatLiteralInst>(&I)) {
+        if (EnableDiagnostics && floatLit->getValue().isInfinity()) {
+          diagnose(I.getModule().getASTContext(), I.getLoc().getSourceLoc(),
+                   diag::float_nonrep);
+          continue;
+        }
+      }
+
       if (isFoldable(&I) && I.hasUsesOfAnyResult()) {
         WorkList.insert(&I);
         continue;
@@ -1248,7 +1355,6 @@ ConstantFolder::processWorkList() {
       }
       continue;
     }
-
 
     // Go through all users of the constant and try to fold them.
     // TODO: MultiValueInstruction
