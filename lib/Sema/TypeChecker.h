@@ -1539,14 +1539,6 @@ public:
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
-  /// \brief Add the RawOptionSet (todo:, Equatable, and Hashable) methods to an
-  /// imported NS_OPTIONS struct.
-  void addImplicitStructConformances(StructDecl *ED);
-
-  /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
-  /// enum with a raw type.
-  void addImplicitEnumConformances(EnumDecl *ED);
-
   /// Synthesize the member with the given name on the target if applicable,
   /// i.e. if the member is synthesizable and has not yet been added to the
   /// target.
@@ -2268,12 +2260,6 @@ public:
   /// This is "Swift", if that module is imported, or the current module if
   /// we're parsing the standard library.
   ModuleDecl *getStdlibModule(const DeclContext *dc);
-
-  /// \name AST Mutation Listener Implementation
-  /// @{
-  void handleExternalDecl(Decl *decl);
-
-  /// @}
 
   /// \name Lazy resolution.
   ///
