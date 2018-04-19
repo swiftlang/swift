@@ -450,6 +450,9 @@ def enable_resilience : Flag<["-"], "enable-resilience">,
 def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
    HelpText<"Enable resilient layout for classes containing resilient value types">;
 
+def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
+   HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
+
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 
