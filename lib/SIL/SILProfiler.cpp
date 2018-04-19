@@ -92,11 +92,8 @@ static bool canCreateProfilerForAST(ASTNode N) {
   assert(hasASTBeenTypeChecked(N) && "Cannot use this AST for profiling");
 
   if (auto *D = N.dyn_cast<Decl *>()) {
-    // Any mapped function may be profiled. There's an exception for
-    // constructors because all of the constructors for a type share a single
-    // profiler.
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-      return !isa<ConstructorDecl>(AFD);
+      return true;
 
     if (isa<TopLevelCodeDecl>(D))
       return true;
@@ -797,7 +794,7 @@ public:
       return visitFunctionDecl(*this, AFD, [&] {
         CounterExpr &funcCounter = assignCounter(AFD->getBody());
 
-        if (isa<ConstructorDecl>(AFD))
+        if (ParentNominalType && isa<ConstructorDecl>(AFD))
           addToCounter(ParentNominalType, funcCounter);
       });
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -995,16 +992,6 @@ static StringRef getCurrentFileName(ASTNode Root) {
   return {};
 }
 
-static void walkTopLevelNodeForProfiling(ASTNode Root, ASTWalker &Walker) {
-  Root.walk(Walker);
-
-  // Visit extensions when walking through a nominal type.
-  auto *NTD = dyn_cast_or_null<NominalTypeDecl>(Root.dyn_cast<Decl *>());
-  if (NTD)
-    for (ExtensionDecl *ED : NTD->getExtensions())
-      ED->walk(Walker);
-}
-
 void SILProfiler::assignRegionCounters() {
   const auto &SM = M.getASTContext().SourceMgr;
 
@@ -1040,7 +1027,7 @@ void SILProfiler::assignRegionCounters() {
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
-  walkTopLevelNodeForProfiling(Root, Mapper);
+  Root.walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;
   // TODO: Mapper needs to calculate a function hash as it goes.
@@ -1048,7 +1035,7 @@ void SILProfiler::assignRegionCounters() {
 
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SM);
-    walkTopLevelNodeForProfiling(Root, Coverage);
+    Root.walk(Coverage);
     CovMap =
         Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName, PGOFuncHash,
                                    RegionCounterMap, CurrentFileName);
@@ -1066,7 +1053,7 @@ void SILProfiler::assignRegionCounters() {
     }
     PGOMapping pgoMapper(RegionLoadedCounterMap, LoadedCounts,
                          RegionCondToParentMap);
-    walkTopLevelNodeForProfiling(Root, pgoMapper);
+    Root.walk(pgoMapper);
   }
 }
 
