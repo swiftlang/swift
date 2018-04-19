@@ -280,7 +280,27 @@ public:
 #define DECL(Name, _) On##Name = 1ull << unsigned(DeclKindIndex::Name),
 #include "swift/AST/DeclNodes.def"
 
-    // More coarse-grained aggregations for use in Attr.def.
+    // Abstract class aggregations for use in Attr.def.
+    OnValue = 0
+#define DECL(Name, _)
+#define VALUE_DECL(Name, _) |On##Name
+#include "swift/AST/DeclNodes.def"
+    ,
+
+    OnNominalType = 0
+#define DECL(Name, _)
+#define NOMINAL_TYPE_DECL(Name, _) |On##Name
+#include "swift/AST/DeclNodes.def"
+    ,
+    OnConcreteNominalType = OnNominalType & ~OnProtocol,
+    OnGenericType = OnNominalType | OnTypeAlias,
+
+    OnAbstractFunction = 0
+#define DECL(Name, _)
+#define ABSTRACT_FUNCTION_DECL(Name, _) |On##Name
+#include "swift/AST/DeclNodes.def"
+    ,
+
     OnOperator = 0
 #define DECL(Name, _)
 #define OPERATOR_DECL(Name, _) |On##Name
