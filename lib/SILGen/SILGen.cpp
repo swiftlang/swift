@@ -793,8 +793,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   // SWIFT_ENABLE_TENSORFLOW
   // If the declaration has a @differentiable(reverse) attribute, turn it into a
-  // SIL [reverse_differentiable] attribute with lowered adjoint function name
-  // and lowered differentiation argument indices.
+  // SIL [reverse_differentiable] attribute with lowered primal and adjoint
+  // function names and lowered differentiation parameter indices.
   //
   // FIXME: Handle multiple @differentiable attributes.
   if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
@@ -806,10 +806,17 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       break;
     case AutoDiffMode::Reverse: {
       auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
-      // If primal exists, get primal's name.
+      // If primal exists, get primal's name. Otherwise, set primal name to
+      // the original function's name.
+      // NOTE: the original function is a valid primal function: specifically,
+      // it is equivalent to a primal function which checkpoints no values
+      // except the original result. When no primal is explicitly specified,
+      // the original function is used as the primal.
       StringRef primName;
       if (auto *primFn = diffAttr->getPrimalFunction())
         primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
+      else
+        primName = silOriginalFn->getName();
       // Get adjoint's name.
       auto *adjointFn = diffAttr->getAdjointFunction();
       assert(adjointFn && "Adjoint should've been type-checked and resolved.");
