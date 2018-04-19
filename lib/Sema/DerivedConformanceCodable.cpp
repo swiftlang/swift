@@ -750,6 +750,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
                                       TypeLoc::withoutLoc(returnType),
                                       target);
   encodeDecl->setImplicit();
+  encodeDecl->setSynthesized();
   encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
 
   // This method should be marked as 'override' for classes inheriting Encodable
@@ -1084,6 +1085,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
                                            SourceLoc(), selfDecl, paramList,
                                            /*GenericParams=*/nullptr, target);
   initDecl->setImplicit();
+  initDecl->setSynthesized();
   initDecl->setBodySynthesizer(deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.
