@@ -1453,11 +1453,11 @@ extension Dictionary: Hashable where Value: Hashable {
     var commutativeHash = 0
     for (k, v) in self {
       var elementHasher = _Hasher()
-      elementHasher.append(k)
-      elementHasher.append(v)
+      elementHasher.combine(k)
+      elementHasher.combine(v)
       commutativeHash ^= elementHasher.finalize()
     }
-    hasher.append(commutativeHash)
+    hasher.combine(commutativeHash)
   }
 }
 
@@ -2436,8 +2436,8 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(seed: _storage.seed)
-    hasher.append(k)
+    var hasher = _Hasher(_seed: _storage.seed)
+    hasher.combine(k)
     return hasher.finalize() & _bucketMask
   }
 

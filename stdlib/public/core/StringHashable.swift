@@ -54,13 +54,13 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   internal func hashASCII(into hasher: inout _Hasher) {
     var asciiHasher = ASCIIHasher()
     for c in self {
-      if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: c)) {
-        hasher.append(combined)
+      if let chunk = asciiHasher.append(UInt8(truncatingIfNeeded: c)) {
+        hasher.combine(chunk)
       }
     }
 
-    if let combined = asciiHasher.consume() {
-      hasher.append(combined)
+    if let chunk = asciiHasher.consume() {
+      hasher.combine(chunk)
     }
   }
 }
@@ -76,26 +76,26 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
       guard cuIsASCII && isSingleSegmentScalar else {
-        if let combined = asciiHasher.consume() {
-          hasher.append(combined)
+        if let chunk = asciiHasher.consume() {
+          hasher.combine(chunk)
         }
 
         let codeUnitSequence = IteratorSequence(
           _NormalizedCodeUnitIterator(self[i..<endIndex])
         )
         for element in codeUnitSequence {
-          hasher.append(UInt(element))
+          hasher.combine(UInt(element))
         }
         return
       }
 
-      if let combined = asciiHasher.append(UInt8(truncatingIfNeeded: cu)) {
-        hasher.append(combined)
+      if let chunk = asciiHasher.append(UInt8(truncatingIfNeeded: cu)) {
+        hasher.combine(chunk)
       }
     }
 
-    if let combined = asciiHasher.consume() {
-      hasher.append(combined)
+    if let chunk = asciiHasher.consume() {
+      hasher.combine(chunk)
     }
   }
 }
