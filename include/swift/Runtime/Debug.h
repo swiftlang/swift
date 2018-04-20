@@ -46,19 +46,19 @@ extern struct crashreporter_annotations_t gCRAnnotations;
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *message) {
+static inline void CRSetCrashLogMessage(const char *message) {
   gCRAnnotations.message = reinterpret_cast<uint64_t>(message);
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static const char *CRGetCrashLogMessage() {
+static inline const char *CRGetCrashLogMessage() {
   return reinterpret_cast<const char *>(gCRAnnotations.message);
 }
 
 #else
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *) {}
+static inline void CRSetCrashLogMessage(const char *) {}
 
 #endif
 
