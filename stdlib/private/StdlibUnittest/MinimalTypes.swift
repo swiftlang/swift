@@ -51,13 +51,14 @@ public struct MinimalEquatableValue : Equatable {
     self.value = value
     self.identity = identity
   }
-}
-public func == (
-  lhs: MinimalEquatableValue,
-  rhs: MinimalEquatableValue
-) -> Bool {
-  MinimalEquatableValue.timesEqualEqualWasCalled += 1
-  return MinimalEquatableValue.equalImpl.value(lhs.value, rhs.value)
+
+  public static func == (
+    lhs: MinimalEquatableValue,
+    rhs: MinimalEquatableValue
+  ) -> Bool {
+    MinimalEquatableValue.timesEqualEqualWasCalled += 1
+    return MinimalEquatableValue.equalImpl.value(lhs.value, rhs.value)
+  }
 }
 
 /// A type that conforms only to `Equatable` and `Comparable`.
@@ -85,22 +86,22 @@ public struct MinimalComparableValue : Equatable, Comparable {
     self.value = value
     self.identity = identity
   }
-}
 
-public func == (
-  lhs: MinimalComparableValue,
-  rhs: MinimalComparableValue
-) -> Bool {
-  MinimalComparableValue.timesEqualEqualWasCalled.value += 1
-  return MinimalComparableValue.equalImpl.value(lhs.value, rhs.value)
-}
+  public static func == (
+    lhs: MinimalComparableValue,
+    rhs: MinimalComparableValue
+  ) -> Bool {
+    MinimalComparableValue.timesEqualEqualWasCalled.value += 1
+    return MinimalComparableValue.equalImpl.value(lhs.value, rhs.value)
+  }
 
-public func < (
-  lhs: MinimalComparableValue,
-  rhs: MinimalComparableValue
-) -> Bool {
-  MinimalComparableValue.timesLessWasCalled.value += 1
-  return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
+  public static func < (
+    lhs: MinimalComparableValue,
+    rhs: MinimalComparableValue
+  ) -> Bool {
+    MinimalComparableValue.timesLessWasCalled.value += 1
+    return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
+  }
 }
 
 
@@ -130,19 +131,20 @@ public struct MinimalHashableValue : Equatable, Hashable {
     self.identity = identity
   }
 
+  public static func ==(
+    lhs: MinimalHashableValue,
+    rhs: MinimalHashableValue
+  ) -> Bool {
+    MinimalHashableValue.timesEqualEqualWasCalled += 1
+    return MinimalHashableValue.equalImpl.value(lhs.value, rhs.value)
+  }
+
   public var hashValue: Int {
     MinimalHashableValue.timesHashValueWasCalled += 1
     return MinimalHashableValue.hashValueImpl.value(value)
   }
 }
 
-public func == (
-  lhs: MinimalHashableValue,
-  rhs: MinimalHashableValue
-) -> Bool {
-  MinimalHashableValue.timesEqualEqualWasCalled += 1
-  return MinimalHashableValue.equalImpl.value(lhs.value, rhs.value)
-}
 
 
 /// A type that conforms only to `Equatable` and `Hashable`.
@@ -171,29 +173,34 @@ public class MinimalHashableClass : Equatable, Hashable {
     self.identity = identity
   }
 
+  public static func == (
+    lhs: MinimalHashableClass,
+    rhs: MinimalHashableClass
+  ) -> Bool {
+    MinimalHashableClass.timesEqualEqualWasCalled += 1
+    return MinimalHashableClass.equalImpl.value(lhs.value, rhs.value)
+  }
+
   public var hashValue: Int {
     MinimalHashableClass.timesHashValueWasCalled += 1
     return MinimalHashableClass.hashValueImpl.value(value)
   }
 }
 
-public func == (
-  lhs: MinimalHashableClass,
-  rhs: MinimalHashableClass
-) -> Bool {
-  MinimalHashableClass.timesEqualEqualWasCalled += 1
-  return MinimalHashableClass.equalImpl.value(lhs.value, rhs.value)
-}
 
 
 
 public var GenericMinimalHashableValue_timesEqualEqualWasCalled: Int = 0
 public var GenericMinimalHashableValue_timesHashValueWasCalled: Int = 0
 
-public var GenericMinimalHashableValue_equalImpl = ResettableValue<(Any, Any) -> Bool>(
-  { _, _ in fatalError("GenericMinimalHashableValue_equalImpl is not set yet"); () })
-public var GenericMinimalHashableValue_hashValueImpl = ResettableValue<(Any) -> Int>(
-  { _ in fatalError("GenericMinimalHashableValue_hashValueImpl is not set yet"); () })
+public var GenericMinimalHashableValue_equalImpl =
+  ResettableValue<(Any, Any) -> Bool>({ _, _ in
+    fatalError("GenericMinimalHashableValue_equalImpl is not set yet")
+  })
+public var GenericMinimalHashableValue_hashValueImpl =
+  ResettableValue<(Any) -> Int>({ _ in
+    fatalError("GenericMinimalHashableValue_hashValueImpl is not set yet")
+  })
 
 /// A type that conforms only to `Equatable` and `Hashable`.
 ///
@@ -213,28 +220,32 @@ public struct GenericMinimalHashableValue<Wrapped> : Equatable, Hashable {
     self.identity = identity
   }
 
+  public static func == <Wrapped>(
+    lhs: GenericMinimalHashableValue<Wrapped>,
+    rhs: GenericMinimalHashableValue<Wrapped>
+  ) -> Bool {
+    GenericMinimalHashableValue_timesEqualEqualWasCalled += 1
+    return GenericMinimalHashableValue_equalImpl.value(lhs.value, rhs.value)
+  }
+
   public var hashValue: Int {
     GenericMinimalHashableValue_timesHashValueWasCalled += 1
     return GenericMinimalHashableValue_hashValueImpl.value(value)
   }
 }
 
-public func == <Wrapped>(
-  lhs: GenericMinimalHashableValue<Wrapped>,
-  rhs: GenericMinimalHashableValue<Wrapped>
-) -> Bool {
-  GenericMinimalHashableValue_timesEqualEqualWasCalled += 1
-  return GenericMinimalHashableValue_equalImpl.value(lhs.value, rhs.value)
-}
-
 
 public var GenericMinimalHashableClass_timesEqualEqualWasCalled: Int = 0
 public var GenericMinimalHashableClass_timesHashValueWasCalled: Int = 0
 
-public var GenericMinimalHashableClass_equalImpl = ResettableValue<(Any, Any) -> Bool>(
-  { _, _ in fatalError("GenericMinimalHashableClass_equalImpl is not set yet"); () })
-public var GenericMinimalHashableClass_hashValueImpl = ResettableValue<(Any) -> Int>(
-  { _ in fatalError("GenericMinimalHashableClass_hashValueImpl is not set yet"); () })
+public var GenericMinimalHashableClass_equalImpl =
+  ResettableValue<(Any, Any) -> Bool>({ _, _ in
+    fatalError("GenericMinimalHashableClass_equalImpl is not set yet")
+  })
+public var GenericMinimalHashableClass_hashValueImpl =
+  ResettableValue<(Any) -> Int>({ _ in
+    fatalError("GenericMinimalHashableClass_hashValueImpl is not set yet")
+  })
 
 /// A type that conforms only to `Equatable` and `Hashable`.
 ///
@@ -254,19 +265,20 @@ public class GenericMinimalHashableClass<Wrapped> : Equatable, Hashable {
     self.identity = identity
   }
 
+  public static func == <Wrapped>(
+    lhs: GenericMinimalHashableClass<Wrapped>,
+    rhs: GenericMinimalHashableClass<Wrapped>
+  ) -> Bool {
+    GenericMinimalHashableClass_timesEqualEqualWasCalled += 1
+    return GenericMinimalHashableClass_equalImpl.value(lhs.value, rhs.value)
+  }
+
   public var hashValue: Int {
     GenericMinimalHashableClass_timesHashValueWasCalled += 1
     return GenericMinimalHashableClass_hashValueImpl.value(value)
   }
 }
 
-public func == <Wrapped>(
-  lhs: GenericMinimalHashableClass<Wrapped>,
-  rhs: GenericMinimalHashableClass<Wrapped>
-) -> Bool {
-  GenericMinimalHashableClass_timesEqualEqualWasCalled += 1
-  return GenericMinimalHashableClass_equalImpl.value(lhs.value, rhs.value)
-}
 
 
 /// A type that conforms only to `Equatable`, `Comparable`, and `Strideable`.
@@ -299,6 +311,22 @@ public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
 
   public typealias Stride = Int
 
+  public static func == (
+    lhs: MinimalStrideableValue,
+    rhs: MinimalStrideableValue
+  ) -> Bool {
+    MinimalStrideableValue.timesEqualEqualWasCalled.value += 1
+    return MinimalStrideableValue.equalImpl.value(lhs.value, rhs.value)
+  }
+
+  public static func < (
+    lhs: MinimalStrideableValue,
+    rhs: MinimalStrideableValue
+  ) -> Bool {
+    MinimalStrideableValue.timesLessWasCalled.value += 1
+    return MinimalStrideableValue.lessImpl.value(lhs.value, rhs.value)
+  }
+
   public func distance(to other: MinimalStrideableValue) -> Stride {
     MinimalStrideableValue.timesDistanceWasCalled.value += 1
     return other.value - self.value
@@ -310,21 +338,6 @@ public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
   }
 }
 
-public func == (
-  lhs: MinimalStrideableValue,
-  rhs: MinimalStrideableValue
-) -> Bool {
-  MinimalStrideableValue.timesEqualEqualWasCalled.value += 1
-  return MinimalStrideableValue.equalImpl.value(lhs.value, rhs.value)
-}
-
-public func < (
-  lhs: MinimalStrideableValue,
-  rhs: MinimalStrideableValue
-) -> Bool {
-  MinimalStrideableValue.timesLessWasCalled.value += 1
-  return MinimalStrideableValue.lessImpl.value(lhs.value, rhs.value)
-}
 
 // Local Variables:
 // eval: (read-only-mode 1)
