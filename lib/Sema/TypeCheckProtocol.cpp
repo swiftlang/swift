@@ -4030,6 +4030,7 @@ void TypeChecker::checkConformanceRequirements(
   llvm::SetVector<ValueDecl *> globalMissingWitnesses;
   ConformanceChecker checker(*this, conformance, globalMissingWitnesses);
   checker.ensureRequirementsAreSatisfied(/*failUnsubstituted=*/true);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 
 /// Determine the score when trying to match two identifiers together.
@@ -4937,6 +4938,7 @@ void TypeChecker::resolveTypeWitness(
     checker.resolveTypeWitnesses();
   else
     checker.resolveSingleTypeWitness(assocType);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 
 void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
@@ -4947,6 +4949,7 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
                        const_cast<NormalProtocolConformance*>(conformance),
                        MissingWitnesses);
   checker.resolveSingleWitness(requirement);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 
 ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
