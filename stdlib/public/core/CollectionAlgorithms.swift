@@ -274,7 +274,7 @@ extension Sequence {
   /// on that range:
   ///
   ///     let numbers = 0...9
-  ///     let shuffledNumbers = numbers.shuffled(using: myGenerator)
+  ///     let shuffledNumbers = numbers.shuffled(using: &myGenerator)
   ///     // shuffledNumbers == [8, 9, 4, 3, 2, 6, 7, 0, 5, 1]
   ///
   /// - Parameter generator: The random number generator to use when shuffling
@@ -284,10 +284,10 @@ extension Sequence {
   /// - Complexity: O(*n*)
   @inlinable
   public func shuffled<T: RandomNumberGenerator>(
-    using generator: T
+    using generator: inout T
   ) -> [Element] {
     var result = ContiguousArray(self)
-    result.shuffle(using: generator)
+    result.shuffle(using: &generator)
     return Array(result)
   }
   
@@ -302,7 +302,7 @@ extension Sequence {
   ///
   /// This method uses the default random generator, `Random.default`. The call
   /// to `numbers.shuffled()` above is equivalent to calling
-  /// `numbers.shuffled(using: Random.default)`.
+  /// `numbers.shuffled(using: &Random.default)`.
   ///
   /// - Parameter generator: The random number generator to use when shuffling
   ///   the sequence.
@@ -311,7 +311,7 @@ extension Sequence {
   /// - Complexity: O(*n*)
   @inlinable
   public func shuffled() -> [Element] {
-    return shuffled(using: Random.default)
+    return shuffled(using: &Random.default)
   }
 }
 
@@ -324,7 +324,7 @@ extension MutableCollection {
   /// `shuffle(using:)` method to randomly reorder the elements of an array.
   ///
   ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
-  ///     names.shuffle(using: myGenerator)
+  ///     names.shuffle(using: &myGenerator)
   ///     // names == ["Sofía", "Alejandro", "Camila", "Luis", "Diego", "Luciana"]
   ///
   /// - Parameter generator: The random number generator to use when shuffling
@@ -333,7 +333,7 @@ extension MutableCollection {
   /// - Complexity: O(*n*)
   @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
-    using generator: T
+    using generator: inout T
   ) {
     guard count > 1 else { return }
     var amount = count
@@ -360,12 +360,12 @@ extension MutableCollection {
   ///
   /// This method uses the default random generator, `Random.default`. The call
   /// to `names.shuffle()` above is equivalent to calling
-  /// `names.shuffle(using: Random.default)`.
+  /// `names.shuffle(using: &Random.default)`.
   ///
   /// - Complexity: O(*n*)
   @inlinable
   public mutating func shuffle() {
-    shuffle(using: Random.default)
+    shuffle(using: &Random.default)
   }
 }
 

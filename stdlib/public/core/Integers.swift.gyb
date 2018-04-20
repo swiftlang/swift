@@ -2510,8 +2510,8 @@ extension ${Range}
   ///   This method never returns `nil`.
 %   end
   @inlinable
-  public func random<T: RandomNumberGenerator>(
-    using generator: T
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
   ) -> Element? {
 %   if 'Closed' not in Range:
     guard lowerBound != upperBound else {
@@ -2565,8 +2565,8 @@ extension ${Range}
   /// value.
   ///
   /// This method uses the default random generator, `Random.default`. Calling
-  /// `(${exampleRange}).random()` is equivalent to calling
-  /// `(${exampleRange}).random(using: Random.default)`.
+  /// `(${exampleRange}).randomElement()` is equivalent to calling
+  /// `(${exampleRange}).randomElement(using: &Random.default)`.
   ///
   /// - Returns: A random element of the range.
 %   if 'Closed' not in Range:
@@ -2575,8 +2575,8 @@ extension ${Range}
   ///   This method never returns `nil`.
 %   end
   @inlinable
-  public func random() -> Element? {
-    return self.random(using: Random.default)
+  public func randomElement() -> Element? {
+    return randomElement(using: &Random.default)
   }
 }
 
@@ -2592,7 +2592,7 @@ where Self.Stride : SignedInteger,
   /// new values in the range `${exampleRange}`.
   ///
   ///     for _ in 1...3 {
-  ///         print(Int.random(in: ${exampleRange}, using: myGenerator))
+  ///         print(Int.random(in: ${exampleRange}, using: &myGenerator))
   ///     }
   ///     // Prints "7"
   ///     // Prints "44"
@@ -2609,7 +2609,7 @@ where Self.Stride : SignedInteger,
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: ${Range}<Self>,
-    using generator: T
+    using generator: inout T
   ) -> Self {
 %   if 'Closed' not in Range:
     _precondition(
@@ -2617,7 +2617,7 @@ where Self.Stride : SignedInteger,
       "Can't get random value with lowerBound == upperBound"
     )
 %   end
-    return range.random(using: generator)!
+    return range.randomElement(using: &generator)!
   }
   
   /// Returns a random value within the specified range.
@@ -2634,7 +2634,7 @@ where Self.Stride : SignedInteger,
   ///
   /// This method uses the default random generator, `Random.default`. The call
   /// to `Int.random(in: ${exampleRange})` above is equivalent to calling
-  /// `Int.random(in: ${exampleRange}, using: Random.default)`.
+  /// `Int.random(in: ${exampleRange}, using: &Random.default)`.
   ///
   /// - Parameter range: The range in which to create a random value.
 %   if Range == 'Range':
@@ -2643,7 +2643,7 @@ where Self.Stride : SignedInteger,
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
   public static func random(in range: ${Range}<Self>) -> Self {
-    return Self.random(in: range, using: Random.default)
+    return Self.random(in: range, using: &Random.default)
   }
 }
 

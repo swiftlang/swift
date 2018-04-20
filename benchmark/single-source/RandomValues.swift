@@ -26,7 +26,7 @@ public let RandomValues = [
 ]
 
 /// A linear congruential PRNG.
-final class LCRNG: RandomNumberGenerator {
+struct LCRNG: RandomNumberGenerator {
   private var state: UInt64
   
   init(seed: Int) {
@@ -34,7 +34,7 @@ final class LCRNG: RandomNumberGenerator {
     for _ in 0..<10 { _ = next() }
   }
   
-  func next() -> UInt64 {
+  mutating func next() -> UInt64 {
     state = 2862933555777941757 &* state &+ 3037000493
     return state
   }
@@ -55,9 +55,9 @@ public func run_RandomIntegersDef(_ N: Int) {
 public func run_RandomIntegersLCG(_ N: Int) {
   for _ in 0 ..< N {
     var x = 0
-    let generator = LCRNG(seed: 0)
+    var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
-      x &+= Int.random(in: 0...10_000, using: generator)
+      x &+= Int.random(in: 0...10_000, using: &generator)
     }
     CheckResults(x == 498214315)
   }
@@ -78,9 +78,9 @@ public func run_RandomDoubleDef(_ N: Int) {
 public func run_RandomDoubleLCG(_ N: Int) {
   for _ in 0 ..< N {
     var x = 0.0
-    let generator = LCRNG(seed: 0)
+    var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
-      x += Double.random(in: -1000...1000, using: generator)
+      x += Double.random(in: -1000...1000, using: &generator)
     }
     blackHole(x)
   }

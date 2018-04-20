@@ -2389,7 +2389,7 @@ where Self.RawSignificand : FixedWidthInteger,
   /// creates three new values in the range `${exampleRange}`.
   ///
   ///     for _ in 1...3 {
-  ///         print(Double.random(in: ${exampleRange}, using: myGenerator))
+  ///         print(Double.random(in: ${exampleRange}, using: &myGenerator))
   ///     }
   ///     // Prints "18.1900709259179"
   ///     // Prints "14.2286325689993"
@@ -2412,7 +2412,7 @@ where Self.RawSignificand : FixedWidthInteger,
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     in range: ${Range}<Self>,
-    using generator: T
+    using generator: inout T
   ) -> Self {
 %   if 'Closed' not in Range:
     _precondition(
@@ -2466,7 +2466,7 @@ where Self.RawSignificand : FixedWidthInteger,
   ///
   /// This method uses the default random generator, `Random.default`. The call
   /// to `Double.random(in: ${exampleRange})` above is equivalent to calling
-  /// `Double.random(in: ${exampleRange}, using: Random.default)`.
+  /// `Double.random(in: ${exampleRange}, using: &Random.default)`.
   ///
   /// - Parameter range: The range in which to create a random value.
 %   if Range == 'Range':
@@ -2475,7 +2475,7 @@ where Self.RawSignificand : FixedWidthInteger,
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
   public static func random(in range: ${Range}<Self>) -> Self {
-    return Self.random(in: range, using: Random.default)
+    return Self.random(in: range, using: &Random.default)
   }
 }
 

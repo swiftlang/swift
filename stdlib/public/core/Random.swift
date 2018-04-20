@@ -27,8 +27,8 @@ import SwiftShims
 ///     enum Weekday : CaseIterable {
 ///         case sunday, monday, tuesday, wednesday, thursday, friday, saturday
 ///
-///         static func randomWeekday<G: RandomNumberGenerator>(using generator: G) -> Weekday {
-///             return Weekday.allCases.random(using: generator)!
+///         static func randomWeekday<G: RandomNumberGenerator>(using generator: inout G) -> Weekday {
+///             return Weekday.allCases.randomElement(using: &generator)!
 ///         }
 ///
 ///         static func randomWeekday() -> Weekday {
@@ -53,7 +53,7 @@ public protocol RandomNumberGenerator {
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// - Returns: An unsigned 64-bit random value.
-  func next() -> UInt64
+  mutating func next() -> UInt64
 }
 
 extension RandomNumberGenerator {
@@ -62,7 +62,7 @@ extension RandomNumberGenerator {
   /// - Returns: A random value of `T`. Bits are randomly distributed so that
   ///   every value of `T` is equally likely to be returned.
   @inlinable
-  public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
+  public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
     if T.bitWidth <= UInt64.bitWidth {
       return T(truncatingIfNeeded: self.next())
     }
@@ -91,7 +91,9 @@ extension RandomNumberGenerator {
   /// - Returns: A random value of `T` in the range `0..<upperBound`. Every
   ///   value in the range `0..<upperBound` is equally likely to be returned.
   @inlinable
-  public func next<T: FixedWidthInteger & UnsignedInteger>(upperBound: T) -> T {
+  public mutating func next<T: FixedWidthInteger & UnsignedInteger>(
+    upperBound: T
+  ) -> T {
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
@@ -112,20 +114,23 @@ extension RandomNumberGenerator {
 /// example are equivalent:
 ///
 ///     let x = Int.random(in: 1...100)
-///     let y = Int.random(in: 1...100, using: Random.default)
+///     let y = Int.random(in: 1...100, using: &Random.default)
 ///
 /// `Random.default` is safe to use in multiple threads, and uses a
 /// cryptographically secure algorithm whenever possible.
 public struct Random : RandomNumberGenerator {
   /// The shared, default instance of the `Range` random number generator.
-  public static let `default` = Random()
+  public static var `default`: Random {
+    get { return Random() }
+    set { /* Discard */ }
+  }
 
   private init() {}
 
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// - Returns: An unsigned 64-bit random value.
-  public func next() -> UInt64 {
+  public mutating func next() -> UInt64 {
     var random: UInt64 = 0
     _stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
@@ -135,7 +140,7 @@ public struct Random : RandomNumberGenerator {
   ///
   /// - Returns: A random value of `T`. Bits are randomly distributed so that
   ///   every value of `T` is equally likely to be returned.
-  public func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
+  public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
     var random: T = 0
     _stdlib_random(&random, MemoryLayout<T>.size)
     return random

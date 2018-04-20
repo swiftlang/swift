@@ -795,17 +795,19 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// You use this method to select a random element from a collection when you
   /// are using a custom random number generator. For example, call
-  /// `random(using:)` to select a random element from an array of names.
+  /// `randomElement(using:)` to select a random element from an array of names.
   ///
   ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
-  ///     let randomName = names.random(using: myGenerator)!
+  ///     let randomName = names.randomElement(using: &myGenerator)!
   ///     // randomName == "Amani" (maybe)
   ///
   /// - Parameter generator: The random number generator to use when choosing
   ///   a random element.
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
-  func random<T: RandomNumberGenerator>(using generator: T) -> Element?
+  func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element?
 
   @available(*, deprecated, message: "all index distances are now of type Int")
   typealias IndexDistance = Int
@@ -1025,10 +1027,10 @@ extension Collection {
   ///
   /// You use this method to select a random element from a collection when you
   /// are using a custom random number generator. For example, call
-  /// `random(using:)` to select a random element from an array of names.
+  /// `randomElement(using:)` to select a random element from an array of names.
   ///
   ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
-  ///     let randomName = names.random(using: myGenerator)!
+  ///     let randomName = names.randomElement(using: &myGenerator)!
   ///     // randomName == "Amani" (maybe)
   ///
   /// - Parameter generator: The random number generator to use when choosing
@@ -1036,8 +1038,8 @@ extension Collection {
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
   @inlinable
-  public func random<T: RandomNumberGenerator>(
-    using generator: T
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
   ) -> Element? {
     guard !isEmpty else { return nil }
     let random = generator.next(upperBound: UInt(count))
@@ -1050,22 +1052,22 @@ extension Collection {
 
   /// Returns a random element of the collection.
   ///
-  /// For example, call `random()` to select a random element from an
+  /// For example, call `randomElement()` to select a random element from an
   /// array of names.
   ///
   ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
-  ///     let randomName = names.random()!
+  ///     let randomName = names.randomElement()!
   ///     // randomName == "Amani" (perhaps)
   ///
   /// This method uses the default random generator, `Random.default`. The call
-  /// to `names.random()` above is equivalent to calling
-  /// `names.random(using: Random.default)`.
+  /// to `names.randomElement()` above is equivalent to calling
+  /// `names.randomElement(using: &Random.default)`.
   ///
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
   @inlinable
-  public func random() -> Element? {
-    return random(using: Random.default)
+  public func randomElement() -> Element? {
+    return randomElement(using: &Random.default)
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.

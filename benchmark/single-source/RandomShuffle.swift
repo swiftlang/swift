@@ -25,7 +25,7 @@ public let RandomShuffle = [
 ]
 
 /// A linear congruential PRNG.
-final class LCRNG: RandomNumberGenerator {
+struct LCRNG: RandomNumberGenerator {
   private var state: UInt64
   
   init(seed: Int) {
@@ -33,7 +33,7 @@ final class LCRNG: RandomNumberGenerator {
     for _ in 0..<10 { _ = next() }
   }
   
-  func next() -> UInt64 {
+  mutating func next() -> UInt64 {
     state = 2862933555777941757 &* state &+ 3037000493
     return state
   }
@@ -56,9 +56,9 @@ public func run_RandomShuffleDef(_ N: Int) {
 
 @inline(never)
 public func run_RandomShuffleLCG(_ N: Int) {
-  let generator = LCRNG(seed: 0)
+  var generator = LCRNG(seed: 0)
   for _ in 0 ..< N {
-    numbers.shuffle(using: generator)
+    numbers.shuffle(using: &generator)
     blackHole(numbers.first!)
   }
 }
