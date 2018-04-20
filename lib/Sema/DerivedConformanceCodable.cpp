@@ -757,7 +757,7 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   // conformance from a parent class.
   auto *classDecl = dyn_cast<ClassDecl>(target);
   if (classDecl && superclassIsEncodable(classDecl)) {
-    auto *attr = new (C) SimpleDeclAttr<DAK_Override>(/*IsImplicit=*/true);
+    auto *attr = new (C) OverrideAttr(/*IsImplicit=*/true);
     encodeDecl->getAttrs().add(attr);
   }
 
@@ -1090,7 +1090,7 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
 
   // This constructor should be marked as `required` for non-final classes.
   if (isa<ClassDecl>(target) && !target->getAttrs().hasAttribute<FinalAttr>()) {
-    auto *reqAttr = new (C) SimpleDeclAttr<DAK_Required>(/*IsImplicit=*/true);
+    auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
     initDecl->getAttrs().add(reqAttr);
   }
 
