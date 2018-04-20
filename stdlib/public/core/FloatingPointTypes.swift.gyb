@@ -1771,7 +1771,7 @@ extension ${Self} {
   @_versioned @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointAdd(
-    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
   ) -> (${Self}, ${Self}) {
     return (adjoint, adjoint)
   }
@@ -1779,7 +1779,7 @@ extension ${Self} {
   @_versioned @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointSubtract(
-    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
   ) -> (${Self}, ${Self}) {
     return (adjoint, -adjoint)
   }
@@ -1787,7 +1787,7 @@ extension ${Self} {
   @_versioned @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointMultiply(
-    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
   ) -> (${Self}, ${Self}) {
     return (rhs * adjoint, lhs * adjoint)
   }
@@ -1795,7 +1795,7 @@ extension ${Self} {
   @_versioned @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointDivide(
-    _ lhs: ${Self}, _ rhs: ${Self}, partial: ${Self}, adjoint: ${Self}
+    _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
   ) -> (${Self}, ${Self}) {
     return (adjoint / rhs, -lhs / (rhs * rhs) * adjoint)
   }

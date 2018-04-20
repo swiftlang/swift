@@ -578,30 +578,6 @@ public extension AccelerableByTensorFlow {
   }
 }
 
-public extension Tensor where Scalar : Numeric {
-  @_inlineable @inline(__always)
-  func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
-    let zeros: Tensor = #tfop("Fill", shape, Tensor(0))
-    return self + zeros
-  }
-
-  /// Broadcast to the same shape as the specified `Tensor`.
-  /// - Precondition: The specified shape must be compatible for broadcasting.
-  // TODO: This is a temporary workaround for supporting broadcast on numeric
-  // tensors. Remove this function once a general working broadcast is
-  // implemented.
-  @_inlineable @inline(__always)
-  func broadcast(to other: Tensor) -> Tensor {
-    return broadcast(toShape: other.shapeTensor)
-  }
-
-  @_inlineable @inline(__always)
-  func broadcast(to shape: TensorShape) -> Tensor {
-    let zeros: Tensor = #tfop("Fill", Tensor<Int32>(shape.dimensions), Tensor(0))
-    return self + zeros
-  }
-}
-
 public extension Tensor {
   /// Reshape to the shape of the specified `Tensor`.
   /// - Precondition: The number of scalars matches the new shape.
@@ -620,10 +596,13 @@ public extension Tensor {
   /// Reshape to the specified `Tensor` representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
-  @differentiable(
-    reverse, withRespectTo: (self),
-    adjoint: _adjointReshaped(toShape:partial:seed:)
-  )
+  // FIXME: Uncomment when type checking for the trailing `where` clause is
+  // implemented or when a `Broadcast` op kernel is implemented.
+  //
+  // @differentiable(
+  //   reverse, withRespectTo: (self),
+  //   adjoint: _adjointReshaped(toShape:originalValue:seed:)
+  // )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return #tfop("Reshape", handle, newShape)
   }
@@ -644,10 +623,13 @@ public extension Tensor {
   /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
   /// specified shape index.
   @_inlineable @inline(__always)
-  @differentiable(
-    reverse, withRespectTo: (self),
-    adjoint: _adjointExpandingShape(at:partial:seed:)
-  )
+  // FIXME: Uncomment when type checking for the trailing `where` clause is
+  // implemented or when a `Broadcast` op kernel is implemented.
+  //
+  // @differentiable(
+  //   reverse, withRespectTo: (self),
+  //   adjoint: _adjointExpandingShape(at:originalValue:seed:)
+  // )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),
                  Tdim: Int32.self)
@@ -656,7 +638,7 @@ public extension Tensor {
   /// Remove the specified dimensions of size 1 from the shape of a tensor. If
   /// no dimensions are specified, then all dimensions of size 1 will be
   /// removed.
-  // NOTE: the gradient for variadic `squeezed` is difficult to express because
+  // FIXME: The gradient for variadic `squeezed` is difficult to express because
   // ExpandDims only expands one axis at a time.
   @_inlineable @inline(__always)
   func squeezingShape(at axes: Int32...) -> Tensor {
@@ -714,17 +696,9 @@ extension Tensor : Differentiable where Scalar : FloatingPoint {
   /// The currency type in the mathematical model of differentiation.
   public typealias DifferentiationCurrency = Scalar
 
-  /// Creates an instance by numerically broadcasting the specified currency
-  /// value to be structurally isomorphic to another instance.
-  ///
-  /// - Parameters:
-  ///   - value: The differentiation currency value for initializing the
-  ///     instance.
-  ///   - other: The other structurally isomorphic instance.
-  ///
   @_inlineable @inline(__always)
-  public init(numericallyBroadcasting value: Scalar, to other: Tensor) {
-    self.init(handle: #tfop("Fill", other.shapeTensor, value))
+  public init(differentiationSeed: Scalar) {
+    self.init(differentiationSeed)
   }
 
   @_inlineable @inline(__always)

@@ -445,17 +445,9 @@ extension ${TensorXD} : Differentiable where Scalar : FloatingPoint {
   /// The currency type in the mathematical model of differentiation.
   public typealias DifferentiationCurrency = Scalar
 
-  /// Creates an instance by numerically broadcasting the specified currency
-  /// value to be structurally isomorphic to another instance.
-  ///
-  /// - Parameters:
-  ///   - value: The differentiation currency value for initializing the
-  ///     instance.
-  ///   - other: The other structurally isomorphic instance.
-  ///
   @_inlineable @inline(__always)
-  public init(numericallyBroadcasting value: Scalar, to other: ${TensorXD}) {
-    self.init(handle: #tfop("Fill", other.shapeTensor, value))
+  public init(differentiationSeed: Scalar) {
+    self.init(broadcasting: differentiationSeed)
   }
 
   @_inlineable @inline(__always)
@@ -468,7 +460,7 @@ extension ${TensorXD} : Differentiable where Scalar : FloatingPoint {
 // Transforms
 //===----------------------------------------------------------------------===//
 
-public extension ${TensorXD} {
+public extension ${TensorXD} where Scalar : Numeric {
   /// Returns a transposed `${TensorXD}`, with dimensions permuted in reverse
   /// order.
   @_inlineable @inline(__always)
@@ -478,7 +470,9 @@ public extension ${TensorXD} {
     )
     return transposed(withPermutations: defaultPermutations)
   }
+}
 
+public extension ${TensorXD} {
   /// Return a copy of the `${TensorXD}` collapsed into a `Tensor1D` in
   /// row-major order.
   @_inlineable @inline(__always)

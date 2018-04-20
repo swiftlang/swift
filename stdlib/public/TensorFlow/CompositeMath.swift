@@ -27,7 +27,7 @@ public func sigmoid<T : TensorProtocol>(_ x: T) -> T
 /// Computes `relu` of the specified tensor element-wise.
 /// Specifically, computes `max(0, x)`.
 @_inlineable @inline(__always)
-@differentiable(reverse, adjoint: _adjointRelu(_:partial:seed:))
+@differentiable(reverse, adjoint: _adjointRelu(_:originalValue:seed:))
 public func relu<T : TensorProtocol>(_ x: T) -> T
   where T.Scalar : FloatingPoint {
   return max(0, x)
