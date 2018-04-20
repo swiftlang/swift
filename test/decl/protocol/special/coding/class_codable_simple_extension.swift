@@ -17,9 +17,8 @@ class SimpleClass { // expected-note {{did you mean 'init'?}}
 }
 
 extension SimpleClass : Codable {} // expected-error {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
-// expected-error@-1 {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
+// expected-error@-1 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
 // expected-error@-2 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
-// expected-error@-3 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
 
 // They should not receive Codable methods.
 let _ = SimpleClass.init(from:) // expected-error {{type 'SimpleClass' has no member 'init(from:)'}}
