@@ -6,9 +6,9 @@
 
 import TensorFlow
 #if TPU
-import TestUtilsTPU
+import TensorFlowUnittestTPU
 #else
-import TestUtils
+import TensorFlowUnittest
 #endif
 import StdlibUnittest
 

@@ -11,6 +11,11 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   add_subdirectory(SwiftPrivateLibcExtras)
   add_subdirectory(SwiftPrivatePthreadExtras)
 
+  # SWIFT_ENABLE_TENSORFLOW
+  if(SWIFT_ENABLE_TENSORFLOW)
+    add_subdirectory(TensorFlowUnittest)
+  endif()
+
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_subdirectory(StdlibUnittestFoundationExtras)
     if (SWIFT_INCLUDE_TESTS)
