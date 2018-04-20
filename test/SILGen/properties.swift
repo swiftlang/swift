@@ -513,7 +513,7 @@ struct DidSetWillSetTests: ForceAccessors {
   }
 
   var a: Int {
-    // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
+    // CHECK-LABEL: sil private @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
     willSet(newA) {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
@@ -548,7 +548,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
     }
 
-    // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
+    // CHECK-LABEL: sil private @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
     didSet {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
@@ -626,7 +626,7 @@ var global_observing_property : Int = zero {
   // CHECK: properties.zero.unsafeMutableAddressor
   // CHECK: return
 
-  // CHECK-LABEL: sil hidden @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+  // CHECK-LABEL: sil private @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
   didSet {
     // The didSet implementation needs to call takeInt.
     takeInt(global_observing_property)
