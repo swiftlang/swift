@@ -5109,6 +5109,7 @@ protected:
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
         unsigned(ResilienceExpansion::Maximal);
+    Bits.AbstractFunctionDecl.Synthesized = false;
 
     // Verify no bitfield truncation.
     assert(Bits.AbstractFunctionDecl.NumParameterLists == NumParameterLists);
