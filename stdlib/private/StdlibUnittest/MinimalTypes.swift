@@ -116,7 +116,7 @@ public struct MinimalHashableValue : Equatable, Hashable {
   public static var equalImpl =
     ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
   public static var hashIntoImpl =
-    ResettableValue<(Int, inout _Hasher) -> Void>({ $1.combine($0) })
+    ResettableValue<(Int, inout Hasher) -> Void>({ $1.combine($0) })
 
   public var value: Int
   public var identity: Int
@@ -140,12 +140,12 @@ public struct MinimalHashableValue : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    var hasher = _Hasher()
+    var hasher = Hasher()
     hasher.combine(self)
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout _Hasher) {
+  public func _hash(into hasher: inout Hasher) {
     MinimalHashableValue.timesHashIntoWasCalled += 1
     MinimalHashableValue.hashIntoImpl.value(value, &hasher)
   }
@@ -169,7 +169,7 @@ public class MinimalHashableClass : Equatable, Hashable {
   public static var equalImpl =
     ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
   public static var hashIntoImpl =
-  ResettableValue<(Int, inout _Hasher) -> Void>({ $1.combine($0) })
+  ResettableValue<(Int, inout Hasher) -> Void>({ $1.combine($0) })
 
   public var value: Int
   public var identity: Int
@@ -193,12 +193,12 @@ public class MinimalHashableClass : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    var hasher = _Hasher()
+    var hasher = Hasher()
     hasher.combine(self)
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout _Hasher) {
+  public func _hash(into hasher: inout Hasher) {
     MinimalHashableClass.timesHashIntoWasCalled += 1
     MinimalHashableClass.hashIntoImpl.value(value, &hasher)
   }
@@ -220,7 +220,7 @@ public var GenericMinimalHashableValue_equalImpl =
     fatalError("GenericMinimalHashableValue_equalImpl is not set yet")
   })
 public var GenericMinimalHashableValue_hashIntoImpl =
-  ResettableValue<(Any, inout _Hasher) -> Void>({ _ in
+  ResettableValue<(Any, inout Hasher) -> Void>({ _ in
     fatalError("GenericMinimalHashableValue_hashIntoImpl is not set yet")
   })
 
@@ -251,12 +251,12 @@ public struct GenericMinimalHashableValue<Wrapped> : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    var hasher = _Hasher()
+    var hasher = Hasher()
     hasher.combine(self)
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout _Hasher) {
+  public func _hash(into hasher: inout Hasher) {
     GenericMinimalHashableValue_timesHashIntoWasCalled += 1
     GenericMinimalHashableValue_hashIntoImpl.value(value, &hasher)
   }
@@ -276,7 +276,7 @@ public var GenericMinimalHashableClass_equalImpl =
     fatalError("GenericMinimalHashableClass_equalImpl is not set yet")
   })
 public var GenericMinimalHashableClass_hashIntoImpl =
-  ResettableValue<(Any, inout _Hasher) -> Void>({ _ in
+  ResettableValue<(Any, inout Hasher) -> Void>({ _ in
     fatalError("GenericMinimalHashableClass_hashIntoImpl is not set yet")
   })
 
@@ -307,12 +307,12 @@ public class GenericMinimalHashableClass<Wrapped> : Equatable, Hashable {
   }
 
   public var hashValue: Int {
-    var hasher = _Hasher()
+    var hasher = Hasher()
     hasher.combine(self)
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout _Hasher) {
+  public func _hash(into hasher: inout Hasher) {
     GenericMinimalHashableClass_timesHashIntoWasCalled += 1
     GenericMinimalHashableClass_hashIntoImpl.value(value, &hasher)
   }

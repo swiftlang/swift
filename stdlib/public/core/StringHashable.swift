@@ -13,13 +13,13 @@
 import SwiftShims
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  internal func hashASCII(into core: inout _Hasher.Core) {
+  internal func hashASCII(into core: inout Hasher.Core) {
     core.combine(bytes: rawBuffer)
   }
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
-  internal func hashUTF16(into core: inout _Hasher.Core) {
+  internal func hashUTF16(into core: inout Hasher.Core) {
     for i in self.indices {
       let cu = self[i]
       let cuIsASCII = cu <= 0x7F
@@ -45,28 +45,28 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 }
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  internal func hash(into hasher: inout _Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     self.hashASCII(into: &hasher._core)
     hasher._core.combine(0xFF as UInt8) // terminator
   }
 }
 
 extension _UnmanagedString where CodeUnit == UInt16 {
-  internal func hash(into hasher: inout _Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     self.hashUTF16(into: &hasher._core)
     hasher._core.combine(0xFF as UInt8) // terminator
   }
 }
 
 extension _UnmanagedOpaqueString {
-  internal func hash(into hasher: inout _Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     self.hashUTF16(into: &hasher._core)
     hasher._core.combine(0xFF as UInt8) // terminator
   }
 }
 
 extension _SmallUTF8String {
-  internal func hash(into hasher: inout _Hasher) {
+  internal func hash(into hasher: inout Hasher) {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
@@ -82,7 +82,7 @@ extension _SmallUTF8String {
 extension _StringGuts {
   @effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  internal func _hash(into hasher: inout _Hasher) {
+  internal func _hash(into hasher: inout Hasher) {
     if _isSmall {
       _smallUTF8String.hash(into: &hasher)
       return
@@ -102,7 +102,7 @@ extension _StringGuts {
 
   @effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  internal func _hash(_ range: Range<Int>, into hasher: inout _Hasher) {
+  internal func _hash(_ range: Range<Int>, into hasher: inout Hasher) {
     if _isSmall {
       _smallUTF8String[range].hash(into: &hasher)
       return
@@ -132,7 +132,7 @@ extension String : Hashable {
   }
 
   @inlinable
-  public func _hash(into hasher: inout _Hasher) {
+  public func _hash(into hasher: inout Hasher) {
     _guts._hash(into: &hasher)
   }
 }
@@ -144,7 +144,7 @@ extension StringProtocol {
   }
 
   @inlinable
-  public func _hash(into hasher: inout _Hasher) {
+  public func _hash(into hasher: inout Hasher) {
     _wholeString._guts._hash(_encodedOffsetRange, into: &hasher)
   }
 }
