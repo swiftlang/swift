@@ -1333,7 +1333,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
 static DeclName
 findCorrectEnumCaseName(Type Ty, TypoCorrectionResults &corrections,
                         DeclName memberName) {
-  if (!memberName.isSimpleName())
+  if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
   if (!Ty->is<EnumType>() &&
       !Ty->is<BoundGenericEnumType>())
@@ -7525,18 +7525,23 @@ bool FailureDiagnosis::diagnoseMemberFailures(
 
   // If this is a tuple, then the index needs to be valid.
   if (auto tuple = baseObjTy->getAs<TupleType>()) {
-    StringRef nameStr = memberName.getBaseIdentifier().str();
-    int fieldIdx = -1;
-    // Resolve a number reference into the tuple type.
-    unsigned Value = 0;
-    if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
-      fieldIdx = Value;
-    } else {
-      fieldIdx = tuple->getNamedElementId(memberName.getBaseIdentifier());
-    }
+    auto baseName = memberName.getBaseName();
 
-    if (fieldIdx != -1)
-      return false; // Lookup is valid.
+    if (!baseName.isSpecial()) {
+      StringRef nameStr = baseName.userFacingName();
+
+      int fieldIdx = -1;
+      // Resolve a number reference into the tuple type.
+      unsigned Value = 0;
+      if (!nameStr.getAsInteger(10, Value) && Value < tuple->getNumElements()) {
+        fieldIdx = Value;
+      } else {
+        fieldIdx = tuple->getNamedElementId(memberName.getBaseIdentifier());
+      }
+
+      if (fieldIdx != -1)
+        return false; // Lookup is valid.
+    }
 
     diagnose(BaseLoc, diag::could_not_find_tuple_member, baseObjTy, memberName)
         .highlight(memberRange);
