@@ -1,0 +1,238 @@
+[
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributes:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertDictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributes:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertDictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertOptionalDictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertOptionalDictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributesArray:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertArrayMemberUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributesArray:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributesArray:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertArrayMemberUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributesArray:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributesArray:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertOptionalArrayMemberUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributesArray:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributesArray:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertOptionalArrayMemberUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributesArray:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleOptionalAttribute:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "RevertSimpleOptionalStringRepresentableUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleOptionalAttribute:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleAttribute:",
+    "LeftComment": "AnimalAttributeName",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)TypeWithMethod",
+    "LeftComment": "SwiftTypeWithMethodRight",
+    "RightUsr": "",
+    "RightComment": "SwiftTypeWithMethodLeft",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@ANTGlobalValue",
+    "OldPrintedName": "newMember",
+    "OldTypeName": "NewType",
+    "NewPrintedName": "oldMember",
+    "NewTypeName": "OldType"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:objc(pl)TypeWithMethod(cm)plusPrint",
+    "OldPrintedName": "plusPrint()",
+    "OldTypeName": "SwiftTypeWithMethodRight",
+    "NewPrintedName": "plusPrint()",
+    "NewTypeName": "SwiftTypeWithMethodLeft"
+  }
+]
