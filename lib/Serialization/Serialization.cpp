@@ -1536,19 +1536,17 @@ void Serializer::writeNormalConformance(
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
 
-      if (auto genericEnv = witness.requiresSubstitution() 
-                              ? witness.getSyntheticEnvironment()
-                              : nullptr) {
+      if (auto *genericEnv = witness.getSyntheticEnvironment()) {
         // Generic signature.
         auto *genericSig = genericEnv->getGenericSignature();
         data.push_back(addGenericSignatureRef(genericSig));
-
-        auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
-        data.push_back(reqToSyntheticSubs.size());
       } else {
         data.push_back(/*null generic signature*/0);
       }
 
+      auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
+
+      data.push_back(reqToSyntheticSubs.size());
       data.push_back(witness.getSubstitutions().size());
   });
 
@@ -1574,19 +1572,14 @@ void Serializer::writeNormalConformance(
    // Bail out early for simple witnesses.
    if (!witness.getDecl()) return;
 
-   if (witness.requiresSubstitution()) {
-     // Write requirement-to-synthetic substitutions.
-     writeSubstitutions(witness.getRequirementToSyntheticSubs(),
-                        DeclTypeAbbrCodes,
-                        nullptr);
-   }
+   // Write requirement-to-synthetic substitutions.
+   writeSubstitutions(witness.getRequirementToSyntheticSubs(),
+                      DeclTypeAbbrCodes, nullptr);
 
    // Write the witness substitutions.
    writeSubstitutions(witness.getSubstitutions(),
                       DeclTypeAbbrCodes,
-                      witness.requiresSubstitution()
-                        ? witness.getSyntheticEnvironment()
-                        : nullptr);
+                      witness.getSyntheticEnvironment());
   });
 }
 
