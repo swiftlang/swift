@@ -65,18 +65,6 @@ TypeChecker::~TypeChecker() {
   Context.setLazyResolver(nullptr);
 }
 
-void TypeChecker::handleExternalDecl(Decl *decl) {
-  if (auto SD = dyn_cast<StructDecl>(decl)) {
-    addImplicitStructConformances(SD);
-  }
-  if (auto CD = dyn_cast<ClassDecl>(decl)) {
-    CD->addImplicitDestructor();
-  }
-  if (auto ED = dyn_cast<EnumDecl>(decl)) {
-    addImplicitEnumConformances(ED);
-  }
-}
-
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
   if (!protocol && loc.isValid()) {
@@ -450,6 +438,10 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       else {
         auto *ntd = cast<NominalTypeDecl>(decl);
         TC.checkConformancesInContext(ntd, ntd);
+
+        // Finally, we can check classes for missing initializers.
+        if (auto *classDecl = dyn_cast<ClassDecl>(ntd))
+          TC.maybeDiagnoseClassWithoutInitializers(classDecl);
       }
     }
     TC.ConformanceContexts.clear();
@@ -475,10 +467,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
         TC.checkFunctionErrorHandling(AFD);
         continue;
       }
-      if (isa<NominalTypeDecl>(decl)) {
-        TC.handleExternalDecl(decl);
+      if (isa<NominalTypeDecl>(decl))
         continue;
-      }
       if (isa<VarDecl>(decl))
         continue;
       llvm_unreachable("Unhandled external definition kind");

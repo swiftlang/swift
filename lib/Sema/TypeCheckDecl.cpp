@@ -8591,6 +8591,27 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   }
 }
 
+void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
+  // Some heuristics to skip emitting a diagnostic if the class is already
+  // irreperably busted.
+  if (classDecl->isInvalid() ||
+      classDecl->inheritsSuperclassInitializers(nullptr))
+    return;
+
+  auto *superclassDecl = classDecl->getSuperclassDecl();
+  if (superclassDecl &&
+      superclassDecl->hasMissingDesignatedInitializers())
+    return;
+
+  for (auto member : classDecl->lookupDirect(DeclBaseName::createConstructor())) {
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (ctor && ctor->isDesignatedInit())
+      return;
+  }
+
+  diagnoseClassWithoutInitializers(*this, classDecl);
+}
+
 /// Diagnose a missing required initializer.
 static void diagnoseMissingRequiredInitializer(
               TypeChecker &TC,
@@ -8713,16 +8734,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.
   if (isa<ClassDecl>(decl)) {
-    bool alreadyValidatingCtor = false;
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         validateDecl(ctor);
         if (!ctor->hasValidSignature())
-          alreadyValidatingCtor = true;
+          return;
       }
     }
-    if (alreadyValidatingCtor)
-      return;
   }
 
   decl->setAddedImplicitInitializers();
@@ -8891,7 +8909,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // stored properties.
     if (SuppressDefaultInitializer && !FoundDesignatedInit
         && !FoundSynthesizedInit && !classDecl->hasClangNode()) {
-      diagnoseClassWithoutInitializers(*this, classDecl);
       return;
     }
 
@@ -8992,12 +9009,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // constructor.
 
     // ... unless there are uninitialized stored properties.
-    if (SuppressDefaultInitializer) {
-      if (!FoundSynthesizedInit)
-        diagnoseClassWithoutInitializers(*this, classDecl);
-
+    if (SuppressDefaultInitializer)
       return;
-    }
 
     defineDefaultConstructor(decl);
   }
@@ -9098,32 +9111,6 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       (void)evaluateTargetConformanceTo(encodableProto);
     }
   }
-}
-
-void TypeChecker::addImplicitStructConformances(StructDecl *SD) {
-  // Type-check the protocol conformances of the struct decl to instantiate its
-  // derived conformances.
-  checkConformancesInContext(SD, SD);
-}
-
-void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
-  // Type-check the raw values of the enum.
-  for (auto elt : ED->getAllElements()) {
-    assert(elt->hasRawValueExpr());
-    if (elt->getTypeCheckedRawValueExpr()) continue;
-    Expr *typeChecked = elt->getRawValueExpr();
-    Type rawTy = ED->mapTypeIntoContext(ED->getRawType());
-    auto resultTy = typeCheckExpression(
-        typeChecked, ED, TypeLoc::withoutLoc(rawTy), CTP_EnumCaseRawValue);
-    assert(resultTy);
-    (void)resultTy;
-    elt->setTypeCheckedRawValueExpr(typeChecked);
-    checkEnumElementErrorHandling(elt);
-  }
-  
-  // Type-check the protocol conformances of the enum decl to instantiate its
-  // derived conformances.
-  checkConformancesInContext(ED, ED);
 }
 
 void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {

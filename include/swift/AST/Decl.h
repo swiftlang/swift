@@ -367,7 +367,7 @@ protected:
     DefaultArgumentResilienceExpansion : 1
   );
   
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -390,7 +390,11 @@ protected:
     HasComputedNeedsNewVTableEntry : 1,
 
     /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1
+    DefaultArgumentResilienceExpansion : 1,
+
+    /// Whether this member was synthesized as part of a derived
+    /// protocol conformance.
+    Synthesized : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
@@ -5251,6 +5255,14 @@ public:
     if (!Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry)
       const_cast<AbstractFunctionDecl *>(this)->computeNeedsNewVTableEntry();
     return Bits.AbstractFunctionDecl.NeedsNewVTableEntry;
+  }
+
+  bool isSynthesized() const {
+    return Bits.AbstractFunctionDecl.Synthesized;
+  }
+
+  void setSynthesized(bool value = true) {
+    Bits.AbstractFunctionDecl.Synthesized = value;
   }
 
 private:
