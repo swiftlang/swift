@@ -23,6 +23,14 @@ AnyRequest::HolderBase::~HolderBase() { }
 
 Evaluator::Evaluator(DiagnosticEngine &diags) : diags(diags) { }
 
+bool Evaluator::checkDependency(const AnyRequest &request) {
+  if (activeRequests.insert(request))
+    return false;
+
+  diagnoseCycle(request);
+  return true;
+}
+
 void Evaluator::diagnoseCycle(const AnyRequest &request) {
   request.diagnoseCycle(diags);
   for (const auto &step : reversed(activeRequests)) {

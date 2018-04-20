@@ -23,6 +23,7 @@
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SetVector.h"
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -65,9 +66,9 @@ class DiagnosticEngine;
 ///
 ///     static const bool isEverCached;
 ///
-///       When false, the request's result will never be cached. Note that this
-///       also precludes cycle detection.  When true, the result will be
-///       cached on completion. How it is cached depends on the following.
+///       When false, the request's result will never be cached. When true,
+///       the result will be cached on completion. How it is cached depends on
+///       the following.
 ///
 ///     bool isCached() const;
 ///
@@ -96,27 +97,17 @@ class DiagnosticEngine;
 ///         void cacheResult(OutputType value) const;
 ///
 ///            Cache the given result.
-///
-///         bool isInFlight() const;
-///
-///           Whether we're already computing this value.
-///
-///         void setInFlight() const;
-///
-///           Indicate that we're about to compute this value. After this,
-///           \c isInFlight() should return \c true until \c cacheResult()
-///           is called.
 class Evaluator {
   /// The diagnostics engine through which any cyclic-dependency
   /// diagnostics will be emitted.
   DiagnosticEngine &diags;
 
   /// A vector containing all of the active evaluation requests, which
-  /// is treated as a stack.
-  std::vector<AnyRequest> activeRequests;
+  /// is treated as a stack and is used to detect cycles.
+  llvm::SetVector<AnyRequest> activeRequests;
 
   /// A cache that stores the results of requests.
-  llvm::DenseMap<AnyRequest, Optional<AnyValue>> cache;
+  llvm::DenseMap<AnyRequest, AnyValue> cache;
 
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
@@ -127,6 +118,18 @@ public:
   /// consulting/populating the cache as required.
   template<typename Request>
   typename Request::OutputType operator()(const Request &request) {
+    // Check for a cycle.
+    if (checkDependency(request))
+      return request.breakCycle();
+
+    // Make sure we remove this from the set of active requests once we're
+    // done.
+    SWIFT_DEFER {
+      assert(activeRequests.back() == request);
+      activeRequests.pop_back();
+    };
+
+    // Get the result.
     return getResult(request);
   }
 
@@ -140,10 +143,24 @@ public:
     return std::tuple<typename Requests::OutputType...>((*this)(requests)...);
   }
 
+  /// Clear the cache stored within this evaluator.
+  ///
+  /// Note that this does not clear the caches of requests that use external
+  /// caching.
+  void clearCache() { cache.clear(); }
+
 private:
   /// Diagnose a cycle detected in the evaluation of the given
   /// request.
   void diagnoseCycle(const AnyRequest &request);
+
+  /// Check the dependency from the current top of the stack to
+  /// the given request, including cycle detection and diagnostics.
+  ///
+  /// \returns true if a cycle was detected, in which case this function has
+  /// already diagnosed the cycle. Otherwise, returns \c false and adds this
+  /// request to the \c activeRequests stack.
+  bool checkDependency(const AnyRequest &request);
 
   /// Retrieve the result produced by evaluating a request that can
   /// be cached.
@@ -170,13 +187,6 @@ private:
   /// Produce the result of the request without caching.
   template<typename Request>
   typename Request::OutputType getResultUncached(const Request &request) {
-    // Push this request onto the active-requests stack while we
-    // evaluate it.
-    activeRequests.push_back(request);
-    SWIFT_DEFER {
-      activeRequests.pop_back();
-    };
-
     return request(*this);
   }
 
@@ -186,31 +196,14 @@ private:
   template<typename Request,
            typename std::enable_if<Request::hasExternalCache>::type * = nullptr>
   typename Request::OutputType getResultCached(const Request &request) {
-    // If the request is still in flight, diagnose it.
-    if (request.isInFlight()) {
-      diagnoseCycle(request);
-
-      // Break the cache and cache the result, so we don't attempt
-      // this operation again.
-      request.cacheResult(request.breakCycle());
-    }
-
     // If there is a cached result, return it.
     if (auto cached = request.getCachedResult())
       return *cached;
 
-    // Push this request onto the active-requests stack while we
-    // evaluate it.
-    activeRequests.push_back(request);
-    SWIFT_DEFER {
-      activeRequests.pop_back();
-    };
-
-    // Compute the result.
-    request.setInFlight();
+    // Service the request.
     auto result = request(*this);
 
-    // Cache it.
+    // Cache the result.
     request.cacheResult(result);
 
     // Return it.
@@ -225,36 +218,17 @@ private:
   typename Request::OutputType getResultCached(const Request &request) {
     AnyRequest anyRequest{request};
 
-    // Find an existing entry for this request in the cache, or create
-    // an empty entry if none exists yet.
-    auto cached = cache.insert({anyRequest, None});
-    if (!cached.second) {
-      // There was already an entry in the cache.
-
-      // If the existing cache entry had no value, we have a
-      // cycle. Diagnose the cycle and have the request break the
-      // cycle by providing a placeholder value.
-      if (!cached.first->second) {
-        diagnoseCycle(anyRequest);
-        cached.first->second = request.breakCycle();
-      }
-
-      // Return the cached value, which might be the placeholder above.
-      return cached.first->second->castTo<typename Request::OutputType>();
+    // If we already have an entry for this request in the cache, return it.
+    auto known = cache.find(anyRequest);
+    if (known != cache.end()) {
+      return known->second.castTo<typename Request::OutputType>();
     }
-
-    // Push this request onto the active-requests stack while we
-    // evaluate it.
-    activeRequests.push_back(anyRequest);
-    SWIFT_DEFER {
-      activeRequests.pop_back();
-    };
 
     // Evaluate the request.
     auto result = request(*this);
 
     // Cache the result.
-    cache[anyRequest] = result;
+    cache.insert({anyRequest, result});
     return result;
   }
 };

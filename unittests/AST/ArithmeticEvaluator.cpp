@@ -31,7 +31,6 @@ class ArithmeticExpr {
   } kind;
 
   // Note: used for internal caching.
-  bool computingValue = false;
   Optional<double> cachedValue;
 
  protected:
@@ -91,7 +90,9 @@ struct EvaluationRule {
     }
   }
 
+  static bool brokeCycle;
   double breakCycle() const {
+    brokeCycle = true;
     return NAN;
   }
 
@@ -110,6 +111,9 @@ struct EvaluationRule {
     return hash_value(er.expr);
   }
 };
+
+template<typename Derived>
+bool EvaluationRule<Derived>::brokeCycle = false;
 
 struct InternallyCachedEvaluationRule :
   EvaluationRule<InternallyCachedEvaluationRule> {
@@ -153,21 +157,12 @@ struct ExternallyCachedEvaluationRule :
     }
   }
 
-  bool isInFlight() const {
-    return expr->computingValue;
-  }
-
-  void setInFlight() const {
-    expr->computingValue = true;
-  }
-
   Optional<double> getCachedResult() const {
     return expr->cachedValue;
   }
 
   void cacheResult(double value) const {
     expr->cachedValue = value;
-    expr->computingValue = false;
   }
 
   ExternallyCachedEvaluationRule(ArithmeticExpr *expr)
@@ -202,12 +197,14 @@ TEST(ArithmeticEvaluator, Simple) {
             expectedResult);
 
   // Uncached
+  evaluator.clearCache();
   EXPECT_EQ(evaluator(UncachedEvaluationRule(product)),
             expectedResult);
   EXPECT_EQ(evaluator(UncachedEvaluationRule(product)),
             expectedResult);
 
   // External cached query.
+  evaluator.clearCache();
   EXPECT_EQ(evaluator(ExternallyCachedEvaluationRule(product)),
             expectedResult);
   EXPECT_EQ(*sum->cachedValue, 3.14159 + 2.71828);
@@ -241,11 +238,37 @@ TEST(ArithmeticEvaluator, Cycle) {
   DiagnosticEngine diags(sourceMgr);
   Evaluator evaluator(diags);
 
-  EXPECT_TRUE(isnan(evaluator(InternallyCachedEvaluationRule(product))));
-  EXPECT_TRUE(isnan(evaluator(InternallyCachedEvaluationRule(product))));
+  // Evaluate when there is a cycle.
+  UncachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(isnan(evaluator(UncachedEvaluationRule(product))));
+  EXPECT_TRUE(UncachedEvaluationRule::brokeCycle);
 
+  // Cycle-breaking result is cached.
+  EXPECT_TRUE(isnan(evaluator(UncachedEvaluationRule(product))));
+  UncachedEvaluationRule::brokeCycle = false;
+  EXPECT_FALSE(UncachedEvaluationRule::brokeCycle);
+
+  // Evaluate when there is a cycle.
+  evaluator.clearCache();
+  InternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(isnan(evaluator(InternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(InternallyCachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  InternallyCachedEvaluationRule::brokeCycle = false;
+  EXPECT_TRUE(isnan(evaluator(InternallyCachedEvaluationRule(product))));
+  EXPECT_FALSE(InternallyCachedEvaluationRule::brokeCycle);
+
+  // Evaluate when there is a cycle.
+  evaluator.clearCache();
+  ExternallyCachedEvaluationRule::brokeCycle = false;
   EXPECT_TRUE(isnan(evaluator(ExternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(ExternallyCachedEvaluationRule::brokeCycle);
+
+  // Cycle-breaking result is cached.
+  ExternallyCachedEvaluationRule::brokeCycle = false;
   EXPECT_TRUE(isnan(evaluator(ExternallyCachedEvaluationRule(product))));
+  EXPECT_FALSE(ExternallyCachedEvaluationRule::brokeCycle);
 
   // Cleanup
   delete pi;
