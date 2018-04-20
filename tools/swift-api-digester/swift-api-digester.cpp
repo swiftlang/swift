@@ -2739,15 +2739,13 @@ class InterfaceTypeChangeDetector {
   }
 
   bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
-    if (!IsVisitingLeft)
-      return false;
-
     // We only care if this the top-level type node.
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
-    if (L->getTypeKind() == KnownTypeKind::Optional &&
-        R->getTypeKind() == KnownTypeKind::Optional) {
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+      R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
       // Detect [String: Any]? to [StringRepresentableStruct: Any]? Chnage
       KeyChangedTo =
         detectDictionaryKeyChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
@@ -2757,10 +2755,16 @@ class InterfaceTypeChangeDetector {
       KeyChangedTo = detectDictionaryKeyChangeInternal(L, R);
     }
     if (!KeyChangedTo.empty()) {
-      L->annotate(L->getTypeKind() == KnownTypeKind::Optional ?
+      if (IsVisitingLeft) {
+        L->annotate(HasOptional ?
                     NodeAnnotation::OptionalDictionaryKeyUpdate :
                     NodeAnnotation::DictionaryKeyUpdate);
-      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+      } else {
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertOptionalDictionaryKeyUpdate :
+                    NodeAnnotation::RevertDictionaryKeyUpdate);
+      }
       return true;
     }
     return false;
@@ -2781,14 +2785,13 @@ class InterfaceTypeChangeDetector {
   }
 
   bool detectArrayMemberChange(SDKNodeType* L, SDKNodeType *R) {
-    if (!IsVisitingLeft)
-      return false;
     // We only care if this the top-level type node.
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
-    if (L->getTypeKind() == KnownTypeKind::Optional &&
-        R->getTypeKind() == KnownTypeKind::Optional) {
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+      R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
       // Detect [String]? to [StringRepresentableStruct]? Chnage
       KeyChangedTo =
         detectArrayMemberChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
@@ -2798,18 +2801,22 @@ class InterfaceTypeChangeDetector {
       KeyChangedTo = detectArrayMemberChangeInternal(L, R);
     }
     if (!KeyChangedTo.empty()) {
-      L->annotate(L->getTypeKind() == KnownTypeKind::Optional ?
+      if (IsVisitingLeft) {
+        L->annotate(HasOptional ?
                     NodeAnnotation::OptionalArrayMemberUpdate :
                     NodeAnnotation::ArrayMemberUpdate);
-      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+      } else {
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertOptionalArrayMemberUpdate :
+                    NodeAnnotation::RevertArrayMemberUpdate);
+      }
       return true;
     }
     return false;
   }
 
   bool detectSimpleStringRepresentableUpdate(SDKNodeType *L, SDKNodeType *R) {
-    if (!IsVisitingLeft)
-      return false;
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
@@ -2825,11 +2832,15 @@ class InterfaceTypeChangeDetector {
       KeyChangedTo = getStringRepresentableChange(L, R);
     }
     if (!KeyChangedTo.empty()) {
-      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
-      if (HasOptional) {
-        L->annotate(NodeAnnotation::SimpleOptionalStringRepresentableUpdate);
+      if (IsVisitingLeft) {
+        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(HasOptional ?
+                    NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+                    NodeAnnotation::SimpleStringRepresentableUpdate);
       } else {
-        L->annotate(NodeAnnotation::SimpleStringRepresentableUpdate);
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
+                    NodeAnnotation::RevertSimpleStringRepresentableUpdate);
       }
       return true;
     }
