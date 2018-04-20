@@ -45,29 +45,23 @@ struct TypeIdZones {
 };
 
 /// Form a type ID given a zone and type value.
-constexpr uint8_t formTypeID(uint8_t zone, uint8_t type) {
-  return (zone << 8) | type;
+constexpr uint64_t formTypeID(uint8_t zone, uint8_t type) {
+  return (uint64_t(zone) << 8) | uint64_t(type);
 }
 
 /// Assign the given type a particular value in the zone.
 #define SWIFT_TYPEID(Zone, Type, Value)                           \
 template<> struct TypeID<Type> {                                        \
   static const uint64_t value = formTypeID(TypeIdZones::Zone, Value);   \
-  static const unsigned depth = 0;                                      \
 }
 
 /// Assign the given single-param template a particular value in the zone.
-#define SWIFT_TYPEID_TEMPLATE1(Zone, Template, Value, Param1, Arg1)     \
-template<Param1> struct TypeID<Template<Arg1>> {                        \
-  static const unsigned depth = TypeID<Arg1>::depth + 1;                \
-  static_assert(depth < 4, "cannot fit type in 64-bit value");          \
-                                                                        \
-private:                                                                \
+#define SWIFT_TYPEID_TEMPLATE1(Zone, Template, Value, Param1, Arg1)       \
+template<Param1> struct TypeID<Template<Arg1>> {                          \
  static const uint64_t templateID = formTypeID(TypeIdZones::Zone, Value); \
-                                                                        \
-public:                                                                 \
-  static const uint64_t value =                                         \
-    (templateID << (depth * 8)) | TypeID<Arg1>::value;                  \
+                                                                          \
+public:                                                                   \
+  static const uint64_t value = (TypeID<Arg1>::value << 16) | templateID; \
 }
 
 // C types.
@@ -85,7 +79,7 @@ SWIFT_TYPEID(C, unsigned long long, 11);
 SWIFT_TYPEID(C, float, 12);
 SWIFT_TYPEID(C, double, 13);
 SWIFT_TYPEID(C, bool, 14);
-  SWIFT_TYPEID(C, decltype(nullptr), 15);
+SWIFT_TYPEID(C, decltype(nullptr), 15);
 SWIFT_TYPEID(C, void, 16);
 
 // C++ standard library types.

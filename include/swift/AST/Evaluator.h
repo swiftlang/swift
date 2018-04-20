@@ -60,7 +60,7 @@ class DiagnosticEngine;
 ///
 ///       void diagnoseCycle(DiagnosticEngine &diags) const;
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
-///       OutputType breakCycle() Const;
+///       OutputType breakCycle() const;
 ///   - Caching policy:
 ///
 ///     static const bool isEverCached;
@@ -145,7 +145,7 @@ private:
   /// request.
   void diagnoseCycle(const AnyRequest &request);
 
-  /// Retrieve the result of produced by evaluating a request that can
+  /// Retrieve the result produced by evaluating a request that can
   /// be cached.
   template<typename Request,
            typename std::enable_if<Request::isEverCached>::type * = nullptr>
@@ -159,7 +159,7 @@ private:
     return getResultUncached(request);
   }
 
-  /// Retrieve the result of produced by evaluating a request that
+  /// Retrieve the result produced by evaluating a request that
   /// will never be cached.
   template<typename Request,
            typename std::enable_if<!Request::isEverCached>::type * = nullptr>

@@ -22,8 +22,8 @@
 
 namespace swift {
 
-/// Stores a value of any type satisfies a small set of requirements
-/// (currenrly, just equatability).
+/// Stores a value of any type that satisfies a small set of requirements
+/// (currently, just equatability).
 class AnyValue {
   /// Abstract base class used to hold on to a value.
   class HolderBase {
@@ -85,6 +85,7 @@ public:
   /// Cast to a specific (known) type.
   template<typename T>
   const T &castTo() const {
+    assert(stored->typeID == TypeID<T>::value);
     return static_cast<const Holder<T> *>(stored.get())->value;
   }
 
