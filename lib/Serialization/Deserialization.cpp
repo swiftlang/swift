@@ -5334,13 +5334,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       continue;
     }
 
-    // Handle simple witnesses.
-    if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
-        reqToSyntheticSubs.empty()) {
-      trySetWitness(Witness(witness));
-      continue;
-    }
-
     // Set the witness.
     trySetWitness(Witness(witness, witnessSubstitutions,
                           syntheticEnv, reqToSyntheticSubs));
