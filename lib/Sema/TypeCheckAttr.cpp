@@ -2178,7 +2178,7 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
       D = diag::invalid_ownership_protocol_type;
     }
 
-    diagnose(var->getStartLoc(), D, (unsigned) ownershipKind, underlyingType);
+    diagnose(var->getStartLoc(), D, ownershipKind, underlyingType);
     attr->setInvalid();
   } else if (isa<ProtocolDecl>(var->getDeclContext()) &&
              !cast<ProtocolDecl>(var->getDeclContext())->isObjC()) {
@@ -2186,13 +2186,13 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     // properties of Objective-C protocols.
     if (Context.isSwiftVersionAtLeast(5))
       diagnose(attr->getLocation(),
-        diag::ownership_invalid_in_protocols,
-        (unsigned) ownershipKind)
+               diag::ownership_invalid_in_protocols,
+               ownershipKind)
         .fixItRemove(attr->getRange());
     else
       diagnose(attr->getLocation(),
-        diag::ownership_invalid_in_protocols_compat_warning,
-        (unsigned) ownershipKind)
+               diag::ownership_invalid_in_protocols_compat_warning,
+               ownershipKind)
         .fixItRemove(attr->getRange());
 
     attr->setInvalid();

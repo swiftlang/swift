@@ -472,6 +472,19 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
     break;
+
+  case DiagnosticArgumentKind::ReferenceOwnership:
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              unsigned(Arg.getAsReferenceOwnership()),
+                              FormatOpts, Out);
+    } else {
+      assert(Modifier.empty() &&
+             "Improper modifier for ReferenceOwnership argument");
+      Out << Arg.getAsReferenceOwnership();
+    }
+    break;
+
   case DiagnosticArgumentKind::StaticSpellingKind:
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,

@@ -111,7 +111,7 @@ func test2() {
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
-  // expected-warning@+3 {{instance will be immediately deallocated as 'w2' is a 'weak' variable}}
+  // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'w2' declared here}}
   weak var w2 = SomeClass()
@@ -124,7 +124,7 @@ func test2() {
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
   _ = u1                // expected-error {{variable 'u1' used before being initialized}}
 
-  // expected-warning@+3 {{instance will be immediately deallocated as 'u2' is an 'unowned' variable}}
+  // expected-warning@+3 {{instance will be immediately deallocated because variable 'u2' is 'unowned'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()

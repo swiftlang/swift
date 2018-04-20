@@ -114,7 +114,7 @@ var x15: Int {
   // applied to the getter.
   weak
   var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
-  // expected-warning@-1 {{instance will be immediately deallocated as 'foo' is a 'weak' variable}}
+  // expected-warning@-1 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
   // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-3 {{'foo' declared here}}
   return 0
@@ -1106,7 +1106,7 @@ class OwnershipImplicitSub : OwnershipBase {
 }
 
 class OwnershipBadSub : OwnershipBase {
-  override weak var strongVar: AnyObject? { // expected-error {{cannot override strong property with weak property}}
+  override weak var strongVar: AnyObject? { // expected-error {{cannot override 'strong' property with 'weak' property}}
     didSet {}
   }
   override unowned var weakVar: AnyObject? { // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'AnyObject?'}}
@@ -1115,7 +1115,7 @@ class OwnershipBadSub : OwnershipBase {
   override weak var unownedVar: AnyObject { // expected-error {{'weak' variable should have optional type 'AnyObject?'}}
     didSet {}
   }
-  override unowned var unownedUnsafeVar: AnyObject { // expected-error {{cannot override unowned(unsafe) property with unowned property}}
+  override unowned var unownedUnsafeVar: AnyObject { // expected-error {{cannot override 'unowned(unsafe)' property with 'unowned' property}}
     didSet {}
   }
 }

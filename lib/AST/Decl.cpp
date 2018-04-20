@@ -296,6 +296,17 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   llvm_unreachable("bad StaticSpellingKind");
 }
 
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     ReferenceOwnership RO) {
+  switch (RO) {
+  case ReferenceOwnership::Strong: return OS << "'strong'";
+  case ReferenceOwnership::Weak: return OS << "'weak'";
+  case ReferenceOwnership::Unowned: return OS << "'unowned'";
+  case ReferenceOwnership::Unmanaged: return OS << "'unowned(unsafe)'";
+  }
+  llvm_unreachable("bad ReferenceOwnership kind");
+}
+
 DeclContext *Decl::getInnermostDeclContext() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return const_cast<AbstractFunctionDecl*>(func);
