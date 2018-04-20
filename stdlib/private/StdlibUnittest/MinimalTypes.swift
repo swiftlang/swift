@@ -145,6 +145,11 @@ public struct MinimalHashableValue : Equatable, Hashable {
   }
 }
 
+extension MinimalHashableValue: CustomStringConvertible {
+  public var description: String {
+    return "MinimalHashableValue(value: \(value), identity: \(identity))"
+  }
+}
 
 
 /// A type that conforms only to `Equatable` and `Hashable`.
@@ -187,6 +192,11 @@ public class MinimalHashableClass : Equatable, Hashable {
   }
 }
 
+extension MinimalHashableClass: CustomStringConvertible {
+  public var description: String {
+    return "MinimalHashableClass(value: \(value), identity: \(identity))"
+  }
+}
 
 
 
@@ -234,6 +244,11 @@ public struct GenericMinimalHashableValue<Wrapped> : Equatable, Hashable {
   }
 }
 
+extension GenericMinimalHashableValue: CustomStringConvertible {
+  public var description: String {
+    return "GenericMinimalHashableValue(value: \(value), identity: \(identity))"
+  }
+}
 
 public var GenericMinimalHashableClass_timesEqualEqualWasCalled: Int = 0
 public var GenericMinimalHashableClass_timesHashValueWasCalled: Int = 0
@@ -279,6 +294,11 @@ public class GenericMinimalHashableClass<Wrapped> : Equatable, Hashable {
   }
 }
 
+extension GenericMinimalHashableClass: CustomStringConvertible {
+  public var description: String {
+    return "GenericMinimalHashableClass(value: \(value), identity: \(identity))"
+  }
+}
 
 
 /// A type that conforms only to `Equatable`, `Comparable`, and `Strideable`.
