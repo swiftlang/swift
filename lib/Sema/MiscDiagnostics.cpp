@@ -2128,8 +2128,7 @@ static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
     storageKind = SK_Property;
 
   TC.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
-              varDecl->getName(),
-              (unsigned) ownershipAttr->get(), (unsigned) storageKind)
+              varDecl->getName(), ownershipAttr->get(), unsigned(storageKind))
     .highlight(diagRange);
 
   TC.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
