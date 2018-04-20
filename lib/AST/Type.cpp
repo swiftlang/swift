@@ -3412,7 +3412,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                    genericMemberType->getExtInfo());
   }
 
-  auto type = memberType.subst(subs);
+  auto type = memberType.subst(subs, SubstFlags::UseErrorType);
 
   if (isa<AbstractFunctionDecl>(baseDecl)) {
     type = type->replaceSelfParameterType(this);
