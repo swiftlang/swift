@@ -190,21 +190,55 @@ ArrayTestSuite.test("init(repeating:count:)") {
 }
 
 ArrayTestSuite.test("Hashable") {
-  let a1: Array<Int> = [1, 2, 3]
-  let a2: Array<Int> = [1, 3, 2]
-  let a3: Array<Int> = [3, 1, 2]
-  let a4: Array<Int> = [1, 2]
-  let a5: Array<Int> = [1]
-  let a6: Array<Int> = []
-  let a7: Array<Int> = [1, 1, 1]
-  checkHashable([a1, a2, a3, a4, a5, a6, a7], equalityOracle: { $0 == $1 })
+  let a1: [Array<Int>] = [
+    [1, 2, 3],
+    [1, 3, 2],
+    [3, 1, 2],
+    [1, 2],
+    [1],
+    [],
+    [1, 1, 1]
+  ]
+  checkHashable(a1, equalityOracle: { $0 == $1 })
 
-  let aa1: Array<Array<Int>> = [[], [1], [1, 2], [2, 1]]
-  let aa2: Array<Array<Int>> = [[], [1], [2, 1], [2, 1]]
-  let aa3: Array<Array<Int>> = [[1], [], [2, 1], [2, 1]]
-  let aa4: Array<Array<Int>> = [[1], [], [2, 1], [2]]
-  let aa5: Array<Array<Int>> = [[1], [], [2, 1]]
-  checkHashable([aa1, aa2, aa3, aa4, aa5], equalityOracle: { $0 == $1 })
+  let a2: [Array<Array<Int>>] = [
+    [[], [1], [1, 2], [2, 1]],
+    [[], [1], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2]],
+    [[1], [], [2, 1]]
+  ]
+  checkHashable(a2, equalityOracle: { $0 == $1 })
+
+  // These arrays share the same sequence of leaf integers, but they must
+  // still all hash differently.
+  let a3: [Array<Array<Int>>] = [
+    // Grouping changes must perturb the hash.
+    [[1], [2], [3], [4], [5]],
+    [[1, 2], [3], [4], [5]],
+
+    [[1], [2, 3], [4], [5]],
+    [[1], [2], [3, 4], [5]],
+    [[1], [2], [3], [4, 5]],
+
+    [[1, 2, 3], [4], [5]],
+    [[1], [2, 3, 4], [5]],
+    [[1], [2], [3, 4, 5]],
+
+    [[1, 2, 3, 4], [5]],
+    [[1], [2, 3, 4, 5]],
+
+    [[1, 2], [3, 4], [5]],
+    [[1], [2, 3], [4, 5]],
+    [[1, 2, 3, 4, 5]],
+
+    // Empty arrays must perturb the hash.
+    [[], [1], [2], [3], [4], [5]],
+    [[1], [], [2], [3], [4], [5]],
+    [[1], [2], [3], [4], [5], []],
+    [[1], [], [], [2], [3], [], [4], [], [5]],
+  ]
+  checkHashable(a3, equalityOracle: { $0 == $1 })
 }
 
 

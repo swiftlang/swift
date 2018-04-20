@@ -2270,6 +2270,7 @@ extension ${Self}: Hashable where Element: Hashable {
 
   @inlinable // FIXME(sil-serialize-all)
   public func _hash(into hasher: inout _Hasher) {
+    hasher.combine(count) // discriminator
     for element in self {
       hasher.combine(element)
     }
