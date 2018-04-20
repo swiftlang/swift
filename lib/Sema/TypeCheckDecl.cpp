@@ -5276,12 +5276,6 @@ public:
         // visible via dynamic dispatch.
         lookupOptions -= NameLookupFlags::DynamicLookup;
 
-        // Class methods cannot override declarations only
-        // visible as protocol requirements or protocol
-        // extension members.
-        lookupOptions -= NameLookupFlags::ProtocolMembers;
-        lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-
         members = TC.lookupMember(dc, superclass,
                                   name, lookupOptions);
       }
@@ -5295,6 +5289,9 @@ public:
         if (member->getKind() != decl->getKind())
           continue;
 
+        // Class methods cannot override declarations only
+        // visible as protocol requirements or protocol
+        // extension members.
         if (!dc->getAsClassOrClassExtensionContext())
           continue;
 
@@ -8748,36 +8745,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   bool FoundMemberwiseInitializedProperty = false;
   bool SuppressDefaultInitializer = false;
   bool SuppressMemberwiseInitializer = false;
-  bool FoundSynthesizedInit = false;
   bool FoundDesignatedInit = false;
-
-  // Before we look for constructors, we need to make sure that all synthesized
-  // initializers are properly synthesized.
-  //
-  // NOTE: Lookups of synthesized initializers MUST come after
-  //       decl->setAddedImplicitInitializers() in case synthesis requires
-  //       protocol conformance checking, which might be recursive here.
-  // FIXME: Disable this code and prevent _any_ implicit constructors from doing
-  //        this. Investigate why this hasn't worked otherwise.
-  DeclName synthesizedInitializers[1] = {
-    // init(from:) is synthesized by derived conformance to Decodable.
-    DeclName(Context, DeclBaseName::createConstructor(), Context.Id_from)
-  };
-
-  auto initializerIsSynthesized = [=](ConstructorDecl *initializer) {
-    if (!initializer->isImplicit())
-      return false;
-
-    for (auto &name : synthesizedInitializers)
-      if (initializer->getFullName() == name)
-        return true;
-
-    return false;
-  };
-
-  for (auto &name : synthesizedInitializers) {
-    synthesizeMemberForLookup(decl, name);
-  }
 
   SmallPtrSet<CanType, 4> initializerParamTypes;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
@@ -8800,13 +8768,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   } else {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        // Synthesized initializers others than the default initializer should
-        // not prevent default initializer synthesis.
-        if (initializerIsSynthesized(ctor)) {
-          FoundSynthesizedInit = true;
-        } else if (ctor->isDesignatedInit()) {
+        // Initializers that were synthesized to fulfill derived conformances
+        // should not prevent default initializer synthesis.
+        if (ctor->isDesignatedInit() && !ctor->isSynthesized())
           FoundDesignatedInit = true;
-        }
 
         if (isa<StructDecl>(decl))
           continue;
@@ -8878,8 +8843,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(decl)) {
-    if (!FoundDesignatedInit && !SuppressMemberwiseInitializer
-        && !structDecl->hasUnreferenceableStorage()) {
+    assert(!structDecl->hasUnreferenceableStorage() &&
+           "User-defined structs cannot have unreferenceable storage");
+
+    if (!FoundDesignatedInit && !SuppressMemberwiseInitializer) {
       // For a struct with memberwise initialized properties, we add a
       // memberwise init.
       if (FoundMemberwiseInitializedProperty) {
@@ -8901,12 +8868,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
   if (classDecl->hasSuperclass()) {
-    bool canInheritInitializers = !FoundDesignatedInit;
+    bool canInheritInitializers = (!SuppressDefaultInitializer &&
+                                   !FoundDesignatedInit);
 
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (SuppressDefaultInitializer && !FoundDesignatedInit
-        && !FoundSynthesizedInit && !classDecl->hasClangNode()) {
+    if (SuppressDefaultInitializer && !FoundDesignatedInit &&
+        !classDecl->hasClangNode()) {
       return;
     }
 
@@ -9017,16 +8985,13 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
                                             DeclName member) {
   auto baseName = member.getBaseName();
+  if (baseName != Context.Id_CodingKeys)
+    return;
 
   // Checks whether the target conforms to the given protocol. If the
-  // conformance is incomplete, check the conformance to force synthesis, if
-  // possible.
+  // conformance is incomplete, force the conformance.
   //
-  // Swallows diagnostics if conformance checking is already in progress (so we
-  // don't display diagnostics twice).
-  //
-  // Returns whether the target conforms to the protocol and the conformance is
-  // complete.
+  // Returns whether the target conforms to the protocol.
   auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
     auto targetType = target->getDeclaredInterfaceType();
     if (auto ref = conformsToProtocol(
@@ -9035,80 +9000,31 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
                          ConformanceCheckFlags::SkipConditionalRequirements),
                          SourceLoc())) {
       if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
-        if (conformance->isIncomplete()) {
-          // Check conformance, forcing synthesis.
-          //
-          // If synthesizing conformance fails, this will produce diagnostics.
-          // If conformance checking was already in progress elsewhere, though,
-          // this could produce diagnostics twice.
-          //
-          // To prevent this duplication, we swallow the diagnostics if the
-          // state of the conformance is not Incomplete.
-          DiagnosticTransaction transaction(Context.Diags);
-          auto shouldSwallowDiagnostics =
-            conformance->getState() != ProtocolConformanceState::Incomplete;
-
+        if (conformance->getState() == ProtocolConformanceState::Incomplete) {
           checkConformance(conformance);
-          if (shouldSwallowDiagnostics)
-            transaction.abort();
-
-          return conformance->isComplete();
         }
       }
+
+      return true;
     }
 
     return false;
   };
 
-  if (member.isSimpleName() && !baseName.isSpecial()) {
-    if (baseName.getIdentifier() == Context.Id_CodingKeys) {
-      // CodingKeys is a special type which may be synthesized as part of
-      // Encodable/Decodable conformance. If the target conforms to either
-      // protocol and would derive conformance to either, the type may be
-      // synthesized.
-      // If the target conforms to either and the conformance has not yet been
-      // evaluated, then we should do that here.
-      //
-      // Try to synthesize Decodable first. If that fails, try to synthesize
-      // Encodable. If either succeeds and CodingKeys should have been
-      // synthesized, it will be synthesized.
-      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-      if (!evaluateTargetConformanceTo(decodableProto))
-        (void)evaluateTargetConformanceTo(encodableProto);
-    } else if (baseName.getIdentifier() == Context.Id_allCases ||
-               baseName.getIdentifier() == Context.Id_AllCases) {
-      // If the target should conform to the CaseIterable protocol, check the
-      // conformance here to attempt synthesis.
-      auto *caseIterableProto
-          = Context.getProtocol(KnownProtocolKind::CaseIterable);
-      (void)evaluateTargetConformanceTo(caseIterableProto);
-    }
-  } else {
-    auto argumentNames = member.getArgumentNames();
-    if (argumentNames.size() != 1)
-      return;
-
-    auto argumentName = argumentNames.front();
-    if (baseName == DeclBaseName::createConstructor() &&
-        argumentName == Context.Id_from) {
-      // init(from:) may be synthesized as part of derived conformance to the
-      // Decodable protocol.
-      // If the target should conform to the Decodable protocol, check the
-      // conformance here to attempt synthesis.
-      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-      (void)evaluateTargetConformanceTo(decodableProto);
-    } else if (!baseName.isSpecial() &&
-               baseName.getIdentifier() == Context.Id_encode &&
-               argumentName == Context.Id_to) {
-      // encode(to:) may be synthesized as part of derived conformance to the
-      // Encodable protocol.
-      // If the target should conform to the Encodable protocol, check the
-      // conformance here to attempt synthesis.
-      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-      (void)evaluateTargetConformanceTo(encodableProto);
-    }
-  }
+  // CodingKeys is a special type which may be synthesized as part of
+  // Encodable/Decodable conformance. If the target conforms to either
+  // protocol and would derive conformance to either, the type may be
+  // synthesized.
+  // If the target conforms to either and the conformance has not yet been
+  // evaluated, then we should do that here.
+  //
+  // Try to synthesize Decodable first. If that fails, try to synthesize
+  // Encodable. If either succeeds and CodingKeys should have been
+  // synthesized, it will be synthesized.
+  auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+  auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+  if (!evaluateTargetConformanceTo(decodableProto))
+    (void)evaluateTargetConformanceTo(encodableProto);
 }
 
 void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
