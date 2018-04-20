@@ -9044,13 +9044,6 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
       if (!evaluateTargetConformanceTo(decodableProto))
         (void)evaluateTargetConformanceTo(encodableProto);
-    } else if (baseName.getIdentifier() == Context.Id_allCases ||
-               baseName.getIdentifier() == Context.Id_AllCases) {
-      // If the target should conform to the CaseIterable protocol, check the
-      // conformance here to attempt synthesis.
-      auto *caseIterableProto
-          = Context.getProtocol(KnownProtocolKind::CaseIterable);
-      (void)evaluateTargetConformanceTo(caseIterableProto);
     }
   } else {
     auto argumentNames = member.getArgumentNames();
