@@ -1741,7 +1741,7 @@ internal final class _KeyedDecodingContainerBox<
 //===----------------------------------------------------------------------===//
 
 % for type in codable_types:
-extension ${type} : Codable {
+extension ${type} : Encodable, Decodable {
   /// Creates a new instance by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
