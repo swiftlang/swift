@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize
 //
 // XLA tests, with debug logging enabled.
 
