@@ -7992,8 +7992,6 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   assert(!nominal->hasClangNode());
   assert(isa<SourceFile>(nominal->getModuleScopeContext()));
 
-  Optional<bool> lazyVarsAlreadyHaveImplementation;
-
   if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
     TC.requestSuperclassLayout(classDecl);
 
@@ -8008,31 +8006,14 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     TC.validateDecl(VD);
 
     // The only thing left to do is synthesize storage for lazy variables.
-    // We only have to do that if it's a type from another file, though.
-    // In NDEBUG builds, bail out as soon as we can.
-#ifdef NDEBUG
-    if (lazyVarsAlreadyHaveImplementation.hasValue() &&
-        lazyVarsAlreadyHaveImplementation.getValue())
-      continue;
-#endif
     auto *prop = dyn_cast<VarDecl>(D);
     if (!prop)
       continue;
 
     if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
                                                   && prop->getGetter()) {
-      bool hasImplementation = prop->getGetter()->hasBody();
-
-      if (lazyVarsAlreadyHaveImplementation.hasValue()) {
-        assert(lazyVarsAlreadyHaveImplementation.getValue() ==
-                 hasImplementation &&
-               "only some lazy vars already have implementations");
-      } else {
-        lazyVarsAlreadyHaveImplementation = hasImplementation;
-      }
-
-      if (!hasImplementation)
-        TC.completeLazyVarImplementation(prop);
+      assert(!prop->getGetter()->hasBody());
+      TC.completeLazyVarImplementation(prop);
     }
   }
 
