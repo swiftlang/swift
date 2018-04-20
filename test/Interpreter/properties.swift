@@ -194,6 +194,30 @@ print("done rdar://16805609")       // CHECK-NEXT: done rdar://16805609
 
 
 
+protocol rdar38514252_ProtocolWithArray {
+  var arrayOfInt: [Int] { get set }
+}
+
+var rdar38514252_flag = false
+var rdar38514252_questionSet: rdar38514252_ProtocolWithArray? {
+  didSet {
+    rdar38514252_flag = true
+  }
+}
+
+func rdar38514252_fiddle() {
+  let ignored = rdar38514252_questionSet?.arrayOfInt[0]
+  if rdar38514252_flag || ignored != nil {
+    print("Failed. didSet was called on read.")
+  } else {
+    print("Awesomesauce.")
+  }
+}
+print("testing rdar://38514252")    // CHECK: testing rdar://38514252
+rdar38514252_fiddle()               // CHECK-NEXT: Awesomesauce.
+print("done rdar://38514252")       // CHECK-NEXT: done rdar://38514252
+
+
 
 // rdar://17192398 - Lazy optional types always nil
 class r17192398Failure {
