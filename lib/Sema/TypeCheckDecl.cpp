@@ -5276,12 +5276,6 @@ public:
         // visible via dynamic dispatch.
         lookupOptions -= NameLookupFlags::DynamicLookup;
 
-        // Class methods cannot override declarations only
-        // visible as protocol requirements or protocol
-        // extension members.
-        lookupOptions -= NameLookupFlags::ProtocolMembers;
-        lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-
         members = TC.lookupMember(dc, superclass,
                                   name, lookupOptions);
       }
@@ -5295,6 +5289,9 @@ public:
         if (member->getKind() != decl->getKind())
           continue;
 
+        // Class methods cannot override declarations only
+        // visible as protocol requirements or protocol
+        // extension members.
         if (!dc->getAsClassOrClassExtensionContext())
           continue;
 
