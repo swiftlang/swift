@@ -246,17 +246,44 @@ internal struct _BufferingHasher<Core: _HasherCore> {
   }
 }
 
+/// Represents the universal hash function used by `Set` and `Dictionary`.
+///
+/// `Hasher` can be used to map an arbitrary sequence of bytes to an integer
+/// hash value. You can feed data to the hasher using a series of calls to
+/// mutating `combine` methods. When you've finished feeding the hasher, the
+/// hash value can be retrieved by calling `finalize()`:
+///
+///     var hasher = Hasher()
+///     hasher.combine(23)
+///     hasher.combine("Hello")
+///     let hashValue = hasher.finalize()
+///
+/// Within the execution of a Swift program, `Hasher` guarantees that
+/// `finalize()` will always return the same value as long as it is fed the
+/// exact same sequence of bytes. However, the underlying hash algorithm is
+/// designed to exhibit avalanche effects: slight changes to the seed or the
+/// input byte sequence will typically produce drastic changes in the generated
+/// hash value.
+///
+/// - Note: Do not save or otherwise reuse hash values across executions of your
+///   program. `Hasher` is usually randomly seeded, which means it will return
+///   different values on every new execution of your program. The hash
+///   algorithm implemented by `Hasher` may itself change between any two
+///   versions of the standard library.
 @_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
 public struct Hasher {
   internal typealias Core = _BufferingHasher<_SipHash13Core>
 
   internal var _core: Core
 
+  /// Initialize a new hasher.  The hasher uses a per-execution seed value that
+  /// is set during process startup, usually from a high-quality random source.
   @effects(releasenone)
   public init() {
     self._core = Core(seed: Hasher._seed)
   }
 
+  /// Initialize a new hasher using the specified seed value.
   @usableFromInline
   @effects(releasenone)
   internal init(_seed seed: (UInt64, UInt64)) {
@@ -295,6 +322,8 @@ public struct Hasher {
     }
   }
 
+  /// Feed `value` to this hasher, mixing its essential parts into
+  /// the hasher state.
   @inlinable
   @inline(__always)
   public mutating func combine<H: Hashable>(_ value: H) {
@@ -331,16 +360,22 @@ public struct Hasher {
     _core.combine(value)
   }
 
+  //FIXME: Convert to @usableFromInline internal once integers hash correctly.
   @effects(releasenone)
   public mutating func _combine(bytes value: UInt64, count: Int) {
     _core.combine(bytes: value, count: count)
   }
 
+  /// Feed the contents of `buffer` into this hasher, mixing it into the hasher
+  /// state.
   @effects(releasenone)
   public mutating func combine(bytes: UnsafeRawBufferPointer) {
     _core.combine(bytes: bytes)
   }
 
+  /// Finalize the hasher state and return the hash value.
+  /// Finalizing invalidates the hasher; additional bits cannot be combined
+  /// into it, and it cannot be finalized again.
   @effects(releasenone)
   public mutating func finalize() -> Int {
     return Int(truncatingIfNeeded: _core.finalize())
