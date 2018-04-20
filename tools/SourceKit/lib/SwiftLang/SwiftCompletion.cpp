@@ -865,7 +865,6 @@ static bool canonicalizeFilterName(const char *origName,
       continue;
     }
   }
-  llvm_unreachable("exit is on null byte");
 }
 
 static void translateFilterRules(ArrayRef<FilterRule> rawFilterRules,
