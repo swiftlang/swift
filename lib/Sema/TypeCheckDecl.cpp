@@ -5486,8 +5486,7 @@ public:
         parentOwnership = ReferenceOwnership::Strong;
       if (parentOwnership != ownershipAttr->get()) {
         TC.diagnose(decl, diag::override_ownership_mismatch,
-                    (unsigned)parentOwnership,
-                    (unsigned)ownershipAttr->get());
+                    parentOwnership, ownershipAttr->get());
         TC.diagnose(matchDecl, diag::overridden_here);
       }
     }

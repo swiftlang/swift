@@ -1960,9 +1960,8 @@ ERROR(override_argument_name_mismatch,none,
       "of overridden %select{method|initializer}0 %2",
       (bool, DeclName, DeclName))
 ERROR(override_ownership_mismatch,none,
-      "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
-      "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
-      (/*ReferenceOwnership*/unsigned, /*ReferenceOwnership*/unsigned))
+      "cannot override %0 property with %1 property",
+      (ReferenceOwnership, ReferenceOwnership))
 ERROR(override_dynamic_self_mismatch,none,
       "cannot override a Self return type with a non-Self return type",
       ())
@@ -3078,10 +3077,9 @@ NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
 
 WARNING(unowned_assignment_immediate_deallocation,none,
-        "instance will be immediately deallocated as %0 is "
-        "%select{a 'strong'|a 'weak'|an 'unowned'|an 'unowned'}1 "
-        "%select{variable|property}2",
-        (Identifier, /*Ownership*/unsigned, /*Is Property*/unsigned))
+        "instance will be immediately deallocated because "
+        "%select{variable|property}2 %0 is %1",
+        (Identifier, ReferenceOwnership, /*Is Property*/unsigned))
 NOTE(unowned_assignment_requires_strong,none,
      "a strong reference is required to prevent the instance from being "
      "deallocated", ())
@@ -3239,24 +3237,23 @@ ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
 
 // Ownership
 ERROR(invalid_ownership_type,none,
-      "'%select{strong|weak|unowned|unowned}0' may only be applied to "
-      "class and class-bound protocol types, not %1",
-      (/*ReferenceOwnership*/unsigned, Type))
+      "%0 may only be applied to class and class-bound protocol types, not %1",
+      (ReferenceOwnership, Type))
 ERROR(invalid_ownership_protocol_type,none,
-      "'%select{strong|weak|unowned|unowned}0' must not be applied to "
-      "non-class-bound %1; consider adding a protocol conformance that has a class bound",
-      (/*ReferenceOwnership*/unsigned, Type))
+      "%0 must not be applied to non-class-bound %1; "
+      "consider adding a protocol conformance that has a class bound",
+      (ReferenceOwnership, Type))
 ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
 ERROR(ownership_invalid_in_protocols,none,
-      "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
-      (/*ReferenceOwnership*/unsigned))
+      "%0 cannot be applied to a property declaration in a protocol",
+      (ReferenceOwnership))
 WARNING(ownership_invalid_in_protocols_compat_warning,none,
-      "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
+      "%0 should not be applied to a property declaration "
       "in a protocol and will be disallowed in future versions",
-      (/*ReferenceOwnership*/unsigned))
+      (ReferenceOwnership))
 
 // required
 ERROR(required_initializer_nonclass,none,
