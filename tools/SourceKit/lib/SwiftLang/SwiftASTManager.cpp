@@ -795,8 +795,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
   trace::SwiftInvocation TraceInfo;
   if (TracedOp.enabled()) {
-    TraceInfo.Args.PrimaryFile = InvokRef->Impl.Opts.PrimaryFile;
-    TraceInfo.Args.Args = InvokRef->Impl.Opts.Args;
+    trace::initTraceInfo(TraceInfo, InvokRef->Impl.Opts.PrimaryFile,
+                         InvokRef->Impl.Opts.Args);
   }
 
   ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);

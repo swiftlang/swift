@@ -28,7 +28,7 @@ namespace trace {
 
 struct SwiftArguments {
   std::string PrimaryFile;
-  std::vector<std::string> Args;
+  std::string Arguments;
 };
 
 enum class OperationKind : uint64_t {
