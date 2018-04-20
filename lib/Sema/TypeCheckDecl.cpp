@@ -7733,7 +7733,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     // Member subscripts need some special validation logic.
-    if (auto nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (dc->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
       inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
 
