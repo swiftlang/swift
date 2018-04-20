@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -parse-stdlib -DBUILDING_OUTSIDE_STDLIB %s -emit-ir
+// RUN: not %target-swift-frontend -parse-stdlib -DBUILDING_OUTSIDE_STDLIB %s -emit-ir
 // REQUIRES: objc_interop
 
 //===----------------------------------------------------------------------===//
