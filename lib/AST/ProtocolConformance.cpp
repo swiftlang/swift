@@ -41,8 +41,13 @@ using namespace swift;
 Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionList reqToSynthesizedEnvSubs) {
-  auto &ctx = decl->getASTContext();
+  if (!syntheticEnv && substitutions.empty() &&
+      reqToSynthesizedEnvSubs.empty()) {
+    storage = decl;
+    return;
+  }
 
+  auto &ctx = decl->getASTContext();
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
   auto stored = new (storedMem)

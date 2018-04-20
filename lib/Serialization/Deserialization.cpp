@@ -5309,13 +5309,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
       // Create the synthetic environment.
       syntheticEnv = syntheticSig->createGenericEnvironment();
+    }
 
-      // Requirement -> synthetic substitutions.
-      if (unsigned numReqSubstitutions = *rawIDIter++) {
-        while (numReqSubstitutions--) {
-          auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
-          reqToSyntheticSubs.push_back(*sub);
-        }
+    // Requirement -> synthetic substitutions.
+    if (unsigned numReqSubstitutions = *rawIDIter++) {
+      while (numReqSubstitutions--) {
+        auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
+        reqToSyntheticSubs.push_back(*sub);
       }
     }
 
@@ -5331,13 +5331,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {
       trySetOpaqueWitness();
-      continue;
-    }
-
-    // Handle simple witnesses.
-    if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
-        reqToSyntheticSubs.empty()) {
-      trySetWitness(Witness(witness));
       continue;
     }
 
