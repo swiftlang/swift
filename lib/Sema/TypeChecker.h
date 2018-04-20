@@ -86,35 +86,57 @@ class LookupResult {
 private:
   /// The set of results found.
   SmallVector<LookupResultEntry, 4> Results;
+  size_t IndexOfFirstOuterResult = 0;
 
 public:
   LookupResult() {}
 
-  explicit
-  LookupResult(const SmallVectorImpl<LookupResultEntry> &Results)
-    : Results(Results.begin(), Results.end()) {}
+  explicit LookupResult(const SmallVectorImpl<LookupResultEntry> &Results,
+                        size_t indexOfFirstOuterResult)
+      : Results(Results.begin(), Results.end()),
+        IndexOfFirstOuterResult(indexOfFirstOuterResult) {}
 
   using iterator = SmallVectorImpl<LookupResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
-  iterator end() { return Results.end(); }
-  unsigned size() const { return Results.size(); }
-  bool empty() const { return Results.empty(); }
+  iterator end() {
+    return Results.begin() + IndexOfFirstOuterResult;
+  }
+  unsigned size() const { return innerResults().size(); }
+  bool empty() const { return innerResults().empty(); }
+
+  ArrayRef<LookupResultEntry> innerResults() const {
+    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
+  }
+
+  ArrayRef<LookupResultEntry> outerResults() const {
+    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
+  }
 
   const LookupResultEntry& operator[](unsigned index) const {
     return Results[index];
   }
 
-  LookupResultEntry front() const { return Results.front(); }
-  LookupResultEntry back() const { return Results.back(); }
+  LookupResultEntry front() const { return innerResults().front(); }
+  LookupResultEntry back() const { return innerResults().back(); }
 
   /// Add a result to the set of results.
-  void add(LookupResultEntry result) { Results.push_back(result); }
+  void add(LookupResultEntry result, bool isOuter) {
+    Results.push_back(result);
+    if (!isOuter) {
+      IndexOfFirstOuterResult++;
+      assert(IndexOfFirstOuterResult == Results.size() &&
+             "found an outer result before an inner one");
+    } else {
+      assert(IndexOfFirstOuterResult > 0 &&
+             "found outer results without an inner one");
+    }
+  }
 
   void clear() { Results.clear(); }
 
   /// Determine whether the result set is nonempty.
   explicit operator bool() const {
-    return !Results.empty();
+    return !empty();
   }
 
   TypeDecl *getSingleTypeResult() const {
@@ -125,7 +147,8 @@ public:
   }
 
   /// Filter out any results that aren't accepted by the given predicate.
-  void filter(const std::function<bool(LookupResultEntry)> &pred);
+  void
+  filter(const std::function<bool(LookupResultEntry, /*isOuter*/ bool)> &pred);
 };
 
 /// The result of name lookup for types.
@@ -260,6 +283,9 @@ enum class NameLookupFlags {
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
   IgnoreAccessControl = 0x10,
+  /// Whether to include results from outside the innermost scope that has a
+  /// result.
+  IncludeOuterResults = 0x20,
 };
 
 /// A set of options that control name lookup.

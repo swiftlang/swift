@@ -435,6 +435,13 @@ public:
                             Type First, Type Second, Type Third,
                             ConstraintLocator *locator);
 
+  /// Create a new member constraint, or a disjunction of that with the outer
+  /// alternatives.
+  static Constraint *createMemberOrOuterDisjunction(
+      ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
+      DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
+
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
                                   Type first, Type second, DeclName member,

@@ -2555,6 +2555,7 @@ ConstraintSystem::simplifyConstructionConstraint(
                            DeclBaseName::createConstructor(),
                            FunctionType::get(tv, resultType),
                            useDC, functionRefKind,
+                           /*outerAlternatives=*/{},
                            getConstraintLocator(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
@@ -3443,14 +3444,11 @@ retry_after_fail:
   return result;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
-                                           Type baseTy, DeclName member,
-                                           Type memberTy,
-                                           DeclContext *useDC,
-                                           FunctionRefKind functionRefKind,
-                                           TypeMatchOptions flags,
-                                           ConstraintLocatorBuilder locatorB) {
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
+    ConstraintKind kind, Type baseTy, DeclName member, Type memberTy,
+    DeclContext *useDC, FunctionRefKind functionRefKind,
+    ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locatorB) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   // FIXME: simplifyType() call here could be getFixedTypeRecursive?
@@ -3467,8 +3465,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-        Constraint::createMember(*this, kind, baseTy, memberTy, member, useDC,
-                                 functionRefKind, locator));
+        Constraint::createMemberOrOuterDisjunction(*this, kind, baseTy, memberTy, member, useDC,
+                                                   functionRefKind, outerAlternatives, locator));
       return SolutionKind::Solved;
     }
 
@@ -3485,8 +3483,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
     addOverloadSet(memberTy, result.ViableCandidates, useDC, locator,
-                   result.getFavoredChoice());
-    
+                   result.getFavoredChoice(), outerAlternatives);
+
     return SolutionKind::Solved;
   }
   
@@ -3522,7 +3520,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
     
     // Look through one level of optional.
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
-                             member, memberTy, useDC, functionRefKind, locator);
+                             member, memberTy, useDC, functionRefKind,
+                             outerAlternatives, locator);
     return SolutionKind::Solved;
   }
   return SolutionKind::Error;
@@ -5202,6 +5201,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                     constraint.getSecondType(),
                                     constraint.getMemberUseDC(),
                                     constraint.getFunctionRefKind(),
+                                    /*outerAlternatives=*/{},
                                     TMF_GenerateConstraints,
                                     constraint.getLocator());
 

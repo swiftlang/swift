@@ -978,7 +978,8 @@ namespace {
     /// \brief Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
-                                 FunctionRefKind functionRefKind) {
+                                 FunctionRefKind functionRefKind,
+                                 ArrayRef<ValueDecl *> outerAlternatives) {
       // The base must have a member of the given name, such that accessing
       // that member through the base returns a value convertible to the type
       // of this expression.
@@ -986,8 +987,13 @@ namespace {
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
                   TVO_CanBindToLValue);
-      CS.addValueMemberConstraint(baseTy, name, tv, CurDC, functionRefKind,
-        CS.getConstraintLocator(expr, ConstraintLocator::Member));
+      SmallVector<OverloadChoice, 4> outerChoices;
+      for (auto decl : outerAlternatives) {
+        outerChoices.push_back(OverloadChoice(Type(), decl, functionRefKind));
+      }
+      CS.addValueMemberConstraint(
+          baseTy, name, tv, CurDC, functionRefKind, outerChoices,
+          CS.getConstraintLocator(expr, ConstraintLocator::Member));
       return tv;
     }
 
@@ -1116,6 +1122,7 @@ namespace {
       } else {
         CS.addValueMemberConstraint(baseTy, DeclBaseName::createSubscript(),
                                     fnTy, CurDC, FunctionRefKind::DoubleApply,
+                                    /*outerAlternatives=*/{},
                                     memberLocator);
       }
 
@@ -1496,9 +1503,12 @@ namespace {
                           TVO_PrefersSubtypeBinding);
         auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
         auto methodTy = FunctionType::get(argsTy, resultTy);
-        CS.addValueMemberConstraint(baseTy, expr->getName(),
-          methodTy, CurDC, expr->getFunctionRefKind(),
-          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+        CS.addValueMemberConstraint(
+            baseTy, expr->getName(), methodTy, CurDC,
+            expr->getFunctionRefKind(),
+            /*outerAlternatives=*/{},
+            CS.getConstraintLocator(expr,
+                                    ConstraintLocator::ConstructorMember));
 
         // The result of the expression is the partial application of the
         // constructor to the subexpression.
@@ -1506,7 +1516,8 @@ namespace {
       }
 
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName(),
-                                     expr->getFunctionRefKind());
+                                     expr->getFunctionRefKind(),
+                                     expr->getOuterAlternatives());
     }
     
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
@@ -1911,7 +1922,8 @@ namespace {
       Identifier name
         = context.getIdentifier(llvm::utostr(expr->getFieldNumber()));
       return addMemberRefConstraints(expr, expr->getBase(), name,
-                                     FunctionRefKind::Unapplied);
+                                     FunctionRefKind::Unapplied,
+                                     /*outerAlternatives=*/{});
     }
 
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter
@@ -2862,6 +2874,7 @@ namespace {
                                       memberTy,
                                       CurDC,
                                       refKind,
+                                      /*outerAlternatives=*/{},
                                       memberLocator);
           base = memberTy;
           break;

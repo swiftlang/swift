@@ -1630,7 +1630,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
 
   // This happens, for example, with ambiguous OverloadedDeclRefExprs. We should
   // just implement visitOverloadedDeclRefExprs and nuke this.
-  
+
   // If we couldn't resolve an argument, then produce a generic "ambiguity"
   // diagnostic.
   diagnose(anchor->getLoc(), diag::ambiguous_member_overload_set,
@@ -3549,6 +3549,58 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       TE->isImplicit(), TT));
 }
 
+static DeclName getBaseName(DeclContext *context) {
+  if (auto generic = context->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    return generic->getName();
+  } else if (context->isModuleScopeContext())
+    return context->getParentModule()->getName();
+  else
+    llvm_unreachable("Unsupported base");
+};
+
+static void emitFixItForExplicitlyQualifiedReference(
+    TypeChecker &tc, UnresolvedDotExpr *UDE,
+    decltype(diag::fix_unqualified_access_top_level) diag, DeclName baseName,
+    DescriptiveDeclKind kind) {
+  auto name = baseName.getBaseIdentifier();
+  SmallString<32> namePlusDot = name.str();
+  namePlusDot.push_back('.');
+
+  tc.diagnose(UDE->getLoc(), diag, namePlusDot, kind, name)
+      .fixItInsert(UDE->getStartLoc(), namePlusDot);
+}
+
+void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
+    UnresolvedDotExpr *UDE, ValueDecl *choice) {
+  auto result = TC.lookupUnqualified(DC, UDE->getName(), UDE->getLoc());
+  assert(result && "names can't just disappear");
+  // These should all come from the same place.
+  auto exampleInner = result.front();
+  auto innerChoice = exampleInner.getValueDecl();
+  auto innerDC = exampleInner.getDeclContext()->getInnermostTypeContext();
+  auto innerParentDecl =
+      innerDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto innerBaseName = getBaseName(innerDC);
+
+  auto choiceKind = choice->getDescriptiveKind();
+  auto choiceDC = choice->getDeclContext();
+  auto choiceBaseName = getBaseName(choiceDC);
+  auto choiceParentDecl = choiceDC->getAsDeclOrDeclExtensionContext();
+  auto choiceParentKind = choiceParentDecl
+                              ? choiceParentDecl->getDescriptiveKind()
+                              : DescriptiveDeclKind::Module;
+
+  TC.diagnose(UDE->getLoc(),
+              diag::warn_deprecated_conditional_conformance_outer_access,
+              UDE->getName(), choiceKind, choiceParentKind, choiceBaseName,
+              innerChoice->getDescriptiveKind(),
+              innerParentDecl->getDescriptiveKind(), innerBaseName);
+
+  emitFixItForExplicitlyQualifiedReference(
+      TC, UDE, diag::fix_deprecated_conditional_conformance_outer_access,
+      choiceBaseName, choiceKind);
+}
+
 static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                        CalleeCandidateInfo &CCI,
                                        ArrayRef<Identifier> argLabels,
@@ -3655,16 +3707,6 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     return kind;
   };
 
-  auto getBaseName = [](DeclContext *context) -> DeclName {
-    if (auto generic =
-          context->getAsNominalTypeOrNominalTypeExtensionContext()) {
-      return generic->getName();
-    } else if (context->isModuleScopeContext())
-      return context->getParentModule()->getName();
-    else
-      llvm_unreachable("Unsupported base");
-  };
-
   auto diagnoseShadowing = [&](ValueDecl *base,
                                ArrayRef<OverloadChoice> candidates) -> bool {
     CalleeCandidateInfo calleeInfo(base ? base->getInterfaceType() : nullptr,
@@ -3712,13 +3754,8 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
     if (baseKind == DescriptiveDeclKind::Module)
       topLevelDiag = diag::fix_unqualified_access_top_level_multi;
 
-    auto name = baseName.getBaseIdentifier();
-    SmallString<32> namePlusDot = name.str();
-    namePlusDot.push_back('.');
-
-    TC.diagnose(UDE->getLoc(), topLevelDiag, namePlusDot,
-                choice->getDescriptiveKind(), name)
-        .fixItInsert(UDE->getStartLoc(), namePlusDot);
+    emitFixItForExplicitlyQualifiedReference(TC, UDE, topLevelDiag, baseName,
+                                             choice->getDescriptiveKind());
 
     for (auto &candidate : calleeInfo.candidates) {
       if (auto decl = candidate.getDecl())
@@ -6857,7 +6894,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
     // If we have more than one result, filter out unavailable or
     // obviously unusable candidates.
     if (lookup.size() > 1) {
-      lookup.filter([&](LookupResultEntry result) -> bool {
+      lookup.filter([&](LookupResultEntry result, bool isOuter) -> bool {
         // Drop unavailable candidates.
         if (result.getValueDecl()->getAttrs().isUnavailable(TC.Context))
           return false;
