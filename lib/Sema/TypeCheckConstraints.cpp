@@ -397,6 +397,56 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   }
 }
 
+static bool findNonMembers(TypeChecker &TC,
+                           ArrayRef<LookupResultEntry> lookupResults,
+                           DeclRefKind refKind, bool breakOnMember,
+                           SmallVectorImpl<ValueDecl *> &ResultValues,
+                           llvm::function_ref<bool(ValueDecl *)> isValid) {
+  bool AllDeclRefs = true;
+  for (auto Result : lookupResults) {
+    // If we find a member, then all of the results aren't non-members.
+    bool IsMember =
+        (Result.getBaseDecl() && !isa<ModuleDecl>(Result.getBaseDecl()));
+    if (IsMember) {
+      AllDeclRefs = false;
+      if (breakOnMember)
+        break;
+      continue;
+    }
+
+    ValueDecl *D = Result.getValueDecl();
+    if (!D->hasInterfaceType())
+      TC.validateDecl(D);
+
+    // FIXME: Circularity hack.
+    if (!D->hasInterfaceType()) {
+      AllDeclRefs = false;
+      continue;
+    }
+
+    if (!isValid(D))
+      return false;
+
+    if (matchesDeclRefKind(D, refKind))
+      ResultValues.push_back(D);
+  }
+
+  return AllDeclRefs;
+}
+
+/// Whether we should be looking at the outer results for a function called \c
+/// name.
+///
+/// This is very restrictive because it's a source compatibility issue (see the
+/// if (AllConditionalConformances) { (void)findNonMembers(...); } below).
+static bool shouldConsiderOuterResultsFor(DeclName name) {
+  const StringRef specialNames[] = {"min", "max"};
+  for (auto specialName : specialNames)
+    if (name.isSimpleName(specialName))
+      return true;
+
+  return false;
+}
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
@@ -411,6 +461,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
+  if (shouldConsiderOuterResultsFor(Name))
+    lookupOptions |= NameLookupFlags::IncludeOuterResults;
+
   auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
 
   if (!Lookup) {
@@ -526,40 +579,27 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                    UDRE->isImplicit());
   }
 
-  bool AllDeclRefs = true;
   SmallVector<ValueDecl*, 4> ResultValues;
-  for (auto Result : Lookup) {
-    // If we find a member, then all of the results aren't non-members.
-    bool IsMember = (Result.getBaseDecl() &&
-                     !isa<ModuleDecl>(Result.getBaseDecl()));
-    if (IsMember) {
-      AllDeclRefs = false;
-      break;
-    }
+  Expr *error = nullptr;
+  bool AllDeclRefs = findNonMembers(
+      *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
+      ResultValues, [&](ValueDecl *D) {
+        // FIXME: The source-location checks won't make sense once
+        // EnableASTScopeLookup is the default.
+        if (Loc.isValid() && D->getLoc().isValid() &&
+            D->getDeclContext()->isLocalContext() &&
+            D->getDeclContext() == DC &&
+            Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc())) {
+          diagnose(Loc, diag::use_local_before_declaration, Name);
+          diagnose(D, diag::decl_declared_here, Name);
+          error = new (Context) ErrorExpr(UDRE->getSourceRange());
+          return false;
+        }
+        return true;
+      });
+  if (error)
+    return error;
 
-    ValueDecl *D = Result.getValueDecl();
-    if (!D->hasInterfaceType()) validateDecl(D);
-
-    // FIXME: Circularity hack.
-    if (!D->hasInterfaceType()) {
-      AllDeclRefs = false;
-      continue;
-    }
-
-    // FIXME: The source-location checks won't make sense once
-    // EnableASTScopeLookup is the default.
-    if (Loc.isValid() && D->getLoc().isValid() &&
-        D->getDeclContext()->isLocalContext() &&
-        D->getDeclContext() == DC &&
-        Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc())) {
-      diagnose(Loc, diag::use_local_before_declaration, Name);
-      diagnose(D, diag::decl_declared_here, Name);
-      return new (Context) ErrorExpr(UDRE->getSourceRange());
-    }
-    if (matchesDeclRefKind(D, UDRE->getRefKind()))
-      ResultValues.push_back(D);
-  }
-  
   if (AllDeclRefs) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
@@ -599,20 +639,43 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   ResultValues.clear();
   bool AllMemberRefs = true;
+  bool AllConditionalConformances = true;
   ValueDecl *Base = nullptr;
   DeclContext *BaseDC = nullptr;
   for (auto Result : Lookup) {
+    auto ThisBase = Result.getBaseDecl();
+
     // Track the base for member declarations.
-    if (Result.getBaseDecl() &&
-        !isa<ModuleDecl>(Result.getBaseDecl())) {
-      ResultValues.push_back(Result.getValueDecl());
-      if (Base && Result.getBaseDecl() != Base) {
+    if (ThisBase && !isa<ModuleDecl>(ThisBase)) {
+      auto Value = Result.getValueDecl();
+      ResultValues.push_back(Value);
+      if (Base && ThisBase != Base) {
         AllMemberRefs = false;
         break;
       }
 
-      Base = Result.getBaseDecl();
+      Base = ThisBase;
       BaseDC = Result.getDeclContext();
+
+      // Check if this result is derived through a conditional conformance,
+      // meaning it comes from a protocol (or extension) where there's a
+      // conditional conformance for the type with the method in question
+      // (NB. that type may not be the type associated with DC, for tested types
+      // with static methods).
+      if (auto Proto = Value->getDeclContext()
+                           ->getAsProtocolOrProtocolExtensionContext()) {
+        auto contextSelfType =
+            BaseDC->getInnermostTypeContext()->getDeclaredInterfaceType();
+        auto conformance = conformsToProtocol(
+            contextSelfType, Proto, DC,
+            ConformanceCheckFlags::InExpression |
+                ConformanceCheckFlags::SkipConditionalRequirements);
+
+        if (!conformance || conformance->getConditionalRequirements().empty()) {
+          AllConditionalConformances = false;
+        }
+      }
+
       continue;
     }
 
@@ -633,13 +696,29 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);
     }
-    
-   
+
+    // We *might* include any non-members that we found in outer contexts in
+    // some special cases, for backwards compatibility: first, we have to be
+    // looking for one of the special names
+    // ('shouldConsiderOuterResultsFor(Name)'), and second, all of the inner
+    // results need to come from conditional conformances. The second condition
+    // is how the problem here was encountered: a type ('Range') was made to
+    // conditionally conform to a new protocol ('Sequence'), which introduced
+    // some extra methods ('min' and 'max') that shadowed global functions that
+    // people regularly called within extensions to that type (usually adding
+    // 'clamp').
+    llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
+    if (AllConditionalConformances) {
+      (void)findNonMembers(*this, Lookup.outerResults(), UDRE->getRefKind(),
+                           /*breakOnMember=*/false, outerAlternatives,
+                           /*isValid=*/[&](ValueDecl *) { return true; });
+    }
+
     // Otherwise, form an UnresolvedDotExpr and sema will resolve it based on
     // type information.
-    return new (Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name,
-                                           UDRE->getNameLoc(),
-                                           UDRE->isImplicit());
+    return new (Context) UnresolvedDotExpr(
+        BaseExpr, SourceLoc(), Name, UDRE->getNameLoc(), UDRE->isImplicit(),
+        Context.AllocateCopy(outerAlternatives));
   }
   
   // FIXME: If we reach this point, the program we're being handed is likely

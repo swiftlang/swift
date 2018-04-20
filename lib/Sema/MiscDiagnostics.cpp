@@ -873,7 +873,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
       UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
-                               /*knownPrivate*/true);
+                               /*Loc=*/SourceLoc(),
+                               UnqualifiedLookup::Flags::KnownPrivate);
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;

@@ -295,12 +295,13 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
   // If there's anything to remove, filter it out now.
   if (anyRemovals) {
-    result->filter([&](LookupResultEntry entry) -> bool {
+    result->filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto *decl = entry.getValueDecl();
 
       // Remove invalid declarations so the constraint solver doesn't need to
       // cope with them.
-      if (decl->isInvalid()) return false;
+      if (decl->isInvalid())
+        return false;
 
       return known[getDynamicResultSignature(decl)] == decl;
     });
@@ -1471,11 +1472,12 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
                                       ConstraintLocator *locator,
-                                      OverloadChoice *favoredChoice) {
+                                      OverloadChoice *favoredChoice,
+                                      ArrayRef<OverloadChoice> outerAlternatives) {
   assert(!choices.empty() && "Empty overload set");
 
   // If there is a single choice, add the bind overload directly.
-  if (choices.size() == 1) {
+  if (choices.size() == 1 && outerAlternatives.empty()) {
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
@@ -1511,7 +1513,26 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                                        useDC, locator));
   }
 
-  addDisjunctionConstraint(overloads, locator, ForgetChoice, favoredChoice);
+  auto innerDisjunction = Constraint::createDisjunction(*this, overloads,
+                                                        locator, ForgetChoice);
+  if (outerAlternatives.empty()) {
+    if (favoredChoice)
+      innerDisjunction->setFavored();
+
+    addUnsolvedConstraint(innerDisjunction);
+    return;
+  }
+
+  SmallVector<Constraint *, 4> outerConstraints;
+  outerConstraints.push_back(innerDisjunction);
+  innerDisjunction->setFavored();
+  for (auto choice : outerAlternatives) {
+    outerConstraints.push_back(Constraint::createBindOverload(
+                                 *this, boundType, choice,
+                                   useDC, locator));
+  }
+
+  addDisjunctionConstraint(outerConstraints, locator, ForgetChoice, favoredChoice);
 }
 
 /// If we're resolving an overload set with a decl that has special type

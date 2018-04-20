@@ -642,6 +642,25 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                 locator, typeVars);
 }
 
+Constraint *Constraint::createMemberOrOuterDisjunction(
+    ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
+    DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+    ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator) {
+  auto memberConstraint = createMember(cs, kind, first, second, member,
+                             useDC, functionRefKind, locator);
+
+  if (outerAlternatives.empty())
+    return memberConstraint;
+
+  SmallVector<Constraint *, 4> constraints;
+  constraints.push_back(memberConstraint);
+  memberConstraint->setFavored();
+  for (auto choice : outerAlternatives) {
+    constraints.push_back(
+        Constraint::createBindOverload(cs, first, choice, useDC, locator));
+  }
+  return Constraint::createDisjunction(cs, constraints, locator, ForgetChoice);
+}
 
 Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind, 
                                      Type first, Type second, DeclName member,

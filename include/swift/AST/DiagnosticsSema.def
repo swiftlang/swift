@@ -2747,6 +2747,15 @@ NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
      (StringRef, DescriptiveDeclKind, Identifier))
 
+WARNING(warn_deprecated_conditional_conformance_outer_access,none,
+        "use of %0 as reference to %1 in %2 %3 will change in future versions of Swift to reference %4 in %5 %6 "
+        "which comes via a conditional conformance",
+        (DeclName, DescriptiveDeclKind, DescriptiveDeclKind, DeclName,
+        DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+NOTE(fix_deprecated_conditional_conformance_outer_access,none,
+     "use '%0' to continue to reference the %1",
+     (StringRef, DescriptiveDeclKind, Identifier))
+
 ERROR(unsupported_special_decl_ref, none,
       "referencing %0 as a function value is not implemented", (Identifier))
 
