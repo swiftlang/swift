@@ -5185,13 +5185,18 @@ public:
     if (decl->isInvalid() || decl->getOverriddenDecl())
       return false;
 
+    // Ignore accessor methods (e.g. getters and setters), they will be handled
+    // when their storage decl is processed.
+    if (isa<AccessorDecl>(decl))
+      return false;
+
     auto *dc = decl->getDeclContext();
 
     auto owningTy = dc->getDeclaredInterfaceType();
     if (!owningTy)
       return false;
 
-    auto classDecl = owningTy->getClassOrBoundGenericClass();
+    auto classDecl = dc->getAsClassOrClassExtensionContext();
     if (!classDecl)
       return false;
 
@@ -5199,11 +5204,6 @@ public:
     if (!superclass)
       return false;
 
-    // Ignore accessor methods (e.g. getters and setters), they will be handled
-    // when their storage decl is processed.
-    if (isa<AccessorDecl>(decl))
-      return false;
-    
     auto method = dyn_cast<AbstractFunctionDecl>(decl);
     ConstructorDecl *ctor = nullptr;
     if (method)
@@ -5279,12 +5279,6 @@ public:
         // visible via dynamic dispatch.
         lookupOptions -= NameLookupFlags::DynamicLookup;
 
-        // Class methods cannot override declarations only
-        // visible as protocol requirements or protocol
-        // extension members.
-        lookupOptions -= NameLookupFlags::ProtocolMembers;
-        lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-
         members = TC.lookupMember(dc, superclass,
                                   name, lookupOptions);
       }
@@ -5298,7 +5292,10 @@ public:
         if (member->getKind() != decl->getKind())
           continue;
 
-        if (!dc->getAsClassOrClassExtensionContext())
+        // Class methods cannot override declarations only
+        // visible as protocol requirements or protocol
+        // extension members.
+        if (!member->getDeclContext()->getAsClassOrClassExtensionContext())
           continue;
 
         auto parentDecl = cast<ValueDecl>(member);

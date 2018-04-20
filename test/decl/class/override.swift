@@ -350,3 +350,15 @@ class DerivedWithFilePrivateSetter: BaseWithFilePrivateSetter {
         set { }
     }
 }
+
+protocol HasExtension {}
+
+extension HasExtension {
+  func extensionMethod() {}
+}
+
+class BaseExtended : HasExtension {}
+
+class DerivedExtended : BaseExtended {
+  func extensionMethod() {}
+}
