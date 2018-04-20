@@ -4375,6 +4375,7 @@ public:
 
     TC.validateDecl(ED);
     TC.DeclsToFinalize.remove(ED);
+    ED->setHasValidatedLayout();
 
     {
       // Check for circular inheritance of the raw type.
@@ -4408,6 +4409,7 @@ public:
 
     TC.validateDecl(SD);
     TC.DeclsToFinalize.remove(SD);
+    SD->setHasValidatedLayout();
 
     TC.addImplicitConstructors(SD);
 
@@ -4533,6 +4535,7 @@ public:
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
     TC.DeclsToFinalize.remove(CD);
+    CD->setHasValidatedLayout();
 
     {
       // Check for circular inheritance.
@@ -6912,7 +6915,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     if (!isa<ClassDecl>(nominal))
-      DeclsToFinalize.insert(nominal);
+      requestNominalLayout(nominal);
 
     break;
   }
@@ -7734,7 +7737,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     // Member subscripts need some special validation logic.
-    if (auto nominalDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (dc->isTypeContext()) {
       // If this is a class member, mark it final if the class is final.
       inferFinalAndDiagnoseIfNeeded(*this, SD, StaticSpellingKind::None);
 
@@ -7990,8 +7993,6 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   assert(!nominal->hasClangNode());
   assert(isa<SourceFile>(nominal->getModuleScopeContext()));
 
-  Optional<bool> lazyVarsAlreadyHaveImplementation;
-
   if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
     TC.requestSuperclassLayout(classDecl);
 
@@ -8006,31 +8007,14 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     TC.validateDecl(VD);
 
     // The only thing left to do is synthesize storage for lazy variables.
-    // We only have to do that if it's a type from another file, though.
-    // In NDEBUG builds, bail out as soon as we can.
-#ifdef NDEBUG
-    if (lazyVarsAlreadyHaveImplementation.hasValue() &&
-        lazyVarsAlreadyHaveImplementation.getValue())
-      continue;
-#endif
     auto *prop = dyn_cast<VarDecl>(D);
     if (!prop)
       continue;
 
     if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic()
                                                   && prop->getGetter()) {
-      bool hasImplementation = prop->getGetter()->hasBody();
-
-      if (lazyVarsAlreadyHaveImplementation.hasValue()) {
-        assert(lazyVarsAlreadyHaveImplementation.getValue() ==
-                 hasImplementation &&
-               "only some lazy vars already have implementations");
-      } else {
-        lazyVarsAlreadyHaveImplementation = hasImplementation;
-      }
-
-      if (!hasImplementation)
-        TC.completeLazyVarImplementation(prop);
+      assert(!prop->getGetter()->hasBody());
+      TC.completeLazyVarImplementation(prop);
     }
   }
 
