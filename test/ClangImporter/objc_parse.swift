@@ -509,8 +509,7 @@ func testWeakVariable() {
 }
 
 class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-error {{type 'IncompleteProtocolAdopter' cannot conform to protocol 'Incomplete' because it has requirements that cannot be satisfied}}
-      // expected-error@-1{{type 'IncompleteProtocolAdopter' does not conform to protocol 'Incomplete'}}
-  @objc func getObject() -> AnyObject { return self } // expected-note{{candidate has non-matching type '() -> AnyObject'}}
+  @objc func getObject() -> AnyObject { return self }
 }
 
 func testNullarySelectorPieces(_ obj: AnyObject) {
