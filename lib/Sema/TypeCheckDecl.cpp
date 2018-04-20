@@ -4373,6 +4373,7 @@ public:
 
     TC.validateDecl(ED);
     TC.DeclsToFinalize.remove(ED);
+    ED->setHasValidatedLayout();
 
     {
       // Check for circular inheritance of the raw type.
@@ -4406,6 +4407,7 @@ public:
 
     TC.validateDecl(SD);
     TC.DeclsToFinalize.remove(SD);
+    SD->setHasValidatedLayout();
 
     TC.addImplicitConstructors(SD);
 
@@ -4531,6 +4533,7 @@ public:
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
     TC.DeclsToFinalize.remove(CD);
+    CD->setHasValidatedLayout();
 
     {
       // Check for circular inheritance.
@@ -6911,7 +6914,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     if (!isa<ClassDecl>(nominal))
-      DeclsToFinalize.insert(nominal);
+      requestNominalLayout(nominal);
 
     break;
   }
