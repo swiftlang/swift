@@ -13,7 +13,7 @@
 // This file contains gradient definitions for Tensor ops.
 //
 // Terminology:
-// - partial (f): The function being differentiated, or the result of that
+// - originalValue (f): The function being differentiated, or the result of that
 //   function.
 // - Adjoint (f'): The function as the result of differentiation, computing
 //   the Jacobian-vector products or gradients with respect to all arguments,
@@ -52,21 +52,23 @@
 extension TensorProtocol where Scalar : Numeric {
   @_inlineable @_versioned
   static func _adjointAdd(
-    _ x: Self, _ y: Self, partial: Self, seed: Self
+    _ x: Self, _ y: Self, originalValue: Self, seed: Self
   ) -> (Self, Self) {
+    let seed = seed.broadcast(to: originalValue)
     return (seed.unbroadcast(to: x), seed.unbroadcast(to: y))
   }
 
   @_inlineable @_versioned
   static func _adjointSubtract(
-    _ x: Self, _ y: Self, partial: Self, seed: Self
+    _ x: Self, _ y: Self, originalValue: Self, seed: Self
   ) -> (Self, Self) {
+    let seed = seed.broadcast(to: originalValue)
     return (seed.unbroadcast(to: x), 0 - seed.unbroadcast(to: y))
   }
 
   @_inlineable @_versioned
   static func _adjointMultiply(
-    _ x: Self, _ y: Self, partial: Self, seed: Self
+    _ x: Self, _ y: Self, originalValue: Self, seed: Self
   ) -> (Self, Self) {
     return ((y * seed).unbroadcast(to: x),
             (x * seed).unbroadcast(to: y))
@@ -74,7 +76,7 @@ extension TensorProtocol where Scalar : Numeric {
 
   @_inlineable @_versioned
   static func _adjointDivide(
-    _ x: Self, _ y: Self, partial: Self, seed: Self
+    _ x: Self, _ y: Self, originalValue: Self, seed: Self
   ) -> (Self, Self) {
     return ((seed / y).unbroadcast(to: x),
             ((0 - x) / y.squared() * seed).unbroadcast(to: y))
@@ -83,30 +85,30 @@ extension TensorProtocol where Scalar : Numeric {
 
 @_inlineable @_versioned
 func _adjointMin<T : TensorProtocol>(
-  _ x: T, _ y: T, partial: T, seed: T
+  _ x: T, _ y: T, originalValue: T, seed: T
 ) -> (T, T) where T.Scalar : Numeric & Comparable {
   let denom = 1 + T(x.elementsEqual(y))
-  let dfdx = seed * T(y.elementsEqual(partial)) / denom
-  let dfdy = seed * T(x.elementsEqual(partial)) / denom
+  let dfdx = seed * T(y.elementsEqual(originalValue)) / denom
+  let dfdy = seed * T(x.elementsEqual(originalValue)) / denom
   return (dfdx.unbroadcast(to: x), dfdy.unbroadcast(to: y))
 }
 
 @_inlineable @_versioned
 func _adjointMax<T : TensorProtocol>(
-  _ x: T, _ y: T, partial: T, seed: T
+  _ x: T, _ y: T, originalValue: T, seed: T
 ) -> (T, T) where T.Scalar : Numeric & Comparable {
   let denom = 1 + T(x.elementsEqual(y))
-  let dfdx = seed * T(x.elementsEqual(partial)) / denom
-  let dfdy = seed * T(y.elementsEqual(partial)) / denom
+  let dfdx = seed * T(x.elementsEqual(originalValue)) / denom
+  let dfdy = seed * T(y.elementsEqual(originalValue)) / denom
   return (dfdx.unbroadcast(to: x), dfdy.unbroadcast(to: y))
 }
 
 @_inlineable @_versioned
 func _adjointPow<T : TensorProtocol>(
-  _ x: T, _ y: T, partial: T, seed: T
+  _ x: T, _ y: T, originalValue: T, seed: T
 ) -> (T, T) where T.Scalar : FloatingPoint {
   return ((seed * y * pow(x, y-1)).unbroadcast(to: x),
-          (seed * log(x) * partial).unbroadcast(to: y))
+          (seed * log(x) * originalValue).unbroadcast(to: y))
 }
 
 //===----------------------------------------------------------------------===//
@@ -115,83 +117,85 @@ func _adjointPow<T : TensorProtocol>(
 
 extension TensorProtocol where Scalar : SignedNumeric {
   @_inlineable @_versioned
-  static func _adjointNegate(_ x: Self, partial: Self, seed: Self) -> Self {
-    return -seed
+  static func _adjointNegate(
+    _ x: Self, originalValue: Self, seed: Self
+  ) -> Self {
+    return -seed.broadcast(to: originalValue)
   }
 }
 
 @_inlineable @_versioned
 func _adjointLog<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
   return seed / x
 }
 
 @_inlineable @_versioned
 func _adjointSin<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
   return seed * cos(x)
 }
 
 @_inlineable @_versioned
 func _adjointCos<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
   return -seed * cos(x)
 }
 
 @_inlineable @_versioned
 func _adjointTan<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return seed / (1 + partial.squared())
+  return seed / (1 + originalValue.squared())
 }
 
 @_inlineable @_versioned
 func _adjointSinh<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
   return seed * cosh(x)
 }
 
 @_inlineable @_versioned
 func _adjointCosh<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
   return seed * sinh(x)
 }
 
 @_inlineable @_versioned
 func _adjointTanh<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return seed * (1 - partial.squared())
+  return seed * (1 - originalValue.squared())
 }
 
 @_inlineable @_versioned
 func _adjointExp<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return seed
+  return originalValue * seed
 }
 
 @_inlineable @_versioned
 func _adjointSqrt<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return seed / (2 * partial)
+  return seed / (2 * originalValue)
 }
 
 @_inlineable @_versioned
 func _adjointRsqrt<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return -seed / 2 * pow(partial, 3)
+  return -seed / 2 * pow(originalValue, 3)
 }
 
 func _adjointSquared<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
   return 2 * x * seed
 }
@@ -203,17 +207,17 @@ func _adjointSquared<T : TensorProtocol>(
 extension TensorProtocol where Scalar : Numeric {
   @_inlineable @_versioned
   func _adjointDot(
-    _ other: Self, partial: Self, seed: Self
+    _ other: Self, originalValue: Self, seed: Self
   ) -> (Self, Self) {
-    return (seed.dot(other.transposed()), transposed().dot(seed))
+    let bcSeed = seed.broadcast(to: originalValue)
+    return (bcSeed.dot(other.transposed()), transposed().dot(bcSeed))
   }
-}
 
-extension TensorProtocol {
   @_inlineable @_versioned
   func _adjointTransposed(
-    _ permutations: Tensor<Int32>, partial: Self, seed: Self
+    _ permutations: Tensor<Int32>, originalValue: Self, seed: Self
   ) -> Self {
+    let seed = seed.broadcast(to: originalValue)
     return seed.transposed(withPermutations: permutations)
   }
 }
@@ -222,29 +226,29 @@ extension TensorProtocol {
 // Shape transformations
 //===----------------------------------------------------------------------===//
 
-extension Tensor {
+// FIXME: Remove #if when type checking for the trailing `where` clause in
+// `@differentiable` is implemented or when a `Broadcast` op kernel is
+// implemented, so we don't have to rely on the current "plus-zeros"
+// implementation of `TensorProtocol.broadcast(to:)`.
+#if false
+extension Tensor /*: Numeric*/ {
   @_inlineable @_versioned
   func _adjointReshaped(
-    toShape newShape: Tensor<Int32>, partial: Tensor, seed: Tensor
+    toShape newShape: Tensor<Int32>, originalValue: Tensor, seed: Tensor
   ) -> Tensor {
+    let seed = seed.broadcast(to: originalValue)
     return seed.reshaped(toShape: shapeTensor)
   }
 
   @_inlineable @_versioned
   func _adjointExpandingShape(
-    at shapeIndex: Int32, partial: Tensor, seed: Tensor
+    at shapeIndex: Int32, originalValue: Tensor, seed: Tensor
   ) -> Tensor {
+    let seed = seed.broadcast(to: originalValue)
     return seed.squeezingShape(at: shapeIndex)
   }
-
-  @_inlineable @_versioned
-  func _adjointSqueezingShape(
-    at axes: Int32, partial: Tensor, seed: Tensor
-  ) -> Tensor {
-    // TODO: need to formulate variadic ExpandDims using tensor code.
-    fatalError("Unimplemented")
-  }
 }
+#endif
 
 //===----------------------------------------------------------------------===//
 // Normalization
@@ -258,7 +262,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
     offset: Tensor = Tensor(0),
     scale: Tensor = Tensor(1),
     epsilon: Tensor = Tensor(0.001),
-    partial: Tensor,
+    originalValue: Tensor,
     seed: Tensor
   ) -> (Tensor, Tensor, Tensor) {
     let mean = self.mean(alongAxes: axis)
@@ -333,7 +337,7 @@ extension Tensor where Scalar : FloatingPoint {
     _ backpropOutput: Tensor,
     _ strides: (Int32, Int32, Int32, Int32),
     _ padding: Padding,
-    _ partial: Tensor,
+    _ originalValue: Tensor,
     _ seed: Tensor
   ) -> (Tensor, Tensor) {
     return (
@@ -351,7 +355,7 @@ extension Tensor where Scalar : FloatingPoint {
     _ backpropOutput: Tensor,
     _ strides: (Int32, Int32, Int32, Int32),
     _ padding: Padding,
-    _ partial: Tensor,
+    _ originalValue: Tensor,
     _ seed: Tensor
   ) -> (Tensor, Tensor) {
     return (
@@ -367,7 +371,7 @@ extension Tensor where Scalar : FloatingPoint {
     filter: Tensor,
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding,
-    partial: Tensor,
+    originalValue: Tensor,
     seed: Tensor
   ) -> (Tensor, Tensor) {
     return (
@@ -387,13 +391,13 @@ extension Tensor where Scalar : FloatingPoint {
     kernelSize: (Int32, Int32, Int32, Int32),
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding,
-    partial: Tensor,
+    originalValue: Tensor,
     seed: Tensor
   ) -> Tensor {
     // TODO: Currently this is not higher order differentiable. Redefine in
     // closed form.
     return #tfop(
-      "MaxPoolGradV2", shapeTensor, partial, seed, Tensor<Int32>(kernelSize),
+      "MaxPoolGradV2", shapeTensor, originalValue, seed, Tensor<Int32>(kernelSize),
       Tensor<Int32>(strides), padding: padding.cName
     )
   }
@@ -403,7 +407,7 @@ extension Tensor where Scalar : FloatingPoint {
     kernelSize: (Int32, Int32, Int32, Int32),
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding,
-    partial: Tensor,
+    originalValue: Tensor,
     seed: Tensor
   ) -> Tensor {
     // TODO: Currently this is not higher order differentiable. Redefine in
@@ -423,7 +427,7 @@ extension Tensor where Scalar : FloatingPoint {
 
 @_inlineable @_versioned
 func _adjointRelu<T : TensorProtocol>(
-  _ x: T, partial: T, seed: T
+  _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
   return T(x > 0) * seed
 }
