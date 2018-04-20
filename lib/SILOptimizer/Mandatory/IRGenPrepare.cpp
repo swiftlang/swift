@@ -72,14 +72,6 @@ class IRGenPrepare : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
 
-    if (F->hasSemanticsAttr(OPTIMIZE_SIL_PRESERVE_EXCLUSIVITY)) {
-      assert(F->getInlineStrategy() == NoInline &&
-             "All OPTIMIZE_SIL_PRESERVE_EXCLUSIVITY functions should have "
-             "no-inline");
-      // We always want to inline these at the llvm level.
-      F->setInlineStrategy(AlwaysInline);
-    }
-
     bool shouldInvalidate = cleanFunction(*F);
 
     if (shouldInvalidate)

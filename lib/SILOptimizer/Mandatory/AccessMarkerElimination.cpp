@@ -19,6 +19,12 @@
 /// test cases through the pipeline and exercising SIL verification before all
 /// passes support access markers.
 ///
+/// This must only run before inlining _semantic calls. If we inline and drop
+/// the @_semantics("optimize.sil.preserve_exclusivity") attribute, the inlined
+/// markers will be eliminated, but the noninlined markers will not. This would
+/// result in inconsistent begin/end_unpaired_access resulting in unpredictable,
+/// potentially catastrophic runtime behavior.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-marker-elim"

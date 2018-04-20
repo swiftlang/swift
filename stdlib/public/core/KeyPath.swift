@@ -625,6 +625,41 @@ internal enum KeyPathComponent: Hashable {
   }
 }
 
+// _semantics("optimize.sil.preserve_exclusivity" forces the compiler to
+// generate access markers regardless of the current build settings. This way,
+// user code that accesses keypaths are properly enforced even if the standard
+// library has exclusivity checking internally disabled. The semantic attribute
+// must be consistently applied to both the begin and end unpaired access
+// markers, otherwise the runtime will fail catastrophically and unpredictably.
+// This relies on Swift module serialization occurring before these _semantic
+// function are inlined, since inlining would unpredictably cause the attribute
+// to be dropped.
+//
+// An exclusivity violation will report the caller's stack frame location.
+// Runtime diagnostics will be improved by inlining this function. However, this
+// cannot be marked @transparent because it can't be inlined prior to
+// serialization.
+@inlinable
+@inline(__always)
+@_semantics("optimize.sil.preserve_exclusivity")
+func beginAccessHelper<T>(_ address: Builtin.RawPointer, _ accessRecordPtr: Builtin.RawPointer, _ type: T.Type) {
+  Builtin.beginUnpairedModifyAccess(address, accessRecordPtr, type)
+}
+
+@inlinable
+@inline(__always)
+@_semantics("optimize.sil.preserve_exclusivity")
+func endAccessHelper(_ accessRecordPtr: Builtin.RawPointer) {
+  Builtin.endUnpairedAccess(accessRecordPtr)
+}
+
+@inlinable
+@inline(__always)
+@_semantics("optimize.sil.preserve_exclusivity")
+func instantaneousAccessHelper<T>(_ address: Builtin.RawPointer, _ type: T.Type) {
+  Builtin.performInstantaneousReadAccess(address, T.self)
+}
+
 // A class that maintains ownership of another object while a mutable projection
 // into it is underway. The lifetime of the instance of this class is also used
 // to begin and end exclusive 'modify' access to the projected address.
@@ -648,7 +683,6 @@ internal final class ClassHolder<ProjectionType> {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal final class func _create(
       previous: AnyObject?,
       instance: AnyObject,
@@ -680,18 +714,17 @@ internal final class ClassHolder<ProjectionType> {
 
     // Begin a 'modify' access to the address. This access is ended in
     // ClassHolder's deinitializer.
-    Builtin.beginUnpairedModifyAccess(address._rawValue, accessRecordPtr, type)
+    beginAccessHelper(address._rawValue, accessRecordPtr, type)
 
     return holder
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {
     let accessRecordPtr = Builtin.projectTailElems(self, AccessRecord.self)
 
     // Ends the access begun in _create().
-    Builtin.endUnpairedAccess(accessRecordPtr)
+    endAccessHelper(accessRecordPtr)
   }
 }
 
@@ -1242,8 +1275,7 @@ internal struct RawKeyPathComponent {
       // Perform an instaneous record access on the address in order to
       // ensure that the read will not conflict with an already in-progress
       // 'modify' access.
-      Builtin.performInstantaneousReadAccess(offsetAddress._rawValue,
-                                             NewValue.self)
+      instantaneousAccessHelper(offsetAddress._rawValue, NewValue.self)
       return .continue(offsetAddress
         .assumingMemoryBound(to: NewValue.self)
         .pointee)

@@ -384,8 +384,9 @@ func beginUnpairedModifyAccess<T1>(address: Builtin.RawPointer, scratch: Builtin
 // CHECK-LABEL: sil hidden @$S8builtins30performInstantaneousReadAccess{{[_0-9a-zA-Z]*}}F
 func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {
   // CHECK: [[P2A_ADDR:%.*]] = pointer_to_address %0
-  // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[P2A_ADDR]] : $*T1
-  // CHECK-NEXT: end_access [[ACCESS]] : $*T1
+  // CHECK: [[SCRATCH:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
+  // CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict] [[P2A_ADDR]] : $*T1, [[SCRATCH]] : $*Builtin.UnsafeValueBuffer
+  // CHECK-NOT: end_{{.*}}access
   // CHECK: [[RESULT:%.*]] = tuple ()
   // CHECK: [[RETURN:%.*]] = tuple ()
   // CHECK: return [[RETURN]] : $()

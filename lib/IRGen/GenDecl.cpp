@@ -2317,7 +2317,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                llvm::Attribute::NoInline);
     break;
   case AlwaysInline:
-    // We do not transfer AlwaysInline since we get weird test failures.
+    // FIXME: We do not currently transfer AlwaysInline since doing so results
+    // in test failures, which must be investigated first.
   case InlineDefault:
     break;
   }
