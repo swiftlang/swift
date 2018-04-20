@@ -291,11 +291,9 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
       self.filter = filter
     }
 
-    // This initializer is a `Differentiable` requirement and will be
-    // compiler synthesized.
     @_inlineable @inline(__always)
-    public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
-      self.filter = Tensor<Scalar>(shape: other.filter.shape, repeating: value)
+    public init(differentiationSeed: Scalar) {
+      self.filter = Tensor<Scalar>(differentiationSeed)
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
@@ -361,7 +359,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
       filter: filter,
       strides: strides,
       padding: padding,
-      partial: primalValues.result,
+      originalValue: primalValues.result,
       seed: adjoint
     )
     return (dInput, Parameters(filter: dFilter))
@@ -435,14 +433,10 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
       self.bias = bias
     }
 
-    // This initializer is a `Differentiable` requirement and will be
-    // compiler synthesized.
     @_inlineable @inline(__always)
-    public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
-      self.weight = Tensor<Scalar>(shape: other.weight.shape,
-                                   repeating: value).toDevice()
-      self.bias = Tensor<Scalar>(shape: other.bias.shape,
-                                 repeating: value).toDevice()
+    public init(differentiationSeed: Scalar) {
+      self.weight = Tensor<Scalar>(differentiationSeed)
+      self.bias = Tensor<Scalar>(differentiationSeed)
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
@@ -508,9 +502,9 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
     let (dDot, dBias) = Tensor._adjointAdd(primalValues.dot, bias,
-                                           partial: primalValues.result,
+                                           originalValue: primalValues.result,
                                            seed: adjoint)
-    let (dInput, dWeight) = input._adjointDot(weight, partial: primalValues.dot,
+    let (dInput, dWeight) = input._adjointDot(weight, originalValue: primalValues.dot,
                                               seed: dDot)
     return (dInput, Parameters(weight: dWeight, bias: dBias))
   }
@@ -600,14 +594,10 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
       self.scale = scale
     }
 
-    // This initializer is a `Differentiable` requirement and will be
-    // compiler synthesized.
     @_inlineable @inline(__always)
-    public init(numericallyBroadcasting value: Scalar, to other: Parameters) {
-      self.offset = Tensor<Scalar>(shape: other.offset.shape,
-                                   repeating: value).toDevice()
-      self.scale = Tensor<Scalar>(shape: other.scale.shape,
-                                  repeating: value).toDevice()
+    public init(differentiationSeed: Scalar) {
+      self.offset = Tensor<Scalar>(differentiationSeed)
+      self.scale = Tensor<Scalar>(differentiationSeed)
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
@@ -675,7 +665,7 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   ) -> (Tensor<Scalar>, Parameters) {
     let (dInput, dOffset, dScale) = input._adjointBatchNormalized(
       alongAxis: axis, offset: offset, scale: scale, epsilon: epsilon,
-      partial: primalValues.result, seed: adjoint
+      originalValue: primalValues.result, seed: adjoint
     )
     return (dInput, Parameters(offset: dOffset, scale: dScale))
   }
