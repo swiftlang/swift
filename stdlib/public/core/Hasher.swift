@@ -247,14 +247,14 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 }
 
 @_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
-public struct _Hasher {
+public struct Hasher {
   internal typealias Core = _BufferingHasher<_SipHash13Core>
 
   internal var _core: Core
 
   @effects(releasenone)
   public init() {
-    self._core = Core(seed: _Hasher._seed)
+    self._core = Core(seed: Hasher._seed)
   }
 
   @usableFromInline
