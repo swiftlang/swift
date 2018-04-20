@@ -574,10 +574,11 @@ static ManagedValue emitBuiltinBeginUnpairedModifyAccess(SILGenFunction &SGF,
   SILType valueBufferTy =
       SGF.getLoweredType(SGF.getASTContext().TheUnsafeValueBufferType);
 
-  SILValue buffer = SGF.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
-                                                 valueBufferTy.getAddressType(),
-                                                 /*strict*/ true,
-                                                 /*invariant*/ false);
+  SILValue buffer =
+    SGF.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
+                                 valueBufferTy.getAddressType(),
+                                 /*strict*/ true,
+                                 /*invariant*/ false);
   SGF.B.createBeginUnpairedAccess(loc, addr, buffer, SILAccessKind::Modify,
                                   SILAccessEnforcement::Dynamic,
                                   /*noNestedConflict*/ false);
@@ -586,11 +587,10 @@ static ManagedValue emitBuiltinBeginUnpairedModifyAccess(SILGenFunction &SGF,
 }
 
 /// Specialized emitter for Builtin.performInstantaneousReadAccess
-static ManagedValue emitBuiltinPerformInstantaneousReadAccess(SILGenFunction &SGF,
-                                                       SILLocation loc,
-                                                       SubstitutionList substitutions,
-                                                       ArrayRef<ManagedValue> args,
-                                                       SGFContext C) {
+static ManagedValue emitBuiltinPerformInstantaneousReadAccess(
+  SILGenFunction &SGF, SILLocation loc, SubstitutionList substitutions,
+  ArrayRef<ManagedValue> args, SGFContext C) {
+
   assert(substitutions.size() == 1 &&
          "Builtin.performInstantaneousReadAccess should have one substitution");
   assert(args.size() == 2 &&
@@ -603,13 +603,21 @@ static ManagedValue emitBuiltinPerformInstantaneousReadAccess(SILGenFunction &SG
                                                /*strict*/ true,
                                                /*invariant*/ false);
 
-  // Begin and then immediately end a read access. No nested conflict is
-  // possible because there are no instructions between the begin and the
-  // end of the access.
-  SILValue access = SGF.B.createBeginAccess(loc, addr, SILAccessKind::Read,
-                                            SILAccessEnforcement::Dynamic,
-                                            /*noNestedConflict*/ true);
-  SGF.B.createEndAccess(loc, access, /*aborted*/ false);
+  SILType valueBufferTy =
+    SGF.getLoweredType(SGF.getASTContext().TheUnsafeValueBufferType);
+  SILValue unusedBuffer = SGF.emitTemporaryAllocation(loc, valueBufferTy);
+
+  // Begin an "unscoped" read access. No nested conflict is possible because
+  // the compiler should generate the actual read for the KeyPath expression
+  // immediately after the call to this builtin, which forms the address of
+  // that real access. When noNestedConflict=true, no EndUnpairedAccess should
+  // be emitted.
+  //
+  // Unpaired access is necessary because a BeginAccess/EndAccess pair with no
+  // use will be trivially optimized away.
+  SGF.B.createBeginUnpairedAccess(loc, addr, unusedBuffer, SILAccessKind::Read,
+                                  SILAccessEnforcement::Dynamic,
+                                  /*noNestedConflict*/ true);
 
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }

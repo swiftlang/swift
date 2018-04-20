@@ -20,12 +20,14 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/PassManager/Passes.h"
+#define DEBUG_TYPE "sil-cleanup"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -68,10 +70,12 @@ namespace {
 
 class IRGenPrepare : public SILFunctionTransform {
   void run() override {
-    bool shouldInvalidate = cleanFunction(*getFunction());
-    if (!shouldInvalidate)
-      return;
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    SILFunction *F = getFunction();
+
+    bool shouldInvalidate = cleanFunction(*F);
+
+    if (shouldInvalidate)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
