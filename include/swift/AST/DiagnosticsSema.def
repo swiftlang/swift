@@ -585,6 +585,9 @@ ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
       "missing required modules: %0", (StringRef))
+ERROR(serialization_circular_dependency,Fatal,
+      "circular dependency between modules '%0' and %1",
+      (StringRef, Identifier))
 ERROR(serialization_missing_shadowed_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
 ERROR(serialization_name_mismatch,Fatal,

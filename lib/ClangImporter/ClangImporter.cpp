@@ -1083,6 +1083,7 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
+  importedHeaderModule->setHasResolvedImports();
 
   importer->Impl.IsReadingBridgingPCH = false;
 
@@ -1588,6 +1589,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     result = ModuleDecl::create(name, SwiftContext);
     // Silence error messages about testably importing a Clang module.
     result->setTestingEnabled();
+    result->setHasResolvedImports();
 
     wrapperUnit =
       new (SwiftContext) ClangModuleUnit(*result, *this, clangModule);
@@ -1732,6 +1734,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   auto wrapper = ModuleDecl::create(name, SwiftContext);
   // Silence error messages about testably importing a Clang module.
   wrapper->setTestingEnabled();
+  wrapper->setHasResolvedImports();
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
                                                  underlying);
