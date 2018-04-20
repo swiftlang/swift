@@ -61,6 +61,15 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SR-106][]
+
+  The behavior of `.description` and `.debugDescription` for floating-point
+  numbers has been changed. Previously these unconditionally printed a fixed
+  number of decimal digits (e.g. 15 and 17 for Double, respectively). They now
+  print exactly as many digits as are needed for the resulting string to
+  convert back to the original source value, and no more. For more details,
+  see the original bug report and the linked pull request.
+
 * [SE-0193][]
 
   Various function-like declarations can now be marked as `@inlinable`,
@@ -6981,6 +6990,7 @@ Swift 1.0
 [SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
 [SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
 
+[SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
 [SR-1009]: <https://bugs.swift.org/browse/SR-1009>
 [SR-1446]: <https://bugs.swift.org/browse/SR-1446>
