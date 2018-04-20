@@ -7,7 +7,7 @@
 // specifics, so we can keep it simple and just test CPU.
 
 import TensorFlow
-import TestUtils
+import TensorFlowUnittest
 import StdlibUnittest
 
 var TopLevelTests = TestSuite("TopLevel")
