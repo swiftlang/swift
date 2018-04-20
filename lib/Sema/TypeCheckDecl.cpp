@@ -7991,9 +7991,6 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   assert(!nominal->hasClangNode());
   assert(isa<SourceFile>(nominal->getModuleScopeContext()));
 
-  if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-    TC.requestSuperclassLayout(classDecl);
-
   for (auto *D : nominal->getMembers()) {
     auto VD = dyn_cast<ValueDecl>(D);
     if (!VD)
@@ -8016,12 +8013,33 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     }
   }
 
-  // FIXME: We need to add implicit initializers and dtors when a decl is
-  // touched, because it affects vtable layout.  If you're not defining the
-  // class, you shouldn't have to know what the vtable layout is.
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    // We need to add implicit initializers and dtors because it
+    // affects vtable layout.
     TC.addImplicitConstructors(CD);
     CD->addImplicitDestructor();
+
+    // We need the superclass vtable layout as well.
+    TC.requestSuperclassLayout(CD);
+
+    auto useConformance = [&](ProtocolDecl *protocol) {
+      if (auto ref = TC.conformsToProtocol(
+            CD->getDeclaredInterfaceType(), protocol, CD,
+            ConformanceCheckFlags::SkipConditionalRequirements,
+            SourceLoc())) {
+        if (ref->getConcrete()->getDeclContext() == CD)
+          TC.markConformanceUsed(*ref, CD);
+      }
+    };
+
+    // If the class is Encodable or Decodable, force those
+    // conformances to ensure that the init(from:) and
+    // encode(to:) members appear in the vtable.
+    //
+    // FIXME: Generalize this to other protocols for which
+    // we can derive conformances.
+    useConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
+    useConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
   }
 
   // validateDeclForNameLookup will not trigger an immediate full
