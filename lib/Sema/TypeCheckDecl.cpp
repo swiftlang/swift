@@ -8990,14 +8990,9 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
   auto baseName = member.getBaseName();
 
   // Checks whether the target conforms to the given protocol. If the
-  // conformance is incomplete, check the conformance to force synthesis, if
-  // possible.
+  // conformance is incomplete, force the conformance.
   //
-  // Swallows diagnostics if conformance checking is already in progress (so we
-  // don't display diagnostics twice).
-  //
-  // Returns whether the target conforms to the protocol and the conformance is
-  // complete.
+  // Returns whether the target conforms to the protocol.
   auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
     auto targetType = target->getDeclaredInterfaceType();
     if (auto ref = conformsToProtocol(
@@ -9006,26 +9001,12 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
                          ConformanceCheckFlags::SkipConditionalRequirements),
                          SourceLoc())) {
       if (auto *conformance = ref->getConcrete()->getRootNormalConformance()) {
-        if (conformance->isIncomplete()) {
-          // Check conformance, forcing synthesis.
-          //
-          // If synthesizing conformance fails, this will produce diagnostics.
-          // If conformance checking was already in progress elsewhere, though,
-          // this could produce diagnostics twice.
-          //
-          // To prevent this duplication, we swallow the diagnostics if the
-          // state of the conformance is not Incomplete.
-          DiagnosticTransaction transaction(Context.Diags);
-          auto shouldSwallowDiagnostics =
-            conformance->getState() != ProtocolConformanceState::Incomplete;
-
+        if (conformance->getState() == ProtocolConformanceState::Incomplete) {
           checkConformance(conformance);
-          if (shouldSwallowDiagnostics)
-            transaction.abort();
-
-          return conformance->isComplete();
         }
       }
+
+      return true;
     }
 
     return false;
