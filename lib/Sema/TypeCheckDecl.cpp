@@ -5331,6 +5331,7 @@ public:
         // Check whether the types are identical.
         auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
             parentDecl, decl, parentDecl->getInterfaceType());
+        if (parentDeclTy->hasError()) continue;
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           // For methods, strip off the 'Self' type.
