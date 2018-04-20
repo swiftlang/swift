@@ -96,8 +96,10 @@ DECL_NODES = [
                    is_optional=True),
              Child('Elements', kind='Syntax',
                    node_choices=[
-                      Child('Statements', kind='CodeBlockItemList'),
-                      Child('SwitchCases', kind='SwitchCaseList')]),
+                       Child('Statements', kind='CodeBlockItemList'),
+                       Child('SwitchCases', kind='SwitchCaseList'),
+                       Child('Decls', kind='DeclList'),
+                   ]),
          ]),
 
     Node('IfConfigClauseList', kind='SyntaxCollection',
