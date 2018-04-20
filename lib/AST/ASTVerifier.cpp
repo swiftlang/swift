@@ -2115,11 +2115,17 @@ public:
 
     void verifyChecked(ValueDecl *VD) {
       if (VD->hasAccess()) {
-        if (VD->getFormalAccess() == AccessLevel::Open &&
-            !isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
-          Out << "decl cannot be 'open'\n";
-          VD->dump(Out);
-          abort();
+        if (VD->getFormalAccess() == AccessLevel::Open) {
+          if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+            Out << "decl cannot be 'open'\n";
+            VD->dump(Out);
+            abort();
+          }
+          if (VD->isFinal()) {
+            Out << "decl cannot be both 'open' and 'final'\n";
+            VD->dump(Out);
+            abort();
+          }
         }
       } else {
         if (!VD->getDeclContext()->isLocalContext() &&
