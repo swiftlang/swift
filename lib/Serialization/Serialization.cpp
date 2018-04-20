@@ -1573,9 +1573,7 @@ void Serializer::writeNormalConformance(
    // Write the witness substitutions.
    writeSubstitutions(witness.getSubstitutions(),
                       DeclTypeAbbrCodes,
-                      witness.requiresSubstitution()
-                        ? witness.getSyntheticEnvironment()
-                        : nullptr);
+                      witness.getSyntheticEnvironment());
   });
 }
 
