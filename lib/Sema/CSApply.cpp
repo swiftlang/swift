@@ -2804,6 +2804,13 @@ namespace {
       if (!selected.choice.getBaseType()) {
         // This is one of the "outer alternatives", meaning the innermost
         // methods didn't work out.
+        //
+        // The only way to get here is via an UnresolvedDotExpr with outer
+        // alternatives.
+        auto UDE = cast<UnresolvedDotExpr>(expr);
+        cs.diagnoseDeprecatedConditionalConformanceOuterAccess(
+            UDE, selected.choice.getDecl());
+
         return buildDeclRef(selected.choice, nameLoc, selected.openedFullType,
                             memberLocator, implicit,
                             selected.choice.getFunctionRefKind(),
