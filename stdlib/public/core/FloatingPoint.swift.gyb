@@ -1835,7 +1835,7 @@ extension FloatingPoint {
   /// The adjoint of `squareRoot`. Returns the gradient of `squareRoot` with
   /// respect to `self`.
   @_versioned @_inlineable // FIXME(sil-serialize-all)
-  func _adjointSquareRoot(partial: Self, adjoint: Self) -> Self {
+  func _adjointSquareRoot(originalValue: Self, adjoint: Self) -> Self {
     return 2 * self * adjoint
   }
 
@@ -1870,7 +1870,7 @@ extension FloatingPoint {
   @_versioned @_inlineable
   func _adjointAddingProduct(
     _ lhs: Self, _ rhs: Self,
-    partial: Self, adjoint: Self
+    originalValue: Self, adjoint: Self
   ) -> (Self, Self, Self) {
     return (1, rhs, lhs)
   }

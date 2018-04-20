@@ -25,15 +25,6 @@
 /// Types that conform to the `Differentiable` protocol can be differentiated
 /// with-respect-to in `#gradient` and `#valueAndGradient` expressions.
 ///
-/// You can rely on automatic synthesis of the `Differentiable` protocol's
-/// requirements for a custom type when you declare `Differentiable` conformance
-/// in the type's original declaration and your type meets these criteria:
-///
-/// - For a `struct`, all its stored properties must conform to
-///   `Differentiable`. The `DifferentiationCurrency` associated type for the
-///   `struct` is synthesized to be the currency type of the stored properties
-///   with least precision.
-///
 /// Example:
 ///
 ///     struct Vector<Scalar> {
@@ -46,9 +37,8 @@
 ///     extension Vector: Differentiable where Scalar: FloatingPoint {
 ///         associatedtype DifferentiationCurrency = Scalar
 ///
-///         init(numericallyBroadcasting value: DifferentiationCurrency,
-///              to other: Self) {
-///             self.init(Array(repeating: value, count: elements.count))
+///         init(differentiationSeed: Scalar) {
+///           self.init(differentiationSeed)
 ///         }
 ///
 ///         func combiningAsAdjoint(with newAdjoint: Self) -> Self {
@@ -64,15 +54,10 @@ public protocol Differentiable {
   /// the initial adjoint/tangent and the seed.
   associatedtype DifferentiationCurrency : FloatingPoint
 
-  /// Creates an instance by numerically broadcasting the specified currency
-  /// value to be structurally isomorphic to another instance.
+  /// Creates a differentiation seed from a value of the currency type.
   ///
-  /// - Parameters:
-  ///   - value: The differentiation currency value for initializing the
-  ///     instance.
-  ///   - other: The other structurally isomorphic instance.
-  ///
-  init(numericallyBroadcasting value: DifferentiationCurrency, to other: Self)
+  /// - Parameter differentiationSeed: The seed.
+  init(differentiationSeed: DifferentiationCurrency)
 
   /// Combining self with the given value as differentiated adjoint, producing
   /// a new adjoint.
@@ -85,8 +70,8 @@ public protocol Differentiable {
 public extension FloatingPoint {
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
-  init(numericallyBroadcasting value: Self, to other: Self) {
-    self = value
+  init(differentiationSeed: Self) {
+    self = differentiationSeed
   }
 
   @_inlineable // FIXME(sil-serialize-all)
@@ -218,6 +203,7 @@ class _ADTape<Element> {
 }
 
 extension _ADTape {
+  @_versioned
   var count: Int {
     @inline(never)
     @_semantics("autodiff.tape_element_count")
@@ -227,14 +213,14 @@ extension _ADTape {
     }
   }
 
-  @inline(never)
+  @_versioned @inline(never)
   @_semantics("autodiff.push_to_tape")
   @_silgen_name("_swift_autodiff_PushToTape")
   func push(_ value: Element) {
     elements.append(value)
   }
 
-  @inline(never)
+  @_versioned @inline(never)
   @_semantics("autodiff.pop_from_tape")
   @_silgen_name("_swift_autodiff_PopFromTape")
   func pop() -> Element {
