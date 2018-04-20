@@ -64,3 +64,7 @@
 // INVALID_ARG_CLANG-NEXT:     key.severity: source.diagnostic.severity.warning,
 // INVALID_ARG_CLANG-NEXT:     key.offset: 0
 // INVALID_ARG_CLANG-NEXT:     key.description: "argument unused
+
+// Ignore the spurious -wmo + -enable-batch-mode warning.
+// RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -enable-batch-mode | %FileCheck %s -check-prefix=NODIAGS
+// RUN: %sourcekitd-test -req=track-compiles == -req=complete -offset=0 %s -- %s -enable-batch-mode | %FileCheck %s -check-prefix=NODIAGS
