@@ -399,11 +399,32 @@ private:
   // TODO: split these next three into a contained class, for handling events?
   FdStatus tryReadFromFd(struct pollfd &fd);
   FdStatus handleFdEvent(struct pollfd &fd);
-  FdStatus waitForTaskThenCleanUp(Task &T, struct pollfd &fd);
+};
 
-  // TODO: split up these next two into a contained class, for cleaning up?
-  bool cleanupExitedTask(int Status, const Task &T) const;
-  bool cleanupSignalledTask(int Status, const Task &T) const;
+class TaskCompleter {
+  Task &T; // CONST? UNIQ?
+  const struct pollfd &fd;
+  const TaskQueue::TaskFinishedCallback FinishedCallBack;
+  const TaskQueue::TaskSignalledCallback SignalledCallBack;
+
+public:
+  TaskCompleter(Task &T, struct pollfd &fd,
+                const TaskQueue::TaskFinishedCallback FinishedCallBack,
+                const TaskQueue::TaskSignalledCallback SignalledCallBack)
+      : T(T), fd(fd), FinishedCallBack(FinishedCallBack),
+        SignalledCallBack(SignalledCallBack) {}
+
+  /// \return true if had error
+  bool waitForExitThenCleanUp() const;
+
+private:
+  /// \return true if had error
+  bool cleanupExitedTask(int Status) const;
+  /// \return true if had error
+  bool cleanupSignalledTask(int Status) const;
+
+  /// Block until process \p pid exits then return the exit status.
+  static Optional<int> waitForPid(pid_t pid);
 };
 
 bool TaskExecutor::executeTasks() {
@@ -446,7 +467,8 @@ TaskExecutor::PollResult TaskExecutor::tryPollingFds() {
                                                  : PollResult::hardError;
 }
 
-Optional<std::vector<std::unique_ptr<Task>>> TaskExecutor::startExecutingTasks() {
+Optional<std::vector<std::unique_ptr<Task>>>
+TaskExecutor::startExecutingTasks() {
   std::vector<std::unique_ptr<Task>> startedTasks;
   while (!TasksToExecute.empty() &&
          ExecutingTasks.size() < MaxNumberOfParallelTasks) {
@@ -537,14 +559,29 @@ TaskExecutor::FdStatus TaskExecutor::handleFdEvent(struct pollfd &fd) {
   if (fd.revents & POLLHUP || fd.revents & POLLERR) {
     // This fd was "hung up" or had an error, so we need to wait for the
     // Task and then clean up.
-    return waitForTaskThenCleanUp(T, fd);
+    const bool hadError =
+        TaskCompleter(T, fd, FinishedCallBack, SignalledCallBack)
+            .waitForExitThenCleanUp();
+    ExecutingTasks.erase(T.getPid());
+    return hadError ? FdStatus::hadError : FdStatus::finished;
   }
   return FdStatus::alive;
 }
 
-/// Block until process \p pidToWaitFor exits the return the exit status.
+bool TaskCompleter::waitForExitThenCleanUp() const {
+  const Optional<int> StatusIfOK = waitForPid(T.getPid());
+  if (!StatusIfOK)
+    return true;
 
-static Optional<const int> waitForPid(const pid_t pidToWaitFor) {
+  T.finishExecution();
+  int Status = *StatusIfOK;
+  return WIFEXITED(Status)
+             ? cleanupExitedTask(Status)
+             : WIFSIGNALED(Status) ? cleanupSignalledTask(Status)
+                                   : false /* Can this case ever happen? */;
+}
+
+Optional<int> TaskCompleter::waitForPid(const pid_t pidToWaitFor) {
   for (;;) {
     int Status = 0;
     const pid_t pidFromWait = waitpid(pidToWaitFor, &Status, 0);
@@ -560,26 +597,7 @@ static Optional<const int> waitForPid(const pid_t pidToWaitFor) {
   }
 }
 
-TaskExecutor::FdStatus TaskExecutor::waitForTaskThenCleanUp(Task &T,
-                                                            struct pollfd &fd) {
-  const Optional<const int> StatusIfOK = waitForPid(T.getPid());
-  if (!StatusIfOK)
-    return FdStatus::hadError;
-
-  T.finishExecution();
-  int Status = *StatusIfOK;
-  const bool hadError = WIFEXITED(Status)
-                            ? cleanupExitedTask(Status, T)
-                            : WIFSIGNALED(Status)
-                                  ? cleanupSignalledTask(Status, T)
-                                  : false /* Can this case ever happen? */;
-
-  ExecutingTasks.erase(T.getPid());
-
-  return hadError ? FdStatus::hadError : FdStatus::finished;
-}
-
-bool TaskExecutor::cleanupExitedTask(int Status, const Task &T) const {
+bool TaskCompleter::cleanupExitedTask(int Status) const {
   const int Result = WEXITSTATUS(Status);
   if (!FinishedCallBack) {
     // Since we don't have a TaskFinishedCallback, treat a subtask
@@ -593,7 +611,7 @@ bool TaskExecutor::cleanupExitedTask(int Status, const Task &T) const {
                           T.getContext());
 }
 
-bool TaskExecutor::cleanupSignalledTask(int Status, const Task &T) const {
+bool TaskCompleter::cleanupSignalledTask(int Status) const {
   // The process exited due to a signal.
   const int Signal = WTERMSIG(Status);
   StringRef ErrorMsg = strsignal(Signal);
