@@ -152,6 +152,9 @@ class Remangler {
   // nested generics. This factory owns them.
   NodeFactory Factory;
 
+  // A callback for resolving symbolic references.
+  SymbolicResolver Resolver;
+
   StringRef getBufferStr() const { return Buffer.getStringRef(); }
 
   void resetBuffer(size_t toPos) { Buffer.resetSize(toPos); }
@@ -284,7 +287,8 @@ class Remangler {
 #include "swift/Demangling/DemangleNodes.def"
 
 public:
-  Remangler(DemanglerPrinter &Buffer) : Buffer(Buffer) {}
+  Remangler(DemanglerPrinter &Buffer,
+            SymbolicResolver Resolver) : Buffer(Buffer), Resolver(Resolver) {}
 
   void mangle(Node *node) {
     switch (node->getKind()) {
@@ -1988,18 +1992,25 @@ void Remangler::mangleUnresolvedSymbolicReference(Node *node) {
 }
 
 void Remangler::mangleSymbolicReference(Node *node) {
-  unreachable("should not try to mangle a symbolic reference; "
-              "resolve it to a non-symbolic demangling tree instead");
+  return mangle(Resolver((const void *)node->getIndex()));
 }
 
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNode(const NodePointer &node) {
+  return mangleNode(node, [](const void *) -> NodePointer {
+    unreachable("should not try to mangle a symbolic reference; "
+                "resolve it to a non-symbolic demangling tree instead");
+  });
+}
+
+std::string
+Demangle::mangleNode(const NodePointer &node, SymbolicResolver resolver) {
   if (!node) return "";
 
   DemanglerPrinter printer;
-  Remangler(printer).mangle(node);
+  Remangler(printer, resolver).mangle(node);
 
   return std::move(printer).str();
 }

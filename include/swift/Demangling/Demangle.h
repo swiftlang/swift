@@ -466,6 +466,14 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
+using SymbolicResolver = llvm::function_ref<Demangle::NodePointer (const void *)>;
+
+/// \brief Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
+///
+/// This should always round-trip perfectly with demangleSymbolAsNode.
+std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
+
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names and should be removed as soon as
