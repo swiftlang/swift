@@ -261,6 +261,8 @@ PASS(StripDebugInfo, "strip-debug-info",
 PASS(SwiftArrayOpts, "array-specialize",
      "Loop Specialization for Array Properties")
 // SWIFT_ENABLE_TENSORFLOW
+PASS(Differentiation, "differentiation",
+     "Automatic Differentiation")
 PASS(TFDeabstraction, "tf-deabstraction",
      "Deabstract tensor operations")
 PASS(TFPartition, "tf-partition-impl",
