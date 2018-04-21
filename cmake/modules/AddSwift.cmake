@@ -2071,15 +2071,21 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
 
+  # SWIFT_ENABLE_TENSORFLOW
+  set(swift_relative_library_path "../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
   is_darwin_based_sdk("${SWIFTEXE_SINGLE_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
-        "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+        "-Xlinker" "@executable_path/${swift_relative_library_path}")
+  # NOTE: Adding "${SWIFTLIB_DIR}/linux" to the rpath is a hack solely for
+  # working around tests like Driver/linker.swift which copy/hard link Swift
+  # executables to different directories without also copying the "libs"
+  # directory. A more robust solution should be found.
   elseif("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX" AND NOT "${SWIFTEXE_SINGLE_SDK}" STREQUAL "ANDROID")
-    set(local_rpath "$ORIGIN:/usr/lib/swift/linux")
+    set(local_rpath "$ORIGIN:$ORIGIN/${swift_relative_library_path}:${SWIFTLIB_DIR}/linux:/usr/lib/swift/linux")
   elseif("${SWIFTEXE_SINGLE_SDK}" STREQUAL "CYGWIN")
-    set(local_rpath "$ORIGIN:/usr/lib/swift/cygwin")
+    set(local_rpath "$ORIGIN:$ORIGIN/${swift_relative_library_path}:${SWIFTLIB_DIR}/cygwin:/usr/lib/swift/cygwin")
   endif()
 
   # Find the names of dependency library targets.
