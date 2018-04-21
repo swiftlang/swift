@@ -827,7 +827,7 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          ATTRS(NoUnwind))
 
 // MetadataResponse swift_checkMetadataState(MetadataRequest request,
-//                                           cosnt Metadata *type);
+//                                           const Metadata *type);
 FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, TypeMetadataPtrTy),
