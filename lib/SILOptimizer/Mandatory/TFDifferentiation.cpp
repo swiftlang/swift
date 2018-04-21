@@ -183,18 +183,6 @@ private:
   /// Flag indicating whether an error occurred.
   bool errorOccurred = false;
 
-  /// AD runtime declarations.
-  /// struct _ADTape
-  NominalTypeDecl *tapeDecl = nullptr;
-  /// sil @_swift_autodiff_CreateTape
-  SILFunction *createTapeFn = nullptr;
-  /// sil @_swift_autodiff_PushToTape
-  SILFunction *pushToTapeFn = nullptr;
-  /// sil @_swift_autodiff_PopFromTape
-  SILFunction *popFromTapeFn = nullptr;
-  /// sil @_swift_autodiff_TapeElementCount
-  SILFunction *tapeElementCountFn = nullptr;
-
   /// `Differentiable.combiningAsAdjoint(with:)` declaration.
   FuncDecl *combiningAsAdjoingFn = nullptr;
 
@@ -328,22 +316,6 @@ ADContext::ADContext(SILModule &module, SILPassManager &passManager)
     ctx.getProtocol(KnownProtocolKind::Differentiable);
   floatingPointProtocol =
     cast<ProtocolDecl>(getStdlibTypeDecl("FloatingPoint", ctx));
-
-  // Load tape runtime functions.
-  tapeDecl = getStdlibTypeDecl("_ADTape", ctx);
-  createTapeFn = module.findFunction("_swift_autodiff_CreateTape",
-                                     SILLinkage::PublicExternal);
-  assert(createTapeFn && "_swift_autodiff_CreateTape doesn't exist?");
-  pushToTapeFn = module.findFunction("_swift_autodiff_PushToTape",
-                                     SILLinkage::PublicExternal);
-  assert(pushToTapeFn && "_swift_autodiff_PushToTape doesn't exist?");
-  popFromTapeFn = module.findFunction("_swift_autodiff_PopFromTape",
-                                      SILLinkage::PublicExternal);
-  assert(popFromTapeFn && "_swift_autodiff_PopFromTape doesn't exist?");
-  tapeElementCountFn = module.findFunction("_swift_autodiff_TapeElementCount",
-                                           SILLinkage::PublicExternal);
-  assert(tapeElementCountFn &&
-         "_swift_autodiff_TapeElementCount doesn't exist?");
 
   DeclName combineAsAdjointFnName(ctx, ctx.getIdentifier("combiningAsAdjoint"),
                                   { ctx.Id_with });
