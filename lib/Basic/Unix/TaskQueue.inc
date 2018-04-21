@@ -408,12 +408,12 @@ private:
 
 bool TaskExecutor::executeTasks() {
   while (!isFinishedExecutingTasks()) {
-    Optional<std::vector<std::uniq_ptr<Task>>> startedTasks =
+    Optional<std::vector<std::unique_ptr<Task>>> startedTasks =
         startExecutingTasks();
     if (!startedTasks)
       return true;
 
-    for (std::uniq_ptr<Task> &T : *startedTasks)
+    for (std::unique_ptr<Task> &T : *startedTasks)
       recordTasksFdsForPolling(std::move(T));
 
     switch (tryPollingFds()) {
@@ -446,8 +446,8 @@ TaskExecutor::PollResult TaskExecutor::tryPollingFds() {
                                                  : PollResult::hardError;
 }
 
-Optional<std::vector<std::uniq_ptr<Task>>> TaskExecutor::startExecutingTasks() {
-  std::vector<std::uniq_ptr<Task>> startedTasks;
+Optional<std::vector<std::unique_ptr<Task>>> TaskExecutor::startExecutingTasks() {
+  std::vector<std::unique_ptr<Task>> startedTasks;
   while (!TasksToExecute.empty() &&
          ExecutingTasks.size() < MaxNumberOfParallelTasks) {
     std::unique_ptr<Task> T = startNextTask();
