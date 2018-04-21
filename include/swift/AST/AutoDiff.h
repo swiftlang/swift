@@ -77,6 +77,23 @@ struct SILReverseAutoDiffConfiguration {
   ArrayRef<unsigned> parameterIndices;
   bool seedable;
   bool preservingResult;
+
+  /// Returns the "master" configuration, which all variants with the same
+  /// parameter indices can derive from.
+  static
+  SILReverseAutoDiffConfiguration getMaster(ArrayRef<unsigned> paramIndices) {
+    return { paramIndices, /*seedable*/ true, /*preservingResult*/ true };
+  }
+
+  bool isEqual(const SILReverseAutoDiffConfiguration &other) const {
+    return parameterIndices.equals(other.parameterIndices) &&
+           seedable == other.seedable &&
+           preservingResult == other.preservingResult;
+  }
+
+  bool isMaster() const {
+    return seedable && preservingResult;
+  }
 };
 
 } // end namespace swift
@@ -96,7 +113,7 @@ template<> struct DenseMapInfo<SILReverseAutoDiffConfiguration> {
     return { {}, true, true };
   }
 
-  static unsigned getHashValue(SILReverseAutoDiffConfiguration Val) {
+  static unsigned getHashValue(const SILReverseAutoDiffConfiguration &Val) {
     unsigned paramHash = ~1U;
     for (auto i : Val.parameterIndices)
       paramHash = hash_combine(paramHash,
@@ -108,8 +125,8 @@ template<> struct DenseMapInfo<SILReverseAutoDiffConfiguration> {
     );
   }
 
-  static bool isEqual(SILReverseAutoDiffConfiguration LHS,
-                      SILReverseAutoDiffConfiguration RHS) {
+  static bool isEqual(const SILReverseAutoDiffConfiguration &LHS,
+                      const SILReverseAutoDiffConfiguration &RHS) {
     auto numParams = LHS.parameterIndices.size();
     if (numParams != RHS.parameterIndices.size())
       return false;

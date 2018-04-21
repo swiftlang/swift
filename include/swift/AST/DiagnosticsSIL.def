@@ -338,6 +338,18 @@ ERROR(shifting_all_significant_bits,none,
 ERROR(static_report_error, none,
       "static report error", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+// Automatic differentiation diagnostics
+
+ERROR(autodiff_opaque_function_unsupported,none,
+      "differentiating an opaque function is not supported yet", ())
+
+// AD-related "unsupported" errors
+ERROR(autodiff_cannot_synthesize_primal_yet,none,
+      "automatic differentiation cannot synthesize primal yet; define the primal function using a '@differentiable' attribute", ())
+ERROR(autodiff_unsupported_type,none,
+      "differentiating '%0' is not supported yet", (Type))
+
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
       "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
