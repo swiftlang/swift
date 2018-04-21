@@ -72,6 +72,16 @@ swift_install_in_component(stdlib
   DIRECTORY "${output_dir}/"
   DESTINATION "lib/swift/CTensorFlow")
 
+# Install TensorFlow libraries in each SDK subdirectory.
+foreach(sdk ${SWIFT_SDKS})
+  if(NOT "${sdk}" STREQUAL "OSX" AND NOT "${sdk}" STREQUAL "LINUX")
+    continue()
+  endif()
+  swift_install_in_component(stdlib
+    FILES "${TF_LIBRARIES}"
+    DESTINATION "lib/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+endforeach()
+
 add_swift_library(swiftCTensorFlow OBJECT_LIBRARY TARGET_LIBRARY
   ctensorflow_init.cpp
   DEPENDS ctensorflow_modulemap
