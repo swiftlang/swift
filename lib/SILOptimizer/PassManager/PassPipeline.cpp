@@ -106,6 +106,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addSplitNonCondBrCriticalEdges();
 
   // SWIFT_ENABLE_TENSORFLOW
+  P.addDifferentiation();
   P.addTFDeabstraction();
 }
 
