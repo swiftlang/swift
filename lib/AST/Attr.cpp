@@ -509,7 +509,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     Printer.printAttrName("@differentiable");
+    Printer << '(';
     auto *attr = cast<DifferentiableAttr>(this);
+    switch (attr->getMode()) {
+    case AutoDiffMode::Forward:
+      Printer << "forward";
+    case AutoDiffMode::Reverse:
+      Printer << "reverse";
+    }
+    Printer << ", ";
     auto params = attr->getParameters();
     // Print differentiation parameters, if any.
     if (!params.empty()) {
