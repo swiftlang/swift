@@ -196,7 +196,7 @@ public func valueAndGradient<T, U, V, W, Result>(
 class _ADTape<Element> {
   @_versioned var elements: [Element] = []
 
-  @_versioned @inline(never)
+  @_versioned @inline(never) @_inlineable
   @_semantics("autodiff.create_tape")
   @_silgen_name("_swift_autodiff_CreateTape")
   init() {}
@@ -204,7 +204,7 @@ class _ADTape<Element> {
 
 extension _ADTape {
   var count: Int {
-    @_versioned @inline(never)
+    @_versioned @inline(never) @_inlineable
     @_semantics("autodiff.tape_element_count")
     @_silgen_name("_swift_autodiff_TapeElementCount")
     get {
@@ -212,14 +212,14 @@ extension _ADTape {
     }
   }
 
-  @_versioned @inline(never)
+  @_versioned @inline(never) @_inlineable
   @_semantics("autodiff.push_to_tape")
   @_silgen_name("_swift_autodiff_PushToTape")
   func push(_ value: Element) {
     elements.append(value)
   }
 
-  @_versioned @inline(never)
+  @_versioned @inline(never) @_inlineable
   @_semantics("autodiff.pop_from_tape")
   @_silgen_name("_swift_autodiff_PopFromTape")
   func pop() -> Element {
