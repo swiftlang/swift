@@ -275,20 +275,18 @@ public struct Hasher {
   /// This is not recommended for production use, but it is useful in certain
   /// test environments where randomization may lead to unwanted nondeterminism
   /// of test results.
-  public // SPI
-  static var _isDeterministic: Bool {
-    @inlinable
+  @inlinable
+  internal static var _isDeterministic: Bool {
     @inline(__always)
     get {
-      return _swift_stdlib_Hashing_parameters.deterministic;
+      return _swift_stdlib_Hashing_parameters.deterministic
     }
   }
 
   /// The 128-bit hash seed used to initialize the hasher state. Initialized
   /// once during process startup.
-  public // SPI
-  static var _seed: (UInt64, UInt64) {
-    @inlinable
+  @inlinable
+  internal static var _seed: (UInt64, UInt64) {
     @inline(__always)
     get {
       // The seed itself is defined in C++ code so that it is initialized during
@@ -309,39 +307,39 @@ public struct Hasher {
     value._hash(into: &self)
   }
 
-  //FIXME: Convert to @usableFromInline internal once integers hash correctly.
   @effects(releasenone)
-  public mutating func _combine(_ value: UInt) {
+  @usableFromInline
+  internal mutating func _combine(_ value: UInt) {
     _core.combine(value)
   }
 
-  //FIXME: Convert to @usableFromInline internal once integers hash correctly.
   @effects(releasenone)
-  public mutating func _combine(_ value: UInt64) {
+  @usableFromInline
+  internal mutating func _combine(_ value: UInt64) {
     _core.combine(value)
   }
 
-  //FIXME: Convert to @usableFromInline internal once integers hash correctly.
   @effects(releasenone)
-  public mutating func _combine(_ value: UInt32) {
+  @usableFromInline
+  internal mutating func _combine(_ value: UInt32) {
     _core.combine(value)
   }
 
-  //FIXME: Convert to @usableFromInline internal once integers hash correctly.
   @effects(releasenone)
-  public mutating func _combine(_ value: UInt16) {
+  @usableFromInline
+  internal mutating func _combine(_ value: UInt16) {
     _core.combine(value)
   }
 
-  //FIXME: Convert to @usableFromInline internal once integers hash correctly.
   @effects(releasenone)
-  public mutating func _combine(_ value: UInt8) {
+  @usableFromInline
+  internal mutating func _combine(_ value: UInt8) {
     _core.combine(value)
   }
 
-  //FIXME: Convert to @usableFromInline internal once integers hash correctly.
   @effects(releasenone)
-  public mutating func _combine(bytes value: UInt64, count: Int) {
+  @usableFromInline
+  internal mutating func _combine(bytes value: UInt64, count: Int) {
     _core.combine(bytes: value, count: count)
   }
 
