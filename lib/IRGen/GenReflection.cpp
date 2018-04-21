@@ -203,7 +203,7 @@ protected:
 
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
-  void addTypeRef(ModuleDecl *ModuleContext, CanType type) {
+  void addTypeRef(CanType type) {
     assert(type);
 
     // Generic parameters should be written in terms of interface types
@@ -211,8 +211,7 @@ protected:
     assert(!type->hasArchetype() && "Forgot to map typeref out of context");
 
     IRGenMangler mangler;
-    auto MangledStr = mangler.mangleTypeForReflection(IGM, type,
-                                                      ModuleContext);
+    auto MangledStr = mangler.mangleTypeForReflection(IGM, type);
     auto mangledName = IGM.getAddrOfStringForTypeRef(MangledStr);
     B.addRelativeAddress(mangledName);
   }
@@ -227,7 +226,7 @@ protected:
     } else {
       CanType type = nominal->getDeclaredType()->getCanonicalType();
       mangledStr =
-        mangler.mangleTypeForReflection(IGM, type, nominal->getModuleContext());
+        mangler.mangleTypeForReflection(IGM, type);
     }
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangledStr);
     B.addRelativeAddress(mangledName);
@@ -284,9 +283,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",
                                     Nominal);
 
-    auto *M = IGM.getSILModule().getSwiftModule();
-
-    addTypeRef(M, Nominal->getDeclaredType()->getCanonicalType());
+    addTypeRef(Nominal->getDeclaredType()->getCanonicalType());
     addNominalRef(Conformance->getProtocol());
 
     B.addInt32(AssociatedTypes.size());
@@ -296,7 +293,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
       addBuiltinTypeRefs(AssocTy.second);
-      addTypeRef(M, AssocTy.second);
+      addTypeRef(AssocTy.second);
     }
   }
 
@@ -330,7 +327,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     if (!type) {
       B.addInt32(0);
     } else {
-      addTypeRef(value->getModuleContext(), type);
+      addTypeRef(type);
       addBuiltinTypeRefs(type);
     }
 
@@ -436,8 +433,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     auto *CD = dyn_cast<ClassDecl>(NTD);
     if (CD && CD->getSuperclass()) {
-      addTypeRef(NTD->getModuleContext(),
-                 CD->getSuperclass()->getCanonicalType());
+      addTypeRef(CD->getSuperclass()->getCanonicalType());
     } else {
       B.addInt32(0);
     }
@@ -499,7 +495,7 @@ public:
   }
   
   void layout() override {
-    addTypeRef(module, type);
+    addTypeRef(type);
 
     B.addInt32(ti->getFixedSize().getValue());
     B.addInt32(ti->getFixedAlignment().getValue());
@@ -549,7 +545,7 @@ public:
     B.addInt32(0); // Number of sources
     B.addInt32(0); // Number of generic bindings
 
-    addTypeRef(IGM.getSILModule().getSwiftModule(), BoxedType);
+    addTypeRef(BoxedType);
     addBuiltinTypeRefs(BoxedType);
   }
 
@@ -742,7 +738,7 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType);
+      addTypeRef(CaptureType);
       addBuiltinTypeRefs(CaptureType);
     }
 
@@ -752,7 +748,7 @@ public:
       auto GenericParam = GenericAndSource.first->getCanonicalType();
       auto Source = GenericAndSource.second;
 
-      addTypeRef(nullptr, GenericParam);
+      addTypeRef(GenericParam);
       addMetadataSource(Source);
     }
   }

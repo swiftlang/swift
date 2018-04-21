@@ -354,8 +354,7 @@ public:
   }
 
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
-                                           Type Ty,
-                                           ModuleDecl *Module);
+                                           Type Ty);
 
   std::string mangleTypeForLLVMTypeName(CanType Ty);
 

@@ -81,9 +81,8 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
 
 SymbolicMangling
 IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
-                                      Type Ty,
-                                      ModuleDecl *Module) {
-  Mod = Module;
+                                      Type Ty) {
+  Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
 
   llvm::SaveAndRestore<std::function<bool (const DeclContext *)>>
