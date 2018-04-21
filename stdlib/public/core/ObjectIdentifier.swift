@@ -21,8 +21,8 @@ public struct ObjectIdentifier {
 
   /// Creates an instance that uniquely identifies the given class instance.
   ///
-  /// The following example creates an example class `A` and compares instances
-  /// of the class using their object identifiers and the identical-to
+  /// The following example creates an example class `IntegerRef` and compares
+  /// instances of the class using their object identifiers and the identical-to
   /// operator (`===`):
   ///
   ///     class IntegerRef {
