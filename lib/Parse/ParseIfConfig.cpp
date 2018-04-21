@@ -282,10 +282,10 @@ public:
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
       llvm::Optional<StringRef> PrefixName = PUE ?
         getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
-      if (!PrefixName || *PrefixName != ">=") {
+      if (!PrefixName || (*PrefixName != ">=" && *PrefixName != "<")) {
         D.diagnose(Arg->getLoc(),
                    diag::unsupported_platform_condition_argument,
-                   "a unary comparison, such as '>=2.2'");
+                   "a unary comparison, such as '>=2.2' or '<4.1'");
         return nullptr;
       }
       auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getArg());
@@ -447,11 +447,16 @@ public:
       return thisVersion >= Val;
     } else if (KindName == "swift") {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
+      auto PrefixName = getDeclRefStr(PUE->getFn());
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
       auto Val = version::Version::parseVersionString(
           Str, SourceLoc(), nullptr).getValue();
       auto thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-      return thisVersion >= Val;
+      if (PrefixName == ">=") {
+        return thisVersion >= Val;
+      } else if (PrefixName == "<") {
+        return thisVersion < Val;
+      }
     } else if (KindName == "canImport") {
       auto Str = extractExprSource(Ctx.SourceMgr, Arg);
       return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc()  });
