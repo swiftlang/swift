@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because moving Swift executables without the TensorFlow libraries causes dynamic linking to fail.
+// UNSUPPORTED: tensorflow
+
 // RUN: not %swift -repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
 // RUN: not %swift_driver -sdk "" -repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s
 // RUN: not %swift_driver -sdk "" -lldb-repl %s 2>&1 | %FileCheck -check-prefix=REPL_NO_FILES %s

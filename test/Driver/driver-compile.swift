@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because moving Swift executables without the TensorFlow libraries causes dynamic linking to fail.
+// UNSUPPORTED: tensorflow
+
 // RUN: %empty-directory(%t)
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt

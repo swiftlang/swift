@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because moving Swift executables without the TensorFlow libraries causes dynamic linking to fail.
+// UNSUPPORTED: tensorflow
+
 // REQUIRES: OS=macosx
 
 // Test LLDB detection, first in a clean environment, then in one that looks
