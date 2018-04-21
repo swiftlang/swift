@@ -312,7 +312,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableNonFrozenEnumExhaustivityDiagnostics =
     Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
                  OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                 Opts.EnableNonFrozenEnumExhaustivityDiagnostics);
+                 Opts.isSwiftVersionAtLeast(5));
 
   if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
     Opts.OptimizationRemarkPassedPattern =

@@ -1997,8 +1997,12 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    requireSameType(caseTy, UI->getType(),
-            "InitEnumDataAddrInst result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      requireSameType(
+          caseTy, UI->getType(),
+          "InitEnumDataAddrInst result does not match type of enum case");
+    }
   }
 
   void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
@@ -2016,8 +2020,11 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    require(caseTy == UI->getType(),
-            "UncheckedEnumData result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      require(caseTy == UI->getType(),
+              "UncheckedEnumData result does not match type of enum case");
+    }
   }
 
   void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
@@ -2035,8 +2042,11 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    require(caseTy == UI->getType(),
-            "UncheckedTakeEnumDataAddrInst result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      require(caseTy == UI->getType(), "UncheckedTakeEnumDataAddrInst result "
+                                       "does not match type of enum case");
+    }
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
