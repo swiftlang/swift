@@ -127,7 +127,7 @@ extension Hashable {
 public func _hashValue<H: Hashable>(for value: H) -> Int {
   var hasher = Hasher()
   hasher.combine(value)
-  return hasher.finalize()
+  return hasher._finalize()
 }
 
 // Called by the SwiftValue implementation.

@@ -1461,7 +1461,7 @@ extension Dictionary: Hashable where Value: Hashable {
       var elementHasher = Hasher()
       elementHasher.combine(k)
       elementHasher.combine(v)
-      commutativeHash ^= elementHasher.finalize()
+      commutativeHash ^= elementHasher._finalize()
     }
     hasher.combine(commutativeHash)
   }

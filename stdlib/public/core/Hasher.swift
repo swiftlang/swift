@@ -93,17 +93,6 @@ internal struct _HasherTailBuffer {
     get { return value &>> 56 }
   }
 
-  internal var isFinalized: Bool {
-    @inline(__always)
-    get { return value == 1 }
-  }
-
-  @inline(__always)
-  internal mutating func finalize() {
-    // A byteCount of 0 with a nonzero tail never occurs during normal use.
-    value = 1
-  }
-
   @inline(__always)
   internal mutating func append(_ bytes: UInt64) -> UInt64 {
     let c = byteCount & 7
@@ -158,13 +147,11 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func combine(_ value: UInt64) {
-    precondition(!_buffer.isFinalized)
     _core.compress(_buffer.append(value))
   }
 
   @inline(__always)
   internal mutating func combine(_ value: UInt32) {
-    precondition(!_buffer.isFinalized)
     let value = UInt64(truncatingIfNeeded: value)
     if let chunk = _buffer.append(value, count: 4) {
       _core.compress(chunk)
@@ -173,7 +160,6 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func combine(_ value: UInt16) {
-    precondition(!_buffer.isFinalized)
     let value = UInt64(truncatingIfNeeded: value)
     if let chunk = _buffer.append(value, count: 2) {
       _core.compress(chunk)
@@ -182,7 +168,6 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func combine(_ value: UInt8) {
-    precondition(!_buffer.isFinalized)
     let value = UInt64(truncatingIfNeeded: value)
     if let chunk = _buffer.append(value, count: 1) {
       _core.compress(chunk)
@@ -191,7 +176,6 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func combine(bytes: UInt64, count: Int) {
-    precondition(!_buffer.isFinalized)
     _sanityCheck(count <= 8)
     let count = UInt64(truncatingIfNeeded: count)
     if let chunk = _buffer.append(bytes, count: count) {
@@ -201,7 +185,6 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func combine(bytes: UnsafeRawBufferPointer) {
-    precondition(!_buffer.isFinalized)
     var remaining = bytes.count
     guard remaining > 0 else { return }
     var data = bytes.baseAddress!
@@ -239,10 +222,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func finalize() -> UInt64 {
-    precondition(!_buffer.isFinalized)
-    let hash = _core.finalize(tailAndByteCount: _buffer.value)
-    _buffer.finalize()
-    return hash
+    return _core.finalize(tailAndByteCount: _buffer.value)
   }
 }
 
@@ -258,12 +238,11 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 ///     hasher.combine("Hello")
 ///     let hashValue = hasher.finalize()
 ///
-/// Within the execution of a Swift program, `Hasher` guarantees that
-/// `finalize()` will always return the same value as long as it is fed the
-/// exact same sequence of bytes. However, the underlying hash algorithm is
-/// designed to exhibit avalanche effects: slight changes to the seed or the
-/// input byte sequence will typically produce drastic changes in the generated
-/// hash value.
+/// Within the execution of a Swift program, `Hasher` guarantees that finalizing
+/// it will always produce the same hash value as long as it is fed the exact
+/// same sequence of bytes. However, the underlying hash algorithm is designed
+/// to exhibit avalanche effects: slight changes to the seed or the input byte
+/// sequence will typically produce drastic changes in the generated hash value.
 ///
 /// - Note: Do not save or otherwise reuse hash values across executions of your
 ///   program. `Hasher` is usually randomly seeded, which means it will return
@@ -377,7 +356,16 @@ public struct Hasher {
   /// Finalizing invalidates the hasher; additional bits cannot be combined
   /// into it, and it cannot be finalized again.
   @effects(releasenone)
-  public mutating func finalize() -> Int {
+  @usableFromInline
+  internal mutating func _finalize() -> Int {
     return Int(truncatingIfNeeded: _core.finalize())
+  }
+
+  /// Finalize the hasher state and return the hash value. Finalizing consumes
+  /// the hasher, forbidding further operations.
+  @effects(releasenone)
+  public __consuming func finalize() -> Int {
+    var core = _core
+    return Int(truncatingIfNeeded: core.finalize())
   }
 }

@@ -2051,7 +2051,7 @@ extension _NativeSetBuffer where Element: Hashable
   internal func _bucket(_ k: Key) -> Int {
     var hasher = Hasher(_seed: _storage.seed)
     hasher.combine(k)
-    return hasher.finalize() & _bucketMask
+    return hasher._finalize() & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
