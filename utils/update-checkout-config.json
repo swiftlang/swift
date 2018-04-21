@@ -202,8 +202,8 @@
                 "swift-corelibs-xctest": "swift-4.2-branch",
                 "swift-corelibs-foundation": "swift-4.2-branch",
                 "swift-corelibs-libdispatch": "swift-4.2-branch",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
+                "swift-integration-tests": "swift-4.2-branch",
+                "swift-xcode-playground-support": "swift-4.2-branch",
                 "ninja": "release"
             }
         },
