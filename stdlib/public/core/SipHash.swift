@@ -118,46 +118,72 @@ internal struct _SipHash24Core: _HasherCore {
   }
 }
 
-// FIXME: This type only exists to facilitate testing.
-public // @testable
-struct _SipHash13 {
+// FIXME: This type only exists to facilitate testing, and should not exist in
+// production builds.
+@usableFromInline // @testable
+internal struct _SipHash13 {
   internal typealias Core = _BufferingHasher<_SipHash13Core>
 
   internal var _core: Core
 
-  public init(seed: (UInt64, UInt64)) { _core = Core(seed: seed) }
-  public mutating func _combine(_ v: UInt) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt64) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt32) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt16) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt8) { _core.combine(v) }
-  public mutating func combine(bytes v: UInt64, count: Int) {
+  @usableFromInline // @testable
+  internal init(_seed: (UInt64, UInt64)) { _core = Core(seed: _seed) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt64) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt32) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt16) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt8) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(bytes v: UInt64, count: Int) {
     _core.combine(bytes: v, count: count)
   }
-  public mutating func combine(bytes: UnsafeRawBufferPointer) {
+  @usableFromInline // @testable
+  internal mutating func combine(bytes: UnsafeRawBufferPointer) {
     _core.combine(bytes: bytes)
   }
-  public mutating func finalize() -> UInt64 { return _core.finalize() }
+  @usableFromInline // @testable
+  internal __consuming func finalize() -> UInt64 {
+    var core = _core
+    return core.finalize()
+  }
 }
 
-// FIXME: This type only exists to facilitate testing.
-public // @testable
-struct _SipHash24 {
+// FIXME: This type only exists to facilitate testing, and should not exist in
+// production builds.
+@usableFromInline // @testable
+internal struct _SipHash24 {
   internal typealias Core = _BufferingHasher<_SipHash24Core>
 
   internal var _core: Core
 
-  public init(seed: (UInt64, UInt64)) { _core = Core(seed: seed) }
-  public mutating func _combine(_ v: UInt) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt64) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt32) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt16) { _core.combine(v) }
-  public mutating func _combine(_ v: UInt8) { _core.combine(v) }
-  public mutating func combine(bytes v: UInt64, count: Int) {
+  @usableFromInline // @testable
+  internal init(_seed: (UInt64, UInt64)) { _core = Core(seed: _seed) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt64) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt32) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt16) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(_ v: UInt8) { _core.combine(v) }
+  @usableFromInline // @testable
+  internal mutating func _combine(bytes v: UInt64, count: Int) {
     _core.combine(bytes: v, count: count)
   }
-  public mutating func combine(bytes: UnsafeRawBufferPointer) {
+  @usableFromInline // @testable
+  internal mutating func combine(bytes: UnsafeRawBufferPointer) {
     _core.combine(bytes: bytes)
   }
-  public mutating func finalize() -> UInt64 { return _core.finalize() }
+  @usableFromInline // @testable
+  internal __consuming func finalize() -> UInt64 {
+    var core = _core
+    return core.finalize()
+  }
 }
