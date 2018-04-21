@@ -2362,6 +2362,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 lldb_build_dir=$(build_directory ${host} lldb)
                 swift_build_dir=$(build_directory ${host} swift)
 
+                # SWIFT_ENABLE_TENSORFLOW
+                # Add host variant information.
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    -DHOST_VARIANT:STRING="${SWIFT_HOST_VARIANT}"
+                    -DHOST_VARIANT_ARCH:STRING="${SWIFT_HOST_VARIANT_ARCH}")
+
                 # Add any lldb extra cmake arguments here.
 
                 cmake_options=(
