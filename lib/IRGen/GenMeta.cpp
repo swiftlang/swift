@@ -365,8 +365,8 @@ namespace {
     }
     
     void addExtendedContext() {
-      auto string = getTypeRef(IGM,
-                               E->getSelfInterfaceType()->getCanonicalType());
+      auto string = IGM.getTypeRef(
+          E->getSelfInterfaceType()->getCanonicalType());
       B.addRelativeAddress(string);
     }
     
@@ -3841,7 +3841,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        getTypeRef(IGM, requirement.getSecondType()->getCanonicalType());
+        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType());
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

@@ -503,8 +503,6 @@ emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
 llvm::Value *uniqueForeignTypeMetadataRef(IRGenFunction &IGF,
                                           llvm::Value *candidate);
 
-llvm::Constant *getTypeRef(IRGenModule &IGM, CanType type);
-
 using LazyCacheEmitter =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;
 
