@@ -10,13 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
+// RUN: cp %s %t/main.swift
 //
 // RUN: if [ %target-runtime == "objc" ]; \
 // RUN: then \
 // RUN:   %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && \
-// RUN:   %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
+// RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
 // RUN: else \
-// RUN:   %target-build-swift %s -o %t/Mirror; \
+// RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror; \
 // RUN: fi
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
@@ -791,11 +792,34 @@ struct e<f> {
     var constraints: [Int: a<f>.c] = [:]
 }
 
-mirrors.test("field with generic nested type") {
+mirrors.test("GenericNestedTypeField") {
   let x = e<d>()
   
   expectTrue(type(of: Mirror(reflecting: x).children.first!.value)
               == [Int: a<d>.c].self)
+}
+
+extension OtherOuter {
+  struct Inner {}
+}
+
+extension OtherOuterGeneric {
+  struct Inner<U> {}
+}
+
+mirrors.test("SymbolicReferenceInsideType") {
+  let s = OtherStruct(a: OtherOuter.Inner(),
+                      b: OtherOuterGeneric<Int>.Inner<String>())
+
+  var output = ""
+  dump(s, to: &output)
+
+  let expected =
+    "▿ Mirror.OtherStruct\n" +
+    "  - a: Mirror.OtherOuter.Inner\n" +
+    "  - b: Mirror.OtherOuterGeneric<Swift.Int>.Inner<Swift.String>\n"
+
+  expectEqual(expected, output)
 }
 
 runAllTests()
