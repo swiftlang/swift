@@ -203,27 +203,16 @@ protected:
 
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
-  void addTypeRef(ModuleDecl *ModuleContext, CanType type,
-                  CanGenericSignature Context = {}) {
+  void addTypeRef(ModuleDecl *ModuleContext, CanType type) {
     assert(type);
 
     // Generic parameters should be written in terms of interface types
     // for the purposes of reflection metadata
     assert(!type->hasArchetype() && "Forgot to map typeref out of context");
 
-    // TODO: As a compatibility hack, mangle single-field boxes with the legacy
-    // mangling in reflection metadata.
-    bool isSingleFieldOfBox = false;
-    auto boxTy = dyn_cast<SILBoxType>(type);
-    if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
-      GenericContextScope scope(IGM, Context);
-      type = boxTy->getFieldLoweredType(IGM.getSILModule(), 0);
-      isSingleFieldOfBox = true;
-    }
     IRGenMangler mangler;
     auto MangledStr = mangler.mangleTypeForReflection(IGM, type,
-                                                      ModuleContext,
-                                                      isSingleFieldOfBox);
+                                                      ModuleContext);
     auto mangledName = IGM.getAddrOfStringForTypeRef(MangledStr);
     B.addRelativeAddress(mangledName);
   }
@@ -238,8 +227,7 @@ protected:
     } else {
       CanType type = nominal->getDeclaredType()->getCanonicalType();
       mangledStr =
-        mangler.mangleTypeForReflection(IGM, type, nominal->getModuleContext(),
-                                        /*isSingleFieldOfBox=*/false);
+        mangler.mangleTypeForReflection(IGM, type, nominal->getModuleContext());
     }
     auto mangledName = IGM.getAddrOfStringForTypeRef(mangledStr);
     B.addRelativeAddress(mangledName);
@@ -754,8 +742,7 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType,
-                 OrigCalleeType->getGenericSignature());
+      addTypeRef(IGM.getSILModule().getSwiftModule(), CaptureType);
       addBuiltinTypeRefs(CaptureType);
     }
 

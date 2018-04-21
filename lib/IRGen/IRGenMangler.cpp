@@ -82,8 +82,7 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
 SymbolicMangling
 IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
                                       Type Ty,
-                                      ModuleDecl *Module,
-                                      bool isSingleFieldOfBox) {
+                                      ModuleDecl *Module) {
   Mod = Module;
   OptimizeProtocolNames = false;
 
@@ -109,8 +108,6 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   SymbolicReferences.clear();
   
   appendType(Ty);
-  if (isSingleFieldOfBox)
-    appendOperator("Xb");
   
   return {finalize(), std::move(SymbolicReferences)};
 }

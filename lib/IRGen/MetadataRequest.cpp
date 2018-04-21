@@ -303,8 +303,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
 llvm::Constant *irgen::getTypeRef(IRGenModule &IGM, CanType type) {
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(IGM, type,
-                                                    IGM.getSwiftModule(),
-                                                    /*single-field box*/ false);
+                                                    IGM.getSwiftModule());
   
   return IGM.getAddrOfStringForTypeRef(SymbolicName);
 }
