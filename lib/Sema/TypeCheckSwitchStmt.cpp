@@ -1381,10 +1381,8 @@ namespace {
           // playgrounds.
           return;
         }
-        if (!TC.Context.isSwiftVersionAtLeast(5)) {
-          // Downgrade missing '@unknown' to a warning in Swift 4 and below.
-          mainDiagType = diag::non_exhaustive_switch_warn;
-        }
+        // Missing '@unknown' is just a warning.
+        mainDiagType = diag::non_exhaustive_switch_warn;
         break;
       }
 
