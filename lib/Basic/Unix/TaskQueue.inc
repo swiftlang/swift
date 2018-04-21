@@ -321,9 +321,38 @@ void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
   QueuedTasks.push(std::move(T));
 }
 
+// Owns Tasks, handles correspondence with FDs and pids.
+// FIXME: only handles stdout fds.
+class TaskMap {
+  using PidToTaskMap = llvm::DenseMap<pid_t, std::unique_ptr<Task>>;
+  PidToTaskMap TasksByPid;
+
+public:
+  TaskMap() = default;
+
+  bool empty() const { return TasksByPid.empty(); }
+  unsigned size() const { return TasksByPid.size(); }
+
+  void add(std::unique_ptr<Task> T) { TasksByPid[T->getPid()] = std::move(T); }
+
+  Task &findTaskForFd(const int fd) {
+    auto predicate = [&fd](PidToTaskMap::value_type &value) -> bool {
+      return value.second->getPipe() == fd;
+    };
+    auto iter = std::find_if(TasksByPid.begin(), TasksByPid.end(), predicate);
+    assert(iter != TasksByPid.end() &&
+           "All outstanding fds must be associated with a  Task");
+    return *iter->second;
+  }
+
+  void eraseTask(Task &T) { TasksByPid.erase(T.getPid()); }
+};
+
 /// Concurrently execute the tasks in the TaskQueue, collecting the outputs from
 /// each task. The typical task is a Swift frontend job.
-class TaskExecutor {
+/// Maintain invarients connecting tasks to execute, tasks currently executing,
+/// and fds being polled. Handle output from and death of tasks.
+class TaskShepherd {
 
   /// The set of tasks needed to be executed.
   std::queue<std::unique_ptr<Task>> &TasksToExecute;
@@ -334,11 +363,10 @@ public:
   using PidToTaskMap = llvm::DenseMap<pid_t, std::unique_ptr<Task>>;
 
 private:
-  // Stores the current executing Tasks, organized by pid.
-  PidToTaskMap ExecutingTasks;
+  TaskMap ExecutingTasks;
 
   // Maintains the current fds we're checking with poll.
-  std::vector<struct pollfd> PollFds;
+  std::vector<struct pollfd> FdsToPoll;
 
   /// Limits the number of tasks to run in parallel
   const unsigned MaxNumberOfParallelTasks;
@@ -352,7 +380,7 @@ private:
   UnifiedStatsReporter *Stats;
 
 public:
-  TaskExecutor(std::queue<std::unique_ptr<Task>> &TasksToExecute,
+  TaskShepherd(std::queue<std::unique_ptr<Task>> &TasksToExecute,
                const unsigned NumberOfParallelTasks,
                const TaskQueue::TaskBeganCallback BeganCallBack,
                const TaskQueue::TaskFinishedCallback FinishedCallBack,
@@ -374,8 +402,8 @@ private:
 
   /// Start up tasks if we aren't
   /// already at the parallel limit, and no earlier subtasks have failed.
-  /// \return the started tasks, or None for error.
-  Optional<std::vector<std::unique_ptr<Task>>> startExecutingTasks();
+  /// \return true for error;
+  bool startUpSomeTasks();
 
   /// Take ownership of the next task to start. Start it, and \return a
   /// unique pointer if no error.
@@ -383,14 +411,14 @@ private:
 
   // TODO: factor the polling routines and data structures into a separate class
 
-  /// Enter the task and its outputs in this TaskExecutor's data structures so
+  /// Enter the task and its outputs in this TaskShepherd's data structures so
   /// it can be polled.
-  void recordTasksFdsForPolling(std::unique_ptr<Task> T);
+  void startPollingFdsOfTask(const Task *T);
 
   void stopPolling(std::vector<int>);
 
   enum class PollResult { hardError, softError, noError };
-  PollResult tryPollingFds();
+  PollResult pollTheFds();
 
   /// \return None on error
   Optional<std::vector<int>> readFromReadyFdsReturningFinishedOnes();
@@ -399,6 +427,7 @@ private:
   bool reactToFdEvents(short events, int fd, Task &T);
 };
 
+/// Do everything required to handle a task when its output has hung up.
 class TaskCompleter {
   Task &T; // CONST? UNIQ?
   const TaskQueue::TaskFinishedCallback FinishedCallBack;
@@ -423,17 +452,12 @@ private:
   static Optional<int> waitForPid(pid_t pid);
 };
 
-bool TaskExecutor::executeTasks() {
+bool TaskShepherd::executeTasks() {
   while (!isFinishedExecutingTasks()) {
-    Optional<std::vector<std::unique_ptr<Task>>> startedTasks =
-        startExecutingTasks();
-    if (!startedTasks)
+    if (startUpSomeTasks())
       return true;
 
-    for (std::unique_ptr<Task> &T : *startedTasks)
-      recordTasksFdsForPolling(std::move(T));
-
-    switch (tryPollingFds()) {
+    switch (pollTheFds()) {
     case PollResult::hardError:
       return true;
     case PollResult::softError:
@@ -451,10 +475,30 @@ bool TaskExecutor::executeTasks() {
   return false;
 }
 
-TaskExecutor::PollResult TaskExecutor::tryPollingFds() {
-  assert(!PollFds.empty() &&
+bool TaskShepherd::startUpSomeTasks() {
+  while (!TasksToExecute.empty() &&
+         ExecutingTasks.size() < MaxNumberOfParallelTasks) {
+    std::unique_ptr<Task> T = startNextTask();
+    if (!T)
+      return true;
+    if (BeganCallBack)
+      BeganCallBack(T->getPid(), T->getContext());
+    startPollingFdsOfTask(T.get());
+    ExecutingTasks.add(std::move(T));
+  }
+  return false;
+}
+
+void TaskShepherd::startPollingFdsOfTask(const Task *T) {
+  FdsToPoll.push_back({T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0});
+  // We should also poll T->getErrorPipe(), but this introduces timing
+  // issues with shutting down the task after reading getPipe().
+}
+
+TaskShepherd::PollResult TaskShepherd::pollTheFds() {
+  assert(!FdsToPoll.empty() &&
          "We should only call poll() if we have fds to watch!");
-  int ReadyFdCount = poll(PollFds.data(), PollFds.size(), -1);
+  int ReadyFdCount = poll(FdsToPoll.data(), FdsToPoll.size(), -1);
   if (Stats)
     Stats->getDriverCounters().NumDriverPipePolls++;
   return ReadyFdCount != -1
@@ -463,70 +507,34 @@ TaskExecutor::PollResult TaskExecutor::tryPollingFds() {
                                                  : PollResult::hardError;
 }
 
-Optional<std::vector<std::unique_ptr<Task>>>
-TaskExecutor::startExecutingTasks() {
-  std::vector<std::unique_ptr<Task>> startedTasks;
-  while (!TasksToExecute.empty() &&
-         ExecutingTasks.size() < MaxNumberOfParallelTasks) {
-    std::unique_ptr<Task> T = startNextTask();
-    if (!T)
-      return None;
-    if (BeganCallBack)
-      BeganCallBack(T->getPid(), T->getContext());
-    startedTasks.push_back(std::move(T));
-  }
-  return startedTasks;
-}
-
-std::unique_ptr<Task> TaskExecutor::startNextTask() {
+std::unique_ptr<Task> TaskShepherd::startNextTask() {
   std::unique_ptr<Task> T(TasksToExecute.front().release());
   TasksToExecute.pop();
   return T->execute() ? nullptr : std::move(T);
 }
 
-void TaskExecutor::recordTasksFdsForPolling(std::unique_ptr<Task> T) {
-  PollFds.push_back({T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0});
-  const int Pid = T->getPid();
-  ExecutingTasks[Pid] = std::move(T);
-  // We should also poll T->getErrorPipe(), but this introduces timing
-  // issues with shutting down the task after reading getPipe().
-}
-
-static Task &findTask(TaskExecutor::PidToTaskMap &ExecutingTasks,
-                      const int fd) {
-  auto predicate =
-      [&fd](TaskExecutor::PidToTaskMap::value_type &value) -> bool {
-    return value.second->getPipe() == fd;
-  };
-  auto iter =
-      std::find_if(ExecutingTasks.begin(), ExecutingTasks.end(), predicate);
-  assert(iter != ExecutingTasks.end() &&
-         "All outstanding fds must be associated with an executing Task");
-  return *iter->second;
-}
-
 Optional<std::vector<int>>
-TaskExecutor::readFromReadyFdsReturningFinishedOnes() {
+TaskShepherd::readFromReadyFdsReturningFinishedOnes() {
   std::vector<int> finishedFds;
-  for (struct pollfd &fd : PollFds) {
+  for (struct pollfd &fd : FdsToPoll) {
     const int fileDes = fd.fd;
     const short receivedEvents = fd.revents;
     fd.revents = 0;
-    Task &T = findTask(ExecutingTasks, fileDes);
+    Task &T = ExecutingTasks.findTaskForFd(fileDes);
     const bool fdHungUp = reactToFdEvents(receivedEvents, fileDes, T);
     if (!fdHungUp)
       continue;
     finishedFds.push_back(fileDes);
     const bool hadError = TaskCompleter(T, FinishedCallBack, SignalledCallBack)
                               .waitForExitThenCleanUp();
-    ExecutingTasks.erase(T.getPid());
+    ExecutingTasks.eraseTask(T);
     if (hadError)
       return None;
   }
   return finishedFds;
 }
 
-bool TaskExecutor::reactToFdEvents(const short events, const int fd, Task &T) {
+bool TaskShepherd::reactToFdEvents(const short events, const int fd, Task &T) {
   if (events & POLLNVAL) {
     // We passed an invalid fd; this should never happen,
     // since we always mark fds as finished after calling
@@ -612,13 +620,13 @@ bool TaskCompleter::cleanupSignalledTask(int Status) const {
                            T.getContext(), Signal);
 }
 
-void TaskExecutor::stopPolling(std::vector<int> FinishedFds) {
-  // Remove any fds which we've closed from PollFds.
+void TaskShepherd::stopPolling(std::vector<int> FinishedFds) {
+  // Remove any fds which we've closed from FdsToPoll.
   for (int fd : FinishedFds) {
     auto predicate = [&fd](struct pollfd &i) { return i.fd == fd; };
-    auto iter = std::find_if(PollFds.begin(), PollFds.end(), predicate);
-    assert(iter != PollFds.end() && "The finished fd must be in PollFds!");
-    PollFds.erase(iter);
+    auto iter = std::find_if(FdsToPoll.begin(), FdsToPoll.end(), predicate);
+    assert(iter != FdsToPoll.end() && "The finished fd must be in FdsToPoll!");
+    FdsToPoll.erase(iter);
   }
 }
 
@@ -626,7 +634,7 @@ bool TaskQueue::execute(TaskBeganCallback BeganCallBack,
                         TaskFinishedCallback FinishedCallBack,
                         TaskSignalledCallback SignalledCallBack) {
 
-  TaskExecutor TE(QueuedTasks, getNumberOfParallelTasks(), BeganCallBack,
+  TaskShepherd TE(QueuedTasks, getNumberOfParallelTasks(), BeganCallBack,
                   FinishedCallBack, SignalledCallBack, Stats);
   return TE.executeTasks();
 }
