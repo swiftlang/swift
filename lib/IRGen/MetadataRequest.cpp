@@ -297,18 +297,6 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
   return addr;
 }
 
-// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
-// resolving relative references to coalesceable symbols.
-// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *irgen::getTypeRef(IRGenModule &IGM, CanType type) {
-  IRGenMangler Mangler;
-  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, type,
-                                                    IGM.getSwiftModule(),
-                                                    /*single-field box*/ false);
-  
-  return IGM.getAddrOfStringForTypeRef(SymbolicName);
-}
-
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
                                                    llvm::Value *classPtr) {
   assert(IGF.IGM.Context.LangOpts.EnableObjCInterop);
