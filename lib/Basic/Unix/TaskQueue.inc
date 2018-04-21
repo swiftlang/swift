@@ -395,23 +395,19 @@ private:
   /// \return None on error
   Optional<std::vector<int>> readFromReadyFdsReturningFinishedOnes();
 
-  enum class FdStatus { hadError, finished, alive };
-  // TODO: split these next three into a contained class, for handling events?
-  FdStatus tryReadFromFd(struct pollfd &fd);
-  FdStatus handleFdEvent(struct pollfd &fd);
+  /// \return true if fd "hung up"
+  bool reactToFdEvents(short events, int fd, Task &T);
 };
 
 class TaskCompleter {
   Task &T; // CONST? UNIQ?
-  const struct pollfd &fd;
   const TaskQueue::TaskFinishedCallback FinishedCallBack;
   const TaskQueue::TaskSignalledCallback SignalledCallBack;
 
 public:
-  TaskCompleter(Task &T, struct pollfd &fd,
-                const TaskQueue::TaskFinishedCallback FinishedCallBack,
+  TaskCompleter(Task &T, const TaskQueue::TaskFinishedCallback FinishedCallBack,
                 const TaskQueue::TaskSignalledCallback SignalledCallBack)
-      : T(T), fd(fd), FinishedCallBack(FinishedCallBack),
+      : T(T), FinishedCallBack(FinishedCallBack),
         SignalledCallBack(SignalledCallBack) {}
 
   /// \return true if had error
@@ -496,45 +492,11 @@ void TaskExecutor::recordTasksFdsForPolling(std::unique_ptr<Task> T) {
   // issues with shutting down the task after reading getPipe().
 }
 
-Optional<std::vector<int>>
-TaskExecutor::readFromReadyFdsReturningFinishedOnes() {
-  std::vector<int> finishedFds;
-  for (struct pollfd &fd : PollFds) {
-    switch (tryReadFromFd(fd)) {
-    case FdStatus::hadError:
-      return None;
-    case FdStatus::finished:
-      finishedFds.push_back(fd.fd);
-      break;
-    case FdStatus::alive:
-      break;
-    }
-  }
-  return finishedFds;
-}
-
-TaskExecutor::FdStatus TaskExecutor::tryReadFromFd(struct pollfd &fd) {
-  if (fd.revents & POLLIN || fd.revents & POLLPRI || fd.revents & POLLHUP ||
-      fd.revents & POLLERR) {
-    FdStatus status = handleFdEvent(fd);
-    fd.revents = 0;
-    return status;
-  }
-  if (fd.revents & POLLNVAL) {
-    // We passed an invalid fd; this should never happen,
-    // since we always mark fds as finished after calling
-    // Task::finishExecution() (which closes the Task's fd).
-    llvm_unreachable("Asked poll() to watch a closed fd");
-  }
-  fd.revents = 0;
-  return FdStatus::alive;
-}
-
 static Task &findTask(TaskExecutor::PidToTaskMap &ExecutingTasks,
-                      struct pollfd &fd) {
+                      const int fd) {
   auto predicate =
       [&fd](TaskExecutor::PidToTaskMap::value_type &value) -> bool {
-    return value.second->getPipe() == fd.fd;
+    return value.second->getPipe() == fd;
   };
   auto iter =
       std::find_if(ExecutingTasks.begin(), ExecutingTasks.end(), predicate);
@@ -543,9 +505,40 @@ static Task &findTask(TaskExecutor::PidToTaskMap &ExecutingTasks,
   return *iter->second;
 }
 
-TaskExecutor::FdStatus TaskExecutor::handleFdEvent(struct pollfd &fd) {
-  Task &T = findTask(ExecutingTasks, fd);
-  if (fd.revents & POLLIN || fd.revents & POLLPRI) {
+Optional<std::vector<int>>
+TaskExecutor::readFromReadyFdsReturningFinishedOnes() {
+  std::vector<int> finishedFds;
+  for (struct pollfd &fd : PollFds) {
+    const int fileDes = fd.fd;
+    const short receivedEvents = fd.revents;
+    fd.revents = 0;
+    Task &T = findTask(ExecutingTasks, fileDes);
+    const bool fdHungUp = reactToFdEvents(receivedEvents, fileDes, T);
+    if (!fdHungUp)
+      continue;
+    finishedFds.push_back(fileDes);
+    const bool hadError = TaskCompleter(T, FinishedCallBack, SignalledCallBack)
+                              .waitForExitThenCleanUp();
+    ExecutingTasks.erase(T.getPid());
+    if (hadError)
+      return None;
+  }
+  return finishedFds;
+}
+
+bool TaskExecutor::reactToFdEvents(const short events, const int fd, Task &T) {
+  if (events & POLLNVAL) {
+    // We passed an invalid fd; this should never happen,
+    // since we always mark fds as finished after calling
+    // Task::finishExecution() (which closes the Task's fd).
+    llvm_unreachable("Asked poll() to watch a closed fd");
+  }
+  const bool isDataAvailable = events & POLLIN || events & POLLPRI;
+  const bool didFdHangUp = events & POLLHUP || events & POLLERR;
+  assert(!(events != 0 && !isDataAvailable && !didFdHangUp) &&
+         "Received unexpected event");
+
+  if (isDataAvailable) {
     // There's data available to read. Read _some_ of it here, but not
     // necessarily _all_, since the pipe is in blocking mode and we might
     // have other input pending (or soon -- before this subprocess is done
@@ -556,16 +549,7 @@ TaskExecutor::FdStatus TaskExecutor::handleFdEvent(struct pollfd &fd) {
     // well; the whole loop here is a bit of a mess.
     T.readFromPipes(/*UntilEnd = */ false);
   }
-  if (fd.revents & POLLHUP || fd.revents & POLLERR) {
-    // This fd was "hung up" or had an error, so we need to wait for the
-    // Task and then clean up.
-    const bool hadError =
-        TaskCompleter(T, fd, FinishedCallBack, SignalledCallBack)
-            .waitForExitThenCleanUp();
-    ExecutingTasks.erase(T.getPid());
-    return hadError ? FdStatus::hadError : FdStatus::finished;
-  }
-  return FdStatus::alive;
+  return didFdHangUp;
 }
 
 bool TaskCompleter::waitForExitThenCleanUp() const {
