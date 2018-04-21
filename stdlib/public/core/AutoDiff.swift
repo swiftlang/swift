@@ -192,20 +192,19 @@ public func valueAndGradient<T, U, V, W, Result>(
 // Runtime
 //===----------------------------------------------------------------------===//
 
-@_versioned
+@_versioned @_fixed_layout
 class _ADTape<Element> {
   @_versioned var elements: [Element] = []
 
-  @inline(never)
+  @_versioned @inline(never)
   @_semantics("autodiff.create_tape")
   @_silgen_name("_swift_autodiff_CreateTape")
   init() {}
 }
 
 extension _ADTape {
-  @_versioned
   var count: Int {
-    @inline(never)
+    @_versioned @inline(never)
     @_semantics("autodiff.tape_element_count")
     @_silgen_name("_swift_autodiff_TapeElementCount")
     get {

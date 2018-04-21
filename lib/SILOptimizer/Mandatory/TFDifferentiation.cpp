@@ -329,23 +329,21 @@ ADContext::ADContext(SILModule &module, SILPassManager &passManager)
   floatingPointProtocol =
     cast<ProtocolDecl>(getStdlibTypeDecl("FloatingPoint", ctx));
 
-  // FIXME: Load tape runtime functions.
-#if false
+  // Load tape runtime functions.
   tapeDecl = getStdlibTypeDecl("_ADTape", ctx);
   createTapeFn = module.findFunction("_swift_autodiff_CreateTape",
-                                     SILLinkage::Public);
+                                     SILLinkage::PublicExternal);
   assert(createTapeFn && "_swift_autodiff_CreateTape doesn't exist?");
   pushToTapeFn = module.findFunction("_swift_autodiff_PushToTape",
-                                     SILLinkage::Public);
+                                     SILLinkage::PublicExternal);
   assert(pushToTapeFn && "_swift_autodiff_PushToTape doesn't exist?");
   popFromTapeFn = module.findFunction("_swift_autodiff_PopFromTape",
-                                      SILLinkage::Public);
+                                      SILLinkage::PublicExternal);
   assert(popFromTapeFn && "_swift_autodiff_PopFromTape doesn't exist?");
   tapeElementCountFn = module.findFunction("_swift_autodiff_TapeElementCount",
-                                           SILLinkage::Public);
+                                           SILLinkage::PublicExternal);
   assert(tapeElementCountFn &&
          "_swift_autodiff_TapeElementCount doesn't exist?");
-#endif
 
   DeclName combineAsAdjointFnName(ctx, ctx.getIdentifier("combiningAsAdjoint"),
                                   { ctx.Id_with });
