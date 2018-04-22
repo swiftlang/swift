@@ -814,13 +814,13 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-    // index(of:)/index(where:)
+    // firstIndex(of:)/firstIndex(where:)
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).index(of:)/semantics") {
+    self.test("\(testNamePrefix).firstIndex(of:)/semantics") {
       for test in findTests {
         let c = makeWrappedCollectionWithEquatableElement(test.sequence)
-        var result = c.index(of: wrapValueIntoEquatable(test.element))
+        var result = c.firstIndex(of: wrapValueIntoEquatable(test.element))
         expectType(
           Optional<CollectionWithEquatableElement.Index>.self,
           &result)
@@ -834,12 +834,12 @@ extension TestSuite {
       }
     }
 
-    self.test("\(testNamePrefix).index(where:)/semantics") {
+    self.test("\(testNamePrefix).firstIndex(where:)/semantics") {
       for test in findTests {
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
         let c = makeWrappedCollectionWithEquatableElement(test.sequence)
-        let result = c.index {
+        let result = c.firstIndex {
           (candidate) in
           _blackHole(closureLifetimeTracker)
           return

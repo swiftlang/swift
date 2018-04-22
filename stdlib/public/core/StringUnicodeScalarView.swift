@@ -52,7 +52,7 @@ extension String {
   /// using the `String` type's `init(_:)` initializer.
   ///
   ///     let favemoji = "My favorite emoji is 🎉"
-  ///     if let i = favemoji.unicodeScalars.index(where: { $0.value >= 128 }) {
+  ///     if let i = favemoji.unicodeScalars.firstIndex(where: { $0.value >= 128 }) {
   ///         let asciiPrefix = String(favemoji.unicodeScalars[..<i])
   ///         print(asciiPrefix)
   ///     }
@@ -156,7 +156,7 @@ extension String {
     /// at the found index:
     ///
     ///     let greeting = "Hello, friend!"
-    ///     if let i = greeting.unicodeScalars.index(where: { "A"..."Z" ~= $0 }) {
+    ///     if let i = greeting.unicodeScalars.firstIndex(where: { "A"..."Z" ~= $0 }) {
     ///         print("First capital letter: \(greeting.unicodeScalars[i])")
     ///         print("Unicode scalar value: \(greeting.unicodeScalars[i].value)")
     ///     }
@@ -277,7 +277,7 @@ extension String {
   /// another string's `unicodeScalars` view.
   ///
   ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.unicodeScalars.index(of: " ") {
+  ///     if let i = picnicGuest.unicodeScalars.firstIndex(of: " ") {
   ///         let adjective = String(picnicGuest.unicodeScalars[..<i])
   ///         print(adjective)
   ///     }
@@ -474,7 +474,7 @@ extension String.UnicodeScalarIndex {
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let utf16Index = cafe.utf16.index(of: 32)!
+  ///     let utf16Index = cafe.utf16.firstIndex(of: 32)!
   ///     let scalarIndex = String.Index(utf16Index, within: cafe.unicodeScalars)!
   ///
   ///     print(String(cafe.unicodeScalars[..<scalarIndex]))
@@ -507,7 +507,7 @@ extension String.UnicodeScalarIndex {
   /// in the string.
   ///
   ///     let cafe = "Café 🍵"
-  ///     let i = cafe.unicodeScalars.index(of: "🍵")
+  ///     let i = cafe.unicodeScalars.firstIndex(of: "🍵")
   ///     let j = i.samePosition(in: cafe)!
   ///     print(cafe[j...])
   ///     // Prints "🍵"
@@ -625,7 +625,7 @@ extension String.UnicodeScalarView {
   /// to, but not including, the first comma (`","`) in the string.
   ///
   ///     let str = "All this happened, more or less."
-  ///     let i = str.unicodeScalars.index(of: ",")!
+  ///     let i = str.unicodeScalars.firstIndex(of: ",")!
   ///     let substring = str.unicodeScalars[str.unicodeScalars.startIndex ..< i]
   ///     print(String(substring))
   ///     // Prints "All this happened"
