@@ -226,28 +226,32 @@ public:
   }
 
   SILFunction *lookupPrimal(SILFunction *original,
-                            ArrayRef<unsigned> paramIndices) const {
-    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices))
-      return module.findFunction(attr->getPrimalName(), SILLinkage::Public);
+                            ArrayRef<unsigned> paramIndices) {
+    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices)) {
+      return lookupPrimal(attr);
+    }
     return nullptr;
   }
 
   SILFunction *lookupAdjoint(SILFunction *original,
-                             ArrayRef<unsigned> paramIndices) const {
-    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices))
-      return module.findFunction(attr->getAdjointName(), SILLinkage::Public);
+                             ArrayRef<unsigned> paramIndices) {
+    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices)) {
+      return lookupPrimal(attr);
+    }
     return nullptr;
   }
 
-  SILFunction *lookupPrimal(const DifferentiationTask &task) const {
-    auto name = task.attr->getPrimalName();
-    if (name.empty()) return nullptr;
-    return module.findFunction(name, SILLinkage::Public);
+  SILFunction *lookupPrimal(SILReverseDifferentiableAttr *attr) {
+    return lookupOrLinkFunction(attr->getPrimalName());
   }
 
-  SILFunction *lookupAdjoint(const DifferentiationTask &task) const {
-    auto name = task.attr->getAdjointName();
-    if (name.empty()) return nullptr;
+  SILFunction *lookupAdjoint(SILReverseDifferentiableAttr *attr) {
+    return lookupOrLinkFunction(attr->getAdjointName());
+  }
+
+  SILFunction *lookupOrLinkFunction(StringRef name) {
+    if (auto *localFn = module.lookUpFunction(name))
+      return localFn;
     return module.findFunction(name, SILLinkage::Public);
   }
 
@@ -530,7 +534,7 @@ void PrimalGen::generate(PrimalGen::Result &primalInfos) {
   for (auto &task : diffTasks) {
     // Does this original function have a primal yet? If not, generate a new one
     // and push it to the work list so that its body will be filled.
-    if (context.lookupPrimal(task))
+    if (context.lookupPrimal(task.attr))
       continue;
     auto *original = task.original;
     auto *diffAttr = task.attr;
@@ -710,7 +714,8 @@ AdjointGen::createAdjointFunction(SILFunction *original,
                                       origTy->getCalleeConvention(),
                                       adjParams, {}, adjResults, None,
                                       original->getASTContext());
-  auto *adjoint = module.createFunction(SILLinkage::Public, adjName, adjType,
+  auto *adjoint = module.createFunction(original->getLinkage(),
+                                        adjName, adjType,
                                         original->getGenericEnvironment(),
                                         original->getLocation(),
                                         original->isBare(),
@@ -730,12 +735,12 @@ void AdjointGen::generate() {
   SmallVector<Task, 16> worklist;
   // Push everything to the worklist.
   for (auto task : diffTasks) {
-    if (context.lookupAdjoint(task))
+    if (context.lookupAdjoint(task.attr))
       continue;
     auto *original = task.original;
     auto *diffAttr = task.attr;
     auto paramIndices = diffAttr->getParamIndices();
-    auto *primal = context.lookupPrimal(task);
+    auto *primal = context.lookupPrimal(task.attr);
     assert(primal && "PrimalGen didn't run on this function before?!");
     auto primalTy = primal->getLoweredFunctionType();
     auto checkpointsTy = primalTy->getSingleResult().getType();
@@ -1002,7 +1007,7 @@ static SILFunction *getOrCreateGradient(
     std::string gradName =
     original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
-    auto *gradFn = module.createFunction(SILLinkage::Public,
+    auto *gradFn = module.createFunction(original->getLinkage(),
                                          gradNameId.str(), gradType,
                                          original->getGenericEnvironment(),
                                          original->getLocation(),
@@ -1150,10 +1155,10 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   auto &module = context.getModule();
   auto canGradTy = canGrad.getLoweredFunctionType();
   auto loc = canGrad.getLocation();
-  auto *primal = context.lookupPrimal(task);
+  auto *primal = context.lookupPrimal(task.attr);
   assert(primal && "Primal does not exist?");
   auto primalTy = primal->getLoweredFunctionType();
-  auto *adjoint = context.lookupAdjoint(task);
+  auto *adjoint = context.lookupAdjoint(task.attr);
   assert(adjoint && "Adjoint does not exist?");
   auto adjointTy = adjoint->getLoweredFunctionType();
   SILFunctionConventions primalConv(primalTy, module),
