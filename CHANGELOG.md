@@ -134,6 +134,18 @@ Swift 4.2
 Swift 4.1
 ---------
 
+* [SE-0187][]
+
+  `Sequence.flatMap` has been deprecated in favor of a potentially more descriptive name `compactMap`.
+  The motivation for this is mainly to discourage uses of `flatMap` where just simply `map` would be 
+  more appropriate.
+  As an example removing `nil` items from a Sequence using `compactMap` can be performed like so:
+  
+  ```swift
+  let original = [1, nil, 3, nil, 5]
+  original.compactMap { $0 } // gives [1,3,5]
+  ```
+  
 * [SE-0075][]
 
   Compile-time testing for the existence and importability of modules is now
