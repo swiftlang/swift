@@ -17,16 +17,15 @@ func foo(_ x: Float) -> Float { // expected-note {{did you mean 'foo'?}}
 
 // Primal returns custom checkpoints type.
 struct CheckpointsFoo {
-  let result: Float
 }
 
-func pfoo(_ x: Float) -> CheckpointsFoo { // expected-note {{did you mean 'pfoo'?}}
-  return CheckpointsFoo(result: x * x)
+func pfoo(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) { // expected-note {{did you mean 'pfoo'?}}
+  return (CheckpointsFoo(), x * x)
 }
-func dfoo_checkpointed(_ x: Float, primal: CheckpointsFoo, seed: Float) -> Float {
+func dfoo_checkpointed(_ x: Float, checkpoints: CheckpointsFoo, originalValue: Float, seed: Float) -> Float {
   return 2 * x
 }
-@differentiable(reverse, primal: pfoo(_:), adjoint: dfoo_checkpointed(_:primal:seed:)) // ok!
+@differentiable(reverse, primal: pfoo(_:), adjoint: dfoo_checkpointed(_:checkpoints:originalValue:seed:)) // ok!
 func foo_checkpointed(_ x: Float) -> Float {
   return x * x
 }
@@ -262,7 +261,7 @@ extension E6 {
   }
 
   @differentiable(reverse, withRespectTo: (self), primal: primal, adjoint: adjoint_checkpointed_mismatch)
-  // expected-error @-1 {{'adjoint_checkpointed_mismatch' does not have expected type '<T> (E6<T>) -> (Float, E6<T>.Checkpoints, Float) -> E6<T>'}}
+  // expected-error @-1 {{'adjoint_checkpointed_mismatch' does not have expected type '<T> (E6<T>) -> (Float, E6<T>.Checkpoints, Float, Float) -> E6<T>'}}
   func original3(x: Float) -> Float {
     return x
   }
@@ -272,11 +271,11 @@ extension E6 {
     let e6: E6
   }
 
-  func primal(x: Float) -> Checkpoints {
-    return Checkpoints(e6: self)
+  func primal(x: Float) -> (Checkpoints, Float) {
+    return (Checkpoints(e6: self), x)
   }
 
-  func adjoint_checkpointed(x: Float, _: Checkpoints, _: Float) -> E6 {
+  func adjoint_checkpointed(x: Float, _: Checkpoints, _: Float, _: Float) -> E6 {
     return self
   }
 
@@ -299,13 +298,13 @@ func baz1<T>(_ x: T, _ y: T) -> T {
   return x
 }
 
-func pbaz1<T>(_ x: T, _ y: T) -> (T, T) {
+func pbaz1<T>(_ x: T, _ y: T) -> ((T, T), T) {
+  return ((y, y), x)
+}
+func dbaz1_checkpointed<T>(_ x: T, _ y: T, primal: (T, T), originalValue: T, seed: T) -> (T, T) {
   return (y, x)
 }
-func dbaz1_checkpointed<T>(_ x: T, _ y: T, primal: (T, T), seed: T) -> (T, T) {
-  return (y, x)
-}
-@differentiable(reverse, primal: pbaz1(_:_:), adjoint: dbaz1_checkpointed(_:_:primal:seed:)) // ok!
+@differentiable(reverse, primal: pbaz1(_:_:), adjoint: dbaz1_checkpointed(_:_:primal:originalValue:seed:)) // ok!
 func baz1_checkpointed<T>(_ x: T, _ y: T) -> T {
   return x
 }
@@ -320,15 +319,15 @@ func baz2<T : FloatingPoint>(_ x: T, _ y: T) -> T {
 }
 
 struct CheckpointsFP<T : FloatingPoint> {
-  let result: T
+  let meow: T
 }
-func pbaz2<T : FloatingPoint>(_ x: T, _ y: T) -> CheckpointsFP<T> {
-  return CheckpointsFP(result: x + y)
+func pbaz2<T : FloatingPoint>(_ x: T, _ y: T) -> (CheckpointsFP<T>, T) {
+  return (CheckpointsFP(meow: 1), x + y)
 }
-func dbaz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T, primal: CheckpointsFP<T>, seed: T) -> (T, T) {
+func dbaz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T, primal: CheckpointsFP<T>, originalValue: T, seed: T) -> (T, T) {
   return (1, 1)
 }
-@differentiable(reverse, primal: pbaz2(_:_:), adjoint: dbaz2_checkpointed(_:_:primal:seed:)) // ok!
+@differentiable(reverse, primal: pbaz2(_:_:), adjoint: dbaz2_checkpointed(_:_:primal:originalValue:seed:)) // ok!
 func baz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
 }
@@ -344,15 +343,15 @@ func baz3<T : FloatingPoint>(_ x: T, _ y: T) -> T {
 }
 
 struct CheckpointsNumeric<T : Numeric> {
-  let result: T
+  let meow: T
 }
-func pbaz3<T : Numeric>(_ x: T, _ y: T) -> CheckpointsNumeric<T> {
-  return CheckpointsNumeric(result: x + y)
+func pbaz3<T : Numeric>(_ x: T, _ y: T) -> (CheckpointsNumeric<T>, T) {
+  return (CheckpointsNumeric(meow: 1), x + y)
 }
-func dbaz3_checkpointed<T : Numeric>(_ x: T, _ y: T, primal: CheckpointsNumeric<T>, seed: T) -> (T, T) {
+func dbaz3_checkpointed<T : Numeric>(_ x: T, _ y: T, primal: CheckpointsNumeric<T>, originalValue: T, seed: T) -> (T, T) {
   return (1, 1)
 }
-@differentiable(reverse, primal: pbaz3(_:_:), adjoint: dbaz3_checkpointed(_:_:primal:seed:))
+@differentiable(reverse, primal: pbaz3(_:_:), adjoint: dbaz3_checkpointed(_:_:primal:originalValue:seed:))
 // expected-error @-1 {{'pbaz3' does not have expected parameters' type '(T, T)'}}
 func baz3_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
