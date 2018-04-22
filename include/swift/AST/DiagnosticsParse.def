@@ -121,6 +121,8 @@ ERROR(lex_invalid_curly_quote,none,
 NOTE(lex_confusable_character,none,
       "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
       (StringRef, StringRef))
+WARNING(lex_nonbreaking_space,none,
+        "non-breaking space (U+00A0) used instead of regular space", ())
 
 ERROR(lex_unterminated_block_comment,none,
       "unterminated '/*' comment", ())
