@@ -48,8 +48,9 @@ import SwiftShims
 ///     extension Int {
 ///         init(validating input: String) throws {
 ///             // ...
-///             if !_isValid(s) {
-///                 throw IntParsingError.invalidInput(s)
+///             let c = _nextCharacter(from: input)
+///             if !_isValid(c) {
+///                 throw IntParsingError.invalidInput(c)
 ///             }
 ///             // ...
 ///         }
