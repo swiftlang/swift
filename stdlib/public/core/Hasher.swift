@@ -359,8 +359,11 @@ public struct Hasher {
     return Int(truncatingIfNeeded: _core.finalize())
   }
 
-  /// Finalize the hasher state and return the hash value. Finalizing consumes
-  /// the hasher, forbidding further operations.
+  /// Finalize the hasher state and return the hash value.
+  ///
+  /// Finalizing consumes the hasher: it is illegal to finalize a hasher you
+  /// don't own, or to perform operations on a finalized hasher. (These may
+  /// become compile-time errors in the future.)
   @effects(releasenone)
   public __consuming func finalize() -> Int {
     var core = _core
