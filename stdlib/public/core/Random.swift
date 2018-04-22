@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -32,7 +32,7 @@ import SwiftShims
 ///         }
 ///
 ///         static func randomWeekday() -> Weekday {
-///             return Weekday.randomWeekday(using: Random.default)
+///             return Weekday.randomWeekday(using: &Random.default)
 ///         }
 ///     }
 ///
@@ -64,7 +64,7 @@ extension RandomNumberGenerator {
   @inlinable
   public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
     if T.bitWidth <= UInt64.bitWidth {
-      return T(truncatingIfNeeded: self.next())
+      return T(truncatingIfNeeded: next())
     }
 
     let (quotient, remainder) = T.bitWidth.quotientAndRemainder(
@@ -73,11 +73,11 @@ extension RandomNumberGenerator {
     var tmp: T = 0
 
     for i in 0 ..< quotient {
-      tmp += T(truncatingIfNeeded: self.next()) &<< (UInt64.bitWidth * i)
+      tmp += T(truncatingIfNeeded: next()) &<< (UInt64.bitWidth * i)
     }
 
     if remainder != 0 {
-      let random = self.next()
+      let random = next()
       let mask = UInt64.max &>> (UInt64.bitWidth - remainder)
       tmp += T(truncatingIfNeeded: random & mask) &<< (UInt64.bitWidth * quotient)
     }
@@ -94,12 +94,13 @@ extension RandomNumberGenerator {
   public mutating func next<T: FixedWidthInteger & UnsignedInteger>(
     upperBound: T
   ) -> T {
+    guard upperBound != 0 else { return 0 }
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
 
     repeat {
-      random = self.next()
+      random = next()
     } while random < range
 
     return random % upperBound
@@ -118,8 +119,18 @@ extension RandomNumberGenerator {
 ///
 /// `Random.default` is safe to use in multiple threads, and uses a
 /// cryptographically secure algorithm whenever possible.
+///
+/// Platform Implementation of `Random`
+/// ===================================
+///
+/// - Apple platforms all use `arc4random_buf(3)`.
+/// - `Linux`, `Android`, `Cygwin`, `Haiku`, `FreeBSD`, and `PS4` all try to
+///   use `getrandom(2)`, but if it doesn't exist then they read from
+///   `/dev/urandom`.
+/// - `Fuchsia` calls `getentropy(3)`.
+/// - `Windows` calls `BCryptGenRandom`.
 public struct Random : RandomNumberGenerator {
-  /// The shared, default instance of the `Range` random number generator.
+  /// The default instance of the `Random` random number generator.
   public static var `default`: Random {
     get { return Random() }
     set { /* Discard */ }
@@ -130,6 +141,7 @@ public struct Random : RandomNumberGenerator {
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// - Returns: An unsigned 64-bit random value.
+  @effects(releasenone)
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
     _stdlib_random(&random, MemoryLayout<UInt64>.size)
@@ -147,7 +159,7 @@ public struct Random : RandomNumberGenerator {
   }
 }
 
-public // @testable
+@usableFromInline internal// @testable
 func _stdlib_random(_ bytes: UnsafeMutableRawBufferPointer) {
   if !bytes.isEmpty {
     _stdlib_random(bytes.baseAddress!, bytes.count)
