@@ -682,6 +682,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
     else
       return true;
 
+  case '\240':
+    if (tokBegin - 1 != bufferBegin && tokBegin[-2] == '\302')
+      return false; // Non-breaking whitespace (U+00A0)
+    else
+      return true;
+
   default:
     return true;
   }
@@ -713,6 +719,12 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
     // A following comment counts as whitespace, so this token is not right bound.
     if (tokEnd[1] == '/' || tokEnd[1] == '*')
       return false;
+    else
+      return true;
+
+  case '\302':
+    if (tokEnd[1] == '\240')
+      return false; // Non-breaking whitespace (U+00A0)
     else
       return true;
 
@@ -2426,6 +2438,18 @@ Restart:
       break;
     }
     break;
+  case '\302':
+    if (CurPtr[0] == '\240') {
+      // Non-breaking whitespace (U+00A0)
+      diagnose(TriviaStart, diag::lex_nonbreaking_space)
+        .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(CurPtr + 1), " ");
+      ++CurPtr;
+      size_t Length = CurPtr - TriviaStart;
+      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      goto Restart;
+    } else {
+      break;
+    }
   // Start character of tokens.
   case -1: case -2:
   case '@': case '{': case '[': case '(': case '}': case ']': case ')':
