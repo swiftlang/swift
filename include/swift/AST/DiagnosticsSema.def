@@ -3243,6 +3243,8 @@ ERROR(invalid_ownership_protocol_type,none,
       "%0 must not be applied to non-class-bound %1; "
       "consider adding a protocol conformance that has a class bound",
       (ReferenceOwnership, Type))
+ERROR(invalid_ownership_with_optional,none,
+      "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
