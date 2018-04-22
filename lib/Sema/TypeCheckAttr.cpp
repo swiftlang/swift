@@ -2270,21 +2270,34 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     auto primalSpecifier = attr->getPrimal().getValue();
 
     auto isValidPrimal = [&](FuncDecl *primalCandidate) {
-        // Returns true if primal candidate has the same parameter types and
-        // generic signature as original function.
-        auto primalSelfDecl = primalCandidate->getImplicitSelfDecl();
-        auto &primalParams =
-          *primalCandidate->getParameterList(primalSelfDecl ? 1 : 0);
-        auto primalParamsTy =
-          primalParams.getInterfaceType(original->getASTContext());
-        auto originalCanGenSig = original->getGenericSignature()
-          ? original->getGenericSignature()->getCanonicalSignature()
-          : CanGenericSignature();
-        auto primalCanGenSig = primalCandidate->getGenericSignature()
-          ? primalCandidate->getGenericSignature()->getCanonicalSignature()
-          : CanGenericSignature();
-        return primalParamsTy->isEqual(originalParamsTy) &&
-               primalCanGenSig == originalCanGenSig;
+      // Returns true if the primal candidate
+      // - has the same parameter types as the original function,
+      // - has the same generic signature as the original function, and
+      // - returns a 2-tuple where the second element type is the original
+      //   function's result type.
+      auto primalSelfDecl = primalCandidate->getImplicitSelfDecl();
+      auto primalParams =
+        primalCandidate->getParameterList(primalSelfDecl ? 1 : 0);
+      auto primalParamsTy =
+        primalParams->getInterfaceType(original->getASTContext());
+      if (!primalParamsTy->isEqual(originalParamsTy))
+        return false;
+      auto originalCanGenSig = original->getGenericSignature()
+        ? original->getGenericSignature()->getCanonicalSignature()
+        : CanGenericSignature();
+      auto primalCanGenSig = primalCandidate->getGenericSignature()
+        ? primalCandidate->getGenericSignature()->getCanonicalSignature()
+        : CanGenericSignature();
+      if (primalCanGenSig != originalCanGenSig)
+        return false;
+      auto origResultTy = original->getResultInterfaceType();
+      auto resultTy = primalCandidate->getResultInterfaceType();
+      auto *resultTupleTy = resultTy->getAs<TupleType>();
+      if (!resultTupleTy ||
+          resultTupleTy->getNumElements() != 2 ||
+          !resultTupleTy->getElement(1).getType()->isEqual(origResultTy))
+        return false;
+      return true;
     };
 
     auto primalOverloadDiagnostic = [&] {
@@ -2398,20 +2411,19 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   for (auto *param : originalParams)
     paramTypes.push_back(FunctionType::Param(param->getInterfaceType()));
 
-  // The remaining two parameters are the checkpoints data structure and the
-  // seed.
-  // If the primal exists, the checkpoints type must be the same as the primal
-  // result type. Otherwise, the checkpoints type must be the same as the original
-  // result type.
-  Type checkpointsTy;
-  if (attr->getPrimal())
-    checkpointsTy = resolvedPrimal->getResultInterfaceType();
-  else
-    checkpointsTy = original->getResultInterfaceType();
-  paramTypes.push_back(FunctionType::Param(checkpointsTy));
-
-  // The seed type must be the same as the original return type.
-  paramTypes.push_back(FunctionType::Param(original->getResultInterfaceType()));
+  // The remaining parameters are the checkpoints data structure (optional), the
+  // original result, and the seed.
+  //
+  // If the primal exists, the checkpoints type is the primal result type.
+  if (attr->getPrimal()) {
+    auto *primResultTy =
+      resolvedPrimal->getResultInterfaceType()->getAs<TupleType>();
+    auto checkpointsTy = primResultTy->getElement(0).getType();
+    paramTypes.push_back(FunctionType::Param(checkpointsTy));
+  }
+  // The original result and the seed have the same type as the original return
+  // type.
+  paramTypes.append(2, FunctionType::Param(original->getResultInterfaceType()));
 
   // Compute the expected adjoint function type, using the same generic
   // signature as the original function.

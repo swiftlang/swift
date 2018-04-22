@@ -227,17 +227,15 @@ public:
 
   SILFunction *lookupPrimal(SILFunction *original,
                             ArrayRef<unsigned> paramIndices) {
-    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices)) {
+    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices))
       return lookupPrimal(attr);
-    }
     return nullptr;
   }
 
   SILFunction *lookupAdjoint(SILFunction *original,
                              ArrayRef<unsigned> paramIndices) {
-    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices)) {
+    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices))
       return lookupPrimal(attr);
-    }
     return nullptr;
   }
 
@@ -532,8 +530,7 @@ void PrimalGen::generate(PrimalGen::Result &primalInfos) {
   SmallVector<Task, 16> worklist;
   // Push everything to the worklist.
   for (auto &task : diffTasks) {
-    // Does this original function have a primal yet? If not, generate a new one
-    // and push it to the work list so that its body will be filled.
+    // If the original function already has a primal, skip this task.
     if (context.lookupPrimal(task.attr))
       continue;
     auto *original = task.original;
