@@ -803,7 +803,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     diagnose(Tok, diag::attr_differentiable_expected_mode);
     return errorAndSkipToEnd();
   }
-  consumeToken(tok::identifier); // 'forward' or 'reverse'.
+  auto modeLoc = consumeToken(tok::identifier); // 'forward' or 'reverse'.
   // Parse comma.
   parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
              /*isDeclModifier=*/false);
@@ -920,7 +920,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
-                               mode, params, primalSpec, adjointSpec,
+                               mode, modeLoc, params, primalSpec, adjointSpec,
                                whereClause));
 }
 

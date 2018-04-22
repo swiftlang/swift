@@ -1314,6 +1314,7 @@ public:
 private:
   /// Differentiation mode (forward or reverse).
   AutoDiffMode Mode;
+  SourceLoc ModeLoc;
   /// The number of parameters specified in 'withRespectTo:'.
   unsigned NumParameters;
   /// The primal function.
@@ -1329,7 +1330,7 @@ private:
   FuncDecl *AdjointFunction = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                              AutoDiffMode mode,
+                              AutoDiffMode mode, SourceLoc modeLoc,
                               ArrayRef<AutoDiffParameter> parameters,
                               Optional<FunctionSpecifier> primal,
                               FunctionSpecifier adjoint,
@@ -1338,12 +1339,14 @@ private:
 public:
   static DifferentiableAttr *create(ASTContext &context, SourceLoc atLoc,
                                     SourceRange baseRange, AutoDiffMode mode,
+                                    SourceLoc modeLoc,
                                     ArrayRef<AutoDiffParameter> parameters,
                                     Optional<FunctionSpecifier> primal,
                                     FunctionSpecifier adjoint,
                                     TrailingWhereClause *clause);
 
   AutoDiffMode getMode() const { return Mode; }
+  SourceLoc getModeLoc() const { return ModeLoc; }
   Optional<FunctionSpecifier> getPrimal() const { return Primal; }
   FunctionSpecifier getAdjoint() const { return Adjoint; }
 
