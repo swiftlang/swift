@@ -1906,6 +1906,12 @@ bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
         .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
     CurPtr = Tmp;
     return false; // Skip presumed whitespace.
+  } else if (Codepoint == 0x000000A0) {
+      // Non-breaking whitespace (U+00A0)
+      diagnose(CurPtr - 1, diag::lex_nonbreaking_space)
+      .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
+      CurPtr = Tmp;
+      return false;
   } else if (Codepoint == 0x0000201D) {
     // If this is an end curly quote, just diagnose it with a fixit hint.
     if (EmitDiagnosticsIfToken) {
@@ -2438,18 +2444,6 @@ Restart:
       break;
     }
     break;
-  case '\302':
-    if (CurPtr[0] == '\240') {
-      // Non-breaking whitespace (U+00A0)
-      diagnose(TriviaStart, diag::lex_nonbreaking_space)
-        .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(CurPtr + 1), " ");
-      ++CurPtr;
-      size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
-      goto Restart;
-    } else {
-      break;
-    }
   // Start character of tokens.
   case -1: case -2:
   case '@': case '{': case '[': case '(': case '}': case ']': case ')':
