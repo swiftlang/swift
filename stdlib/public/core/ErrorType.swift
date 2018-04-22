@@ -35,7 +35,7 @@ import SwiftShims
 ///
 ///     enum IntParsingError: Error {
 ///         case overflow
-///         case invalidInput(String)
+///         case invalidInput(Character)
 ///     }
 ///
 /// The `invalidInput` case includes the invalid character as an associated
