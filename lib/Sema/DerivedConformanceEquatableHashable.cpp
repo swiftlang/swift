@@ -193,6 +193,20 @@ enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
   return pat;
 }
 
+/// Returns a new integer literal expression with the given value.
+/// \p C The AST context.
+/// \p value The integer value.
+/// \return The integer literal expression.
+static Expr *integerLiteralExpr(ASTContext &C, int64_t value) {
+  llvm::SmallString<8> integerVal;
+  APInt(32, value).toString(integerVal, 10, /*signed*/ false);
+  auto integerStr = C.AllocateCopy(integerVal);
+  auto integerExpr = new (C) IntegerLiteralExpr(
+    StringRef(integerStr.data(), integerStr.size()), SourceLoc(),
+    /*implicit*/ true);
+  return integerExpr;
+}
+
 /// Create AST statements which convert from an enum to an Int with a switch.
 /// \p stmts The generated statements are appended to this vector.
 /// \p parentDC Either an extension or the enum itself.
@@ -240,13 +254,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     auto labelItem = CaseLabelItem(pat);
 
     // generate: indexVar = <index>
-    llvm::SmallString<8> indexVal;
-    APInt(32, index++).toString(indexVal, 10, /*signed*/ false);
-    auto indexStr = C.AllocateCopy(indexVal);
-
-    auto indexExpr = new (C) IntegerLiteralExpr(StringRef(indexStr.data(),
-                                                indexStr.size()), SourceLoc(),
-                                                /*implicit*/ true);
+    auto indexExpr = integerLiteralExpr(C, index++);
     auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
                                         /*implicit*/true);
     auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
@@ -714,20 +722,6 @@ ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
   return nullptr;
 }
 
-/// Returns a new integer literal expression with the given value.
-/// \p C The AST context.
-/// \p value The integer value.
-/// \return The integer literal expression.
-static Expr *integerLiteralExpr(ASTContext &C, int64_t value) {
-  llvm::SmallString<8> integerVal;
-  APInt(32, value).toString(integerVal, 10, /*signed*/ false);
-  auto integerStr = C.AllocateCopy(integerVal);
-  auto integerExpr = new (C) IntegerLiteralExpr(
-    StringRef(integerStr.data(), integerStr.size()), SourceLoc(),
-    /*implicit*/ true);
-  return integerExpr;
-}
-
 /// Returns a new \c CallExpr representing
 ///
 ///   hasher.combine(hashable)
@@ -853,23 +847,54 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   hashIntoDecl->setBody(body);
 }
 
-/// Derive the body for the 'hash(into:)' method for an enum.
+/// Derive the body for the 'hash(into:)' method for an enum without associated
+/// values.
 static void
-deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
+deriveBodyHashable_enum_noAssociatedValues_hashInto(
+  AbstractFunctionDecl *hashIntoDecl
+) {
   // enum SomeEnum {
   //   case A, B, C
   //   @derived func hash(into hasher: inout Hasher) {
+  //     let discriminator: Int
   //     switch self {
   //     case A:
-  //       hasher.combine(0)
+  //       discriminator = 0
   //     case B:
-  //       hasher.combine(1)
+  //       discriminator = 1
   //     case C:
-  //       hasher.combine(2)
+  //       discriminator = 2
   //     }
+  //     hasher.combine(discriminator)
   //   }
   // }
-  //
+  auto parentDC = hashIntoDecl->getDeclContext();
+  ASTContext &C = parentDC->getASTContext();
+
+  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
+
+  // generate: switch self {...}
+  SmallVector<ASTNode, 3> stmts;
+  auto discriminatorExpr = convertEnumToIndex(stmts, parentDC, enumDecl,
+                                              selfDecl, hashIntoDecl,
+                                              "discriminator");
+  // generate: hasher.combine(discriminator)
+  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  auto combineStmt = createHasherCombineCall(C, hasherParam, discriminatorExpr);
+  stmts.push_back(combineStmt);
+
+  auto body = BraceStmt::create(C, SourceLoc(), stmts, SourceLoc(),
+                                /*implicit*/ true);
+  hashIntoDecl->setBody(body);
+}
+
+/// Derive the body for the 'hash(into:)' method for an enum with associated
+/// values.
+static void
+deriveBodyHashable_enum_hasAssociatedValues_hashInto(
+  AbstractFunctionDecl *hashIntoDecl
+) {
   // enum SomeEnumWithAssociatedValues {
   //   case A, B(Int), C(String, Int)
   //   @derived func hash(into hasher: inout Hasher) {
@@ -940,7 +965,8 @@ deriveBodyHashable_enum_hashInto(AbstractFunctionDecl *hashIntoDecl) {
     auto hasBoundDecls = !payloadVars.empty();
     auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, hasBoundDecls,
-                                     SourceLoc(), SourceLoc(), body));
+                                     SourceLoc(), SourceLoc(), body,
+                                     /*implicit*/ true));
   }
 
   // generate: switch enumVar { }
@@ -1195,16 +1221,20 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
       // special case for enums with no associated values to preserve source
       // compatibility.
       auto theEnum = dyn_cast<EnumDecl>(type);
-      if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
-          type != parentDecl) {
+      auto hasAssociatedValues =
+        theEnum && !theEnum->hasOnlyCasesWithoutAssociatedValues();
+      if ((!theEnum || hasAssociatedValues) && type != parentDecl) {
         tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
                     hashableProto->getDeclaredType());
         return nullptr;
       }
-      if (theEnum)
+      if (theEnum) {
+        auto bodySynthesizer = hasAssociatedValues
+          ? &deriveBodyHashable_enum_hasAssociatedValues_hashInto
+          : &deriveBodyHashable_enum_noAssociatedValues_hashInto;
         return deriveHashable_hashInto(tc, parentDecl, theEnum,
-                                       &deriveBodyHashable_enum_hashInto);
-      else if (auto theStruct = dyn_cast<StructDecl>(type))
+                                       bodySynthesizer);
+      } else if (auto theStruct = dyn_cast<StructDecl>(type))
         return deriveHashable_hashInto(tc, parentDecl, theStruct,
                                        &deriveBodyHashable_struct_hashInto);
       else // This should've been caught by canDeriveHashable above.
