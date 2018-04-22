@@ -2225,8 +2225,7 @@ static FuncDecl *getResolvedFuncDecl(
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Forward mode is unsupported.
   if (attr->getMode() == AutoDiffMode::Forward) {
-    // TODO: Add location for mode in the AST node.
-    TC.diagnose(attr->getLocation(),
+    TC.diagnose(attr->getModeLoc(),
                 diag::differentiable_attr_forward_mode_unsupported);
     return;
   }

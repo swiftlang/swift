@@ -969,20 +969,21 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
-                                       AutoDiffMode mode,
+                                       AutoDiffMode mode, SourceLoc modeLoc,
                                        ArrayRef<AutoDiffParameter> parameters,
                                        Optional<FunctionSpecifier> primal,
                                        FunctionSpecifier adjoint,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
-    Mode(mode), NumParameters(parameters.size()), Primal(std::move(primal)),
-    Adjoint(adjoint), WhereClause(clause) {
+    Mode(mode), ModeLoc(modeLoc), NumParameters(parameters.size()),
+    Primal(std::move(primal)), Adjoint(adjoint), WhereClause(clause) {
   std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            SourceRange baseRange, AutoDiffMode mode,
+                           SourceLoc modeLoc,
                            ArrayRef<AutoDiffParameter> parameters,
                            Optional<FunctionSpecifier> primal,
                            FunctionSpecifier adjoint,
@@ -991,8 +992,9 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
   unsigned size = sizeof(DifferentiableAttr) +
     numParams * sizeof(AutoDiffParameter);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(atLoc, baseRange, mode, parameters,
-                                      std::move(primal), adjoint, clause);
+  return new (mem) DifferentiableAttr(atLoc, baseRange, mode, modeLoc,
+                                      parameters, std::move(primal), adjoint,
+                                      clause);
 }
 
 ArrayRef<AutoDiffParameter>
