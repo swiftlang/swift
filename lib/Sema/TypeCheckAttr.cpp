@@ -2146,7 +2146,9 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   auto ownershipKind = attr->get();
 
   // A weak variable must have type R? or R! for some ownership-capable type R.
-  Type underlyingType = type;
+  auto underlyingType = type->getOptionalObjectType();
+  auto isOptional = bool(underlyingType);
+  auto allowOptional = false;
   switch (ownershipKind) {
   case ReferenceOwnership::Strong:
     llvm_unreachable("Cannot specify 'strong' in an ownership attribute");
@@ -2154,23 +2156,34 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   case ReferenceOwnership::Unmanaged:
     break;
   case ReferenceOwnership::Weak:
+    allowOptional = true;
     if (var->isLet()) {
       diagnose(var->getStartLoc(), diag::invalid_weak_let);
       attr->setInvalid();
     }
 
-    if (Type objType = type->getOptionalObjectType()) {
-      underlyingType = objType;
-    } else {
-      // @IBOutlet must be optional, but not necessarily weak. Let it diagnose.
-      if (!var->getAttrs().hasAttribute<IBOutletAttr>()) {
-        diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
-                 OptionalType::get(type));
-      }
-      attr->setInvalid();
+    if (isOptional)
+      break;
+
+    // @IBOutlet must be optional, but not necessarily weak. Let it diagnose.
+    if (!var->getAttrs().hasAttribute<IBOutletAttr>()) {
+      diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
+               OptionalType::get(type));
     }
+    attr->setInvalid();
     break;
   }
+
+
+  if (!allowOptional && isOptional) {
+    diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
+             ownershipKind)
+      .fixItReplace(attr->getRange(), "weak");
+    attr->setInvalid();
+  }
+
+  if (!underlyingType)
+    underlyingType = type;
 
   if (!underlyingType->allowsOwnership()) {
     auto D = diag::invalid_ownership_type;

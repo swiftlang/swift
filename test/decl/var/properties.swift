@@ -1109,7 +1109,7 @@ class OwnershipBadSub : OwnershipBase {
   override weak var strongVar: AnyObject? { // expected-error {{cannot override 'strong' property with 'weak' property}}
     didSet {}
   }
-  override unowned var weakVar: AnyObject? { // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'AnyObject?'}}
+  override unowned var weakVar: AnyObject? { // expected-error {{'unowned' variable cannot have optional type}}
     didSet {}
   }
   override weak var unownedVar: AnyObject { // expected-error {{'weak' variable should have optional type 'AnyObject?'}}
