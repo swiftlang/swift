@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2513,11 +2513,9 @@ extension ${Range}
   public func randomElement<T: RandomNumberGenerator>(
     using generator: inout T
   ) -> Element? {
-%   if 'Closed' not in Range:
-    guard lowerBound != upperBound else {
+    guard !isEmpty else {
       return nil
     }
-%   end
     let isLowerNegative = Bound.isSigned && lowerBound < 0
     let sameSign = !Bound.isSigned || isLowerNegative == (upperBound < 0)
 %   if 'Closed' not in Range:
@@ -2611,12 +2609,10 @@ where Self.Stride : SignedInteger,
     in range: ${Range}<Self>,
     using generator: inout T
   ) -> Self {
-%   if 'Closed' not in Range:
     _precondition(
-      range.lowerBound != range.upperBound,
-      "Can't get random value with lowerBound == upperBound"
+      !range.isEmpty,
+      "Can't get random value with an empty range"
     )
-%   end
     return range.randomElement(using: &generator)!
   }
   

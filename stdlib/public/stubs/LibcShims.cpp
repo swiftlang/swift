@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,42 +13,14 @@
 #if defined(__APPLE__)
 #  define _REENTRANT
 #  include <math.h>
-#  include <Security/Security.h>
-#endif
-
-#if defined(__CYGWIN__)
-#  include <cygwin/version.h>
-#  if (CYGWIN_VERSION_API_MAJOR > 0) || (CYGWIN_VERSION_API_MINOR >= 306)
-#    include <sys/random.h>
-#    define SWIFT_STDLIB_USING_GETRANDOM
-#  endif
-#endif
-
-#if defined(__Fuchsia__)
-#  include <sys/random.h>
-#  define SWIFT_STDLIB_USING_GETENTROPY
-#endif
-
-#if defined(__linux__)
-#  include <linux/version.h>
-#  if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,17,0))
-#    include <features.h>
-#    if defined(__BIONIC__) || (defined(__GLIBC_PREREQ) && __GLIBC_PREREQ(2,25))
-#      include <sys/random.h>
-#      define SWIFT_STDLIB_USING_GETRANDOM
-#    endif
-#  endif
 #endif
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #  include <io.h>
 #  define WIN32_LEAN_AND_MEAN
-#  define WIN32_NO_STATUS
-#    include <Windows.h>
-#  undef WIN32_NO_STATUS
-#  include <Ntstatus.h>
-#  include <Ntdef.h>
+#  include <Windows.h>
 #  include <Bcrypt.h>
+#  pragma comment(lib, "Bcrypt.lib")
 #else
 #  include <pthread.h>
 #  include <semaphore.h>
@@ -56,6 +28,7 @@
 #  include <unistd.h>
 #endif
 
+#include <algorithm>
 #include <cmath>
 #include <errno.h>
 #include <fcntl.h>
@@ -63,6 +36,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if __has_include(<sys/random.h>)
+#  include <sys/random.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <type_traits>
@@ -71,6 +47,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Mutex.h"
 #include "../SwiftShims/LibcShims.h"
 
 using namespace swift;
@@ -342,22 +319,15 @@ swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
   return RandomUniform(getGlobalMT19937());
 }
 
-#if defined(__APPLE__)
+// _stdlib_random
+//
+// Should the implementation of this function add a new platform/change for a
+// platform, make sure to also update the stdlib documentation regarding
+// platform implementation of this function.
+// This can be found at: stdlib/public/core/Random.swift
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
-  if (__builtin_available(macOS 10.12, iOS 10, tvOS 10, watchOS 3, *)) {
-    arc4random_buf(buf, nbytes);
-  } else {
-    OSStatus status = SecRandomCopyBytes(kSecRandomDefault, nbytes, buf);
-    if (status != errSecSuccess) {
-      fatalError(0, "Fatal error: %d in '%s'\n", status, __func__);
-    }
-  }
-}
-
-#elif defined(_WIN32) && !defined(__CYGWIN__)
-// TODO: Test on Windows
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#error TODO: Test _stdlib_random on Windows
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
@@ -365,45 +335,52 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
                                     static_cast<PUCHAR>(buf),
                                     static_cast<ULONG>(nbytes),
                                     BCRYPT_USE_SYSTEM_PREFERRED_RNG);
-  if (!NT_SUCCESS(status)) {
-    fatalError(0, "Fatal error: %#.8x in '%s'\n", status, __func__);
+  if (!BCRYPT_SUCCESS(status)) {
+    fatalError(0, "Fatal error: 0x%.8X in '%s'\n", status, __func__);
   }
 }
 
-#elif defined(SWIFT_STDLIB_USING_GETENTROPY)
+#else
+
+#undef  WHILE_EINTR
+#define WHILE_EINTR(expression) ({                                             \
+  decltype(expression) result = -1;                                            \
+  do { result = (expression); } while (result == -1 && errno == EINTR);        \
+  result;                                                                      \
+})
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
-    constexpr __swift_size_t max_nbytes = 256;
-    __swift_size_t actual_nbytes = (nbytes < max_nbytes ?
-                                    nbytes : max_nbytes);
-    if (0 != getentropy(buf, actual_nbytes)) {
-      fatalError(0, "Fatal error: %d in '%s'\n", errno, __func__);
+    __swift_ssize_t actual_nbytes = -1;
+#if defined(GRND_RANDOM)
+    static const bool getrandom_available =
+      !(getrandom(nullptr, 0, 0) == -1 && errno == ENOSYS);
+    if (getrandom_available) {
+      actual_nbytes = WHILE_EINTR(getrandom(buf, nbytes, 0));
     }
-    buf = static_cast<uint8_t *>(buf) + actual_nbytes;
-    nbytes -= actual_nbytes;
-  }
-}
-
-#else
-
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
-#if !defined(SWIFT_STDLIB_USING_GETRANDOM)
-  static const int fd = _stdlib_open("/dev/urandom", O_RDONLY, 0);
-  if (fd < 0) {
-    fatalError(0, "Fatal error: %d in '%s'\n", errno, __func__);
-  }
+#elif defined(__Fuchsia__)
+    __swift_size_t getentropy_nbytes = std::min(nbytes, __swift_size_t{256});
+    if (0 == getentropy(buf, getentropy_nbytes)) {
+      actual_nbytes = getentropy_nbytes;
+    }
+#elif defined(__APPLE__)
+    if (__builtin_available(macOS 10.12, iOS 10, tvOS 10, watchOS 3, *)) {
+      arc4random_buf(buf, nbytes);
+      actual_nbytes = nbytes;
+    }
 #endif
-  while (nbytes > 0) {
-#if !defined(SWIFT_STDLIB_USING_GETRANDOM)
-    __swift_ssize_t actual_nbytes = _stdlib_read(fd, buf, nbytes);
-#else
-    __swift_ssize_t actual_nbytes = getrandom(buf, nbytes, 0);
-#endif
-    if (actual_nbytes < 1) {
-      if (errno == EINTR) { continue; }
+    if (actual_nbytes == -1) {
+      static const int fd =
+        WHILE_EINTR(_stdlib_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
+      if (fd != -1) {
+        static StaticMutex mutex;
+        mutex.withLock([&] {
+          actual_nbytes = WHILE_EINTR(_stdlib_read(fd, buf, nbytes));
+        });
+      }
+    }
+    if (actual_nbytes == -1) {
       fatalError(0, "Fatal error: %d in '%s'\n", errno, __func__);
     }
     buf = static_cast<uint8_t *>(buf) + actual_nbytes;

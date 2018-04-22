@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -304,8 +304,6 @@ extension Sequence {
   /// to `numbers.shuffled()` above is equivalent to calling
   /// `numbers.shuffled(using: &Random.default)`.
   ///
-  /// - Parameter generator: The random number generator to use when shuffling
-  ///   the sequence.
   /// - Returns: A shuffled array of this sequence's elements.
   ///
   /// - Complexity: O(*n*)
@@ -335,6 +333,7 @@ extension MutableCollection {
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
   ) {
+    let count = self.count
     guard count > 1 else { return }
     var amount = count
     var currentIndex = startIndex

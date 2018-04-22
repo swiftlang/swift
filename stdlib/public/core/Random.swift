@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -32,7 +32,7 @@ import SwiftShims
 ///         }
 ///
 ///         static func randomWeekday() -> Weekday {
-///             return Weekday.randomWeekday(using: Random.default)
+///             return Weekday.randomWeekday(using: &Random.default)
 ///         }
 ///     }
 ///
@@ -94,6 +94,7 @@ extension RandomNumberGenerator {
   public mutating func next<T: FixedWidthInteger & UnsignedInteger>(
     upperBound: T
   ) -> T {
+    guard upperBound != 0 else { return 0 }
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
@@ -118,8 +119,19 @@ extension RandomNumberGenerator {
 ///
 /// `Random.default` is safe to use in multiple threads, and uses a
 /// cryptographically secure algorithm whenever possible.
+///
+/// Platform Implementation of `Random`
+/// ===================================
+///
+/// - Apple platforms use `arc4random_buf(3)` for newer versions of their OS,
+///   and for older versions they will read from `/dev/urandom`.
+/// - `Linux`, `Android`, `Cygwin`, `Haiku`, `FreeBSD`, and `PS4` all try to
+///   use `getrandom(2)`, but if it doesn't exist then they read from
+///   `/dev/urandom`.
+/// - `Fuchsia` calls `getentropy(3)`.
+/// - `Windows` calls `BCryptGenRandom`.
 public struct Random : RandomNumberGenerator {
-  /// The shared, default instance of the `Range` random number generator.
+  /// The default instance of the `Random` random number generator.
   public static var `default`: Random {
     get { return Random() }
     set { /* Discard */ }

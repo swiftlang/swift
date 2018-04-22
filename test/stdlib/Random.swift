@@ -5,18 +5,39 @@ import StdlibUnittest
 
 let RandomTests = TestSuite("Random")
 
+// _stdlib_random
+
+RandomTests.test("_stdlib_random") {
+  for count in [100, 1000] {
+    var bytes1 = [UInt8](repeating: 0, count: count)
+    var bytes2 = [UInt8](repeating: 0, count: count)
+    let zeros = [UInt8](repeating: 0, count: count)
+    expectEqual(bytes1, bytes2)
+    expectEqual(bytes1, zeros)
+    expectEqual(bytes2, zeros)
+    
+    bytes1.withUnsafeMutableBytes { _stdlib_random($0) }
+    expectNotEqual(bytes1, bytes2)
+    expectNotEqual(bytes1, zeros)
+    
+    bytes2.withUnsafeMutableBytes { _stdlib_random($0) }
+    expectNotEqual(bytes1, bytes2)
+    expectNotEqual(bytes2, zeros)
+  }
+}
+
 // Basic random numbers
 
 RandomTests.test("basic random numbers") {
   let randomNumber1 = Int.random(in: .min ... .max)
   let randomNumber2 = Int.random(in: .min ... .max)
-  expectTrue(randomNumber1 != randomNumber2)
+  expectNotEqual(randomNumber1, randomNumber2)
 
   let randomDouble1 = Double.random(in: 0 ..< 1)
   expectTrue(randomDouble1 < 1 && randomDouble1 >= 0)
   let randomDouble2 = Double.random(in: 0 ..< 1)
   expectTrue(randomDouble2 < 1 && randomDouble2 >= 0)
-  expectTrue(randomDouble1 != randomDouble2)
+  expectNotEqual(randomDouble1, randomDouble2)
 }
 
 // Random integers in ranges
@@ -34,7 +55,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(minOpenRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set(minOpenRange))
+  expectEqual(integerSet, Set(minOpenRange))
   integerSet.removeAll()
   
   // min closed range
@@ -44,7 +65,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(minClosedRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set(minClosedRange))
+  expectEqual(integerSet, Set(minClosedRange))
   integerSet.removeAll()
   
   // max open range
@@ -54,7 +75,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(maxOpenRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set(maxOpenRange))
+  expectEqual(integerSet, Set(maxOpenRange))
   integerSet.removeAll()
   
   // max closed range
@@ -64,7 +85,33 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type)
     expectTrue(maxClosedRange.contains(random))
     integerSet.insert(random)
   }
-  expectTrue(integerSet == Set(maxClosedRange))
+  expectEqual(integerSet, Set(maxClosedRange))
+  integerSet.removeAll()
+  
+  // Test full ranges for Int8 and UInt8
+  if T.bitWidth == 8 {
+    let fullTestRange = 0 ..< 10_000
+    
+    // full open range
+    let fullOpenRange = T.min ..< T.max
+    for _ in fullTestRange {
+      let random = T.random(in: fullOpenRange)
+      expectTrue(fullOpenRange.contains(random))
+      integerSet.insert(random)
+    }
+    expectEqual(integerSet, Set(fullOpenRange))
+    integerSet.removeAll()
+    
+    // full closed range
+    let fullClosedRange = T.min ... T.max
+    for _ in fullTestRange {
+      let random = T.random(in: fullClosedRange)
+      expectTrue(fullClosedRange.contains(random))
+      integerSet.insert(random)
+    }
+    expectEqual(integerSet, Set(fullClosedRange))
+    integerSet.removeAll()
+  }
 }
 
 RandomTests.test("random integers in ranges") {
@@ -127,7 +174,7 @@ RandomTests.test("shuffling") {
                   "y", "z"]
   for _ in 0 ..< 1_000 {
     let newAlphabet = alphabet.shuffled()
-    expectTrue(newAlphabet != alphabet)
+    expectNotEqual(newAlphabet, alphabet)
     alphabet = newAlphabet
   }
 }
@@ -185,11 +232,11 @@ RandomTests.test("different random number generators") {
     }
   }
   
-  expectTrue(intPasses[0] == intPasses[1])
-  expectTrue(doublePasses[0] == doublePasses[1])
-  expectTrue(boolPasses[0] == boolPasses[1])
-  expectTrue(collectionPasses[0] == collectionPasses[1])
-  expectTrue(shufflePasses[0] == shufflePasses[1])
+  expectEqual(intPasses[0], intPasses[1])
+  expectEqual(doublePasses[0], doublePasses[1])
+  expectEqual(boolPasses[0], boolPasses[1])
+  expectEqual(collectionPasses[0], collectionPasses[1])
+  expectEqual(shufflePasses[0], shufflePasses[1])
 }
 
 // Uniform Distribution

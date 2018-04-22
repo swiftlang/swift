@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2395,7 +2395,7 @@ where Self.RawSignificand : FixedWidthInteger,
   ///     // Prints "14.2286325689993"
   ///     // Prints "13.1485686260762"
   ///
-  /// The `random(using:)` static method chooses a random value from a
+  /// The `random(in:using:)` static method chooses a random value from a
   /// continuous uniform distribution in `range`, and then converts that value
   /// to the nearest representable value in this type. Depending on the size and
   /// span of `range`, some concrete values may be represented more frequently
@@ -2414,12 +2414,10 @@ where Self.RawSignificand : FixedWidthInteger,
     in range: ${Range}<Self>,
     using generator: inout T
   ) -> Self {
-%   if 'Closed' not in Range:
     _precondition(
-      range.lowerBound != range.upperBound,
-      "Can't get random value with lowerBound == upperBound"
+      !range.isEmpty,
+      "Can't get random value with an empty range"
     )
-%   end
     let delta = range.upperBound - range.lowerBound
     let rand: Self.RawSignificand
     if Self.RawSignificand.bitWidth == Self.significandBitCount + 1 {
