@@ -1421,23 +1421,4 @@ extension Unicode.Scalar.Properties {
   public var isDefined: Bool {
     return __swift_stdlib_u_isdefined(_value) != 0
   }
-
-  /// A Boolean property indicating whether a normalization boundary always
-  /// occurs before this scalar.
-  ///
-  /// A normalization boundary is a position in a string where everything to the
-  /// left of the boundary can be normalized independently of everything to the
-  /// right of the boundary. The concatenation of each such normalization result
-  /// is thus the same as if the entire string had been normalized as a whole.
-  ///
-  /// ```
-  /// print(("A" as Unicode.Scalar).properties.hasNormalizationBoundaryBefore)
-  /// // Prints "true"
-  /// print(("\u{0301}" as Unicode.Scalar).properties.hasNormalizationBoundaryBefore)
-  /// // Prints "false"
-  /// ```
-  public var hasNormalizationBoundaryBefore: Bool {
-    return __swift_stdlib_unorm2_hasBoundaryBefore(
-      _Normalization._nfcNormalizer, _value) != 0
-  }
 }

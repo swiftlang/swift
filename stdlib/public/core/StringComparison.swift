@@ -317,8 +317,7 @@ internal func _decodeSurrogatePair(
 
 internal func _hasNormalizationBoundary(before cu: UInt16) -> Bool {
   guard !_isSurrogate(cu) else { return false }
-  return UnicodeScalar(
-    _unchecked: UInt32(cu)).properties.hasNormalizationBoundaryBefore
+  return UnicodeScalar(_unchecked: UInt32(cu))._hasNormalizationBoundaryBefore
 }
 
 //
@@ -862,10 +861,8 @@ private struct _UnicodeScalarExceptions {
       var i = 0
       while i < length {
         let (innerScalar, nextI) = _parseRawScalar(&outBuffer, startingFrom: i)
-        if _slowPath(
-          i != 0 && innerScalar.properties.hasNormalizationBoundaryBefore
-        ) {
-          guard innerScalar.properties.hasNormalizationBoundaryBefore else {
+        if _slowPath(i != 0 && innerScalar._hasNormalizationBoundaryBefore) {
+          guard innerScalar._hasNormalizationBoundaryBefore else {
             fatalError(
               "Unicode invariant violated: non-starter multi-segment expander")
           }
@@ -1051,7 +1048,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     var (_, segmentEndIdx) = self._parseRawScalar(startingFrom: idx)
     while segmentEndIdx < count {
       let (scalar, nextIdx) = self._parseRawScalar(startingFrom: segmentEndIdx)
-      if scalar.properties.hasNormalizationBoundaryBefore {
+      if scalar._hasNormalizationBoundaryBefore {
         break
       }
       segmentEndIdx = nextIdx
@@ -1069,7 +1066,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     while idx > 0 {
       let (scalar, priorIdx) = _reverseParseRawScalar(endingAt: idx)
       idx = priorIdx
-      if scalar.properties.hasNormalizationBoundaryBefore {
+      if scalar._hasNormalizationBoundaryBefore {
         break
       }
     }
@@ -1095,8 +1092,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     }
 
     // Check current scalar
-    let currentScalar = self._parseRawScalar(startingFrom: idx).0
-    if currentScalar.properties.hasNormalizationBoundaryBefore {
+    if self._parseRawScalar(startingFrom: idx).0._hasNormalizationBoundaryBefore {
       return (idx, segmentEnd)
     }
 
