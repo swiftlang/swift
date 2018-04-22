@@ -5,17 +5,17 @@ import Swift
 
 sil_stage raw
 
-sil public @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
+sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
 bb0(%0 : $Float, %1 : $Float, %2 : $Float):
   return %2 : $Float
 }
 
-sil public [reverse_differentiable wrt 0 primal @foo adjoint @foo_adj] @foo : $@convention(thin) (Float) -> Float {
+sil hidden [reverse_differentiable wrt 0 primal @foo adjoint @foo_adj] @foo : $@convention(thin) (Float) -> Float {
 bb0(%0 : $Float):
   return %0 : $Float
 }
 
-sil public @bar : $@convention(thin) (Float) -> Float {
+sil hidden @bar : $@convention(thin) (Float) -> Float {
 bb0(%0 : $Float):
   %1 = function_ref @foo : $@convention(thin) (Float) -> Float
   %2 = gradient [wrt 0] %1 : $@convention(thin) (Float) -> Float
@@ -23,7 +23,7 @@ bb0(%0 : $Float):
   return %3 : $Float
 }
 
-// CHECK-LABEL: sil @bar : $@convention(thin) (Float) -> Float {
+// CHECK-LABEL: sil hidden @bar : $@convention(thin) (Float) -> Float {
 // CHECK: bb0
 // CHECK:   %1 = function_ref @foo : $@convention(thin) (Float) -> Float
 // CHECK:   %2 = function_ref @foo__grad_wrt_0 : $@convention(thin) (Float) -> Float
@@ -31,7 +31,7 @@ bb0(%0 : $Float):
 // CHECK:   return %3 : $Float
 // CHECK: }
 
-// CHECK-LABEL:sil @foo__grad_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float) {
+// CHECK-LABEL:sil hidden @foo__grad_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float) {
 // CHECK: bb0
 // CHECK:   %2 = function_ref @foo : $@convention(thin) (Float) -> Float
 // CHECK:   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
@@ -41,7 +41,7 @@ bb0(%0 : $Float):
 // CHECK:   return %6 : $(Float, Float)
 // CHECK: }
 
-// CHECK-LABEL:sil @foo__grad_wrt_0 : $@convention(thin) (Float) -> Float {
+// CHECK-LABEL:sil hidden @foo__grad_wrt_0 : $@convention(thin) (Float) -> Float {
 // CHECK: bb0
 // CHECK:  %1 = alloc_stack $Float
 // CHECK:  %2 = integer_literal $Builtin.Int2048, 1
