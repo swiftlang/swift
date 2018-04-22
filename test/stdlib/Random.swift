@@ -1,22 +1,44 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 let RandomTests = TestSuite("Random")
+
+// _stdlib_random
+
+RandomTests.test("_stdlib_random") {
+  for count in [100, 1000] {
+    var bytes1 = [UInt8](repeating: 0, count: count)
+    var bytes2 = [UInt8](repeating: 0, count: count)
+    let zeros = [UInt8](repeating: 0, count: count)
+    expectEqual(bytes1, bytes2)
+    expectEqual(bytes1, zeros)
+    expectEqual(bytes2, zeros)
+    
+    bytes1.withUnsafeMutableBytes { _stdlib_random($0) }
+    expectNotEqual(bytes1, bytes2)
+    expectNotEqual(bytes1, zeros)
+    
+    bytes2.withUnsafeMutableBytes { _stdlib_random($0) }
+    expectNotEqual(bytes1, bytes2)
+    expectNotEqual(bytes2, zeros)
+  }
+}
 
 // Basic random numbers
 
 RandomTests.test("basic random numbers") {
   let randomNumber1 = Int.random(in: .min ... .max)
   let randomNumber2 = Int.random(in: .min ... .max)
-  expectTrue(randomNumber1 != randomNumber2)
+  expectNotEqual(randomNumber1, randomNumber2)
 
   let randomDouble1 = Double.random(in: 0 ..< 1)
   expectTrue(randomDouble1 < 1 && randomDouble1 >= 0)
   let randomDouble2 = Double.random(in: 0 ..< 1)
   expectTrue(randomDouble2 < 1 && randomDouble2 >= 0)
-  expectTrue(randomDouble1 != randomDouble2)
+  expectNotEqual(randomDouble1, randomDouble2)
 }
 
 // Random integers in ranges
@@ -24,47 +46,48 @@ RandomTests.test("basic random numbers") {
 func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) 
   where T.Stride: SignedInteger, T.Magnitude: UnsignedInteger {
     
-  let testRange = 0 ..< 1_000
-  var integerSet: Set<T> = []
+  func testRange(_ range: Range<T>, iterations: Int = 1_000) {
+    var integerSet: Set<T> = []
+    for _ in 0 ..< iterations {
+      let random = T.random(in: range)
+      expectTrue(range.contains(random))
+      integerSet.insert(random)
+    }
+    expectEqual(integerSet, Set(range))
+  }
+    
+  func testClosedRange(_ range: ClosedRange<T>, iterations: Int = 1_000) {
+    var integerSet: Set<T> = []
+    for _ in 0 ..< iterations {
+      let random = T.random(in: range)
+      expectTrue(range.contains(random))
+      integerSet.insert(random)
+    }
+    expectEqual(integerSet, Set(range))
+  }
   
   // min open range
-  let minOpenRange = T.min ..< (T.min + 10)
-  for _ in testRange {
-    let random = T.random(in: minOpenRange)
-    expectTrue(minOpenRange.contains(random))
-    integerSet.insert(random)
-  }
-  expectTrue(integerSet == Set(minOpenRange))
-  integerSet.removeAll()
+  testRange(T.min ..< (T.min + 10))
   
   // min closed range
-  let minClosedRange = T.min ... (T.min + 10)
-  for _ in testRange {
-    let random = T.random(in: minClosedRange)
-    expectTrue(minClosedRange.contains(random))
-    integerSet.insert(random)
-  }
-  expectTrue(integerSet == Set(minClosedRange))
-  integerSet.removeAll()
+  testClosedRange(T.min ... (T.min + 10))
   
   // max open range
-  let maxOpenRange = (T.max - 10) ..< T.max
-  for _ in testRange {
-    let random = T.random(in: maxOpenRange)
-    expectTrue(maxOpenRange.contains(random))
-    integerSet.insert(random)
-  }
-  expectTrue(integerSet == Set(maxOpenRange))
-  integerSet.removeAll()
+  testRange((T.max - 10) ..< T.max)
   
   // max closed range
-  let maxClosedRange = (T.max - 10) ... T.max
-  for _ in testRange {
-    let random = T.random(in: maxClosedRange)
-    expectTrue(maxClosedRange.contains(random))
-    integerSet.insert(random)
+  testClosedRange((T.max - 10) ... T.max)
+  
+  // Test full ranges for Int8 and UInt8
+  if T.bitWidth == 8 {
+    let fullIterations = 10_000
+    
+    // full open range
+    testRange(T.min ..< T.max, iterations: fullIterations)
+    
+    // full closed range
+    testClosedRange(T.min ... T.max, iterations: fullIterations)
   }
-  expectTrue(integerSet == Set(maxClosedRange))
 }
 
 RandomTests.test("random integers in ranges") {
@@ -111,24 +134,37 @@ RandomTests.test("random floating points in ranges") {
 // Random Elements from collection
 
 RandomTests.test("random elements from collection") {
+  // Non-empty collection
+  var elementSet: Set<String> = []
   let greetings = ["hello", "hi", "hey", "hola", "what's up"]
   for _ in 0 ..< 1_000 {
     let randomGreeting = greetings.randomElement()
     expectNotNil(randomGreeting)
     expectTrue(greetings.contains(randomGreeting!))
+    elementSet.insert(randomGreeting!)
+  }
+  expectEqual(elementSet, Set(greetings))
+  
+  // Empty collection
+  let emptyArray: [String] = []
+  for _ in 0 ..< 1_000 {
+    let randomElement = emptyArray.randomElement()
+    expectNil(randomElement)
   }
 }
 
 // Shuffle
 
 RandomTests.test("shuffling") {
-  var alphabet = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l",
+  let alphabet = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l",
                   "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
                   "y", "z"]
+  var oldAlphabet = MinimalSequence(elements: alphabet)
   for _ in 0 ..< 1_000 {
     let newAlphabet = alphabet.shuffled()
-    expectTrue(newAlphabet != alphabet)
-    alphabet = newAlphabet
+    expectTrue(alphabet.elementsEqual(newAlphabet.sorted()))
+    expectFalse(oldAlphabet.elementsEqual(newAlphabet))
+    oldAlphabet = MinimalSequence(elements: newAlphabet)
   }
 }
 
@@ -185,11 +221,11 @@ RandomTests.test("different random number generators") {
     }
   }
   
-  expectTrue(intPasses[0] == intPasses[1])
-  expectTrue(doublePasses[0] == doublePasses[1])
-  expectTrue(boolPasses[0] == boolPasses[1])
-  expectTrue(collectionPasses[0] == collectionPasses[1])
-  expectTrue(shufflePasses[0] == shufflePasses[1])
+  expectEqual(intPasses[0], intPasses[1])
+  expectEqual(doublePasses[0], doublePasses[1])
+  expectEqual(boolPasses[0], boolPasses[1])
+  expectEqual(collectionPasses[0], collectionPasses[1])
+  expectEqual(shufflePasses[0], shufflePasses[1])
 }
 
 // Uniform Distribution
