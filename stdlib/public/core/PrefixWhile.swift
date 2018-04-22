@@ -208,7 +208,7 @@ extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     switch _value {
     case .index(let value):
       hasher.combine(value)

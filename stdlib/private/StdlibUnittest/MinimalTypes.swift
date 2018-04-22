@@ -145,7 +145,7 @@ public struct MinimalHashableValue : Equatable, Hashable {
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     MinimalHashableValue.timesHashIntoWasCalled += 1
     MinimalHashableValue.hashIntoImpl.value(value, &hasher)
   }
@@ -198,7 +198,7 @@ public class MinimalHashableClass : Equatable, Hashable {
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     MinimalHashableClass.timesHashIntoWasCalled += 1
     MinimalHashableClass.hashIntoImpl.value(value, &hasher)
   }
@@ -256,7 +256,7 @@ public struct GenericMinimalHashableValue<Wrapped> : Equatable, Hashable {
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     GenericMinimalHashableValue_timesHashIntoWasCalled += 1
     GenericMinimalHashableValue_hashIntoImpl.value(value, &hasher)
   }
@@ -312,7 +312,7 @@ public class GenericMinimalHashableClass<Wrapped> : Equatable, Hashable {
     return hasher.finalize()
   }
 
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     GenericMinimalHashableClass_timesHashIntoWasCalled += 1
     GenericMinimalHashableClass_hashIntoImpl.value(value, &hasher)
   }

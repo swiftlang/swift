@@ -52,7 +52,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     return withBuffer {
       var buffer = $0
       while true {
@@ -446,7 +446,7 @@ internal struct ComputedPropertyID: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(value)
     hasher.combine(isStoredProperty)
     hasher.combine(isTableOffset)
@@ -579,7 +579,7 @@ internal enum KeyPathComponent: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func _hash(into hasher: inout Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
