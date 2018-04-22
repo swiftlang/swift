@@ -37,7 +37,7 @@ extension String {
 /// substring of the first sentence:
 ///
 ///     let greeting = "Hi there! It's nice to meet you! 👋"
-///     let endOfSentence = greeting.index(of: "!")!
+///     let endOfSentence = greeting.firstIndex(of: "!")!
 ///     let firstSentence = greeting[...endOfSentence]
 ///     // firstSentence == "Hi there!"
 ///

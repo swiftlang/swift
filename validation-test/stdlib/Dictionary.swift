@@ -1398,9 +1398,9 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     var lastKey: MinimalHashableValue = d2.first!.key
     for i in d2.indices { lastKey = d2[i].key }
 
-    // index(where:) - linear search
+    // firstIndex(where:) - linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let j = d2.index(where: { (k, _) in k == lastKey })!
+    let j = d2.firstIndex(where: { (k, _) in k == lastKey })!
     expectGE(MinimalHashableValue.timesEqualEqualWasCalled, 8)
 
     // index(forKey:) - O(1) bucket + linear search
@@ -1408,9 +1408,9 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     let k = d2.index(forKey: lastKey)!
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
     
-    // keys.index(of:) - O(1) bucket + linear search
+    // keys.firstIndex(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let l = d2.keys.index(of: lastKey)!
+    let l = d2.keys.firstIndex(of: lastKey)!
 #if swift(>=4.0)
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
 #endif
@@ -4464,11 +4464,11 @@ DictionaryTestSuite.test("misc") {
     expectOptionalEqual(4, d3["four"])
     expectOptionalEqual(5, d3["five"])
 
-    expectEqual(3, d.values[d.keys.index(of: "three")!])
-    expectEqual(4, d.values[d.keys.index(of: "four")!])
+    expectEqual(3, d.values[d.keys.firstIndex(of: "three")!])
+    expectEqual(4, d.values[d.keys.firstIndex(of: "four")!])
 
-    expectEqual(3, d3.values[d3.keys.index(of: "three")!])
-    expectEqual(4, d3.values[d3.keys.index(of: "four")!])
+    expectEqual(3, d3.values[d3.keys.firstIndex(of: "three")!])
+    expectEqual(4, d3.values[d3.keys.firstIndex(of: "four")!])
   }
 }
 
