@@ -349,7 +349,7 @@ extension Set: Collection {
   ///
   /// - Complexity: O(1)
   @inlinable // FIXME(sil-serialize-all)
-  public func index(of member: Element) -> Index? {
+  public func firstIndex(of member: Element) -> Index? {
     return _variantBuffer.index(forKey: member)
   }
 
@@ -357,7 +357,7 @@ extension Set: Collection {
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
-    return Optional(index(of: member))
+    return Optional(firstIndex(of: member))
   }
 
   /// The number of elements in the set.

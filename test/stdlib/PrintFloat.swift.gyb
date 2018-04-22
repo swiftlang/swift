@@ -514,7 +514,7 @@ fileprivate func exponentialPowerOfTen(_ power: Int) -> String {
 // this logic to help verify that the output does not depend on
 // the C locale.
 PrintTests.setUp {
-  if let localeArgIndex = CommandLine.arguments.index(of: "--locale") {
+  if let localeArgIndex = CommandLine.arguments.firstIndex(of: "--locale") {
     let locale = CommandLine.arguments[localeArgIndex + 1]
     expectEqual("ru_RU.UTF-8", locale)
     setlocale(LC_ALL, locale)

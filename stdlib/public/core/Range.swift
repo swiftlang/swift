@@ -814,7 +814,7 @@ extension Collection {
   /// of the strings in the slice, and then uses that index in the original
   /// array.
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // "Evarts"
   ///

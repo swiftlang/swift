@@ -31,20 +31,20 @@ extension BidirectionalCollection {
 }
 
 //===----------------------------------------------------------------------===//
-// index(of:)/index(where:)
+// firstIndex(of:)/firstIndex(where:)
 //===----------------------------------------------------------------------===//
 
 extension Collection where Element : Equatable {
   /// Returns the first index where the specified value appears in the
   /// collection.
   ///
-  /// After using `index(of:)` to find the position of a particular element in
-  /// a collection, you can use it to access the element by subscripting. This
-  /// example shows how you can modify one of the names in an array of
+  /// After using `firstIndex(of:)` to find the position of a particular element
+  /// in a collection, you can use it to access the element by subscripting.
+  /// This example shows how you can modify one of the names in an array of
   /// students.
   ///
   ///     var students = ["Ben", "Ivy", "Jordell", "Maxime"]
-  ///     if let i = students.index(of: "Maxime") {
+  ///     if let i = students.firstIndex(of: "Maxime") {
   ///         students[i] = "Max"
   ///     }
   ///     print(students)
@@ -54,7 +54,7 @@ extension Collection where Element : Equatable {
   /// - Returns: The first index where `element` is found. If `element` is not
   ///   found in the collection, returns `nil`.
   @inlinable
-  public func index(of element: Element) -> Index? {
+  public func firstIndex(of element: Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
@@ -68,6 +68,13 @@ extension Collection where Element : Equatable {
     }
     return nil
   }
+  
+  /// Returns the first index where the specified value appears in the
+  /// collection.
+  @inlinable
+  public func index(of _element: Element) -> Index? {
+    return firstIndex(of: _element)
+  }
 }
 
 extension Collection {
@@ -80,7 +87,7 @@ extension Collection {
   /// begins with the letter "A":
   ///
   ///     let students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     if let i = students.index(where: { $0.hasPrefix("A") }) {
+  ///     if let i = students.firstIndex(where: { $0.hasPrefix("A") }) {
   ///         print("\(students[i]) starts with 'A'!")
   ///     }
   ///     // Prints "Abena starts with 'A'!"
@@ -92,7 +99,7 @@ extension Collection {
   ///   `true`. If no elements in the collection satisfy the given predicate,
   ///   returns `nil`.
   @inlinable
-  public func index(
+  public func firstIndex(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index? {
     var i = self.startIndex
@@ -103,6 +110,15 @@ extension Collection {
       self.formIndex(after: &i)
     }
     return nil
+  }
+  
+  /// Returns the first index in which an element of the collection satisfies
+  /// the given predicate.
+  @inlinable
+  public func index(
+    where _predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    return try firstIndex(where: _predicate)
   }
 }
 
