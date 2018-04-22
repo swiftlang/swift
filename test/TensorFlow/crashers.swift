@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify
 
+// FIXME(b/78371828): Should this test work with optimized_stdlib?
+// UNSUPPORTED: optimized_stdlib
+
 // This file contains various regression tests that crashed the compiler.
 
 import TensorFlow

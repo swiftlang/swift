@@ -1,5 +1,9 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+
+// FIXME(b/78371828): Should this test work with optimized_stdlib?
+// UNSUPPORTED: optimized_stdlib
+
 import TensorFlow
 
 public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
