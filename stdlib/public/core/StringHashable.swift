@@ -82,7 +82,7 @@ extension _SmallUTF8String {
 extension _StringGuts {
   @effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  internal func _hash(into hasher: inout Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     if _isSmall {
       _smallUTF8String.hash(into: &hasher)
       return
@@ -102,7 +102,7 @@ extension _StringGuts {
 
   @effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  internal func _hash(_ range: Range<Int>, into hasher: inout Hasher) {
+  internal func hash(_ range: Range<Int>, into hasher: inout Hasher) {
     if _isSmall {
       _smallUTF8String[range].hash(into: &hasher)
       return
@@ -132,8 +132,8 @@ extension String : Hashable {
   }
 
   @inlinable
-  public func _hash(into hasher: inout Hasher) {
-    _guts._hash(into: &hasher)
+  public func hash(into hasher: inout Hasher) {
+    _guts.hash(into: &hasher)
   }
 }
 
@@ -144,7 +144,7 @@ extension StringProtocol {
   }
 
   @inlinable
-  public func _hash(into hasher: inout Hasher) {
-    _wholeString._guts._hash(_encodedOffsetRange, into: &hasher)
+  public func hash(into hasher: inout Hasher) {
+    _wholeString._guts.hash(_encodedOffsetRange, into: &hasher)
   }
 }

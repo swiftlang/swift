@@ -1455,7 +1455,7 @@ extension Dictionary: Hashable where Value: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
       var elementHasher = Hasher()

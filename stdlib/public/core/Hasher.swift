@@ -304,7 +304,7 @@ public struct Hasher {
   @inlinable
   @inline(__always)
   public mutating func combine<H: Hashable>(_ value: H) {
-    value._hash(into: &self)
+    value.hash(into: &self)
   }
 
   @effects(releasenone)

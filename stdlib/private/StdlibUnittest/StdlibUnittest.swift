@@ -2497,7 +2497,7 @@ public func checkHashable<Instances: Collection>(
         expectTrue(
           (0..<10).contains { hash(x, seed: $0) != hash(y, seed: $0) },
           """
-          _hash(into:) expected to differ, found to match
+          hash(into:) expected to differ, found to match
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,

@@ -22,7 +22,7 @@ extension _SwiftNewtypeWrapper where Self: Hashable, Self.RawValue : Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(rawValue)
   }
 }
