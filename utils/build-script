@@ -227,7 +227,7 @@ class BuildScriptInvocation(object):
                     "can't find distcc-pump (please install distcc-pump)")
 
         # SWIFT_ENABLE_TENSORFLOW
-        if args.swift_enable_tensorflow:
+        if args.enable_tensorflow:
             if toolchain.bazel is None:
                 diagnostics.fatal(
                     "can't find bazel, needed to build TensorFlow (please "
@@ -261,13 +261,13 @@ class BuildScriptInvocation(object):
                     "and --android-icu-i18n-include must be specified")
 
         # SWIFT_ENABLE_TENSORFLOW
-        if args.swift_enable_tensorflow:
+        if args.enable_tensorflow:
             tensorflow_libs = ["libtensorflow.so", "libtensorflow_framework.so"]
             tensorflow_dirs = [
-                ("swift_tensorflow_host_lib_dir", True),
-                ("swift_tensorflow_host_include_dir", False),
-                ("swift_tensorflow_target_lib_dir", True),
-                ("swift_tensorflow_target_include_dir", False)
+                ("tensorflow_host_lib_dir", True),
+                ("tensorflow_host_include_dir", False),
+                ("tensorflow_target_lib_dir", True),
+                ("tensorflow_target_include_dir", False),
             ]
             tensorflow_dirs = [d for d in tensorflow_dirs
                                if getattr(args, d[0]) is not None]
@@ -286,14 +286,14 @@ class BuildScriptInvocation(object):
                                 .format(dirname, lib, tensorflow_dir))
 
             if args.build_tensorflow and \
-               args.swift_tensorflow_host_lib_dir is not None and \
-                args.swift_tensorflow_host_include_dir is not None:
+               args.tensorflow_host_lib_dir is not None and \
+                args.tensorflow_host_include_dir is not None:
                 diagnostics.fatal(
                     "when building with TensorFlow support, cannot specify "
                     " --build-tensorflow (to build TensorFlow from source) at "
-                    "the same time as --swift-tensorflow-host-lib-dir and "
-                    "--swift-tensorflow-host-include-dir (to use custom " \
-                    "TensorFlow headers/libraries); please pick one")
+                    "the same time as --tensorflow-host-lib-dir and "
+                    "--tensorflow-host-include-dir (to use custom TensorFlow "
+                    "headers/libraries); please pick one")
 
 
     @staticmethod
@@ -355,13 +355,13 @@ class BuildScriptInvocation(object):
             args.build_android = False
 
         # SWIFT_ENABLE_TENSORFLOW
-        if args.swift_enable_tensorflow:
-           if args.swift_tensorflow_host_lib_dir is None and \
-                args.swift_tensorflow_host_include_dir is None:
-               args.build_tensorflow = True
-           elif args.swift_tensorflow_host_lib_dir is not None and \
-              args.swift_tensorflow_host_include_dir is not None:
-               args.build_tensorflow = False
+        if args.enable_tensorflow:
+            if args.tensorflow_host_lib_dir is None and \
+               args.tensorflow_host_include_dir is None:
+                args.build_tensorflow = True
+            elif args.tensorflow_host_lib_dir is not None and \
+                 args.tensorflow_host_include_dir is not None:
+                args.build_tensorflow = False
 
 # ---
 
@@ -805,34 +805,39 @@ class BuildScriptInvocation(object):
         if not args.build_tensorflow:
             impl_args += ["--skip-build-tensorflow"]
 
-        if args.swift_enable_tensorflow:
+        if args.enable_tensorflow:
             impl_args += [
-                "--swift-enable-tensorflow",
+                "--enable-tensorflow",
                 "--host-bazel", toolchain.bazel,
             ]
             # If args.build-tensorflow, include/lib directories will be
             # configured automatically by build-script-impl.
             if not args.build_tensorflow:
-                assert args.swift_tensorflow_host_lib_dir, \
-                    "Missing --swift-tensorflow-host-lib-dir"
-                assert args.swift_tensorflow_host_include_dir, \
-                    "Missing --swift-tensorflow-host-include-dir"
+                assert args.tensorflow_host_lib_dir, \
+                    "Missing --tensorflow-host-lib-dir"
+                assert args.tensorflow_host_include_dir, \
+                    "Missing --tensorflow-host-include-dir"
                 impl_args += [
-                    "--swift-tensorflow-host-lib-dir",
-                    args.swift_tensorflow_host_lib_dir,
-                    "--swift-tensorflow-host-include-dir",
-                    args.swift_tensorflow_host_include_dir,
+                    "--tensorflow-host-lib-dir",
+                    args.tensorflow_host_lib_dir,
+                    "--tensorflow-host-include-dir",
+                    args.tensorflow_host_include_dir,
                 ]
-                if args.swift_tensorflow_target_lib_dir:
+                if args.tensorflow_target_lib_dir:
                     impl_args += [
-                        "--swift-tensorflow-target-lib-dir",
-                        args.swift_tensorflow_target_lib_dir,
+                        "--tensorflow-target-lib-dir",
+                        args.tensorflow_target_lib_dir,
                     ]
-                if args.swift_tensorflow_target_include_dir:
+                if args.tensorflow_target_include_dir:
                     impl_args += [
-                        "--swift-tensorflow-target-include-dir",
-                        args.swift_tensorflow_target_include_dir,
+                        "--tensorflow-target-include-dir",
+                        args.tensorflow_target_include_dir,
                     ]
+        if args.tensorflow_bazel_options:
+            impl_args += [
+                "--tensorflow-bazel-options=%s" % ' '.join(
+                    pipes.quote(opt) for opt in args.tensorflow_bazel_options)
+            ]
 
         impl_args += args.build_script_impl_args
 

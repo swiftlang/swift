@@ -262,11 +262,11 @@ KNOWN_SETTINGS=(
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
-    swift-enable-tensorflow            ""        "If true, enable compiling with TensorFlow"
-    swift-tensorflow-host-lib-dir      ""        "Path to host TensorFlow libraries"
-    swift-tensorflow-host-include-dir      ""        "Path to host TensorFlow headers"
-    swift-tensorflow-target-include-dir    ""        "Path to target Tensorflow headers"
-    swift-tensorflow-target-lib-dir        ""        "Path to target TensorFlow libraries"
+    enable-tensorflow                  ""        "If true, enable compiling with TensorFlow"
+    tensorflow-host-lib-dir            ""        "Path to host TensorFlow libraries"
+    tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
+    tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
+    tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
 )
 
 # Centralized access point for traced command invocation.
@@ -971,7 +971,7 @@ if [ -z "${CMAKE}" ] ; then
     exit 1
 fi
 # SWIFT_ENABLE_TENSORFLOW
-if [[ "${SWIFT_ENABLE_TENSORFLOW}" ]]; then
+if [[ "${ENABLE_TENSORFLOW}" ]]; then
     if [ -z "${HOST_BAZEL}" ] ; then
         echo "Can't find bazel, needed for building TensorFlow."
         exit 1
@@ -1197,7 +1197,7 @@ if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR
     exit 1
 fi
 # SWIFT_ENABLE_TENSORFLOW
-if [[ "${SWIFT_ENABLE_TENSORFLOW}" ]]; then
+if [[ "${ENABLE_TENSORFLOW}" ]]; then
     if [[ ! "${SKIP_BUILD_TENSORFLOW}" && ! -d "${TENSORFLOW_SOURCE_DIR}" ]]; then
         echo "Couldn't find TensorFlow source directory."
         exit 1
@@ -1276,7 +1276,7 @@ function verify_tensorflow_directories() {
     # NOTE: This function must be called after TensorFlow is built from source
     # if --build-tensorflow if true. Otherwise, host include/library directories
     # will not be set.
-    if [[ ! "${SWIFT_ENABLE_TENSORFLOW}" ]]; then
+    if [[ ! "${ENABLE_TENSORFLOW}" ]]; then
         return 1
     fi
 
@@ -1286,7 +1286,7 @@ function verify_tensorflow_directories() {
         for dir_type in "INCLUDE" "LIB"; do
             lower_platform="$(tolower ${platform})"
             lower_dir_type="$(tolower ${dir_type})"
-            dir_name="SWIFT_TENSORFLOW_${platform}_${dir_type}_DIR"
+            dir_name="TENSORFLOW_${platform}_${dir_type}_DIR"
 
             # Always perform check for "HOST" arguments.
             # Perform check for "TARGET" arguments only if they are specified.
@@ -1556,6 +1556,7 @@ COMMON_C_FLAGS=" -Wno-unknown-warning-option -Werror=unguarded-availability-new"
 eval COMMON_CMAKE_OPTIONS=(${COMMON_CMAKE_OPTIONS})
 eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
+eval TENSORFLOW_BAZEL_OPTIONS=(${TENSORFLOW_BAZEL_OPTIONS})
 
 if [[ -n "${DISTCC}" ]]; then
     if [[ "$(uname -s)" == "Darwin" ]] ; then
@@ -1865,7 +1866,7 @@ function set_lldb_xcodebuild_options() {
 	)
     fi
     # SWIFT_ENABLE_TENSORFLOW
-    if [[ "${SWIFT_ENABLE_TENSORFLOW}" && "$(uname -s)" == "Darwin" ]] ; then
+    if [[ "${ENABLE_TENSORFLOW}" && "$(uname -s)" == "Darwin" ]] ; then
         set_lldb_build_mode
         # FIXME: This is a hack: adding rpaths with many `..` that jump across
         # frameworks is bad practice. It would be cleaner/more robust to copy
@@ -1876,7 +1877,7 @@ function set_lldb_xcodebuild_options() {
         RPATHS="${LLDB_BINARY_RPATH} ${LLDB_BINARIES_RPATH} ${LLDB_SO_RPATH}"
         lldb_xcodebuild_options=(
             "${lldb_xcodebuild_options[@]}"
-            SWIFT_ENABLE_TENSORFLOW=1
+            ENABLE_TENSORFLOW=1
             EXTRA_OTHER_LDFLAGS="-L\$(LLDB_PATH_TO_SWIFT_BUILD)/lib/swift/\$(PLATFORM_NAME) ${RPATHS} -ltensorflow -ltensorflow_framework"
         )
     fi
@@ -2282,7 +2283,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                if [[ "${SWIFT_ENABLE_TENSORFLOW}" ]] ; then
+                if [[ "${ENABLE_TENSORFLOW}" ]] ; then
                     # Verify TensorFlow include/library directories.
                     verify_tensorflow_directories
 
@@ -2297,23 +2298,23 @@ for host in "${ALL_HOSTS[@]}"; do
                     for lib_name in tensorflow tensorflow_framework; do
                         lib="lib${lib_name}.so"
                         rm -f "${TF_LIB_DIR}/${lib}"
-                        chmod +w "${SWIFT_TENSORFLOW_HOST_LIB_DIR}/${lib}"
-                        cp -p "${SWIFT_TENSORFLOW_HOST_LIB_DIR}/${lib}" "${TF_LIB_DIR}"
+                        chmod +w "${TENSORFLOW_HOST_LIB_DIR}/${lib}"
+                        cp -p "${TENSORFLOW_HOST_LIB_DIR}/${lib}" "${TF_LIB_DIR}"
                     done
 
-                    if [[ ! "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
-                        SWIFT_TENSORFLOW_TARGET_LIB_DIR="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
+                    if [[ ! "${TENSORFLOW_TARGET_LIB_DIR}" ]] ; then
+                        TENSORFLOW_TARGET_LIB_DIR="${TENSORFLOW_HOST_LIB_DIR}"
                     fi
-                    if [[ ! "${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}" ]] ; then
-                        SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR="${SWIFT_TENSORFLOW_HOST_INCLUDE_DIR}"
+                    if [[ ! "${TENSORFLOW_TARGET_INCLUDE_DIR}" ]] ; then
+                        TENSORFLOW_TARGET_INCLUDE_DIR="${TENSORFLOW_HOST_INCLUDE_DIR}"
                     fi
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
-                        -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
-                        -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_HOST_INCLUDE_DIR}"
-                        -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_LIB_DIR}"
-                        -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
+                        -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${TENSORFLOW_HOST_LIB_DIR}"
+                        -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${TENSORFLOW_HOST_INCLUDE_DIR}"
+                        -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${TENSORFLOW_TARGET_LIB_DIR}"
+                        -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
                     )
                 fi
 
@@ -2324,14 +2325,14 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DLLDB_ENABLE:BOOL=TRUE
                         -DLLDB_BUILD_DIR:STRING="${lldb_build_dir}"
                     )
-                    if [[ "${SWIFT_ENABLE_TENSORFLOW}" ]] ; then
+                    if [[ "${ENABLE_TENSORFLOW}" ]] ; then
                         lldb_cmake_options=(
                             "${lldb_cmake_options[@]}"
                             -DSWIFT_ENABLE_TENSORFLOW:BOOL=TRUE
-                            -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${SWIFT_TENSORFLOW_HOST_LIB_DIR}"
-                            -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_HOST_INCLDUE_DIR}"
-                            -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_LIB_DIR}"
-                            -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR}"
+                            -DSWIFT_TENSORFLOW_HOST_LIB_DIR:PATH="${TENSORFLOW_HOST_LIB_DIR}"
+                            -DSWIFT_TENSORFLOW_HOST_INCLUDE_DIR:PATH="${TENSORFLOW_HOST_INCLDUE_DIR}"
+                            -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${TENSORFLOW_TARGET_LIB_DIR}"
+                            -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
                         )
                     fi
                 fi
@@ -2727,15 +2728,14 @@ for host in "${ALL_HOSTS[@]}"; do
             tensorflow)
                 # Configure TensorFlow and build using bazel.
                 echo yes "" | "${source_dir}/configure"
-                TENSORFLOW_BAZEL_OPTIONS="$(echo "${TENSORFLOW_BAZEL_OPTIONS}" | tr ';' ' ')"
                 with_pushd "${source_dir}" \
-                    call bazel build -c opt ${TENSORFLOW_BAZEL_OPTIONS} //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
+                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
 
                 # Set TensorFlow include/lib directories.
-                SWIFT_TENSORFLOW_HOST_INCLUDE_DIR="${source_dir}"
-                SWIFT_TENSORFLOW_HOST_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
-                SWIFT_TENSORFLOW_TARGET_INCLUDE_DIR="${source_dir}"
-                SWIFT_TENSORFLOW_TARGET_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
+                TENSORFLOW_HOST_INCLUDE_DIR="${source_dir}"
+                TENSORFLOW_HOST_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
+                TENSORFLOW_TARGET_INCLUDE_DIR="${source_dir}"
+                TENSORFLOW_TARGET_LIB_DIR="${source_dir}/bazel-bin/tensorflow"
 
                 # TensorFlow builds itself and doesn't use CMake.
                 continue
