@@ -487,6 +487,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { paramRef }, { Identifier() });
   reinterpreted->setType(enumTy);
+  reinterpreted->setThrows(false);
 
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
                                    /*implicit*/ true);
@@ -573,6 +574,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { selfRef }, { Identifier() });
   reinterpreted->setType(rawTy);
+  reinterpreted->setThrows(false);
 
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
@@ -911,6 +913,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                   { selfRef },
                                                   { Identifier() });
+    reinterpreted->setThrows(false);
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
