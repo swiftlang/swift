@@ -75,6 +75,7 @@ EXPR_NODES = [
                        'SelfToken',
                        'CapitalSelfToken',
                        'DollarIdentifierToken',
+                       'SpacedBinaryOperatorToken',
                    ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True),

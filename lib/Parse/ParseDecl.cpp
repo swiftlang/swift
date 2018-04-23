@@ -2848,9 +2848,8 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
     };
     // Parse the 'class' keyword for a class requirement.
     if (Tok.is(tok::kw_class)) {
-      // FIXME: class requirement will turn to an unknown type in libSyntax tree.
       SyntaxParsingContext ClassTypeContext(SyntaxContext,
-                                            SyntaxContextKind::Type);
+                                            SyntaxKind::ClassRestrictionType);
       // If we aren't allowed to have a class requirement here, complain.
       auto classLoc = consumeToken();
       if (!allowClassRequirement) {
