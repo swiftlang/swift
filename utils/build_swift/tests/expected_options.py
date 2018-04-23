@@ -188,13 +188,14 @@ EXPECTED_DEFAULTS = {
     'watchos': False,
     'watchos_all': False,
     # SWIFT_ENABLE_TENSORFLOW
+    'enable_tensorflow': False,
     'build_tensorflow': False,
+    'tensorflow_host_lib_dir': None,
+    'tensorflow_host_include_dir': None,
+    'tensorflow_target_lib_dir': None,
+    'tensorflow_target_include_dir': None,
     'host_bazel': None,
-    'swift_enable_tensorflow': False,
-    'swift_tensorflow_host_lib_dir': None,
-    'swift_tensorflow_host_include_dir': None,
-    'swift_tensorflow_target_lib_dir': None,
-    'swift_tensorflow_target_include_dir': None,
+    'tensorflow_bazel_options': [],
 }
 
 
@@ -559,11 +560,12 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--watchos-all'),
 
     # SWIFT_ENABLE_TENSORFLOW
+    EnableOption('--enable-tensorflow'),
     EnableOption('--build-tensorflow'),
-    EnableOption('--swift-enable-tensorflow'),
+    PathOption('--tensorflow-host-lib-dir'),
+    PathOption('--tensorflow-host-include-dir'),
+    PathOption('--tensorflow-target-lib-dir'),
+    PathOption('--tensorflow-target-include-dir'),
     PathOption('--host-bazel'),
-    PathOption('--swift-tensorflow-host-lib-dir'),
-    PathOption('--swift-tensorflow-host-include-dir'),
-    PathOption('--swift-tensorflow-target-lib-dir'),
-    PathOption('--swift-tensorflow-target-include-dir'),
+    AppendOption('--tensorflow-bazel-options'),
 ]
