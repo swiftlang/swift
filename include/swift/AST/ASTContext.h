@@ -860,6 +860,10 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
+  /// Populate \p names with visible top level module names.
+  /// This guarantees that resulted \p names doesn't have duplicated names.
+  void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
+
 private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already

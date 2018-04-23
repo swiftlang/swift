@@ -1753,35 +1753,22 @@ public:
   }
 
   void addImportModuleNames() {
-    // FIXME: Add user-defined swift modules
-    SmallVector<StringRef, 20> ModuleNames;
-
-    // Collect clang module names.
-    {
-      SmallVector<clang::Module*, 20> ClangModules;
-      Ctx.getVisibleTopLevelClangModules(ClangModules);
-      for (auto *M : ClangModules) {
-        if (!M->isAvailable())
-          continue;
-        if (M->getTopLevelModuleName().startswith("_"))
-          continue;
-        if (M->getTopLevelModuleName() == Ctx.SwiftShimsModuleName.str())
-          continue;
-
-        ModuleNames.push_back(M->getTopLevelModuleName());
-      }
-    }
-
-    std::sort(ModuleNames.begin(), ModuleNames.end(),
-              [](StringRef LHS, StringRef RHS) {
-                return LHS.compare_lower(RHS) < 0;
-              });
+    SmallVector<Identifier, 0> ModuleNames;
+    Ctx.getVisibleTopLevelModuleNames(ModuleNames);
 
     llvm::StringSet<> ImportedModules;
     collectImportedModules(ImportedModules);
 
+    auto mainModuleName = CurrDeclContext->getParentModule()->getName();
     for (auto ModuleName : ModuleNames) {
-      auto MD = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+      if (ModuleName == mainModuleName)
+        continue;
+      if (ModuleName.str().startswith("_"))
+        continue;
+      if (ModuleName == Ctx.SwiftShimsModuleName)
+        continue;
+
+      auto MD = ModuleDecl::create(ModuleName, Ctx);
       CodeCompletionResultBuilder Builder(
           Sink,
           CodeCompletionResult::ResultKind::Declaration,

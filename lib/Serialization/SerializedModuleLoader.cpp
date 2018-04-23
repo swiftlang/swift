@@ -44,6 +44,149 @@ SerializedModuleLoader::~SerializedModuleLoader() = default;
 MemoryBufferSerializedModuleLoader::~MemoryBufferSerializedModuleLoader() =
     default;
 
+void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
+    SmallVectorImpl<Identifier> &names, StringRef extension) const {
+  llvm::SmallString<16> moduleSuffix;
+  moduleSuffix += '.';
+  moduleSuffix += file_types::getExtension(file_types::TY_SwiftModuleFile);
+
+  llvm::SmallString<16> suffix;
+  suffix += '.';
+  suffix += extension;
+
+  SmallVector<SmallString<64>, 3> targetFiles;
+  targetFiles.emplace_back(
+      getTargetSpecificModuleTriple(Ctx.LangOpts.Target).str());
+  targetFiles.back() += suffix;
+  targetFiles.emplace_back(Ctx.LangOpts.Target.getArchName());
+  targetFiles.back() += suffix;
+
+  auto &fs = *Ctx.SourceMgr.getFileSystem();
+
+  // Apply \p body for each directory entry in \p dirPath.
+  auto forEachDirectoryEntryPath =
+      [&](StringRef dirPath, llvm::function_ref<void(StringRef)> body) {
+        std::error_code errorCode;
+        llvm::vfs::directory_iterator DI = fs.dir_begin(dirPath, errorCode);
+        llvm::vfs::directory_iterator End;
+        for (; !errorCode && DI != End; DI.increment(errorCode))
+          body(DI->path());
+      };
+
+  // Check whether target specific module file exists or not in given directory.
+  // $PATH/{arch}.{extension}
+  auto checkTargetFiles = [&](StringRef path) -> bool {
+    llvm::SmallString<256> scratch;
+    for (auto targetFile : targetFiles) {
+      scratch.clear();
+      llvm::sys::path::append(scratch, path, targetFile);
+      // If {arch}.{extension} exists, consider it's visible. Technically, we
+      // should check the file type, permission, format, etc., but it's too
+      // heavy to do that for each files.
+      if (fs.exists(scratch))
+        return true;
+    }
+    return false;
+  };
+
+  auto tryImportSearchPath = [&](StringRef searchPath) {
+    // Look for:
+    // $PATH/{name}.swiftmodule/{arch}.{extension} ; Or
+    // $PATH/{name}.{extension}
+    forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
+      auto pathExt = llvm::sys::path::extension(path);
+      if (pathExt != moduleSuffix && pathExt != suffix)
+        return;
+
+      auto stat = fs.status(path);
+      if (!stat)
+        return;
+      if (pathExt == moduleSuffix && stat->isDirectory()) {
+        if (!checkTargetFiles(path))
+          return;
+      } else if (pathExt != suffix) {
+        return;
+      }
+      // Extract module name.
+      auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
+      names.push_back(Ctx.getIdentifier(name));
+    });
+  };
+
+  auto tryRuntimeLibraryPath = [&](StringRef searchPath) {
+    // Look for:
+    // (Darwin OS) $PATH/{name}.swiftmodule/{arch}.{extension}
+    // (Other OS)  $PATH/{name}.{extension}
+    bool requireTargetSpecificModule = Ctx.LangOpts.Target.isOSDarwin();
+    forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
+      auto pathExt = llvm::sys::path::extension(path);
+      if (requireTargetSpecificModule) {
+        if (pathExt != moduleSuffix)
+          return;
+        if (!checkTargetFiles(path))
+          return;
+      } else {
+        auto stat = fs.status(path);
+        if (!stat || stat->isDirectory())
+          return;
+        if (suffix != pathExt)
+          return;
+      }
+      // Extract module name.
+      auto name = llvm::sys::path::filename(path).drop_back(pathExt.size());
+      names.push_back(Ctx.getIdentifier(name));
+    });
+  };
+
+  auto tryFrameworkSearchPath = [&](StringRef searchPath) {
+    // Look for:
+    // $PATH/{name}.framework/Modules/{name}.swiftmodule/{arch}.{extension}
+    forEachDirectoryEntryPath(searchPath, [&](StringRef path) {
+      if (llvm::sys::path::extension(path) != ".framework")
+        return;
+
+      // Extract Framework name.
+      auto name = llvm::sys::path::filename(path).drop_back(
+          StringLiteral(".framework").size());
+
+      SmallString<128> moduleDir;
+      llvm::sys::path::append(moduleDir, path, "Modules", name + moduleSuffix);
+      if (!checkTargetFiles(moduleDir))
+        return;
+
+      names.push_back(Ctx.getIdentifier(name));
+    });
+  };
+
+  for (const auto &path : Ctx.SearchPathOpts.ImportSearchPaths)
+    tryImportSearchPath(path);
+
+  for (const auto &path : Ctx.SearchPathOpts.FrameworkSearchPaths)
+    tryFrameworkSearchPath(path.Path);
+
+  // Apple platforms have extra implicit framework search paths:
+  // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/
+  if (Ctx.LangOpts.Target.isOSDarwin()) {
+    SmallString<128> scratch;
+    scratch = Ctx.SearchPathOpts.SDKPath;
+    llvm::sys::path::append(scratch, "System", "Library", "Frameworks");
+    tryFrameworkSearchPath(scratch);
+
+    scratch = Ctx.SearchPathOpts.SDKPath;
+    llvm::sys::path::append(scratch, "Library", "Frameworks");
+    tryFrameworkSearchPath(scratch);
+  }
+
+  for (auto importPath : Ctx.SearchPathOpts.RuntimeLibraryImportPaths)
+    tryRuntimeLibraryPath(importPath);
+}
+
+void SerializedModuleLoader::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  collectVisibleTopLevelModuleNamesImpl(
+      names, file_types::getExtension(file_types::TY_SwiftModuleFile));
+}
+
 std::error_code SerializedModuleLoaderBase::openModuleDocFile(
   AccessPathElem ModuleID, StringRef ModuleDocPath,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {

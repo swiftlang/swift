@@ -1494,9 +1494,22 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   return false;
 }
 
+void ClangImporter::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  SmallVector<clang::Module *, 32> Modules;
+  Impl.getClangPreprocessor().getHeaderSearchInfo().collectAllModules(Modules);
+  for (auto &M : Modules) {
+    if (!M->isAvailable())
+      continue;
+
+    names.push_back(
+        Impl.SwiftContext.getIdentifier(M->getTopLevelModuleName()));
+  }
+}
+
 void ClangImporter::collectSubModuleNames(
     ArrayRef<std::pair<Identifier, SourceLoc>> path,
-    std::vector<std::string> &names) {
+    std::vector<std::string> &names) const {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
