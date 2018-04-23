@@ -486,3 +486,8 @@ precedencegroup BazPrecedence {
 infix operator<++>:FooPrecedence
 prefix operator..<<
 postfix operator <-
+
+func higherOrderFunc() {
+  let x = [1,2,3]
+  x.reduce(0, +)
+}
