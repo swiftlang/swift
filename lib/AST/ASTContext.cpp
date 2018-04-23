@@ -139,8 +139,11 @@ struct ASTContext::Implementation {
   CanType AnyObjectType;
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// The TensorFlow.TensorHandle<T> decl.
+  /// The declaration of TensorFlow.TensorHandle<T>.
   ClassDecl *TensorHandleDecl = nullptr;
+
+  /// The declaration of Swift._AutoDiffTape<T>.
+  ClassDecl *AutoDiffTapeDecl = nullptr;
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
@@ -766,6 +769,12 @@ ClassDecl *ASTContext::getTensorHandleDecl() const {
     if (auto CD = dyn_cast<ClassDecl>(result))
       return Impl.TensorHandleDecl = CD;
   return nullptr;
+}
+
+CanType ASTContext::getAutoDiffTapeType() const {
+  if (auto adtDecl = get_AutoDiffTapeDecl())
+    return adtDecl->getDeclaredType()->getCanonicalType();
+  return CanType();
 }
 
 CanType ASTContext::getNeverType() const {

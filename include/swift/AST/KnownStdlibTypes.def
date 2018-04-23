@@ -80,4 +80,7 @@ KNOWN_STDLIB_TYPE_DECL(KeyedEncodingContainer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(KeyedDecodingContainer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(RangeReplaceableCollection, ProtocolDecl, 1)
 
+// SWIFT_ENABLE_TENSORFLOW
+KNOWN_STDLIB_TYPE_DECL(_AutoDiffTape, ClassDecl, 1)
+
 #undef KNOWN_STDLIB_TYPE_DECL
