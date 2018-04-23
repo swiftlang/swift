@@ -1414,6 +1414,10 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Swift3ImplicitObjCEntrypoint)
 // SWIFT_ENABLE_TENSORFLOW
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TensorFlowSend)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TensorFlowReceive)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffCreateTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffPushToTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffPopFromTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffDestroyTape)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

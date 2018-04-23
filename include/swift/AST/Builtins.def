@@ -553,6 +553,15 @@ BUILTIN_MISC_OPERATION(TensorFlowSend, "tensorflowSend", "", Special)
 /// ID number that allows matching sends and receives.
 BUILTIN_MISC_OPERATION(TensorFlowReceive, "tensorflowReceive", "", Special)
 
+// Automatic differentiation builtins.
+/// autodiffCreateTape has type <T> () -> Builtin.AutoDiffTape<T>.
+BUILTIN_MISC_OPERATION(AutoDiffCreateTape, "autodiffCreateTape", "", Special)
+/// autodiffPushToTape has type <T> (Builtin.AutoDiffTape<T>, T, Builtin.Int) -> ().
+BUILTIN_MISC_OPERATION(AutoDiffPushToTape, "autodiffPushToTape", "", Special)
+/// autodiffPopFromTape has type <T> (Builtin.AutoDiffTape<T>, Builtin.Int) -> T.
+BUILTIN_MISC_OPERATION(AutoDiffPopFromTape, "autodiffPopFromTape", "", Special)
+/// autodiffDestroyTape has type <T> (Builtin.AutoDiffTape<T>) -> ().
+BUILTIN_MISC_OPERATION(AutoDiffDestroyTape, "autodiffDestroyTape", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 
