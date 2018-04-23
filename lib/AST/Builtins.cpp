@@ -590,7 +590,7 @@ makeConcrete(Type type) {
 // SWIFT_ENABLE_TENSORFLOW
 template <class P, class... Gs>
 static BuiltinGenericSignatureBuilder::LambdaGenerator
-makeBoundGeneric(NominalTypeDecl *decl, P parentGenerator,
+makeBoundGeneric(NominalTypeDecl *decl, const P &parentGenerator,
                  const Gs & ...genericParamGenerators) {
   return {
     [=](BuiltinGenericSignatureBuilder &builder, bool forBody) -> Type {
@@ -985,7 +985,7 @@ static ValueDecl *getTensorFlowReceive(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAutoDiffCreateTape(ASTContext &Context, Identifier Id) {
   // <T> () -> (Swift._AutoDiffTape<T>)
   BuiltinGenericSignatureBuilder builder(Context, 1);
-  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
   builder.setResult(
     makeBoundGeneric(tapeDecl, makeConcrete(Type()), makeGenericParam()));
   return builder.build(Id);
@@ -994,7 +994,7 @@ static ValueDecl *getAutoDiffCreateTape(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAutoDiffPushToTape(ASTContext &Context, Identifier Id) {
   // <T> (Swift._AutoDiffTape<T>, T, Builtin.Int64) -> ()
   BuiltinGenericSignatureBuilder builder(Context, 1);
-  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
   auto T = makeGenericParam();
   builder.addParameter(makeBoundGeneric(tapeDecl, makeConcrete(Type()), T));
   builder.addParameter(T);
@@ -1006,7 +1006,7 @@ static ValueDecl *getAutoDiffPushToTape(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAutoDiffPopFromTape(ASTContext &Context, Identifier Id) {
   // <T> (Swift._AutoDiffTape<T>, Builtin.Int64) -> (T)
   BuiltinGenericSignatureBuilder builder(Context, 1);
-  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
   auto T = makeGenericParam();
   builder.addParameter(makeBoundGeneric(tapeDecl, makeConcrete(Type()), T));
   builder.addParameter(makeConcrete(BuiltinIntegerType::get(64, Context)));
@@ -1017,7 +1017,7 @@ static ValueDecl *getAutoDiffPopFromTape(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
   // <T> (Swift._AutoDiffTape<T>) -> ()
   BuiltinGenericSignatureBuilder builder(Context, 1);
-  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  auto *tapeDecl = Context.get_AutoDiffTapeDecl();
   builder.addParameter(
     makeBoundGeneric(tapeDecl, makeConcrete(Type()), makeGenericParam()));
   builder.setResult(makeConcrete(Context.TheEmptyTupleType));
