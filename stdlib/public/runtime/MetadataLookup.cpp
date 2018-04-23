@@ -262,7 +262,8 @@ _searchTypeMetadataRecords(const TypeMetadataPrivateState &T,
 }
 
 static const TypeContextDescriptor *
-_findNominalTypeDescriptor(Demangle::NodePointer node) {
+_findNominalTypeDescriptor(Demangle::NodePointer node,
+                           Demangle::Demangler &Dem) {
   const TypeContextDescriptor *foundNominal = nullptr;
   auto &T = TypeMetadataRecords.get();
 
@@ -274,7 +275,13 @@ _findNominalTypeDescriptor(Demangle::NodePointer node) {
     return cast<TypeContextDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
-  auto mangledName = Demangle::mangleNode(node);
+  auto mangledName =
+    Demangle::mangleNode(node,
+                         [&](const void *context) -> NodePointer {
+                           return _buildDemanglingForContext(
+                               (const ContextDescriptor *) context,
+                               {}, false, Dem);
+                         });
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -695,7 +702,7 @@ public:
 #endif
 
     // Look for a nominal type descriptor based on its mangled name.
-    return _findNominalTypeDescriptor(node);
+    return _findNominalTypeDescriptor(node, demangler);
   }
 
   BuiltProtocolDecl createProtocolDecl(
