@@ -140,6 +140,25 @@ public struct FilterTest {
   }
 }
 
+public struct PredicateCountTest {
+  public let expected: Int
+  public let sequence: [Int]
+  public let includeElement: (Int) -> Bool
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: Int,
+    _ sequence: [Int],
+    _ includeElement: @escaping (Int) -> Bool,
+    file: String = #file, line: UInt = #line
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.includeElement = includeElement
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
 public struct FindTest {
   public let expected: Int?
   public let element: MinimalEquatableValue
@@ -521,6 +540,21 @@ public let filterTests = [
     [ 0, 30, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in x % 3 == 0 }
   ),
 ]
+
+public let predicateCountTests = [
+  PredicateCountTest(
+    0, [],
+    { _ -> Bool in expectUnreachable(); return true }),
+
+  PredicateCountTest(0, [ 0, 30, 10, 90 ], { _ -> Bool in false }),
+  PredicateCountTest(
+    4, [ 0, 30, 10, 90 ], { _ -> Bool in true }
+  ),
+  PredicateCountTest(
+    3, [ 0, 30, 10, 90 ], { (x: Int) -> Bool in x % 3 == 0 }
+  ),
+]
+
 
 public let findTests = [
   FindTest(

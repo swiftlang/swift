@@ -517,6 +517,52 @@ extension Sequence where Element : Equatable {
 }
 
 //===----------------------------------------------------------------------===//
+// count(where:)
+//===----------------------------------------------------------------------===//
+
+extension Sequence {
+  /// Returns a Int value indicating how many elements in the sequence
+  /// satisfy the given predicate.
+  ///
+  /// You can use the predicate to check for an element of a type that
+  /// doesn't conform to the `Equatable` protocol, such as the
+  /// `HTTPResponse` enumeration in this example.
+  ///
+  ///     enum HTTPResponse {
+  ///         case ok
+  ///         case error(Int)
+  ///     }
+  ///
+  ///     let responses: [HTTPResponse] = [.ok, .error(500), .error(404)]
+  ///     let numberOfErrors = responses.count { element in
+  ///         if case .error = element {
+  ///             return true
+  ///         } else {
+  ///             return false
+  ///         }
+  ///     }
+  ///     // 'numberOfErrors' == 2
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence
+  ///   as its argument and returns a Boolean value that indicates whether
+  ///   the passed element should be included in the count.
+  /// - Returns: a value indicating how many elements in the sequence
+  ///   satisfy the given predicate.
+  @inlinable
+  public func count(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Int {
+    var count = 0
+    for e in self {
+      if try predicate(e) {
+        count += 1
+      }
+    }
+    return count
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//
 
