@@ -306,7 +306,9 @@ ADContext::ADContext(SILModule &module, SILPassManager &passManager)
   auto &ctx = getASTContext();
 
   // Link all from module.
+  // FIXME: Link per instance.
   module.linkAllFromCurrentModule();
+  module.linkAllWitnessTables();
 
   // Cache commonly used declarations and function references.
   differentiableProtocol =
@@ -357,7 +359,7 @@ public:
     : diffTasks(diffTasks), context(context) {}
 
   using Result = DenseMap<std::pair<SILFunction *, ArrayRef<unsigned>>,
-                                  PrimalFunctionInfo>;
+                          PrimalFunctionInfo>;
   /// Perform primal generation, and indirectly returns a mapping from original
   /// functions to primal infos.
   void generate(Result &primalInfos);
@@ -779,21 +781,22 @@ findSILFunctionForRequiredProtocolMember(NominalTypeDecl *typeDecl,
 }
 
 /// Looks through the definition of a function value. If the source that
-/// produced this function value is `function_ref`, it return the concrete
-/// `SILFunction`.
-static SILFunction *findReferencedFunction(SILValue value) {
+/// produced this function value is `function_ref` and the function is visible
+/// (either in the same module or is serialized), return the instruction.
+/// Otherwise, return null.
+static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
   auto *inst = value->getDefiningInstruction();
   if (!inst) return nullptr;
   if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
     auto *fn = fri->getReferencedFunction();
     if (&fn->getModule() == &inst->getModule() ||
         fn->isSerialized() == IsSerialized)
-      return fn;
+      return fri;
   }
   if (auto *thinToThink = dyn_cast<ThinToThickFunctionInst>(inst))
-    return findReferencedFunction(thinToThink->getOperand());
+    return findReferenceToVisibleFunction(thinToThink->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
-    return findReferencedFunction(convertFn->getOperand());
+    return findReferenceToVisibleFunction(convertFn->getOperand());
   return nullptr;
 }
 
@@ -1136,20 +1139,34 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   auto *primalApply = builder.createApply(loc, primalRef,
                                           canGrad.getForwardingSubstitutions(),
                                           primalArgs, /*isNonThrowing*/ false);
-  // Collect primal results (direct and indirect) in the original order, to be
-  // ready to pass them to the adjoint.
-  // TODO: Does `SILInstruction::getResults` give all results, including the
-  // indirect ones?
-  auto primalResults = primalApply->getResults();
-
+  // Collect the primal's direct results.
+  SmallVector<SILValue, 8> primalResults;
+  if (primalConv.getNumDirectSILResults() == 1)
+    primalResults.push_back(primalApply);
+  else {
+    auto tupleSILTy = primalConv.getSILResultType();
+    for (unsigned i = 0, n = primalConv.getNumDirectSILResults();
+         i != n; ++i) {
+      auto val = builder.createTupleExtract(loc, primalApply, i,
+                                            tupleSILTy.getTupleElementType(i));
+      primalResults.push_back(val);
+    }
+  }
   // Call adjoint with original arguments, the checkpoints value and the seed.
   SmallVector<SILValue, 8> adjointArgs;
   // Add indirect results and original parameters. These are the canonical
   // gradient's arguments except the seed, which is the last argument.
   for (auto arg : canGrad.getArguments().drop_back())
     adjointArgs.push_back(arg);
-  // Add primal checkpoints.
-  adjointArgs.append(primalResults.begin(), primalResults.end());
+  // Add primal checkpoints and the original result (all returned by primal).
+  auto primIndResIdx = primalConv.getSILArgIndexOfFirstIndirectResult();
+  auto primDirResIdx = 0;
+  for (auto result : primalConv.getResults()) {
+    if (result.isFormalDirect())
+      adjointArgs.push_back(primalResults[primDirResIdx++]);
+    else
+      adjointArgs.push_back(primalArgs[primIndResIdx++]);
+  }
   // Add seed.
   adjointArgs.push_back(canGrad.getArguments().back());
   // %2 = function_ref @adjoint
@@ -1163,21 +1180,24 @@ static void fillCanonicalGradient(SILFunction &canGrad,
     builder.createDeallocStack(loc, val);
   // Return the original result and the adjoint result as a tuple. If either one
   // of the primal or the adjoint returns a tuple, join them in a flat tuple.
-  //
-  // NOTE: Currently we don't have a formal way to extract the primal result
-  // from the checkpoints value, which can be a value of some nominal type, or a
-  // tuple. The best way would be separating the original result from
-  // checkpoints and also passing them separately to the adjoint. Today, we just
-  // assume that the primal result is the checkpoints value. This only works for
-  // primitive functions unfortunately.
-  SmallVector<SILValue, 8> directResults = { primalApply };
+  SmallVector<SILValue, 8> directResults;
+  // If the original result is a direct return, add it to the direct return list
+  // of the canonical gradient.
+  if (primalConv.getResults().back().isFormalDirect())
+    directResults.push_back(*primalResults.rbegin());
+  // Add the adjoint's results to the direct return list.
   if (adjointConv.getNumDirectSILResults() == 1)
     directResults.push_back(adjApply);
   else {
-    auto adjointElems =
-      builder.createDestructureTuple(loc, adjApply)->getResults();
-    directResults.append(adjointElems.begin(), adjointElems.end());
+    auto tupleSILTy = adjApply->getType();
+    for (unsigned i = 0, n = adjointConv.getNumDirectSILResults();
+         i != n; ++i) {
+      auto val = builder.createTupleExtract(loc, adjApply, i,
+                                            tupleSILTy.getTupleElementType(i));
+      directResults.push_back(val);
+    }
   }
+  // Return these results as a tuple.
   auto tupleRet =
     builder.createTuple(loc, canGradConv.getSILResultType(), directResults);
   builder.createReturn(loc, tupleRet);
@@ -1238,8 +1258,39 @@ void Differentiation::run() {
     auto operand = gi->getOperand(0);
     SILFunction *gradFn = nullptr;
     // If it traces back to a `function_ref`, differentiate that.
-    if (auto *original = findReferencedFunction(operand))
+    if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
+      auto *original = originalFRI->getReferencedFunction();
       gradFn = getOrCreateGradient(context, gi, original, worklist);
+
+      // If `gradFn` is still null, errors must have occurred.
+      if (!gradFn) return;
+
+      // Replace the `gradient` instruction with the reference to the specified
+      // function.
+      SILBuilder builder(gi);
+      auto loc = parent->getLocation();
+      SILValue gradRef = builder.createFunctionRef(loc, gradFn);
+      // Traverse from the `gradient` instruction to the original
+      // `function_ref`. If there's any function convertion, do the same
+      // convertion for the gradient.
+      std::function<SILValue(SILValue)> convertGradRefLikeOriginal;
+      convertGradRefLikeOriginal = [&](SILValue originalVal) -> SILValue {
+        auto *inst = originalVal->getDefiningInstruction();
+        if (inst == originalFRI) return gradRef;
+        if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(inst)) {
+          auto thickTy = original->getLoweredFunctionType()
+            ->getWithRepresentation(SILFunctionTypeRepresentation::Thick);
+          auto silThickTy = SILType::getPrimitiveObjectType(thickTy);
+          return builder.createThinToThickFunction(
+            loc, convertGradRefLikeOriginal(tttfi->getOperand()), silThickTy);
+        }
+        llvm_unreachable("Unhandled function convertion instruction");
+      };
+      // Replace uses of the `gradient` instruction with the converted (if
+      // necessary) gradient function value.
+      gi->replaceAllUsesWith(convertGradRefLikeOriginal(gi->getOriginal()));
+      gi->eraseFromParent();
+    }
     // Differentiating opaque functions is not supported yet.
     else {
       if (auto loc = gi->getLoc()) {
@@ -1249,17 +1300,6 @@ void Differentiation::run() {
       }
       context.setErrorOccurred();
     }
-
-    // If `gradFn` is still null, errors must have occurred.
-    if (!gradFn) return;
-
-    // Replace the `gradient` instruction with the reference to the specified
-    // function.
-    SILBuilder builder(gi);
-    auto *gradFnRef = builder.createFunctionRef(gi->getLoc(), gradFn);
-    gi->replaceAllUsesWith(gradFnRef);
-    gi->dropAllReferences();
-    gi->eraseFromParent();
     // We invalide analyses on the parent function because the `gradient`
     // instruciton is transformed.
     PM->invalidateAnalysis(parent, SILAnalysis::InvalidationKind::FunctionBody);
