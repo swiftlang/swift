@@ -3131,12 +3131,9 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   ParserResult<Decl> Result;
   SyntaxParsingContext DeclContext(SyntaxContext,
                                    SyntaxKind::MemberDeclListItem);
-  {
-    SyntaxParsingContext DeclContext(SyntaxContext, SyntaxContextKind::Decl);
-    Result = parseDecl(Options, handler);
-    if (Result.isParseError())
-      skipUntilDeclRBrace(tok::semi, tok::pound_endif);
-  }
+  Result = parseDecl(Options, handler);
+  if (Result.isParseError())
+    skipUntilDeclRBrace(tok::semi, tok::pound_endif);
   SourceLoc SemiLoc;
   PreviousHadSemi = consumeIf(tok::semi, SemiLoc);
   if (PreviousHadSemi && Result.isNonNull())
