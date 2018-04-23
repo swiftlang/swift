@@ -258,7 +258,7 @@ func test_lambda2() {
   { () -> protocol<Int> in
     // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated and not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
-    // expected-warning @-3 {{result of call is unused}}
+    // expected-warning @-3 {{result of call to closure returning 'Any' is unused}}
     return 1
   }()
 }
@@ -669,7 +669,7 @@ func lvalue_processing() {
 
   var n = 42
   fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{6-6=&}}
-  fn(&n, 12) // expected-warning {{result of call is unused, but produces 'Int'}}
+  fn(&n, 12) // expected-warning {{result of call to function returning 'Int' is unused}}
 
   n +-+= 12
 
