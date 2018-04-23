@@ -1749,6 +1749,19 @@ void ProtocolDecl::setDefaultAssociatedConformanceWitness(
   (void)pair;
 }
 
+void ASTContext::getVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  names.clear();
+  for (auto &importer : getImpl().ModuleLoaders)
+    importer->collectVisibleTopLevelModuleNames(names);
+
+  // Sort and unique.
+  std::sort(names.begin(), names.end(), [](Identifier LHS, Identifier RHS) {
+    return LHS.str().compare_lower(RHS.str()) < 0;
+  });
+  names.erase(std::unique(names.begin(), names.end()), names.end());
+}
+
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
   // If this module has already been successfully imported, it is importable.
   if (getLoadedModule(ModulePath) != nullptr)
