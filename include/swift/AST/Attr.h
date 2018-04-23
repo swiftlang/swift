@@ -1332,7 +1332,7 @@ public:
   }
 
   FuncDecl *getPrimalFunction() const { return PrimalFunction; }
-  void setPrimalFunction(FuncDecl *decl) { AdjointFunction = decl; }
+  void setPrimalFunction(FuncDecl *decl) { PrimalFunction = decl; }
   FuncDecl *getAdjointFunction() const { return AdjointFunction; }
   void setAdjointFunction(FuncDecl *decl) { AdjointFunction = decl; }
 
