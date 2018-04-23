@@ -13,6 +13,18 @@
 // RUN: %FileCheck -check-prefix CHECK-INDEX %s <%t/stderr_batch_index
 // CHECK-INDEX: warning: ignoring '-enable-batch-mode' because '-index-file' was also specified
 //
+// The following test is verifying that -disable-batch-mode overrides an earlier
+// -enable-batch-mode and silences the warning about mixing batch mode with
+// -index-file. Tools that take an existing command line and add -index-file can
+// thus add -disable-batch-mode without having to otherwise interpret the
+// arguments.
+//
+// RUN: %swiftc_driver -disable-batch-mode -index-file  %S/../Inputs/empty.swift -### 2>%t/stderr_nobatch_index | %FileCheck %s
+// RUN: %swiftc_driver -enable-batch-mode -index-file  %S/../Inputs/empty.swift -disable-batch-mode -### 2>%t/stderr_batch_nobatch_index | %FileCheck %s
+// RUN: %FileCheck -allow-empty -check-prefix CHECK-INDEX-DISABLED %s <%t/stderr_nobatch_index
+// RUN: %FileCheck -allow-empty -check-prefix CHECK-INDEX-DISABLED %s <%t/stderr_batch_nobatch_index
+// CHECK-INDEX-DISABLED-NOT: warning
+//
 // This next one is a regression test for a specific failure in the past: wmo +
 // batch mode should not just result in wmo, but also preserve the num-threads
 // argument and (crucially) the resulting fact that the single wmo subprocess
