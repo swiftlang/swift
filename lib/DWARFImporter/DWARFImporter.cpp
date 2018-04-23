@@ -142,6 +142,9 @@ DWARFImporter::DWARFImporter(ASTContext &ctx,
 
 DWARFImporter::~DWARFImporter() { delete &Impl; }
 
+void DWARFImporter::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {}
+
 bool DWARFImporter::canImportModule(std::pair<Identifier, SourceLoc> named) {
   return false;
 }
