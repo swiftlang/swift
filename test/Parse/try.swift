@@ -151,7 +151,7 @@ struct r21432429 {
 
 // <rdar://problem/21427855> Swift 2: Omitting try from call to throwing closure in rethrowing function crashes compiler
 func callThrowingClosureWithoutTry(closure: (Int) throws -> Int) rethrows {
-  closure(0)  // expected-error {{call can throw but is not marked with 'try'}} expected-warning {{result of call is unused}}
+  closure(0)  // expected-error {{call can throw but is not marked with 'try'}} expected-warning {{result of call to function returning 'Int' is unused}}
               // expected-note@-1 {{did you mean to use 'try'?}} {{3-3=try }}
               // expected-note@-2 {{did you mean to handle error as optional value?}} {{3-3=try? }}
               // expected-note@-3 {{did you mean to disable error propagation?}} {{3-3=try! }}
