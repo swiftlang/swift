@@ -3483,7 +3483,7 @@ function build_and_test_installable_package() {
             fi
 
             LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
-            FILECHECK_EXECUTABLE_PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
+            LLVM_BIN_DIR="$(build_directory_bin ${LOCAL_HOST} llvm)"
             echo "-- Test Installable Package --"
             call rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
             call mkdir -p "${PKG_TESTS_SANDBOX}"
@@ -3491,7 +3491,7 @@ function build_and_test_installable_package() {
                 call tar xzf "${package_for_host}"
 
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}" --param test-exec-root="${PKG_TESTS_TEMPS}"
+                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}"
         fi
     fi
 }
