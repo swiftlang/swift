@@ -496,16 +496,28 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
 
   // If the type wasn't optional, an array, or unowned, complain.
   if (!wasOptional && !isArray) {
-    auto symbolLoc = Lexer::getLocForEndOfToken(
-                       TC.Context.SourceMgr,
-                       VD->getTypeSourceRangeForDiagnostics().End);
-    TC.diagnose(attr->getLocation(), diag::iboutlet_non_optional,
-                type);
-    TC.diagnose(symbolLoc, diag::note_make_optional,
-                OptionalType::get(type))
-      .fixItInsert(symbolLoc, "?");
-    TC.diagnose(symbolLoc, diag::note_make_implicitly_unwrapped_optional)
-        .fixItInsert(symbolLoc, "!");
+    TC.diagnose(attr->getLocation(), diag::iboutlet_non_optional, type);
+    auto typeRange = VD->getTypeSourceRangeForDiagnostics();
+    { // Only one diagnostic can be active at a time.
+      auto diag = TC.diagnose(typeRange.Start, diag::note_make_optional,
+                              OptionalType::get(type));
+      if (type->hasSimpleTypeRepr()) {
+        diag.fixItInsertAfter(typeRange.End, "?");
+      } else {
+        diag.fixItInsert(typeRange.Start, "(")
+          .fixItInsertAfter(typeRange.End, ")?");
+      }
+    }
+    { // Only one diagnostic can be active at a time.
+      auto diag = TC.diagnose(typeRange.Start,
+                              diag::note_make_implicitly_unwrapped_optional);
+      if (type->hasSimpleTypeRepr()) {
+        diag.fixItInsertAfter(typeRange.End, "!");
+      } else {
+        diag.fixItInsert(typeRange.Start, "(")
+          .fixItInsertAfter(typeRange.End, ")!");
+      }
+    }
   }
 }
 
@@ -2161,12 +2173,22 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     if (isOptional)
       break;
 
-    // @IBOutlet must be optional, but not necessarily weak. Let it diagnose.
-    if (!var->getAttrs().hasAttribute<IBOutletAttr>()) {
-      diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
-               OptionalType::get(type));
-    }
     attr->setInvalid();
+
+    // While @IBOutlet can be weak, it must be optional. Let it diagnose.
+    if (var->getAttrs().hasAttribute<IBOutletAttr>())
+      break;
+
+    auto diag = diagnose(var->getStartLoc(),
+                         diag::invalid_weak_ownership_not_optional,
+                         OptionalType::get(type));
+    auto typeRange = var->getTypeSourceRangeForDiagnostics();
+    if (type->hasSimpleTypeRepr()) {
+      diag.fixItInsertAfter(typeRange.End, "?");
+    } else {
+      diag.fixItInsert(typeRange.Start, "(")
+        .fixItInsertAfter(typeRange.End, ")?");
+    }
     break;
   }
 
