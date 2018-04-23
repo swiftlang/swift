@@ -480,6 +480,30 @@ mirrors.test("ObjC") {
   expectEqual(0, Mirror(reflecting: HasIVars()).children.count)
 }
 
+// rdar://problem/39629937
+@objc class ObjCClass : NSObject {
+  let value: Int
+
+  init(value: Int) { self.value = value }
+
+  override var description: String {
+    return "\(value)"
+  }
+}
+
+struct WrapObjCClassArray {
+  var array: [ObjCClass]
+}
+
+mirrors.test("struct/WrapNSArray") {
+  let nsArray: NSArray = [
+    ObjCClass(value: 1), ObjCClass(value: 2),
+    ObjCClass(value: 3), ObjCClass(value: 4)
+  ]
+  let s = String(describing: WrapObjCClassArray(array: nsArray as! [ObjCClass]))
+  expectEqual("WrapObjCClassArray(array: [1, 2, 3, 4])", s)
+}
+
 #endif // _runtime(_ObjC)
 
 //===--- Suppressed Superclass Mirrors ------------------------------------===//

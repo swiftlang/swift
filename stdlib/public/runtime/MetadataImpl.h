@@ -410,7 +410,8 @@ struct BridgeObjectBox :
   static constexpr unsigned numExtraInhabitants = 1;
       
   static void *retain(void *obj) {
-    return swift_bridgeObjectRetain(obj);
+    (void)swift_bridgeObjectRetain(obj);
+    return obj;
   }
 
   static void release(void *obj) {
