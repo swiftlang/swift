@@ -1842,7 +1842,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
-  return LinkInfo::get(IGM, IGM.getSwiftModule(), entity, isDefinition);
+  return LinkInfo::get(UniversalLinkageInfo(IGM), IGM.getSwiftModule(), entity,
+                       isDefinition);
 }
 
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
@@ -1851,27 +1852,21 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   LinkInfo result;
 
   entity.mangle(result.Name);
-
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
-                   isDefinition, entity.isWeakImported(swiftModule));
-
+      getIRLinkage(linkInfo, entity.getLinkage(isDefinition), isDefinition,
+                   entity.isWeakImported(swiftModule));
   result.ForDefinition = isDefinition;
-
   return result;
 }
 
-LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
-                       StringRef name,
-                       SILLinkage linkage,
-                       ForDefinition_t isDefinition,
+LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
+                       SILLinkage linkage, ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
 
   result.Name += name;
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-    getIRLinkage(linkInfo, linkage,
-                 isDefinition, isWeakImported);
+      getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported);
   result.ForDefinition = isDefinition;
   return result;
 }
