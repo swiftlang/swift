@@ -587,6 +587,22 @@ makeConcrete(Type type) {
   return { type };
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+template <class P, class... Gs>
+static BuiltinGenericSignatureBuilder::LambdaGenerator
+makeBoundGeneric(NominalTypeDecl *decl, P parentGenerator,
+                 const Gs & ...genericParamGenerators) {
+  return {
+    [=](BuiltinGenericSignatureBuilder &builder, bool forBody) -> Type {
+      Type parent = parentGenerator.build(builder, forBody);
+      Type genParams[] = {
+        genericParamGenerators.build(builder, forBody)...
+      };
+      return BoundGenericType::get(decl, parent, genParams);
+    }
+  };
+}
+
 static BuiltinGenericSignatureBuilder::ParameterGenerator
 makeGenericParam(unsigned index = 0) {
   return { index };
@@ -988,6 +1004,48 @@ static ValueDecl *getTensorFlowReceive(ASTContext &Context, Identifier Id) {
   // <T> () -> (T)
   BuiltinGenericSignatureBuilder builder(Context);
   builder.setResult(makeGenericParam());
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffCreateTape(ASTContext &Context, Identifier Id) {
+  // <T> () -> (Swift._AutoDiffTape<T>)
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  builder.setResult(
+    makeBoundGeneric(tapeDecl, makeConcrete(Type()), makeGenericParam()));
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffPushToTape(ASTContext &Context, Identifier Id) {
+  // <T> (Swift._AutoDiffTape<T>, T, Builtin.Int64) -> ()
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  auto T = makeGenericParam();
+  builder.addParameter(makeBoundGeneric(tapeDecl, makeConcrete(Type()), T));
+  builder.addParameter(T);
+  builder.addParameter(makeConcrete(BuiltinIntegerType::get(64, Context)));
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffPopFromTape(ASTContext &Context, Identifier Id) {
+  // <T> (Swift._AutoDiffTape<T>, Builtin.Int64) -> (T)
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  auto T = makeGenericParam();
+  builder.addParameter(makeBoundGeneric(tapeDecl, makeConcrete(Type()), T));
+  builder.addParameter(makeConcrete(BuiltinIntegerType::get(64, Context)));
+  builder.setResult(T);
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
+  // <T> (Swift._AutoDiffTape<T>) -> ()
+  BuiltinGenericSignatureBuilder builder(Context, 1);
+  auto *tapeDecl = Context.getAutoDiffTapeType().getAnyNominal();
+  builder.addParameter(
+    makeBoundGeneric(tapeDecl, makeConcrete(Type()), makeGenericParam()));
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
   return builder.build(Id);
 }
 
@@ -1916,6 +1974,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getTensorFlowSend(Context, Id);
   case BuiltinValueKind::TensorFlowReceive:
     return getTensorFlowReceive(Context, Id);
+  case BuiltinValueKind::AutoDiffCreateTape:
+    return getAutoDiffCreateTape(Context, Id);
+  case BuiltinValueKind::AutoDiffPushToTape:
+    return getAutoDiffPushToTape(Context, Id);
+  case BuiltinValueKind::AutoDiffPopFromTape:
+    return getAutoDiffPopFromTape(Context, Id);
+  case BuiltinValueKind::AutoDiffDestroyTape:
+    return getAutoDiffDestroyTape(Context, Id);
 
   case BuiltinValueKind::OnFastPath:
     return getOnFastPath(Context, Id);

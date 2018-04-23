@@ -208,11 +208,6 @@ public:
   /// Determines whether the given type conforms to Differentiable.
   bool conformsToDifferentiable(Type type) const;
 
-  /// Determines whether the given type is differentiable.
-  bool isDifferentiableType(Type type) const;
-  /// Determines whether the given value is differentiable.
-  bool isDifferentiableOperation(SILValue value) const;
-
   void insertPrimal(SILFunction *original, ArrayRef<unsigned> paramIndices,
                     SILFunction *primal) {
     auto *attr = getOrCreateReverseDifferentiableAttr(original, paramIndices);
@@ -341,34 +336,6 @@ bool ADContext::conformsToDifferentiable(Type type) const {
   return false;
 }
 
-/// Type must be differentiable.
-bool ADContext::isDifferentiableType(Type type) const {
-  if (conformsToDifferentiable(type))
-    return true;
-  // FIXME: Add DifferentiationParameter.
-  if (auto structTy = type->getAs<StructType>()) {
-    for (auto *prop : structTy->getDecl()->getStoredProperties())
-      if (!isDifferentiableType(prop->getInterfaceType()))
-        return false;
-    return true;
-  } else if (auto tupleTy = type->getAs<TupleType>()) {
-    for (auto &tup : tupleTy->getElements())
-      if (!isDifferentiableType(tup.getType()))
-        return false;
-    return true;
-  }
-  return false;
-}
-
-bool ADContext::isDifferentiableOperation(SILValue value) const {
-  // Before we decide whether the opreation is differentiable, we need to see
-  // if the type of this value is differentiable.
-  if (!isDifferentiableType(value->getType().getSwiftRValueType()))
-    return false;
-  // FIXME: Check instructions
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 // PrimalGen - generates primal functions for each differentiation task in
 // the SIL module.
@@ -448,6 +415,10 @@ static PrimalValueKind classifyInstruction(SILValue value,
   switch (value->getKind()) {
     case ValueKind::SILFunctionArgument:
       return PrimalValueKind::Argument;
+    case ValueKind::IntegerLiteralInst:
+    case ValueKind::FloatLiteralInst:
+    case ValueKind::StringLiteralInst:
+    case ValueKind::ConstStringLiteralInst:
     case ValueKind::TupleInst:
     case ValueKind::StructInst:
     case ValueKind::TupleExtractInst:
@@ -456,8 +427,9 @@ static PrimalValueKind classifyInstruction(SILValue value,
     case ValueKind::FunctionRefInst:
     case ValueKind::ConvertFunctionInst:
     case ValueKind::ThinToThickFunctionInst:
-    case ValueKind::StringLiteralInst:
     case ValueKind::BuiltinInst:
+    case ValueKind::ApplyInst:
+    case ValueKind::PartialApplyInst:
     case ValueKind::GlobalValueInst:
     case ValueKind::KeyPathInst:
     case ValueKind::MetatypeInst:
@@ -760,7 +732,7 @@ void AdjointGen::generate() {
 
 template<typename T>
 static void debugDump(T &v) {
-  DEBUG(llvm::dbgs() << "==== BEGIN DEBUG DUMP ===="
+  DEBUG(llvm::dbgs() << "\n==== BEGIN DEBUG DUMP ===="
         << v << "==== END DEBUG DUMP ====\n");
 }
 
@@ -773,15 +745,13 @@ static NominalTypeDecl *getStdlibTypeDecl(StringRef name, ASTContext &ctx) {
 }
 
 static
-void lookupProtocolRequiredMember(NominalTypeDecl *typeDecl,
-                                  ProtocolDecl *proto,
-                                  DeclName name, ModuleDecl *module,
-                                  SmallVectorImpl<ValueDecl *> &results) {
+void lookupProtocolRequiredMembers(NominalTypeDecl *typeDecl,
+                                   ProtocolDecl *proto,
+                                   DeclName name, ModuleDecl *module,
+                                   SmallVectorImpl<ValueDecl *> &results) {
   // Make sure the given type conforms to the given protocol.
   SmallVector<ProtocolConformance *, 2> conformances;
   auto type = typeDecl->getDeclaredInterfaceType();
-  DEBUG(llvm::dbgs() << "Looking up protocol required method: "
-        << name << " in " << type << '\n');
   typeDecl->lookupConformance(module, proto, conformances);
   assert(!conformances.empty() && "Type doesn't conform to the protocol?");
   // Look up nominal type candidates and protocol requirement candidates.
@@ -789,11 +759,8 @@ void lookupProtocolRequiredMember(NominalTypeDecl *typeDecl,
   typeDecl->lookupQualified(
     type, name, NLOptions::NL_ProtocolMembers, nullptr, lookupResults);
   // Append matches to results.
-  for (ValueDecl *decl : lookupResults) {
-    DEBUG(llvm::dbgs() << "Protocol requirement lookup result: "
-          << decl->getFullName() << " : " << decl->getInterfaceType() << '\n');
+  for (ValueDecl *decl : lookupResults)
     results.push_back(decl);
-  }
 }
 
 static SILFunction *
@@ -802,7 +769,7 @@ findSILFunctionForRequiredProtocolMember(NominalTypeDecl *typeDecl,
                                          ModuleDecl *module,
                                          SILModule &silModule) {
   SmallVector<ValueDecl *, 4> results;
-  lookupProtocolRequiredMember(typeDecl, proto, name, module, results);
+  lookupProtocolRequiredMembers(typeDecl, proto, name, module, results);
   for (auto *result : results) {
     std::string name = SILDeclRef(result).mangle();
     if (auto *fn = silModule.findFunction(name, SILLinkage::PublicExternal))
@@ -866,8 +833,9 @@ static void createEntryArguments(SILFunction *f) {
 /// Build an Int.
 static SILValue convertFromIntegerLiteral(intmax_t value,
                                           NominalTypeDecl *targetTypeDecl,
-                                          SILLocation loc, SILBuilder &builder,
-                                          SILModule &module) {
+                                          SILLocation loc,
+                                          SILBuilder &builder) {
+  auto &module = builder.getModule();
   auto &astCtx = module.getASTContext();
   auto targetTy =
     targetTypeDecl->getDeclaredInterfaceType()->getCanonicalType();
@@ -886,9 +854,9 @@ static SILValue convertFromIntegerLiteral(intmax_t value,
   auto *expByBuiltinIntProto =
     astCtx.getProtocol(KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
   SmallVector<ValueDecl *, 1> builtinLitInitMethods;
-  lookupProtocolRequiredMember(targetTypeDecl, expByBuiltinIntProto,
-                               builtinLitInitName, module.getSwiftModule(),
-                               builtinLitInitMethods);
+  lookupProtocolRequiredMembers(targetTypeDecl, expByBuiltinIntProto,
+                                builtinLitInitName, module.getSwiftModule(),
+                                builtinLitInitMethods);
   auto builtinLitInit = cast<ConstructorDecl>(builtinLitInitMethods.front());
   auto initDeclRefName = SILDeclRef(builtinLitInit).mangle();
   auto *builtinLitInitFunc = module.findFunction(initDeclRefName,
@@ -909,23 +877,10 @@ static void convertToIndirectSeed(intmax_t value,
                                   SILValue seedBuf, SILLocation loc,
                                   SILBuilder &builder, ADContext &context) {
   auto type = targetTypeDecl->getDeclaredInterfaceType()->getCanonicalType();
-  auto silObjType = SILType::getPrimitiveObjectType(type);
   auto *diffableProto = context.getDifferentiableProtocol();
-  DEBUG(llvm::dbgs() << "Creating seed for " << type << " type\n");
   auto &astCtx = context.getASTContext();
   auto &module = context.getModule();
   auto &typeConv = context.getTypeConverter();
-
-  // FIXME: We are using a hack here for `Float` because protocol witness method
-  // application doesn't work yet.
-  // if (targetTypeDecl == astCtx.getFloatDecl())
-  //   return convertFromIntegerLiteral(1, targetTypeDecl, loc, builder, module);
-  // else {
-  //   context.diagnose(loc.getSourceLoc(), diag::autodiff_unsupported_type,
-  //                    targetTypeDecl->getDeclaredInterfaceType());
-  //   return SILValue();
-  // }
-
   // Create a currency value from the specified integer literal.
   DeclName currencyDeclName(astCtx.getIdentifier("DifferentiationCurrency"));
   auto currencyDeclLookupResult =
@@ -936,13 +891,11 @@ static void convertToIndirectSeed(intmax_t value,
   auto currencyTyDecl = currencyTy.getAnyNominal();
   // %0 = ... : $<currency type>
   auto currencyVal =
-    convertFromIntegerLiteral(value, currencyTyDecl, loc, builder, module);
-
+    convertFromIntegerLiteral(value, currencyTyDecl, loc, builder);
   // %1 = metatype $Float.Type
   auto metatypeTy = SILType::getPrimitiveObjectType(
     CanMetatypeType::get(type, MetatypeRepresentation::Thick));
   auto *metatype = builder.createMetatype(loc, metatypeTy);
-
   // Call `init(differentiationSeed:)` through `Differentiable` protocol.
   DeclName initName(astCtx, astCtx.Id_init,
                     { astCtx.getIdentifier("differentiationSeed") });
@@ -970,8 +923,6 @@ static void convertToIndirectSeed(intmax_t value,
   // $4 = witness_method ...
   auto initFnRef =
     builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
-  DEBUG(llvm::dbgs() << "Calling init(differentiationSeed:) on "
-        << silObjType << "\n");
   auto subMap =
     type->getMemberSubstitutionMap(module.getSwiftModule(), reqr,
                                    diffableProto->getGenericEnvironment());
@@ -1063,7 +1014,6 @@ static SILFunction *getOrCreateGradient(
                            origConv(origTy, module),
                            canGradConv(canonicalGrad->getLoweredFunctionType(),
                                        module);
-
     SmallVector<SILValue, 8> args;
     SmallVector<SILValue, 1> stackAllocsToCleanUp;
     // Prepare arguments.
