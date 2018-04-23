@@ -3563,8 +3563,13 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
   // DynamicTypeExpr.
   SyntaxParsingContext CallCtxt(SyntaxContext, SyntaxKind::FunctionCallExpr);
 
-  // Consume 'type'
-  SourceLoc keywordLoc = consumeToken();
+  SourceLoc keywordLoc;
+  {
+    SyntaxParsingContext IdentifierExprContext(SyntaxContext,
+                                               SyntaxKind::IdentifierExpr);
+    // Consume 'type'
+    keywordLoc = consumeToken();
+  }
 
   // Parse the leading '('.
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
