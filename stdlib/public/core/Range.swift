@@ -257,6 +257,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
 
   @inlinable
   public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
     return _customIndexOfEquatableElement(element)
   }
 

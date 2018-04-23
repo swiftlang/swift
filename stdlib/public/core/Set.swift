@@ -364,6 +364,7 @@ extension Set: Collection {
   public func _customLastIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
+    // The first and last elements are the same because each element is unique.
     return _customIndexOfEquatableElement(member)
   }
 

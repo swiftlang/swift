@@ -1264,6 +1264,7 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
+      // The first and last elements are the same because each element is unique.
       return _customIndexOfEquatableElement(element)
     }
 
