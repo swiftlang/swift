@@ -944,7 +944,7 @@ def create_argument_parser():
     option('--tensorflow-bazel-options', append,
            type=argparse.ShellSplitType(),
            default=[],
-           help='Common separated options passed to Bazel when building '
+           help='Comma separated options passed to Bazel when building '
                 'TensorFlow, e.g. "--copt=-mavx,--copt=-msse4.2". Can be '
                 'called multiple times to add multiple such options.')
 
