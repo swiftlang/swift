@@ -113,14 +113,7 @@ extern int apinotes_main(ArrayRef<const char *> Args);
 int main(int argc_, const char **argv_) {
   PROGRAM_START(argc_, argv_);
 
-  SmallVector<const char *, 256> argv;
-  llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
-  std::error_code EC = llvm::sys::Process::GetArgumentVector(
-      argv, llvm::ArrayRef<const char *>(argv_, argc_), ArgAllocator);
-  if (EC) {
-    llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
-    return 1;
-  }
+  SmallVector<const char *, 256> argv(&argv_[0], &argv_[argc_]);
 
   // Expand any response files in the command line argument vector - arguments
   // may be passed through response files in the event of command line length
