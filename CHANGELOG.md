@@ -57,6 +57,22 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0204][]
+
+  Bidirectional collections now have methods for searching from the end
+  for an element or the index of an element matching a predicate, or for
+  the index of an `Equatable` element.
+  
+  ```swift
+  let names = ["Alex", "Beatrice", "Carlos", "Carlos", "Danilo", "Edie"]
+  names.last(where: { $0.contains("o") })       // "Danilo"
+  names.lastIndex(where: { $0.contains("e") })  // 5
+  names.lastIndex(of: "Carlos")                 // 3
+  ```
+  
+  In addition, for parity, `index(of:)` and `index(where:)` have been renamed
+  to `firstIndex(of:)` and `firstIndex(where:)`.
+
 * [SE-0185][]
 
   Protocol conformances are now able to be synthesized in extensions in the same
