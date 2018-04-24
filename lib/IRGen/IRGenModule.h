@@ -355,6 +355,8 @@ public:
     noteUseOfTypeGlobals(type, false, requireMetadata);
   }
 
+  void noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type);
+
 private:
   void noteUseOfTypeGlobals(NominalTypeDecl *type,
                             bool isUseOfMetadata,
