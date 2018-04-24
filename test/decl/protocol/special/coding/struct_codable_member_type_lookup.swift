@@ -654,3 +654,10 @@ struct sr6886 {
   struct Nested : Codable {}
   let Nested: Nested // Don't crash with a coding key that is the same as a nested type name
 }
+
+// Don't crash if we have a static property with the same name as an ivar that
+// we will encode. We check the actual codegen in a SILGen test.
+struct StaticInstanceNameDisambiguation : Codable {
+  static let version: Float = 0.42
+  let version: Int = 42
+}
