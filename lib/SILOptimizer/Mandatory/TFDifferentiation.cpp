@@ -54,6 +54,7 @@ using llvm::DenseMap;
 static NominalTypeDecl *getStdlibTypeDecl(StringRef, ASTContext &);
 static std::string mangleWRT(ArrayRef<unsigned>);
 static std::string mangleADConfig(const SILReverseAutoDiffConfiguration &);
+static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &);
 
 //===----------------------------------------------------------------------===//
 // Auxiliary data structures
@@ -235,17 +236,11 @@ public:
   }
 
   SILFunction *lookupPrimal(SILReverseDifferentiableAttr *attr) {
-    return lookupOrLinkFunction(attr->getPrimalName());
+    return lookupOrLinkFunction(attr->getPrimalName(), module);
   }
 
   SILFunction *lookupAdjoint(SILReverseDifferentiableAttr *attr) {
-    return lookupOrLinkFunction(attr->getAdjointName());
-  }
-
-  SILFunction *lookupOrLinkFunction(StringRef name) {
-    if (auto *localFn = module.lookUpFunction(name))
-      return localFn;
-    return module.findFunction(name, SILLinkage::Public);
+    return lookupOrLinkFunction(attr->getAdjointName(), module);
   }
 
   void insertGradient(const GradientLookupKey &key, SILFunction *gradient) {
@@ -304,10 +299,10 @@ public:
 ADContext::ADContext(SILModule &module, SILPassManager &passManager)
   : module(module), passManager(passManager), typeConverter(module) {
   auto &ctx = getASTContext();
-
-  // Link all from module.
-  // FIXME: Link per instance.
-  module.linkAllFromCurrentModule();
+    
+  // Deserialize witness tables.
+  // FIXME: For performance, we shouldn't link everything. Find a way to link
+  // only what we need.
   module.linkAllWitnessTables();
 
   // Cache commonly used declarations and function references.
@@ -588,6 +583,8 @@ AdjointGen::accumulateAdjoint(SILValue oldAdjoint, SILValue newAdjoint,
     auto fnTy = context.combiningAsAdjoingFn->getInterfaceType();
     auto silFnTy = SILType::getPrimitiveObjectType(fnTy->getCanonicalType());
     SILDeclRef declRef(context.combiningAsAdjoingFn, SILDeclRef::Kind::Func);
+    builder.getModule().lookUpWitnessTable(conformance,
+                                           /*deserializeLazily*/ true);
     auto witnessMethod = builder.createWitnessMethod(
       loc, adjointTy, ProtocolConformanceRef(conformance), declRef, silFnTy);
     auto subMap =
@@ -774,7 +771,7 @@ findSILFunctionForRequiredProtocolMember(NominalTypeDecl *typeDecl,
   lookupProtocolRequiredMembers(typeDecl, proto, name, module, results);
   for (auto *result : results) {
     std::string name = SILDeclRef(result).mangle();
-    if (auto *fn = silModule.findFunction(name, SILLinkage::PublicExternal))
+    if (auto *fn = lookupOrLinkFunction(name, silModule))
       return fn;
   }
   return nullptr;
@@ -782,8 +779,8 @@ findSILFunctionForRequiredProtocolMember(NominalTypeDecl *typeDecl,
 
 /// Looks through the definition of a function value. If the source that
 /// produced this function value is `function_ref` and the function is visible
-/// (either in the same module or is serialized), return the instruction.
-/// Otherwise, return null.
+/// (either in the same module or is serialized), returns the instruction.
+/// Otherwise, returns null.
 static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
   auto *inst = value->getDefiningInstruction();
   if (!inst) return nullptr;
@@ -797,6 +794,17 @@ static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
     return findReferenceToVisibleFunction(thinToThink->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
     return findReferenceToVisibleFunction(convertFn->getOperand());
+  return nullptr;
+}
+
+/// Looks up a function in the current module. If it exists, returns it.
+/// Otherwise, attempt to link it from imported modules. Returns null if such
+/// function name does not exist.
+static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
+  if (auto *localFn = module.lookUpFunction(name))
+    return localFn;
+  if (module.linkFunction(name))
+    return module.findFunction(name, SILLinkage::PublicExternal);
   return nullptr;
 }
 
@@ -862,8 +870,7 @@ static SILValue convertFromIntegerLiteral(intmax_t value,
                                 builtinLitInitMethods);
   auto builtinLitInit = cast<ConstructorDecl>(builtinLitInitMethods.front());
   auto initDeclRefName = SILDeclRef(builtinLitInit).mangle();
-  auto *builtinLitInitFunc = module.findFunction(initDeclRefName,
-                                                 SILLinkage::PublicExternal);
+  auto *builtinLitInitFunc = lookupOrLinkFunction(initDeclRefName, module);
   assert(builtinLitInitFunc &&
          "Cannot find `init(_builtinIntegerLiteral)` in SIL?");
   // %3 = function_ref @<target type>.init(_builtinIntegerLiteral:)
