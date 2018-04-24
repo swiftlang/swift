@@ -15,9 +15,9 @@ _ = gradient(of: id)(2)
 // CHECK-LABEL: @{{.*}}id{{.*}}__grad_wrt_0_s_p
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-import Darwin
+import func Darwin.exp
 #else
-import Glibc
+import func Glibc.exp
 #endif
 
 @differentiable(reverse, primal: primalSigmoid, adjoint: adjointSigmoid)
@@ -37,7 +37,7 @@ func adjointSigmoid(_ x: Double, checkpoints: (Double, Double, Double), result: 
   return result * (1 - result)
 }
 
-_ = gradient(of: sigmoid)(3)
+print(gradient(of: sigmoid)(3))
 
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0_s_p
