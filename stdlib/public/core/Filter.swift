@@ -327,6 +327,12 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   public subscript(bounds: Range<Index>) -> SubSequence {
     return SubSequence(_base: _base[bounds], _predicate)
   }
+  
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
+    guard _predicate(element) else { return .some(nil) }
+    return _base._customLastIndexOfEquatableElement(element)
+  }
 }
 
 extension LazyFilterCollection : BidirectionalCollection
