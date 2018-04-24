@@ -882,11 +882,11 @@ static SILValue convertFromIntegerLiteral(intmax_t value,
 }
 
 /// Create a seed value by calling the `init(differentiationSeed:)` initializer.
-static void convertToIndirectSeed(intmax_t value,
-                                  NominalTypeDecl *targetTypeDecl,
+static void convertToIndirectSeed(intmax_t value, CanType type,
                                   SILValue seedBuf, SILLocation loc,
                                   SILBuilder &builder, ADContext &context) {
-  auto type = targetTypeDecl->getDeclaredInterfaceType()->getCanonicalType();
+  auto *targetTypeDecl = type->getAnyNominal();
+  assert(targetTypeDecl && "Target type must be a nominal type");
   auto *diffableProto = context.getDifferentiableProtocol();
   auto &astCtx = context.getASTContext();
   auto &module = context.getModule();
@@ -898,7 +898,11 @@ static void convertToIndirectSeed(intmax_t value,
   auto *currencyAlias = cast<TypeAliasDecl>(currencyDeclLookupResult[0]);
   auto currencyTy =
     currencyAlias->getDeclaredInterfaceType()->getCanonicalType();
-  auto currencyTyDecl = currencyTy.getAnyNominal();
+  auto currencySubMap =
+    type->getMemberSubstitutionMap(module.getSwiftModule(), currencyAlias);
+  currencyTy = currencyTy.subst(currencySubMap)->getCanonicalType();
+  auto *currencyTyDecl = currencyTy.getAnyNominal();
+  assert(currencyTyDecl && "DifferentiationCurrency must be a nominal type");
   // %0 = ... : $<currency type>
   auto currencyVal =
     convertFromIntegerLiteral(value, currencyTyDecl, loc, builder);
@@ -933,11 +937,11 @@ static void convertToIndirectSeed(intmax_t value,
   // $4 = witness_method ...
   auto initFnRef =
     builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
-  auto subMap =
+  auto initSubMap =
     type->getMemberSubstitutionMap(module.getSwiftModule(), reqr,
                                    diffableProto->getGenericEnvironment());
   SmallVector<Substitution, 1> subs;
-  diffableProto->getGenericSignature()->getSubstitutions(subMap, subs);
+  diffableProto->getGenericSignature()->getSubstitutions(initSubMap, subs);
   // %5 = apply %4(%3, %2, %1)
   builder.createApply(loc, initFnRef, astCtx.AllocateCopy(subs),
                       { seedBuf, currencyValBuf, metatype },
@@ -1034,11 +1038,10 @@ static SILFunction *getOrCreateGradient(
     if (!config.seedable) {
       auto seedTy = origTy->getSingleResult().getType();
       auto seedSILTy = SILType::getPrimitiveObjectType(seedTy);
-      auto *seedTyDecl = seedTy->getAnyNominal();
       // Call `<seed type>.init(differentiationSeed: 1)` to create a default
       // seed to feed into the canonical gradient.
       auto *seedBuf = builder.createAllocStack(loc, seedSILTy);
-      convertToIndirectSeed(1, seedTyDecl, seedBuf, loc, builder, context);
+      convertToIndirectSeed(1, seedTy, seedBuf, loc, builder, context);
       // If seed is address only, we'll clean up the buffer after calling the
       // canonical gradient Otherwise, we just load the seed and deallocate the
       // buffer.
