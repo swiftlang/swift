@@ -24,20 +24,19 @@ public final class AbsolutePosition {
   }
 
   internal func add(columns: Int) {
-    print("adding \(columns) column bytes")
     self.column += columns
+    self.utf8Offset += columns
   }
 
   internal func add(lines: Int, size: Int) {
-    print("adding \(lines * size) line bytes")
     self.line += lines * size
     self.column = 1
+    self.utf8Offset += lines * size
   }
 
   /// Use some text as a reference for adding to the absolute position,
   /// taking note of newlines, etc.
   internal func add(text: String) {
-    print("adding text: \(text)")
     for char in text {
       switch char {
       case "\n", "\r\n":
