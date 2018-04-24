@@ -102,86 +102,71 @@ CanType SILFunctionType::getSelfInstanceType() const {
 CanSILFunctionType
 SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
                                  SILModule &M) {
-  auto originalGenSig = getGenericSignature();
-  auto originalCanGenSig = originalGenSig
-    ? originalGenSig->getCanonicalSignature()
-    : CanGenericSignature();
   auto originalParams = getParameters();
-  auto originalResults = getResults();
-  // The original's result as a single type, i.e. a tuple of results if they are
-  // more than one, or just one result.
-  CanType originalSingleResultTy;
-  if (originalResults.size() == 1) {
-    originalSingleResultTy = originalResults.front().getType();
-  } else {
-    SmallVector<TupleTypeElt, 8> tupleElts;
-    for (auto &originalResult : originalResults)
-      tupleElts.push_back(originalResult.getType());
-    Type tupleTy =
-      TupleType::get(tupleElts, getASTContext());
-    originalSingleResultTy = tupleTy->getCanonicalType();
-  }
-
-  // Function that returns the parameter convention for a SIL object type.
-  auto getParamConvention = [&](CanType ty) -> ParameterConvention {
-    auto silTy = SILType::getPrimitiveObjectType(ty);
-    if (silTy.isFormallyPassedIndirectly(
-          ty, M, originalCanGenSig,
-          ResilienceExpansion::Last_ResilienceExpansion))
-      return ParameterConvention::Indirect_In;
-    return silTy.isTrivial(M)
-      ? ParameterConvention::Direct_Unowned
-      : ParameterConvention::Direct_Owned;
-  };
-
-  // Function that returns the result convention for a SIL object type.
-  auto getResultConvention = [&](CanType ty) -> ResultConvention {
-    auto silTy = SILType::getPrimitiveObjectType(ty);
-    return silTy.isTrivial(M)
-      ? ResultConvention::Unowned : ResultConvention::Owned;
-  };
-
-  SmallVector<unsigned, 8> allParamIndices;
+  auto originalResult = getSingleResult();
+  auto originalSingleResultTy = originalResult.getType();
+  SmallVector<unsigned, 4> allParamIndices;
   ArrayRef<unsigned> paramIndices = config.parameterIndices;
-  SmallVector<SILParameterInfo, 8> expectedGradParams;
-  SmallVector<SILResultInfo, 8> expectedGradResults;
-  // Collect original parameters to gradient parameters.
+  SmallVector<SILParameterInfo, 4> gradParams;
+  SmallVector<SILResultInfo, 4> gradResults;
+  // Collect original parameters to gradient parameters. They have the same
+  // convention.
   for (auto &originalParam : originalParams)
-    expectedGradParams.push_back(originalParam);
-  if (config.seedable)
-    expectedGradParams.push_back({
-      originalSingleResultTy,
-      getParamConvention(originalSingleResultTy)
-    });
+    gradParams.push_back(originalParam);
+  // If seedable, add original result to the parameter list.
+  if (config.seedable) {
+    ParameterConvention seedConv;
+    switch (originalResult.getConvention()) {
+    case ResultConvention::Indirect:
+      seedConv = ParameterConvention::Indirect_In_Guaranteed; break;
+    case ResultConvention::Unowned:
+      seedConv = ParameterConvention::Direct_Unowned; break;
+    case ResultConvention::Owned:
+      seedConv = ParameterConvention::Direct_Owned; break;
+    case ResultConvention::Autoreleased:
+      seedConv = ParameterConvention::Direct_Guaranteed; break;
+    case ResultConvention::UnownedInnerPointer:
+      seedConv = ParameterConvention::Indirect_In_Guaranteed; break;
+    }
+    gradParams.push_back({ originalSingleResultTy, seedConv });
+  }
   // If no differentiation parameters are specified, differentiation is done
   // with respect to all of original's parameters. For simplicity, we add all
   // parameter indices to a temporary.
   if (config.parameterIndices.empty()) {
-    for (unsigned i = 0; i < originalParams.size(); i++)
-      allParamIndices.push_back(i);
+    auto allParamRange = range(0, getNumParameters());
+    allParamIndices.append(allParamRange.begin(), allParamRange.end());
     paramIndices = allParamIndices;
+  }
+  // If preserving result, the original result will be the first result.
+  if (config.preservingResult) {
+    gradResults.push_back(originalResult);
   }
   // Collect differentiation parameters to gradient results.
   for (auto index : paramIndices) {
-    auto paramTy = originalParams[index].getType();
-    expectedGradResults.push_back({
-      paramTy, getResultConvention(paramTy)
-    });
+    auto param = originalParams[index];
+    ResultConvention conv;
+    switch (param.getConvention()) {
+    case ParameterConvention::Direct_Owned:
+      conv = ResultConvention::Owned; break;
+    case ParameterConvention::Direct_Unowned:
+      conv = ResultConvention::Unowned; break;
+    case ParameterConvention::Direct_Guaranteed:
+      conv = ResultConvention::Owned; break;
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_In_Guaranteed:
+      conv = ResultConvention::Indirect; break;
+    }
+    gradResults.push_back({ param.getType(), conv });
   }
-  // If preserving result, the original result will be the last result.
-  if (config.preservingResult)
-    expectedGradResults.push_back({
-      originalSingleResultTy,
-      getResultConvention(originalSingleResultTy)
-    });
   // Create an expected function type.
-  return SILFunctionType::get(originalGenSig, getExtInfo(),
-                              getCoroutineKind(),
-                              getCalleeConvention(),
-                              expectedGradParams, getYields(),
-                              expectedGradResults,
-                              getOptionalErrorResult(),
-                              getASTContext(),
+  return SILFunctionType::get(getGenericSignature(), getExtInfo(),
+                              getCoroutineKind(), getCalleeConvention(),
+                              gradParams, getYields(), gradResults,
+                              getOptionalErrorResult(), getASTContext(),
                               getWitnessMethodConformanceOrNone());
 }
 
