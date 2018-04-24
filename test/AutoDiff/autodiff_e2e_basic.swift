@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
 @differentiable(reverse, adjoint: adjointId)
 func id(_ x: Float) -> Float {
