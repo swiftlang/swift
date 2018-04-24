@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -enable-objc-interop -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
-// XFAIL: linux
+
+// TODO: missing `-enable-objc-interop` results in an assertion
 
 import Swift
 

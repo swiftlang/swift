@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
-// XFAIL: linux
 
 sil_stage canonical
 
@@ -271,7 +270,7 @@ nay:
   unreachable
 }
 
-// CHECK: define {{(dllexport )?}}swiftcc {{.*}} @checked_downcast_optional_class_to_ex([[INT]])
+// CHECK: define {{(dllexport )?}}{{(protected )?}}swiftcc {{.*}} @checked_downcast_optional_class_to_ex([[INT]])
 // CHECK: entry:
 // CHECK:   [[V1:%.*]] = inttoptr [[INT]] %0 to %T5casts1AC*
 // CHECK:   [[V2:%.*]] = icmp ne %T5casts1AC* [[V1]], null

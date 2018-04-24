@@ -1,9 +1,8 @@
 // Same test as clang_inline.swift, but with the order swapped.
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -emit-ir -module-name clang_inline | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -enable-objc-interop -emit-ir -module-name clang_inline | %FileCheck %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
-// XFAIL: linux
 
 import gizmo
 
