@@ -37,7 +37,10 @@ func adjointSigmoid(_ x: Double, checkpoints: (Double, Double, Double), result: 
   return result * (1 - result)
 }
 
-print(gradient(of: sigmoid)(3))
+let x = #gradient(of: sigmoid)(3)
+let (value: y, gradient: z) = #valueAndGradient(of: sigmoid)(4)
+print(x * z)
 
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0_s_p
+// CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0_p

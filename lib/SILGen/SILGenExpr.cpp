@@ -2947,20 +2947,20 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-RValue RValueEmitter::
-visitGradientExpr(GradientExpr *E, SGFContext C) {
+static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
+                               ReverseAutoDiffExpr *E, bool isValueAndGrad) {
   SILLocation loc(E);
   auto *origExpr = E->getOriginalExpr();
   auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
-  ManagedValue origVal = visit(origExpr, C).getAsSingleValue(SGF, loc);
+  ManagedValue origVal = RVE.visit(origExpr, C).getAsSingleValue(RVE.SGF, loc);
   auto origSILTy = origVal.getType().getAs<SILFunctionType>();
   // Lower Swift parameters to SIL parameters.
   auto diffParams = E->getParameters();
+  SmallVector<AutoDiffParameter, 4> allParamIndices;
   // If no differentiation parameters are specified, differentiation is done
   // with respect to all of original's parameters.
   if (E->getParameters().empty()) {
-    SmallVector<AutoDiffParameter, 8> allParamIndices;
-    for (unsigned i = 0, n = origTy->getNumParams(); i != n; ++i)
+    for (unsigned i : range(0, origTy->getNumParams()))
       allParamIndices.push_back(
         AutoDiffParameter::getIndexParameter(E->getStartLoc(), i));
     diffParams = allParamIndices;
@@ -2970,7 +2970,7 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
     switch (param.getKind()) {
     case swift::AutoDiffParameter::Kind::Index: {
       auto silParamIndices =
-        SGF.SGM.getLoweredFunctionParameterIndex(param.getIndex(), origTy);
+      RVE.SGF.SGM.getLoweredFunctionParameterIndex(param.getIndex(), origTy);
       for (auto idx : silParamIndices)
         loweredParamIndices.push_back(idx);
       break;
@@ -2983,17 +2983,22 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
     }
     }
   }
-  auto gradInst =
-    SGF.B.createGradient(loc, origVal.forward(SGF), loweredParamIndices,
-                         /*seedable*/ false,
-                         /*preservingResult*/ false);
-  ManagedValue v = SGF.emitManagedRValueWithCleanup(gradInst);
-  return RValue(SGF, E, v);
+  auto gradInst = RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF),
+                                           loweredParamIndices,
+                                           /*seedable*/ false,
+                                           /*preservingResult*/ isValueAndGrad);
+  ManagedValue v = RVE.SGF.emitManagedRValueWithCleanup(gradInst);
+  return RValue(RVE.SGF, E, v);
+}
+
+RValue RValueEmitter::
+visitGradientExpr(GradientExpr *E, SGFContext C) {
+  return emitGradientInst(*this, C, E, /*isValueAndGrad*/ false);
 }
 
 RValue RValueEmitter::
 visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C) {
-  llvm_unreachable("Unhandled #valueAndGradient");
+  return emitGradientInst(*this, C, E, /*isValueAndGrad*/ true);
 }
 
 RValue RValueEmitter::

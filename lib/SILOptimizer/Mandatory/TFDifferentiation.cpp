@@ -247,12 +247,12 @@ public:
     gradientMap.insert({key, gradient});
   }
 
-  SILFunction *lookupCanonicalGradient(const DifferentiationTask &task) const {
-    return gradientMap.lookup({task.original, task.getMasterConfig()});
-  }
-
   SILFunction *lookupGradient(const GradientLookupKey &key) const {
     return gradientMap.lookup(key);
+  }
+
+  SILFunction *lookupCanonicalGradient(const DifferentiationTask &task) const {
+    return gradientMap.lookup({task.original, task.getMasterConfig()});
   }
 
   /// Finds the `[reverse_differentiable]` attribute on the specified original
@@ -994,14 +994,15 @@ static SILFunction *getOrCreateGradient(
   // Step 2: Get or create a seedable, result-preserving gradient function. If
   // this function exists, return it.
   SILFunction *canonicalGrad = nullptr;
+  // The master AD config corresponds to the canonical gradient.
+  auto masterConfig =
+    SILReverseAutoDiffConfiguration::getMaster(config.parameterIndices);
   // If it already exists, we'll simply use the existing one.
-  if (auto *existingGrad = context.lookupGradient({original, config}))
+  if (auto *existingGrad = context.lookupGradient({original, masterConfig}))
     canonicalGrad = existingGrad;
   // Otherwise, create an empty function and push a differentiation task to the
   // worklist.
   else {
-    auto masterConfig =
-      SILReverseAutoDiffConfiguration::getMaster(config.parameterIndices);
     canonicalGrad = createGradFunction(masterConfig);
     // Cache the canonical gradient.
     context.insertGradient({original, masterConfig}, canonicalGrad);
@@ -1288,7 +1289,7 @@ void Differentiation::run() {
         auto *inst = originalVal->getDefiningInstruction();
         if (inst == originalFRI) return gradRef;
         if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(inst)) {
-          auto thickTy = original->getLoweredFunctionType()
+          auto thickTy = gradFn->getLoweredFunctionType()
             ->getWithRepresentation(SILFunctionTypeRepresentation::Thick);
           auto silThickTy = SILType::getPrimitiveObjectType(thickTy);
           return builder.createThinToThickFunction(
