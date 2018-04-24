@@ -3986,26 +3986,33 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   // Generate Debug Info.
   if (!Decl)
     return;
-  emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
 
   // To make it unambiguous whether a `var` binding has been initialized,
   // zero-initialize the first pointer-sized field. LLDB uses this to
   // recognize to detect uninitizialized variables. This can be removed once
-  // swiftc switches to @llvm.dbg.addr() intrinsics. This dead store will get
-  // optimized away when optimizations are enabled.
-  if (!Decl->getType()->getClassOrBoundGenericClass())
-    return;
+  // swiftc switches to @llvm.dbg.addr() intrinsics.
+  auto zeroInit = [&]() {
+    if (IGM.IRGen.Opts.shouldOptimize())
+      return;
+    Type Desugared = Decl->getType()->getDesugaredType();
+    if (!Desugared->getClassOrBoundGenericClass() &&
+        !Desugared->getStructOrBoundGenericStruct())
+      return;
 
-  auto *AI = dyn_cast<llvm::AllocaInst>(addr.getAddress().getAddress());
-  if (!AI)
-    return;
+    auto *AI = dyn_cast<llvm::AllocaInst>(addr.getAddress().getAddress());
+    if (!AI)
+      return;
 
-  auto &DL = IGM.DataLayout;
-  if (DL.getTypeSizeInBits(AI->getAllocatedType()) < DL.getPointerSize())
-    return;
-  auto *BC = Builder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
-  Builder.CreateStore(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
-                      IGM.getPointerAlignment());
+    auto &DL = IGM.DataLayout;
+    if (DL.getTypeSizeInBits(AI->getAllocatedType()) < DL.getPointerSize())
+      return;
+
+    auto *BC = Builder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
+    Builder.CreateStore(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
+                        IGM.getPointerAlignment());
+  };
+  zeroInit();
+  emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
 }
 
 static void
