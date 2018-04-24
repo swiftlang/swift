@@ -31,7 +31,7 @@ public struct SourceLocation: Codable {
 
   public init(file: String, position: AbsolutePosition) {
     self.init(line: position.line, column: position.column,
-              offset: position.byteOffset, file: file)
+              offset: position.utf8Offset, file: file)
   }
 
   public init(line: Int, column: Int, offset: Int, file: String) {

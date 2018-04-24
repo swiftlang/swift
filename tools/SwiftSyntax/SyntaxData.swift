@@ -94,7 +94,7 @@ final class SyntaxData: Equatable {
   }
 
   var byteSize: Int {
-    return getNextSiblingPos().byteOffset - self.position.byteOffset
+    return getNextSiblingPos().utf8Offset - self.position.utf8Offset
   }
 
   /// Creates a SyntaxData with the provided raw syntax, pointing to the
@@ -256,65 +256,5 @@ final class SyntaxData: Equatable {
   /// - Returns: True if both datas are exactly the same.
   static func ==(lhs: SyntaxData, rhs: SyntaxData) -> Bool {
     return lhs === rhs
-  }
-}
-
-/// An absolute position in a source file as text - the absolute byteOffset from
-/// the start, line, and column.
-public final class AbsolutePosition {
-  public fileprivate(set) var byteOffset: Int
-  public fileprivate(set) var line: Int
-  public fileprivate(set) var column: Int
-  public let encoding: Encoding
-
-  public enum Encoding {
-    case utf8
-    case utf16
-  }
-
-  public init(line: Int = 1, column: Int = 1, byteOffset: Int = 0,
-              encoding: Encoding = .utf8) {
-    self.line = line
-    self.column = column
-    self.byteOffset = byteOffset
-    self.encoding = encoding
-  }
-
-  internal func add(columns: Int) {
-    self.column += columns
-  }
-
-  internal func add(lines: Int, size: Int) {
-    self.line += lines * size
-    self.column = 1
-  }
-
-  /// Use some text as a reference for adding to the absolute position,
-  /// taking note of newlines, etc.
-  internal func add(text: String) {
-    for char in text {
-      switch char {
-      case "\n", "\r\n":
-        line += 1
-        column = 1
-      default:
-        column += 1
-      }
-
-      // FIXME: This is currently very wasteful, but should be fast once the small-string
-      //        optimization lands.
-      switch encoding {
-      case .utf8:
-        byteOffset += String(char).utf8.count
-      case .utf16:
-        // FIXME: Is this correct?
-        byteOffset += String(char).utf16.count * 2
-      }
-    }
-  }
-
-  internal func copy() -> AbsolutePosition {
-    return AbsolutePosition(line: line, column: column,
-      byteOffset: byteOffset)
   }
 }

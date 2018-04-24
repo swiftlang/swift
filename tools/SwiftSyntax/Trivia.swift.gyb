@@ -182,7 +182,7 @@ extension Trivia: Collection {
     for piece in pieces {
       piece.accumulateAbsolutePosition(pos)
     }
-    return pos.byteOffset
+    return pos.utf8Offset
   }
 }
 
@@ -214,6 +214,6 @@ extension TriviaPiece {
       pos.add(text: text)
 %   end
 % end
-  }
+    }
   }
 }
