@@ -219,12 +219,18 @@ static unsigned getNumArgs(ValueDecl *value) {
   AnyFunctionType *fnTy = value->getInterfaceType()->castTo<AnyFunctionType>();
   if (value->getDeclContext()->isTypeContext())
     fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
-  Type argTy = fnTy->getInput();
-  if (auto tuple = argTy->getAs<TupleType>()) {
-    return tuple->getNumElements();
-  } else {
-    return 1;
+
+  auto params = fnTy->getParams();
+  if (params.size() == 1) {
+    const auto &param = params.front();
+    if (param.hasLabel() || param.isVariadic())
+      return 1;
+
+    if (auto *tuple = param.getType()->getAs<TupleType>())
+      return tuple->getNumElements();
   }
+
+  return params.size();
 }
 
 static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {

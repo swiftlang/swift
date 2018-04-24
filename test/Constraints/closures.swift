@@ -299,7 +299,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> (Thing) }}
+let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> Thing }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -552,7 +552,7 @@ extension A_SR_5030 {
   func foo() -> B_SR_5030<Int> {
     let tt : B_SR_5030<Int> = sr5030_exFalso()
     return tt.map { x in (idx: x) }
-    // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
+    // expected-error@-1 {{cannot convert value of type '(idx: Int)' to closure result type 'Int'}}
   }
 }
 

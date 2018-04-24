@@ -1467,7 +1467,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
     // which would wrap the NameAliasType or ParenType, and apply the
     // isNoEscape bit when de-sugaring.
     // <https://bugs.swift.org/browse/SR-2520>
-    return FunctionType::get(funcTy->getInput(), funcTy->getResult(), extInfo);
+    return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
   }
 
   // Note: original sugared type

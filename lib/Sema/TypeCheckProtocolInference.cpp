@@ -503,7 +503,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   // common, because most of the recursion involves the requirements
   // of the generic type.
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    type = FunctionType::get(genericFn->getInput(),
+    type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
                              genericFn->getExtInfo());
   }

@@ -1660,7 +1660,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
       auto sigWithoutReqts
         = GenericSignature::get(genericFn->getGenericParams(), {});
       return GenericFunctionType::get(sigWithoutReqts,
-                                      resultFn->getInput(),
+                                      resultFn->getParams(),
                                       resultFn->getResult(),
                                       resultFn->getExtInfo());
     }
