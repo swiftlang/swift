@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %utils/chex.py < %s > %t/property_descriptor.sil
+// RUN: %{python} %utils/chex.py < %s > %t/property_descriptor.sil
 // RUN: %target-swift-frontend -emit-ir %t/property_descriptor.sil | %FileCheck --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK %t/property_descriptor.sil
 
 sil_stage canonical
