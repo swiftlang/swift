@@ -169,10 +169,11 @@ struct ExternallyCachedEvaluationRule :
     : EvaluationRule{expr} { }
 };
 
+// Define the arithmetic evaluator's zone.
 namespace swift {
-SWIFT_TYPEID(UnitTests, UncachedEvaluationRule, 1);
-SWIFT_TYPEID(UnitTests, InternallyCachedEvaluationRule, 2);
-SWIFT_TYPEID(UnitTests, ExternallyCachedEvaluationRule, 3);
+#define SWIFT_TYPEID_ZONE 255
+#define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
+#include "swift/Basic/DefineTypeIDZone.h"
 }
 
 TEST(ArithmeticEvaluator, Simple) {
