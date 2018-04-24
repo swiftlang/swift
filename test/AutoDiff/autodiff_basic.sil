@@ -15,23 +15,29 @@ bb0(%0 : $Float):
   return %0 : $Float
 }
 
-sil hidden @bar : $@convention(thin) (Float) -> Float {
+sil hidden @bar : $@convention(thin) (Float) -> (Float, Float) {
 bb0(%0 : $Float):
   %1 = function_ref @foo : $@convention(thin) (Float) -> Float
   %2 = gradient [wrt 0] %1 : $@convention(thin) (Float) -> Float
   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
-  return %3 : $Float
+  %4 = gradient [wrt 0] [preserving_result] %1 : $@convention(thin) (Float) -> Float
+  %5 = apply %4(%3) : $@convention(thin) (Float) -> (Float, Float)
+  return %5 : $(Float, Float)
 }
 
-// CHECK-LABEL: sil hidden @bar : $@convention(thin) (Float) -> Float {
+// Here all `gradient` instructions have been replaced by `function_ref`s.
+
+// CHECK-LABEL: sil hidden @bar :
 // CHECK: bb0
 // CHECK:   %1 = function_ref @foo : $@convention(thin) (Float) -> Float
 // CHECK:   %2 = function_ref @foo__grad_wrt_0 : $@convention(thin) (Float) -> Float
 // CHECK:   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
-// CHECK:   return %3 : $Float
+// CHECK:   %4 = function_ref @foo__grad_wrt_0_p : $@convention(thin) (Float) -> (Float, Float)
+// CHECK:   %5 = apply %4(%3) : $@convention(thin) (Float) -> (Float, Float)
+// CHECK:   return %5 : $(Float, Float)
 // CHECK: }
 
-// CHECK-LABEL:sil hidden @foo__grad_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float) {
+// CHECK-LABEL:sil hidden @foo__grad_wrt_0_s_p :
 // CHECK: bb0
 // CHECK:   %2 = function_ref @foo : $@convention(thin) (Float) -> Float
 // CHECK:   %3 = apply %2(%0) : $@convention(thin) (Float) -> Float
@@ -41,7 +47,7 @@ bb0(%0 : $Float):
 // CHECK:   return %6 : $(Float, Float)
 // CHECK: }
 
-// CHECK-LABEL:sil hidden @foo__grad_wrt_0 : $@convention(thin) (Float) -> Float {
+// CHECK-LABEL:sil hidden @foo__grad_wrt_0 :
 // CHECK: bb0
 // CHECK:  %1 = alloc_stack $Float
 // CHECK:  %2 = integer_literal $Builtin.Int2048, 1
@@ -62,4 +68,24 @@ bb0(%0 : $Float):
 // CHECK:  %15 = apply %14(%0, %12) : $@convention(thin) (Float, Float) -> (Float, Float)
 // CHECK:  %16 = tuple_extract %15 : $(Float, Float), 1
 // CHECK:  return %16 : $Float
+// CHECK: }
+
+// CHECK-LABEL: sil hidden @foo__grad_wrt_0_p :
+// CHECK: bb0(%0 : $Float):
+// CHECK:   %1 = alloc_stack $Float
+// CHECK:   %2 = integer_literal $Builtin.Int2048, 1
+// CHECK:   %3 = metatype $@thin Float.Type
+// CHECK:   %4 = function_ref @$SSf22_builtinIntegerLiteralSfBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Float.Type) -> Float
+// CHECK:   %5 = apply %4(%2, %3) : $@convention(method) (Builtin.Int2048, @thin Float.Type) -> Float
+// CHECK:   %6 = metatype $@thick Float.Type
+// CHECK:   %7 = alloc_stack $Float
+// CHECK:   store %5 to [trivial] %7 : $*Float
+// CHECK:   %9 = witness_method $Float, #Differentiable.init!allocator.1 : <Self where Self : Differentiable> (Self.Type) -> (Self.DifferentiationCurrency) -> Self : $@convention(witness_method: Differentiable) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0.DifferentiationCurrency, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   %10 = apply %9<Float>(%1, %7, %6) : $@convention(witness_method: Differentiable) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0.DifferentiationCurrency, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK:   dealloc_stack %7 : $*Float
+// CHECK:   %12 = load [trivial] %1 : $*Float
+// CHECK:   dealloc_stack %1 : $*Float
+// CHECK:   %14 = function_ref @foo__grad_wrt_0_s_p : $@convention(thin) (Float, Float) -> (Float, Float)
+// CHECK:   %15 = apply %14(%0, %12) : $@convention(thin) (Float, Float) -> (Float, Float)
+// CHECK:   return %15 : $(Float, Float)
 // CHECK: }

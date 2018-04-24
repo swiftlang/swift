@@ -18,6 +18,7 @@ public func foo_generic_diff<T : Differentiable>(x: T, y: T) -> T {
 
 let _ = #gradient(of: foo)
 let _ = #gradient(of: foo, withRespectTo: .0)
+let _ = #valueAndGradient(of: foo)
 
 // TODO: Uncomment these when generics are supported.
 // let _: (Float, Float) -> (Float, Float) = #gradient(of: foo_generic_diff)
@@ -26,3 +27,4 @@ let _ = #gradient(of: foo, withRespectTo: .0)
 // CHECK-LABEL: sil @main :
 // CHECK: %{{[0-9]+}} = gradient [wrt 0, 1] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
 // CHECK: %{{[0-9]+}} = gradient [wrt 0] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
+// CHECK: %{{[0-9]+}} = gradient [wrt 0, 1] [preserving_result] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
