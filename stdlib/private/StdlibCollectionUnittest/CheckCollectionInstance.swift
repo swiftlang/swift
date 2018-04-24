@@ -1892,7 +1892,7 @@ public func checkRangeReplaceable<C, N>(
         let growth = newCount - oldCount
 
         let expectedCount = source.count + growth
-        let actualCount = numericCast(a.count) as Int
+        let actualCount = a.count
         if actualCount != expectedCount {
           reportFailure(
             &a, "\(actualCount) != expected count \(expectedCount)")

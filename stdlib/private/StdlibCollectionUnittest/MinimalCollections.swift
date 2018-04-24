@@ -3814,7 +3814,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -3995,7 +3995,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -4172,7 +4172,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -4359,7 +4359,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -4536,7 +4536,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -4723,7 +4723,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -4906,7 +4906,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -5099,7 +5099,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -5286,7 +5286,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -5448,7 +5448,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -5645,7 +5645,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -5838,7 +5838,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,
@@ -6041,7 +6041,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
     let endOffset =
       endIndex.position
       - subRange.count
-      + numericCast(newElements.count) as Int
+      + newElements.count
     Index._failEarlyRangeCheck2(
       rangeStart: subRange.lowerBound,
       rangeEnd: subRange.upperBound,

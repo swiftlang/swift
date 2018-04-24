@@ -892,7 +892,7 @@ extension TestSuite {
     self.test("\(testNamePrefix).count/semantics") {
       for test in subscriptRangeTests {
         let c = makeWrappedCollection(test.collection)
-        expectEqual(test.count, numericCast(c.count) as Int)
+        expectEqual(test.count, c.count)
       }
     }
 
@@ -908,7 +908,7 @@ extension TestSuite {
           Optional<CollectionWithEquatableElement.Index>.self,
           &result)
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
@@ -929,7 +929,47 @@ extension TestSuite {
             extractValueFromEquatable(candidate).value == test.element.value
         }
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
+        }
+        expectEqual(
+          test.expected,
+          zeroBasedIndex,
+          stackTrace: SourceLocStack().with(test.loc))
+      }
+    }
+
+    // Echoing these same tests for index(of:)/index(where:), which alias
+  
+    self.test("\(testNamePrefix).index(of:)/semantics") {
+      for test in findTests {
+        let c = makeWrappedCollectionWithEquatableElement(test.sequence)
+        var result = c.index(of: wrapValueIntoEquatable(test.element))
+        expectType(
+          Optional<CollectionWithEquatableElement.Index>.self,
+          &result)
+        let zeroBasedIndex = result.map {
+          c.distance(from: c.startIndex, to: $0)
+        }
+        expectEqual(
+          test.expected,
+          zeroBasedIndex,
+          stackTrace: SourceLocStack().with(test.loc))
+      }
+    }
+
+    self.test("\(testNamePrefix).index(where:)/semantics") {
+      for test in findTests {
+        let closureLifetimeTracker = LifetimeTracked(0)
+        expectEqual(1, LifetimeTracked.instances)
+        let c = makeWrappedCollectionWithEquatableElement(test.sequence)
+        let result = c.index {
+          (candidate) in
+          _blackHole(closureLifetimeTracker)
+          return
+            extractValueFromEquatable(candidate).value == test.element.value
+        }
+        let zeroBasedIndex = result.map {
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
@@ -1387,7 +1427,7 @@ extension TestSuite {
           Optional<CollectionWithEquatableElement.Index>.self,
           &result)
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
@@ -1416,7 +1456,7 @@ extension TestSuite {
             extractValueFromEquatable(candidate).value == test.element.value
         })
         let zeroBasedIndex = result.map {
-          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+          c.distance(from: c.startIndex, to: $0)
         }
         expectEqual(
           test.expected,
