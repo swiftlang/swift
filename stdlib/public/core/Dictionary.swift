@@ -3299,8 +3299,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaDictionaryBuffer
   ) {
@@ -3464,8 +3464,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Key
   ) -> Value? {
