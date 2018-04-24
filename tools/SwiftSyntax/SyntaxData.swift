@@ -68,7 +68,7 @@ final class SyntaxData: Equatable {
     return positionCache.value { return calculatePosition(AbsolutePosition()) }
   }
 
-  var positionBeforeLeadingTrivia: AbsolutePosition {
+  var positionAfterSkippingLeadingTrivia: AbsolutePosition {
     let result = position.copy()
     _ = raw.accumulateLeadingTrivia(result)
     return result
