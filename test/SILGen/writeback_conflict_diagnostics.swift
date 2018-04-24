@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership %s -o /dev/null -emit-silgen -verify
-// RUN: %target-swift-frontend -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -emit-silgen -verify
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -o /dev/null -verify
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -verify
 
 struct MutatorStruct {
   mutating func f(_ x : inout MutatorStruct) {}

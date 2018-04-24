@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck --check-prefix=SILGEN %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck --check-prefix=SILGEN %s
 //
 // Check that SILGen emits the correct SIL attributes for @_semantics("optimize.sil.preserve_exclusivity")/
 
-// RUN: %target-swift-frontend -parse-stdlib -parse-stdlib -emit-sil -Onone %s | %FileCheck --check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-sil -parse-stdlib -parse-stdlib -Onone %s | %FileCheck --check-prefix=CANONICAL %s
 //
 // Check that -Onone pipeline does not eliminate the attribute or access markers.
 

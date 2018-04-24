@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name unowned -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name unowned -enable-sil-ownership %s | %FileCheck %s
 
 func takeClosure(_ fn: () -> Int) {}
 

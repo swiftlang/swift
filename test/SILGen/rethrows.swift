@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name rethrows -enable-sil-ownership -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name rethrows -enable-sil-ownership -verify %s | %FileCheck %s
 
 @discardableResult
 func rethrower(_ fn: () throws -> Int) rethrows -> Int {

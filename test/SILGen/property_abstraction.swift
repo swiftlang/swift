@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name property_abstraction -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name property_abstraction -enable-sil-ownership %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}

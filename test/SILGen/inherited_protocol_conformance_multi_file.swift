@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -primary-file %s %S/Inputs/inherited_protocol_conformance_other_file.swift -module-name main | %FileCheck %s --check-prefix=THIS_FILE
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s -primary-file %S/Inputs/inherited_protocol_conformance_other_file.swift -module-name main | %FileCheck %s --check-prefix=OTHER_FILE
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/inherited_protocol_conformance_other_file.swift -module-name main | %FileCheck %s --check-prefix=THIS_FILE
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -primary-file %S/Inputs/inherited_protocol_conformance_other_file.swift -module-name main | %FileCheck %s --check-prefix=OTHER_FILE
 
 // THIS_FILE-NOT: sil_witness_table {{.*}} B: P
 // THIS_FILE-LABEL: sil_witness_table hidden D: R module main

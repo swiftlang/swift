@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -verify %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership  %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -enable-sil-ownership -verify %s
 
 protocol BestFriend: class {
   init()
