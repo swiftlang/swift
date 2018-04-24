@@ -6998,21 +6998,15 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
                                     AccessSemantics semantics,
                                     DeclContext *UseDC) {
   auto baseObjectTy = baseTy->getWithoutSpecifierType();
-  if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+
+  if (isa<ConstructorDecl>(member))
+    return baseObjectTy;
+
+  if (auto func = dyn_cast<FuncDecl>(member)) {
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
-    auto selfParam = func->getInterfaceType()->getAs<AnyFunctionType>()->getParams();
-    assert(selfParam.size() == 1 && "found invalid arity of self param");
-    if (selfParam[0].getParameterFlags().isInOut()) {
-      // Unless we're looking at a nonmutating existential member.  In which
-      // case, the member will be modeled as an inout but ExistentialMemberRef
-      // and ArchetypeMemberRef want to take the base as an rvalue.
-      if (auto *fd = dyn_cast<FuncDecl>(func))
-        if (!fd->isMutating() && baseObjectTy->is<ArchetypeType>())
-          return baseObjectTy;
-      
+    if (func->isMutating())
       return InOutType::get(baseObjectTy);
-    }
 
     // Otherwise, return the rvalue type.
     return baseObjectTy;
@@ -7020,23 +7014,22 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
 
   // If the base of the access is mutable, then we may be invoking a getter or
   // setter that requires the base to be mutable.
-  if (auto *SD = dyn_cast<AbstractStorageDecl>(member)) {
-    bool isSettableFromHere = SD->isSettable(UseDC)
-      && (!UseDC->getASTContext().LangOpts.EnableAccessControl
-          || SD->isSetterAccessibleFrom(UseDC));
+  auto *SD = cast<AbstractStorageDecl>(member);
+  bool isSettableFromHere = SD->isSettable(UseDC)
+    && (!UseDC->getASTContext().LangOpts.EnableAccessControl
+        || SD->isSetterAccessibleFrom(UseDC));
 
-    // If neither the property's getter nor its setter are mutating, the base
-    // can be an rvalue.
-    if (!SD->isGetterMutating()
-        && (!isSettableFromHere || !SD->isSetterMutating()))
-      return baseObjectTy;
+  // If neither the property's getter nor its setter are mutating, the base
+  // can be an rvalue.
+  if (!SD->isGetterMutating()
+      && (!isSettableFromHere || !SD->isSetterMutating()))
+    return baseObjectTy;
 
-    // If we're calling an accessor, keep the base as an inout type, because the
-    // getter may be mutating.
-    if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
-        semantics != AccessSemantics::DirectToStorage)
-      return InOutType::get(baseObjectTy);
-  }
+  // If we're calling an accessor, keep the base as an inout type, because the
+  // getter may be mutating.
+  if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
+      semantics != AccessSemantics::DirectToStorage)
+    return InOutType::get(baseObjectTy);
 
   // Accesses to non-function members in value types are done through an @lvalue
   // type.
