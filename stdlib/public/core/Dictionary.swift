@@ -1263,6 +1263,12 @@ extension Dictionary {
     }
 
     @inlinable // FIXME(sil-serialize-all)
+    public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
+      // The first and last elements are the same because each element is unique.
+      return _customIndexOfEquatableElement(element)
+    }
+
+    @inlinable // FIXME(sil-serialize-all)
     public static func ==(lhs: Keys, rhs: Keys) -> Bool {
       // Equal if the two dictionaries share storage.
       if case (.native(let lhsNative), .native(let rhsNative)) =

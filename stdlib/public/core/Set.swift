@@ -360,6 +360,14 @@ extension Set: Collection {
     return Optional(firstIndex(of: member))
   }
 
+  @inlinable // FIXME(sil-serialize-all)
+  public func _customLastIndexOfEquatableElement(
+     _ member: Element
+    ) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(member)
+  }
+
   /// The number of elements in the set.
   ///
   /// - Complexity: O(1).

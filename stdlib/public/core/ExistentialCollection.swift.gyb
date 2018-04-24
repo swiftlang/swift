@@ -349,6 +349,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
   func _customIndexOfEquatableElement(element: Element) -> Index??
+  func _customLastIndexOfEquatableElement(element: Element) -> Index??
   */
 
   @inlinable // FIXME(sil-serialize-all)
