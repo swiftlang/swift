@@ -179,7 +179,7 @@ bb0(%0 : $SinglePayloadNontrivial):
   return %v : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @single_payload_nontrivial_copy_destroy(i64)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_nontrivial_copy_destroy(i64)
 // CHECK:      call void @"$S20enum_value_semantics23SinglePayloadNontrivialOWOy"
 // CHECK-NEXT: call swiftcc void @single_payload_nontrivial_user
 // CHECK-NEXT: call void @"$S20enum_value_semantics23SinglePayloadNontrivialOWOe"

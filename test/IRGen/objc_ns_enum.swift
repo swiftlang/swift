@@ -13,7 +13,7 @@ import gizmo
 // CHECK: @"$SSo16NSRuncingOptionsVN" = linkonce_odr hidden global
 // CHECK: @"$SSo28NeverActuallyMentionedByNameVs9EquatableSCWp" = linkonce_odr hidden constant
 
-// CHECK-LABEL: define{{( protected)?}} i32 @main
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main
 // CHECK:         call swiftcc %swift.metadata_response @"$SSo16NSRuncingOptionsVMa"(i64 0)
 
 // CHECK: define hidden swiftcc i16 @"$S12objc_ns_enum09imported_C9_inject_aSo16NSRuncingOptionsVyF"()

@@ -47,7 +47,7 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
   return %5 : $()
 }
 
-// CHECK:    define{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
 // CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$SSo17CCRefrigeratorRefaMa"([[INT]] 0)
 // CHECK-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
