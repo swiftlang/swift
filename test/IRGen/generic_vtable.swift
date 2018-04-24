@@ -22,7 +22,7 @@ public class Concrete : Derived<Int> {
 
 //// Nominal type descriptor for 'Base' does not have any method descriptors.
 
-// CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(protected )?}}constant
+// CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, reflectable, is class, is unique
 // CHECK-SAME: <i32 0x8004_0050>,
 // -- vtable offset
@@ -47,7 +47,7 @@ public class Concrete : Derived<Int> {
 
 //// Nominal type descriptor for 'Derived' has method descriptors.
 
-// CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(protected )?}}constant
+// CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, reflectable, is class, is unique, is generic
 // CHECK-SAME: <i32 0x8004_00D0>,
 // -- vtable offset
@@ -71,7 +71,7 @@ public class Concrete : Derived<Int> {
 
 //// Nominal type descriptor for 'Concrete' has method descriptors.
 
-// CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(protected )?}}constant
+// CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, reflectable, is class, is unique
 // CHECK-SAME: <i32 0x8004_0050>,
 // -- vtable offset

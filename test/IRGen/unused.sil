@@ -50,7 +50,7 @@ bb0:
 
 // CHECK: define linkonce_odr hidden swiftcc void @qux()
 // CHECK: define hidden swiftcc void @fred()
-// CHECK: define{{( protected)?}} swiftcc void @frieda()
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @frieda()
 
 // NEGATIVE-NOT: @foo
 // NEGATIVE-NOT: @bar

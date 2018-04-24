@@ -14,9 +14,9 @@
 
 // CHECK: @"$S16class_resilience14ResilientChildC5fields5Int32VvpWvd" = hidden global [[INT]] {{8|16}}
 
-// CHECK: @"$S16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}global [[BOUNDS:{ (i32|i64), i32, i32 }]] zeroinitializer
+// CHECK: @"$S16class_resilience21ResilientGenericChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS:{ (i32|i64), i32, i32 }]] zeroinitializer
 
-// CHECK: @"$S16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK: @"$S16class_resilience26ClassWithResilientPropertyCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
 // CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
 
@@ -28,9 +28,9 @@
 
 // CHECK: [[RESILIENTCHILD_NAME:@.*]] = private constant [15 x i8] c"ResilientChild\00"
 
-// CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}global [[BOUNDS]] zeroinitializer
+// CHECK: @"$S16class_resilience14ResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
-// CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}constant <{{.*}}> <{
+// CHECK: @"$S16class_resilience14ResilientChildCMn" = {{(protected )?}}{{(dllexport )?}}constant <{{.*}}> <{
 // --       flags: class, unique, reflectable, has vtable, has resilient superclass
 // CHECK-SAME:   <i32 0xD004_0050>
 // --       name:
@@ -41,21 +41,21 @@
 // CHECK-SAME:   i32 3,
 // CHECK-SAME: }>
 
-// CHECK: @"$S16class_resilience16FixedLayoutChildCMo" = {{(protected )?}}global [[BOUNDS]] zeroinitializer
+// CHECK: @"$S16class_resilience16FixedLayoutChildCMo" = {{(protected )?}}{{(dllexport )?}}global [[BOUNDS]] zeroinitializer
 
-// CHECK: @"$S16class_resilience17MyResilientParentCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK: @"$S16class_resilience17MyResilientParentCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
 // CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
 
-// CHECK: @"$S16class_resilience16MyResilientChildCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK: @"$S16class_resilience16MyResilientChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 60, i32 2, i32 15 }
 // CHECK-SAME-64: { [[INT]] 96, i32 2, i32 12 }
 
-// CHECK: @"$S16class_resilience24MyResilientGenericParentCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK: @"$S16class_resilience24MyResilientGenericParentCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 52, i32 2, i32 13 }
 // CHECK-SAME-64: { [[INT]] 80, i32 2, i32 10 }
 
-// CHECK: @"$S16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}constant [[BOUNDS]]
+// CHECK: @"$S16class_resilience24MyResilientConcreteChildCMo" = {{(protected )?}}{{(dllexport )?}}constant [[BOUNDS]]
 // CHECK-SAME-32: { [[INT]] 64, i32 2, i32 16 }
 // CHECK-SAME-64: { [[INT]] 104, i32 2, i32 13 }
 
@@ -189,7 +189,7 @@ extension ResilientGenericOutsideParent {
 
 // ClassWithResilientProperty.color getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(%T16class_resilience26ClassWithResilientPropertyC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32Vvg"(%T16class_resilience26ClassWithResilientPropertyC* swiftself)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @"$S16class_resilience26ClassWithResilientPropertyC5colors5Int32VvpWvd"
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience26ClassWithResilientPropertyC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
@@ -200,7 +200,7 @@ extension ResilientGenericOutsideParent {
 
 // ClassWithResilientProperty metadata accessor
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.metadata_response @"$S16class_resilience26ClassWithResilientPropertyCMa"(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$S16class_resilience26ClassWithResilientPropertyCMa"(
 // CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @"$S16class_resilience26ClassWithResilientPropertyCML"
 // CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
@@ -218,7 +218,7 @@ extension ResilientGenericOutsideParent {
 
 // ClassWithResilientlySizedProperty.color getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(%T16class_resilience33ClassWithResilientlySizedPropertyC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(%T16class_resilience33ClassWithResilientlySizedPropertyC* swiftself)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @"$S16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32VvpWvd"
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience33ClassWithResilientlySizedPropertyC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
@@ -229,7 +229,7 @@ extension ResilientGenericOutsideParent {
 
 // ClassWithResilientlySizedProperty metadata accessor
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.metadata_response @"$S16class_resilience33ClassWithResilientlySizedPropertyCMa"(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$S16class_resilience33ClassWithResilientlySizedPropertyCMa"(
 // CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** @"$S16class_resilience33ClassWithResilientlySizedPropertyCML"
 // CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
@@ -247,7 +247,7 @@ extension ResilientGenericOutsideParent {
 
 // ClassWithIndirectResilientEnum.color getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg"(%T16class_resilience30ClassWithIndirectResilientEnumC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience30ClassWithIndirectResilientEnumC5colors5Int32Vvg"(%T16class_resilience30ClassWithIndirectResilientEnumC* swiftself)
 // CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T16class_resilience30ClassWithIndirectResilientEnumC, %T16class_resilience30ClassWithIndirectResilientEnumC* %0, i32 0, i32 2
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
@@ -256,7 +256,7 @@ extension ResilientGenericOutsideParent {
 
 // ResilientChild.field getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience14ResilientChildC5fields5Int32Vvg"(%T16class_resilience14ResilientChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience14ResilientChildC5fields5Int32Vvg"(%T16class_resilience14ResilientChildC* swiftself)
 // CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @"$S16class_resilience14ResilientChildC5fields5Int32VvpWvd"
 // CHECK-NEXT: [[PTR:%.*]] = bitcast %T16class_resilience14ResilientChildC* %0 to i8*
 // CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
@@ -269,7 +269,7 @@ extension ResilientGenericOutsideParent {
 
 // ResilientGenericChild.field getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience21ResilientGenericChildC5fields5Int32Vvg"(%T16class_resilience21ResilientGenericChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience21ResilientGenericChildC5fields5Int32Vvg"(%T16class_resilience21ResilientGenericChildC* swiftself)
 
 // FIXME: we could eliminate the unnecessary isa load by lazily emitting
 // metadata sources in EmitPolymorphicParameters
@@ -296,7 +296,7 @@ extension ResilientGenericOutsideParent {
 
 // MyResilientChild.field getter
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience16MyResilientChildC5fields5Int32Vvg"(%T16class_resilience16MyResilientChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience16MyResilientChildC5fields5Int32Vvg"(%T16class_resilience16MyResilientChildC* swiftself)
 // CHECK:      [[FIELD_ADDR:%.*]] = getelementptr inbounds %T16class_resilience16MyResilientChildC, %T16class_resilience16MyResilientChildC* %0, i32 0, i32 2
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[RESULT:%.*]] = load i32, i32* [[PAYLOAD_ADDR]]
@@ -305,7 +305,7 @@ extension ResilientGenericOutsideParent {
 
 // ResilientGenericOutsideParent.genericExtensionMethod()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(%T15resilient_class29ResilientGenericOutsideParentC* swiftself) #0 {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$S15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(%T15resilient_class29ResilientGenericOutsideParentC* swiftself) #0 {
 // CHECK:      [[ISA_ADDR:%.*]] = bitcast %T15resilient_class29ResilientGenericOutsideParentC* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class29ResilientGenericOutsideParentCMo", i32 0, i32 0)
@@ -395,7 +395,7 @@ extension ResilientGenericOutsideParent {
 
 // ResilientChild.field getter dispatch thunk
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @"$S16class_resilience14ResilientChildC5fields5Int32VvgTj"(%T16class_resilience14ResilientChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$S16class_resilience14ResilientChildC5fields5Int32VvgTj"(%T16class_resilience14ResilientChildC* swiftself)
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)
@@ -408,7 +408,7 @@ extension ResilientGenericOutsideParent {
 
 // ResilientChild.field setter dispatch thunk
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32, %T16class_resilience14ResilientChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32, %T16class_resilience14ResilientChildC* swiftself)
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T16class_resilience14ResilientChildC, %T16class_resilience14ResilientChildC* %1, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S16class_resilience14ResilientChildCMo", i32 0, i32 0)

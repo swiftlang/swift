@@ -29,7 +29,8 @@ public func test3(d : Double) -> Double {
 }
 
 // CHECK-LABEL: define {{.*}}test4
-// CHECK: call float @llvm.sqrt.f32
+// CHECK-LINUX: call float @llvm.sqrt.f32
+// CHECK-WINDOWS: call float @llvm.sqrt.f32
 
 public func test4(f : Float) -> Float {
   // This call does not match the signature for the C sqrt function

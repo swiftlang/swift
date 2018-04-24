@@ -36,7 +36,7 @@ struct Conformer: Q, QQ {
   func qMethod() {}
 }
 
-// CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@"\$S39sil_witness_tables_external_conformance17ExternalConformerVAA0F1PAAWP"]] = external global i8*, align 8
+// CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@"\$S39sil_witness_tables_external_conformance17ExternalConformerVAA0F1PAAWP"]] = external{{( dllimport)?}} global i8*, align 8
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@"\$S18sil_witness_tables9ConformerVAA1QAAWP"]] = hidden constant [3 x i8*] [
 // CHECK:   i8* bitcast ([5 x i8*]* [[CONFORMER_P_WITNESS_TABLE:@"\$S18sil_witness_tables9ConformerVAA1PAAWP"]] to i8*),
 // CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @"$S18sil_witness_tables9ConformerVAA1QA2aDP7qMethod{{[_0-9a-zA-Z]*}}FTW" to i8*)
