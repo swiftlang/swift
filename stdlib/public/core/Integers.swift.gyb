@@ -3708,7 +3708,7 @@ extension ${Self} : Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
     // `AnyHashable`-boxed integers, all integer values are currently required
     // to hash exactly the same way as the corresponding (U)Int64 value.  To fix
