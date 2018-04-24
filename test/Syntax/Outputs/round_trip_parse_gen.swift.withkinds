@@ -107,7 +107,12 @@ class C <MemberDeclBlock>{<MemberDeclListItem><FunctionDecl>
   private </DeclModifier>deinit <CodeBlock>{}</CodeBlock></DeinitializerDecl></MemberDeclListItem><MemberDeclListItem><SubscriptDecl><DeclModifier>
 
   internal </DeclModifier>subscript<ParameterClause>(<FunctionParameter>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>set <CodeBlock>{} </CodeBlock></AccessorDecl>}</AccessorBlock></SubscriptDecl></MemberDeclListItem><MemberDeclListItem><SubscriptDecl>
-  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl></MemberDeclListItem>
+  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
+
+  var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<FunctionCallExpr><IdentifierExpr>
+    address </IdentifierExpr><ClosureExpr>{ <FunctionCallExpr><IdentifierExpr>fatalError</IdentifierExpr>() </FunctionCallExpr>}</ClosureExpr></FunctionCallExpr><FunctionCallExpr><IdentifierExpr>
+    unsafeMutableAddress </IdentifierExpr><ClosureExpr>{ <FunctionCallExpr><IdentifierExpr>fatalError</IdentifierExpr>() </FunctionCallExpr>}</ClosureExpr></FunctionCallExpr>
+  }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></ClassDecl><ProtocolDecl>
 
 protocol PP <MemberDeclBlock>{<MemberDeclListItem><AssociatedtypeDecl>

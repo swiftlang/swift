@@ -108,6 +108,11 @@ class C {
 
   internal subscript(x: Int) -> Int { get {} set {} }
   subscript() -> Int { return 1 }
+
+  var x: Int {
+    address { fatalError() }
+    unsafeMutableAddress { fatalError() }
+  }
 }
 
 protocol PP {
