@@ -301,10 +301,13 @@ public final class AbsolutePosition {
         column += 1
       }
 
+      // FIXME: This is currently very wasteful, but should be fast once the small-string
+      //        optimization lands.
       switch encoding {
       case .utf8:
         byteOffset += String(char).utf8.count
       case .utf16:
+        // FIXME: Is this correct?
         byteOffset += String(char).utf16.count * 2
       }
     }

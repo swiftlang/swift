@@ -201,7 +201,11 @@ public struct Diagnostic: Codable {
   /// An array of possible FixIts to apply to this diagnostic.
   public let fixIts: [FixIt]
 
-  /// A diagnostic builder that
+  /// A diagnostic builder that exposes mutating operations for notes,
+  /// highlights, and FixIts. When a Diagnostic is created, a builder
+  /// will be provided in a closure where the user can conditionally
+  /// add notes, highlights, and FixIts, that will then be wrapped
+  /// into the immutable Diagnostic object.
   public struct Builder {
     /// An in-flight array of notes.
     internal var notes = [Note]()
