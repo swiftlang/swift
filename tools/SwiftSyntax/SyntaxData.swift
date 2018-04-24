@@ -313,8 +313,8 @@ public final class AbsolutePosition {
     }
   }
 
-  internal func copy() -> Self {
-    return type(of: self).init(line: line, column: column,
+  internal func copy() -> AbsolutePosition {
+    return AbsolutePosition(line: line, column: column,
       byteOffset: byteOffset)
   }
 }
