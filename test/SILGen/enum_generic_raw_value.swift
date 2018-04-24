@@ -6,6 +6,6 @@ enum E<T>: Int {
 }
 
 // CHECK-LABEL: sil hidden @$S22enum_generic_raw_value1FO
-enum F<T: ExpressibleByIntegerLiteral where T: Equatable>: T {
+enum F<T: ExpressibleByIntegerLiteral>: T where T: Equatable {
   case A = 1
 }

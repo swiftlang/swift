@@ -14,36 +14,36 @@ class C {}
 
 func a<T>(x: T) {}
 func b<T: P>(x: G<T>, y: T.Assoc) {}
-func c<T where T: P>(x: T, y: T.Assoc) {}
+func c<T>(x: T, y: T.Assoc) where T: P {}
 func d<T: P, U: P & Q>(x: T, y: U) {}
-func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
+func e<T, U>(x: T, y: U) where T: P, U: P, U: Q {}
 // FIXME: Same-type constraints expose a typechecker bug.
 // <rdar://problem/15730168>
-func f<T: Q where T.Assoc1 == T.Assoc2>(x: T) {}
-func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
-func h<T: P, U where T.Assoc == U>(x: T) {}
-func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(x: T) {}
+func f<T: Q>(x: T) where T.Assoc1 == T.Assoc2 {}
+func g<T>(x: T) where T: Q, T.Assoc1 == T.Assoc2 {}
+func h<T: P, U>(x: T) where T.Assoc == U {}
+func i<T: P>(x: T) where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2 {}
 func j<T: C>(_: T) {}
-func k<T where T: C>(_: T) {}
-func l<T: C where T: P>(_: T) {}
-func m<T: P where T.Assoc: C>(_: T) {}
+func k<T>(_: T) where T: C {}
+func l<T: C>(_: T) where T: P {}
+func m<T: P>(_: T) where T.Assoc: C {}
 
 struct Foo<V> {
   func z() {}
 
   func a<T>(x: T) {}
   func b<T: P>(x: G<T>, y: T.Assoc) {}
-  func c<T where T: P>(x: T, y: T.Assoc) {}
+  func c<T>(x: T, y: T.Assoc) where T: P {}
   func d<T: P, U: P & Q>(x: T, y: U) {}
-  func e<T, U where T: P, U: P, U: Q>(x: T, y: U) {}
-  func f<T: Q where T.Assoc1 == T.Assoc2>(x: T) {}
-  func g<T where T: Q, T.Assoc1 == T.Assoc2>(x: T) {}
-  func h<T: P, U where T.Assoc == U>(x: T) {}
-  func i<T: P where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2>(x: T) {}
+  func e<T, U>(x: T, y: U) where T: P, U: P, U: Q {}
+  func f<T: Q>(x: T) where T.Assoc1 == T.Assoc2 {}
+  func g<T>(x: T) where T: Q, T.Assoc1 == T.Assoc2 {}
+  func h<T: P, U>(x: T) where T.Assoc == U {}
+  func i<T: P>(x: T) where T.Assoc: Q, T.Assoc.Assoc1 == T.Assoc.Assoc2 {}
   func j<T: C>(_: T) {}
-  func k<T where T: C>(_: T) {}
-  func l<T: C where T: P>(_: T) {}
-  func m<T: P where T.Assoc: C>(_: T) {}
+  func k<T>(_: T) where T: C {}
+  func l<T: C>(_: T) where T: P {}
+  func m<T: P>(_: T) where T.Assoc: C {}
 }
 
 // Test that we handle interface type lowering when accessing a dependent
