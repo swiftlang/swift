@@ -2424,6 +2424,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     IGM.addObjCClass(var,
               classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
   }
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(classDecl);
 }
 
 llvm::Value *IRGenFunction::emitInvariantLoad(Address address,
@@ -2820,6 +2822,19 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          canBeConstant, init.finishAndCreateFuture());
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(structDecl);
+}
+
+void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
+  // If this is a nested type we also potentially might need the outer types.
+  auto *declCtxt = type->getDeclContext();
+  assert(declCtxt);
+  auto *parentNominalDecl = dyn_cast_or_null<NominalTypeDecl>(declCtxt);
+  if (!parentNominalDecl)
+    return;
+
+  noteUseOfTypeMetadata(parentNominalDecl);
 }
 
 // Enums
@@ -3024,6 +3039,8 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          canBeConstant, init.finishAndCreateFuture());
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(theEnum);
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
