@@ -98,7 +98,7 @@ DECL_NODES = [
                    node_choices=[
                        Child('Statements', kind='CodeBlockItemList'),
                        Child('SwitchCases', kind='SwitchCaseList'),
-                       Child('Decls', kind='DeclList'),
+                       Child('Decls', kind='MemberDeclList'),
                    ]),
          ]),
 
@@ -249,13 +249,26 @@ DECL_NODES = [
     Node('MemberDeclBlock', kind='Syntax', traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('Members', kind='DeclList'),
+             Child('Members', kind='MemberDeclList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
-    # decl-list = decl decl-list?
-    Node('DeclList', kind='SyntaxCollection',
-         element='Decl'),
+    # member-decl-list = member-decl member-decl-list?
+    Node('MemberDeclList', kind='SyntaxCollection',
+         element='MemberDeclListItem'),
+
+    # member-decl = decl ';'?
+    Node('MemberDeclListItem', kind='Syntax',
+         description='''
+         A member declaration of a type consisting of a declaration and an \
+         optional semicolon;
+         ''',
+         children=[
+             Child('Decl', kind='Decl', 
+                   description='The declaration of the type member.'),
+             Child('Semicolon', kind='SemicolonToken', is_optional=True,
+                   description='An optional trailing semicolon.'),
+         ]),
 
     # source-file = code-block-item-list eof
     Node('SourceFile', kind='Syntax',
