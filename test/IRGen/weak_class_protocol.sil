@@ -6,7 +6,7 @@ import Swift
 
 protocol Foo: class { }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @store_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @store_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64) {{.*}} {
 // CHECK:       entry:
 // CHECK-objc:    [[INSTANCE:%.*]] = inttoptr i64 %1 to %objc_object*
 // CHECK-native:  [[INSTANCE:%.*]] = inttoptr i64 %1 to %swift.refcounted*
