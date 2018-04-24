@@ -109,25 +109,26 @@ public protocol Hashable : Equatable {
   /// your program. Do not save hash values to use during a future execution.
   var hashValue: Int { get }
 
-  /// Feed bits to be hashed into the hash function represented by `hasher`.
-  func _hash(into hasher: inout _Hasher)
-}
-
-extension Hashable {
-  @inlinable
-  @inline(__always)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.combine(self.hashValue)
-  }
+  /// Hash the essential components of this value into the hash function
+  /// represented by `hasher`, by feeding them into it using its `combine`
+  /// methods.
+  ///
+  /// Essential components are precisely those that are compared in the type's
+  /// implementation of `Equatable`.
+  ///
+  /// Note that `hash(into:)` doesn't own the hasher passed into it, so it must
+  /// not call `finalize()` on it. Doing so may become a compile-time error in
+  /// the future.
+  func hash(into hasher: inout Hasher)
 }
 
 // Called by synthesized `hashValue` implementations.
 @inlinable
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
-  var hasher = _Hasher()
+  var hasher = Hasher()
   hasher.combine(value)
-  return hasher.finalize()
+  return hasher._finalize()
 }
 
 // Called by the SwiftValue implementation.

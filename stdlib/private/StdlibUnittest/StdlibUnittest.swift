@@ -2402,7 +2402,7 @@ public func checkEquatable<T : Equatable>(
 }
 
 internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
-  var hasher = _Hasher()
+  var hasher = Hasher()
   if let seed = seed {
     hasher.combine(seed)
   }
@@ -2497,7 +2497,7 @@ public func checkHashable<Instances: Collection>(
         expectTrue(
           (0..<10).contains { hash(x, seed: $0) != hash(y, seed: $0) },
           """
-          _hash(into:) expected to differ, found to match
+          hash(into:) expected to differ, found to match
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,
