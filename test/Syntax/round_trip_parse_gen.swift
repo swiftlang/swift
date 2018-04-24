@@ -446,6 +446,7 @@ func keypath() {
   _ = \a.b.c
   _ = \a.b[1]
   _ = \.a.b
+  _ = \Array<Int>.[]
   _ = #keyPath(a.b.c)
 }
 func objcSelector() {

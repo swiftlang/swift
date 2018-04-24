@@ -498,7 +498,11 @@ EXPR_NODES = [
     Node('KeyPathExpr', kind='Expr',
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('RootExpr', kind='IdentifierExpr', is_optional=True), 
+             Child('RootExpr', kind='Expr', is_optional=True, 
+                   node_choices=[
+                       Child('IdentifierExpr', kind='IdentifierExpr'),
+                       Child('SpecializeExpr', kind='SpecializeExpr')
+                   ]), 
              Child('Expression', kind='Expr'),
          ]),
 
