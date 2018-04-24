@@ -2819,8 +2819,8 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
   // If this is a nested type we also potentially might need the outer types.
   auto *declCtxt = type->getDeclContext();
-  assert(declCtxt);
-  auto *parentNominalDecl = dyn_cast_or_null<NominalTypeDecl>(declCtxt);
+  auto *parentNominalDecl =
+    declCtxt->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!parentNominalDecl)
     return;
 

@@ -13,3 +13,8 @@ struct Outer3 {
   }
 }
 
+struct Outer4 {}
+
+extension Outer4 {
+  struct InnerExtension {}
+}
