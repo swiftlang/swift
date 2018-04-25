@@ -3914,3 +3914,14 @@ bool Metadata::satisfiesClassConstraint() const {
   // or it's a class.
   return isAnyClass();
 }
+
+#if !NDEBUG
+void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
+  Demangle::Demangler Dem;
+  auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
+  auto mangledName = Demangle::mangleNode(node);
+  auto result = _getTypeByMangledName(mangledName,
+                                      [](unsigned, unsigned){ return nullptr; });
+  assert(metadata == result);
+}
+#endif
