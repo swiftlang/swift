@@ -1150,11 +1150,15 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
 ParserStatus
 Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
+  SyntaxParsingContext AvailabilitySpecContext(
+      SyntaxContext, SyntaxKind::AvailabilitySpecList);
   ParserStatus Status = makeParserSuccess();
 
   // We don't use parseList() because we want to provide more specific
   // diagnostics disallowing operators in version specs.
   while (1) {
+    SyntaxParsingContext AvailabilityEntryContext(
+        SyntaxContext, SyntaxKind::AvailabilityArgument);
     auto SpecResult = parseAvailabilitySpec();
     if (auto *Spec = SpecResult.getPtrOrNull()) {
       Specs.push_back(Spec);

@@ -151,7 +151,7 @@ class Bar<TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Foo </Sim
 
 class C<GenericParameterClause><<GenericParameter>A, </GenericParameter><GenericParameter>B</GenericParameter>> </GenericParameterClause><GenericWhereClause>where <ConformanceRequirement><SimpleTypeIdentifier>A</SimpleTypeIdentifier>: <SimpleTypeIdentifier>Foo</SimpleTypeIdentifier>, </ConformanceRequirement><SameTypeRequirement><SimpleTypeIdentifier>B </SimpleTypeIdentifier>== <SimpleTypeIdentifier>Bar </SimpleTypeIdentifier></SameTypeRequirement></GenericWhereClause><MemberDeclBlock>{}</MemberDeclBlock></ClassDecl><ClassDecl><Attribute>
 
-@available(*, unavailable)</Attribute><DeclModifier>
+@available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument>unavailable</AvailabilityArgument>)</Attribute><DeclModifier>
 private </DeclModifier>class C <MemberDeclBlock>{}</MemberDeclBlock></ClassDecl><StructDecl>
 
 struct foo <MemberDeclBlock>{<StructDecl>
@@ -165,12 +165,15 @@ struct foo <MemberDeclBlock>{<StructDecl>
 }</MemberDeclBlock></StructDecl><StructDecl>
 
 struct foo <MemberDeclBlock>{<StructDecl><Attribute>
-  @available(*, unavailable)</Attribute>
+  @available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument>unavailable</AvailabilityArgument>)</Attribute>
   struct foo <MemberDeclBlock>{}</MemberDeclBlock></StructDecl><ClassDecl><DeclModifier>
   public </DeclModifier>class foo <MemberDeclBlock>{<FunctionDecl><Attribute>
-    @available(*, unavailable)</Attribute><Attribute>
-    @objc(fooObjc)</Attribute><DeclModifier>
-    private </DeclModifier><DeclModifier>static </DeclModifier>func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl>
+    @available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument>unavailable</AvailabilityArgument>)</Attribute><Attribute>
+    @objc(<ObjCSelectorPiece>fooObjc</ObjCSelectorPiece>)</Attribute><DeclModifier>
+    private </DeclModifier><DeclModifier>static </DeclModifier>func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><Attribute>
+    
+    @objc(<ObjCSelectorPiece>fooObjcBar:</ObjCSelectorPiece><ObjCSelectorPiece>baz:</ObjCSelectorPiece>)</Attribute><DeclModifier>
+    private </DeclModifier><DeclModifier>static </DeclModifier>func foo<FunctionSignature><ParameterClause>(<FunctionParameter>bar: <SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>baz: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>)</ParameterClause></FunctionSignature></FunctionDecl>
   }</MemberDeclBlock></ClassDecl>
 }</MemberDeclBlock></StructDecl><StructDecl>
 
@@ -195,7 +198,7 @@ func foo<FunctionSignature><ParameterClause>( <FunctionParameter>a: <SimpleTypeI
 
 struct C <MemberDeclBlock>{<FunctionDecl><Attribute>
 @objc</Attribute><Attribute>
-@available(*, unavailable)</Attribute><DeclModifier>
+@available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument>unavailable</AvailabilityArgument>)</Attribute><DeclModifier>
 private </DeclModifier><DeclModifier>static </DeclModifier><DeclModifier>override </DeclModifier>func foo<GenericParameterClause><<GenericParameter>a, </GenericParameter><GenericParameter>b, </GenericParameter><GenericParameter>c</GenericParameter>></GenericParameterClause><FunctionSignature><ParameterClause>(<FunctionParameter>a b: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>c: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause>throws <ReturnClause>-> <ArrayType>[<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>] </ArrayType></ReturnClause></FunctionSignature><GenericWhereClause>where <SameTypeRequirement><SimpleTypeIdentifier>a</SimpleTypeIdentifier>==<SimpleTypeIdentifier>p1</SimpleTypeIdentifier>, </SameTypeRequirement><ConformanceRequirement><SimpleTypeIdentifier>b</SimpleTypeIdentifier>:<SimpleTypeIdentifier>p2 </SimpleTypeIdentifier></ConformanceRequirement></GenericWhereClause><CodeBlock>{ <IdentifierExpr>ddd </IdentifierExpr>}</CodeBlock></FunctionDecl><FunctionDecl>
 func rootView<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Label </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><DeclModifier>
 static </DeclModifier>func ==<FunctionSignature><ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>bool </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><FunctionDecl><DeclModifier>
@@ -415,7 +418,7 @@ extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><MemberDeclBlock>{<Va
   }</AccessorBlock></PatternBinding></VariableDecl>
 }</MemberDeclBlock></ExtensionDecl><ExtensionDecl><Attribute>
 
-@available(*, unavailable)</Attribute><DeclModifier>
+@available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument>unavailable</AvailabilityArgument>)</Attribute><DeclModifier>
 fileprivate </DeclModifier>extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><MemberDeclBlock>{}</MemberDeclBlock></ExtensionDecl><ExtensionDecl>
 
 extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>extProtocol </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{}</MemberDeclBlock></ExtensionDecl><ExtensionDecl>
@@ -490,4 +493,43 @@ postfix </DeclModifier>operator <-</OperatorDecl><FunctionDecl>
 func higherOrderFunc<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<VariableDecl>
   let <PatternBinding><IdentifierPattern>x </IdentifierPattern><InitializerClause>= <ArrayExpr>[<ArrayElement><IntegerLiteralExpr>1</IntegerLiteralExpr>,</ArrayElement><ArrayElement><IntegerLiteralExpr>2</IntegerLiteralExpr>,</ArrayElement><ArrayElement><IntegerLiteralExpr>3</IntegerLiteralExpr></ArrayElement>]</ArrayExpr></InitializerClause></PatternBinding></VariableDecl><FunctionCallExpr><MemberAccessExpr><IdentifierExpr>
   x</IdentifierExpr>.reduce</MemberAccessExpr>(<FunctionCallArgument><IntegerLiteralExpr>0</IntegerLiteralExpr>, </FunctionCallArgument><FunctionCallArgument><IdentifierExpr>+</IdentifierExpr></FunctionCallArgument>)</FunctionCallExpr>
-}</CodeBlock></FunctionDecl>
+}</CodeBlock></FunctionDecl><IfStmt>
+
+if <ConditionElement><AvailabilityCondition>#available(<AvailabilityArgument><AvailabilityVersionRestriction>iOS <VersionTuple>11</VersionTuple></AvailabilityVersionRestriction>, </AvailabilityArgument><AvailabilityArgument><AvailabilityVersionRestriction>macOS <VersionTuple>10.11.2</VersionTuple></AvailabilityVersionRestriction>, </AvailabilityArgument><AvailabilityArgument>*</AvailabilityArgument>) </AvailabilityCondition></ConditionElement><CodeBlock>{}</CodeBlock></IfStmt><FunctionDecl><Attribute>
+
+@_specialize(<GenericWhereClause>where <SameTypeRequirement><SimpleTypeIdentifier>T </SimpleTypeIdentifier>== <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></SameTypeRequirement></GenericWhereClause>)</Attribute><Attribute>
+@_specialize(<LabeledSpecializeEntry>exported: true, </LabeledSpecializeEntry><GenericWhereClause>where <SameTypeRequirement><SimpleTypeIdentifier>T </SimpleTypeIdentifier>== <SimpleTypeIdentifier>String</SimpleTypeIdentifier></SameTypeRequirement></GenericWhereClause>)</Attribute><DeclModifier>
+public </DeclModifier>func specializedGenericFunc<GenericParameterClause><<GenericParameter>T</GenericParameter>></GenericParameterClause><FunctionSignature><ParameterClause>(<FunctionParameter>_ t: <SimpleTypeIdentifier>T</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>T </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{<ReturnStmt>
+  return <IdentifierExpr>t</IdentifierExpr></ReturnStmt>
+}</CodeBlock></FunctionDecl><ProtocolDecl>
+
+protocol Q <MemberDeclBlock>{<FunctionDecl>
+  func g<FunctionSignature><ParameterClause>()</ParameterClause></FunctionSignature></FunctionDecl><VariableDecl>
+  var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>String </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{ <AccessorDecl>get </AccessorDecl>}</AccessorBlock></PatternBinding></VariableDecl><FunctionDecl>
+  func f<FunctionSignature><ParameterClause>(<FunctionParameter>x:<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>y:<SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></ReturnClause></FunctionSignature></FunctionDecl>
+  #if <IdentifierExpr>FOO_BAR</IdentifierExpr><VariableDecl>
+  var <PatternBinding><IdentifierPattern>conditionalVar</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl>
+  #endif
+}</MemberDeclBlock></ProtocolDecl><StructDecl>
+
+struct S <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Q</SimpleTypeIdentifier>, </InheritedType><InheritedType><SimpleTypeIdentifier>Equatable </SimpleTypeIdentifier></InheritedType></TypeInheritanceClause><MemberDeclBlock>{<FunctionDecl><Attribute>
+  @_implements(<ImplementsAttributeArguments><SimpleTypeIdentifier>Q</SimpleTypeIdentifier>, f<DeclNameArguments>(<DeclNameArgument>x:</DeclNameArgument><DeclNameArgument>y:</DeclNameArgument>)</DeclNameArguments></ImplementsAttributeArguments>)</Attribute>
+  func h<FunctionSignature><ParameterClause>(<FunctionParameter>x:<SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>y:<SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{<ReturnStmt>
+    return <IntegerLiteralExpr>6</IntegerLiteralExpr></ReturnStmt>
+  }</CodeBlock></FunctionDecl><FunctionDecl><Attribute>
+
+  @_implements(<ImplementsAttributeArguments><SimpleTypeIdentifier>Equatable</SimpleTypeIdentifier>, ==<DeclNameArguments>(<DeclNameArgument>_:</DeclNameArgument><DeclNameArgument>_:</DeclNameArgument>)</DeclNameArguments></ImplementsAttributeArguments>)</Attribute><DeclModifier>
+  public </DeclModifier><DeclModifier>static </DeclModifier>func isEqual<FunctionSignature><ParameterClause>(<FunctionParameter>_ lhs: <SimpleTypeIdentifier>S</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>_ rhs: <SimpleTypeIdentifier>S</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Bool </SimpleTypeIdentifier></ReturnClause></FunctionSignature><CodeBlock>{<ReturnStmt>
+    return <BooleanLiteralExpr>false</BooleanLiteralExpr></ReturnStmt>
+  }</CodeBlock></FunctionDecl><VariableDecl><Attribute>
+
+  @_implements(<ImplementsAttributeArguments><SimpleTypeIdentifier>P</SimpleTypeIdentifier>, x</ImplementsAttributeArguments>)</Attribute>
+  var <PatternBinding><IdentifierPattern>y</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl><FunctionDecl><Attribute>
+  @_implements(<ImplementsAttributeArguments><SimpleTypeIdentifier>P</SimpleTypeIdentifier>, g<DeclNameArguments>()</DeclNameArguments></ImplementsAttributeArguments>)</Attribute>
+  func h<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><VariableDecl><Attribute>
+
+  @available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument><AvailabilityLabeledArgument>deprecated: <VersionTuple>1.2</VersionTuple></AvailabilityLabeledArgument>, </AvailabilityArgument><AvailabilityArgument><AvailabilityLabeledArgument>message: "ABC"</AvailabilityLabeledArgument></AvailabilityArgument>)</Attribute><DeclModifier>
+  fileprivate(set) </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl>
+}</MemberDeclBlock></StructDecl><StructDecl><Attribute>
+
+@_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl>}</MemberDeclBlock></StructDecl>

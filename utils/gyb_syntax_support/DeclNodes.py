@@ -139,7 +139,9 @@ DECL_NODES = [
                        'fileprivate', 'internal', 'public', 'open',
                        'mutating', 'nonmutating', 'indirect',
                    ]),
-             Child('Detail', kind='TokenList', is_optional=True),
+             Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
+             Child('Detail', kind='IdentifierToken', is_optional=True),
+             Child('DetailRightParen', kind='RightParenToken', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
