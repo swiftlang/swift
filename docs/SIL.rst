@@ -2880,6 +2880,25 @@ Performs a copy of an Objective-C block. Unlike retains of other
 reference-counted types, this can produce a different value from the operand
 if the block is copied from the stack to the heap.
 
+copy_block_without_escaping
+``````````
+::
+
+  sil-instruction :: 'copy_block_without_escaping' sil-operand 'withoutEscaping' sil-operand
+
+  %1 = copy_block %0 : $@convention(block) T -> U withoutEscaping %1 : $T -> U
+
+Performs a copy of an Objective-C block. Unlike retains of other
+reference-counted types, this can produce a different value from the operand if
+the block is copied from the stack to the heap.
+
+Additionally consumes the ``withoutEscaping`` operand ``%1`` which is the
+closure sentinel. SILGen emits these instructions when it passes @noescape
+swift closures to Objective C. A mandatory SIL pass will lower this instruction
+into a ``copy_block`` and a ``is_escaping``/``cond_fail``/``destroy_value`` at
+the end of the lifetime of the objective c closure parameter to check whether
+the sentinel closure was escaped.
+
 builtin "unsafeGuaranteed"
 ``````````````````````````
 

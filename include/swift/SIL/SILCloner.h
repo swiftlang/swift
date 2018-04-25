@@ -1880,6 +1880,16 @@ SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {
                             getOpValue(Inst->getOperand())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitCopyBlockWithoutEscapingInst(
+    CopyBlockWithoutEscapingInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                Builder.createCopyBlockWithoutEscaping(
+                    getOpLocation(Inst->getLoc()), getOpValue(Inst->getBlock()),
+                    getOpValue(Inst->getClosure())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitStrongRetainInst(StrongRetainInst *Inst) {

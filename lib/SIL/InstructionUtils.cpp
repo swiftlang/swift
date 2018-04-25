@@ -256,6 +256,7 @@ SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
     return nullptr;
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginAccessInst:
     return cast<SingleValueInstruction>(I);
@@ -359,6 +360,11 @@ static SILValue findClosureStoredIntoBlock(SILValue V) {
   while (true) {
     if (auto *CBI = dyn_cast<CopyBlockInst>(V)) {
       V = CBI->getOperand();
+      continue;
+    }
+
+    if (auto *CBI = dyn_cast<CopyBlockWithoutEscapingInst>(V)) {
+      V = CBI->getBlock();
       continue;
     }
 

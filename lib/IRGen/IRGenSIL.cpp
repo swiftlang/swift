@@ -1039,6 +1039,9 @@ public:
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
+  void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
+    llvm_unreachable("not valid in canonical SIL");
+  }
   void visitStrongPinInst(StrongPinInst *i);
   void visitStrongUnpinInst(StrongUnpinInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);

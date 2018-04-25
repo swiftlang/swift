@@ -1312,13 +1312,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     break;
   }
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::DeallocPartialRefInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::IndexRawPointerInst: {
     SILValue operand, operand2;
     unsigned Attr = 0;
-    if (SI.getKind() == SILInstructionKind::DeallocPartialRefInst) {
+    if (SI.getKind() == SILInstructionKind::CopyBlockWithoutEscapingInst) {
+      const CopyBlockWithoutEscapingInst *C = cast<CopyBlockWithoutEscapingInst>(&SI);
+      operand = C->getBlock();
+      operand2 = C->getClosure();
+    } else if (SI.getKind() == SILInstructionKind::DeallocPartialRefInst) {
       const DeallocPartialRefInst *DPRI = cast<DeallocPartialRefInst>(&SI);
       operand = DPRI->getInstance();
       operand2 = DPRI->getMetatype();

@@ -1866,6 +1866,16 @@ public:
     require(I->getOperand()->getType() == I->getType(),
             "result of copy_block should be same type as operand");
   }
+  void checkCopyBlockInst(CopyBlockWithoutEscapingInst *I) {
+    require(I->getBlock()->getType().isBlockPointerCompatible(),
+            "operand of copy_block should be a block");
+    require(I->getBlock()->getType() == I->getType(),
+            "result of copy_block should be same type as operand");
+    auto FnTy = requireObjectType(SILFunctionType, I->getClosure(),
+                                  "copy_block_without_escaping operand");
+    require(!FnTy->isNoEscape(),
+            "closure parameter must not be a @noescape closure");
+  }
 
   void checkAllocValueBufferInst(AllocValueBufferInst *I) {
     require(I->getOperand()->getType().isAddress(),

@@ -2811,6 +2811,18 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
    break;
   }
 
+  case SILInstructionKind::CopyBlockWithoutEscapingInst: {
+    SILValue Closure;
+    if (parseTypedValueRef(Val, B) ||
+        parseVerbatim("withoutEscaping") ||
+        parseTypedValueRef(Closure, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createCopyBlockWithoutEscaping(InstLoc, Val, Closure);
+    break;
+  }
+
   case SILInstructionKind::MarkDependenceInst: {
     SILValue Base;
     if (parseTypedValueRef(Val, B) ||

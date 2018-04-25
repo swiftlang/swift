@@ -6245,6 +6245,34 @@ class CopyBlockInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
+class CopyBlockWithoutEscapingInst
+    : public InstructionBase<SILInstructionKind::CopyBlockWithoutEscapingInst,
+                             SingleValueInstruction> {
+  friend SILBuilder;
+
+  enum { Block, Closure };
+  FixedOperandList<2> Operands;
+
+  CopyBlockWithoutEscapingInst(SILDebugLocation DebugLoc, SILValue block,
+                               SILValue closure)
+      : InstructionBase(DebugLoc, block->getType()), Operands{this, block,
+                                                              closure} {}
+
+public:
+  SILValue getBlock() const { return Operands[Block].get(); }
+  SILValue getClosure() const { return Operands[Closure].get(); }
+
+  void setBlock(SILValue block) {
+    Operands[Block].set(block);
+  }
+  void setClosure(SILValue closure) {
+    Operands[Closure].set(closure);
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
 class CopyValueInst
     : public UnaryInstructionBase<SILInstructionKind::CopyValueInst,
                                   SingleValueInstruction> {

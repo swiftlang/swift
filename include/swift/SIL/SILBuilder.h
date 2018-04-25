@@ -1482,6 +1482,14 @@ public:
     return insert(new (getModule())
                       CopyBlockInst(getSILDebugLocation(Loc), Operand));
   }
+
+  CopyBlockWithoutEscapingInst *
+  createCopyBlockWithoutEscaping(SILLocation Loc, SILValue Block,
+                                 SILValue Closure) {
+    return insert(new (getModule()) CopyBlockWithoutEscapingInst(
+        getSILDebugLocation(Loc), Block, Closure));
+  }
+
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand,
                                        Atomicity atomicity) {
     assert(isParsing || !getFunction().hasQualifiedOwnership());

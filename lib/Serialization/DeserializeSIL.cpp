@@ -1458,6 +1458,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                       getSILType(Ty2,  (SILValueCategory)TyCategory2)));
     break;
   }
+  case SILInstructionKind::CopyBlockWithoutEscapingInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultVal = Builder.createCopyBlockWithoutEscaping(
+        Loc, getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory)),
+        getLocalValue(ValID2, getSILType(Ty2, (SILValueCategory)TyCategory2)));
+    break;
+  }
   case SILInstructionKind::IndexAddrInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
