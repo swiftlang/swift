@@ -319,6 +319,11 @@ extension Unicode.Scalar : Hashable {
   public var hashValue: Int {
     return Int(self.value)
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.value)
+  }
 }
 
 extension Unicode.Scalar {
