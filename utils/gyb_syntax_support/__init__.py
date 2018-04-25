@@ -1,5 +1,6 @@
 import textwrap
 from AttributeNodes import ATTRIBUTE_NODES
+from AvailabilityNodes import AVAILABILITY_NODES
 from CommonNodes import COMMON_NODES  # noqa: I201
 from DeclNodes import DECL_NODES  # noqa: I201
 from ExprNodes import EXPR_NODES  # noqa: I201
@@ -12,7 +13,8 @@ from TypeNodes import TYPE_NODES  # noqa: I201
 
 # Re-export global constants
 SYNTAX_NODES = COMMON_NODES + EXPR_NODES + DECL_NODES + ATTRIBUTE_NODES + \
-    STMT_NODES + GENERIC_NODES + TYPE_NODES + PATTERN_NODES
+    STMT_NODES + GENERIC_NODES + TYPE_NODES + PATTERN_NODES + \
+    AVAILABILITY_NODES
 SYNTAX_TOKENS = Token.SYNTAX_TOKENS
 SYNTAX_TOKEN_MAP = Token.SYNTAX_TOKEN_MAP
 
