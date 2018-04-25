@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
-// REQUIRES: objc_interop
-
 sil_stage canonical
 
 import Swift

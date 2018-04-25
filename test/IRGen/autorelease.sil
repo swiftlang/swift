@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck -check-prefix=%target-cpu %s
-// REQUIRES: objc_interop
 
 // rdar://16565958
 
