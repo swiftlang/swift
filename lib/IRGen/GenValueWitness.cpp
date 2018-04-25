@@ -1144,7 +1144,8 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
       witnessSurrogate = C.TheUnknownObjectType;
       break;
     case ReferenceCounting::Bridge:
-      witnessSurrogate = C.TheBridgeObjectType;
+      // FIXME: Temporarily disable this optimization (rdar://problem/39697747)
+      // witnessSurrogate = C.TheBridgeObjectType;
       break;
     case ReferenceCounting::Error:
       break;
