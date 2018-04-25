@@ -84,9 +84,11 @@ Diagnostics.test("SourceLocations") {
     }
     override func visit(_ function: FunctionDeclSyntax) {
       let startLoc = function.identifier.startLocation(in: url)
+      let endLoc = function.identifier.endLocation(in: url)
       engine.diagnose(.badFunction(function.identifier), location: startLoc) {
         $0.highlight(function.identifier.sourceRange(in: self.url))
       }
+      engine.diagnose(.badFunction(function.identifier), location: endLoc)
     }
   }
 
@@ -95,11 +97,11 @@ Diagnostics.test("SourceLocations") {
     Visitor(url: url, engine: engine).visit(file)
   })
 
-  expectEqual(3, engine.diagnostics.count)
+  expectEqual(6, engine.diagnostics.count)
   let lines = Set(engine.diagnostics.compactMap { $0.location?.line })
-  expectEqual([1, 5, 9], lines)
+  expectEqual([1, 3, 5, 7, 9, 11], lines)
   let columns = Set(engine.diagnostics.compactMap { $0.location?.column })
-  expectEqual([6], columns)
+  expectEqual([6, 1], columns)
 }
 
 runAllTests()
