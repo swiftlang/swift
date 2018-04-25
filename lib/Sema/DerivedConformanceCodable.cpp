@@ -604,10 +604,16 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // Now need to generate `try container.encode(x, forKey: .x)` for all
   // existing properties. Optional properties get `encodeIfPresent`.
   for (auto *elt : codingKeysEnum->getAllElements()) {
-    VarDecl *varDecl;
-    for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName())))
-      if ((varDecl = dyn_cast<VarDecl>(decl)))
-        break;
+    VarDecl *varDecl = nullptr;
+    for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
+      if (auto *vd = dyn_cast<VarDecl>(decl)) {
+        if (!vd->isStatic()) {
+          varDecl = vd;
+          break;
+        }
+      }
+    }
+    assert(varDecl && "Should have found at least 1 var decl");
 
     // self.x
     auto *selfRef = createSelfDeclRef(encodeDecl);
