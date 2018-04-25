@@ -213,8 +213,8 @@ extension Syntax {
     afterLeadingTrivia: Bool = true
   ) -> SourceLocation {
     let pos = afterLeadingTrivia ? 
-      data.position :
-      data.positionAfterSkippingLeadingTrivia
+      data.position.copy() :
+      data.positionAfterSkippingLeadingTrivia.copy()
     return SourceLocation(file: file.path, position: pos)
   }
 
@@ -228,7 +228,7 @@ extension Syntax {
     in file: URL,
     afterTrailingTrivia: Bool = false
   ) -> SourceLocation {
-    let pos = data.positionAfterSkippingLeadingTrivia
+    let pos = data.position.copy()
     raw.accumulateAbsolutePosition(pos)
     if afterTrailingTrivia {
       raw.accumulateTrailingTrivia(pos)

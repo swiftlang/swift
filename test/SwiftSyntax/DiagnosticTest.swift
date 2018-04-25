@@ -36,6 +36,9 @@ extension Diagnostic.Message {
   static func badFunction(_ name: TokenSyntax) -> Diagnostic.Message {
     return .init(.error, "bad function '\(name.text)'")
   }
+  static func endOfFunction(_ name: TokenSyntax) -> Diagnostic.Message {
+    return .init(.warning, "end of function '\(name.text)'")
+  }
 }
 
 var Diagnostics = TestSuite("Diagnostics")
@@ -84,11 +87,12 @@ Diagnostics.test("SourceLocations") {
     }
     override func visit(_ function: FunctionDeclSyntax) {
       let startLoc = function.identifier.startLocation(in: url)
-      let endLoc = function.identifier.endLocation(in: url)
+      let endLoc = function.endLocation(in: url)
+      print("\(function.identifier.text): startLoc: \(startLoc), endLoc: \(endLoc)")
       engine.diagnose(.badFunction(function.identifier), location: startLoc) {
         $0.highlight(function.identifier.sourceRange(in: self.url))
       }
-      engine.diagnose(.badFunction(function.identifier), location: endLoc)
+      engine.diagnose(.endOfFunction(function.identifier), location: endLoc)
     }
   }
 
@@ -101,7 +105,7 @@ Diagnostics.test("SourceLocations") {
   let lines = Set(engine.diagnostics.compactMap { $0.location?.line })
   expectEqual([1, 3, 5, 7, 9, 11], lines)
   let columns = Set(engine.diagnostics.compactMap { $0.location?.column })
-  expectEqual([6, 1], columns)
+  expectEqual([6, 2], columns)
 }
 
 runAllTests()
