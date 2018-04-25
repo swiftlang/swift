@@ -749,35 +749,23 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     auto PossibleDeclKinds = attr->getOptions() & DeclAttribute::OnAnyDecl;
     StringRef OnlyKind;
     switch (PossibleDeclKinds) {
-    case DeclAttribute::OnImport:
-      OnlyKind = "import";
-      break;
-    case DeclAttribute::OnVar:
-      OnlyKind = "var";
-      break;
-    // FIXME: Update Attr.def to use OnAccessor.
-    case DeclAttribute::OnFunc:
-    case DeclAttribute::OnAccessor:
-    case DeclAttribute::OnFunc | DeclAttribute::OnAccessor:
-      OnlyKind = "func";
-      break;
-    case DeclAttribute::OnClass:
-      OnlyKind = "class";
-      break;
-    case DeclAttribute::OnStruct:
-      OnlyKind = "struct";
-      break;
-    case DeclAttribute::OnConstructor:
-      OnlyKind = "init";
-      break;
-    case DeclAttribute::OnProtocol:
-      OnlyKind = "protocol";
-      break;
-    case DeclAttribute::OnParam:
-      OnlyKind = "parameter";
-      break;
-    default:
-      break;
+    case DeclAttribute::OnAccessor:    OnlyKind = "accessor"; break;
+    case DeclAttribute::OnClass:       OnlyKind = "class"; break;
+    case DeclAttribute::OnConstructor: OnlyKind = "init"; break;
+    case DeclAttribute::OnDestructor:  OnlyKind = "deinit"; break;
+    case DeclAttribute::OnEnum:        OnlyKind = "enum"; break;
+    case DeclAttribute::OnEnumCase:    OnlyKind = "case"; break;
+    case DeclAttribute::OnFunc | DeclAttribute::OnAccessor: // FIXME
+    case DeclAttribute::OnFunc:        OnlyKind = "func"; break;
+    case DeclAttribute::OnImport:      OnlyKind = "import"; break;
+    case DeclAttribute::OnModule:      OnlyKind = "module"; break;
+    case DeclAttribute::OnParam:       OnlyKind = "parameter"; break;
+    case DeclAttribute::OnProtocol:    OnlyKind = "protocol"; break;
+    case DeclAttribute::OnStruct:      OnlyKind = "struct"; break;
+    case DeclAttribute::OnSubscript:   OnlyKind = "subscript"; break;
+    case DeclAttribute::OnTypeAlias:   OnlyKind = "typealias"; break;
+    case DeclAttribute::OnVar:         OnlyKind = "var"; break;
+    default: break;
     }
 
     if (!OnlyKind.empty())
