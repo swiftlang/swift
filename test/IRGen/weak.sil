@@ -112,8 +112,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: {{_?}}$S4weak1AVwCP:
-// TAILCALL:  jmp     {{_?}}swift_weakCopyInit
+// TAILCALL-LABEL: $S4weak1AVwCP:
+// TAILCALL: jmp{{q?}} {{(\*__imp_)?_?}}swift_weakCopyInit
 
 //   destroy
 // CHECK:    define linkonce_odr hidden void @"$S4weak1AVwxx"([[OPAQUE]]* noalias [[ARG:%.*]], [[TYPE]]*
@@ -122,8 +122,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T1]])
 // CHECK-NEXT: ret void
 
-// TAILCALL: {{_?}}$S4weak1AVwxx:
-// TAILCALL:  jmp     {{_?}}swift_weakDestroy
+// TAILCALL-LABEL: $S4weak1AVwxx:
+// TAILCALL: jmp{{q?}} {{(\*__imp_)?_?}}swift_weakDestroy
 
 //   initializeWithCopy
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwcp"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
@@ -135,8 +135,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: {{_?}}$S4weak1AVwcp:
-// TAILCALL:  jmp     {{_?}}swift_weakCopyInit
+// TAILCALL-LABEL: $S4weak1AVwcp:
+// TAILCALL: jmp{{q?}} {{(\*__imp_)?_?}}swift_weakCopyInit
 
 //   assignWithCopy
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwca"([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
@@ -148,8 +148,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: {{_?}}$S4weak1AVwca:
-// TAILCALL:  jmp     {{_?}}swift_weakCopyAssign
+// TAILCALL-LABEL: $S4weak1AVwca:
+// TAILCALL: jmp{{q?}} {{(\*__imp_)?_?}}swift_weakCopyAssign
 
 //   assignWithTake
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwta"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
@@ -161,11 +161,11 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: {{_?}}$S4weak1AVwtk:
-// TAILCALL:  jmp     {{_?}}swift_weakTakeInit
+// TAILCALL-LABEL: $S4weak1AVwtk:
+// TAILCALL: jmp{{q?}} {{(\*__imp_)?_?}}swift_weakTakeInit
 
-// TAILCALL: {{_?}}$S4weak1AVwta:
-// TAILCALL:  jmp     {{_?}}swift_weakTakeAssign
+// TAILCALL-LABEL: $S4weak1AVwta:
+// TAILCALL: jmp{{q?}} {{(\*__imp_)?_?}}swift_weakTakeAssign
 
-// TAILCALL: {{_?}}$S4weak1AVwTK:
-// TAILCALL:  jmp     {{_?}}swift_weakTakeInit
+// TAILCALL-LABEL: $S4weak1AVwTK:
+// TAILCALL: jmp{{q?}} {{(\*__imp_)?_?}}swift_weakTakeInit
