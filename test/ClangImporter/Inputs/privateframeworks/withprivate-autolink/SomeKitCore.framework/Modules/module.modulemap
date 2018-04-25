@@ -1,7 +1,0 @@
-framework module SomeKitCore {
-  umbrella header "SomeKitCore.h"
-  export_as SomeKit
-  module * {
-    export *
-  }
-}
