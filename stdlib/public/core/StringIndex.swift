@@ -66,11 +66,6 @@ extension String.Index : Comparable {
 
 extension String.Index : Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _compoundOffset.hashValue
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_compoundOffset)
   }

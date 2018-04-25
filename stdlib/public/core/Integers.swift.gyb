@@ -3694,19 +3694,6 @@ ${assignmentOperatorComment(x.operator, True)}
 %# end of concrete type: ${Self}
 
 extension ${Self} : Hashable {
-  /// The integer's hash value.
-  ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program. Do not persist the hash value across
-  /// program runs.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    @inline(__always)
-    get {
-      return _hashValue(for: self)
-    }
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing

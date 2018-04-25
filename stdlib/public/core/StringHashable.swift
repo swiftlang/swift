@@ -122,15 +122,6 @@ extension _StringGuts {
 }
 
 extension String : Hashable {
-  /// The string's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
   @inlinable
   public func hash(into hasher: inout Hasher) {
     _guts.hash(into: &hasher)
@@ -138,11 +129,6 @@ extension String : Hashable {
 }
 
 extension StringProtocol {
-  @inlinable
-  public var hashValue : Int {
-    return _hashValue(for: self)
-  }
-
   @inlinable
   public func hash(into hasher: inout Hasher) {
     _wholeString._guts.hash(_encodedOffsetRange, into: &hasher)
