@@ -224,12 +224,6 @@ bool swift::immediate::IRGenImportedModules(
     import.second->collectLinkLibraries(addLinkLibrary);
   });
 
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  for (const auto &linkLib :
-          irgen::collectLinkLibrariesFromExternals(CI.getASTContext())) {
-    addLinkLibrary(linkLib);
-  }
-
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
                    CI.getDiags());
 
