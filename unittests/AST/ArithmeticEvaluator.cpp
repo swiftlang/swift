@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/Basic/SimpleRequest.h"
 #include "swift/Basic/SourceManager.h"
 #include "gtest/gtest.h"
 #include <cmath>
@@ -61,13 +62,13 @@ class Binary : public ArithmeticExpr {
 
 /// Rule to evaluate the value of the expression.
 template<typename Derived>
-struct EvaluationRule {
-  using OutputType = double;
+struct EvaluationRule
+  : public SimpleRequest<Derived, double, ArithmeticExpr *>
+{
+  using SimpleRequest<Derived, double, ArithmeticExpr *>::SimpleRequest;
+  using SimpleRequest<Derived, double, ArithmeticExpr *>::operator();
 
-  // The expression to evaluate.
-  ArithmeticExpr *expr;
-
-  double operator()(Evaluator &evaluator) const {
+  double operator()(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
     case ArithmeticExpr::Kind::Literal:
       return static_cast<Literal *>(expr)->value;
@@ -98,29 +99,21 @@ struct EvaluationRule {
 
   void diagnoseCycle(DiagnosticEngine &diags) const { }
   void noteCycleStep(DiagnosticEngine &diags) const { }
-
-  friend bool operator==(const EvaluationRule &lhs, const EvaluationRule &rhs) {
-    return lhs.expr == rhs.expr;
-  }
-
-  friend bool operator!=(const EvaluationRule &lhs, const EvaluationRule &rhs) {
-    return lhs.expr != rhs.expr;
-  }
-
-  friend hash_code hash_value(const EvaluationRule &er) {
-    return hash_value(er.expr);
-  }
 };
 
 template<typename Derived>
 bool EvaluationRule<Derived>::brokeCycle = false;
 
 struct InternallyCachedEvaluationRule :
-  EvaluationRule<InternallyCachedEvaluationRule> {
+  EvaluationRule<InternallyCachedEvaluationRule>
+{
   static const bool isEverCached = true;
   static const bool hasExternalCache = false;
 
+  using EvaluationRule::EvaluationRule;
+
   bool isCached() const {
+    auto expr = std::get<0>(getStorage());
     switch (expr->kind) {
     case ArithmeticExpr::Kind::Literal:
       return false;
@@ -129,17 +122,12 @@ struct InternallyCachedEvaluationRule :
       return true;
     }
   }
-
-  InternallyCachedEvaluationRule(ArithmeticExpr *expr)
-    : EvaluationRule{expr} { }
 };
 
-struct UncachedEvaluationRule :
-  EvaluationRule<InternallyCachedEvaluationRule> {
+struct UncachedEvaluationRule : EvaluationRule<UncachedEvaluationRule> {
   static const bool isEverCached = false;
 
-  UncachedEvaluationRule(ArithmeticExpr *expr)
-    : EvaluationRule{expr} { }
+  using EvaluationRule::EvaluationRule;
 };
 
 struct ExternallyCachedEvaluationRule :
@@ -147,7 +135,11 @@ struct ExternallyCachedEvaluationRule :
   static const bool isEverCached = true;
   static const bool hasExternalCache = true;
 
+  using EvaluationRule::EvaluationRule;
+
   bool isCached() const {
+    auto expr = std::get<0>(getStorage());
+
     switch (expr->kind) {
     case ArithmeticExpr::Kind::Literal:
       return false;
@@ -158,15 +150,16 @@ struct ExternallyCachedEvaluationRule :
   }
 
   Optional<double> getCachedResult() const {
+    auto expr = std::get<0>(getStorage());
+
     return expr->cachedValue;
   }
 
   void cacheResult(double value) const {
+    auto expr = std::get<0>(getStorage());
+
     expr->cachedValue = value;
   }
-
-  ExternallyCachedEvaluationRule(ArithmeticExpr *expr)
-    : EvaluationRule{expr} { }
 };
 
 // Define the arithmetic evaluator's zone.
@@ -174,6 +167,11 @@ namespace swift {
 #define SWIFT_TYPEID_ZONE 255
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
+
+#define SWIFT_TYPEID_ZONE 255
+#define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
+#include "swift/Basic/ImplementTypeIDZone.h"
+
 }
 
 TEST(ArithmeticEvaluator, Simple) {

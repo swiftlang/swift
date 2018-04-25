@@ -46,24 +46,34 @@ template<> struct TypeIDZoneTypes<SWIFT_TYPEID_ZONE> {
 };
 
 // Second pass: create specializations of TypeID for these types.
-#define SWIFT_TYPEID_NAMED(Type, Name)                     \
-template<> struct TypeID<Type> {                           \
-  static const uint64_t value =                            \
-    formTypeID(SWIFT_TYPEID_ZONE,                          \
-               TypeIDZoneTypes<SWIFT_TYPEID_ZONE>::Name);  \
+#define SWIFT_TYPEID_NAMED(Type, Name)                    \
+template<> struct TypeID<Type> {                          \
+  static const uint64_t value =                           \
+    formTypeID(SWIFT_TYPEID_ZONE,                         \
+               TypeIDZoneTypes<SWIFT_TYPEID_ZONE>::Name); \
+                                                          \
+  static llvm::StringRef getName() {                      \
+    return #Name;                                         \
+  }                                                       \
 };
 
-#define SWIFT_TYPEID_TEMPLATE1_NAMED(Template, Name, Param1, Arg1)      \
-template<Param1> struct TypeID<Template<Arg1>> {                        \
-private:                                                                \
-  static const uint64_t templateID =                                    \
-    formTypeID(SWIFT_TYPEID_ZONE,                          \
-               TypeIDZoneTypes<SWIFT_TYPEID_ZONE>::Name);  \
-                                                                        \
-public:                                                                 \
-  static const uint64_t value =                                         \
-    (TypeID<Arg1>::value << 16) | templateID;                           \
-};
+#define SWIFT_TYPEID_TEMPLATE1_NAMED(Template, Name, Param1, Arg1)    \
+template<Param1> struct TypeID<Template<Arg1>> {                      \
+private:                                                              \
+  static const uint64_t templateID =                                  \
+    formTypeID(SWIFT_TYPEID_ZONE,                                     \
+               TypeIDZoneTypes<SWIFT_TYPEID_ZONE>::Name);             \
+                                                                      \
+public:                                                               \
+  static const uint64_t value =                                       \
+    (TypeID<Arg1>::value << 16) | templateID;                         \
+                                                                      \
+  static std::string getName() {                                      \
+    return std::string(#Name) + "<" + TypeID<Arg1>::getName() + ">";  \
+  }                                                                   \
+};                                                                    \
+                                                                      \
+template<Param1> const uint64_t TypeID<Template<Arg1>>::value;
 
 #include SWIFT_TYPEID_HEADER
 #undef SWIFT_TYPEID_NAMED

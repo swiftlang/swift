@@ -21,6 +21,10 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 
+namespace llvm {
+class raw_ostream;
+}
+
 namespace swift {
 
 using llvm::hash_code;
@@ -37,8 +41,9 @@ class DiagnosticEngine;
 ///   - Equality operator (==)
 ///   - Hashing support (hash_value)
 ///   - TypeID support (see swift/Basic/TypeID.h)
+///   - Display support (free function):
+///       void simple_display(llvm::raw_ostream &, const T &);
 ///   - Cycle diagnostics operations:
-///
 ///       void diagnoseCycle(DiagnosticEngine &diags) const;
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
 ///
@@ -63,6 +68,9 @@ class AnyRequest {
     /// Determine whether this request is equivalent to the \c other
     /// request.
     virtual bool equals(const HolderBase &other) const = 0;
+
+    /// Display.
+    virtual void display(llvm::raw_ostream &out) const = 0;
 
     /// Diagnose a cycle detected for this request.
     virtual void diagnoseCycle(DiagnosticEngine &diags) const = 0;
@@ -93,6 +101,11 @@ class AnyRequest {
     virtual bool equals(const HolderBase &other) const override {
       assert(typeID == other.typeID && "Caller should match typeIDs");
       return request == static_cast<const Holder<Request> &>(other).request;
+    }
+
+    /// Display.
+    virtual void display(llvm::raw_ostream &out) const override {
+      simple_display(out, request);
     }
 
     /// Diagnose a cycle detected for this request.
@@ -191,6 +204,10 @@ public:
       return 1;
 
     return any.stored->hash;
+  }
+
+  friend void simple_display(llvm::raw_ostream &out, const AnyRequest &any) {
+    any.stored->display(out);
   }
 
   static AnyRequest getEmptyKey() {

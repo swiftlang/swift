@@ -19,7 +19,9 @@
 #ifndef SWIFT_BASIC_TYPEID_H
 #define SWIFT_BASIC_TYPEID_H
 
+#include "llvm/ADT/StringRef.h"
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace swift {

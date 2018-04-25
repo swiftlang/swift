@@ -18,12 +18,29 @@
 #ifndef SWIFT_BASIC_ANYVALUE_H
 #define SWIFT_BASIC_ANYVALUE_H
 
+#include "swift/Basic/SimpleDisplay.h"
 #include "swift/Basic/TypeID.h"
+#include "llvm/ADT/PointerUnion.h"  // to define hash_value
+
+namespace llvm {
+  // FIXME: Belongs in LLVM itself
+  template<typename PT1, typename PT2>
+  hash_code hash_value(const llvm::PointerUnion<PT1, PT2> &ptr) {
+    return hash_value(ptr.getOpaqueValue());
+  }
+}
 
 namespace swift {
 
-/// Stores a value of any type that satisfies a small set of requirements
-/// (currently, just equatability).
+/// Stores a value of any type that satisfies a small set of requirements.
+///
+/// Requirements on the values stored within an AnyValue:
+///
+///   - Copy constructor
+///   - Equality operator (==)
+///   - TypeID support (see swift/Basic/TypeID.h)
+///   - Display support (free function):
+///       void simple_display(llvm::raw_ostream &, const T &);
 class AnyValue {
   /// Abstract base class used to hold on to a value.
   class HolderBase {
@@ -46,6 +63,9 @@ class AnyValue {
     ///
     /// The caller guarantees that the type IDs are the same.
     virtual bool equals(const HolderBase &other) const = 0;
+
+    /// Display.
+    virtual void display(llvm::raw_ostream &out) const = 0;
   };
 
   /// Holds a value that can be used as a request input/output.
@@ -68,6 +88,11 @@ class AnyValue {
     virtual bool equals(const HolderBase &other) const override {
       assert(typeID == other.typeID && "Caller should match type IDs");
       return value == static_cast<const Holder<T> &>(other).value;
+    }
+
+    /// Display.
+    virtual void display(llvm::raw_ostream &out) const override {
+      simple_display(out, value);
     }
   };
 
@@ -109,6 +134,10 @@ public:
 
   friend bool operator!=(const AnyValue &lhs, const AnyValue &rhs) {
     return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out, const AnyValue &value) {
+    value.stored->display(out);
   }
 };
 
