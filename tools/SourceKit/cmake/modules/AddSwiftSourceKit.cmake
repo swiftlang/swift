@@ -83,14 +83,16 @@ function(add_sourcekit_default_compiler_flags target)
 
   # SWIFT_ENABLE_TENSORFLOW
   if(SWIFT_ENABLE_TENSORFLOW)
-    # FIXME: This is a hack: adding rpaths with many `..` that jump across
-    # frameworks is bad practice. It would be cleaner/more robust to copy
-    # the TensorFlow libraries to sourcekitd.framework.
-    list(APPEND link_flags
-      "-Xlinker" "-rpath"
-      "-Xlinker" "@loader_path/../../../swift/${SOURCEKIT_DEPLOYMENT_OS}"
-      "-Xlinker" "-rpath"
-      "-Xlinker" "@loader_path/../../../../../../../swift/${SOURCEKIT_DEPLOYMENT_OS}")
+    if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+      # FIXME: This is a hack: adding rpaths with many `..` that jump across
+      # frameworks is bad practice. It would be cleaner/more robust to copy
+      # the TensorFlow libraries to sourcekitd.framework.
+      list(APPEND link_flags
+        "-Xlinker" "-rpath"
+        "-Xlinker" "@loader_path/../../../swift/${SOURCEKIT_DEPLOYMENT_OS}"
+        "-Xlinker" "-rpath"
+        "-Xlinker" "@loader_path/../../../../../../../swift/${SOURCEKIT_DEPLOYMENT_OS}")
+    endif()
   endif()
 
   # Convert variables to space-separated strings.
