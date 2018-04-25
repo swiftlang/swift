@@ -249,11 +249,6 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
    list(APPEND shared_only_libs swiftImageInspectionShared)
 endif()
 
-set(swiftCoreExtraFileDepends)
-if(SWIFT_ENABLE_TENSORFLOW)
-  list(APPEND swiftCoreExtraFileDepends "${SWIFTLIB_DIR}/CTensorFlow")
-endif()
-
 add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   # The copy_shim_headers target dependency is required to let the
@@ -263,7 +258,6 @@ add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STD
   # and the generated directory as dependencies.
   FILE_DEPENDS
     copy_shim_headers "${SWIFTLIB_DIR}/shims"
-    ${swiftCoreExtraFileDepends}
     ${GROUP_INFO_JSON_FILE}
   SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags}
   LINK_FLAGS ${swift_core_link_flags}
