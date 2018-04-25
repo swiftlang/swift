@@ -32,7 +32,7 @@ struct Err1 : Error { }
 func test4(arg: () throws -> Void) {
   do {
     try arg()
-  } catch let x as Err1 {
+  } catch let xRenamed as Err1 {
     print(xRenamed)
   } catch let x {
     print(x)
