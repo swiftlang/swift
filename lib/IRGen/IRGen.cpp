@@ -793,10 +793,6 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.addLinkLibrary(linkLib);
     });
 
-    // Hack to handle thunks eagerly synthesized by the Clang importer.
-    for (const auto &linkLib : collectLinkLibrariesFromExternals(Ctx))
-      IGM.addLinkLibrary(linkLib);
-
     if (!IGM.finalize())
       return nullptr;
 
@@ -966,10 +962,6 @@ static void performParallelIRGeneration(
                   PrimaryGM->addLinkLibrary(linkLib);
                 });
   
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  for (const auto &linkLib : collectLinkLibrariesFromExternals(Ctx))
-    PrimaryGM->addLinkLibrary(linkLib);
-
   llvm::StringSet<> referencedGlobals;
 
   for (auto it = irgen.begin(); it != irgen.end(); ++it) {
@@ -1149,21 +1141,4 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                     OutputFilename, Stats))
     return true;
   return false;
-}
-
-SmallVector<LinkLibrary, 4> irgen::collectLinkLibrariesFromExternals(
-                                                           ASTContext &ctx) {
-  SmallVector<LinkLibrary, 4> result;
-  auto addLinkLibrary = [&](LinkLibrary linkLib) {
-    result.push_back(linkLib);
-  };
-
-  llvm::SmallPtrSet<ModuleDecl *, 8> known;
-  for (auto external : ctx.ExternalDefinitions) {
-    swift::ModuleDecl *module = external->getModuleContext();
-    if (known.insert(module).second)
-      module->collectLinkLibraries(addLinkLibrary);
-  }
-
-  return result;
 }
