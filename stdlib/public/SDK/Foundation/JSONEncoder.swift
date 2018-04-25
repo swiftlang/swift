@@ -13,9 +13,6 @@
 fileprivate protocol _JSONStringDictionaryMarker {
     static var elementType: Decodable.Type { get }
 }
-func isStringKeyedDict<T>(_ type: T.Type) -> Bool {
-    return type is _JSONStringDictionaryMarker.Type
-}
 
 extension Dictionary : _JSONStringDictionaryMarker where Key == String, Value: Decodable {
     static var elementType: Decodable.Type { return Value.self }
