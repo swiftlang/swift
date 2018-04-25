@@ -171,6 +171,9 @@ struct foo {
     @available(*, unavailable)
     @objc(fooObjc)
     private static func foo() {}
+    
+    @objc(fooObjcBar:baz:)
+    private static func foo(bar: String, baz: Int)
   }
 }
 
@@ -491,3 +494,42 @@ func higherOrderFunc() {
   let x = [1,2,3]
   x.reduce(0, +)
 }
+
+if #available(iOS 11, macOS 10.11.2, *) {}
+
+@_specialize(where T == Int)
+@_specialize(exported: true, where T == String)
+public func specializedGenericFunc<T>(_ t: T) -> T {
+  return t
+}
+
+protocol Q {
+  func g()
+  var x: String { get }
+  func f(x:Int, y:Int) -> Int
+  #if FOO_BAR
+  var conditionalVar: String
+  #endif
+}
+
+struct S : Q, Equatable {
+  @_implements(Q, f(x:y:))
+  func h(x:Int, y:Int) -> Int {
+    return 6
+  }
+
+  @_implements(Equatable, ==(_:_:))
+  public static func isEqual(_ lhs: S, _ rhs: S) -> Bool {
+    return false
+  }
+
+  @_implements(P, x)
+  var y: String
+  @_implements(P, g())
+  func h() {}
+
+  @available(*, deprecated: 1.2, message: "ABC")
+  fileprivate(set) var x: String
+}
+
+@_alignment(16) public struct float3 { public var x, y, z: Float }
