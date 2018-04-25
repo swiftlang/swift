@@ -1039,6 +1039,9 @@ public:
   }
   void visitMarkDependenceInst(MarkDependenceInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
+  void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
+    llvm_unreachable("not valid in canonical SIL");
+  }
   void visitStrongPinInst(StrongPinInst *i);
   void visitStrongUnpinInst(StrongUnpinInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
@@ -3894,20 +3897,30 @@ visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
 
 void IRGenSILFunction::visitIsEscapingClosureInst(
     swift::IsEscapingClosureInst *i) {
-  assert(i->getOperand()->getType().is<SILFunctionType>() &&
-         i->getOperand()
-             ->getType()
-             .getAs<SILFunctionType>()
-             ->getExtInfo()
-             .hasContext() &&
-         "Must have a closure operand");
+  // The closure operand is allowed to be an optional closure.
+  auto operandType = i->getOperand()->getType();
+  if (operandType.getOptionalObjectType())
+    operandType = operandType.getOptionalObjectType();
+
+  auto fnType = operandType.getAs<SILFunctionType>();
+  assert(fnType->getExtInfo().hasContext() && "Must have a closure operand");
+
+  // This code relies on that an optional<()->()>'s tag fits in the function
+  // pointer.
+  auto &TI = cast<LoadableTypeInfo>(getTypeInfo(operandType));
+  assert(TI.mayHaveExtraInhabitants(IGM) &&
+         "Must have extra inhabitants to be able to handle the optional "
+         "closure case");
 
   Explosion closure = getLoweredExplosion(i->getOperand());
   auto func = closure.claimNext();
   (void)func;
   auto context = closure.claimNext();
-
-  auto result = emitIsEscapingClosureCall(context, i->getLoc().getSourceLoc());
+  assert(closure.empty());
+  if (context->getType()->isIntegerTy())
+    context = Builder.CreateIntToPtr(context, IGM.RefCountedPtrTy);
+  auto result = emitIsEscapingClosureCall(context, i->getLoc().getSourceLoc(),
+                                          i->getVerificationType());
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);
