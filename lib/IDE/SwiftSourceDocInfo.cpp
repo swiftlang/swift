@@ -581,7 +581,7 @@ std::pair<bool, Pattern*> NameMatcher::walkToPatternPre(Pattern *P) {
   if (isDone() || shouldSkip(P->getSourceRange()))
     return std::make_pair(false, P);
 
-  tryResolve(ASTWalker::ParentTy(P), P->getLoc());
+  tryResolve(ASTWalker::ParentTy(P), P->getStartLoc());
   return std::make_pair(!isDone(), P);
 }
 
