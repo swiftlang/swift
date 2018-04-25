@@ -826,6 +826,13 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
     if (isIncidentalUse(user) || onlyAffectsRefCount(user))
       continue;
 
+    if (auto *MD = dyn_cast<MarkDependenceInst>(user)) {
+      if (oper->getOperandNumber() == MarkDependenceInst::Base)
+        continue;
+      uses.append(MD->getUses().begin(), MD->getUses().end());
+      continue;
+    }
+
     if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
       uses.append(copy->getUses().begin(), copy->getUses().end());
       continue;

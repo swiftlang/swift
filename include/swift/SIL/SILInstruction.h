@@ -1278,6 +1278,8 @@ public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(AllocationInst)
 };
 
+class DeallocStackInst;
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -1350,6 +1352,9 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands();
   }
+
+  /// Return a single dealloc_stack user or null.
+  DeallocStackInst *getSingleDeallocStack() const;
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
@@ -6210,7 +6215,6 @@ class MarkDependenceInst
                              SingleValueInstruction> {
   friend SILBuilder;
 
-  enum { Value, Base };
   FixedOperandList<2> Operands;
 
   MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base)
@@ -6218,6 +6222,8 @@ class MarkDependenceInst
         Operands{this, value, base} {}
 
 public:
+  enum { Value, Base };
+
   SILValue getValue() const { return Operands[Value].get(); }
   SILValue getBase() const { return Operands[Base].get(); }
 
@@ -6242,6 +6248,35 @@ class CopyBlockInst
 
   CopyBlockInst(SILDebugLocation DebugLoc, SILValue operand)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+};
+
+class CopyBlockWithoutEscapingInst
+    : public InstructionBase<SILInstructionKind::CopyBlockWithoutEscapingInst,
+                             SingleValueInstruction> {
+  friend SILBuilder;
+
+  FixedOperandList<2> Operands;
+
+  CopyBlockWithoutEscapingInst(SILDebugLocation DebugLoc, SILValue block,
+                               SILValue closure)
+      : InstructionBase(DebugLoc, block->getType()), Operands{this, block,
+                                                              closure} {}
+
+public:
+  enum { Block, Closure };
+
+  SILValue getBlock() const { return Operands[Block].get(); }
+  SILValue getClosure() const { return Operands[Closure].get(); }
+
+  void setBlock(SILValue block) {
+    Operands[Block].set(block);
+  }
+  void setClosure(SILValue closure) {
+    Operands[Closure].set(closure);
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
 class CopyValueInst
@@ -6305,9 +6340,17 @@ class IsEscapingClosureInst
                                   SingleValueInstruction> {
   friend SILBuilder;
 
+  unsigned VerificationType;
+
   IsEscapingClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
-                        SILType BoolTy)
-      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
+                        SILType BoolTy, unsigned VerificationType)
+      : UnaryInstructionBase(DebugLoc, Operand, BoolTy),
+        VerificationType(VerificationType) {}
+
+public:
+  enum { WithoutActuallyEscaping, ObjCEscaping };
+
+  unsigned getVerificationType() const { return VerificationType; }
 };
 
 //===----------------------------------------------------------------------===//
