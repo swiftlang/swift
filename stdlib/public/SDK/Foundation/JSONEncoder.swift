@@ -10,6 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+fileprivate protocol _JSONStringDictionaryMarker {
+    static var elementType: Decodable.Type { get }
+}
+func isStringKeyedDict<T>(_ type: T.Type) -> Bool {
+    return type is _JSONStringDictionaryMarker.Type
+}
+
+extension Dictionary : _JSONStringDictionaryMarker where Key == String, Value: Decodable {
+    static var elementType: Decodable.Type { return Value.self }
+}
+
 //===----------------------------------------------------------------------===//
 // JSON Encoder
 //===----------------------------------------------------------------------===//
@@ -815,22 +826,33 @@ extension _JSONEncoder {
         }
     }
 
-    fileprivate func box<T : Encodable>(_ value: T) throws -> NSObject {
+    fileprivate func box(_ value: Encodable) throws -> NSObject {
         return try self.box_(value) ?? NSDictionary()
     }
 
+    fileprivate func box(_ dict: [String : Encodable]) throws {
+        let result = self.storage.pushKeyedContainer()
+        for (k, v) in dict {
+            self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
+            defer { self.codingPath.removeLast() }
+            result[k] = try box(v)
+        }
+        // Container will be popped by caller
+    }
+
     // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
-    fileprivate func box_<T : Encodable>(_ value: T) throws -> NSObject? {
-        if T.self == Date.self || T.self == NSDate.self {
+    fileprivate func box_(_ value: Encodable) throws -> NSObject? {
+        let type = type(of: value)
+        if type == Date.self || type == NSDate.self {
             // Respect Date encoding strategy
             return try self.box((value as! Date))
-        } else if T.self == Data.self || T.self == NSData.self {
+        } else if type == Data.self || type == NSData.self {
             // Respect Data encoding strategy
             return try self.box((value as! Data))
-        } else if T.self == URL.self || T.self == NSURL.self {
+        } else if type == URL.self || type == NSURL.self {
             // Encode URLs as single strings.
             return self.box((value as! URL).absoluteString)
-        } else if T.self == Decimal.self || T.self == NSDecimalNumber.self {
+        } else if type == Decimal.self || type == NSDecimalNumber.self {
             // JSONSerialization can natively handle NSDecimalNumber.
             return (value as! NSDecimalNumber)
         }
@@ -838,7 +860,11 @@ extension _JSONEncoder {
         // The value should request a container from the _JSONEncoder.
         let depth = self.storage.count
         do {
-            try value.encode(to: self)
+            if let stringKeyedDict = value as? Dictionary<String, Encodable> {
+                try box(stringKeyedDict)
+            } else {
+                try value.encode(to: self)
+            }
         } catch {
             // If the value pushed a container before throwing, pop it back off to restore state.
             if self.storage.count > depth {
@@ -2359,11 +2385,29 @@ extension _JSONDecoder {
         }
     }
 
+    fileprivate func unbox<T>(_ value: Any, as type: _JSONStringDictionaryMarker.Type) throws -> T? {
+        var result: Dictionary<String, Any> = [:]
+        let dict = value as! Dictionary<String, NSObject>
+        let elementType = type.elementType
+        for (k, v) in dict {
+            self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
+            defer { self.codingPath.removeLast() }
+
+            result[k] = try unbox_(v, as: elementType)
+        }
+
+        return result as? T
+    }
+
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
+        return try unbox_(value, as: type) as? T
+    }
+
+    fileprivate func unbox_(_ value: Any, as type: Decodable.Type) throws -> Any? {
         if type == Date.self || type == NSDate.self {
-            return try self.unbox(value, as: Date.self) as? T
+            return try self.unbox(value, as: Date.self)
         } else if type == Data.self || type == NSData.self {
-            return try self.unbox(value, as: Data.self) as? T
+            return try self.unbox(value, as: Data.self)
         } else if type == URL.self || type == NSURL.self {
             guard let urlString = try self.unbox(value, as: String.self) else {
                 return nil
@@ -2373,10 +2417,11 @@ extension _JSONDecoder {
                 throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: self.codingPath,
                                                                         debugDescription: "Invalid URL string."))
             }
-
-            return url as! T
+            return url
         } else if type == Decimal.self || type == NSDecimalNumber.self {
-            return try self.unbox(value, as: Decimal.self) as? T
+            return try self.unbox(value, as: Decimal.self)
+        } else if let stringKeyedDictType = type as? _JSONStringDictionaryMarker.Type {
+            return try self.unbox(value, as: stringKeyedDictType)
         } else {
             self.storage.push(container: value)
             defer { self.storage.popContainer() }

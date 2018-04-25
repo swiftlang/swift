@@ -479,6 +479,18 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     
     expectEqual(expected, resultString)
   }
+
+  func testEncodingDictionaryStringKeyConversionUntouched() {
+    let expected = "{\"leaveMeAlone\":\"test\"}"
+    let toEncode: [String: String] = ["leaveMeAlone": "test"]
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    let resultData = try! encoder.encode(toEncode)
+    let resultString = String(bytes: resultData, encoding: .utf8)
+
+    expectEqual(expected, resultString)
+  }
   
   private struct EncodeNested : Encodable {
     let nestedValue: EncodeMe
@@ -605,6 +617,15 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let result = try! decoder.decode(DecodeMe2.self, from: input)
     
     expectEqual("test", result.hello)
+  }
+
+  func testDecodingDictionaryStringKeyConversionUntouched() {
+    let input = "{\"leave_me_alone\":\"test\"}".data(using: .utf8)!
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let result = try! decoder.decode([String: String].self, from: input)
+
+    expectEqual(["leave_me_alone": "test"], result)
   }
   
   private struct DecodeMe3 : Codable {
@@ -1553,9 +1574,11 @@ JSONEncoderTests.test("testEncodingNonConformingFloats") { TestJSONEncoder().tes
 JSONEncoderTests.test("testEncodingNonConformingFloatStrings") { TestJSONEncoder().testEncodingNonConformingFloatStrings() }
 JSONEncoderTests.test("testEncodingKeyStrategySnake") { TestJSONEncoder().testEncodingKeyStrategySnake() }
 JSONEncoderTests.test("testEncodingKeyStrategyCustom") { TestJSONEncoder().testEncodingKeyStrategyCustom() }
+JSONEncoderTests.test("testEncodingDictionaryStringKeyConversionUntouched") { TestJSONEncoder().testEncodingDictionaryStringKeyConversionUntouched() }
 JSONEncoderTests.test("testEncodingKeyStrategyPath") { TestJSONEncoder().testEncodingKeyStrategyPath() }
 JSONEncoderTests.test("testDecodingKeyStrategyCamel") { TestJSONEncoder().testDecodingKeyStrategyCamel() }
 JSONEncoderTests.test("testDecodingKeyStrategyCustom") { TestJSONEncoder().testDecodingKeyStrategyCustom() }
+JSONEncoderTests.test("testDecodingDictionaryStringKeyConversionUntouched") { TestJSONEncoder().testDecodingDictionaryStringKeyConversionUntouched() }
 JSONEncoderTests.test("testEncodingKeyStrategySnakeGenerated") { TestJSONEncoder().testEncodingKeyStrategySnakeGenerated() }
 JSONEncoderTests.test("testDecodingKeyStrategyCamelGenerated") { TestJSONEncoder().testDecodingKeyStrategyCamelGenerated() }
 JSONEncoderTests.test("testKeyStrategySnakeGeneratedAndCustom") { TestJSONEncoder().testKeyStrategySnakeGeneratedAndCustom() }
