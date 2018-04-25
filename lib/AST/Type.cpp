@@ -551,6 +551,18 @@ Type TypeBase::getRValueType() {
     });
 }
 
+bool TypeBase::isOptionalType() {
+  if (auto boundTy = getAs<BoundGenericEnumType>())
+    return boundTy->getDecl()->isOptionalDecl();
+  return false;
+}
+
+bool CanType::isOptionalTypeImpl(CanType type) {
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
+    return boundTy->getDecl()->isOptionalDecl();
+  return false;
+}
+
 Type TypeBase::getOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericEnumType>())
     if (boundTy->getDecl()->isOptionalDecl())
@@ -562,7 +574,6 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if (boundTy->getDecl()->isOptionalDecl())
       return boundTy.getGenericArgs()[0];
-
   return CanType();
 }
 

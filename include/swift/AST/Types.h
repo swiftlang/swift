@@ -1042,6 +1042,9 @@ public:
                                       const ValueDecl *derivedDecl,
                                       Type memberType);
 
+  /// Return true if this type is Optional<T>; otherwise false;
+  bool isOptionalType();
+
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 

@@ -3469,6 +3469,9 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
                                                 const ASTContext &C) {
   assert(ownership != ReferenceOwnership::Strong &&
          "ReferenceStorageType is unnecessary for strong ownership");
+  assert((ownership == ReferenceOwnership::Weak) == T->isOptionalType() &&
+         "optionalness of ReferenceStorageType does not match "
+         "optionalness of type");
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
@@ -3485,8 +3488,6 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
     return entry = new (C, arena) UnownedStorageType(
                T, T->isCanonical() ? &C : nullptr, properties);
   case ReferenceOwnership::Weak:
-    assert(T->getOptionalObjectType() &&
-           "object of weak storage type is not optional");
     return entry = new (C, arena)
                WeakStorageType(T, T->isCanonical() ? &C : nullptr, properties);
   case ReferenceOwnership::Unmanaged:
