@@ -637,8 +637,11 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 
   ParserStatus Status = parseBraceItems(Entries, BraceItemListKind::Brace,
                                         BraceItemListKind::Brace);
-  parseMatchingToken(tok::r_brace, RBLoc,
-                     diag::expected_rbrace_in_brace_stmt, LBLoc);
+  if (parseMatchingToken(tok::r_brace, RBLoc,
+                         diag::expected_rbrace_in_brace_stmt, LBLoc)) {
+    // Synthesize a r-brace if the source doesn't have any.
+    LocalContext.synthesize(tok::r_brace);
+  }
 
   return makeParserResult(Status,
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
