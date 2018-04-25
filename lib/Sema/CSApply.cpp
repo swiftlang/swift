@@ -3432,6 +3432,8 @@ namespace {
               auto &tc = cs.getTypeChecker();
               Type srcType = cs.getType(sub);
               tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
+                          destValueType);
+              tc.diagnose(cast->getLoc(), diag::compare_CFTyteId_foreign,
                           srcType, destValueType);
             }
           }

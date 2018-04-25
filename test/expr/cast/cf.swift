@@ -60,17 +60,18 @@ func testAnyObjectToCF(_ anyObject: AnyObject) {
 func testUncheckableCasts(_ anyObject: AnyObject, nsObject: NSObject,
                           anyObjectType: AnyObject.Type, 
                           nsObjectType: NSObject.Type) {
-  if let _ = anyObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed; you would need to compare CFTypeID between 'AnyObject' and 'CFString'}}
-  if let _ = nsObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed; you would need to compare CFTypeID between 'NSObject' and 'CFString'}}
+  if let _ = anyObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}} expected-note{{compare CFTypeID between 'AnyObject' and 'CFString' to make sure they are convertible}}
+  if let _ = nsObject as? CFString { } // expected-error{{conditional downcast to CoreFoundation type 'CFString' will always succeed}} expected-note{{compare CFTypeID between 'NSObject' and 'CFString' to make sure they are convertible}}
 
-  if let _ = anyObject as? CFTree { } // expected-error{{conditional downcast to CoreFoundation type 'CFTree' will always succeed; you would need to compare CFTypeID between 'AnyObject' and 'CFTree'}}
-  if let _ = nsObject as? CFTree { } // expected-error{{will always succeed}}
+  if let _ = anyObject as? CFTree { } // expected-error{{conditional downcast to CoreFoundation type 'CFTree' will always succeed}} expected-note{{compare CFTypeID between 'AnyObject' and 'CFTree' to make sure they are convertible}}
+  if let _ = nsObject as? CFTree { } // expected-error{{will always succeed}} expected-note{{compare CFTypeID between 'NSObject' and 'CFTree' to make sure they are convertible}}
 
-  if let _ = anyObjectType as? CFString.Type { } // expected-error{{conditional downcast to CoreFoundation type 'CFString.Type' will always succeed; you would need to compare CFTypeID between 'AnyObject.Type' and 'CFString.Type'}}
-  if let _ = nsObjectType as? CFString.Type { } // expected-error{{conditional downcast to CoreFoundation type 'CFString.Type' will always succeed; you would need to compare CFTypeID between 'NSObject.Type' and 'CFString.Type'}}
+  if let _ = anyObjectType as? CFString.Type { } // expected-error{{conditional downcast to CoreFoundation type 'CFString.Type' will always succeed}} expected-note{{compare CFTypeID between 'AnyObject.Type' and 'CFString.Type' to make sure they are convertible}}
+  if let _ = nsObjectType as? CFString.Type { } // expected-error{{conditional downcast to CoreFoundation type 'CFString.Type' will always succeed}} expected-note{{compare CFTypeID between 'NSObject.Type' and 'CFString.Type' to make sure they are convertible}}
 
-  if let _ = anyObjectType as? CFTree.Type { } // expected-error{{conditional downcast to CoreFoundation type 'CFTree.Type' will always succeed; you would need to compare CFTypeID between 'AnyObject.Type' and 'CFTree.Type'}}
-  if let _ = nsObjectType as? CFTree.Type { } // expected-error{{will always succeed}}
+  if let _ = anyObjectType as? CFTree.Type { } // expected-error{{conditional downcast to CoreFoundation type 'CFTree.Type' will always succeed}} expected-note{{compare CFTypeID between 'AnyObject.Type' and 'CFTree.Type' to make sure they are convertible}}
+  if let _ = nsObjectType as? CFTree.Type { } // expected-error{{will always succeed}} expected-note{{compare CFTypeID between 'NSObject.Type' and 'CFTree.Type' to make sure they are convertible}}
+
 }
 
 func testCFConvWithIUO(_ x: CFString!, y: NSString!) {
