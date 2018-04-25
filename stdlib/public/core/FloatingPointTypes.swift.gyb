@@ -1521,15 +1521,6 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 % end
 
 extension ${Self} : Hashable {
-  /// The number's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     var v = self

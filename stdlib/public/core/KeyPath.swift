@@ -441,11 +441,6 @@ internal struct ComputedPropertyID: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   internal func hash(into hasher: inout Hasher) {
     hasher.combine(value)
     hasher.combine(isStoredProperty)
@@ -573,11 +568,6 @@ internal enum KeyPathComponent: Hashable {
     }
   }
   
-  @inlinable // FIXME(sil-serialize-all)
-  internal var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   internal func hash(into hasher: inout Hasher) {
     var hasher = hasher

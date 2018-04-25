@@ -477,17 +477,6 @@ extension Character : Comparable {
 }
 
 extension Character: Hashable {
-  /// The character's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    // FIXME(performance): constructing a temporary string is extremely
-    // wasteful and inefficient.
-    return String(self).hashValue
-  }
-
   public func hash(into hasher: inout Hasher) {
     // FIXME(performance): constructing a temporary string is extremely
     // wasteful and inefficient.

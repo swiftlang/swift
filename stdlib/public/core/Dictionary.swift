@@ -1450,11 +1450,6 @@ extension Dictionary: Equatable where Value: Equatable {
 
 extension Dictionary: Hashable where Value: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
