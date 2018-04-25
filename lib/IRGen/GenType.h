@@ -225,7 +225,7 @@ class CompletelyFragileScope {
   bool State;
   TypeConverter &TC;
 public:
-  CompletelyFragileScope(TypeConverter &TC) : TC(TC) {
+  explicit CompletelyFragileScope(TypeConverter &TC) : TC(TC) {
     State = TC.isCompletelyFragile();
     if (!State)
       TC.pushCompletelyFragile();

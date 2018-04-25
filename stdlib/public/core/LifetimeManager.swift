@@ -162,7 +162,7 @@ public func withUnsafePointer<T, Result>(
 ///     type. If you need to mutate the argument through the pointer, use
 ///     `withUnsafeMutablePointer(to:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@_inlineable
+@inlinable
 public func withUnsafePointer<T, Result>(
   to value: inout T,
   _ body: (UnsafePointer<T>) throws -> Result
