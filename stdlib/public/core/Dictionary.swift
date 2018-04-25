@@ -4334,18 +4334,28 @@ extension Dictionary.Index {
 
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    if _fastPath(_guaranteedNative) {
-      return _nativeIndex.offset
-    }
+    return _hashValue(for: self)
+  }
 
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+  #if _runtime(_ObjC)
+    if _fastPath(_guaranteedNative) {
+      hasher.combine(0 as UInt8)
+      hasher.combine(_nativeIndex.offset)
+      return
+    }
     switch _value {
     case ._native(let nativeIndex):
-      return nativeIndex.offset
-  #if _runtime(_ObjC)
+      hasher.combine(0 as UInt8)
+      hasher.combine(nativeIndex.offset)
     case ._cocoa(let cocoaIndex):
-      return cocoaIndex.currentKeyIndex
-  #endif
+      hasher.combine(1 as UInt8)
+      hasher.combine(cocoaIndex.currentKeyIndex)
     }
+  #else
+    hasher.combine(_nativeIndex.offset)
+  #endif
   }
 }
 

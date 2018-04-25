@@ -974,6 +974,11 @@ extension ${Self}: Hashable {
   public var hashValue: Int {
     return Int(bitPattern: self)
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(bitPattern: self))
+  }
 }
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {

@@ -94,6 +94,11 @@ extension ObjectIdentifier: Hashable {
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_value))
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(Builtin.ptrtoint_Word(_value)))
+  }
 }
 
 extension UInt {

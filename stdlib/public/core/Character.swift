@@ -487,4 +487,10 @@ extension Character: Hashable {
     // wasteful and inefficient.
     return String(self).hashValue
   }
+
+  public func hash(into hasher: inout Hasher) {
+    // FIXME(performance): constructing a temporary string is extremely
+    // wasteful and inefficient.
+    hasher.combine(String(self))
+  }
 }
