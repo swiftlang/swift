@@ -710,7 +710,7 @@ namespace llvm {
 /// Specialization of \c ilist_traits for constraints.
 template<>
 struct ilist_traits<swift::constraints::Constraint>
-         : public ilist_default_traits<swift::constraints::Constraint> {
+         : public ilist_node_traits<swift::constraints::Constraint> {
   using Element = swift::constraints::Constraint;
 
   static Element *createNode(const Element &V) = delete;

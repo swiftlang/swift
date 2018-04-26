@@ -173,7 +173,7 @@ namespace llvm {
   
 template <>
 struct ilist_traits<::swift::SILDefaultWitnessTable> :
-public ilist_default_traits<::swift::SILDefaultWitnessTable> {
+public ilist_node_traits<::swift::SILDefaultWitnessTable> {
   using SILDefaultWitnessTable = ::swift::SILDefaultWitnessTable;
 
 public:
