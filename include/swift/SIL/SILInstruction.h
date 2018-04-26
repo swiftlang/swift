@@ -8077,7 +8077,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILInstruction> :
-  public ilist_default_traits<::swift::SILInstruction> {
+  public ilist_node_traits<::swift::SILInstruction> {
   using SILInstruction = ::swift::SILInstruction;
 
 private:
