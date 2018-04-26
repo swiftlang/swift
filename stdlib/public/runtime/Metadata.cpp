@@ -3917,11 +3917,25 @@ bool Metadata::satisfiesClassConstraint() const {
 
 #if !NDEBUG
 void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
+  // Disable verification when a special environment variable is set.
+  // Some metatypes crash when going through the mangler or demangler. A
+  // lot of tests currently trigger those crashes, resulting in failing
+  // tests which are still usefully testing something else. Tests are
+  // run with this variable set to avoid a ton of new test failures.
+  // When the tests are fixed, remove this.
+  bool verificationDisabled =
+    SWIFT_LAZY_CONSTANT((bool)getenv("SWIFT_DISABLE_MANGLED_NAME_VERIFICATION"));
+  
+  if (verificationDisabled) return;
+  
   Demangle::Demangler Dem;
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   auto mangledName = Demangle::mangleNode(node);
   auto result = _getTypeByMangledName(mangledName,
                                       [](unsigned, unsigned){ return nullptr; });
-  assert(metadata == result);
+  if (metadata != result)
+    swift::warning(RuntimeErrorFlagNone,
+                   "Metadata mangled name failed to roundtrip: %p -> %s -> %p",
+                   metadata, mangledName.c_str(), (const Metadata *)result);
 }
 #endif

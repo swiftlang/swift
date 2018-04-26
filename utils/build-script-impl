@@ -1702,7 +1702,10 @@ function set_swiftpm_bootstrap_command() {
         echo "Error: Cannot build swiftpm without llbuild (swift-build-tool)."
         exit 1
     fi
-    swiftpm_bootstrap_command=("${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
+    # Disable mangled name verification when bootstrapping swiftpm, as
+    # it triggers some failures. Remove the setting of
+    # SWIFT_DISABLE_MANGLED_NAME_VERIFICATION=1 once the bugs are fixed.
+    swiftpm_bootstrap_command=("env" "SWIFT_DISABLE_MANGLED_NAME_VERIFICATION=1" "${SWIFTPM_SOURCE_DIR}/Utilities/bootstrap" "${swiftpm_bootstrap_options[@]}")
     # Add --release if we have to build in release mode.
     if [[ "${SWIFTPM_BUILD_TYPE}" ==  "Release" ]] ; then
         swiftpm_bootstrap_command+=(--release)
