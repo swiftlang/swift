@@ -3166,9 +3166,9 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
     diagID = diag::assignment_lhs_is_immutable_variable;
   else if (isa<ForceValueExpr>(dest))
     diagID = diag::assignment_bang_has_immutable_subcomponent;
-  else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest)) {
+  else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_property;
-  } else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
+  else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
     diagID = diag::assignment_subscript_has_immutable_base;
 
     // If the destination is a subscript with a 'dynamicLookup:' label and if
