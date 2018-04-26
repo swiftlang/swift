@@ -6532,18 +6532,18 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     }
 
     expectedResultType = fnType->getResult();
-  } else {
-    // Defend against type variables from our constraint system leaking into
-    // recursive constraints systems formed when checking the body of the
-    // closure.  These typevars come into them when the body does name
-    // lookups against the parameter decls.
-    //
-    // Handle this by rewriting the arguments to UnresolvedType().
-    for (auto VD : *CE->getParameters()) {
-      if (VD->getType()->hasTypeVariable() || VD->getType()->hasError()) {
-        VD->setType(CS.getASTContext().TheUnresolvedType);
-        VD->setInterfaceType(VD->getType()->getInOutObjectType());
-      }
+  }
+
+  // Defend against type variables from our constraint system leaking into
+  // recursive constraints systems formed when checking the body of the
+  // closure.  These typevars come into them when the body does name
+  // lookups against the parameter decls.
+  //
+  // Handle this by rewriting the arguments to UnresolvedType().
+  for (auto VD : *CE->getParameters()) {
+    if (VD->getType()->hasTypeVariable() || VD->getType()->hasError()) {
+      VD->setType(CS.getASTContext().TheUnresolvedType);
+      VD->setInterfaceType(VD->getType()->getInOutObjectType());
     }
   }
 
