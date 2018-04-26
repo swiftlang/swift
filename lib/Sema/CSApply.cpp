@@ -8488,16 +8488,26 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
   };
 
   // Apply 'self' to get the method value.
-  auto *methodRef = CallExpr::createImplicit(ctx, declRef,
-                                             { expr }, { }, getType);
+  auto *methodRef = CallExpr::create(ctx, declRef,
+                                     expr->getLoc(),
+                                     { expr }, { }, { },
+                                     expr->getLoc(),
+                                     /*trailingClosure=*/nullptr,
+                                     /*implicit=*/true,
+                                     getType);
   methodRef->setType(builtinMethodType->getResult());
   methodRef->getArg()->setType(cs.getType(expr));
   cs.cacheType(methodRef->getArg());
   cs.cacheType(methodRef);
 
   // Apply the empty argument list to get the final result.
-  auto *result = CallExpr::createImplicit(ctx, methodRef,
-                                          { }, { }, getType);
+  auto *result = CallExpr::create(ctx, methodRef,
+                                  expr->getLoc(),
+                                  { }, { }, { },
+                                  expr->getLoc(),
+                                  /*trailingClosure=*/nullptr,
+                                  /*implicit=*/true,
+                                  getType);
   result->setType(builtinMethodType->getResult()
                   ->castTo<FunctionType>()->getResult());
   result->getArg()->setType(ctx.TheEmptyTupleType);
