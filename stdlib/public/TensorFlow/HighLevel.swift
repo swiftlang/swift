@@ -295,6 +295,11 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     public init(differentiationSeed: Scalar) {
       self.filter = Tensor<Scalar>(differentiationSeed)
     }
+    
+    @_inlineable @inline(__always)
+    public func makeAdjoint(_ value: Scalar) -> Parameters {
+      return Parameters(filter: Tensor(value).broadcast(to: filter))
+    }
 
     // This operator is a `Differentiable` requirement and will be compiler
     // synthesized.
@@ -437,6 +442,12 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     public init(differentiationSeed: Scalar) {
       self.weight = Tensor<Scalar>(differentiationSeed)
       self.bias = Tensor<Scalar>(differentiationSeed)
+    }
+    
+    @_inlineable @inline(__always)
+    public func makeAdjoint(_ value: Scalar) -> Parameters {
+      return Parameters(weight: Tensor(value).broadcast(to: weight),
+                        bias: Tensor(value).broadcast(to: bias))
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
@@ -598,6 +609,12 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     public init(differentiationSeed: Scalar) {
       self.offset = Tensor<Scalar>(differentiationSeed)
       self.scale = Tensor<Scalar>(differentiationSeed)
+    }
+    
+    @_inlineable @inline(__always)
+    public func makeAdjoint(_ value: Scalar) -> Parameters {
+      return Parameters(offset: Tensor(value).broadcast(to: offset),
+                        scale: Tensor(value).broadcast(to: scale))
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
