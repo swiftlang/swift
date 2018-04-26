@@ -348,6 +348,10 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
 
 SIMPLE_DECL_ATTR(_frozen, Frozen, OnEnum | UserInaccessible, 76)
 
+SIMPLE_DECL_ATTR(_usableFromInline, UsableFromInlineImport,
+                 OnImport | UserInaccessible,
+                 77)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
