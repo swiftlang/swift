@@ -1338,7 +1338,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
   @inline(never)
-  @usableFromInline
+  @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
@@ -1990,7 +1990,7 @@ extension _ArrayBufferProtocol {
   ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
   ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
   @inline(never)
-  @usableFromInline
+  @inlinable // @specializable
   internal func _forceCreateUniqueMutableBuffer(
     newCount: Int, requiredCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
@@ -2006,7 +2006,7 @@ extension _ArrayBufferProtocol {
   ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
   ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
   @inline(never)
-  @usableFromInline
+  @inlinable // @specializable
   internal func _forceCreateUniqueMutableBuffer(
     countForNewBuffer: Int, minNewCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
@@ -2055,7 +2055,7 @@ extension _ArrayBufferProtocol {
   /// As an optimization, may move elements out of source rather than
   /// copying when it isUniquelyReferenced.
   @inline(never)
-  @usableFromInline
+  @inlinable // @specializable
   internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
     _ dest: inout _ContiguousArrayBuffer<Element>,
     _ headCount: Int, // Count of initial source elements to copy/move
