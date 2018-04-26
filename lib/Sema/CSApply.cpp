@@ -8468,6 +8468,11 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
 
   auto type = cs.getType(expr);
 
+  // We allow UnresolvedType <c $T for all $T, so we might end up here
+  // in diagnostics. Just bail out.
+  if (type->is<UnresolvedType>())
+    return expr;
+
   // Look for the builtin name. If we don't have it, we need to call the
   // general name via the witness table.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
