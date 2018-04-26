@@ -1251,12 +1251,12 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
 static const char *const IntrinsicNameTable[] = {
     "not_intrinsic",
 #define GET_INTRINSIC_NAME_TABLE
-#include "llvm/IR/Intrinsics.gen"
+#include "llvm/IR/Intrinsics.inc"
 #undef GET_INTRINSIC_NAME_TABLE
 };
 
 #define GET_INTRINSIC_TARGET_DATA
-#include "llvm/IR/Intrinsics.gen"
+#include "llvm/IR/Intrinsics.inc"
 #undef GET_INTRINSIC_TARGET_DATA
 
 /// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
