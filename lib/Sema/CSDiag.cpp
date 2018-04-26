@@ -708,14 +708,19 @@ static void diagnoseSubElementFailure(Expr *destExpr,
   }
   
   // If we're trying to set an unapplied method, say that.
-  if (auto *VD = dyn_cast_or_null<ValueDecl>(immInfo.second)) {
+  if (auto *VD = immInfo.second) {
     std::string message = "'";
     message += VD->getBaseName().getIdentifier().str();
     message += "'";
-    
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-      message += AFD->getImplicitSelfDecl() ? " is a method" : " is a function";
-    else
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      if (AFD->getImplicitSelfDecl()) {
+        message += " is a method";
+        diagID = diag::assignment_lhs_is_method;
+      } else {
+        message += " is a function";
+      }
+    } else
       message += " is not settable";
     
     TC.diagnose(loc, diagID, message)
@@ -3155,15 +3160,17 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
   }
 
   Diag<StringRef> diagID;
-  if (isa<DeclRefExpr>(dest))
+  if (isa<ApplyExpr>(dest))
+    diagID = diag::assignment_lhs_is_apply_expression;
+  else if (isa<DeclRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_variable;
   else if (isa<ForceValueExpr>(dest))
     diagID = diag::assignment_bang_has_immutable_subcomponent;
-  else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
+  else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest)) {
     diagID = diag::assignment_lhs_is_immutable_property;
-  else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
+  } else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
     diagID = diag::assignment_subscript_has_immutable_base;
-    
+
     // If the destination is a subscript with a 'dynamicLookup:' label and if
     // the tuple is implicit, then this was actually a @dynamicMemberLookup
     // access. Emit a more specific diagnostic.
