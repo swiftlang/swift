@@ -61,6 +61,73 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0206][]
+
+    The standard library now uses a high-quality, randomly seeded, universal
+    hash function, represented by the new public `Hasher` struct.
+  
+    “Random seeding” means that `hashValue` properties will return different
+    values on each execution of a Swift program. This is an important tool for
+    improving the reliability of the standard library’s hashing collections,
+    `Set` and `Dictionary`. In particular, random seeding enables better
+    protection against (accidental or deliberate) hash-flooding attacks.
+    
+    This change fulfills a long-standing prophecy in Hashable's documentation:
+
+    > Hash values are not guaranteed to be equal across different executions of
+    > your program. Do not save hash values to use during a future execution.
+    
+    As a consequence of random seeding, the elements in `Set` and `Dictionary`
+    values may have a different order on each execution. This may expose some
+    bugs in existing code that accidentally relies on repeatable ordering.
+
+    Additionally, the `Hashable` protocol now includes an extra function
+    requirement, `hash(into:)`. The new requirement is designed to be much
+    easier to implement than the old `hashValue` property, and it generally
+    provides better hashing. To implement `hash(into:)`, simply feed the exact
+    same components of your type that you compare in `Equatable`'s `==`
+    implementation to the supplied `Hasher`:
+    
+    ```swift
+    struct Foo: Hashable {
+      var a: String?
+      var b: [Int]
+      var c: [String: Int]
+      
+      static func ==(lhs: Foo, rhs: Foo) -> Bool {
+        return lhs.a == rhs.a && lhs.b == rhs.b && lhs.c == rhs.c
+      }
+      
+      func hash(into hasher: inout Hasher) {
+        hasher.combine(a)
+        hasher.combine(b)
+        hasher.combine(c)
+      }
+    }
+    ```
+    
+    Automatic synthesis for `Hashable` ([SE-0185]) has been updated to generate
+    `hash(into:)` implementations. For example, the `==` and `hash(into:)`
+    implementations above are equivalent to the ones synthesized by the
+    compiler, and can be removed without changing the meaning of the code.
+    
+    Automatic synthesis has also been extended to support deriving `hashValue`
+    from `hash(into:)`, and vice versa. Therefore, code that only implements
+    `hashValue` continues to work in Swift 4.2. This new functionality works for
+    all types that can implement `Hashable`, including classes.
+    
+    Note that these changes don't affect Foundation's hashing interface. Classes
+    that subclass `NSObject` should override the `hash` property, like before.
+
+    In certain controlled environments, such as while running particular tests,
+    it may be helpful to selectively disable hash seed randomization, so that
+    hash values and the order of elements in `Set`/`Dictionary` values remain
+    consistent across executions. You can disable hash seed randomization by
+    defining the environment variable `SWIFT_DETERMINISTIC_HASHING` with the
+    value of `1`. The Swift runtime looks at this variable during process
+    startup and, if it is defined, replaces the random seed with a constant
+    value.
+  
 * [SR-106][]
 
   The behavior of `.description` and `.debugDescription` for floating-point
@@ -6989,6 +7056,7 @@ Swift 1.0
 [SE-0197]: <https://github.com/apple/swift-evolution/blob/master/proposals/0197-remove-where.md>
 [SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
 [SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
+[SE-0206]: <https://github.com/apple/swift-evolution/blob/master/proposals/0206-hashable-enhancements.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
