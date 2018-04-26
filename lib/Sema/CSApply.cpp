@@ -3430,11 +3430,10 @@ namespace {
                 return nullptr;
 
               auto &tc = cs.getTypeChecker();
-              Type srcType = cs.getType(sub);
               tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
                           destValueType);
-              tc.diagnose(cast->getLoc(), diag::compare_CFTyteId_foreign,
-                          srcType, destValueType);
+              tc.diagnose(cast->getLoc(), diag::note_explicitly_compare_cftypeid,
+                          sub->getReferencedDecl().getDecl()->getBaseName().getIdentifier(), destValueType);
             }
           }
         }

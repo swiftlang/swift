@@ -2533,11 +2533,11 @@ NOTE(silence_inject_forced_downcast,none,
      "add parentheses around the cast to silence this warning", ())
 
 ERROR(conditional_downcast_foreign,none,
-     "conditional downcast to CoreFoundation type %0 will always succeed",
+      "conditional downcast to CoreFoundation type %0 will always succeed",
       (Type))
-NOTE(compare_CFTyteId_foreign,none,
-     "compare CFTypeID between %0 and %1 to make sure they are convertible",
-      (Type, Type))
+NOTE(note_explicitly_compare_cftypeid,none,
+      "did you mean to explicitly compare the CFTypeIDs of %0 and %1?",
+      (Identifier, Type))
 
 ERROR(optional_used_as_boolean,none,
      "optional type %0 cannot be used as a boolean; "
