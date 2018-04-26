@@ -66,11 +66,11 @@ Swift 4.2
     The standard library now uses a high-quality, randomly seeded, universal
     hash function, represented by the new public `Hasher` struct.
   
-    “Random seeding” means that `hashValue` properties will return different
-    values on each execution of a Swift program. This is an important tool for
-    improving the reliability of the standard library’s hashing collections,
-    `Set` and `Dictionary`. In particular, random seeding enables better
-    protection against (accidental or deliberate) hash-flooding attacks.
+    “Random seeding” varies the result of `hashValue` on each execution of a
+    Swift program, improving the reliability of the standard library's hashed
+    collections such as `Set` and `Dictionary`. In particular, random seeding
+    enables better protection against (accidental or deliberate) hash-flooding
+    attacks.
     
     This change fulfills a long-standing prophecy in Hashable's documentation:
 
@@ -111,10 +111,10 @@ Swift 4.2
     implementations above are equivalent to the ones synthesized by the
     compiler, and can be removed without changing the meaning of the code.
     
-    Automatic synthesis has also been extended to support deriving `hashValue`
-    from `hash(into:)`, and vice versa. Therefore, code that only implements
-    `hashValue` continues to work in Swift 4.2. This new functionality works for
-    all types that can implement `Hashable`, including classes.
+    Synthesis has also been extended to support deriving `hashValue` from
+    `hash(into:)`, and vice versa. Therefore, code that only implements
+    `hashValue` continues to work in Swift 4.2. This new compiler functionality
+    works for all types that can implement `Hashable`, including classes.
     
     Note that these changes don't affect Foundation's hashing interface. Classes
     that subclass `NSObject` should override the `hash` property, like before.
