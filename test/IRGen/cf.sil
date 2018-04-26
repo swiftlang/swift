@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/cf.sil
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -enable-objc-interop -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
-// REQUIRES: objc_interop
 
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[REFRIGERATOR:%TSo17CCRefrigeratorRefa]] = type
