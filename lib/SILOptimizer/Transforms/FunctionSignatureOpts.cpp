@@ -69,6 +69,21 @@ llvm::cl::opt<bool>
                       llvm::cl::desc("Support function signature optimization "
                                      "of generic functions"));
 
+static llvm::cl::opt<bool> FSODisableOwnedToGuaranteed(
+    "sil-fso-disable-owned-to-guaranteed",
+    llvm::cl::desc("Do not perform owned to guaranteed during FSO. Intended "
+                   "only for testing purposes."));
+
+static llvm::cl::opt<bool> FSODisableDeadArgument(
+    "sil-fso-disable-dead-argument",
+    llvm::cl::desc("Do not perform dead argument elimination during FSO. "
+                   "Intended only for testing purposes"));
+
+static llvm::cl::opt<bool> FSODisableArgExplosion(
+    "sil-fso-disable-arg-explosion",
+    llvm::cl::desc("Do not perform argument explosion during FSO. Intended "
+                   "only for testing purposes"));
+
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
   switch (Rep) {
@@ -884,6 +899,9 @@ bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
 //===----------------------------------------------------------------------===//
 
 bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
+  if (FSODisableDeadArgument)
+    return false;
+
   // Did we decide we should optimize any parameter?
   SILFunction *F = TransformDescriptor.OriginalFunction;
   bool SignatureOptimize = false;
@@ -1166,6 +1184,9 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
 }
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyze() {
+  if (FSODisableOwnedToGuaranteed)
+    return false;
+
   bool Result = OwnedToGuaranteedAnalyzeResults();
   bool Params = OwnedToGuaranteedAnalyzeParameters();
   return Params || Result;
@@ -1181,6 +1202,10 @@ void FunctionSignatureTransform::OwnedToGuaranteedTransform() {
 //===----------------------------------------------------------------------===//
 
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
+  // If we are not supposed to perform argument explosion, bail.
+  if (FSODisableArgExplosion)
+    return false;
+
   SILFunction *F = TransformDescriptor.OriginalFunction;
   // Did we decide we should optimize any parameter?
   bool SignatureOptimize = false;
