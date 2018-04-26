@@ -780,10 +780,13 @@ namespace {
             return Space();
           }
           
-          SmallVector<Space, 4> constrSpaces;
           bool foundBad = false;
           auto i = this->getSpaces().begin();
           auto j = other.getSpaces().begin();
+
+          SmallVector<Space, 4> copyParams(this->getSpaces().begin(),
+                                           this->getSpaces().end());
+
           for (auto idx = 0;
                i != this->getSpaces().end() && j != other.getSpaces().end();
                ++i, ++j, ++idx) {
@@ -803,17 +806,13 @@ namespace {
             // Copy the params and replace the parameter at each index with the
             // difference of the two spaces.  This unpacks one constructor head
             // into each parameter.
-            SmallVector<Space, 4> copyParams(this->getSpaces().begin(),
-                                             this->getSpaces().end());
             copyParams[idx] = s1.minus(s2, TC, DC);
-            Space CS = Space::forConstructor(this->getType(), this->getHead(),
-                                             this->canDowngradeToWarning(),
-                                             copyParams);
-            constrSpaces.push_back(CS);
           }
 
           if (foundBad) {
-            return Space::forDisjunct(constrSpaces);
+            return Space::forConstructor(this->getType(), this->getHead(),
+                                         this->canDowngradeToWarning(),
+                                         copyParams);
           }
           return Space();
         }
@@ -1023,6 +1022,39 @@ namespace {
         return eed->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>();
       }
 
+      static void
+      decomposeTuple(TypeChecker &TC, const DeclContext *DC, TupleType *tuple,
+                     llvm::function_ref<void(ArrayRef<Space>)> processor) {
+        llvm::SmallVector<Space, 4> scratch;
+        decomposeTupleImpl(TC, DC, tuple->getElements(), 0, scratch, processor);
+      }
+
+      static void
+      decomposeTupleImpl(TypeChecker &TC, const DeclContext *DC,
+                         ArrayRef<TupleTypeElt> elements, unsigned startIndex,
+                         llvm::SmallVectorImpl<Space> &scratch,
+                         llvm::function_ref<void(ArrayRef<Space>)> processor) {
+        for (unsigned i = startIndex, n = elements.size(); i != n; ++i) {
+          llvm::SmallVector<Space, 4> spaces;
+
+          auto eltType = elements[i].getType();
+          if (canDecompose(eltType, DC)) {
+            decompose(TC, DC, eltType, spaces);
+          } else {
+            spaces.push_back(Space::forType(eltType, elements[i].getName()));
+          }
+
+          for (const auto &space : spaces) {
+            scratch.push_back(space);
+            decomposeTupleImpl(TC, DC, elements, i + 1, scratch, processor);
+            (void)scratch.pop_back_val();
+          }
+        }
+
+        if (startIndex == elements.size() && scratch.size() == elements.size())
+          processor(scratch);
+      }
+
       // Decompose a type into its component spaces.
       static void decompose(TypeChecker &TC, const DeclContext *DC, Type tp,
                             SmallVectorImpl<Space> &arr) {
@@ -1086,11 +1118,29 @@ namespace {
         } else if (auto *TTy = tp->castTo<TupleType>()) {
           // Decompose each of the elements into its component type space.
           SmallVector<Space, 4> constElemSpaces;
-          llvm::transform(TTy->getElements(),
-                          std::back_inserter(constElemSpaces),
-                          [&](TupleTypeElt elt) {
-            return Space::forType(elt.getType(), elt.getName());
-          });
+
+          auto elements = TTy->getElements();
+          switch (elements.size()) {
+          case 0:
+            break;
+
+          case 1: {
+            const auto &elt = elements.front();
+            constElemSpaces.push_back(
+                Space::forType(elt.getType(), elt.getName()));
+            break;
+          }
+
+          default: {
+            decomposeTuple(TC, DC, TTy, [&](ArrayRef<Space> eltSpaces) {
+              arr.push_back(Space::forConstructor(tp, Identifier(),
+                                                  /*canDowngrade*/ false,
+                                                  eltSpaces));
+            });
+            return;
+          }
+          }
+
           // Create an empty constructor head for the tuple space.
           arr.push_back(Space::forConstructor(tp, Identifier(),
                                               /*canDowngrade*/false,
@@ -1786,4 +1836,5 @@ void SpaceEngine::Space::dump() const {
   llvm::raw_svector_ostream os(buf);
   this->show(os, /*normalize*/false);
   llvm::errs() << buf.str();
+  llvm::errs() << '\n';
 }
