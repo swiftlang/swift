@@ -732,13 +732,17 @@ public:
   };
 
   /// Possible attributes for imports in source files.
-  enum class ImportFlags {
+  enum class ImportFlags : uint8_t {
     /// The imported module is exposed to anyone who imports the parent module.
     Exported = 0x1,
 
     /// This source file has access to testable declarations in the imported
     /// module.
-    Testable = 0x2
+    Testable = 0x2,
+
+    /// Modules that depend on the module containing this source file will
+    /// autolink this dependency.
+    UsableFromInline = 0x4,
   };
 
   /// \see ImportFlags
