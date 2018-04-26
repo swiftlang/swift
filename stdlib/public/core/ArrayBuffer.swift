@@ -390,7 +390,7 @@ extension _ArrayBuffer {
   }
 
   @inline(never)
-  @usableFromInline
+  @inlinable // @specializable
   internal func _getElementSlowPath(_ i: Int) -> AnyObject {
     _sanityCheck(
       _isClassOrObjCExistential(Element.self),
