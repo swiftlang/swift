@@ -7280,24 +7280,16 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       return nullptr;
 
     // Form a reference to the builtin conversion function.
-    // FIXME: Bogus location info.
-    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context);
-
-    Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
-                                             base, SourceLoc(),
-                                             witness->getFullName(),
-                                             DeclNameLoc(base->getEndLoc()),
-                                             /*Implicit=*/true);
-    (void)tc.typeCheckExpression(unresolvedDot, dc);
-
-    cs.cacheExprTypes(unresolvedDot);
-
-    ConcreteDeclRef builtinRef = unresolvedDot->getReferencedDecl();
-    if (!builtinRef) {
-      tc.diagnose(base->getLoc(), brokenBuiltinProtocolDiag);
-      return nullptr;
+    SubstitutionMap subMap;
+    SmallVector<Substitution, 2> subs;
+    if (auto *genericSig = witness->getGenericSignature()) {
+      auto *concreteConformance = builtinConformance->getConcrete();
+      subMap = cast<SpecializedProtocolConformance>(concreteConformance)
+        ->getSubstitutionMap();
+      genericSig->getSubstitutions(subMap, subs);
     }
+
+    ConcreteDeclRef builtinRef(tc.Context, witness, subs);
 
     // Set the builtin initializer.
     if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
@@ -7345,23 +7337,16 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     return nullptr;
 
   // Form a reference to the conversion function.
-  // FIXME: Bogus location info.
-  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                            tc.Context);
-
-  Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
-                                           base, SourceLoc(),
-                                           witness->getFullName(),
-                                           DeclNameLoc(base->getEndLoc()),
-                                           /*Implicit=*/true);
-  (void)tc.typeCheckExpression(unresolvedDot, dc);
-  cs.cacheExprTypes(unresolvedDot);
-
-  ConcreteDeclRef ref = unresolvedDot->getReferencedDecl();
-  if (!ref) {
-    tc.diagnose(base->getLoc(), brokenProtocolDiag);
-    return nullptr;
+  SubstitutionMap subMap;
+  SmallVector<Substitution, 2> subs;
+  if (auto *genericSig = witness->getGenericSignature()) {
+    auto *concreteConformance = conformance->getConcrete();
+    subMap = cast<SpecializedProtocolConformance>(concreteConformance)
+      ->getSubstitutionMap();
+    genericSig->getSubstitutions(subMap, subs);
   }
+
+  ConcreteDeclRef ref(tc.Context, witness, subs);
 
   // Set the initializer.
   if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
