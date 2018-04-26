@@ -30,22 +30,23 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-function-signature-opt"
+#include "FunctionSignatureOpts.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/FunctionSignatureOptUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
@@ -57,6 +58,71 @@ STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
 using SILParameterInfoList = llvm::SmallVector<SILParameterInfo, 8>;
 using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
+
+//===----------------------------------------------------------------------===//
+//                           Optimization Hueristic
+//===----------------------------------------------------------------------===//
+
+/// Set to true to enable the support for partial specialization.
+llvm::cl::opt<bool>
+    FSOEnableGenerics("sil-fso-enable-generics", llvm::cl::init(true),
+                      llvm::cl::desc("Support function signature optimization "
+                                     "of generic functions"));
+
+static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
+                                          bool OptForPartialApply) {
+  switch (Rep) {
+  case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::Thin:
+  case SILFunctionTypeRepresentation::Thick:
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+    return true;
+  case SILFunctionTypeRepresentation::WitnessMethod:
+    return OptForPartialApply;
+  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionTypeRepresentation::Block:
+    return false;
+  }
+
+  llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
+}
+
+/// Returns true if F is a function which the pass know show to specialize
+/// function signatures for.
+static bool canSpecializeFunction(SILFunction *F,
+                                  const CallerAnalysis::FunctionInfo *FuncInfo,
+                                  bool OptForPartialApply) {
+  // Do not specialize the signature of SILFunctions that are external
+  // declarations since there is no body to optimize.
+  if (F->isExternalDeclaration())
+    return false;
+
+  // For now ignore functions with indirect results.
+  if (F->getConventions().hasIndirectSILResults())
+    return false;
+
+  // Do not specialize the signature of always inline functions. We
+  // will just inline them and specialize each one of the individual
+  // functions that these sorts of functions are inlined into.
+  // It is OK to specialize always inline functions if they are
+  // used by partial_apply instructions.
+  assert(!OptForPartialApply || FuncInfo);
+  if (F->getInlineStrategy() == Inline_t::AlwaysInline &&
+      (!OptForPartialApply || !FuncInfo->getMinPartialAppliedArgs()))
+    return false;
+
+  // For now ignore generic functions to keep things simple...
+  if (!FSOEnableGenerics && F->getLoweredFunctionType()->isPolymorphic())
+    return false;
+
+  // Make sure F has a linkage that we can optimize.
+  if (!isSpecializableRepresentation(F->getRepresentation(),
+                                     OptForPartialApply))
+    return false;
+
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 //                                 Utilities
@@ -1256,6 +1322,7 @@ public:
       return;
     }
 
+    // Ok, we think we can perform optimization. Now perform a quick check
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     auto *EA = PM->getAnalysis<EpilogueARCAnalysis>();
 
