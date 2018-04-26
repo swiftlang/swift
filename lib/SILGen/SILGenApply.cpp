@@ -5098,11 +5098,11 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
       eltSources.emplace_back(loc, std::move(subscripts));
     }
 
-    if (inputTupleType) {
-      setValue = ArgumentSource(loc, inputTupleType, eltSources);
-    } else {
-      assert(eltSources.size() == 1);
+    if (eltSources.size() == 1) {
       setValue = std::move(eltSources.front());
+    } else {
+      assert(inputTupleType);
+      setValue = ArgumentSource(loc, inputTupleType, eltSources);
     }
 
   } else {
