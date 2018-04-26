@@ -2659,10 +2659,11 @@ public:
     /// Whether the parameter is marked 'owned'
     bool isOwned() const { return Flags.isOwned(); }
 
-    bool operator!=(Param const &b) const {
-      return Label != b.Label || !getType()->isEqual(b.getType()) ||
-             Flags != b.Flags;
+    bool operator==(Param const &b) const {
+      return Label == b.Label && getType()->isEqual(b.getType()) &&
+             Flags == b.Flags;
     }
+    bool operator!=(Param const &b) const { return !(*this == b); }
 
     Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
   };
