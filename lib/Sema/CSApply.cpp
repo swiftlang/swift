@@ -595,63 +595,6 @@ namespace {
           = simplifyType(openedFnType)->castTo<FunctionType>();
         auto baseTy = simplifiedFnType->getInput()->getRValueInstanceType();
 
-        // Handle operator requirements found in protocols.
-        if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-          // If we don't have an archetype or existential, we have to call the
-          // witness.
-          // FIXME: This is awful. We should be able to handle this as a call to
-          // the protocol requirement with Self == the concrete type, and SILGen
-          // (or later) can devirtualize as appropriate.
-          if (!baseTy->is<ArchetypeType>() && !baseTy->isAnyExistentialType()) {
-            auto &tc = cs.getTypeChecker();
-            auto conformance =
-              tc.conformsToProtocol(
-                        baseTy, proto, cs.DC,
-                        (ConformanceCheckFlags::InExpression|
-                         ConformanceCheckFlags::Used));
-            if (conformance && conformance->isConcrete()) {
-              if (auto witness =
-                      conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
-                // Hack up an AST that we can type-check (independently) to get
-                // it into the right form.
-                // FIXME: the hop through 'getDecl()' is because
-                // SpecializedProtocolConformance doesn't substitute into
-                // witnesses' ConcreteDeclRefs.
-                Type expectedFnType = simplifiedFnType->getResult();
-                Expr *refExpr;
-                if (witness->getDeclContext()->isTypeContext()) {
-                  Expr *base =
-                    TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
-                                                 ctx);
-                  refExpr = new (ctx) MemberRefExpr(base, SourceLoc(), witness,
-                                                    loc, /*Implicit=*/true);
-                } else {
-                  auto declRefExpr =  new (ctx) DeclRefExpr(witness, loc,
-                                                            /*Implicit=*/false);
-                  declRefExpr->setFunctionRefKind(functionRefKind);
-                  refExpr = declRefExpr;
-                }
-
-                auto resultTy = tc.typeCheckExpression(
-                    refExpr, cs.DC, TypeLoc::withoutLoc(expectedFnType),
-                    CTP_CannotFail);
-                if (!resultTy)
-                  return nullptr;
-
-                cs.cacheExprTypes(refExpr);
-
-                // Remove an outer function-conversion expression. This
-                // happens when we end up referring to a witness for a
-                // superclass conformance, and 'Self' differs.
-                if (auto fnConv = dyn_cast<FunctionConversionExpr>(refExpr))
-                  refExpr = fnConv->getSubExpr();
-
-                return forceUnwrapIfExpected(refExpr, choice, locator);
-              }
-            }
-          }
-        }
-
         // Build a reference to the protocol requirement.
         Expr *base =
           TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
