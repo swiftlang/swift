@@ -113,7 +113,7 @@ information, see the inline help:
 
     utils/build-script -h
 
-### Customize TensorFlow suppot
+### Customize TensorFlow support
 
  If you want to build with custom TensorFlow headers and shared libraries, please specify the `--tensorflow-host-include-dir` and `--tensorflow-host-lib-dir` arguments:
 
