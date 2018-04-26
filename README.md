@@ -66,7 +66,7 @@ repositories and will update them instead.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
-    git clone https://github.com/google/swift.git -b tensorflow 
+    git clone https://github.com/google/swift.git -b tensorflow
     ./swift/utils/update-checkout --clone --config swift/utils/update-checkout-config-tensorflow.json
 
 **Via SSH**  For those who plan on regularly making direct commits,
@@ -198,11 +198,31 @@ recompiling the entire project by passing the `--reconfigure` option.
 Make sure all repositories are up to date with the `update-checkout` command
 described above.
 
+## Testing Swift
+
+The simplest way to run the Swift test suite is by passing the `--test` and
+`--validation-test` flags to `build-script`:
+
+    utils/build-script --enable-tensorflow --test --validation-test
+
+Swift for TensorFlow adds the following new test suites:
+
+- [test/AutoDiff](test/AutoDiff): tests for [automatic differentiation](https://github.com/tensorflow/swift/blob/master/docs/AutomaticDifferentiation.md).
+- [test/TensorFlow](test/TensorFlow): TensorFlow infrastructure tests that don't
+  depend on the TensorFlow runtime.
+- [test/TensorFlowRuntime](test/TensorFlowRuntime): TensorFlow runtime tests.
+
+Before submitting pull requests involving large code changes, please run the
+command above locally to ensure all tests pass.
+
+For more details on testing, see [docs/Testing.md](docs/Testing.md), in
+particular the section on [lit.py](docs/Testing.md#using-litpy).
+
 ## Build Dependencies
 
 ### CMake
-[CMake](https://cmake.org) is the core infrastructure used to configure builds of 
-Swift and its companion projects; at least version 3.4.3 is required. 
+[CMake](https://cmake.org) is the core infrastructure used to configure builds of
+Swift and its companion projects; at least version 3.4.3 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
