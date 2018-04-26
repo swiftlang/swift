@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir > %t
-// RUN: %FileCheck %s --check-prefix=CHECK-%target-object-format --check-prefix=CHECK < %t
-// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck -check-prefix CHECK -check-prefix NEGATIVE %s
 
 // REQUIRES: CPU=x86_64
 
