@@ -8476,10 +8476,11 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
     ->castTo<FunctionType>();
 
   // Form an unbound reference to the builtin method.
-  Expr *declRef = new (ctx) DeclRefExpr(builtinMethod,
+  auto *declRef = new (ctx) DeclRefExpr(builtinMethod,
                                         DeclNameLoc(expr->getLoc()),
                                         /*Implicit=*/true);
   declRef->setType(builtinMethodType);
+  declRef->setFunctionRefKind(FunctionRefKind::DoubleApply);
   cs.cacheType(declRef);
 
   auto getType = [&](const Expr *E) -> Type {
