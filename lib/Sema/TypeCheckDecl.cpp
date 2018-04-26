@@ -7000,41 +7000,58 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     break;
   }
 
-  case DeclKind::Var:
   case DeclKind::Param: {
-    auto VD = cast<VarDecl>(D);
+    // FIXME: This case is hit when code completion occurs in a function
+    // parameter list. Previous parameters are definitely in scope, but
+    // we don't really know how to type-check them.
+    // We can also hit this when code-completing in a closure body.
+    //
+    // FIXME: Also, note that we don't call setValidationStarted() here,
+    // because the ExprCleanser clears the type of ParamDecls, so we
+    // can end up here multiple times for the same ParamDecl.
+    auto *PD = cast<ParamDecl>(D);
+    if (!PD->hasInterfaceType())
+      PD->markInvalid();
 
-    if (PatternBindingDecl *PBD = VD->getParentPatternBinding())
-      if (PBD->isBeingValidated())
-        return;
+    break;
+  }
+
+  case DeclKind::Var: {
+    auto *VD = cast<VarDecl>(D);
+    auto *PBD = VD->getParentPatternBinding();
+
+    // Note that we need to handle the fact that some VarDecls don't
+    // have a PatternBindingDecl, for example the iterator in a
+    // 'for ... in ...' loop.
+    if (PBD == nullptr) {
+      if (!VD->hasInterfaceType()) {
+        VD->setValidationStarted();
+        VD->markInvalid();
+      }
+
+      break;
+    }
+
+    // If we're already checking our PatternBindingDecl, bail out
+    // without setting our own 'is being validated' flag, since we
+    // will attempt validation again later.
+    if (PBD->isBeingValidated())
+      return;
 
     D->setIsBeingValidated();
 
     if (!VD->hasInterfaceType()) {
-      if (VD->isSelfParameter()) {
-        if (!VD->hasInterfaceType()) {
-          VD->setInterfaceType(ErrorType::get(Context));
-          VD->setInvalid();
-        }
-        recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
-      } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        validatePatternBindingEntries(*this, PBD);
+      // Attempt to infer the type using initializer expressions.
+      validatePatternBindingEntries(*this, PBD);
 
-        auto parentPattern = VD->getParentPattern();
-        if (PBD->isInvalid() || !parentPattern->hasType()) {
-          parentPattern->setType(ErrorType::get(Context));
-          setBoundVarsTypeError(parentPattern, Context);
-        }
-      } else {
-        // FIXME: This case is hit when code completion occurs in a function
-        // parameter list. Previous parameters are definitely in scope, but
-        // we don't really know how to type-check them.
-        // We can also hit this when code-completing in a closure body.
-        assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
-               isa<AbstractClosureExpr>(D->getDeclContext()) ||
-               isa<TopLevelCodeDecl>(D->getDeclContext()));
-        VD->markInvalid();
+      auto parentPattern = VD->getParentPattern();
+      if (PBD->isInvalid() || !parentPattern->hasType()) {
+        parentPattern->setType(ErrorType::get(Context));
+        setBoundVarsTypeError(parentPattern, Context);
       }
+
+      // Should have set a type above.
+      assert(VD->hasInterfaceType());
     }
 
     // We're not really done with processing the signature yet, but

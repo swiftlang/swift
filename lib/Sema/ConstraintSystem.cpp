@@ -748,7 +748,7 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                              const DeclRefExpr *base,
                                              bool wantInterfaceType) {
   validateDecl(value);
-  if (value->isInvalid())
+  if (!value->hasValidSignature() || value->isInvalid())
     return ErrorType::get(Context);
 
   Type requestedType = (wantInterfaceType
