@@ -1737,8 +1737,7 @@ namespace {
           //
           // FIXME: SE-0155 makes this case unreachable.
           if (SP->getKind() == PatternKind::Named
-              || SP->getKind() == PatternKind::Any
-              || SP->getKind() == PatternKind::Tuple) {
+              || SP->getKind() == PatternKind::Any) {
             if (auto *TTy = SP->getType()->getAs<TupleType>()) {
               for (auto ty : TTy->getElements()) {
                 conArgSpace.push_back(Space::forType(ty.getType(),
@@ -1748,6 +1747,13 @@ namespace {
               conArgSpace.push_back(projectPattern(TC, SP,
                                                    sawDowngradablePattern));
             }
+          } else if (SP->getKind() == PatternKind::Tuple) {
+            Space argTupleSpace = projectPattern(TC, SP,
+                                                 sawDowngradablePattern);
+            assert(argTupleSpace.getKind() == SpaceKind::Constructor);
+            conArgSpace.insert(conArgSpace.end(),
+                               argTupleSpace.getSpaces().begin(),
+                               argTupleSpace.getSpaces().end());
           } else {
             conArgSpace.push_back(projectPattern(TC, SP,
                                                  sawDowngradablePattern));
