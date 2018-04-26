@@ -702,6 +702,11 @@ extension Tensor : Differentiable where Scalar : FloatingPoint {
   }
 
   @_inlineable @inline(__always)
+  public func makeAdjoint(_ value: Scalar) -> Tensor {
+    return Tensor(value).broadcast(to: self)
+  }
+
+  @_inlineable @inline(__always)
   public func combiningAsAdjoint(with other: Tensor) -> Tensor {
     return self + other
   }

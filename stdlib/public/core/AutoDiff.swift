@@ -49,7 +49,7 @@
 public protocol Differentiable {
   /// The currency type in the mathematical model of differentiation. For
   /// example, the currency type of `Float` is `Float`, and the currency type
-  /// of a vector of `Float` is still `Float`. The currency type is used to
+  /// of `Vector<Float>` is still `Float`. The currency type is used to
   /// initialize intermediate values during automatic differentiation, such as
   /// the initial adjoint/tangent and the seed.
   associatedtype DifferentiationCurrency : FloatingPoint
@@ -58,6 +58,9 @@ public protocol Differentiable {
   ///
   /// - Parameter differentiationSeed: The seed.
   init(differentiationSeed: DifferentiationCurrency)
+  
+  /// Create an adjoint value to be used in differentiation from a scalar.
+  func makeAdjoint(_ value: DifferentiationCurrency) -> Self
 
   /// Combining self with the given value as differentiated adjoint, producing
   /// a new adjoint.
@@ -72,6 +75,12 @@ public extension FloatingPoint {
   @_transparent
   init(differentiationSeed: Self) {
     self = differentiationSeed
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_transparent
+  func makeAdjoint(_ value: Self) -> Self {
+    return value
   }
 
   @_inlineable // FIXME(sil-serialize-all)
