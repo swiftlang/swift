@@ -4192,7 +4192,12 @@ public:
   }
 
   void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
-    auto fnType = IEC->getOperand()->getType().getAs<SILFunctionType>();
+    // The closure operand is allowed to be an optional closure.
+    auto operandType = IEC->getOperand()->getType();
+    if (operandType.getOptionalObjectType())
+      operandType = operandType.getOptionalObjectType();
+
+    auto fnType = operandType.getAs<SILFunctionType>();
     require(fnType && fnType->getExtInfo().hasContext() &&
                 !fnType->isNoEscape() &&
                 fnType->getExtInfo().getRepresentation() ==
