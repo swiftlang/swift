@@ -12,6 +12,12 @@
 
 import SwiftShims
 
+/// Last chance handler for "fatal" errors that in a server
+/// environment the user might want to do something creative
+/// like canceling the thread or long jumping to a save point.
+public var _swift_stdlib_errorHandler: ((_: StaticString, _: String,
+                        _: StaticString, _: UInt, _: UInt32, _: Int32) -> ())?
+
 // Implementation Note: this file intentionally uses very LOW-LEVEL
 // CONSTRUCTS, so that assert and fatal may be used liberally in
 // building library abstractions without fear of infinite recursion.
@@ -87,6 +93,8 @@ internal func _assertionFailure(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  _swift_stdlib_errorHandler?(prefix, message.description, file, line, flags,
+                              Int32(Builtin.assert_configuration()))
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message.withUTF8Buffer {
@@ -117,6 +125,8 @@ internal func _assertionFailure(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  _swift_stdlib_errorHandler?(prefix, message, file, line, flags,
+                              Int32(Builtin.assert_configuration()))
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message._withUnsafeBufferPointerToUTF8 {
@@ -173,6 +183,8 @@ internal func _fatalErrorMessage(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  _swift_stdlib_errorHandler?(prefix, message.description, file, line, flags,
+                              Int32(Builtin.assert_configuration()))
 #if INTERNAL_CHECKS_ENABLED
   prefix.withUTF8Buffer {
     (prefix) in
