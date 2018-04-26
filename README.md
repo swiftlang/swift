@@ -75,12 +75,16 @@ cloning over SSH may provide a better experience (which requires
 
     git clone git@github.com:google/swift.git -b tensorflow
     ./swift/utils/update-checkout --clone-with-ssh --config swift/utils/update-checkout-config-tensorflow.json
+    cd swift
 
-### Building Swift
+### Building Swift with TensorFlow support
 
 The `build-script` is a high-level build automation script that supports basic
 options such as building a Swift-compatible LLDB, building the Swift Package
 Manager, building for various platforms, running tests after builds, and more.
+TensorFlow support is enabled by the `--enable-tensorflow` flag. TensorFlow will
+be automatically cloned from GitHub and built from source using Bazel when this
+flag is specified.
 
 There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
@@ -109,17 +113,18 @@ information, see the inline help:
 
     utils/build-script -h
 
-### TensorFlow Support
+### Customize TensorFlow suppot
 
-To enable TensorFlow support, specify the `--enable-tensorflow` flag:
-
-    utils/build-script --enable-tensorflow
-
-By default, TensorFlow will be automatically cloned from GitHub and built from source using Bazel. If you want to build with custom TensorFlow headers and shared libraries, please specify the `tensorflow-host-include-dir` and `tensorflow-host-lib-dir` arguments:
+ If you want to build with custom TensorFlow headers and shared libraries, please specify the `--tensorflow-host-include-dir` and `--tensorflow-host-lib-dir` arguments:
 
     utils/build-script --enable-tensorflow --tensorflow-host-include-dir=<path_to_tensorflow_headers> --tensorflow-host-lib-dir=<path_to_tensorflow_libraries>
 
-Below is more information about the arguments:
+You can assign specific values to these arguments after a double-dash `--` in
+your build-script command. For example:
+
+    utils/build-script -- enable-tensorflow=True
+
+Below is more information about TensorFlow-related build arguments.
 
 * `enable-tensorflow`: If true, enables TensorFlow support for Swift.
     * Default value: `False`.
@@ -133,6 +138,8 @@ Below is more information about the arguments:
     * Default value: None.
 * `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so` and `libtensorflow_framework.so`).
     * Default value: None.
+
+### Build systems
 
 #### Xcode
 
