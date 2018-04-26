@@ -110,6 +110,27 @@ public struct SuffixFromTest {
   }
 }
 
+public struct FindLastTest {
+  public let expected: Int?
+  public let comparisons: Int
+  public let element: MinimalEquatableValue
+  public let sequence: [MinimalEquatableValue]
+  public let loc: SourceLoc
+  
+  public init(
+    expected: Int?, comparisons: Int, element: Int, sequence: [Int],
+    file: String = #file, line: UInt = #line
+    ) {
+    self.expected = expected
+    self.comparisons = comparisons
+    self.element = MinimalEquatableValue(element)
+    self.sequence = sequence.enumerated().map {
+      return MinimalEquatableValue($1, identity: $0)
+    }
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
 public let subscriptRangeTests = [
   // Slice an empty collection.
   SubscriptRangeTest(
@@ -303,6 +324,68 @@ let removeFirstTests: [RemoveFirstNTest] = [
     numberToRemove: 5,
     expectedCollection: []
   ),
+]
+
+let findLastTests = [
+  FindLastTest(
+    expected: nil,
+    comparisons: 0,
+    element: 42,
+    sequence: []),
+  
+  FindLastTest(
+    expected: nil,
+    comparisons: 1,
+    element: 42,
+    sequence: [ 1010 ]),
+  FindLastTest(
+    expected: 0,
+    comparisons: 1,
+    element: 1010,
+    sequence: [ 1010 ]),
+  
+  FindLastTest(
+    expected: nil,
+    comparisons: 2,
+    element: 42,
+    sequence: [ 1010, 1010 ]),
+  FindLastTest(
+    expected: 1,
+    comparisons: 1,
+    element: 1010,
+    sequence: [ 1010, 1010 ]),
+  
+  FindLastTest(
+    expected: nil,
+    comparisons: 4,
+    element: 42,
+    sequence: [ 1010, 2020, 3030, 4040 ]),
+  FindLastTest(
+    expected: 0,
+    comparisons: 4,
+    element: 1010,
+    sequence: [ 1010, 2020, 3030, 4040 ]),
+  FindLastTest(
+    expected: 1,
+    comparisons: 3,
+    element: 2020,
+    sequence: [ 1010, 2020, 3030, 4040 ]),
+  FindLastTest(
+    expected: 2,
+    comparisons: 2,
+    element: 3030,
+    sequence: [ 1010, 2020, 3030, 4040 ]),
+  FindLastTest(
+    expected: 3,
+    comparisons: 1,
+    element: 4040,
+    sequence: [ 1010, 2020, 3030, 4040 ]),
+  
+  FindLastTest(
+    expected: 3,
+    comparisons: 2,
+    element: 2020,
+    sequence: [ 1010, 2020, 3030, 2020, 4040 ]),
 ]
 
 extension Collection {
@@ -814,13 +897,13 @@ extension TestSuite {
     }
 
     //===------------------------------------------------------------------===//
-    // index(of:)/index(where:)
+    // firstIndex(of:)/firstIndex(where:)
     //===------------------------------------------------------------------===//
 
-    self.test("\(testNamePrefix).index(of:)/semantics") {
+    self.test("\(testNamePrefix).firstIndex(of:)/semantics") {
       for test in findTests {
         let c = makeWrappedCollectionWithEquatableElement(test.sequence)
-        var result = c.index(of: wrapValueIntoEquatable(test.element))
+        var result = c.firstIndex(of: wrapValueIntoEquatable(test.element))
         expectType(
           Optional<CollectionWithEquatableElement.Index>.self,
           &result)
@@ -834,12 +917,12 @@ extension TestSuite {
       }
     }
 
-    self.test("\(testNamePrefix).index(where:)/semantics") {
+    self.test("\(testNamePrefix).firstIndex(where:)/semantics") {
       for test in findTests {
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
         let c = makeWrappedCollectionWithEquatableElement(test.sequence)
-        let result = c.index {
+        let result = c.firstIndex {
           (candidate) in
           _blackHole(closureLifetimeTracker)
           return
@@ -1222,6 +1305,12 @@ extension TestSuite {
       return makeCollection(elements.map(wrapValue))
     }
 
+    func makeWrappedCollectionWithEquatableElement(
+      _ elements: [MinimalEquatableValue]
+    ) -> CollectionWithEquatableElement {
+      return makeCollectionOfEquatable(elements.map(wrapValueIntoEquatable))
+    }
+
     testNamePrefix += String(describing: C.Type.self)
 
     // FIXME: swift-3-indexing-model - add tests for the follow?
@@ -1251,6 +1340,92 @@ extension TestSuite {
             result.map(extractValue)
           ) { $0.value == $1.value }
         }
+      }
+    }
+
+    //===------------------------------------------------------------------===//
+    // last(where:)
+    //===------------------------------------------------------------------===//
+
+    self.test("\(testNamePrefix).last(where:)/semantics") {
+      for test in findLastTests {
+        let c = makeWrappedCollectionWithEquatableElement(test.sequence)
+        var closureCounter = 0
+        let closureLifetimeTracker = LifetimeTracked(0)
+        let found = c.last(where: {
+          _blackHole(closureLifetimeTracker)
+          closureCounter += 1
+          return $0 == wrapValueIntoEquatable(test.element)
+        })
+        expectEqual(
+          test.expected == nil ? nil : wrapValueIntoEquatable(test.element),
+          found,
+          stackTrace: SourceLocStack().with(test.loc))
+        expectEqual(
+          test.comparisons,
+          closureCounter,
+          stackTrace: SourceLocStack().with(test.loc))
+        if let expectedIdentity = test.expected {
+          expectEqual(
+            expectedIdentity, extractValueFromEquatable(found!).identity,
+            "last(where:) should find only the first element matching its predicate")
+        }
+      }
+    }
+
+    //===------------------------------------------------------------------===//
+    // lastIndex(of:)/lastIndex(where:)
+    //===------------------------------------------------------------------===//
+
+    self.test("\(testNamePrefix).lastIndex(of:)/semantics") {
+      for test in findLastTests {
+        let c = makeWrappedCollectionWithEquatableElement(test.sequence)
+        MinimalEquatableValue.timesEqualEqualWasCalled = 0
+        let wrappedElement = wrapValueIntoEquatable(test.element)
+        var result = c.lastIndex(of: wrappedElement)
+        expectType(
+          Optional<CollectionWithEquatableElement.Index>.self,
+          &result)
+        let zeroBasedIndex = result.map {
+          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+        }
+        expectEqual(
+          test.expected,
+          zeroBasedIndex,
+          stackTrace: SourceLocStack().with(test.loc))
+        if wrappedElement is MinimalEquatableValue {
+          expectEqual(
+            test.comparisons,
+            MinimalEquatableValue.timesEqualEqualWasCalled,
+            stackTrace: SourceLocStack().with(test.loc))
+        }
+      }
+    }
+
+    self.test("\(testNamePrefix).lastIndex(where:)/semantics") {
+      for test in findLastTests {
+        let closureLifetimeTracker = LifetimeTracked(0)
+        expectEqual(1, LifetimeTracked.instances)
+        let c = makeWrappedCollectionWithEquatableElement(test.sequence)
+        var closureCounter = 0
+        let result = c.lastIndex(where: {
+          (candidate) in
+          _blackHole(closureLifetimeTracker)
+          closureCounter += 1
+          return
+            extractValueFromEquatable(candidate).value == test.element.value
+        })
+        let zeroBasedIndex = result.map {
+          numericCast(c.distance(from: c.startIndex, to: $0)) as Int
+        }
+        expectEqual(
+          test.expected,
+          zeroBasedIndex,
+          stackTrace: SourceLocStack().with(test.loc))
+        expectEqual(
+          test.comparisons,
+          closureCounter,
+          stackTrace: SourceLocStack().with(test.loc))
       }
     }
 

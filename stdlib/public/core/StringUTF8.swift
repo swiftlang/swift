@@ -390,7 +390,7 @@ extension String {
   /// another string's `utf8` view.
   ///
   ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf8.index(of: 32) {
+  ///     if let i = picnicGuest.utf8.firstIndex(of: 32) {
   ///         let adjective = String(picnicGuest.utf8[..<i])
   ///         print(adjective)
   ///     }
@@ -583,7 +583,7 @@ extension String.UTF8View.Index {
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let utf16Index = cafe.utf16.index(of: 32)!
+  ///     let utf16Index = cafe.utf16.firstIndex(of: 32)!
   ///     let utf8Index = String.UTF8View.Index(utf16Index, within: cafe.utf8)!
   ///
   ///     print(Array(cafe.utf8[..<utf8Index]))

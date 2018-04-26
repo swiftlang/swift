@@ -95,9 +95,9 @@ ErrorHandlingTests.test("ErrorHandling/withCString extends lifetime") {
   // TODO: Some way to check string was deallocated?
 }
 
-ErrorHandlingTests.test("ErrorHandling/index(where:)") {
+ErrorHandlingTests.test("ErrorHandling/firstIndex(where:)") {
   do {
-    let _: Int? = try [1, 2, 3].index {
+    let _: Int? = try [1, 2, 3].firstIndex {
       throw SillyError.JazzHands
       return $0 == $0
     }

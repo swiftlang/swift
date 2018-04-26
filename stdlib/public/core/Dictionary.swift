@@ -328,11 +328,11 @@ import SwiftShims
 /// provides, see the `DictionaryLiteral` type for an alternative.
 ///
 /// You can search a dictionary's contents for a particular value using the
-/// `contains(where:)` or `index(where:)` methods supplied by default
+/// `contains(where:)` or `firstIndex(where:)` methods supplied by default
 /// implementation. The following example checks to see if `imagePaths` contains
 /// any paths in the `"/glyphs"` directory:
 ///
-///     let glyphIndex = imagePaths.index { $0.value.hasPrefix("/glyphs") }
+///     let glyphIndex = imagePaths.firstIndex(where: { $0.value.hasPrefix("/glyphs") })
 ///     if let index = glyphIndex {
 ///         print("The '\(imagesPaths[index].key)' image is a glyph.")
 ///     } else {
@@ -668,10 +668,10 @@ extension Dictionary: Collection {
   /// this subscript with the resulting value.
   ///
   /// For example, to find the key for a particular value in a dictionary, use
-  /// the `index(where:)` method.
+  /// the `firstIndex(where:)` method.
   ///
   ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     if let index = countryCodes.index(where: { $0.value == "Japan" }) {
+  ///     if let index = countryCodes.firstIndex(where: { $0.value == "Japan" }) {
   ///         print(countryCodes[index])
   ///         print("Japan's country code is '\(countryCodes[index].key)'.")
   ///     } else {
@@ -1260,6 +1260,12 @@ extension Dictionary {
     @inlinable // FIXME(sil-serialize-all)
     public func _customIndexOfEquatableElement(_ element: Element) -> Index?? {
       return Optional(_variantBuffer.index(forKey: element))
+    }
+
+    @inlinable // FIXME(sil-serialize-all)
+    public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
+      // The first and last elements are the same because each element is unique.
+      return _customIndexOfEquatableElement(element)
     }
 
     @inlinable // FIXME(sil-serialize-all)

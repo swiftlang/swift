@@ -255,6 +255,12 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element < upperBound ? element : nil
   }
 
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(element)
+  }
+
   /// Accesses the element at specified position.
   ///
   /// You can subscript a collection with any valid index other than the
@@ -814,7 +820,7 @@ extension Collection {
   /// of the strings in the slice, and then uses that index in the original
   /// array.
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // "Evarts"
   ///
