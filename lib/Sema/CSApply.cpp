@@ -8471,37 +8471,44 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
     return nullptr;
   }
 
-  // Form a reference to the builtin method.
-  Expr *memberRef = new (ctx) MemberRefExpr(expr, SourceLoc(),
-                                            builtinMethod,
-                                            DeclNameLoc(expr->getLoc()),
-                                            /*Implicit=*/true);
-  cs.cacheSubExprTypes(memberRef);
-  cs.setSubExprTypes(memberRef);
-  bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-  cs.cacheExprTypes(memberRef);
-  assert(!failed && "Could not reference witness?");
-  (void)failed;
+  // The method is not generic, so there are no substitutions.
+  auto builtinMethodType = builtinMethod->getInterfaceType()
+    ->castTo<FunctionType>();
 
-  // Call the builtin method.
+  // Form an unbound reference to the builtin method.
+  Expr *declRef = new (ctx) DeclRefExpr(builtinMethod,
+                                        DeclNameLoc(expr->getLoc()),
+                                        /*Implicit=*/true);
+  declRef->setType(builtinMethodType);
+  cs.cacheType(declRef);
+
   auto getType = [&](const Expr *E) -> Type {
     return cs.getType(E);
   };
 
-  expr = CallExpr::createImplicit(ctx, memberRef, { }, { }, getType);
-  cs.cacheSubExprTypes(expr);
-  cs.setSubExprTypes(expr);
-  failed = tc.typeCheckExpressionShallow(expr, cs.DC);
-  cs.cacheExprTypes(expr);
-  assert(!failed && "Could not call witness?");
-  (void)failed;
+  // Apply 'self' to get the method value.
+  auto *methodRef = CallExpr::createImplicit(ctx, declRef,
+                                             { expr }, { }, getType);
+  methodRef->setType(builtinMethodType->getResult());
+  methodRef->getArg()->setType(cs.getType(expr));
+  cs.cacheType(methodRef->getArg());
+  cs.cacheType(methodRef);
 
-  if (expr && !cs.getType(expr)->isBuiltinIntegerType(1)) {
+  // Apply the empty argument list to get the final result.
+  auto *result = CallExpr::createImplicit(ctx, methodRef,
+                                          { }, { }, getType);
+  result->setType(builtinMethodType->getResult()
+                  ->castTo<FunctionType>()->getResult());
+  result->getArg()->setType(ctx.TheEmptyTupleType);
+  cs.cacheType(result->getArg());
+  cs.cacheType(result);
+
+  if (!cs.getType(result)->isBuiltinIntegerType(1)) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
   }
 
-  return expr;
+  return result;
 }
 
 Expr *Solution::convertOptionalToBool(Expr *expr,
