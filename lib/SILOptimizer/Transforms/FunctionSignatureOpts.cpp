@@ -705,8 +705,8 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Do the last bit of work to the newly created optimized function.
-  ArgumentExplosionFinalizeOptimizedFunction();
   DeadArgumentFinalizeOptimizedFunction();
+  ArgumentExplosionFinalizeOptimizedFunction();
 
   // Update the ownership kinds of function entry BB arguments.
   for (auto Arg : NewF->begin()->getFunctionArguments()) {
@@ -971,10 +971,10 @@ void FunctionSignatureTransform::DeadArgumentTransformFunction() {
 void FunctionSignatureTransform::DeadArgumentFinalizeOptimizedFunction() {
   auto *BB = &*TransformDescriptor.OptimizedFunction.get()->begin();
   // Remove any dead argument starting from the last argument to the first.
-  for (const ArgumentDescriptor &AD :
-       reverse(TransformDescriptor.ArgumentDescList)) {
+  for (ArgumentDescriptor &AD : reverse(TransformDescriptor.ArgumentDescList)) {
     if (!AD.IsEntirelyDead)
       continue;
+    AD.WasErased = true;
     BB->eraseArgument(AD.Arg->getIndex());
   }
 }
@@ -1216,6 +1216,12 @@ bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   // Analyze the argument information.
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor &A = TransformDescriptor.ArgumentDescList[i];
+    // If the argument is dead, there is no point in trying to explode it. The
+    // dead argument pass will get it.
+    if (A.IsEntirelyDead) {
+      continue;
+    }
+
     // Do not optimize argument.
     if (!A.canOptimizeLiveArg()) {
       continue;
@@ -1245,12 +1251,21 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
   Builder.setCurrentDebugScope(BB->getParent()->getDebugScope());
   unsigned TotalArgIndex = 0;
   for (ArgumentDescriptor &AD : TransformDescriptor.ArgumentDescList) {
+    // If this argument descriptor was dead and we removed it, just skip it. Do
+    // not increment the argument index.
+    if (AD.WasErased) {
+      continue;
+    }
+
     // Simply continue if do not explode.
     if (!AD.Explode) {
       TransformDescriptor.AIM[TotalArgIndex] = AD.Index;
       TotalArgIndex ++;
       continue;
     }
+
+    assert(!AD.IsEntirelyDead &&
+           "Should never see completely dead values here");
 
     // OK, we need to explode this argument.
     unsigned ArgOffset = ++TotalArgIndex;
