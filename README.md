@@ -62,7 +62,7 @@ repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
 repositories and will update them instead.
 
-**TensorFlow Support:** To build with TensorFlow support, the `update-checkout-config-tensorflow.json` configuration file must be specified when cloning sources. The configuration file pins specific versions of every Swift companion directory and is updated with every upstream merge from the Apple Swift repositories. 
+**TensorFlow Support:** To build with TensorFlow support, the `update-checkout-config-tensorflow.json` configuration file must be specified when cloning sources. The configuration file pins specific versions of every Swift companion directory and is updated with every upstream merge from the Apple Swift repositories.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
@@ -200,10 +200,11 @@ described above.
 
 ## Testing Swift
 
-The simplest way to run the Swift test suite is by passing the `--test` and
-`--validation-test` flags to `build-script`:
+The simplest way to run the Swift test suite is using the `tensorflow_test`
+build preset, which runs the entire Swift test suite (including new TensorFlow
+tests):
 
-    utils/build-script --enable-tensorflow --test --validation-test
+    utils/build-script --preset=tensorflow_test
 
 Swift for TensorFlow adds the following new test suites:
 
