@@ -1591,9 +1591,26 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (filter != ModuleDecl::ImportFilter::All &&
-        (filter == ModuleDecl::ImportFilter::Public) ^ dep.isExported())
-      continue;
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+      // We're including all imports.
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      // Skip @_exported imports.
+      if (dep.isExported())
+        continue;
+
+      break;
+
+    case ModuleDecl::ImportFilter::Public:
+      // Only include @_exported imports.
+      if (!dep.isExported())
+        continue;
+
+      break;
+    }
+
     assert(dep.isLoaded());
     results.push_back(dep.Import);
   }
