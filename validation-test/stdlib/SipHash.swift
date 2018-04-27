@@ -1,9 +1,19 @@
-// RUN: %target-run-simple-swiftgyb
+// RUN: %target-run-stdlib-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
 
 let SipHashTests = TestSuite("SipHashTests")
+
+extension Hasher {
+  typealias HashValue = Int
+}
+extension _SipHash13 {
+  typealias HashValue = UInt64
+}
+extension _SipHash24 {
+  typealias HashValue = UInt64
+}
 
 struct SipHashTest {
   let input: [UInt8]
@@ -228,23 +238,24 @@ struct Loop<C: Collection>: Sequence, IteratorProtocol {
 }
 
 % for (Self, tests) in [
+%   ('Hasher', 'sipHash13Tests'),
 %   ('_SipHash13', 'sipHash13Tests'),
 %   ('_SipHash24', 'sipHash24Tests')
 % ]:
 
 SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)")
   .forEach(in: ${tests}) { test in
-  var hasher = ${Self}(seed: test.seed)
+  var hasher = ${Self}(_seed: test.seed)
   test.input.withUnsafeBytes { hasher.combine(bytes: $0) }
   let hash = hasher.finalize()
-  expectEqual(test.output, hash)
+  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
 }
 
 SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)/pattern")
   .forEach(in: cartesianProduct(${tests}, incrementalPatterns)) { test_ in
   let (test, pattern) = test_
 
-  var hasher = ${Self}(seed: test.seed)
+  var hasher = ${Self}(_seed: test.seed)
   var chunkSizes = Loop(pattern).makeIterator()
   var startIndex = 0
   while startIndex != test.input.endIndex {
@@ -255,14 +266,15 @@ SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)/pattern")
     slice.withUnsafeBytes { hasher.combine(bytes: $0) }
     startIndex += chunkSize
   }
-  expectEqual(test.output, hasher.finalize())
+  let hash = hasher.finalize()
+  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
 }
 
 % for data_type in ['UInt', 'UInt64', 'UInt32', 'UInt16', 'UInt8']:
 SipHashTests.test("${Self}._combine(${data_type})")
   .forEach(in: ${tests}) { test in
 
-  var hasher = ${Self}(seed: test.seed)
+  var hasher = ${Self}(_seed: test.seed)
 
   // Load little-endian chunks and combine them into the hasher.
   let bitWidth = ${data_type}.bitWidth
@@ -281,41 +293,32 @@ SipHashTests.test("${Self}._combine(${data_type})")
   }
   // Combine tail bytes.
   if count > 0 {
-    hasher.combine(bytes: UInt64(truncatingIfNeeded: chunk), count: count)
+    hasher._combine(bytes: UInt64(truncatingIfNeeded: chunk), count: count)
   }
 
   let hash = hasher.finalize()
-  expectEqual(test.output, hash)
-}
-
-SipHashTests.test("${Self}/CombineAfterFinalize/${data_type}") {
-  var hasher = ${Self}(seed: (0, 0))
-  _ = hasher.finalize()
-  expectCrashLater()
-  hasher._combine(42 as ${data_type})
+  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
 }
 % end
 
-SipHashTests.test("${Self}/CombineAfterFinalize/PartialUInt64") {
-  var hasher = ${Self}(seed: (0, 0))
-  _ = hasher.finalize()
-  expectCrashLater()
-  hasher.combine(bytes: 42, count: 1)
-}
+SipHashTests.test("${Self}/OperationsAfterFinalize") {
+  // Verify that finalize is nonmutating.
+  var hasher1 = ${Self}(_seed: (0, 0))
+  hasher1._combine(1 as UInt8)
+  _ = hasher1.finalize()
+  // Hasher is now consumed. The operations below are illegal, but this isn't
+  // currently enforced. Check that the behavior matches that of a nonmutating
+  // function.
+  hasher1._combine(2 as UInt16)
+  let hash1a = hasher1.finalize()
+  let hash1b = hasher1.finalize()
+  expectEqual(hash1a, hash1b)
 
-SipHashTests.test("${Self}/CombineAfterFinalize/UnsafeRawBufferPointer") {
-  var hasher = ${Self}(seed: (0, 0))
-  _ = hasher.finalize()
-  expectCrashLater()
-  var v = 42
-  withUnsafeBytes(of: &v) { hasher.combine(bytes: $0) }
-}
-
-SipHashTests.test("${Self}/FinalizeAfterFinalize") {
-  var hasher = ${Self}(seed: (0, 0))
-  _ = hasher.finalize()
-  expectCrashLater()
-  _ = hasher.finalize()
+  var hasher2 = ${Self}(_seed: (0, 0))
+  hasher2._combine(1 as UInt8)
+  hasher2._combine(2 as UInt16)
+  let hash2 = hasher2.finalize()
+  expectEqual(hash1a, hash2)
 }
 % end
 

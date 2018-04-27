@@ -38,6 +38,10 @@ internal func _abstract(
 #endif
 }
 
+internal func _mixInt(_ value: Int) -> Int {
+  return value.hashValue
+}
+
 // MARK: Type-erased abstract base classes
 
 public class AnyKeyPath: Hashable {

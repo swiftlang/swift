@@ -1455,13 +1455,13 @@ extension Dictionary: Hashable where Value: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
-      var elementHasher = _Hasher()
+      var elementHasher = Hasher()
       elementHasher.combine(k)
       elementHasher.combine(v)
-      commutativeHash ^= elementHasher.finalize()
+      commutativeHash ^= elementHasher._finalize()
     }
     hasher.combine(commutativeHash)
   }
@@ -2167,7 +2167,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     //
     // FIXME: Use an approximation of true per-instance seeding. We can't just
     // use the base address, because COW copies need to share the same seed.
-    let seed = _Hasher._seed
+    let seed = Hasher._seed
     let perturbation = bucketCount
     _storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
   }
@@ -2442,7 +2442,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(_seed: _storage.seed)
+    var hasher = Hasher(_seed: _storage.seed)
     hasher.combine(k)
     return hasher.finalize() & _bucketMask
   }

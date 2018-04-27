@@ -8047,14 +8047,14 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       }
     };
 
-    // If the class is Encodable or Decodable, force those
-    // conformances to ensure that the init(from:) and
-    // encode(to:) members appear in the vtable.
+    // If the class is Encodable, Decodable or Hashable, force those
+    // conformances to ensure that the synthesized members appear in the vtable.
     //
     // FIXME: Generalize this to other protocols for which
     // we can derive conformances.
     useConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
     useConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
+    useConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
   }
 
   // validateDeclForNameLookup will not trigger an immediate full
