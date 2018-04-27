@@ -4824,18 +4824,18 @@ public:
 
     // Determine the input and result types of this function.
     auto fnType = type->castTo<AnyFunctionType>();
-    Type inputType = fnType->getInput();
+    auto parameters = fnType->getParams();
     Type resultType = dropResultOptionality(fnType->getResult(),
                                             uncurryLevel - 1);
 
     // Produce the resulting function type.
     if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
       return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                      inputType, resultType,
+                                      parameters, resultType,
                                       fnType->getExtInfo());
     }
 
-    return FunctionType::get(inputType, resultType, fnType->getExtInfo());
+    return FunctionType::get(parameters, resultType, fnType->getExtInfo());
   }
 
   static bool
@@ -5033,8 +5033,12 @@ public:
       if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
         // Special-case initializers, whose "type" isn't useful besides the
         // input arguments.
-        baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
-        Type argTy = baseTy->getAs<AnyFunctionType>()->getInput();
+        auto *fnType = baseTy->getAs<AnyFunctionType>();
+        baseTy = fnType->getResult();
+        Type argTy = FunctionType::composeInput(TC.Context,
+                                                baseTy->getAs<AnyFunctionType>()
+                                                      ->getParams(),
+                                                false);
         auto diagKind = diag::override_type_mismatch_with_fixits_init;
         unsigned numArgs = baseInit->getParameters()->size();
         activeDiag.emplace(TC.diagnose(decl, diagKind,
@@ -5227,8 +5231,9 @@ public:
       // For subscripts, we don't have a 'Self' type, but turn it
       // into a monomorphic function type.
       auto funcTy = declTy->castTo<AnyFunctionType>();
-      declTy = FunctionType::get(funcTy->getInput(),
-                                 funcTy->getResult());
+      declTy = FunctionType::get(funcTy->getParams(),
+                                 funcTy->getResult(),
+                                 FunctionType::ExtInfo());
     } else {
       // For properties, strip off ownership.
       declTy = declTy->getReferenceStorageReferent();

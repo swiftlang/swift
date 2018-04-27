@@ -799,8 +799,9 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   return result;
 }
 
-void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
-                              unsigned level, SmallVectorImpl<bool> &outDefaultMap) {
+void swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
+                              const ValueDecl *paramOwner, unsigned level,
+                              SmallVectorImpl<bool> &outDefaultMap) {
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (paramOwner) {
@@ -815,34 +816,28 @@ void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
         paramList = enumElement->getParameterList();
     }
   }
-  
-  switch (type->getKind()) {
-  case TypeKind::Tuple: {
-    auto tupleTy = cast<TupleType>(type.getPointer());
 
+  switch (params.size()) {
+  case 0:
+    break;
+
+  case 1:
+    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
+                            paramList->get(0)->isDefaultArgument());
+    break;
+
+  default:
     // Arguments and parameters are not guaranteed to always line-up
     // perfectly, e.g. failure diagnostics tries to match argument type
     // to different "candidate" parameters.
-    if (paramList && tupleTy->getNumElements() != paramList->size())
+    if (paramList && params.size() != paramList->size())
       paramList = nullptr;
 
-    for (auto i : range(0, tupleTy->getNumElements())) {
+    for (auto i : range(0, params.size())) {
       outDefaultMap.push_back(paramList &&
                               paramList->get(i)->isDefaultArgument());
     }
     break;
-  }
-      
-  case TypeKind::Paren: {
-    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
-                            paramList->get(0)->isDefaultArgument());
-    break;
-  }
-      
-  default: {
-    outDefaultMap.push_back(false);
-    break;
-  }
   }
 }
 

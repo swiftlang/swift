@@ -3679,6 +3679,19 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
   return TupleType::get(elements, ctx);
 }
 
+bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
+                                  ArrayRef<AnyFunctionType::Param> b) {
+  if (a.size() != b.size())
+    return false;
+
+  for (unsigned i = 0, n = a.size(); i != n; ++i) {
+    if (a[i] != b[i])
+      return false;
+  }
+
+  return true;
+}
+
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, const ExtInfo &info,
                                 bool canonicalVararg) {

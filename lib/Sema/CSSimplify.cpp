@@ -103,8 +103,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   
   auto params = levelTy->getParams();
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(levelTy->getInput(), decl, parameterDepth, defaultMap);
-  
+  computeDefaultMap(params, decl, parameterDepth, defaultMap);
+
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
@@ -702,7 +702,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   AnyFunctionType::decomposeInput(paramType, params);
   
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(paramType, callee, calleeLevel, defaultMap);
+  computeDefaultMap(params, callee, calleeLevel, defaultMap);
   
   if (callee && cs.getASTContext().isSwiftVersion3()
       && argType->is<TupleType>()) {
@@ -1033,7 +1033,7 @@ ConstraintSystem::matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1
   }
   
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(argType, callee, calleeLevel, defaultMap);
+  computeDefaultMap(type1, callee, calleeLevel, defaultMap);
   
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
