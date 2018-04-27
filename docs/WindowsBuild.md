@@ -172,6 +172,25 @@ cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
  ...
 ```
 
+### 8. Build lldb
+- This must be done from within a developer command prompt and could take up to
+  two hours depending on your system.
+```cmd
+mkdir "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+cmake -G "Ninja" "%swift_source_dir%/lldb"^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DLLDB_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
+  -DLLDB_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"^
+  -DLLDB_PATH_TO_LLVM_SOURCE="%swift_source_dir%/llvm"^
+  -DLLDB_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+  -DLLDB_PATH_TO_CLANG_SOURCE="%swift_source_dir%/clang"^
+  -DLLDB_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+  -DLLVM_ENABLE_ASSERTIONS=YES
+popd
+cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+```
+
 ## MSVC
 
 Follow instructions 1-6 for `clang-cl`, but run the following instead to build Swift
