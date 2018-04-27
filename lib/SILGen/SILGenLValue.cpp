@@ -2342,18 +2342,20 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
                                           AccessKind accessKind,
                                           LValueOptions options) {
   // Handle an opaque lvalue that refers to an opened existential.
-  auto known = SGF.OpaqueLValues.find(e);
-  if (known != SGF.OpaqueLValues.end()) {
-    // Dig the opened address out of the list.
-    SILValue opened = known->second.first;
-    CanType openedType = known->second.second;
-    SGF.OpaqueLValues.erase(known);
+  auto known = SGF.OpaqueValueExprs.find(e);
+  if (known != SGF.OpaqueValueExprs.end()) {
+    // Dig the open-existential expression out of the list.
+    OpenExistentialExpr *opened = known->second;
+    SGF.OpaqueValueExprs.erase(known);
 
-    // Continue formal evaluation of the lvalue from this address.
-    return LValue::forAddress(ManagedValue::forLValue(opened),
-                              None,
-                              AbstractionPattern(openedType),
-                              openedType);
+    // Do formal evaluation of the underlying existential lvalue.
+    auto lv = visitRec(opened->getExistentialValue(), accessKind, options);
+    lv = SGF.emitOpenExistentialLValue(
+        opened, std::move(lv),
+        CanArchetypeType(opened->getOpenedArchetype()),
+        e->getType()->getWithoutSpecifierType()->getCanonicalType(),
+        accessKind);
+    return lv;
   }
 
   assert(SGF.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
@@ -2645,12 +2647,29 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
 LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
                                               AccessKind accessKind,
                                               LValueOptions options) {
-  return SGF.emitOpenExistentialExpr<LValue>(e,
-                                             [&](Expr *subExpr) -> LValue {
-                                               return visitRec(subExpr,
-                                                               accessKind,
-                                                               options);
-                                             });
+  // If the opaque value is not an lvalue, open the existential immediately.
+  if (!e->getOpaqueValue()->getType()->is<LValueType>()) {
+    return SGF.emitOpenExistentialExpr<LValue>(e,
+                                               [&](Expr *subExpr) -> LValue {
+                                                 return visitRec(subExpr,
+                                                                 accessKind,
+                                                                 options);
+                                               });
+  }
+
+  // Record the fact that we're opening this existential. The actual
+  // opening operation will occur when we see the OpaqueValueExpr.
+  bool inserted = SGF.OpaqueValueExprs.insert({e->getOpaqueValue(), e}).second;
+  (void)inserted;
+  assert(inserted && "already have this opened existential?");
+
+  // Visit the subexpression.
+  LValue lv = visitRec(e->getSubExpr(), accessKind, options);
+
+  // Sanity check that we did see the OpaqueValueExpr.
+  assert(SGF.OpaqueValueExprs.count(e->getOpaqueValue()) == 0 &&
+         "opened existential not removed?");
+  return lv;
 }
 
 static LValueTypeData
