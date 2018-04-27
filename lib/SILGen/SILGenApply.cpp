@@ -5073,7 +5073,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   if (!subscripts.isNull()) {
     // If we have a value and index list, create a new rvalue to represent the
     // both of them together.
-    auto inputTupleType = cast<TupleType>(accessType.getInput());
+    auto inputTupleType = dyn_cast<TupleType>(accessType.getInput());
 
     SmallVector<ArgumentSource, 4> eltSources;
 
@@ -5086,18 +5086,25 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     // TODO: we should really take an array of RValues.
     if (accessType->getNumParams() != 2) {
       auto subscriptsTupleType = cast<TupleType>(subscripts.getType());
-      assert(inputTupleType->getNumElements()
+      assert(accessType.getParams().size()
               == 1 + subscriptsTupleType->getNumElements());
       SmallVector<RValue, 8> eltRVs;
       std::move(subscripts).extractElements(eltRVs);
       for (auto &elt : eltRVs)
         eltSources.emplace_back(loc, std::move(elt));
     } else {
+      assert(inputTupleType && "Must have an input tuple here");
       subscripts.rewriteType(inputTupleType.getElementType(1));
       eltSources.emplace_back(loc, std::move(subscripts));
     }
 
-    setValue = ArgumentSource(loc, inputTupleType, eltSources);
+    if (eltSources.size() == 1) {
+      setValue = std::move(eltSources.front());
+    } else {
+      assert(inputTupleType);
+      setValue = ArgumentSource(loc, inputTupleType, eltSources);
+    }
+
   } else {
     setValue.rewriteType(accessType.getInput());
   }

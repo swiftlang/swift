@@ -1617,12 +1617,6 @@ class NameAliasType final
     return getNumSubstitutions();
   }
 
-  /// Retrieve the set of substitutions to be applied to the declaration to
-  /// produce the underlying type.
-  SubstitutionList getSubstitutionList() const {
-    return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
-  }
-
   /// Retrieve the generic signature used for substitutions.
   GenericSignature *getGenericSignature() const {
     return getNumSubstitutions() > 0
@@ -1646,6 +1640,12 @@ public:
   Type getParent() const {
     return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
                                              : Type();
+  }
+
+  /// Retrieve the set of substitutions to be applied to the declaration to
+  /// produce the underlying type.
+  SubstitutionList getSubstitutionList() const {
+    return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
   }
 
   /// Retrieve the substitution map applied to the declaration's underlying
