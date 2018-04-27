@@ -497,7 +497,7 @@ extension Sequence {
   ///   the passed element satisfies a condition.
   /// - Returns: `true` if the sequence contains only elements that satisfy
   ///   `predicate`; otherwise, `false`.
-  @_inlineable
+  @inlinable
   public func allSatisfy(
     _ predicate: (Element) throws -> Bool
   ) rethrows -> Bool {
