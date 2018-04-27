@@ -1576,7 +1576,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cacheEntry.setInt(true);
-      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {});
+      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {
+          return true;
+        });
     }
   } else {
     // Build the representation of the Clang module in Swift.
@@ -1595,7 +1597,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // Force load adapter modules for all imported modules.
     // FIXME: This forces the creation of wrapper modules for all imports as
     // well, and may do unnecessary work.
-    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
+    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {
+        return true;
+      });
   }
 
   if (clangModule->isSubModule()) {
