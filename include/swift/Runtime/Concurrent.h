@@ -16,6 +16,7 @@
 #include <functional>
 #include <stdint.h>
 #include "llvm/Support/Allocator.h"
+#include "Mutex.h"
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
 #include <stdio.h>
@@ -403,6 +404,91 @@ public:
       assert(node && "spurious failure from compare_exchange_strong?");
       goto searchFromNode;
     }
+  }
+};
+
+
+template <class ElemTy> struct ConcurrentReadableArray {
+private:
+  struct Storage {
+    std::atomic<size_t> Count;
+    typename std::aligned_storage<sizeof(ElemTy), alignof(ElemTy)>::type Elem;
+    
+    ElemTy *data() {
+      return reinterpret_cast<ElemTy *>(&Elem);
+    }
+  };
+  
+  std::atomic<size_t> Capacity;
+  std::atomic<size_t> ReaderCount;
+  std::atomic<Storage *> Elements;
+  Mutex WriterLock;
+  std::vector<Storage *> FreeList;
+  
+  Storage *allocate(size_t capacity) {
+    auto size = sizeof(Storage) + (capacity - 1) * sizeof(Storage().Elem);
+    auto *ptr = reinterpret_cast<Storage *>(malloc(size));
+    ptr->Count.store(0, std::memory_order_relaxed);
+    return ptr;
+  }
+  
+  void deallocate(Storage *storage) {
+    if (storage == nullptr) return;
+    
+    auto *data = storage->data();
+    for (size_t i = 0; i < storage->Count; i++) {
+      data[i].~ElemTy();
+    }
+    free(storage);
+  }
+  
+  
+public:
+  void push_back(const ElemTy &elem) {
+    ScopedLock guard(WriterLock);
+    
+    auto *storage = Elements.load(std::memory_order_relaxed);
+    if (storage == nullptr) {
+      storage = allocate(16);
+      Capacity = 16;
+      Elements.store(storage, std::memory_order_release);
+    } else if (storage->Count >= Capacity) {
+      auto *newStorage = allocate(Capacity * 2);
+      std::copy(storage->data(), storage->data() + storage->Count, newStorage->data());
+      FreeList.push_back(storage);
+      
+      storage = newStorage;
+      Capacity = Capacity * 2;
+      Elements.store(storage, std::memory_order_release);
+    }
+    
+    auto Count = storage->Count.load(std::memory_order_relaxed);
+    storage->data()[Count] = elem;
+    storage->Count.store(Count + 1, std::memory_order_release);
+    
+    if (ReaderCount.load(std::memory_order_relaxed) == 0)
+      for (Storage *storage : FreeList)
+        deallocate(storage);
+  }
+  
+  template <class F> auto read(F f) -> decltype(f(nullptr, 0)) {
+    ReaderCount.fetch_add(1, std::memory_order_relaxed);
+    auto *storage = Elements.load(std::memory_order_consume);
+    auto count = storage->Count.load(std::memory_order_acquire);
+    auto *ptr = storage->data();
+    
+    decltype(f(nullptr, 0)) result = f(ptr, count);
+    
+    ReaderCount.fetch_sub(1, std::memory_order_relaxed);
+    
+    return result;
+  }
+  
+  /// Get the current count. It's just a snapshot and may be obsolete immediately.
+  size_t count() {
+    return read([](ElemTy *ptr, size_t count) -> size_t {
+      return count;
+    });
   }
 };
 
