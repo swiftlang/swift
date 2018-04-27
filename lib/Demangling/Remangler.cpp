@@ -1018,9 +1018,16 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
         if (kindValue &
             unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
           Buffer << 'G';
+        if (kindValue &
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+          Buffer << 'O';
       } else if (kindValue &
               unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) {
         Buffer << 'g';
+      } else if (kindValue &
+                 unsigned(
+                     FunctionSigSpecializationParamKind::GuaranteedToOwned)) {
+        Buffer << 'o';
       }
       if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
         Buffer << 'X';
