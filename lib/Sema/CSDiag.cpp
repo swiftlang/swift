@@ -3357,7 +3357,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // identify operators that have implicit inout arguments.
   Type exampleInputType;
   if (!candidates.empty()) {
-    exampleInputType = candidates[0].getArgumentType();
+    exampleInputType = candidates[0].getArgumentType(CS.getASTContext());
 
     // If we found a single candidate, and have no contextually known argument
     // type information, use that one candidate as the type information for
@@ -3366,7 +3366,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // TODO: If all candidates have the same type for some argument, we could
     // pass down partial information.
     if (candidates.size() == 1 && !argType)
-      argType = candidates[0].getArgumentType();
+      argType = candidates[0].getArgumentType(CS.getASTContext());
   }
   
   // If our candidates are instance members at curry level #0, then the argument
@@ -3440,7 +3440,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (candidates.empty()) {
       defaultMap.assign(params.size(), false);
     } else {
-      computeDefaultMap(argType, candidates[0].getDecl(),
+      computeDefaultMap(params, candidates[0].getDecl(),
                         candidates[0].level, defaultMap);
     }
 
@@ -3833,8 +3833,7 @@ static bool
 diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
                                             Expr *fnExpr, Expr *argExpr) {
   for (auto &candidate : CCI.candidates) {
-    auto argTy = candidate.getArgumentType();
-    if (!argTy)
+    if (!candidate.hasParameters())
       return false;
 
     auto *decl = candidate.getDecl();
@@ -3849,9 +3848,10 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
         (decl->isInstanceMember() && candidate.level == 1))
       continue;
 
-    auto params = candidate.getUncurriedFunctionType()->getParams();
+    auto params = candidate.getParameters();
+
     SmallVector<bool, 4> defaultMap;
-    computeDefaultMap(argTy, decl, candidate.level, defaultMap);
+    computeDefaultMap(params, decl, candidate.level, defaultMap);
     // If one of the candidates is an instance method with a single parameter
     // at the level 0, this might be viable situation for calling instance
     // method as curried member of type problem.
@@ -4031,12 +4031,11 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
 }
 
 static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
-                                           Type paramType, Type argType,
-                                           Expr *fnExpr, Expr *argExpr,
+                                           ArrayRef<FunctionType::Param> params,
+                                           Type argType, Expr *fnExpr,
+                                           Expr *argExpr,
                                            bool isTopLevel = true) {
-  llvm::SmallVector<AnyFunctionType::Param, 4> params, args;
-
-  FunctionType::decomposeInput(paramType, params);
+  llvm::SmallVector<AnyFunctionType::Param, 4> args;
   FunctionType::decomposeInput(argType, args);
 
   return diagnoseTupleParameterMismatch(CCI, params, args, fnExpr, argExpr,
@@ -4352,14 +4351,13 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
   auto candidate = CCI[0];
   auto &TC = CCI.CS.TC;
 
-  auto argTy = candidate.getArgumentType();
-  if (!argTy)
+  if (!candidate.hasParameters())
     return false;
 
-  auto params = candidate.getUncurriedFunctionType()->getParams();
+  auto params = candidate.getParameters();
+
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(argTy, candidate.getDecl(), candidate.level,
-                    defaultMap);
+  computeDefaultMap(params, candidate.getDecl(), candidate.level, defaultMap);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -4400,9 +4398,8 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     }
   }
 
-  if (diagnoseTupleParameterMismatch(CCI, candidate.getArgumentType(),
-                                     CCI.CS.getType(argExpr), fnExpr,
-                                     argExpr))
+  if (diagnoseTupleParameterMismatch(CCI, candidate.getParameters(),
+                                     CCI.CS.getType(argExpr), fnExpr, argExpr))
     return true;
 
   // We only handle structural errors here.
@@ -4475,11 +4472,13 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
     if (!decl)
       continue;
 
-    auto parameters = candidate.getUncurriedFunctionType()->getParams();
-    SmallVector<bool, 4> defaultMap;
-    computeDefaultMap(candidate.getArgumentType(), decl,
-                      candidate.level, defaultMap);
+    if (!candidate.hasParameters())
+      continue;
 
+    auto parameters = candidate.getParameters();
+
+    SmallVector<bool, 4> defaultMap;
+    computeDefaultMap(parameters, decl, candidate.level, defaultMap);
     if (parameters.size() != arguments.size())
       continue;
 
@@ -4979,11 +4978,13 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto const &candidate = candidates.candidates[0];
-  auto params = candidate.getUncurriedFunctionType()->getParams();
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(candidate.getArgumentType(), candidate.getDecl(),
-                    candidate.level, defaultMap);
 
+  if (!candidate.hasParameters())
+    return false;
+
+  auto params = candidate.getParameters();
+  SmallVector<bool, 4> defaultMap;
+  computeDefaultMap(params, candidate.getDecl(), candidate.level, defaultMap);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
@@ -7357,7 +7358,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     }
 
     auto *argExpr = E->getArgument();
-    auto candidateArgTy = candidateInfo[0].getArgumentType();
+    auto candidateArgTy = candidateInfo[0].getArgumentType(CS.getASTContext());
 
     // Depending on how we matched, produce tailored diagnostics.
     switch (candidateInfo.closeness) {

@@ -1539,7 +1539,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(funcType->getInput(), FD,
+  computeDefaultMap(funcType->getParams(), FD,
                     /*level*/ FD->isInstanceMember() ? 1 : 0, defaultMap);
   
   bool OneArg = defaultMap.size() == 1;

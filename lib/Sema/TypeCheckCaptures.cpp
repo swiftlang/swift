@@ -162,7 +162,9 @@ public:
         }
       });
 
-      gft->getInput().walk(walker);
+      for (const auto &param : gft->getParams())
+        param.getType().walk(walker);
+
       gft->getResult().walk(walker);
     }
   }

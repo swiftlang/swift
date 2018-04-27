@@ -1766,6 +1766,10 @@ public:
     return value.toRaw() == other.value.toRaw();
   }
 
+  bool operator!=(const ParameterTypeFlags &other) const {
+    return value.toRaw() != other.value.toRaw();
+  }
+
   uint8_t toRaw() const { return value.toRaw(); }
 };
 
@@ -2654,6 +2658,14 @@ public:
 
     /// Whether the parameter is marked 'owned'
     bool isOwned() const { return Flags.isOwned(); }
+
+    bool operator==(Param const &b) const {
+      return Label == b.Label && getType()->isEqual(b.getType()) &&
+             Flags == b.Flags;
+    }
+    bool operator!=(Param const &b) const { return !(*this == b); }
+
+    Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
   };
 
   class CanParam : public Param {
@@ -2841,6 +2853,10 @@ public:
     return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
   }
 
+  /// \brief Given two arrays of parameters determine if they are equal.
+  static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
+                          ArrayRef<AnyFunctionType::Param> b);
+
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<AnyFunctionType::Param> getParams() const;
@@ -2985,7 +3001,8 @@ decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 /// Break the parameter list into an array of booleans describing whether
 /// the argument type at each index has a default argument associated with
 /// it.
-void computeDefaultMap(Type type, const ValueDecl *paramOwner, unsigned level,
+void computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
+                       const ValueDecl *paramOwner, unsigned level,
                        SmallVectorImpl<bool> &outDefaultMap);
   
 /// Turn a param list into a symbolic and printable representation that does not
