@@ -476,7 +476,12 @@ DECL_NODES = [
              Child('Modifier', kind='DeclModifier', is_optional=True),
              Child('AccessorKind', kind='Token',
                    text_choices=[
-                      'get', 'set', 'didSet', 'willSet',
+                      'get', 'set', 'didSet', 'willSet', 'unsafeAddress', 
+                      'addressWithOwner', 'addressWithNativeOwner', 
+                      'addressWithPinnedNativeOwner', 'unsafeMutableAddress', 
+                      'mutableAddressWithOwner', 
+                      'mutableAddressWithNativeOwner', 
+                      'mutableAddressWithPinnedNativeOwner',
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
              Child('Body', kind='CodeBlock', is_optional=True),

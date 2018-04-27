@@ -108,6 +108,11 @@ class C {
 
   internal subscript(x: Int) -> Int { get {} set {} }
   subscript() -> Int { return 1 }
+
+  var x: Int {
+    address { fatalError() }
+    unsafeMutableAddress { fatalError() }
+  }
 }
 
 protocol PP {
@@ -441,6 +446,7 @@ func keypath() {
   _ = \a.b.c
   _ = \a.b[1]
   _ = \.a.b
+  _ = \Array<Int>.[]
   _ = #keyPath(a.b.c)
 }
 func objcSelector() {

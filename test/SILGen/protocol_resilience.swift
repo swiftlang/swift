@@ -5,10 +5,10 @@
 
 import resilient_protocol
 
-prefix operator ~~~ {}
-infix operator <*> {}
-infix operator <**> {}
-infix operator <===> {}
+prefix operator ~~~
+infix operator <*>
+infix operator <**>
+infix operator <===>
 
 public protocol P {}
 
