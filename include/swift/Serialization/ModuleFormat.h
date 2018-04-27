@@ -583,7 +583,7 @@ namespace input_block {
     LINK_LIBRARY,
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
-    MODULE_FLAGS,
+    MODULE_FLAGS, // [unused]
     SEARCH_PATH
   };
 
@@ -614,11 +614,6 @@ namespace input_block {
   using ImportedHeaderContentsLayout = BCRecordLayout<
     IMPORTED_HEADER_CONTENTS,
     BCBlob
-  >;
-
-  using ModuleFlagsLayout = BCRecordLayout<
-    MODULE_FLAGS,
-    BCFixed<1> // has underlying module? [[UNUSED]]
   >;
 
   using SearchPathLayout = BCRecordLayout<
