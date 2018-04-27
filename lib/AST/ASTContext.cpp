@@ -3692,13 +3692,6 @@ bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
   return true;
 }
 
-bool AnyFunctionType::equalParams(ASTContext &ctx,
-                                  ArrayRef<AnyFunctionType::Param> a,
-                                  Type composedB) {
-  auto composedA = AnyFunctionType::composeInput(ctx, a, false);
-  return composedA->isEqual(composedB);
-}
-
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, const ExtInfo &info,
                                 bool canonicalVararg) {

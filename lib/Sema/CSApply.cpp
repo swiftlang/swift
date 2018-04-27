@@ -5742,8 +5742,9 @@ Expr *ExprRewriter::coerceCallArguments(
     ArrayRef<Identifier> argLabels,
     bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
-
+  auto &tc = getConstraintSystem().getTypeChecker();
   auto params = funcType->getParams();
+
   // Local function to produce a locator to refer to the ith element of the
   // argument tuple.
   auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
@@ -5752,14 +5753,10 @@ Expr *ExprRewriter::coerceCallArguments(
              LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
   };
 
-  bool matchCanFail = false;
-
-  for (const auto &param : params) {
-    if (param.getType()->hasUnresolvedType()) {
-      matchCanFail = true;
-      break;
-    }
-  }
+  bool matchCanFail =
+      llvm::any_of(params, [](const AnyFunctionType::Param &param) {
+        return param.getType()->hasUnresolvedType();
+      });
 
   // If you value your sanity, ignore the body of this 'if' statement.
   if (cs.getASTContext().isSwiftVersion3() && params.size() == 1) {
@@ -5769,10 +5766,11 @@ Expr *ExprRewriter::coerceCallArguments(
     // Total hack: In Swift 3 mode, we can end up with an arity mismatch due to
     // loss of ParenType sugar.
     if (isa<TupleExpr>(arg)) {
-      if (!param.hasLabel() && !param.isVariadic() &&
-          isa<TupleType>(paramType.getPointer())) {
+      auto *tupleType = paramType->getAs<TupleType>();
+      if (!param.hasLabel() && !param.isVariadic() && tupleType) {
         // Rebuild the function type.
-        funcType = FunctionType::get(paramType, funcType->getResult());
+        funcType = FunctionType::get(tupleType, funcType->getResult(),
+                                     funcType->getExtInfo());
         params = funcType->getParams();
       }
     }
@@ -5788,8 +5786,8 @@ Expr *ExprRewriter::coerceCallArguments(
     }
   }
 
-  bool allParamsMatch =
-      AnyFunctionType::equalParams(cs.getASTContext(), params, cs.getType(arg));
+  auto paramType = AnyFunctionType::composeInput(tc.Context, params, false);
+  bool allParamsMatch = cs.getType(arg)->isEqual(paramType);
 
   // Find the callee declaration.
   ConcreteDeclRef callee =
@@ -5868,7 +5866,6 @@ Expr *ExprRewriter::coerceCallArguments(
     return Identifier();
   };
 
-  auto &tc = getConstraintSystem().getTypeChecker();
   SmallVector<TupleTypeElt, 4> toSugarFields;
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  argTuple? argTuple->getNumElements() : 1);
@@ -6045,7 +6042,7 @@ Expr *ExprRewriter::coerceCallArguments(
   }
 
   // If we don't have to shuffle anything, we're done.
-  auto paramType = AnyFunctionType::composeInput(tc.Context, params, false);
+  paramType = AnyFunctionType::composeInput(tc.Context, params, false);
   if (cs.getType(arg)->isEqual(paramType))
     return arg;
 

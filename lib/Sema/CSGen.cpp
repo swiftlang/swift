@@ -789,8 +789,10 @@ namespace {
           }
         }
 
-        return AnyFunctionType::equalParams(CS.getASTContext(),
-                                            fnTy->getParams(), favoredTy);
+        auto paramTy =
+            AnyFunctionType::composeInput(CS.getASTContext(), fnTy->getParams(),
+                                          /*canonicalVararg*/ false);
+        return favoredTy->isEqual(paramTy);
       };
 
       // This is a hack to ensure we always consider the protocol requirement

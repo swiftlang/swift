@@ -2857,11 +2857,6 @@ public:
   static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
                           ArrayRef<AnyFunctionType::Param> b);
 
-  /// \brief Given an array of parameters and a composed parameter
-  /// type determine if they are equal.
-  static bool equalParams(ASTContext &ctx, ArrayRef<AnyFunctionType::Param> a,
-                          Type composedB);
-
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<AnyFunctionType::Param> getParams() const;
