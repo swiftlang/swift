@@ -47,6 +47,12 @@ struct ArgumentDescriptor {
   /// Was this parameter originally dead?
   bool IsEntirelyDead;
 
+  /// Was this argument completely removed already?
+  ///
+  /// TODO: Could we make ArgumentDescriptors just optional and once they have
+  /// been consumed no longer process them?
+  bool WasErased;
+
   /// Should the argument be exploded ?
   bool Explode;
 
@@ -79,10 +85,10 @@ struct ArgumentDescriptor {
   /// when optimizing.
   ArgumentDescriptor(SILFunctionArgument *A)
       : Arg(A), PInfo(A->getKnownParameterInfo()), Index(A->getIndex()),
-        Decl(A->getDecl()), IsEntirelyDead(false), Explode(false),
-        OwnedToGuaranteed(false), IsIndirectResult(A->isIndirectResult()),
-        CalleeRelease(), CalleeReleaseInThrowBlock(),
-        ProjTree(A->getModule(), A->getType()) {
+        Decl(A->getDecl()), IsEntirelyDead(false), WasErased(false),
+        Explode(false), OwnedToGuaranteed(false),
+        IsIndirectResult(A->isIndirectResult()), CalleeRelease(),
+        CalleeReleaseInThrowBlock(), ProjTree(A->getModule(), A->getType()) {
     if (!A->isIndirectResult()) {
       PInfo = Arg->getKnownParameterInfo();
     }
