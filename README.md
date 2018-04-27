@@ -117,7 +117,7 @@ There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
-First make sure that you're in the swift directory:
+First, make sure that you're in the swift directory:
 
     cd swift-source/swift
 
