@@ -1026,6 +1026,8 @@ public:
   llvm::Module *releaseModule();
   llvm::AttributeList getAllocAttrs();
 
+  bool isStandardLibrary() const;
+
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
   llvm::Constant *AnyExistentialMetadata = nullptr;

@@ -432,9 +432,10 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
 ConstantReference
 irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
+  if (IGM.isStandardLibrary())
+    return ConstantReference();
   if (!isTypeMetadataAccessTrivial(IGM, type))
     return ConstantReference();
-
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
 
