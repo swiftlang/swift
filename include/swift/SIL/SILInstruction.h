@@ -1279,6 +1279,8 @@ public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(AllocationInst)
 };
 
+class DeallocStackInst;
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst final
@@ -1351,6 +1353,9 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return getAllOperands();
   }
+
+  /// Return a single dealloc_stack user or null.
+  DeallocStackInst *getSingleDeallocStack() const;
 };
 
 /// The base class for AllocRefInst and AllocRefDynamicInst.
