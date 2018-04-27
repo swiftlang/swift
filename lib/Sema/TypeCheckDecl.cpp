@@ -2169,7 +2169,14 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         auto diagID = diag::class_super_access;
         if (downgradeToWarning == DowngradeToWarning::Yes ||
             outerDowngradeToWarning == DowngradeToWarning::Yes) {
-          diagID = diag::class_super_access_warn;
+          auto diagID = diag::class_super_access_warn;
+
+          auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
+                                  typeAccess,
+                                  isa<FileUnit>(CD->getDeclContext()),
+                                  superclassLocIter->getTypeRepr() != complainRepr);
+          highlightOffendingType(TC, diag, complainRepr);
+          return;
         }
         auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
                                 typeAccess,
