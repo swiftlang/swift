@@ -48,6 +48,19 @@ enum Result<T> {
   }
 }
 
+func overParenthesized() {
+  // SR-7492: Space projection needs to treat extra paren-patterns explicitly.
+  let x: Result<(Result<Int>, String)> = .Ok((.Ok(1), "World"))
+  switch x {
+  case let .Error(e):
+    print(e)
+  case let .Ok((.Error(e), b)):
+    print(e, b)
+  case let .Ok((.Ok(a), b)): // No warning here.
+    print(a, b)
+  }
+}
+
 enum Foo {
   case A(Int)
   case B(Int)
