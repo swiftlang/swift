@@ -3631,10 +3631,7 @@ void Serializer::writeType(Type ty) {
                              addTypeRef(alias->getParent()),
                              addTypeRef(alias->getSinglyDesugaredType()));
     // Write the set of substitutions.
-    SmallVector<Substitution, 4> flatSubs;
-    if (auto genericSig = typeAlias->getGenericSignature())
-      genericSig->getSubstitutions(alias->getSubstitutionMap(), flatSubs);
-    writeSubstitutions(flatSubs, DeclTypeAbbrCodes);
+    writeSubstitutions(alias->getSubstitutionList(), DeclTypeAbbrCodes);
     break;
   }
 
