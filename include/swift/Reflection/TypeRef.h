@@ -42,18 +42,23 @@ enum class TypeRefKind {
 // Clang reports an error if we don't use "template"
 #if defined(__clang__) || defined(__GNUC__)
 #define DEPENDENT_TEMPLATE template
+#if __clang_major__ >= 7
+#define DEPENDENT_TEMPLATE2
+#else
+#define DEPENDENT_TEMPLATE2 template
+#endif
 #else
 #define DEPENDENT_TEMPLATE
 #endif
 
 #define FIND_OR_CREATE_TYPEREF(Allocator, TypeRefTy, ...)                      \
   auto ID = Profile(__VA_ARGS__);                                              \
-  const auto Entry = Allocator.DEPENDENT_TEMPLATE TypeRefTy##s.find(ID);       \
-  if (Entry != Allocator.DEPENDENT_TEMPLATE TypeRefTy##s.end())                \
+  const auto Entry = Allocator.DEPENDENT_TEMPLATE2 TypeRefTy##s.find(ID);      \
+  if (Entry != Allocator.DEPENDENT_TEMPLATE2 TypeRefTy##s.end())               \
     return Entry->second;                                                      \
   const auto TR =                                                              \
       Allocator.DEPENDENT_TEMPLATE makeTypeRef<TypeRefTy>(__VA_ARGS__);        \
-  Allocator.DEPENDENT_TEMPLATE TypeRefTy##s.insert({ID, TR});                  \
+  Allocator.DEPENDENT_TEMPLATE2 TypeRefTy##s.insert({ID, TR});                 \
   return TR;
 
 /// An identifier containing the unique bit pattern made up of all of the
