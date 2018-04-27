@@ -61,6 +61,17 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0054][]
+
+  `ImplicitlyUnwrappedOptional<T>` is now an unavailable typealias of `Optional<T>`.
+  Declarations annotated with `!` have the type `Optional<T>`. If an
+  expression involving one of these values will not compile successfully with the
+  type `Optional<T>`, it is implicitly unwrapped, producing a value of type `T`.
+
+  In some cases this change will cause code that previously compiled to
+  need to be adjusted. Please see [this blog post](https://swift.org/blog/iuo/)
+  for more information.
+
 * [SE-0206][]
 
     The standard library now uses a high-quality, randomly seeded, universal
