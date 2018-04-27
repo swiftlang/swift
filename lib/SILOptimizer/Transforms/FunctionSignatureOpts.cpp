@@ -909,7 +909,7 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   auto OrigShouldModifySelfArgument =
       TransformDescriptor.shouldModifySelfArgument;
   // Analyze the argument information.
-  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+  for (unsigned i : indices(Args)) {
     ArgumentDescriptor &A = TransformDescriptor.ArgumentDescList[i];
     if (!A.PInfo.hasValue()) {
       // It is not an argument. It could be an indirect result. 
@@ -1002,7 +1002,7 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
   bool SignatureOptimize = false;
 
   // Analyze the argument information.
-  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+  for (unsigned i : indices(Args)) {
     ArgumentDescriptor &A = TransformDescriptor.ArgumentDescList[i];
     if (!A.canOptimizeLiveArg()) {
       continue;
@@ -1214,7 +1214,7 @@ bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
     RCIA->get(F), F, {SILArgumentConvention::Direct_Owned});
 
   // Analyze the argument information.
-  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+  for (unsigned i : indices(Args)) {
     ArgumentDescriptor &A = TransformDescriptor.ArgumentDescList[i];
     // If the argument is dead, there is no point in trying to explode it. The
     // dead argument pass will get it.
@@ -1378,7 +1378,7 @@ public:
     /// index.
     llvm::SmallDenseMap<int, int> AIM;
     int asize = F->begin()->getArguments().size();
-    for (auto i = 0; i < asize; ++i) {
+    for (unsigned i : range(asize)) {
       AIM[i] = i;
     }
 
@@ -1386,7 +1386,7 @@ public:
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
     auto Args = F->begin()->getFunctionArguments();
-    for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    for (unsigned i : indices(Args)) {
       ArgumentDescList.emplace_back(Args[i]);
     }
     for (SILResultInfo IR : F->getLoweredFunctionType()->getResults()) {
