@@ -29,6 +29,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILProfiler.h"
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
