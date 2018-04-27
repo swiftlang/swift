@@ -499,7 +499,7 @@ extension Sequence {
   ///   `predicate`; otherwise, `false`.
   @_inlineable
   public func allSatisfy(
-    where predicate: (Element) throws -> Bool
+    _ predicate: (Element) throws -> Bool
   ) rethrows -> Bool {
     return try !contains { try !predicate($0) }
   }
