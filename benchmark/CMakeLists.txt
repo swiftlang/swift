@@ -63,6 +63,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest2
     single-source/DictTest3
     single-source/DictTest4
+    single-source/DictTest4Legacy
     single-source/DictionaryBridge
     single-source/DictionaryCopy
     single-source/DictionaryGroup

@@ -641,6 +641,11 @@ private:
               unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
         }
 
+        if (Mangled.nextIf('o')) {
+          Value |=
+              unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
+        }
+
         if (Mangled.nextIf('s')) {
           Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
         }
