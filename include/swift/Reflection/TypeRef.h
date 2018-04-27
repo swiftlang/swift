@@ -40,15 +40,23 @@ enum class TypeRefKind {
 
 // MSVC reports an error if we use "template"
 // Clang reports an error if we don't use "template"
-#if defined(__clang__) || defined(__GNUC__)
-#define DEPENDENT_TEMPLATE template
-#if __clang_major__ >= 7
-#define DEPENDENT_TEMPLATE2
+#if defined(__APPLE_CC__)
+#  define DEPENDENT_TEMPLATE template
+#  if __APPLE_CC__ >= 7000
+#    define DEPENDENT_TEMPLATE2
+#  else
+#    define DEPENDENT_TEMPLATE2 template
+#  endif
+#elif defined(__clang__) || defined(__GNUC__)
+#  define DEPENDENT_TEMPLATE template
+#  if __clang_major__ >= 7
+#    define DEPENDENT_TEMPLATE2
+#  else
+#    define DEPENDENT_TEMPLATE2 template
+#  endif
 #else
-#define DEPENDENT_TEMPLATE2 template
-#endif
-#else
-#define DEPENDENT_TEMPLATE
+#  define DEPENDENT_TEMPLATE template
+#  define DEPENDENT_TEMPLATE2
 #endif
 
 #define FIND_OR_CREATE_TYPEREF(Allocator, TypeRefTy, ...)                      \
