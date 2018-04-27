@@ -102,6 +102,16 @@ Swift 4.2
   needs to have any `init`s from protocols be `required`, which means they need
   to be in the class definition.
 
+* [SE-0054][]
+
+  `ImplicitlyUnwrappedOptional<T>` is now an unavailable typealias of `Optional<T>`.
+  Declarations annotated with `!` have the type `Optional<T>`. If an
+  expression involving one of these values will not compile successfully with the
+  type `Optional<T>`, it is implicitly unwrapped, producing a value of type `T`.
+
+  In some cases this change will cause code that previously compiled to
+  need to be adjusted. Please see [this blog post](https://swift.org/blog/iuo/)
+  for more information.
 
 * [SE-0206][]
 
