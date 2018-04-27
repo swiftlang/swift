@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-outliner"
 
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
