@@ -327,6 +327,7 @@ func switcheroo(a: XX, b: XX) -> Int {
 enum PatternCasts {
   case one(Any)
   case two
+  case three(String)
 }
 
 func checkPatternCasts() {
@@ -336,6 +337,7 @@ func checkPatternCasts() {
   case .one(let s as String): print(s)
   case .one: break
   case .two: break
+  case .three: break
   }
 
   // But should warn here.
@@ -343,6 +345,14 @@ func checkPatternCasts() {
   case .one(_): print(s)
   case .one: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
   case .two: break
+  case .three: break
+  }
+
+  // And not here
+  switch x {
+  case .one: break
+  case .two: break
+  case .three(let s as String?): print(s as Any)
   }
 }
 
