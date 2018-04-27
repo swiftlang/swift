@@ -219,10 +219,7 @@ bool swift::immediate::IRGenImportedModules(
     AllLinkLibraries.push_back(linkLib);
   };
 
-  M->forAllVisibleModules({}, /*includePrivateTopLevelImports=*/true,
-                          [&](ModuleDecl::ImportedModule import) {
-    import.second->collectLinkLibraries(addLinkLibrary);
-  });
+  M->collectLinkLibraries(addLinkLibrary);
 
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
                    CI.getDiags());
