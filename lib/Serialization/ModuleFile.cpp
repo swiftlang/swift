@@ -1594,6 +1594,13 @@ void ModuleFile::getImportedModules(
         continue;
 
       break;
+
+    case ModuleDecl::ImportFilter::ForLinking:
+      // FIXME
+      if (!dep.isExported())
+        continue;
+
+      break;
     }
 
     assert(dep.isLoaded());
