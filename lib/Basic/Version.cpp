@@ -388,7 +388,7 @@ std::string getSwiftFullVersion(Version effectiveVersion) {
   OS << SWIFT_VENDOR " ";
 #endif
 
-  OS << "Swift version " SWIFT_VERSION_STRING " (swift-4.1-RELEASE)";
+  OS << "Swift version " SWIFT_VERSION_STRING " (swift-4.1.1-RELEASE)";
   return OS.str();
 }
 
