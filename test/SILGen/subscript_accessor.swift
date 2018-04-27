@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -O -emit-silgen -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -O -emit-sil -primary-file %s | %FileCheck %s
 
 // CHECK-LABEL: sil private [transparent] @$S18subscript_accessor1XVxSgycimytfU_
 // CHECK: [[SETTER:%.*]] = function_ref @$S18subscript_accessor1XVxSgycis
@@ -17,3 +17,4 @@ struct X<T> {
 func testXRead<T>(x: X<T>) -> T {
   return x[]!
 }
+// CHECK: $S18subscript_accessor1XVxSgycisTf4dn_n
