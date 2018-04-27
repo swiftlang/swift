@@ -3870,7 +3870,11 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
-static unsigned skipUntilMatchingRBrace(Parser &P) {
+static unsigned skipUntilMatchingRBrace(Parser &P,
+                                        SyntaxParsingContext *&SyntaxContext) {
+  SyntaxParsingContext BlockItemListContext(SyntaxContext,
+                                            SyntaxKind::CodeBlockItemList);
+  SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
   unsigned OpenBraces = 1;
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
     if (P.consumeIf(tok::l_brace)) {
@@ -3888,9 +3892,11 @@ static unsigned skipUntilMatchingRBrace(Parser &P) {
   return OpenBraces;
 }
 
-static unsigned skipBracedBlock(Parser &P) {
+static unsigned skipBracedBlock(Parser &P,
+                                SyntaxParsingContext *&SyntaxContext) {
+  SyntaxParsingContext CodeBlockContext(SyntaxContext, SyntaxKind::CodeBlock);
   P.consumeToken(tok::l_brace);
-  unsigned OpenBraces = skipUntilMatchingRBrace(P);
+  unsigned OpenBraces = skipUntilMatchingRBrace(P, SyntaxContext);
   if (P.consumeIf(tok::r_brace))
     OpenBraces--;
   return OpenBraces;
@@ -3904,7 +3910,7 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
   BodyRange.Start = Tok.getLoc();
 
   // Skip until the next '}' at the correct nesting level.
-  unsigned OpenBraces = skipUntilMatchingRBrace(*this);
+  unsigned OpenBraces = skipUntilMatchingRBrace(*this, SyntaxContext);
 
   if (OpenBraces != 1) {
     // FIXME: implement some error recovery?
@@ -5102,7 +5108,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   BodyRange.Start = Tok.getLoc();
 
   // Consume the '{', and find the matching '}'.
-  unsigned OpenBraces = skipBracedBlock(*this);
+  unsigned OpenBraces = skipBracedBlock(*this, SyntaxContext);
   if (OpenBraces != 0 && Tok.isNot(tok::code_complete)) {
     assert(Tok.is(tok::eof));
     // We hit EOF, and not every brace has a pair.  Recover by searching
@@ -6458,7 +6464,7 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
       (void) consumeIf(tok::r_brace);
     } else if (Tok.isNot(tok::eof) && peekToken().is(tok::l_brace)) {
       consumeToken();
-      skipBracedBlock(*this);
+      skipBracedBlock(*this, SyntaxContext);
     }
     return nullptr;
   }

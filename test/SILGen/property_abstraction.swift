@@ -130,7 +130,7 @@ protocol Factory {
   associatedtype Product
   var builder : () -> Product { get set }
 }
-func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
+func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
   factory.builder = { return MyClass() }
 }
 // CHECK: sil hidden @$S20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
