@@ -477,6 +477,8 @@ extension Character : Comparable {
 }
 
 extension Character: Hashable {
+  // not @inlinable (performance)
+  @effects(releasenone)
   public func hash(into hasher: inout Hasher) {
     // FIXME(performance): constructing a temporary string is extremely
     // wasteful and inefficient.
