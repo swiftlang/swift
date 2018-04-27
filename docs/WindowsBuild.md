@@ -126,8 +126,8 @@ set llvm_bin_dir="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windo
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt and could take up to
-  two hours depending on your system.
+- This must be done from within a developer command prompt and could take hours 
+  depending on your system.
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
 ```cmd
@@ -173,8 +173,8 @@ cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
 ```
 
 ### 8. Build lldb
-- This must be done from within a developer command prompt and could take up to
-  two hours depending on your system.
+- This must be done from within a developer command prompt and could take hours
+  depending on your system.
 ```cmd
 mkdir "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
