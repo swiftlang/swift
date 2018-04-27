@@ -411,6 +411,8 @@ struct BridgeObjectBox :
       
   static void *retain(void *obj) {
     (void)swift_bridgeObjectRetain(obj);
+    // The return value from swift_bridgeObjectRetain may not include the
+    // tag bits; return the input value instead.
     return obj;
   }
 
