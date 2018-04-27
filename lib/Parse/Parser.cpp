@@ -18,6 +18,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -498,6 +499,10 @@ Parser::~Parser() {
   delete L;
   delete TokReceiver;
   delete SyntaxContext;
+}
+
+bool Parser::allowTopLevelCode() const {
+  return SF.isScriptMode();
 }
 
 const Token &Parser::peekToken() {
