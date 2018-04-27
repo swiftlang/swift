@@ -738,7 +738,8 @@ static void diagnoseSubElementFailure(Expr *destExpr,
         argsTuple->getNumElements() == 1 &&
         isa<LiteralExpr>(argsTuple->getElement(0)->
                          getSemanticsProvidingExpr())) {
-      TC.diagnose(loc, diagID, "literals are not mutable");
+          TC.diagnose(loc, diag::assignment_lhs_is_immutable_variable,
+                      "literals are not mutable");
       return;
     }
 
@@ -3131,12 +3132,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                                                  SourceLoc equalLoc) {
   auto &TC = getTypeChecker();
-
-  // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(dest->getValueProvidingExpr())) {
-    TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
-    return;
-  }
 
   // Diagnose assignments to let-properties in delegating initializers.
   if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
