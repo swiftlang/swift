@@ -1397,10 +1397,10 @@ public:
   llvm::SmallDenseMap<OpaqueValueExpr *, OpaqueValueState>
     OpaqueValues;
 
-  /// A mapping from opaque value lvalue expressions to the address of the
-  /// opened value in memory.
-  llvm::SmallDenseMap<OpaqueValueExpr *, std::pair<SILValue, CanType>>
-    OpaqueLValues;
+  /// A mapping from opaque value expressions to the open-existential
+  /// expression that determines them, used while lowering lvalues.
+  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
+    OpaqueValueExprs;
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///
