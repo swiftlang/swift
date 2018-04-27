@@ -348,9 +348,13 @@ static SILValue findClosureStoredIntoBlock(SILValue V) {
   // pattern match to find the noescape closure that invoking the block
   // will call:
   //     %noescape_closure = ...
+  //     %wae_Thunk = function_ref @$withoutActuallyEscapingThunk
+  //     %sentinel =
+  //       partial_apply [callee_guaranteed] %wae_thunk(%noescape_closure)
+  //     %noescaped_wrapped = mark_dependence %sentinel on %noescape_closure
   //     %storage = alloc_stack
   //     %storage_address = project_block_storage %storage
-  //     store %noescape_closure to [init] %storage_address
+  //     store %noescaped_wrapped to [init] %storage_address
   //     %block = init_block_storage_header %storage invoke %thunk
   //     %arg = copy_block %block
 
@@ -382,7 +386,19 @@ static SILValue findClosureStoredIntoBlock(SILValue V) {
   auto *SI = PBSI->getSingleUserOfType<StoreInst>();
   assert(SI && "Couldn't find single store of function into block storage");
 
-  return SI->getSrc();
+  auto *CV = dyn_cast<CopyValueInst>(SI->getSrc());
+  if (!CV)
+    return nullptr;
+  auto *WrappedNoEscape = dyn_cast<MarkDependenceInst>(CV->getOperand());
+  if (!WrappedNoEscape)
+    return nullptr;
+  auto Sentinel = dyn_cast<PartialApplyInst>(WrappedNoEscape->getValue());
+  if (!Sentinel)
+    return nullptr;
+  auto NoEscapeClosure = isPartialApplyOfReabstractionThunk(Sentinel);
+  if (WrappedNoEscape->getBase() != NoEscapeClosure)
+    return nullptr;
+  return NoEscapeClosure;
 }
 
 /// Look through a value passed as a function argument to determine whether

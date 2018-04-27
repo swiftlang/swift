@@ -6256,7 +6256,6 @@ class CopyBlockWithoutEscapingInst
                              SingleValueInstruction> {
   friend SILBuilder;
 
-  enum { Block, Closure };
   FixedOperandList<2> Operands;
 
   CopyBlockWithoutEscapingInst(SILDebugLocation DebugLoc, SILValue block,
@@ -6265,6 +6264,8 @@ class CopyBlockWithoutEscapingInst
                                                               closure} {}
 
 public:
+  enum { Block, Closure };
+
   SILValue getBlock() const { return Operands[Block].get(); }
   SILValue getClosure() const { return Operands[Closure].get(); }
 
