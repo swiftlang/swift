@@ -2348,6 +2348,7 @@ void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
     if (import.second->getName() == Id_Foundation)
       ImportsFoundationModule = true;
+    return true;
   });
 
   if (ImportsFoundationModule)
