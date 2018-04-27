@@ -637,10 +637,9 @@ extension _StringGuts {
     return _copyToNativeStorage(of: CodeUnit.self, from: 0..<count)
   }
 
+  @inlinable
   @_specialize(where CodeUnit == UInt8)
   @_specialize(where CodeUnit == UInt16)
-  @_specialize(where CodeUnit == UTF16.CodeUnit)
-  @inlinable
   internal
   func _copyToNativeStorage<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self,
