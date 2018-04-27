@@ -1260,7 +1260,7 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // Simply continue if do not explode.
     if (!AD.Explode) {
       TransformDescriptor.AIM[TotalArgIndex] = AD.Index;
-      TotalArgIndex ++;
+      ++TotalArgIndex;
       continue;
     }
 
@@ -1279,11 +1279,12 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
 
     for (auto *Node : LeafNodes) {
       auto OwnershipKind = *AD.getTransformedOwnershipKind(Node->getType());
-      LeafValues.push_back(BB->insertFunctionArgument(
-          ArgOffset++, Node->getType(), OwnershipKind,
-          BB->getArgument(OldArgIndex)->getDecl()));
+      LeafValues.push_back(
+          BB->insertFunctionArgument(ArgOffset, Node->getType(), OwnershipKind,
+                                     BB->getArgument(OldArgIndex)->getDecl()));
       TransformDescriptor.AIM[TotalArgIndex - 1] = AD.Index;
-      TotalArgIndex ++;
+      ++ArgOffset;
+      ++TotalArgIndex;
     }
 
     // Then go through the projection tree constructing aggregates and replacing
@@ -1305,7 +1306,7 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // Now erase the old argument since it does not have any uses. We also
     // decrement ArgOffset since we have one less argument now.
     BB->eraseArgument(OldArgIndex);
-    TotalArgIndex --;
+    --TotalArgIndex;
   }
 }
 
