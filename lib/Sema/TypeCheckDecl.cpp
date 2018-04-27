@@ -6938,29 +6938,26 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         if (!aliasDecl->isGeneric()) {
           aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
 
-          // If the underlying alias declaration has a type parameter,
-          // we have unresolved dependent member types we will need to deal
-          // with. Wipe out the types and validate them again.
-          // FIXME: We never should have recorded such a type in the first
-          // place.
-          if (!aliasDecl->getUnderlyingTypeLoc().getType() ||
-              aliasDecl->getUnderlyingTypeLoc().getType()
-                ->findUnresolvedDependentMemberType()) {
-            aliasDecl->getUnderlyingTypeLoc().setType(Type(),
-                                                      /*validated=*/false);
-            validateAccessControl(aliasDecl);
+          // The generic environment didn't exist until now, we may have
+          // unresolved types we will need to deal with, and need to record the
+          // appropriate substitutions for that environment. Wipe out the types
+          // and validate them again.
+          aliasDecl->getUnderlyingTypeLoc().setType(Type(),
+                                                    /*validated=*/false);
+          aliasDecl->setInterfaceType(Type());
 
-            // Check generic parameters, if needed.
-            bool validated = aliasDecl->hasValidationStarted();
+          validateAccessControl(aliasDecl);
+
+          // Check generic parameters, if needed.
+          bool validated = aliasDecl->hasValidationStarted();
+          if (!validated)
+            aliasDecl->setIsBeingValidated();
+          SWIFT_DEFER {
             if (!validated)
-              aliasDecl->setIsBeingValidated();
-            SWIFT_DEFER {
-              if (!validated)
-                aliasDecl->setIsBeingValidated(false);
-            };
+              aliasDecl->setIsBeingValidated(false);
+          };
 
-            validateTypealiasType(*this, aliasDecl);
-          }
+          validateTypealiasType(*this, aliasDecl);
         }
       }
     }
