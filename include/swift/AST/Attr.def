@@ -214,8 +214,7 @@ SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
   UserInaccessible,
   31)
 SIMPLE_DECL_ATTR(inlinable, Inlinable,
-  OnVar | OnSubscript | OnAbstractFunction |
-  UserInaccessible,
+  OnVar | OnSubscript | OnAbstractFunction,
   32)
 DECL_ATTR(_specialize, Specialize,
   OnConstructor | OnFunc | OnAccessor |
@@ -322,7 +321,7 @@ DECL_ATTR(_cdecl, CDecl,
   63)
 SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
   OnAbstractFunction | OnVar | OnSubscript | OnNominalType |
-  LongAttribute | UserInaccessible,
+  LongAttribute,
   64)
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
   OnFunc | OnAccessor | OnConstructor |
