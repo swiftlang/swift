@@ -1574,7 +1574,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cacheEntry.setInt(true);
-      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {});
+      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {
+          return true;
+        });
     }
   } else {
     // Build the representation of the Clang module in Swift.
@@ -1593,7 +1595,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // Force load adapter modules for all imported modules.
     // FIXME: This forces the creation of wrapper modules for all imports as
     // well, and may do unnecessary work.
-    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
+    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {
+        return true;
+      });
   }
 
   if (clangModule->isSubModule()) {
@@ -3037,43 +3041,70 @@ ModuleDecl *ClangModuleUnit::getAdapterModule() const {
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
-  if (filter != ModuleDecl::ImportFilter::Public)
+  switch (filter) {
+  case ModuleDecl::ImportFilter::All:
+  case ModuleDecl::ImportFilter::Private:
     imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
+    break;
+  case ModuleDecl::ImportFilter::Public:
+    break;
+  }
 
   SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
     // This is the special "imported headers" module.
-    if (filter != ModuleDecl::ImportFilter::Private) {
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+    case ModuleDecl::ImportFilter::Public:
       imported.append(owner.ImportedHeaderExports.begin(),
                       owner.ImportedHeaderExports.end());
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      break;
     }
 
   } else {
     clangModule->getExportedModules(imported);
-    if (filter != ModuleDecl::ImportFilter::Public) {
-      if (filter == ModuleDecl::ImportFilter::All) {
-        llvm::SmallPtrSet<clang::Module *, 8> knownModules;
-        imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-        imported.erase(std::remove_if(imported.begin(), imported.end(),
-                                      [&](clang::Module *mod) -> bool {
-                                        return !knownModules.insert(mod).second;
-                                      }),
-                       imported.end());
-      } else {
-        llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
-                                                           imported.end());
-        SmallVector<clang::Module *, 8> privateImports;
-        std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                     std::back_inserter(privateImports), [&](clang::Module *mod) {
-                       return knownModules.count(mod) == 0;
-        });
-        imported.swap(privateImports);
-      }
+
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All: {
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
+      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+      imported.erase(std::remove_if(imported.begin(), imported.end(),
+                                    [&](clang::Module *mod) -> bool {
+                                      return !knownModules.insert(mod).second;
+                                    }),
+                     imported.end());
 
       // FIXME: The parent module isn't exactly a private import, but it is
       // needed for link dependencies.
       if (clangModule->Parent)
         imported.push_back(clangModule->Parent);
+
+      break;
+    }
+
+    case ModuleDecl::ImportFilter::Private: {
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
+                                                         imported.end());
+      SmallVector<clang::Module *, 8> privateImports;
+      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
+                   std::back_inserter(privateImports), [&](clang::Module *mod) {
+                     return knownModules.count(mod) == 0;
+                   });
+      imported.swap(privateImports);
+
+      // FIXME: The parent module isn't exactly a private import, but it is
+      // needed for link dependencies.
+      if (clangModule->Parent)
+        imported.push_back(clangModule->Parent);
+
+      break;
+    }
+
+    case ModuleDecl::ImportFilter::Public:
+      break;
     }
   }
 
