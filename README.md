@@ -117,6 +117,10 @@ There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
+First make sure that you're in the swift directory:
+
+    cd swift-source/swift
+
 To build using Ninja, run:
 
     utils/build-script --release-debuginfo
@@ -240,8 +244,8 @@ expressed today.
 ## Build Dependencies
 
 ### CMake
-[CMake](https://cmake.org) is the core infrastructure used to configure builds of 
-Swift and its companion projects; at least version 3.4.3 is required. 
+[CMake](https://cmake.org) is the core infrastructure used to configure builds of
+Swift and its companion projects; at least version 3.4.3 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded
