@@ -26,6 +26,7 @@ COMMON_NODES = [
                        Child('Decl', kind='Decl'),
                        Child('Stmt', kind='Stmt'),
                        Child('Expr', kind='Expr'),
+                       Child('TokenList', kind='TokenList'),
                    ]),
              Child('Semicolon', kind='SemicolonToken',
                    description="""
