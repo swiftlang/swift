@@ -1,4 +1,4 @@
-//===--- Arrays.swift.gyb -------------------------------------*- swift -*-===//
+//===--- ArrayShared.swift ------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -8,21 +8,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-//===----------------------------------------------------------------------===//
-//
-//  Three generic, mutable array-like types with value semantics.
-//
-//  - `ContiguousArray<Element>` is a fast, contiguous array of `Element` with
-//    a known backing store.
-//
-//  - `ArraySlice<Element>` presents an arbitrary subsequence of some
-//    contiguous sequence of `Element`s.
-//
-//  - `Array<Element>` is like `ContiguousArray<Element>` when `Element` is not
-//    a reference type or an Objective-C existential.  Otherwise, it may use
-//    an `NSArray` bridged from Cocoa for storage.
-//
-//===----------------------------------------------------------------------===//
 
 /// This type is used as a result of the _checkSubscript call to associate the
 /// call with the array access call it guards.
