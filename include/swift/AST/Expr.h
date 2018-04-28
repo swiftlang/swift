@@ -403,7 +403,7 @@ public:
   Type getType() const { return Ty; }
 
   /// setType - Sets the type of this expression.
-  void setType(Type T) { Ty = T; }
+  void setType(Type T);
 
   /// \brief Return the source range of the expression.
   SourceRange getSourceRange() const;
