@@ -736,9 +736,8 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       dyn_cast<TupleExpr>(AE->getArg()->getSemanticsProvidingExpr());
     if (isa<CallExpr>(AE) && AE->isImplicit() && argsTuple &&
         argsTuple->getNumElements() == 1 &&
-        isa<LiteralExpr>(argsTuple->getElement(0)->
-                         getSemanticsProvidingExpr())) {
-          TC.diagnose(loc, diag::assignment_lhs_is_immutable_variable,
+        isa<LiteralExpr>(argsTuple->getElement(0)->getSemanticsProvidingExpr())) {
+      TC.diagnose(loc, diag::assignment_lhs_is_immutable_variable,
                       "literals are not mutable");
       return;
     }
