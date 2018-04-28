@@ -619,8 +619,8 @@ func testConditional(b : Bool) {
 
 
 func f(a : FooClass, b : LetStructMembers) {
-  a.baz = 1 // expected-error {{cannot assign to member: 'baz' is a method}}
-  b.f = 42     // expected-error {{cannot assign to member: 'f' is a method}}
+  a.baz = 1   // expected-error {{cannot assign to value: 'baz' is a method}}
+  b.f = 42    // expected-error {{cannot assign to value: 'f' is a method}}
 }
 
 // SR-2354: Reject subscript declarations with mutable parameters.

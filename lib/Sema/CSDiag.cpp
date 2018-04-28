@@ -657,7 +657,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
                                       Diag<StringRef> diagID,
                                       Diag<Type> unknownDiagID) {
   auto &TC = CS.getTypeChecker();
-  
+
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
   auto immInfo = resolveImmutableBase(destExpr, CS);
@@ -706,7 +706,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       .highlight(immInfo.first->getSourceRange());
     return;
   }
-  
+
   // If we're trying to set an unapplied method, say that.
   if (auto *VD = immInfo.second) {
     std::string message = "'";
@@ -716,13 +716,13 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
       if (AFD->getImplicitSelfDecl()) {
         message += " is a method";
-        diagID = diag::assignment_lhs_is_method;
+        diagID = diag::assignment_lhs_is_immutable_variable;
       } else {
         message += " is a function";
       }
     } else
       message += " is not settable";
-    
+
     TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
     return;
@@ -761,7 +761,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       .highlight(AE->getSourceRange());
     return;
   }
-  
+
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(immInfo.first))
     if (isa<LoadExpr>(ICE->getSubExpr())) {
       TC.diagnose(loc, diagID,
