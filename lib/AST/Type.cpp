@@ -66,6 +66,11 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
   return subMap.lookupSubstitution(key);
 }
 
+void TypeLoc::setType(Type Ty, bool validated) {
+  assert(!Ty || !Ty->hasTypeVariable());
+  TAndValidBit.setPointerAndInt(Ty, validated);
+}
+
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
   return getType()->hasError();
