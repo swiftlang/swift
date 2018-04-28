@@ -738,7 +738,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
         argsTuple->getNumElements() == 1 &&
         isa<LiteralExpr>(argsTuple->getElement(0)->getSemanticsProvidingExpr())) {
       TC.diagnose(loc, diag::assignment_lhs_is_immutable_variable,
-                      "literals are not mutable");
+                  "literals are not mutable");
       return;
     }
 
