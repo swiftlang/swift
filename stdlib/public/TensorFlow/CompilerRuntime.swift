@@ -439,7 +439,8 @@ fileprivate extension _ExecutionContext {
   }
 }
 
-private func dumpTensorContent<Scalar : AccelerableByTensorFlow>(
+@_versioned
+internal func dumpTensorContent<Scalar : AccelerableByTensorFlow>(
   _ inputTensor: CTensorHandle, _: Scalar.Type
 ) {
   let array = ShapedArray<Scalar>(cTensorHandle: inputTensor)
@@ -449,6 +450,30 @@ private func dumpTensorContent<Scalar : AccelerableByTensorFlow>(
     \(array.scalars).
     """)
 }
+
+@_versioned
+internal func dumpCTensorHandleContent(
+  _ idx: Int,
+  _ inputTensorHandle: CTensorHandle) {
+  let dType: TF_DataType = TFE_TensorHandleDataType(inputTensorHandle)
+  debugLog("Tensor \(idx) has TF data type \(dType).")
+  switch dType {
+  case TF_INT8: dumpTensorContent(inputTensorHandle, Int8.self)
+  case TF_UINT8: dumpTensorContent(inputTensorHandle, UInt8.self)
+  case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
+  case TF_UINT16: dumpTensorContent(inputTensorHandle, UInt16.self)
+  case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
+  case TF_UINT32: dumpTensorContent(inputTensorHandle, UInt32.self)
+  case TF_INT32: dumpTensorContent(inputTensorHandle, Int32.self)
+  case TF_UINT64: dumpTensorContent(inputTensorHandle, UInt64.self)
+  case TF_INT64: dumpTensorContent(inputTensorHandle, Int64.self)
+  case TF_FLOAT: dumpTensorContent(inputTensorHandle, Float.self)
+  case TF_DOUBLE: dumpTensorContent(inputTensorHandle, Double.self)
+  case TF_BOOL: dumpTensorContent(inputTensorHandle, Bool.self)
+  default: fatalError("Unsupported dtype \(dType)")
+  }
+}
+
 
 /// Used when _RuntimeConfig.usesTFEagerAPI is true.
 private class TFEState {
@@ -487,7 +512,7 @@ private class TFState {
   let status: CTFStatus = TF_NewStatus()
 
   /// The TF_Session to execute the function.
-  let cSession: CTFSession
+  fileprivate let cSession: CTFSession
   /// The graph that contains the function to execute. Not owned.
   let graph: CTFGraph
   /// The input tensors.
@@ -600,9 +625,13 @@ extension TFState {
     // Synthesize TFE tensor handles to work with the existing Swift TF
     // library code.
     for i in 0..<returnValues.count {
+      assert(outputTensors[i] != nil)
       returnValues[i] = TFE_NewTensorHandle(outputTensors[i], status)
       checkOk(status)
       TF_DeleteTensor(outputTensors[i])
+      if _RuntimeConfig.printsDebugLog {
+        dumpCTensorHandleContent(i, returnValues[i]!)
+      }
     }
   }
 }
@@ -710,23 +739,7 @@ public final class _TensorComputation {
     debugLog("Populating the op's input list.")
     for (i, inputTensorHandle) in inputTensorHandles.enumerated() {
       if _RuntimeConfig.printsDebugLog {
-        let dType: TF_DataType = TFE_TensorHandleDataType(inputTensorHandle)
-        debugLog("Input tensor \(i) has TF data type \(dType).")
-        switch(dType) {
-        case TF_INT8: dumpTensorContent(inputTensorHandle, Int8.self)
-        case TF_UINT8: dumpTensorContent(inputTensorHandle, UInt8.self)
-        case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
-        case TF_UINT16: dumpTensorContent(inputTensorHandle, UInt16.self)
-        case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
-        case TF_UINT32: dumpTensorContent(inputTensorHandle, UInt32.self)
-        case TF_INT32: dumpTensorContent(inputTensorHandle, Int32.self)
-        case TF_UINT64: dumpTensorContent(inputTensorHandle, UInt64.self)
-        case TF_INT64: dumpTensorContent(inputTensorHandle, Int64.self)
-        case TF_FLOAT: dumpTensorContent(inputTensorHandle, Float.self)
-        case TF_DOUBLE: dumpTensorContent(inputTensorHandle, Double.self)
-        case TF_BOOL: dumpTensorContent(inputTensorHandle, Bool.self)
-        default: fatalError("Unsupported dtype \(dType)")
-        }
+        dumpCTensorHandleContent(i, inputTensorHandle)
       }
 
       if let stateTFE = stateTFE {
@@ -858,6 +871,21 @@ public extension _TensorComputation {
   }
 }
 
+extension _TensorComputation {
+  @_versioned
+  var cSession: CTFSession {
+    if let stateTF = stateTF {
+      return stateTF.cSession
+    }
+    // FIXME: Revisit how to enforce this. One option is to move
+    // `usesTFEagerAPI` to a compile-time option. Another option is to mark the
+    // generated graph/binary with a set of compatible devices / runtime
+    // configs, so that we can error out when user sets runtime options such as
+    // _RuntimeConfig.usesTFEagerAPI in an incompatible way.
+    fatalError("No TF Session is available when usesTFEagerAPI is set!")
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // - MARK: Compiler runtime entrypoints
 //===----------------------------------------------------------------------===//
@@ -965,4 +993,27 @@ public func _TFCCreateCTensorHandle<T>(_ value : T,
   TF_DeleteStatus(status)
   TF_DeleteTensor(tensor)
   return cTensorHandle!
+}
+
+/// Receive a tensor based on a tensor computation handle (equivalent to a TF
+/// session handle), and a tensor ID.
+@_inlineable
+@_silgen_name("_swift_tfc_ReceiveTensorHandle")
+public func _TFCReceiveTensorHandle<Scalar : AccelerableByTensorFlow>(
+  _ computation: _TensorComputation,
+  _ tensorId: Int
+) -> TensorHandle<Scalar> {
+  debugLog("Receiving tensor of id \(tensorId) and type \(Scalar.self).")
+  let status = TF_NewStatus()
+  let cTensor: CTensor = TF_DequeueNamedTensor(
+    computation.cSession, Int32(tensorId), status)
+  checkOk(status)
+  TF_DeleteStatus(status)
+  let tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor)
+  TF_DeleteTensor(cTensor)
+  if _RuntimeConfig.printsDebugLog {
+    debugLog("The received tensor of id \(tensorId) has content:")
+    dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
+  }
+  return tensorHandle
 }

@@ -33,7 +33,6 @@ public func shapeError() {
 
 
 class ClassTest {
-  // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
   var w = Tensor<Float>(zeros: [1, 2])  // expected-warning {{value implicitly copied to the host}}
   let b = Tensor<Float>(zeros: [1, 2])
 

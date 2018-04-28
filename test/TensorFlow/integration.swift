@@ -12,7 +12,6 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
   x += x  // expected-note {{value used here}}
 
   x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
-  // GraphGen doesn't support sends yet: expected-error @-1 {{internal error generating TensorFlow graph}}
 
   print(x) // expected-note {{value used here}}
   var y = b.toDevice()
@@ -33,12 +32,12 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testTensor{{.*}}
 // CHECK: sil shared @{{.*}}testTensor{{.*}} : $@convention(thin) (@guaranteed Tensor<Float>, @guaranteed Tensor<Float>) -> () {
 
-// Graph lowering fails on testTensor because it requires send and receive instructions.
-// CHECK: string_literal bytes ""
-// CHECK-NEXT:  integer_literal $Builtin.Int64, 0
+// Graph lowering should succeed, producing a serialized program of 10+ bytes.
+// CHECK: string_literal bytes
+// CHECK-NEXT:  integer_literal $Builtin.Int64, {{[1-9][0-9]+}}
 // CHECK-NOT: = apply
 
-// We're passing one TensorHandle in.
+// We're passing two TensorHandle's in.
 // CHECK: [[ALLOC:%.*]] = alloc_stack $(OpaquePointer, OpaquePointer)
 // CHECK: ref_element_addr
 // CHECK: begin_access [read] [static] [[ALLOC]] : $*(OpaquePointer, OpaquePointer)
@@ -134,11 +133,10 @@ public func testExitBranch2(i: Int) {
   var x = Tensor<Float>(1.0)
 
   // expected-warning @+1 {{implicitly copied to the accelerator}}
-  if i == 0 {
+  if i == 0 {  // expected-error {{Length for attr 'Tout' of 0 must be at least minimum 1}}
     return
   }
 
-  // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
   x += x    // expected-warning {{value implicitly copied to the host}}
   print(x)  // expected-note {{value used here}}
 }
@@ -287,8 +285,8 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
   // expected-warning @-1 {{'a' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
 
   // expected-note @+1 {{value used here}}
-  let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}} expected-error {{GraphGen cannot lower a 'send' to the host yet}}
-  let y = x.scalar! + 2.0 // expected-note {{value used here}}
+  let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
+  let y = x.scalar! + 2.0 // expected-note {{value used here}}  expected-error {{GraphGen cannot lower a 'receive' from the host yet}}
   // expected-warning @-1 {{value implicitly copied to the accelerator}}
 
   let z = Tensor<Float>(y)
