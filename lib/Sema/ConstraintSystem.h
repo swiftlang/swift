@@ -2040,7 +2040,7 @@ public:
   /// Call Expr::propagateLValueAccessKind on the given expression,
   /// using a custom accessor for the type on the expression that
   /// reads the type from the ConstraintSystem expression type map.
-  void propagateLValueAccessKind(Expr *E, AccessKind accessKind, bool isShallow,
+  void propagateLValueAccessKind(Expr *E, AccessKind accessKind,
                                  bool allowOverwrite = false);
 
   /// Call Expr::isTypeReference on the given expression, using a
@@ -2229,12 +2229,6 @@ public:
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
   Expr *generateConstraints(Expr *E);
-
-  /// \brief Generate constraints for the given top-level expression,
-  /// assuming that its children are already type-checked.
-  ///
-  /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraintsShallow(Expr *E);
 
   /// \brief Generate constraints for binding the given pattern to the
   /// value of the given expression.
@@ -3054,11 +3048,6 @@ public:
                       Type convertType, bool discardedExpr,
                       bool suppressDiagnostics,
                       bool skipClosures);
-
-  /// \brief Apply a given solution to the expression to the top-level
-  /// expression, producing a fully type-checked expression.
-  Expr *applySolutionShallow(const Solution &solution, Expr *expr,
-                             bool suppressDiagnostics);
   
   /// \brief Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

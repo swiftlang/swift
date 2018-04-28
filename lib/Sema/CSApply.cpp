@@ -264,14 +264,7 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
 }
 
 void ConstraintSystem::propagateLValueAccessKind(Expr *E, AccessKind accessKind,
-                                                 bool isShallow,
                                                  bool allowOverwrite) {
-  // If solver is set up in "shallow" mode we expect that some of the
-  // sub-expressions are already type-checked which means that they
-  // already have access kind set.
-  if (isShallow && E->hasLValueAccessKind() && !allowOverwrite)
-    return;
-
   E->propagateLValueAccessKind(accessKind,
                                [&](Expr *E) -> Type {
                                  return getType(E);
@@ -452,7 +445,6 @@ namespace {
     DeclContext *dc;
     const Solution &solution;
     bool SuppressDiagnostics;
-    bool IsShallow;
 
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
@@ -935,8 +927,7 @@ namespace {
       // will handle this.
       if (record.OpaqueValue && record.OpaqueValue->hasLValueAccessKind())
         cs.propagateLValueAccessKind(record.ExistentialValue,
-                                     record.OpaqueValue->getLValueAccessKind(),
-                                     IsShallow);
+                                     record.OpaqueValue->getLValueAccessKind());
 
       // Form the open-existential expression.
       result = new (tc.Context) OpenExistentialExpr(
@@ -1894,9 +1885,9 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
-                 bool suppressDiagnostics, bool shallow = false)
+                 bool suppressDiagnostics)
         : cs(cs), dc(cs.DC), solution(solution),
-          SuppressDiagnostics(suppressDiagnostics), IsShallow(shallow) {}
+          SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -3360,8 +3351,7 @@ namespace {
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
       if (!cs.getType(expr->getSubExpr())->is<UnresolvedType>())
-        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite,
-                                     IsShallow);
+        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite);
       auto objectTy = cs.getType(expr->getSubExpr())->getRValueType();
 
       // The type is simply inout of whatever the lvalue's object type was.
@@ -4052,8 +4042,7 @@ namespace {
       auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return nullptr;
-      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write,
-                                   IsShallow);
+      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write);
 
       // Convert the source to the simplified destination type.
       auto locator =
@@ -4370,7 +4359,7 @@ namespace {
 
         if (cs.getType(subExpr)->hasLValueType()) {
           // Treat this like a read of the property.
-          cs.propagateLValueAccessKind(subExpr, AccessKind::Read, IsShallow);
+          cs.propagateLValueAccessKind(subExpr, AccessKind::Read);
         }
 
         // Check that we requested a property getter or setter.
@@ -6745,7 +6734,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       // Load from the lvalue. If we're loading the result of a force,
       // swap the order so that we load first and force the result.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read);
       if (auto *forceExpr = dyn_cast<ForceValueExpr>(expr)) {
         fromType = cs.getType(forceExpr->getSubExpr())->getRValueType();
         auto *loadExpr = cs.cacheType(
@@ -6856,7 +6845,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         // Overwrite the l-value access kind to be read-only if we're
         // converting to a non-mutable pointer type.
         auto *E = cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr();
-        cs.propagateLValueAccessKind(E, AccessKind::Read, IsShallow,
+        cs.propagateLValueAccessKind(E, AccessKind::Read,
                                      /*overwrite*/ true);
       }
 
@@ -6964,7 +6953,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // In an 'inout' operator like "i += 1", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
+      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
       return cs.cacheType(new (tc.Context)
                               InOutExpr(expr->getStartLoc(), expr,
                                         toIO->getObjectType(),
@@ -6983,7 +6972,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     if (performLoad) {
       // Load from the lvalue.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read);
       expr = cs.cacheType(new (tc.Context)
                               LoadExpr(expr, fromLValue->getObjectType()));
 
@@ -7231,7 +7220,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
 
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
-  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
+  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
   return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, 
                                           toInOutTy->getInOutObjectType(),
                                           /*isImplicit*/ true));
@@ -8388,17 +8377,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   if (result)
     rewriter.finalize(result);
 
-  return result;
-}
-
-Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
-                                             Expr *expr,
-                                             bool suppressDiagnostics) {
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics, true);
-  rewriter.walkToExprPre(expr);
-  Expr *result = rewriter.walkToExprPost(expr);
-  if (result)
-    rewriter.finalize(result);
   return result;
 }
 
