@@ -1912,6 +1912,8 @@ namespace {
 
     Expr *visitCodeCompletionExpr(CodeCompletionExpr *expr) {
       // Do nothing with code completion expressions.
+      auto toType = simplifyType(cs.getType(expr));
+      cs.setType(expr, toType);
       return expr;
     }
 
