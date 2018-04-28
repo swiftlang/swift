@@ -3556,7 +3556,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
   ConstraintSystem CS(*TC, &DC, Options);
   Parent = Parent->walk(SanitizeExpr(CS));
-  CleanupIllFormedExpressionRAII cleanup(TC->Context, Parent);
+  CleanupIllFormedExpressionRAII cleanup(Parent);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);

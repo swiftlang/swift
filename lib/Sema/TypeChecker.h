@@ -2522,16 +2522,15 @@ public:
 /// \brief RAII object that cleans up the given expression if not explicitly
 /// disabled.
 class CleanupIllFormedExpressionRAII {
-  ASTContext &Context;
   Expr **expr;
 
 public:
-  CleanupIllFormedExpressionRAII(ASTContext &Context, Expr *&expr)
-    : Context(Context), expr(&expr) { }
+  CleanupIllFormedExpressionRAII(Expr *&expr)
+    : expr(&expr) { }
 
   ~CleanupIllFormedExpressionRAII();
 
-  static void doIt(Expr *expr, ASTContext &Context);
+  static void doIt(Expr *expr);
 
   /// \brief Disable the cleanup of this expression; it doesn't need it.
   void disable() {
