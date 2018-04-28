@@ -2925,6 +2925,8 @@ WARNING(expression_unused_literal,none,
 
 ERROR(assignment_lhs_not_lvalue,none,
       "cannot assign to immutable expression of type %0", (Type))
+ERROR(assignment_lhs_is_apply_expression,none,
+      "expression is not assignable: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_variable,none,
       "cannot assign to value: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_property,none,
@@ -3209,18 +3211,21 @@ ERROR(bool_intrinsics_not_found,none,
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
-      "|cannot be declared "
-      "%select{in this context|fileprivate|internal|public|open}1}0 "
-      "because its superclass is "
-      "%select{private|fileprivate|internal|%error|%error}2",
-      (bool, AccessLevel, AccessLevel, bool))
+      "|cannot be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its superclass "
+      "%select{is %select{private|fileprivate|internal|%error|%error}2"
+      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "type as a generic parameter}4",
+      (bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(class_super_access_warn,none,
-        "class %select{should be declared "
-        "%select{private|fileprivate|internal|%error|%error}2"
-        "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
-        "because its superclass is "
-        "%select{private|fileprivate|internal|%error|%error}2",
-        (bool, AccessLevel, AccessLevel, bool))
+      "class %select{should be declared "
+      "%select{private|fileprivate|internal|%error|%error}2"
+      "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its superclass "
+      "%select{is %select{private|fileprivate|internal|%error|%error}2"
+      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "type as a generic parameter}4",
+      (bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,

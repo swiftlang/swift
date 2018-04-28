@@ -1851,51 +1851,41 @@ static void checkGenericParamAccess(TypeChecker &TC,
     return;
 
   // This must stay in sync with diag::generic_param_access.
-  enum {
-    ACEK_Parameter = 0,
-    ACEK_Requirement
+  enum ACEK {
+    Parameter = 0,
+    Requirement
   } accessControlErrorKind;
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
   auto downgradeToWarning = DowngradeToWarning::Yes;
 
+  auto callbackACEK = ACEK::Parameter;
+
+  auto callback = [&](AccessScope typeAccessScope,
+                      const TypeRepr *thisComplainRepr,
+                      DowngradeToWarning thisDowngrade) {
+    if (typeAccessScope.isChildOf(minAccessScope) ||
+        (thisDowngrade == DowngradeToWarning::No &&
+         downgradeToWarning == DowngradeToWarning::Yes) ||
+        (!complainRepr &&
+         typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+      minAccessScope = typeAccessScope;
+      complainRepr = thisComplainRepr;
+      accessControlErrorKind = callbackACEK;
+      downgradeToWarning = thisDowngrade;
+    }
+  };
   for (auto param : *params) {
     if (param->getInherited().empty())
       continue;
     assert(param->getInherited().size() == 1);
     checkTypeAccessImpl(TC, param->getInherited().front(), accessScope,
                         owner->getDeclContext(),
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *thisComplainRepr,
-                            DowngradeToWarning thisDowngrade) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (thisDowngrade == DowngradeToWarning::No &&
-           downgradeToWarning == DowngradeToWarning::Yes) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        accessControlErrorKind = ACEK_Parameter;
-        downgradeToWarning = thisDowngrade;
-      }
-    });
+                        callback);
   }
+  callbackACEK = ACEK::Requirement;
 
   for (auto &requirement : params->getRequirements()) {
-    auto callback = [&](AccessScope typeAccessScope,
-                        const TypeRepr *thisComplainRepr,
-                        DowngradeToWarning thisDowngrade) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (thisDowngrade == DowngradeToWarning::No &&
-           downgradeToWarning == DowngradeToWarning::Yes) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        accessControlErrorKind = ACEK_Requirement;
-        downgradeToWarning = thisDowngrade;
-      }
-    };
     switch (requirement.getKind()) {
     case RequirementReprKind::TypeConstraint:
       checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
@@ -2234,12 +2224,13 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         bool isExplicit = CD->getAttrs().hasAttribute<AccessControlAttr>();
         auto diagID = diag::class_super_access;
         if (downgradeToWarning == DowngradeToWarning::Yes ||
-            outerDowngradeToWarning == DowngradeToWarning::Yes) {
+            outerDowngradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::class_super_access_warn;
-        }
+
         auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
                                 typeAccess,
-                                isa<FileUnit>(CD->getDeclContext()));
+                                isa<FileUnit>(CD->getDeclContext()),
+                                superclassLocIter->getTypeRepr() != complainRepr);
         highlightOffendingType(TC, diag, complainRepr);
       });
     }

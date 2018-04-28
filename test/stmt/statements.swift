@@ -41,6 +41,11 @@ func funcdecl5(_ a: Int, y: Int) {
 
   1 = x        // expected-error {{cannot assign to a literal value}}
   (1) = x      // expected-error {{cannot assign to a literal value}}
+  "string" = "other"    // expected-error {{cannot assign to a literal value}}
+  [1, 1, 1, 1] = [1, 1] // expected-error {{cannot assign to immutable expression of type '[Int]}}
+  1.0 = x               // expected-error {{cannot assign to a literal value}}
+  nil = 1               // expected-error {{cannot assign to a literal value}}
+
   (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}
   var tup : (x:Int, y:Int)
   tup.x = 1

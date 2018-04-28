@@ -121,7 +121,7 @@ func properties(_ b: B) {
   // An informal property cannot be made formal in a subclass. The
   // formal property is simply ignored.
   b.informalMadeFormal()
-  b.informalMadeFormal = i // expected-error{{cannot assign to property: 'informalMadeFormal' is a method}}
+  b.informalMadeFormal = i // expected-error{{cannot assign to value: 'informalMadeFormal' is a method}}
   b.setInformalMadeFormal(5)
 
   b.overriddenProp = 17
