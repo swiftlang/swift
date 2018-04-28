@@ -29,6 +29,7 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   /// `TensorHandle` will require tweaking the compiler.
   public let cTensorHandle: CTensorHandle
 
+  @_versioned
   init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
     let cTensorHandle = TFE_NewTensorHandle(cTensor, status)

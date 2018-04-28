@@ -136,7 +136,7 @@ public func testStraightLineXORTraining() {
 public func testEagerLoop() -> Int32 {
   var a = Tensor<Int32>(6)
 
-  // expected-error @+1 {{GraphGen cannot lower a 'send' to the host yet}}
+  // expected-error @+2 {{GraphGen cannot lower a 'receive' from the host yet}}
   var count = Tensor<Int32>(0)  // expected-warning {{value implicitly copied to the host}}
   while a.elementsEqual(1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
     if (a % 2).elementsEqual(0).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
