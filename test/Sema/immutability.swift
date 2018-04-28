@@ -433,17 +433,17 @@ func QoI() {
 func func1() -> Int { return 7 }
 
 func func2() {
-    func func3() {}
+  func func3() {}
 
-    func3() = 0 // expected-error {{expression is not assignable: 'func3' returns immutable value}}
+  func3() = 0 // expected-error {{expression is not assignable: 'func3' returns immutable value}}
 }
 
 func assignmentsToFuncs() {
 
-  LetClassMembers(arg: 7).f() = 5 // expected-error {{expression is not assignable: function call returns immutable value}}
+  LetClassMembers(arg: 7).f() = 5  // expected-error {{expression is not assignable: function call returns immutable value}}
   LetStructMembers(arg: 7).f() = 5 // expected-error {{expression is not assignable: function call returns immutable value}}
 
-  func1() = 9 // expected-error {{expression is not assignable: 'func1' returns immutable value}}
+  func1() = 9     // expected-error {{expression is not assignable: 'func1' returns immutable value}}
   func2() = "rrr" // expected-error {{expression is not assignable: 'func2' returns immutable value}}
 
   var x = 0
