@@ -117,6 +117,11 @@ namespace {
   };
 } // end anonymous namespace
 
+void Expr::setType(Type T) {
+  assert(!T || !T->hasTypeVariable());
+  Ty = T;
+}
+
 template <class T> static SourceRange getSourceRangeImpl(const T *E) {
   static_assert(isOverriddenFromExpr(&T::getSourceRange) ||
                 (isOverriddenFromExpr(&T::getStartLoc) &&

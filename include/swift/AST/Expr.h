@@ -403,7 +403,7 @@ public:
   Type getType() const { return Ty; }
 
   /// setType - Sets the type of this expression.
-  void setType(Type T) { Ty = T; }
+  void setType(Type T);
 
   /// \brief Return the source range of the expression.
   SourceRange getSourceRange() const;
@@ -717,12 +717,19 @@ public:
 /// can help us preserve the context of the code completion position.
 class CodeCompletionExpr : public Expr {
   SourceRange Range;
+  bool Activated;
+
 public:
   CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(Range) {}
+      Range(Range) {
+    Activated = false;
+  }
 
   SourceRange getSourceRange() const { return Range; }
+
+  bool isActivated() const { return Activated; }
+  void setActivated() { Activated = true; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CodeCompletion;
