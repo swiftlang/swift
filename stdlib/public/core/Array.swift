@@ -1,4 +1,4 @@
-//===--- Arrays.swift.gyb -------------------------------------*- swift -*-===//
+//===--- Array.swift ------------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,164 +12,12 @@
 //
 //  Three generic, mutable array-like types with value semantics.
 //
-//  - `ContiguousArray<Element>` is a fast, contiguous array of `Element` with
-//    a known backing store.
-//
-//  - `ArraySlice<Element>` presents an arbitrary subsequence of some
-//    contiguous sequence of `Element`s.
-//
 //  - `Array<Element>` is like `ContiguousArray<Element>` when `Element` is not
 //    a reference type or an Objective-C existential.  Otherwise, it may use
 //    an `NSArray` bridged from Cocoa for storage.
 //
 //===----------------------------------------------------------------------===//
 
-/// This type is used as a result of the _checkSubscript call to associate the
-/// call with the array access call it guards.
-@_fixed_layout
-public struct _DependenceToken {
-  @inlinable
-  public init() {
-  }
-}
-
-%{
-  arrayTypes = [
-    ('ContiguousArray', 'a `ContiguousArray` instance'),
-    ('ArraySlice', 'an `ArraySlice` instance'),
-    ('Array', 'an array'),
-  ]
-}%
-
-% for (Self, a_Self) in arrayTypes:
-
-%{
-if True:
-  contiguousCaveat = (
-    ' If no such storage exists, it is created.' if Self == 'Array'
-    else '')
-
-  if Self == 'ContiguousArray':
-    SelfDocComment = """\
-/// A contiguously stored array.
-///
-/// The `ContiguousArray` type is a specialized array that always stores its
-/// elements in a contiguous region of memory. This contrasts with `Array`,
-/// which can store its elements in either a contiguous region of memory or an
-/// `NSArray` instance if its `Element` type is a class or `@objc` protocol.
-///
-/// If your array's `Element` type is a class or `@objc` protocol and you do
-/// not need to bridge the array to `NSArray` or pass the array to Objective-C
-/// APIs, using `ContiguousArray` may be more efficient and have more
-/// predictable performance than `Array`. If the array's `Element` type is a
-/// struct or enumeration, `Array` and `ContiguousArray` should have similar
-/// efficiency.
-///
-/// For more information about using arrays, see `Array` and `ArraySlice`, with
-/// which `ContiguousArray` shares most properties and methods."""
-  elif Self == 'ArraySlice':
-    SelfDocComment = """\
-/// A slice of an `Array`, `ContiguousArray`, or `ArraySlice` instance.
-///
-/// The `ArraySlice` type makes it fast and efficient for you to perform
-/// operations on sections of a larger array. Instead of copying over the
-/// elements of a slice to new storage, an `ArraySlice` instance presents a
-/// view onto the storage of a larger array. And because `ArraySlice`
-/// presents the same interface as `Array`, you can generally perform the
-/// same operations on a slice as you could on the original array.
-///
-/// For more information about using arrays, see `Array` and `ContiguousArray`,
-/// with which `ArraySlice` shares most properties and methods.
-///
-/// Slices Are Views onto Arrays
-/// ============================
-///
-/// For example, suppose you have an array holding the number of absences
-/// from each class during a session.
-///
-///     let absences = [0, 2, 0, 4, 0, 3, 1, 0]
-///
-/// You want to compare the absences in the first half of the session with
-/// those in the second half. To do so, start by creating two slices of the
-/// `absences` array.
-///
-///     let midpoint = absences.count / 2
-///
-///     let firstHalf = absences[..<midpoint]
-///     let secondHalf = absences[midpoint...]
-///
-/// Neither the `firstHalf` nor `secondHalf` slices allocate any new storage
-/// of their own. Instead, each presents a view onto the storage of the
-/// `absences` array.
-///
-/// You can call any method on the slices that you might have called on the
-/// `absences` array. To learn which half had more absences, use the
-/// `reduce(_:_:)` method to calculate each sum.
-///
-///     let firstHalfSum = firstHalf.reduce(0, +)
-///     let secondHalfSum = secondHalf.reduce(0, +)
-///
-///     if firstHalfSum > secondHalfSum {
-///         print("More absences in the first half.")
-///     } else {
-///         print("More absences in the second half.")
-///     }
-///     // Prints "More absences in the first half."
-///
-/// - Important: Long-term storage of `ArraySlice` instances is discouraged. A
-///   slice holds a reference to the entire storage of a larger array, not
-///   just to the portion it presents, even after the original array's lifetime
-///   ends. Long-term storage of a slice may therefore prolong the lifetime of
-///   elements that are no longer otherwise accessible, which can appear to be
-///   memory and object leakage.
-///
-/// Slices Maintain Indices
-/// =======================
-///
-/// Unlike `Array` and `ContiguousArray`, the starting index for an
-/// `ArraySlice` instance isn't always zero. Slices maintain the same
-/// indices of the larger array for the same elements, so the starting
-/// index of a slice depends on how it was created, letting you perform
-/// index-based operations on either a full array or a slice.
-///
-/// Sharing indices between collections and their subsequences is an important
-/// part of the design of Swift's collection algorithms. Suppose you are
-/// tasked with finding the first two days with absences in the session. To
-/// find the indices of the two days in question, follow these steps:
-///
-/// 1) Call `firstIndex(where:)` to find the index of the first element in the
-///    `absences` array that is greater than zero.
-/// 2) Create a slice of the `absences` array starting after the index found in
-///    step 1.
-/// 3) Call `firstIndex(where:)` again, this time on the slice created in step
-///    2. Where in some languages you might pass a starting index into an
-///    `indexOf` method to find the second day, in Swift you perform the same
-///    operation on a slice of the original array.
-/// 4) Print the results using the indices found in steps 1 and 3 on the
-///    original `absences` array.
-///
-/// Here's an implementation of those steps:
-///
-///     if let i = absences.firstIndex(where: { $0 > 0 }) {                 // 1
-///         let absencesAfterFirst = absences[(i + 1)...]                   // 2
-///         if let j = absencesAfterFirst.firstIndex(where: { $0 > 0 }) {   // 3
-///             print("The first day with absences had \(absences[i]).")    // 4
-///             print("The second day with absences had \(absences[j]).")
-///         }
-///     }
-///     // Prints "The first day with absences had 2."
-///     // Prints "The second day with absences had 4."
-///
-/// In particular, note that `j`, the index of the second day with absences,
-/// was found in a slice of the original array and then used to access a value
-/// in the original `absences` array itself.
-///
-/// - Note: To safely reference the starting and ending indices of a slice,
-///   always use the `startIndex` and `endIndex` properties instead of
-///   specific values.
-"""
-  elif Self == 'Array':
-    SelfDocComment = """\
 /// An ordered, random-access collection.
 ///
 /// Arrays are one of the most commonly used data types in an app. You use
@@ -447,26 +295,14 @@ if True:
 ///
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
-///   their storage."""
-  # FIXME: Write about Array up/down-casting.
-  else:
-    raise ValueError('Unhandled case: ' + Self)
-}%
-
-${SelfDocComment}
+///   their storage.
 @_fixed_layout
-public struct ${Self}<Element>: _DestructorSafeContainer {
-  %if Self == 'Array':
+public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
     internal typealias _Buffer = _ArrayBuffer<Element>
   #else
     internal typealias _Buffer = _ContiguousArrayBuffer<Element>
   #endif
-  %elif Self == 'ArraySlice':
-    internal typealias _Buffer = _SliceBuffer<Element>
-  %else:
-    internal typealias _Buffer = _${Self.strip('_')}Buffer<Element>
-  %end
 
   @usableFromInline
   internal var _buffer: _Buffer
@@ -478,24 +314,10 @@ public struct ${Self}<Element>: _DestructorSafeContainer {
     self._buffer = _buffer
   }
 
-  %if Self == 'ArraySlice':
-  /// Initialization from an existing buffer does not have "array.init"
-  /// semantics because the caller may retain an alias to buffer.
-  @inlinable
-  internal init(_buffer buffer: _ContiguousArrayBuffer<Element>) {
-    self.init(_buffer: _Buffer(_buffer: buffer, shiftedToStartIndex: 0))
-  }
-  %end
 }
 
-extension ${Self}: RandomAccessCollection, MutableCollection {
+extension Array: RandomAccessCollection, MutableCollection {
   /// The index type for arrays, `Int`.
-  %if Self == 'ArraySlice':
-  ///
-  /// `ArraySlice` instances are not always indexed from zero. Use `startIndex`
-  /// and `endIndex` as the bounds for any element access, instead of `0` and
-  /// `count`.
-  %end
   public typealias Index = Int
 
   /// The type that represents the indices that are valid for subscripting an
@@ -503,25 +325,15 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   public typealias Indices = Range<Int>
 
   /// The type that allows iteration over an array's elements.
-  public typealias Iterator = IndexingIterator<${Self}>
+  public typealias Iterator = IndexingIterator<Array>
 
-%if Self == 'ArraySlice':
   /// The position of the first element in a nonempty array.
   ///
-  /// If the array is empty, `startIndex` is equal to `endIndex`.
-%else:
-  /// The position of the first element in a nonempty array.
-  ///
-  /// For an instance of `${Self}`, `startIndex` is always zero. If the array
+  /// For an instance of `Array`, `startIndex` is always zero. If the array
   /// is empty, `startIndex` is equal to `endIndex`.
-%end
   @inlinable
   public var startIndex: Int {
-%if Self == 'ArraySlice':
-    return _buffer.startIndex
-%else:
     return 0
-%end
   }
 
   /// The array's "past the end" position---that is, the position one greater
@@ -541,14 +353,10 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   /// If the array is empty, `endIndex` is equal to `startIndex`.
   @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Int {
-%if Self == 'ArraySlice':
-    return _buffer.endIndex
-%else:
     @inlinable
     get {
       return _getCount()
     }
-%end
   }
 
   /// Returns the position immediately after the given index.
@@ -738,10 +546,8 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   /// - Complexity: Reading an element from an array is O(1). Writing is O(1)
   ///   unless the array's storage is shared with another array, in which case
   ///   writing is O(*n*), where *n* is the length of the array.
-%if Self == 'Array':
   ///   If the array uses a bridged `NSArray` instance as its storage, the
   ///   efficiency is unspecified.
-%end
   @inlinable
   public subscript(index: Int) -> Element {
     get {
@@ -811,7 +617,7 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
 }
 
 //===--- private helpers---------------------------------------------------===//
-extension ${Self} {
+extension Array {
   /// Returns `true` if the array is native and does not need a deferred
   /// type check.  May be hoisted by the optimizer, which means its
   /// results may be stale by the time they are used if there is an
@@ -882,11 +688,7 @@ extension ${Self} {
   @inlinable
   @inline(__always)
   internal func _checkSubscript_native(_ index: Int) {
-% if Self != 'Array':
-    _buffer._checkValidSubscript(index)
-% else:
     _ = _checkSubscript(index, wasNativeTypeChecked: true)
-% end
   }
 
   /// Check that the given `index` is valid for subscripting, i.e.
@@ -898,12 +700,8 @@ extension ${Self} {
     _ index: Int, wasNativeTypeChecked: Bool
   ) -> _DependenceToken {
 #if _runtime(_ObjC)
-% if Self == 'Array':
     _buffer._checkInoutAndNativeTypeCheckedBounds(
       index, wasNativeTypeChecked: wasNativeTypeChecked)
-% else:
-    _buffer._checkValidSubscript(index)
-% end
 #else
     _buffer._checkValidSubscript(index)
 #endif
@@ -914,12 +712,8 @@ extension ${Self} {
   @inlinable
   @_semantics("array.check_index")
   internal func _checkIndex(_ index: Int) {
-    _precondition(index <= endIndex, "${Self} index is out of range")
-% if Self in ['Array', 'ContiguousArray']:
-    _precondition(index >= startIndex, "Negative ${Self} index is out of range")
-% else:
-    _precondition(index >= startIndex, "${Self} index is out of range (before startIndex)")
-% end
+    _precondition(index <= endIndex, "Array index is out of range")
+    _precondition(index >= startIndex, "Negative Array index is out of range")
   }
 
   @_semantics("array.get_element")
@@ -927,10 +721,10 @@ extension ${Self} {
   public // @testable
   func _getElement(
     _ index: Int,
-    wasNativeTypeChecked : Bool,
+    wasNativeTypeChecked: Bool,
     matchingSubscriptCheck: _DependenceToken
   ) -> Element {
-#if ${'_runtime(_ObjC)' if Self == 'Array' else 'false'}
+#if _runtime(_ObjC)
     return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
 #else
     return _buffer.getElement(index)
@@ -944,8 +738,7 @@ extension ${Self} {
   }
 }
 
-extension ${Self} : ExpressibleByArrayLiteral {
-%if Self == 'Array':
+extension Array: ExpressibleByArrayLiteral {
   // Optimized implementation for Array
   /// Creates an array from the given array literal.
   ///
@@ -964,70 +757,9 @@ extension ${Self} : ExpressibleByArrayLiteral {
   public init(arrayLiteral elements: Element...) {
     self = elements
   }
-%else:
-  /// Creates an array from the given array literal.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you use an array literal. Instead, create a new array by using an array
-  /// literal as its value. To do this, enclose a comma-separated list of
-  /// values in square brackets.
-  ///
-  /// Here, an array of strings is created from an array literal holding only
-  /// strings:
-  ///
-  ///     let ingredients: ${Self} =
-  ///           ["cocoa beans", "sugar", "cocoa butter", "salt"]
-  ///
-  /// - Parameter elements: A variadic list of elements of the new array.
-  @inlinable
-  public init(arrayLiteral elements: Element...) {
-    self.init(_buffer: ContiguousArray(elements)._buffer)
-  }
-%end
 }
 
-%if Self == 'Array':
-
-/// Returns an Array of `_count` uninitialized elements using the
-/// given `storage`, and a pointer to uninitialized memory for the
-/// first element.
-///
-/// This function is referenced by the compiler to allocate array literals.
-///
-/// - Precondition: `storage` is `_ContiguousArrayStorage`.
-@inline(__always)
-public // COMPILER_INTRINSIC
-func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
-    -> (Array<Element>, Builtin.RawPointer) {
-  let count = Int(builtinCount)
-  if count > 0 {
-    // Doing the actual buffer allocation outside of the array.uninitialized
-    // semantics function enables stack propagation of the buffer.
-    let bufferObject = Builtin.allocWithTailElems_1(
-      _ContiguousArrayStorage<Element>.self, builtinCount, Element.self)
-
-    let (array, ptr) = Array<Element>._adoptStorage(bufferObject, count: count)
-    return (array, ptr._rawValue)
-  }
-  // For an empty array no buffer allocation is needed.
-  let (array, ptr) = Array<Element>._allocateUninitialized(count)
-  return (array, ptr._rawValue)
-}
-
-// Referenced by the compiler to deallocate array literals on the
-// error path.
-@inlinable
-@_semantics("array.dealloc_uninitialized")
-public // COMPILER_INTRINSIC
-func _deallocateUninitializedArray<Element>(
-  _ array: __owned Array<Element>
-) {
-  var array = array
-  array._deallocateUninitialized()
-}
-%end
-
-extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
+extension Array: RangeReplaceableCollection, ArrayProtocol {
   /// Creates a new, empty array.
   ///
   /// This is equivalent to initializing with an empty array literal.
@@ -1081,10 +813,10 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter s: The sequence of elements to turn into an array.
   @inlinable
-  public init<S : Sequence>(_ s: S)
+  public init<S: Sequence>(_ s: S)
     where S.Element == Element {
 
-    self = ${Self}(
+    self = Array(
       _buffer: _Buffer(
         _buffer: s._copyToContiguousArray()._buffer,
         shiftedToStartIndex: 0))
@@ -1108,15 +840,15 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.init")
   public init(repeating repeatedValue: Element, count: Int) {
     var p: UnsafeMutablePointer<Element>
-    (self, p) = ${Self}._allocateUninitialized(count)
+    (self, p) = Array._allocateUninitialized(count)
     for _ in 0..<count {
       p.initialize(to: repeatedValue)
       p += 1
     }
   }
 
+  @inlinable
   @inline(never)
-  @usableFromInline
   internal static func _allocateBufferUninitialized(
     minimumCapacity: Int
   ) -> _Buffer {
@@ -1125,10 +857,10 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
-  /// Construct a ${Self} of `count` uninitialized elements.
+  /// Construct a Array of `count` uninitialized elements.
   @inlinable
   internal init(_uninitializedCount count: Int) {
-    _precondition(count >= 0, "Can't construct ${Self} with count < 0")
+    _precondition(count >= 0, "Can't construct Array with count < 0")
     // Note: Sinking this constructor into an else branch below causes an extra
     // Retain/Release.
     _buffer = _Buffer()
@@ -1136,7 +868,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
       // Creating a buffer instead of calling reserveCapacity saves doing an
       // unnecessary uniqueness check. We disable inlining here to curb code
       // growth.
-      _buffer = ${Self}._allocateBufferUninitialized(minimumCapacity: count)
+      _buffer = Array._allocateBufferUninitialized(minimumCapacity: count)
       _buffer.count = count
     }
     // Can't store count here because the buffer might be pointing to the
@@ -1144,17 +876,16 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
   /// Entry point for `Array` literal construction; builds and returns
-  /// a ${Self} of `count` uninitialized elements.
+  /// a Array of `count` uninitialized elements.
   @inlinable
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
-  ) -> (${Self}, UnsafeMutablePointer<Element>) {
-    let result = ${Self}(_uninitializedCount: count)
+  ) -> (Array, UnsafeMutablePointer<Element>) {
+    let result = Array(_uninitializedCount: count)
     return (result, result._buffer.firstElementAddress)
   }
 
-%if Self == 'Array':
 
   /// Returns an Array of `count` uninitialized elements using the
   /// given `storage`, and a pointer to uninitialized memory for the
@@ -1178,14 +909,13 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 
   /// Entry point for aborting literal construction: deallocates
-  /// a ${Self} containing only uninitialized elements.
+  /// a Array containing only uninitialized elements.
   @inlinable
   internal mutating func _deallocateUninitialized() {
     // Set the count to zero and just release as normal.
     // Somewhat of a hack.
     _buffer.count = 0
   }
-%end
 
   /// The number of elements in the array.
   @inlinable
@@ -1238,12 +968,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
     get { return _buffer.firstElementAddressIfContiguous }
   }
 
-%if Self != 'Array': # // Array does not necessarily have contiguous storage
-  @inlinable
-  internal var _baseAddress: UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress
-  }
-%end
   //===--- basic mutations ------------------------------------------------===//
 
 
@@ -1254,12 +978,10 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// unique, mutable, contiguous storage, with space allocated for at least
   /// the requested number of elements.
   ///
-% if Self != 'ContiguousArray':
   /// Calling the `reserveCapacity(_:)` method on an array with bridged storage
   /// triggers a copy to contiguous storage even if the existing storage
   /// has room to store `minimumCapacity` elements.
   ///
-% end
   /// For performance reasons, the size of the newly allocated storage might be
   /// greater than the requested capacity. Use the array's `capacity` property
   /// to determine the size of the new storage.
@@ -1337,8 +1059,8 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
+  @inlinable
   @inline(never)
-  @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
@@ -1444,7 +1166,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   @inlinable
   @_semantics("array.append_contentsOf")
-  public mutating func append<S : Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: S)
     where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
@@ -1488,51 +1210,10 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
       : newCount)
   }
 
-%if Self == 'ArraySlice':
-  @inlinable
-  public mutating func _customRemoveLast() -> Element? {
-    _precondition(count > 0, "Can't removeLast from an empty ${Self}")
-    // FIXME(performance): if `self` is uniquely referenced, we should remove
-    // the element as shown below (this will deallocate the element and
-    // decrease memory use).  If `self` is not uniquely referenced, the code
-    // below will make a copy of the storage, which is wasteful.  Instead, we
-    // should just shrink the view without allocating new storage.
-    let i = endIndex
-    // We don't check for overflow in `i - 1` because `i` is known to be
-    // positive.
-    let result = self[i &- 1]
-    self.replaceSubrange((i &- 1)..<i, with: EmptyCollection())
-    return result
-  }
-  
-  /// Removes and returns the element at the specified position.
-  ///
-  /// All the elements following the specified position are moved up to
-  /// close the gap.
-  ///
-  ///     var measurements: [Double] = [1.1, 1.5, 2.9, 1.2, 1.5, 1.3, 1.2]
-  ///     let removed = measurements.remove(at: 2)
-  ///     print(measurements)
-  ///     // Prints "[1.1, 1.5, 1.2, 1.5, 1.3, 1.2]"
-  ///
-  /// - Parameter index: The position of the element to remove. `index` must
-  ///   be a valid index of the array.
-  /// - Returns: The element at the specified index.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the array.
-  @inlinable
-  @discardableResult
-  public mutating func remove(at index: Int) -> Element {
-    let result = self[index]
-    self.replaceSubrange(index..<(index + 1), with: EmptyCollection())
-    return result
-  }
-
-%else:
   @inlinable
   public mutating func _customRemoveLast() -> Element? {
     let newCount = _getCount() - 1
-    _precondition(newCount >= 0, "Can't removeLast from an empty ${Self}")
+    _precondition(newCount >= 0, "Can't removeLast from an empty Array")
     _makeUniqueAndReserveCapacityIfNotUnique()
     let pointer = (_buffer.firstElementAddress + newCount)
     let element = pointer.move()
@@ -1568,7 +1249,6 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
     _buffer.count = newCount
     return result
   }
-%end
 
   /// Inserts a new element at the specified position.
   ///
@@ -1633,7 +1313,7 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   }
 }
 
-extension ${Self} : CustomReflectable {
+extension Array: CustomReflectable {
   /// A mirror that reflects the array.
   public var customMirror: Mirror {
     return Mirror(
@@ -1643,7 +1323,7 @@ extension ${Self} : CustomReflectable {
   }
 }
 
-extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
+extension Array: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
     return _makeCollectionDescription(for: self, withTypeName: nil)
@@ -1652,16 +1332,12 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
-%   if Self != 'Array':
-    return _makeCollectionDescription(for: self, withTypeName: "${Self}")
-%   else:
     // Always show sugared representation for Arrays.
     return _makeCollectionDescription(for: self, withTypeName: nil)
-%   end
   }
 }
 
-extension ${Self} {
+extension Array {
   @inlinable
   @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
@@ -1674,7 +1350,7 @@ extension ${Self} {
   }
 }
 
-extension ${Self} {
+extension Array {
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array
@@ -1699,7 +1375,7 @@ extension ${Self} {
   /// pointer for later use.
   ///
   /// - Parameter body: A closure with an `UnsafeBufferPointer` parameter that
-  ///   points to the contiguous storage for the array. ${contiguousCaveat} If
+  ///   points to the contiguous storage for the array.  If no such storage exists, it is created. If
   ///   `body` has a return value, that value is also used as the return value
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
@@ -1742,7 +1418,7 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///    If no such storage exists, it is created. If `body` has a return value, that value is also
   ///   used as the return value for the `withUnsafeMutableBufferPointer(_:)`
   ///   method. The pointer argument is valid only for the duration of the
   ///   method's execution.
@@ -1768,7 +1444,7 @@ extension ${Self} {
     // escape via the address of self in the closure will therefore escape the
     // empty array.
 
-    var work = ${Self}()
+    var work = Array()
     (work, self) = (self, work)
 
     // Create an UnsafeBufferPointer over work that we can pass to body
@@ -1781,7 +1457,7 @@ extension ${Self} {
       _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
-        "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+        "Array withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
 
       (work, self) = (self, work)
     }
@@ -1821,98 +1497,8 @@ extension ${Self} {
     return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
-%end
 
-// Utility method for collections that wish to implement CustomStringConvertible
-// and CustomDebugStringConvertible using a bracketed list of elements,
-// like an array.
-@inlinable // FIXME(sil-serialize-all)
-internal func _makeCollectionDescription<C : Collection>
-  (for items: C, withTypeName type: String?) -> String {
-  var result = ""
-  if let type = type {
-    result += "\(type)(["
-  } else {
-    result += "["
-  }
-  var first = true
-  for item in items {
-    if first {
-      first = false
-    } else {
-      result += ", "
-    }
-    debugPrint(item, terminator: "", to: &result)
-  }
-  result += type != nil ? "])" : "]"
-  return result
-}
-
-@usableFromInline
-@_fixed_layout
-internal struct _InitializeMemoryFromCollection<
-  C: Collection
-> : _PointerFunction {
-  @inlinable
-  internal func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
-    var p = rawMemory
-    var q = newValues.startIndex
-    for _ in 0..<count {
-      p.initialize(to: newValues[q])
-      newValues.formIndex(after: &q)
-      p += 1
-    }
-    _expectEnd(of: newValues, is: q)
-  }
-
-  @inlinable
-  internal init(_ newValues: C) {
-    self.newValues = newValues
-  }
-
-  @usableFromInline
-  internal var newValues: C
-}
-
-extension _ArrayBufferProtocol {
-  @inlinable // FIXME @useableFromInline https://bugs.swift.org/browse/SR-7588
-  @inline(never)
-  internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
-    _ bounds: Range<Int>,
-    with newValues: C,
-    count insertCount: Int
-  ) where C.Element == Element {
-
-    let growth = insertCount - bounds.count
-    let newCount = self.count + growth
-    var newBuffer = _forceCreateUniqueMutableBuffer(
-      newCount: newCount, requiredCapacity: newCount)
-
-    _arrayOutOfPlaceUpdate(
-      &newBuffer,
-      bounds.lowerBound - startIndex, insertCount,
-      _InitializeMemoryFromCollection(newValues)
-    )
-  }
-}
-
-/// A _debugPrecondition check that `i` has exactly reached the end of
-/// `s`.  This test is never used to ensure memory safety; that is
-/// always guaranteed by measuring `s` once and re-using that value.
-@inlinable
-internal func _expectEnd<C : Collection>(of s: C, is i: C.Index) {
-  _debugPrecondition(
-    i == s.endIndex,
-    "invalid Collection: count differed in successive traversals")
-}
-
-@inlinable
-internal func _growArrayCapacity(_ capacity: Int) -> Int {
-  return capacity * 2
-}
-
-% for (Self, a_Self) in arrayTypes:
-extension ${Self} {
+extension Array {
   /// Replaces a range of elements with the elements in the specified
   /// collection.
   ///
@@ -1951,17 +1537,12 @@ extension ${Self} {
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Element == Element {
-% if Self in ['Array', 'ContiguousArray']:
+  ) where C: Collection, C.Element == Element {
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
-      "${Self} replace: subrange start is negative")
-% else:
-    _precondition(subrange.lowerBound >= _buffer.startIndex,
-      "${Self} replace: subrange start is before the startIndex")
-% end
+      "Array replace: subrange start is negative")
 
     _precondition(subrange.upperBound <= _buffer.endIndex,
-      "${Self} replace: subrange extends past the end")
+      "Array replace: subrange extends past the end")
 
     let oldCount = _buffer.count
     let eraseCount = subrange.count
@@ -1978,224 +1559,8 @@ extension ${Self} {
     }
   }
 }
-% end
 
-//===--- generic helpers --------------------------------------------------===//
-
-extension _ArrayBufferProtocol {
-  /// Create a unique mutable buffer that has enough capacity to hold 'newCount'
-  /// elements and at least 'requiredCapacity' elements. Set the count of the new
-  /// buffer to 'newCount'. The content of the buffer is uninitialized.
-  /// The formula used to compute the new buffers capacity is:
-  ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
-  ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
-  @inline(never)
-  @inlinable // @specializable
-  internal func _forceCreateUniqueMutableBuffer(
-    newCount: Int, requiredCapacity: Int
-  ) -> _ContiguousArrayBuffer<Element> {
-    return _forceCreateUniqueMutableBufferImpl(
-      countForBuffer: newCount, minNewCapacity: newCount,
-      requiredCapacity: requiredCapacity)
-  }
-
-  /// Create a unique mutable buffer that has enough capacity to hold
-  /// 'minNewCapacity' elements and set the count of the new buffer to
-  /// 'countForNewBuffer'. The content of the buffer uninitialized.
-  /// The formula used to compute the new buffers capacity is:
-  ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
-  ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
-  @inline(never)
-  @inlinable // @specializable
-  internal func _forceCreateUniqueMutableBuffer(
-    countForNewBuffer: Int, minNewCapacity: Int
-  ) -> _ContiguousArrayBuffer<Element> {
-    return _forceCreateUniqueMutableBufferImpl(
-      countForBuffer: countForNewBuffer, minNewCapacity: minNewCapacity,
-      requiredCapacity: minNewCapacity)
-  }
-
-  /// Create a unique mutable buffer that has enough capacity to hold
-  /// 'minNewCapacity' elements and at least 'requiredCapacity' elements and set
-  /// the count of the new buffer to 'countForBuffer'. The content of the buffer
-  /// uninitialized.
-  /// The formula used to compute the new capacity is:
-  ///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
-  ///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
-  @inlinable
-  internal func _forceCreateUniqueMutableBufferImpl(
-    countForBuffer: Int, minNewCapacity: Int,
-    requiredCapacity: Int
-  ) -> _ContiguousArrayBuffer<Element> {
-    _sanityCheck(countForBuffer >= 0)
-    _sanityCheck(requiredCapacity >= countForBuffer)
-    _sanityCheck(minNewCapacity >= countForBuffer)
-
-    let minimumCapacity = Swift.max(requiredCapacity,
-      minNewCapacity > capacity
-         ? _growArrayCapacity(capacity) : capacity)
-
-    return _ContiguousArrayBuffer(
-      _uninitializedCount: countForBuffer, minimumCapacity: minimumCapacity)
-  }
-}
-
-@usableFromInline
-internal protocol _PointerFunction {
-  associatedtype Element
-  func call(_: UnsafeMutablePointer<Element>, count: Int)
-}
-
-extension _ArrayBufferProtocol {
-  /// Initialize the elements of dest by copying the first headCount
-  /// items from source, calling initializeNewElements on the next
-  /// uninitialized element, and finally by copying the last N items
-  /// from source into the N remaining uninitialized elements of dest.
-  ///
-  /// As an optimization, may move elements out of source rather than
-  /// copying when it isUniquelyReferenced.
-  @inline(never)
-  @inlinable // @specializable
-  internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
-    _ dest: inout _ContiguousArrayBuffer<Element>,
-    _ headCount: Int, // Count of initial source elements to copy/move
-    _ newCount: Int,  // Number of new elements to insert
-    _ initializeNewElements: Initializer
-  ) where
-    Initializer : _PointerFunction,
-    Initializer.Element == Element {
-
-    _sanityCheck(headCount >= 0)
-    _sanityCheck(newCount >= 0)
-
-    // Count of trailing source elements to copy/move
-    let sourceCount = self.count
-    let tailCount = dest.count - headCount - newCount
-    _sanityCheck(headCount + tailCount <= sourceCount)
-
-    let oldCount = sourceCount - headCount - tailCount
-    let destStart = dest.firstElementAddress
-    let newStart = destStart + headCount
-    let newEnd = newStart + newCount
-
-    // Check to see if we have storage we can move from
-    if let backing = requestUniqueMutableBackingBuffer(
-      minimumCapacity: sourceCount) {
-
-      let sourceStart = firstElementAddress
-      let oldStart = sourceStart + headCount
-
-      // Destroy any items that may be lurking in a _SliceBuffer before
-      // its real first element
-      let backingStart = backing.firstElementAddress
-      let sourceOffset = sourceStart - backingStart
-      backingStart.deinitialize(count: sourceOffset)
-
-      // Move the head items
-      destStart.moveInitialize(from: sourceStart, count: headCount)
-
-      // Destroy unused source items
-      oldStart.deinitialize(count: oldCount)
-
-      initializeNewElements.call(newStart, count: newCount)
-
-      // Move the tail items
-      newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
-
-      // Destroy any items that may be lurking in a _SliceBuffer after
-      // its real last element
-      let backingEnd = backingStart + backing.count
-      let sourceEnd = sourceStart + sourceCount
-      sourceEnd.deinitialize(count: backingEnd - sourceEnd)
-      backing.count = 0
-    }
-    else {
-      let headStart = startIndex
-      let headEnd = headStart + headCount
-      let newStart = _copyContents(
-        subRange: headStart..<headEnd,
-        initializing: destStart)
-      initializeNewElements.call(newStart, count: newCount)
-      let tailStart = headEnd + oldCount
-      let tailEnd = endIndex
-      _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
-    }
-    self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
-  }
-}
-
-@usableFromInline
-@_fixed_layout
-internal struct _IgnorePointer<T> : _PointerFunction {
-  @inlinable
-  internal func call(_: UnsafeMutablePointer<T>, count: Int) {
-    _sanityCheck(count == 0)
-  }
-
-  @inlinable
-  internal init() {
-  }
-}
-
-extension _ArrayBufferProtocol {
-  @inline(never)
-  @usableFromInline
-  internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
-
-    if _fastPath(
-        requestUniqueMutableBackingBuffer(minimumCapacity: bufferCount) != nil) {
-      return
-    }
-
-    var newBuffer = _forceCreateUniqueMutableBuffer(
-      newCount: bufferCount, requiredCapacity: bufferCount)
-    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
-  }
-
-  /// Append items from `newItems` to a buffer.
-  @inlinable
-  internal mutating func _arrayAppendSequence<S : Sequence>(
-    _ newItems: S
-  ) where S.Element == Element {
-    
-    // this function is only ever called from append(contentsOf:)
-    // which should always have exhausted its capacity before calling
-    _sanityCheck(count == capacity)
-    var newCount = self.count
-
-    // there might not be any elements to append remaining,
-    // so check for nil element first, then increase capacity,
-    // then inner-loop to fill that capacity with elements
-    var stream = newItems.makeIterator()
-    var nextItem = stream.next()
-    while nextItem != nil {
-
-      // grow capacity, first time around and when filled
-      var newBuffer = _forceCreateUniqueMutableBuffer(
-        countForNewBuffer: newCount, 
-        // minNewCapacity handles the exponential growth, just
-        // need to request 1 more than current count/capacity
-        minNewCapacity: newCount + 1)
-
-      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0, _IgnorePointer())
-
-      let currentCapacity = self.capacity
-      let base = self.firstElementAddress
-
-      // fill while there is another item and spare capacity
-      while let next = nextItem, newCount < currentCapacity {
-        (base + newCount).initialize(to: next)
-        newCount += 1
-        nextItem = stream.next()
-      }
-      self.count = newCount
-    }
-  }
-}
-
-% for (Self, a_Self) in arrayTypes:
-
-extension ${Self} : Equatable where Element : Equatable {
+extension Array: Equatable where Element: Equatable {
   /// Returns a Boolean value indicating whether two arrays contain the same
   /// elements in the same order.
   ///
@@ -2206,7 +1571,7 @@ extension ${Self} : Equatable where Element : Equatable {
   ///   - lhs: An array to compare.
   ///   - rhs: Another array to compare.
   @inlinable
-  public static func ==(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
+  public static func ==(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
     let lhsCount = lhs.count
     if lhsCount != rhs.count {
       return false
@@ -2217,21 +1582,6 @@ extension ${Self} : Equatable where Element : Equatable {
       return true
     }
 
-  %if Self == 'ArraySlice':
-
-    var streamLHS = lhs.makeIterator()
-    var streamRHS = rhs.makeIterator()
-
-    var nextLHS = streamLHS.next()
-    while nextLHS != nil {
-      let nextRHS = streamRHS.next()
-      if nextLHS != nextRHS {
-        return false
-      }
-      nextLHS = streamLHS.next()
-    }
-
-  %else:
 
     _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
     _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
@@ -2242,7 +1592,6 @@ extension ${Self} : Equatable where Element : Equatable {
         return false
       }
     }
-  %end
 
     return true
   }
@@ -2257,17 +1606,17 @@ extension ${Self} : Equatable where Element : Equatable {
   ///   - lhs: An array to compare.
   ///   - rhs: Another array to compare.
   @inlinable
-  public static func !=(lhs: ${Self}<Element>, rhs: ${Self}<Element>) -> Bool {
+  public static func !=(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
     return !(lhs == rhs)
   }
 }
 
-extension ${Self}: Hashable where Element: Hashable {
-  /// Hashes the essential components of this value by feeding them into the
-  /// given hasher.
-  ///
-  /// - Parameter hasher: The hasher to use when combining the components
-  ///   of this instance.
+extension Array: Hashable where Element: Hashable {
+  @inlinable // FIXME(sil-serialize-all)
+  public var hashValue: Int {
+    return _hashValue(for: self)
+  }
+
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // discriminator
@@ -2275,20 +1624,9 @@ extension ${Self}: Hashable where Element: Hashable {
       hasher.combine(element)
     }
   }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
-    var hasher = Hasher(_seed: seed)
-    // Note that we don't need to use delimiters/discriminators for top-level
-    // hashing.
-    for element in self {
-      hasher.combine(element)
-    }
-    return hasher._finalize()
-  }
 }
 
-extension ${Self} {
+extension Array {
   /// Calls the given closure with a pointer to the underlying bytes of the
   /// array's mutable contiguous storage.
   ///
@@ -2322,7 +1660,7 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
   ///   parameter that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///    If no such storage exists, it is created. If `body` has a return value, that value is also
   ///   used as the return value for the `withUnsafeMutableBytes(_:)` method.
   ///   The argument is valid only for the duration of the closure's
   ///   execution.
@@ -2357,7 +1695,7 @@ extension ${Self} {
   ///
   /// - Parameter body: A closure with an `UnsafeRawBufferPointer` parameter
   ///   that points to the contiguous storage for the array.
-  ///   ${contiguousCaveat} If `body` has a return value, that value is also
+  ///    If no such storage exists, it is created. If `body` has a return value, that value is also
   ///   used as the return value for the `withUnsafeBytes(_:)` method. The
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
@@ -2370,7 +1708,6 @@ extension ${Self} {
     }
   }
 }
-%end
 
 #if _runtime(_ObjC)
 // We isolate the bridging of the Cocoa Array -> Swift Array here so that
@@ -2419,18 +1756,3 @@ extension Array {
   }
 }
 #endif
-
-extension ArraySlice {
-  @inlinable
-  public // @testable
-  init(_startIndex: Int) {
-    self.init(
-      _buffer: _Buffer(
-        _buffer: ContiguousArray()._buffer,
-        shiftedToStartIndex: _startIndex))
-  }
-}
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:

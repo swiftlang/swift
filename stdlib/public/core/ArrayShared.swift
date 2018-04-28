@@ -62,7 +62,7 @@ func _deallocateUninitializedArray<Element>(
 // and CustomDebugStringConvertible using a bracketed list of elements,
 // like an array.
 @inlinable // FIXME(sil-serialize-all)
-internal func _makeCollectionDescription<C : Collection>
+internal func _makeCollectionDescription<C: Collection>
   (for items: C, withTypeName type: String?) -> String {
   var result = ""
   if let type = type {
@@ -112,7 +112,7 @@ internal struct _InitializeMemoryFromCollection<
 extension _ArrayBufferProtocol {
   @inlinable
   @inline(never)
-  internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
+  internal mutating func _arrayOutOfPlaceReplace<C: Collection>(
     _ bounds: Range<Int>,
     with newValues: C,
     count insertCount: Int
@@ -135,7 +135,7 @@ extension _ArrayBufferProtocol {
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
 @inlinable
-internal func _expectEnd<C : Collection>(of s: C, is i: C.Index) {
+internal func _expectEnd<C: Collection>(of s: C, is i: C.Index) {
   _debugPrecondition(
     i == s.endIndex,
     "invalid Collection: count differed in successive traversals")
@@ -228,7 +228,7 @@ extension _ArrayBufferProtocol {
     _ newCount: Int,  // Number of new elements to insert
     _ initializeNewElements: Initializer
   ) where
-    Initializer : _PointerFunction,
+    Initializer: _PointerFunction,
     Initializer.Element == Element {
 
     _sanityCheck(headCount >= 0)
@@ -292,7 +292,7 @@ extension _ArrayBufferProtocol {
 
 @usableFromInline
 @_fixed_layout
-internal struct _IgnorePointer<T> : _PointerFunction {
+internal struct _IgnorePointer<T>: _PointerFunction {
   @inlinable
   internal func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
@@ -320,7 +320,7 @@ extension _ArrayBufferProtocol {
 
   /// Append items from `newItems` to a buffer.
   @inlinable
-  internal mutating func _arrayAppendSequence<S : Sequence>(
+  internal mutating func _arrayAppendSequence<S: Sequence>(
     _ newItems: S
   ) where S.Element == Element {
     

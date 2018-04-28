@@ -538,7 +538,7 @@ extension ArraySlice {
   public // @testable
   func _getElement(
     _ index: Int,
-    wasNativeTypeChecked : Bool,
+    wasNativeTypeChecked: Bool,
     matchingSubscriptCheck: _DependenceToken
   ) -> Element {
 #if false
@@ -555,7 +555,7 @@ extension ArraySlice {
   }
 }
 
-extension ArraySlice : ExpressibleByArrayLiteral {
+extension ArraySlice: ExpressibleByArrayLiteral {
   /// Creates an array from the given array literal.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
@@ -577,7 +577,7 @@ extension ArraySlice : ExpressibleByArrayLiteral {
 }
 
 
-extension ArraySlice : RangeReplaceableCollection, ArrayProtocol {
+extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
   /// Creates a new, empty array.
   ///
   /// This is equivalent to initializing with an empty array literal.
@@ -631,7 +631,7 @@ extension ArraySlice : RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter s: The sequence of elements to turn into an array.
   @inlinable
-  public init<S : Sequence>(_ s: S)
+  public init<S: Sequence>(_ s: S)
     where S.Element == Element {
 
     self = ArraySlice(
@@ -958,7 +958,7 @@ extension ArraySlice : RangeReplaceableCollection, ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   @inlinable
   @_semantics("array.append_contentsOf")
-  public mutating func append<S : Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: S)
     where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
@@ -1105,7 +1105,7 @@ extension ArraySlice : RangeReplaceableCollection, ArrayProtocol {
   }
 }
 
-extension ArraySlice : CustomReflectable {
+extension ArraySlice: CustomReflectable {
   /// A mirror that reflects the array.
   public var customMirror: Mirror {
     return Mirror(
@@ -1115,7 +1115,7 @@ extension ArraySlice : CustomReflectable {
   }
 }
 
-extension ArraySlice : CustomStringConvertible, CustomDebugStringConvertible {
+extension ArraySlice: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
     return _makeCollectionDescription(for: self, withTypeName: nil)
@@ -1328,7 +1328,7 @@ extension ArraySlice {
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Element == Element {
+  ) where C: Collection, C.Element == Element {
     _precondition(subrange.lowerBound >= _buffer.startIndex,
       "ArraySlice replace: subrange start is before the startIndex")
 
@@ -1351,7 +1351,7 @@ extension ArraySlice {
   }
 }
 
-extension ArraySlice : Equatable where Element : Equatable {
+extension ArraySlice: Equatable where Element: Equatable {
   /// Returns a Boolean value indicating whether two arrays contain the same
   /// elements in the same order.
   ///

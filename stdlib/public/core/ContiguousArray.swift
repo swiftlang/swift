@@ -451,7 +451,7 @@ extension ContiguousArray {
   public // @testable
   func _getElement(
     _ index: Int,
-    wasNativeTypeChecked : Bool,
+    wasNativeTypeChecked: Bool,
     matchingSubscriptCheck: _DependenceToken
   ) -> Element {
 #if false
@@ -468,7 +468,7 @@ extension ContiguousArray {
   }
 }
 
-extension ContiguousArray : ExpressibleByArrayLiteral {
+extension ContiguousArray: ExpressibleByArrayLiteral {
   /// Creates an array from the given array literal.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
@@ -490,7 +490,7 @@ extension ContiguousArray : ExpressibleByArrayLiteral {
 }
 
 
-extension ContiguousArray : RangeReplaceableCollection, ArrayProtocol {
+extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   /// Creates a new, empty array.
   ///
   /// This is equivalent to initializing with an empty array literal.
@@ -544,7 +544,7 @@ extension ContiguousArray : RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter s: The sequence of elements to turn into an array.
   @inlinable
-  public init<S : Sequence>(_ s: S)
+  public init<S: Sequence>(_ s: S)
     where S.Element == Element {
 
     self = ContiguousArray(
@@ -867,7 +867,7 @@ extension ContiguousArray : RangeReplaceableCollection, ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the resulting array.
   @inlinable
   @_semantics("array.append_contentsOf")
-  public mutating func append<S : Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: S)
     where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
@@ -1014,7 +1014,7 @@ extension ContiguousArray : RangeReplaceableCollection, ArrayProtocol {
   }
 }
 
-extension ContiguousArray : CustomReflectable {
+extension ContiguousArray: CustomReflectable {
   /// A mirror that reflects the array.
   public var customMirror: Mirror {
     return Mirror(
@@ -1024,7 +1024,7 @@ extension ContiguousArray : CustomReflectable {
   }
 }
 
-extension ContiguousArray : CustomStringConvertible, CustomDebugStringConvertible {
+extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
     return _makeCollectionDescription(for: self, withTypeName: nil)
@@ -1238,7 +1238,7 @@ extension ContiguousArray {
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Element == Element {
+  ) where C: Collection, C.Element == Element {
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "ContiguousArray replace: subrange start is negative")
 
@@ -1261,7 +1261,7 @@ extension ContiguousArray {
   }
 }
 
-extension ContiguousArray : Equatable where Element : Equatable {
+extension ContiguousArray: Equatable where Element: Equatable {
   /// Returns a Boolean value indicating whether two arrays contain the same
   /// elements in the same order.
   ///
