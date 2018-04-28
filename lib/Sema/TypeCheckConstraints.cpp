@@ -2089,9 +2089,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   assert(exprAsBinOp == expr && "found wrong expr?");
 
   // Add type variable for the code-completion expression.
-  auto tvRHS =
-      CS.createTypeVariable(CS.getConstraintLocator(CCE), TVO_CanBindToLValue);
-  CCE->setType(tvRHS);
+  CCE->setActivated();
 
   if (auto generated = CS.generateConstraints(expr)) {
     expr = generated;
