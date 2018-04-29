@@ -72,8 +72,8 @@ public enum _ExecutionMode : Equatable {
 
   public var isTPU: Bool {
     switch self {
-      case .tpu: return true
-      default: return false
+    case .tpu: return true
+    default: return false
     }
   }
 }
@@ -133,11 +133,10 @@ public enum _RuntimeConfig {
 }
 
 private func configureRuntimeFromEnvironment() {
-  if let value = getenv("SWIFT_TENSORFLOW_ENABLE_DEBUG_LOGGING") {
-    if String(cString: value).lowercased() == "true" {
+  if let value = getenv("SWIFT_TENSORFLOW_ENABLE_DEBUG_LOGGING"),
+    String(cString: value).lowercased() == "true" {
       _RuntimeConfig.printsDebugLog = true
       debugLog("Turning on debug logging from env.")
-    }
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_VERBOSE_LOG_LEVEL") {
@@ -157,11 +156,10 @@ private func configureRuntimeFromEnvironment() {
       debugLog("Setting TPU execution with infeed from env.")
   }
 
-  if let value = getenv("SWIFT_TENSORFLOW_SYNC_EXECUTION") {
-    if String(cString: value).lowercased() == "true" {
+  if let value = getenv("SWIFT_TENSORFLOW_SYNC_EXECUTION"),
+    String(cString: value).lowercased() == "true" {
       _RuntimeConfig.usesSynchronousExecution = true
       debugLog("Using sync execution from env.")
-    }
   }
 
   if let value = getenv("SWIFT_TENSORFLOW_SERVER_ADDRESS") {
