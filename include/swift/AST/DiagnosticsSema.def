@@ -3954,6 +3954,9 @@ ERROR(empty_switch_stmt,none,
       "'switch' statement body must have at least one 'case' or 'default' "
       "block; do you want to add a default case?",())
 ERROR(non_exhaustive_switch,none, "switch must be exhaustive", ())
+ERROR(possibly_non_exhaustive_switch,none,
+      "cannot promptly guarantee switch is exhaustive", ())
+
 NOTE(missing_several_cases,none,
      "do you want to add "
      "%select{missing cases|a default clause}0"
@@ -3975,6 +3978,9 @@ NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
 WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
+WARNING(possibly_non_exhaustive_switch_warn,none,
+        "cannot promptly guarantee switch is exhaustive", ())
+
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
