@@ -2982,15 +2982,16 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
   return (id)bridgeAnythingToSwiftValueObject(src, srcType, consume);
 }
 
-/// public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
+/// public
+/// func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
+///
 /// Called by inlined stdlib code.
-#define _bridgeAnythingNonVerbatimToObjectiveC \
-  MANGLE_SYM(s38_bridgeAnythingNonVerbatimToObjectiveCyyXlxlF)
+#define _bridgeAnythingNonVerbatimToObjectiveC                                 \
+  MANGLE_SYM(s38_bridgeAnythingNonVerbatimToObjectiveCyyXlxnlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
                                           const Metadata *srcType) {
   bool shouldConsume = true;
-  SWIFT_CC_PLUSZERO_GUARD(shouldConsume = false);
   return bridgeAnythingNonVerbatimToObjectiveC(src, srcType,
                                                /*consume*/shouldConsume);
 }
