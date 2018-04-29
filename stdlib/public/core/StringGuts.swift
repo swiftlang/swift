@@ -1414,6 +1414,12 @@ extension _StringGuts {
     return _object.isContiguousASCII
   }
 
+  @inlinable
+  var _isContiguousNulTerminatedUTF8: Bool {
+    return self.isASCII && self._isNative &&
+      _object.nativeStorage(of: UInt8.self)._isNulTerminated
+  }
+
   @available(*, deprecated)
   public // SPI(Foundation)
   var _isContiguousUTF16: Bool {

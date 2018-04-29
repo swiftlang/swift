@@ -63,6 +63,13 @@ extension String {
   public func withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
+    if self._guts._isContiguousNulTerminatedUTF8 {
+      defer { _fixLifetime(self) }
+      return try body(
+        UnsafeRawPointer(
+          self._guts._unmanagedASCIIView.start
+        ).assumingMemoryBound(to: Int8.self))
+    }
     return try self.utf8CString.withUnsafeBufferPointer {
       try body($0.baseAddress!)
     }

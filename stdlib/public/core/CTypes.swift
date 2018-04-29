@@ -262,6 +262,21 @@ internal func _memcpy(
     /*volatile:*/ false._value)
 }
 
+@inlinable
+internal func _memset(
+  dest destination: UnsafeMutableRawPointer,
+  value: UInt8,
+  size: UInt
+) {
+  let dest = destination._rawValue
+  let value = value._value
+  let size = UInt64(size)._value
+  Builtin.int_memset_RawPointer_Int64(
+    dest, value, size,
+    /*alignment:*/ Int32()._value,
+    /*volatile:*/ false._value)
+}
+
 /// Copy `count` bytes of memory from `src` into `dest`.
 ///
 /// The memory regions `source..<source + count` and
@@ -280,3 +295,5 @@ internal func _memmove(
     /*alignment:*/ Int32()._value,
     /*volatile:*/ false._value)
 }
+
+

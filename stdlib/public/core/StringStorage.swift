@@ -45,6 +45,14 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
 internal typealias _ASCIIStringStorage = _SwiftStringStorage<UInt8>
 internal typealias _UTF16StringStorage = _SwiftStringStorage<UTF16.CodeUnit>
 
+extension UnsafeMutableBufferPointer {
+  internal func _memset(_ value: UInt8) {
+    let rawStart = self.baseAddress._unsafelyUnwrappedUnchecked
+    let length = UInt(self.count * MemoryLayout<Element>.stride)
+    Swift._memset(dest: rawStart, value: value, size: length)
+  }
+}
+
 @_fixed_layout
 @usableFromInline
 final class _SwiftStringStorage<CodeUnit>
@@ -80,7 +88,17 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
     storage.capacity = endAddr - storage.start
     storage.count = count
     _sanityCheck(storage.capacity >= capacity)
+
+    // Zero out excess capacity, to enable more nul-termination opportunities
+    storage.unusedBuffer._memset(0)
+
     return storage
+  }
+
+  @inlinable
+  @nonobjc
+  var _isNulTerminated: Bool {
+    return unusedBuffer.count > 0 && unusedBuffer[0] == 0
   }
 
   @inlinable
@@ -262,6 +280,7 @@ extension _SwiftStringStorage {
   }
 
   @usableFromInline // @opaque
+  @nonobjc
   internal final func _opaqueAppendInPlace(
     opaqueOther other: _StringGuts, range: Range<Int>
   ) {
@@ -293,6 +312,7 @@ extension _SwiftStringStorage {
   }
 
   @usableFromInline // @opaque
+  @nonobjc
   internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
     _sanityCheck(other._isOpaque)
     if other._isSmall {
