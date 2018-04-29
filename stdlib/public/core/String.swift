@@ -911,7 +911,6 @@ extension String {
 
   // TODO(SSO): Consider small-checking version
   @inlinable // FIXME(sil-serialize-all)
-  public
   init<CodeUnit>(_largeStorage storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _guts = _StringGuts(_large: storage)
