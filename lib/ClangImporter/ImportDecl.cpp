@@ -2529,7 +2529,7 @@ namespace {
         clang::QualType ClangType = Decl->getUnderlyingType();
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef, isInSystemModule(DC),
-            getTypedefBridgeability(ClangType), OTK_Optional);
+            getTypedefBridgeability(Decl, ClangType), OTK_Optional);
       }
 
       if (!SwiftType)
