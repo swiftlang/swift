@@ -53,7 +53,7 @@ protected:
 
   WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsPOD_t pod,
                        IsBitwiseTakable_t bt)
-    : super(type, align, pod, bt, IsNotFixedSize, TypeInfo::STIK_None) {}
+    : super(type, align, pod, bt, IsNotFixedSize, SpecialTypeInfoKind::None) {}
 
 private:
   /// Bit-cast the given pointer to the right type and assume it as an
