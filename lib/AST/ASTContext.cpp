@@ -841,7 +841,7 @@ static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
 
 /// Check whether the given function is non-generic.
 static bool isNonGenericIntrinsic(FuncDecl *fn, bool allowTypeMembers,
-                                  Type &input,
+                                  ArrayRef<AnyFunctionType::Param> &params,
                                   Type &output) {
   auto type = fn->getInterfaceType();
   if (allowTypeMembers && fn->getDeclContext()->isTypeContext()) {
@@ -854,7 +854,7 @@ static bool isNonGenericIntrinsic(FuncDecl *fn, bool allowTypeMembers,
   auto fnType = type->getAs<FunctionType>();
   if (!fnType) return false;
 
-  input = fnType->getInput()->getWithoutImmediateLabel();
+  params = fnType->getParams();
   output = fnType->getResult();
   return true;
 }
@@ -906,12 +906,13 @@ static FuncDecl *lookupOperatorFunc(const ASTContext &ctx, StringRef oper,
     if (auto resolver = ctx.getLazyResolver())
       resolver->resolveDeclSignature(funcDecl);
 
-    Type inputType, resultType;
-    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, inputType,
+    ArrayRef<AnyFunctionType::Param> params;
+    Type resultType;
+    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, params,
                                resultType))
       continue;
 
-    if (callback(inputType, resultType))
+    if (callback(params, resultType))
       return funcDecl;
   }
 
@@ -934,14 +935,15 @@ static FuncDecl *lookupLibraryIntrinsicFunc(const ASTContext &ctx,
                                             StringRef name,
                                             LazyResolver *resolver,
                                             MatchFuncCallback &callback) {
-  Type inputType, resultType;
+  ArrayRef<AnyFunctionType::Param> params;
+  Type resultType;
   auto decl = findLibraryIntrinsic(ctx, name, resolver);
   if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, inputType,
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, params,
                              resultType))
     return nullptr;
 
-  if (callback(inputType, resultType))
+  if (callback(params, resultType))
     return decl;
 
   return nullptr;
@@ -956,14 +958,13 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
 
   auto intType = getIntDecl()->getDeclaredType();
   auto boolType = getBoolDecl()->getDeclaredType();
-  auto callback = [&](Type inputType, Type resultType) {
+  auto callback = [&](ArrayRef<AnyFunctionType::Param> params,
+                      Type resultType) {
     // Check for the signature: (Int, Int) -> Bool
-    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
-    assert(tupleType);
-    return tupleType->getNumElements() == 2 &&
-        tupleType->getElementType(0)->isEqual(intType) &&
-        tupleType->getElementType(1)->isEqual(intType) &&
-        resultType->isEqual(boolType);
+    return params.size() == 2 &&
+      params[0].getType()->isEqual(intType) &&
+      params[1].getType()->isEqual(intType) &&
+      resultType->isEqual(boolType);
   };
 
   auto decl = lookupOperatorFunc<32>(*this, "==", intType, callback);
@@ -975,10 +976,12 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   if (Impl.GetBoolDecl)
     return Impl.GetBoolDecl;
 
-  auto callback = [&](Type inputType, Type resultType) {
+  auto callback = [&](ArrayRef<AnyFunctionType::Param> params,
+                      Type resultType) {
     // Look for the signature (Builtin.Int1) -> Bool
-    return isBuiltinInt1Type(inputType) &&
-        resultType->isEqual(getBoolDecl()->getDeclaredType());
+    return params.size() == 1 &&
+      isBuiltinInt1Type(params[0].getType()) &&
+      resultType->isEqual(getBoolDecl()->getDeclaredType());
   };
 
   auto decl = lookupLibraryIntrinsicFunc(*this, "_getBool", resolver, callback);
@@ -1125,11 +1128,12 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
     return Impl.UnimplementedInitializerDecl;
 
   // Look for the function.
-  Type input, output;
+  ArrayRef<AnyFunctionType::Param> params;
+  Type output;
   auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer",
                                    resolver);
   if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, params, output))
     return nullptr;
 
   // FIXME: Check inputs and outputs.
@@ -1158,19 +1162,19 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
     return Impl.IsOSVersionAtLeastDecl;
 
   // Look for the function.
-  Type input, output;
+  ArrayRef<AnyFunctionType::Param> params;
+  Type output;
   auto decl =
       findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast", resolver);
   if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
+      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, params, output))
     return nullptr;
 
   // Input must be (Builtin.Word, Builtin.Word, Builtin.Word)
-  auto inputTuple = input->getAs<TupleType>();
-  if (!inputTuple || inputTuple->getNumElements() != 3 ||
-      !isBuiltinWordType(inputTuple->getElementType(0)) ||
-      !isBuiltinWordType(inputTuple->getElementType(1)) ||
-      !isBuiltinWordType(inputTuple->getElementType(2))) {
+  if (params.size() != 3 ||
+      !isBuiltinWordType(params[0].getType()) ||
+      !isBuiltinWordType(params[1].getType()) ||
+      !isBuiltinWordType(params[2].getType())) {
     return nullptr;
   }
 

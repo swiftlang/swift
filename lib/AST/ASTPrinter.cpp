@@ -3517,7 +3517,7 @@ public:
     }
   }
 
-  void visitFunctionType(FunctionType *T) {
+  void printAnyFunctionType(AnyFunctionType *T, bool isGeneric) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
     SWIFT_DEFER {
       Printer.printStructurePost(PrintStructureKind::FunctionType);
@@ -3525,36 +3525,49 @@ public:
 
     printFunctionExtInfo(T->getExtInfo());
 
-    // If we're stripping argument labels from types, do it when printing.
-    Type inputType = T->getInput();
-    if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
-      SmallVector<TupleTypeElt, 4> elements;
-      elements.reserve(tupleTy->getNumElements());
-      for (const auto &elt : tupleTy->getElements())
-        elements.push_back(elt.getWithoutName());
-      inputType = TupleType::get(elements, inputType->getASTContext());
+    if (isGeneric) {
+      printGenericSignature(((GenericFunctionType*)T)->getGenericSignature(),
+                            PrintAST::PrintParams |
+                            PrintAST::PrintRequirements);
+      Printer << " ";
     }
 
-    bool needsParens =
-      !inputType->hasParenSugar() &&
-      !inputType->is<TupleType>();
+    Printer << "(";
 
-    if (needsParens)
-      Printer << "(";
+    bool first = true;
+    for (auto &Param : T->getParams()) {
+      Printer.printSeparator(first, ", ");
 
-    visit(inputType);
+      if (isGeneric) {
+        auto Label = Param.getLabel();
+        if (!Label.empty()) {
+          Printer << Label.str() << ": ";
+        }
+      }
 
-    if (needsParens)
-      Printer << ")";
+      printParameterFlags(Printer, Options, Param.getParameterFlags());
+      visit(Param.getType());
 
-    if (T->throws())
+      if (Param.isVariadic()) {
+        Printer << "...";
+      }
+    }
+
+    Printer << ")";
+
+    if (T->throws()) {
       Printer << " " << tok::kw_throws;
+    }
 
     Printer << " -> ";
 
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
     T->getResult().print(Printer, Options);
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+  }
+
+  void visitFunctionType(FunctionType *T) {
+    printAnyFunctionType(T, false /* isGeneric */);
   }
 
   void printGenericSignature(const GenericSignature *genericSig,
@@ -3563,36 +3576,7 @@ public:
   }
 
   void visitGenericFunctionType(GenericFunctionType *T) {
-    Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
-    SWIFT_DEFER {
-      Printer.printStructurePost(PrintStructureKind::FunctionType);
-    };
-
-    printFunctionExtInfo(T->getExtInfo());
-    printGenericSignature(T->getGenericSignature(),
-                          PrintAST::PrintParams |
-                          PrintAST::PrintRequirements);
-    Printer << " ";
-
-    bool needsParens =
-      !T->getInput()->hasParenSugar() &&
-      !T->getInput()->is<TupleType>();
-
-    if (needsParens)
-      Printer << "(";
-
-    visit(T->getInput());
-
-    if (needsParens)
-      Printer << ")";
-
-    if (T->throws())
-      Printer << " " << tok::kw_throws;
-
-    Printer << " -> ";
-    Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-    T->getResult().print(Printer, Options);
-    Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
+    printAnyFunctionType(T, true /* isGeneric */);
   }
 
   void printSILCoroutineKind(SILCoroutineKind kind) {
