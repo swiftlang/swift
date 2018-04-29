@@ -5404,6 +5404,7 @@ destination (if it returns with ``throw``).
 The rules on generic substitutions are identical to those of ``apply``.
 
 .. SWIFT_ENABLE_TENSORFLOW
+
 Automatic Differentiation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -5412,6 +5413,7 @@ only reverse-mode differentiation is implemented, but eventually instructions
 for forward-mode differentiation may be added as well.
 
 .. SWIFT_ENABLE_TENSORFLOW
+
 gradient
 ````````
 ::
