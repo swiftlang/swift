@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 //===----------------------------------------------------------------------===//
 // Ops and Convenience Methods
 //===----------------------------------------------------------------------===//
@@ -1021,7 +1020,7 @@ public extension Tensor {
   internal func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
     return #tfop("BroadcastTo", self, shape, Tidx: Int32.self);
   }
-  
+
   @_inlineable @inline(__always)
   func broadcast(to shape: TensorShape) -> Tensor {
     return broadcast(toShape: Tensor<Int32>(shape.dimensions))
