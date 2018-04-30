@@ -7933,7 +7933,9 @@ class GradientInst final
                            SingleValueInstruction> {
 private:
   friend SILBuilder;
-
+  /// The differentiation source index, i.e. the index of the result to
+  /// differentiate from.
+  unsigned SourceIndex;
   /// The number of parameters of the original function to differentiate with
   /// respect to.
   unsigned NumParamIndices;
@@ -7947,12 +7949,13 @@ private:
   FixedOperandList<1> Operands;
 
   GradientInst(SILModule &module, SILDebugLocation debugLoc, SILValue original,
-               ArrayRef<unsigned> paramIndices, bool seedable,
-               bool preservingResult);
+               unsigned Sourceindex, ArrayRef<unsigned> paramIndices,
+               bool seedable, bool preservingResult);
 
   /// A utility function for computing the SIL type of the gradient of a
   /// function, given the specified differentiation configuration options.
   static SILType getGradientSILType(SILModule &module, SILValue original,
+                                    unsigned sourceIndex,
                                     ArrayRef<unsigned> paramIndices,
                                     bool seedable, bool preservingResult);
 
@@ -7960,7 +7963,7 @@ public:
   ~GradientInst() {};
 
   static GradientInst *create(SILModule &M, SILDebugLocation debugLoc,
-                              SILValue original,
+                              SILValue original, unsigned sourceIndex,
                               ArrayRef<unsigned> paramIndices,
                               bool seedable, bool preservingResult);
 
@@ -7968,6 +7971,10 @@ public:
 
   CanSILFunctionType getOriginalType() const {
     return getOriginal()->getType().getAs<SILFunctionType>();
+  }
+                             
+  unsigned getSourceIndex() const {
+    return SourceIndex;
   }
 
   unsigned *getParameterIndicesData() {

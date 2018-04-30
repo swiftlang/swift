@@ -1507,6 +1507,9 @@ ERROR(sil_reverse_autodiff_expected_parameter_index,PointsToFirstBadToken,
 ERROR(sil_gradient_invalid_seed_type,PointsToFirstBadToken,
       "expected seed '%0' to have type %1", (StringRef, Type))
 
+ERROR(sil_gradient_expected_source_index,PointsToFirstBadToken,
+      "expected the index of the result to specify the differentiation source", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

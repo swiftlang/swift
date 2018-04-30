@@ -2637,6 +2637,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GradientInst: {
+    // Parse optional [source <index>].
+    unsigned sourceIndex = 0;
+    SourceLoc sourceIndexLoc;
+    if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
+        parseVerbatim("source") ||
+        P.parseUnsignedInteger(sourceIndex, sourceIndexLoc,
+                               diag::sil_gradient_expected_source_index) ||
+        P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+      return true;
     // Parse [wrt ...].
     SmallVector<unsigned, 8> paramIndices;
     if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
@@ -2694,7 +2703,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createGradient(
-      InstLoc, original, paramIndices, seedable, preservingResult);
+      InstLoc, original, sourceIndex, paramIndices, seedable, preservingResult);
     break;
   }
 

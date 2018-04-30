@@ -2984,6 +2984,7 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
     }
   }
   auto gradInst = RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF),
+                                           /*sourceIndex*/ 0,
                                            loweredParamIndices,
                                            /*seedable*/ false,
                                            /*preservingResult*/ isValueAndGrad);
