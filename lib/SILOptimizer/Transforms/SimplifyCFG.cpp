@@ -767,7 +767,7 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
 
 static NullablePtr<EnumElementDecl>
 getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
-                     llvm::SmallPtrSet<SILArgument *, 8> HandledArgs) {
+                     llvm::SmallPtrSet<SILArgument *, 8> &HandledArgs) {
   // Limit the number of recursions. This is an easy way to cope with cycles
   // in the SSA graph.
   if (RecursionDepth > 3)
