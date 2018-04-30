@@ -1832,7 +1832,8 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
       OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
-                   llvm::toString(std::move(Err)));
+                   llvm::toString(std::move(Err)), A->getValue());
+    return None;
   }
   return *OFM;
 }

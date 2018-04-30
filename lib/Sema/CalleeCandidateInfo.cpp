@@ -84,20 +84,6 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
   }
 }
 
-/// Helper to gather the argument labels from a tuple or paren type, for use
-/// when the AST doesn't store argument-label information properly.
-static void gatherArgumentLabels(Type type,
-                                 SmallVectorImpl<Identifier> &labels) {
-  // Handle tuple types.
-  if (auto tupleTy = dyn_cast<TupleType>(type.getPointer())) {
-    for (auto i : range(tupleTy->getNumElements()))
-      labels.push_back(tupleTy->getElement(i).getName());
-    return;
-  }
-  
-  labels.push_back(Identifier());
-}
-
 ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
                                        SmallVectorImpl<Identifier> &scratch) {
   scratch.clear();
@@ -129,13 +115,14 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
       }
     }
   }
-  
-  if (auto argType = getArgumentType()) {
-    gatherArgumentLabels(argType, scratch);
-    return scratch;
-  }
-  
-  return { };
+
+  if (!hasParameters())
+    return {};
+
+  for (const auto &param : getParameters())
+    scratch.push_back(param.getLabel());
+
+  return scratch;
 }
 
 void UncurriedCandidate::dump() const {
@@ -316,11 +303,14 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   auto *dc = candidate.getDecl()
   ? candidate.getDecl()->getInnermostDeclContext()
   : nullptr;
-  
-  auto candArgs = candidate.getUncurriedFunctionType()->getParams();
+
+  if (!candidate.hasParameters())
+    return {CC_GeneralMismatch, {}};
+
+  auto candArgs = candidate.getParameters();
   SmallVector<bool, 4> candDefaultMap;
-  computeDefaultMap(candidate.getArgumentType(), candidate.getDecl(),
-                    candidate.level, candDefaultMap);
+  computeDefaultMap(candArgs, candidate.getDecl(), candidate.level,
+                    candDefaultMap);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -763,7 +753,8 @@ void CalleeCandidateInfo::filterListArgs(ArrayRef<AnyFunctionType::Param> actual
   filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
-    if (!candidate.getArgumentType()) return { CC_GeneralMismatch, {}};
+    if (!candidate.hasParameters())
+      return {CC_GeneralMismatch, {}};
     return evaluateCloseness(candidate, actualArgs);
   });
 }
@@ -774,10 +765,10 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
   // If the argument is not present then we expect members without arguments.
   if (!argExpr) {
     return filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
-      auto inputType = candidate.getArgumentType();
       // If this candidate has no arguments, then we're a match.
-      if (!inputType) return { CC_ExactMatch, {}};
-      
+      if (!candidate.hasParameters())
+        return {CC_ExactMatch, {}};
+
       // Otherwise, if this is a function candidate with an argument, we
       // mismatch argument count.
       return { CC_ArgumentCountMismatch, {}};
@@ -890,7 +881,8 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
   // the LHS and one using the RHS type for T's.
   for (auto cand : candidates) {
-    auto type = isResult ? cand.getResultType() : cand.getArgumentType();
+    auto type = isResult ? cand.getResultType()
+                         : cand.getArgumentType(CS.getASTContext());
     if (type.isNull())
       continue;
     

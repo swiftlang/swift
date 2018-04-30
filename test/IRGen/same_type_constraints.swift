@@ -23,13 +23,13 @@ public extension P where Foo == DefaultFoo<Self> {
 }
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S21same_type_constraints1PPA2A10DefaultFooVyxG0E0RtzrlE3fooAFyF"
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S21same_type_constraints1PPA2A10DefaultFooVyxG0E0RtzrlE3fooAFyF"
 
 // <rdar://26873036> IRGen crash with derived class declaring same-type constraint on constrained associatedtype.
 public class C1<T: Equatable> { }
 public class C2<T: Equatable, U: P>: C1<T> where T == U.Foo {}
 
-// CHECK: define{{( protected)?}} swiftcc void @"$S21same_type_constraints2C1CfD"
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S21same_type_constraints2C1CfD"
 
 public protocol MyHashable {}
 public protocol DataType : MyHashable {}

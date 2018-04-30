@@ -19,10 +19,9 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
@@ -42,17 +41,18 @@ namespace llvm {
 }
 
 namespace swift {
-  class DefaultArgumentInitializer;
-  class DiagnosticEngine;
-  class Lexer;
-  class ScopeInfo;
-  struct TypeLoc;
-  class TupleType;
-  class SILParserTUStateBase;
-  class SourceManager;
-  class PersistentParserState;
   class CodeCompletionCallbacks;
+  class DefaultArgumentInitializer;
   class DelayedParsingCallbacks;
+  class DiagnosticEngine;
+  class Expr;
+  class Lexer;
+  class PersistentParserState;
+  class SILParserTUStateBase;
+  class ScopeInfo;
+  class SourceManager;
+  class TupleType;
+  struct TypeLoc;
   
   struct EnumElementInfo;
   
@@ -181,9 +181,7 @@ public:
     return L->isCodeCompletion() && !CodeCompletion;
   }
 
-  bool allowTopLevelCode() const {
-    return SF.isScriptMode();
-  }
+  bool allowTopLevelCode() const;
 
   const std::vector<Token> &getSplitTokens() { return SplitTokens; }
 
@@ -768,15 +766,33 @@ public:
   bool parseDeclAttributeList(DeclAttributes &Attributes,
                               bool &FoundCodeCompletionToken);
 
-  /// Parse the optional modifiers  before a declaration.
+  /// Parse the optional modifiers before a declaration.
   bool parseDeclModifierList(DeclAttributes &Attributes, SourceLoc &StaticLoc,
                              StaticSpellingKind &StaticSpelling);
+
+  /// Parse an availability attribute of the form
+  /// @available(*, introduced: 1.0, deprecated: 3.1).
+  /// \return \p nullptr if the platform name is invalid
+  ParserResult<AvailableAttr>
+  parseExtendedAvailabilitySpecList(SourceLoc AtLoc, SourceLoc AttrLoc,
+                                    StringRef AttrName);
+
+  /// Parse the Objective-C selector inside @objc
+  void parseObjCSelector(SmallVector<Identifier, 4> &Names,
+                         SmallVector<SourceLoc, 4> &NameLocs,
+                         bool &IsNullarySelector);
 
   /// Parse the @_specialize attribute.
   /// \p closingBrace is the expected closing brace, which can be either ) or ]
   /// \p Attr is where to store the parsed attribute
   bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
                                 SourceLoc Loc, SpecializeAttr *&Attr);
+
+  /// Parse the arguments inside the @_specialize attribute
+  bool parseSpecializeAttributeArguments(
+      swift::tok ClosingBrace, bool &DiscardAttribute, Optional<bool> &Exported,
+      Optional<SpecializeAttr::SpecializationKind> &Kind,
+      TrailingWhereClause *&TrailingWhereClause);
 
   /// Parse the @_implements attribute.
   /// \p Attr is where to store the parsed attribute

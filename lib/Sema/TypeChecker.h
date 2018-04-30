@@ -1186,7 +1186,6 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
-  /// \param options The type resolution context.
   /// \param resolver The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
@@ -1196,8 +1195,7 @@ public:
   Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
                                     GenericTypeDecl *decl,
                                     SourceLoc loc, DeclContext *dc,
-                                    MutableArrayRef<TypeLoc> genericArgs,
-                                    TypeResolutionOptions options,
+                                    ArrayRef<Type> genericArgs,
                                     GenericTypeResolver *resolver,
                                     UnsatisfiedDependency *unsatisfiedDependency);
 
@@ -2524,16 +2522,15 @@ public:
 /// \brief RAII object that cleans up the given expression if not explicitly
 /// disabled.
 class CleanupIllFormedExpressionRAII {
-  ASTContext &Context;
   Expr **expr;
 
 public:
-  CleanupIllFormedExpressionRAII(ASTContext &Context, Expr *&expr)
-    : Context(Context), expr(&expr) { }
+  CleanupIllFormedExpressionRAII(Expr *&expr)
+    : expr(&expr) { }
 
   ~CleanupIllFormedExpressionRAII();
 
-  static void doIt(Expr *expr, ASTContext &Context);
+  static void doIt(Expr *expr);
 
   /// \brief Disable the cleanup of this expression; it doesn't need it.
   void disable() {

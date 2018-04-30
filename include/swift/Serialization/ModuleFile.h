@@ -156,8 +156,6 @@ public:
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
 
-    void forceExported() { IsExported = true; }
-
     std::string getPrettyPrintedPath() const;
   };
 
@@ -398,12 +396,6 @@ private:
 
     /// Whether this module file comes from a framework.
     unsigned IsFramework : 1;
-
-    /// THIS SETTING IS OBSOLETE BUT IS STILL USED BY OLDER MODULES.
-    ///
-    /// Whether this module has a shadowed module that's part of its public
-    /// interface.
-    unsigned HasUnderlyingModule : 1;
 
     /// Whether or not ImportDecls is valid.
     unsigned ComputedImportDecls : 1;

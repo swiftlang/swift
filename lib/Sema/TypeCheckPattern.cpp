@@ -1592,8 +1592,14 @@ recur:
 ///
 bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                                             AnyFunctionType *FN) {
-  Type paramListType = FN->getInput();
-  bool hadError = paramListType->hasError();
+  llvm::SmallVector<AnyFunctionType::Param, 4> params;
+  params.reserve(FN->getNumParams());
+
+  bool hadError = false;
+  for (const auto &param : FN->getParams()) {
+    params.push_back(param);
+    hadError |= param.getType()->hasError();
+  }
 
   // Local function to check if the given type is valid e.g. doesn't have
   // errors, type variables or unresolved types related to it.
@@ -1660,45 +1666,66 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     return hadError;
   };
 
-  // Check if paramListType only contains one single tuple.
-  // If it is, then paramListType would be sugared ParenType
+  auto hasParenSugar = [](ArrayRef<AnyFunctionType::Param> params) -> bool {
+    if (params.size() == 1) {
+      const auto &param = params.front();
+      return !param.hasLabel() && !param.isVariadic();
+    }
+
+    return false;
+  };
+
+  auto getType = [](const AnyFunctionType::Param &param) -> Type {
+    auto type = param.getPlainType();
+
+    if (param.isInOut())
+      return InOutType::get(type);
+
+    if (param.isVariadic())
+      return ArraySliceType::get(type);
+
+    return type;
+  };
+
+  // Check if parameter list only contains one single tuple.
+  // If it is, then parameter type would be sugared ParenType
   // with a single underlying TupleType. In that case, check if
   // the closure argument is also one to avoid the tuple splat
   // from happening.
-  if (!hadError && paramListType->hasParenSugar()) {
-    auto underlyingTy = cast<ParenType>(paramListType.getPointer())
-      ->getUnderlyingType();
-    
+  if (!hadError && hasParenSugar(params)) {
+    auto underlyingTy = params.front().getType();
+
     if (underlyingTy->is<TupleType>() &&
         !underlyingTy->castTo<TupleType>()->getVarArgsBaseType()) {
       if (P->size() == 1)
         return handleParameter(P->get(0), underlyingTy, /*mutable*/false);
     }
-    
-    //pass
+
+    // pass (strip paren sugar)
+    params.clear();
+    FunctionType::decomposeInput(underlyingTy, params);
   }
-  
+
   // The context type must be a tuple.
-  TupleType *tupleTy = paramListType->getAs<TupleType>();
-  if (!tupleTy && !hadError) {
+  if (hasParenSugar(params) && !hadError) {
+    const auto &param = params.front();
     if (P->size() == 1) {
-      assert(P->size() == FN->getParams().size());
-      return handleParameter(P->get(0), paramListType,
-                             /*mutable*/FN->getParams().front().isInOut());
+      assert(P->size() == params.size());
+      return handleParameter(P->get(0), getType(param),
+                             /*mutable*/ param.isInOut());
     }
     diagnose(P->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
-             paramListType);
+             param.getType());
     hadError = true;
   }
   
   // The number of elements must match exactly.
   // TODO: incomplete tuple patterns, with some syntax.
-  if (!hadError && tupleTy->getNumElements() != P->size()) {
-    auto fnType = FunctionType::get(paramListType->getDesugaredType(),
-                                    FN->getResult());
-    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple,
-             fnType, tupleTy->getNumElements(),
-             P->size(), (P->size() == 1));
+  if (!hadError && params.size() != P->size()) {
+    auto fnType =
+        FunctionType::get(params, FN->getResult(), FunctionType::ExtInfo());
+    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+             params.size(), P->size(), (P->size() == 1));
     hadError = true;
   }
 
@@ -1711,8 +1738,8 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (hadError) {
       CoercionType = ErrorType::get(Context);
     } else {
-      CoercionType = tupleTy->getElement(i).getType();
-      isMutableParam = tupleTy->getElement(i).isInOut();
+      CoercionType = getType(params[i]);
+      isMutableParam = params[i].isInOut();
     }
     
     assert(param->getArgumentName().empty() &&

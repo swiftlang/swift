@@ -1697,9 +1697,18 @@ ERROR(witness_unavailable,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
+ERROR(redundant_conformance_conditional,none,
+      "conflicting conformance of %0 to protocol %1; there cannot be more "
+      "than one conformance, even with different conditional bounds",
+      (Type, DeclName))
 WARNING(redundant_conformance_adhoc,none,
         "conformance of %0 to protocol %1 was already stated in "
         "%select{the protocol's|the type's}2 module %3",
+        (Type, DeclName, bool, Identifier))
+WARNING(redundant_conformance_adhoc_conditional,none,
+        "conformance of %0 to protocol %1 conflicts with that stated in "
+        "%select{the protocol's|the type's}2 module %3 and will be ignored; "
+        "there cannot be more than one conformance, even with different conditional bounds",
         (Type, DeclName, bool, Identifier))
 NOTE(redundant_conformance_witness_ignored,none,
      "%0 %1 will not be used to satisfy the conformance to %2",
@@ -2161,6 +2170,8 @@ ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
+ERROR(broken_hashable_no_hasher,none,
+      "Hashable protocol is broken: Hasher type not found", ())
 ERROR(broken_errortype_requirement,none,
       "Error protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,none,
@@ -2909,7 +2920,7 @@ WARNING(expression_unused_result_call,none,
 WARNING(expression_unused_result_operator,none,
         "result of operator %0 is unused", (DeclName))
 WARNING(expression_unused_result_unknown, none,
-        "result of call is unused, but produces %0", (Type))
+        "result of call to %select{function|closure}0 returning %1 is unused", (bool, Type))
 WARNING(expression_unused_result, none,
         "expression of type %0 is unused", (Type))
 WARNING(expression_unused_init_result,none,
@@ -2923,6 +2934,8 @@ WARNING(expression_unused_literal,none,
 
 ERROR(assignment_lhs_not_lvalue,none,
       "cannot assign to immutable expression of type %0", (Type))
+ERROR(assignment_lhs_is_apply_expression,none,
+      "expression is not assignable: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_variable,none,
       "cannot assign to value: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_property,none,
@@ -3207,18 +3220,21 @@ ERROR(bool_intrinsics_not_found,none,
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
-      "|cannot be declared "
-      "%select{in this context|fileprivate|internal|public|open}1}0 "
-      "because its superclass is "
-      "%select{private|fileprivate|internal|%error|%error}2",
-      (bool, AccessLevel, AccessLevel, bool))
+      "|cannot be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its superclass "
+      "%select{is %select{private|fileprivate|internal|%error|%error}2"
+      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "type as a generic parameter}4",
+      (bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(class_super_access_warn,none,
-        "class %select{should be declared "
-        "%select{private|fileprivate|internal|%error|%error}2"
-        "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
-        "because its superclass is "
-        "%select{private|fileprivate|internal|%error|%error}2",
-        (bool, AccessLevel, AccessLevel, bool))
+      "class %select{should be declared "
+      "%select{private|fileprivate|internal|%error|%error}2"
+      "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its superclass "
+      "%select{is %select{private|fileprivate|internal|%error|%error}2"
+      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "type as a generic parameter}4",
+      (bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,

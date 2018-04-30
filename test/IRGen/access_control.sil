@@ -4,7 +4,7 @@ import Builtin
 import Swift
 
 public struct PublicStruct { var x: Int }
-// CHECK: @"$S14access_control12PublicStructVMn" = {{(protected )?}}constant
+// CHECK: @"$S14access_control12PublicStructVMn" = {{(dllexport )?}}{{(protected )?}}constant
 // CHECK: @"$S14access_control12PublicStructVMf" = internal constant
 
 internal struct InternalStruct { var x: Int }
@@ -21,7 +21,7 @@ func local() {
   // CHECK: @"$S14access_control5localyyF11LocalStructL_VMf" = internal constant
 }
 
-// CHECK: @"$S14access_control12PublicStructVN" = {{(protected )?}}alias
+// CHECK: @"$S14access_control12PublicStructVN" = {{(dllexport )?}}{{(protected )?}}alias
 // CHECK: @"$S14access_control14InternalStructVN" = hidden alias
 // CHECK: @"$S14access_control13PrivateStruct33_8F630B0A1EEF3ED34B761E3ED76C95A8LLVN" = internal alias
 // CHECK: @"$S14access_control5localyyF11LocalStructL_VN" = internal alias

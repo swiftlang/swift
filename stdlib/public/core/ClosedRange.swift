@@ -174,7 +174,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
       hasher.combine(0 as Int8)
@@ -308,6 +308,12 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element <= upperBound
               ? .inRange(element) : nil
   }
+
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(element)
+  }
 }
 
 extension Comparable {  
@@ -395,7 +401,7 @@ extension ClosedRange: Hashable where Bound: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(lowerBound)
     hasher.combine(upperBound)
   }

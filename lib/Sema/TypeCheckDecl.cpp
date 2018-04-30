@@ -1849,51 +1849,41 @@ static void checkGenericParamAccess(TypeChecker &TC,
     return;
 
   // This must stay in sync with diag::generic_param_access.
-  enum {
-    ACEK_Parameter = 0,
-    ACEK_Requirement
+  enum ACEK {
+    Parameter = 0,
+    Requirement
   } accessControlErrorKind;
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
   auto downgradeToWarning = DowngradeToWarning::Yes;
 
+  auto callbackACEK = ACEK::Parameter;
+
+  auto callback = [&](AccessScope typeAccessScope,
+                      const TypeRepr *thisComplainRepr,
+                      DowngradeToWarning thisDowngrade) {
+    if (typeAccessScope.isChildOf(minAccessScope) ||
+        (thisDowngrade == DowngradeToWarning::No &&
+         downgradeToWarning == DowngradeToWarning::Yes) ||
+        (!complainRepr &&
+         typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+      minAccessScope = typeAccessScope;
+      complainRepr = thisComplainRepr;
+      accessControlErrorKind = callbackACEK;
+      downgradeToWarning = thisDowngrade;
+    }
+  };
   for (auto param : *params) {
     if (param->getInherited().empty())
       continue;
     assert(param->getInherited().size() == 1);
     checkTypeAccessImpl(TC, param->getInherited().front(), accessScope,
                         owner->getDeclContext(),
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *thisComplainRepr,
-                            DowngradeToWarning thisDowngrade) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (thisDowngrade == DowngradeToWarning::No &&
-           downgradeToWarning == DowngradeToWarning::Yes) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        accessControlErrorKind = ACEK_Parameter;
-        downgradeToWarning = thisDowngrade;
-      }
-    });
+                        callback);
   }
+  callbackACEK = ACEK::Requirement;
 
   for (auto &requirement : params->getRequirements()) {
-    auto callback = [&](AccessScope typeAccessScope,
-                        const TypeRepr *thisComplainRepr,
-                        DowngradeToWarning thisDowngrade) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (thisDowngrade == DowngradeToWarning::No &&
-           downgradeToWarning == DowngradeToWarning::Yes) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        accessControlErrorKind = ACEK_Requirement;
-        downgradeToWarning = thisDowngrade;
-      }
-    };
     switch (requirement.getKind()) {
     case RequirementReprKind::TypeConstraint:
       checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
@@ -2232,12 +2222,13 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         bool isExplicit = CD->getAttrs().hasAttribute<AccessControlAttr>();
         auto diagID = diag::class_super_access;
         if (downgradeToWarning == DowngradeToWarning::Yes ||
-            outerDowngradeToWarning == DowngradeToWarning::Yes) {
+            outerDowngradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::class_super_access_warn;
-        }
+
         auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
                                 typeAccess,
-                                isa<FileUnit>(CD->getDeclContext()));
+                                isa<FileUnit>(CD->getDeclContext()),
+                                superclassLocIter->getTypeRepr() != complainRepr);
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
@@ -4822,18 +4813,18 @@ public:
 
     // Determine the input and result types of this function.
     auto fnType = type->castTo<AnyFunctionType>();
-    Type inputType = fnType->getInput();
+    auto parameters = fnType->getParams();
     Type resultType = dropResultOptionality(fnType->getResult(),
                                             uncurryLevel - 1);
 
     // Produce the resulting function type.
     if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
       return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                      inputType, resultType,
+                                      parameters, resultType,
                                       fnType->getExtInfo());
     }
 
-    return FunctionType::get(inputType, resultType, fnType->getExtInfo());
+    return FunctionType::get(parameters, resultType, fnType->getExtInfo());
   }
 
   static bool
@@ -5031,8 +5022,12 @@ public:
       if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
         // Special-case initializers, whose "type" isn't useful besides the
         // input arguments.
-        baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
-        Type argTy = baseTy->getAs<AnyFunctionType>()->getInput();
+        auto *fnType = baseTy->getAs<AnyFunctionType>();
+        baseTy = fnType->getResult();
+        Type argTy = FunctionType::composeInput(TC.Context,
+                                                baseTy->getAs<AnyFunctionType>()
+                                                      ->getParams(),
+                                                false);
         auto diagKind = diag::override_type_mismatch_with_fixits_init;
         unsigned numArgs = baseInit->getParameters()->size();
         activeDiag.emplace(TC.diagnose(decl, diagKind,
@@ -5225,8 +5220,9 @@ public:
       // For subscripts, we don't have a 'Self' type, but turn it
       // into a monomorphic function type.
       auto funcTy = declTy->castTo<AnyFunctionType>();
-      declTy = FunctionType::get(funcTy->getInput(),
-                                 funcTy->getResult());
+      declTy = FunctionType::get(funcTy->getParams(),
+                                 funcTy->getResult(),
+                                 FunctionType::ExtInfo());
     } else {
       // For properties, strip off ownership.
       declTy = declTy->getReferenceStorageReferent();
@@ -6938,29 +6934,26 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         if (!aliasDecl->isGeneric()) {
           aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
 
-          // If the underlying alias declaration has a type parameter,
-          // we have unresolved dependent member types we will need to deal
-          // with. Wipe out the types and validate them again.
-          // FIXME: We never should have recorded such a type in the first
-          // place.
-          if (!aliasDecl->getUnderlyingTypeLoc().getType() ||
-              aliasDecl->getUnderlyingTypeLoc().getType()
-                ->findUnresolvedDependentMemberType()) {
-            aliasDecl->getUnderlyingTypeLoc().setType(Type(),
-                                                      /*validated=*/false);
-            validateAccessControl(aliasDecl);
+          // The generic environment didn't exist until now, we may have
+          // unresolved types we will need to deal with, and need to record the
+          // appropriate substitutions for that environment. Wipe out the types
+          // and validate them again.
+          aliasDecl->getUnderlyingTypeLoc().setType(Type(),
+                                                    /*validated=*/false);
+          aliasDecl->setInterfaceType(Type());
 
-            // Check generic parameters, if needed.
-            bool validated = aliasDecl->hasValidationStarted();
+          validateAccessControl(aliasDecl);
+
+          // Check generic parameters, if needed.
+          bool validated = aliasDecl->hasValidationStarted();
+          if (!validated)
+            aliasDecl->setIsBeingValidated();
+          SWIFT_DEFER {
             if (!validated)
-              aliasDecl->setIsBeingValidated();
-            SWIFT_DEFER {
-              if (!validated)
-                aliasDecl->setIsBeingValidated(false);
-            };
+              aliasDecl->setIsBeingValidated(false);
+          };
 
-            validateTypealiasType(*this, aliasDecl);
-          }
+          validateTypealiasType(*this, aliasDecl);
         }
       }
     }
@@ -7000,41 +6993,58 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     break;
   }
 
-  case DeclKind::Var:
   case DeclKind::Param: {
-    auto VD = cast<VarDecl>(D);
+    // FIXME: This case is hit when code completion occurs in a function
+    // parameter list. Previous parameters are definitely in scope, but
+    // we don't really know how to type-check them.
+    // We can also hit this when code-completing in a closure body.
+    //
+    // FIXME: Also, note that we don't call setValidationStarted() here,
+    // because the ExprCleanser clears the type of ParamDecls, so we
+    // can end up here multiple times for the same ParamDecl.
+    auto *PD = cast<ParamDecl>(D);
+    if (!PD->hasInterfaceType())
+      PD->markInvalid();
 
-    if (PatternBindingDecl *PBD = VD->getParentPatternBinding())
-      if (PBD->isBeingValidated())
-        return;
+    break;
+  }
+
+  case DeclKind::Var: {
+    auto *VD = cast<VarDecl>(D);
+    auto *PBD = VD->getParentPatternBinding();
+
+    // Note that we need to handle the fact that some VarDecls don't
+    // have a PatternBindingDecl, for example the iterator in a
+    // 'for ... in ...' loop.
+    if (PBD == nullptr) {
+      if (!VD->hasInterfaceType()) {
+        VD->setValidationStarted();
+        VD->markInvalid();
+      }
+
+      break;
+    }
+
+    // If we're already checking our PatternBindingDecl, bail out
+    // without setting our own 'is being validated' flag, since we
+    // will attempt validation again later.
+    if (PBD->isBeingValidated())
+      return;
 
     D->setIsBeingValidated();
 
     if (!VD->hasInterfaceType()) {
-      if (VD->isSelfParameter()) {
-        if (!VD->hasInterfaceType()) {
-          VD->setInterfaceType(ErrorType::get(Context));
-          VD->setInvalid();
-        }
-        recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
-      } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        validatePatternBindingEntries(*this, PBD);
+      // Attempt to infer the type using initializer expressions.
+      validatePatternBindingEntries(*this, PBD);
 
-        auto parentPattern = VD->getParentPattern();
-        if (PBD->isInvalid() || !parentPattern->hasType()) {
-          parentPattern->setType(ErrorType::get(Context));
-          setBoundVarsTypeError(parentPattern, Context);
-        }
-      } else {
-        // FIXME: This case is hit when code completion occurs in a function
-        // parameter list. Previous parameters are definitely in scope, but
-        // we don't really know how to type-check them.
-        // We can also hit this when code-completing in a closure body.
-        assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
-               isa<AbstractClosureExpr>(D->getDeclContext()) ||
-               isa<TopLevelCodeDecl>(D->getDeclContext()));
-        VD->markInvalid();
+      auto parentPattern = VD->getParentPattern();
+      if (PBD->isInvalid() || !parentPattern->hasType()) {
+        parentPattern->setType(ErrorType::get(Context));
+        setBoundVarsTypeError(parentPattern, Context);
       }
+
+      // Should have set a type above.
+      assert(VD->hasInterfaceType());
     }
 
     // We're not really done with processing the signature yet, but
@@ -8033,14 +8043,14 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       }
     };
 
-    // If the class is Encodable or Decodable, force those
-    // conformances to ensure that the init(from:) and
-    // encode(to:) members appear in the vtable.
+    // If the class is Encodable, Decodable or Hashable, force those
+    // conformances to ensure that the synthesized members appear in the vtable.
     //
     // FIXME: Generalize this to other protocols for which
     // we can derive conformances.
     useConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
     useConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
+    useConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
   }
 
   // validateDeclForNameLookup will not trigger an immediate full

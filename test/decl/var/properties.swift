@@ -1237,4 +1237,15 @@ struct SR3893 {
   var plain: SR3893Box = SR3893Box(value: 0)
 }
 
+protocol WFI_P1 : class {}
+protocol WFI_P2 : class {}
 
+class WeakFixItTest {
+  init() {}
+
+  // expected-error @+1 {{'weak' variable should have optional type 'WeakFixItTest?'}} {{31-31=?}}
+  weak var foo : WeakFixItTest
+
+  // expected-error @+1 {{'weak' variable should have optional type '(WFI_P1 & WFI_P2)?'}} {{18-18=(}} {{33-33=)?}}
+  weak var bar : WFI_P1 & WFI_P2
+}

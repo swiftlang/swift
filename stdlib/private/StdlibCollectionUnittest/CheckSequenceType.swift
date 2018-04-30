@@ -149,7 +149,7 @@ public struct FindTest {
 
   public init(
     expected: Int?, element: Int, sequence: [Int],
-    expectedLeftoverSequence: [Int],
+    expectedLeftoverSequence: [Int] = [],
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected

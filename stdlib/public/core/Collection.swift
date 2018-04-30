@@ -621,8 +621,8 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   of the collection.
   var count: Int { get }
   
-  // The following requirements enable dispatching for firstIndex(of:) when
-  // the element type is Equatable.
+  // The following requirements enable dispatching for firstIndex(of:) and
+  // lastIndex(of:) when the element type is Equatable.
 
   /// Returns `Optional(Optional(index))` if an element was found
   /// or `Optional(nil)` if an element was determined to be missing;
@@ -630,6 +630,18 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// - Complexity: O(*n*)
   func _customIndexOfEquatableElement(_ element: Element) -> Index??
+
+  /// Customization point for `Collection.lastIndex(of:)`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(*n*) by exploiting collection-specific knowledge.
+  ///
+  /// - Returns: `nil` if a linear search should be attempted instead,
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
+  ///
+  /// - Complexity: Hopefully less than O(`count`).
+  func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
 
   /// The first element of the collection.
   ///
@@ -1194,6 +1206,22 @@ extension Collection {
   @inlinable
   public // dispatching
   func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
+    return nil
+  }
+
+  /// Customization point for `Collection.lastIndex(of:)`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(*n*) by exploiting collection-specific knowledge.
+  ///
+  /// - Returns: `nil` if a linear search should be attempted instead,
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
+  ///
+  /// - Complexity: Hopefully less than O(`count`).
+  @inlinable
+  public // dispatching
+  func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
     return nil
   }
 }

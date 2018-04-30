@@ -1043,7 +1043,6 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::LinkLibraryLayout LinkLibrary(Out);
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
-  input_block::ModuleFlagsLayout ModuleFlags(Out);
   input_block::SearchPathLayout SearchPath(Out);
 
   if (options.SerializeOptionsForDebugging) {
@@ -3631,10 +3630,7 @@ void Serializer::writeType(Type ty) {
                              addTypeRef(alias->getParent()),
                              addTypeRef(alias->getSinglyDesugaredType()));
     // Write the set of substitutions.
-    SmallVector<Substitution, 4> flatSubs;
-    if (auto genericSig = typeAlias->getGenericSignature())
-      genericSig->getSubstitutions(alias->getSubstitutionMap(), flatSubs);
-    writeSubstitutions(flatSubs, DeclTypeAbbrCodes);
+    writeSubstitutions(alias->getSubstitutionList(), DeclTypeAbbrCodes);
     break;
   }
 

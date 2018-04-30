@@ -219,16 +219,7 @@ bool swift::immediate::IRGenImportedModules(
     AllLinkLibraries.push_back(linkLib);
   };
 
-  M->forAllVisibleModules({}, /*includePrivateTopLevelImports=*/true,
-                          [&](ModuleDecl::ImportedModule import) {
-    import.second->collectLinkLibraries(addLinkLibrary);
-  });
-
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  for (const auto &linkLib :
-          irgen::collectLinkLibrariesFromExternals(CI.getASTContext())) {
-    addLinkLibrary(linkLib);
-  }
+  M->collectLinkLibraries(addLinkLibrary);
 
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
                    CI.getDiags());

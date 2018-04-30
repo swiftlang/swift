@@ -1531,7 +1531,7 @@ extension ${Self} : Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     var v = self
     if isZero {
       // To satisfy the axiom that equality implies hash equality, we need to

@@ -650,6 +650,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
             bindExtensionDecl(ED, TC);
         }
       }
+
+      return true;
     });
 
     // Type check the top-level elements of the source file.

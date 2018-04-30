@@ -17,8 +17,7 @@ DeclModifierSyntax getCannedDeclModifier() {
   auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
-  return SyntaxFactory::makeDeclModifier(Private,
-    SyntaxFactory::makeTokenList({ LParen, Set, RParen}));
+  return SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
 }
 
 TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
@@ -41,13 +40,12 @@ TEST(DeclSyntaxTests, DeclModifierGetAPIs) {
   auto LParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto Set = SyntaxFactory::makeIdentifier("set", {}, {});
   auto RParen = SyntaxFactory::makeRightParenToken({}, {});
-  auto Mod = SyntaxFactory::makeDeclModifier(Private,
-    SyntaxFactory::makeTokenList({LParen, Set, RParen}));
+  auto Mod = SyntaxFactory::makeDeclModifier(Private, LParen, Set, RParen);
 
   ASSERT_EQ(Private.getRaw(), Mod.getName().getRaw());
-  ASSERT_EQ(LParen.getRaw(), Mod.getDetail().getValue()[0].getRaw());
-  ASSERT_EQ(Set.getRaw(), Mod.getDetail().getValue()[1].getRaw());
-  ASSERT_EQ(RParen.getRaw(), Mod.getDetail().getValue()[2].getRaw());
+  ASSERT_EQ(LParen.getRaw(), Mod.getDetailLeftParen()->getRaw());
+  ASSERT_EQ(Set.getRaw(), Mod.getDetail()->getRaw());
+  ASSERT_EQ(RParen.getRaw(), Mod.getDetailRightParen()->getRaw());
 }
 
 TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
@@ -59,9 +57,11 @@ TEST(DeclSyntaxTests, DeclModifierWithAPIs) {
   SmallString<24> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   SyntaxFactory::makeBlankDeclModifier()
-    .withName(Private)
-    .withDetail(SyntaxFactory::makeTokenList({LParen, Set, RParen}))
-    .print(OS);
+      .withName(Private)
+      .withDetailLeftParen(LParen)
+      .withDetail(Set)
+      .withDetailRightParen(RParen)
+      .print(OS);
   ASSERT_EQ(OS.str().str(), "private(set)");
 }
 
@@ -467,12 +467,12 @@ ModifierListSyntax getCannedModifiers() {
   auto NoLParen = TokenSyntax::missingToken(tok::l_paren, "(");
   auto NoArgument = TokenSyntax::missingToken(tok::identifier, "");
   auto NoRParen = TokenSyntax::missingToken(tok::r_paren, ")");
-  auto Public = SyntaxFactory::makeDeclModifier(PublicID,
-    SyntaxFactory::makeTokenList({NoLParen, NoArgument, NoRParen}));
+  auto Public =
+      SyntaxFactory::makeDeclModifier(PublicID, NoLParen, NoArgument, NoRParen);
 
   auto StaticKW = SyntaxFactory::makeStaticKeyword({}, Trivia::spaces(1));
-  auto Static = SyntaxFactory::makeDeclModifier(StaticKW,
-    SyntaxFactory::makeTokenList({NoLParen, NoArgument, NoRParen}));
+  auto Static =
+      SyntaxFactory::makeDeclModifier(StaticKW, NoLParen, NoArgument, NoRParen);
 
   return SyntaxFactory::makeBlankModifierList()
     .appending(Public)

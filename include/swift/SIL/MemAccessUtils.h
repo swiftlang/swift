@@ -276,6 +276,11 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 /// storage.
 AccessedStorage findAccessedStorageOrigin(SILValue sourceAddr);
 
+/// Return true if the given address operand is used by a memory operation that
+/// initializes the memory at that address, implying that the previous value is
+/// uninitialized.
+bool memInstMustInitialize(Operand *memOper);
+
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
 ///

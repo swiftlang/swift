@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 protocol A { func a() }
 protocol B { func b() }

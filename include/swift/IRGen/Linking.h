@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_LINKING_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
@@ -45,7 +46,7 @@ public:
 
   bool IsWholeModule;
 
-  UniversalLinkageInfo(IRGenModule &IGM);
+  explicit UniversalLinkageInfo(IRGenModule &IGM);
 
   UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
                        bool isWholeModule);
@@ -844,17 +845,15 @@ class LinkInfo {
 
 public:
   /// Compute linkage information for the given
+  static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
+                      ForDefinition_t forDefinition);
+
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       ModuleDecl *swiftModule, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 
-  static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
-                      ForDefinition_t forDefinition);
-  
-  static LinkInfo get(const UniversalLinkageInfo &linkInfo,
-                      StringRef name,
-                      SILLinkage linkage,
-                      ForDefinition_t isDefinition,
+  static LinkInfo get(const UniversalLinkageInfo &linkInfo, StringRef name,
+                      SILLinkage linkage, ForDefinition_t isDefinition,
                       bool isWeakImported);
 
   StringRef getName() const {
