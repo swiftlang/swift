@@ -53,7 +53,6 @@ public:
 };
 
 class OutputFilesComputer {
-  const llvm::opt::ArgList &Args;
   DiagnosticEngine &Diags;
   const FrontendInputsAndOutputs &InputsAndOutputs;
   const std::vector<std::string> OutputFileArguments;

@@ -133,7 +133,7 @@ OutputFilesComputer::OutputFilesComputer(
     const FrontendOptions::ActionType requestedAction,
     const llvm::opt::Arg *moduleNameArg, const StringRef suffix,
     const bool hasTextualOutput)
-    : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
+    : Diags(diags), InputsAndOutputs(inputsAndOutputs),
       OutputFileArguments(outputFileArguments),
       OutputDirectoryArgument(outputDirectoryArgument), FirstInput(firstInput),
       RequestedAction(requestedAction), ModuleNameArg(moduleNameArg),
