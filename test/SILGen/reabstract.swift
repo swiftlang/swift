@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name reabstract -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name reabstract -Xllvm -sil-full-demangle -emit-sil -enable-sil-ownership %s | %FileCheck %s --check-prefix=MANDATORY
+// RUN: %target-swift-emit-silgen -module-name reabstract -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name reabstract -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s --check-prefix=MANDATORY
 
 func takeFn<T>(_ f : (T) -> T?) {}
 func liftOptional(_ x : Int) -> Int? { return x }
