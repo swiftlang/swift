@@ -331,7 +331,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
 /// including arguments to @noescape functions that are passed as closures to
 /// the current call.
 static void visitApplyAccesses(ApplySite apply,
-                               std::function<void(Operand *)> visitor) {
+                               llvm::function_ref<void(Operand *)> visitor) {
   for (Operand &oper : apply.getArgumentOperands()) {
     // Consider any address-type operand an access. Whether it is read or modify
     // depends on the argument convention.
@@ -355,7 +355,7 @@ static void visitApplyAccesses(ApplySite apply,
 }
 
 static void visitBuiltinAddress(BuiltinInst *builtin,
-                                std::function<void(Operand *)> visitor) {
+                                llvm::function_ref<void(Operand *)> visitor) {
   if (auto kind = builtin->getBuiltinKind()) {
     switch (kind.getValue()) {
     default:
@@ -430,7 +430,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
 }
 
 void swift::visitAccessedAddress(SILInstruction *I,
-                                 std::function<void(Operand *)> visitor) {
+                                 llvm::function_ref<void(Operand *)> visitor) {
   assert(I->mayReadOrWriteMemory());
 
   // Reference counting instructions do not access user visible memory.
