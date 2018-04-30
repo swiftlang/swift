@@ -29,6 +29,7 @@
 #define SWIFT_AST_SUBSTITUTION_MAP_H
 
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -76,13 +77,11 @@ class SubstitutionMap {
 
   MutableArrayRef<Type> getReplacementTypes();
 
+  SubstitutionMap(GenericSignature *genericSig);
+
 public:
   SubstitutionMap()
     : SubstitutionMap(static_cast<GenericSignature *>(nullptr)) { }
-
-  SubstitutionMap(GenericSignature *genericSig);
-
-  SubstitutionMap(GenericEnvironment *genericEnv);
 
   SubstitutionMap(SubstitutionMap &&other) = default;
   SubstitutionMap &operator=(SubstitutionMap &&other) = default;
@@ -92,6 +91,18 @@ public:
   SubstitutionMap &operator=(const SubstitutionMap &other);
 
   ~SubstitutionMap();
+
+  /// Build an interface type substitution map for the given generic
+  /// signature and a vector of Substitutions that correspond to the
+  /// requirements of this generic signature.
+  static SubstitutionMap get(GenericSignature *genericSig,
+                             SubstitutionList substitutions);
+
+  /// Build an interface type substitution map for the given generic signature
+  /// from a type substitution function and conformance lookup function.
+  static SubstitutionMap get(GenericSignature *genericSig,
+                             TypeSubstitutionFn subs,
+                             LookupConformanceFn lookupConformance);
 
   /// Retrieve the generic signature describing the environment in which
   /// substitutions occur.

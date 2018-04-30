@@ -55,9 +55,6 @@ SubstitutionMap::SubstitutionMap(GenericSignature *genericSig) : genericSig(gene
   }
 }
 
-SubstitutionMap::SubstitutionMap(GenericEnvironment *genericEnv)
-  : SubstitutionMap(genericEnv->getGenericSignature()) { }
-
 SubstitutionMap::SubstitutionMap(const SubstitutionMap &other)
   : SubstitutionMap(other.getGenericSignature())
 {
@@ -97,6 +94,74 @@ bool SubstitutionMap::hasDynamicSelf() const {
       return true;
   }
   return false;
+}
+
+SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
+                                     SubstitutionList substitutions) {
+  SubstitutionMap result(genericSig);
+
+  genericSig->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
+      auto sub = substitutions.front();
+      substitutions = substitutions.slice(1);
+
+      auto canTy = depTy->getCanonicalType();
+      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
+        result.addSubstitution(paramTy,
+                               sub.getReplacement());
+
+      auto conformances = sub.getConformances();
+      assert(reqts.size() == conformances.size());
+
+      for (unsigned i = 0, e = conformances.size(); i < e; i++) {
+        assert(reqts[i].getSecondType()->getAnyNominal() ==
+               conformances[i].getRequirement());
+        result.addConformance(canTy, conformances[i]);
+      }
+
+      return false;
+    });
+
+  assert(substitutions.empty() && "did not use all substitutions?!");
+  result.verify();
+  return result;
+}
+
+/// Build an interface type substitution map for the given generic signature
+/// from a type substitution function and conformance lookup function.
+SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
+                                     TypeSubstitutionFn subs,
+                                     LookupConformanceFn lookupConformance) {
+  SubstitutionMap subMap(genericSig);
+
+  // Enumerate all of the requirements that require substitution.
+  genericSig->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqs) {
+      auto canTy = depTy->getCanonicalType();
+
+      // Compute the replacement type.
+      Type currentReplacement = depTy.subst(subs, lookupConformance,
+                                            SubstFlags::UseErrorType);
+      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
+        if (!currentReplacement->hasError())
+          subMap.addSubstitution(paramTy, currentReplacement);
+
+      // Collect the conformances.
+      for (auto req: reqs) {
+        assert(req.getKind() == RequirementKind::Conformance);
+        auto protoType = req.getSecondType()->castTo<ProtocolType>();
+        if (auto conformance = lookupConformance(canTy,
+                                                 currentReplacement,
+                                                 protoType)) {
+          subMap.addConformance(canTy, *conformance);
+        }
+      }
+
+      return false;
+    });
+
+  subMap.verify();
+  return subMap;
 }
 
 Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
@@ -276,6 +341,21 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 void SubstitutionMap::
 addConformance(CanType type, ProtocolConformanceRef conformance) {
   assert(!isa<ArchetypeType>(type));
+#ifndef NDEBUG
+  bool found = false;
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance) continue;
+    if (!req.getFirstType()->isEqual(type)) continue;
+    if (req.getSecondType()->castTo<ProtocolType>()->getDecl() !=
+          conformance.getRequirement())
+      continue;
+
+    found = true;
+    break;
+  }
+  assert(found && "Added irrelevant conformance to substitution map");
+#endif
+
   conformanceMap[type].push_back(conformance);
 }
 
