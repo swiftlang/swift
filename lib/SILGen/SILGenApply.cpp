@@ -1693,13 +1693,7 @@ public:
     /// This is a true inout argument.
     InOut,
 
-    /// This is a borrowed direct argument.
-    BorrowDirect,
-
-    /// This is a borrowed indirect argument.
-    BorrowIndirect,
-
-    LastLVKindWithoutExtra = BorrowIndirect,
+    LastLVKindWithoutExtra = InOut,
 
     /// The l-value needs to be converted to a pointer type.
     LValueToPointer,
@@ -1832,10 +1826,6 @@ public:
     switch (Kind) {
     case InOut:
       return emitInOut(SGF);
-    case BorrowDirect:
-      return emitBorrowDirect(SGF);
-    case BorrowIndirect:
-      return emitBorrowIndirect(SGF);
     case LValueToPointer:
     case LValueArrayToPointer:
     case RValueArrayToPointer:
@@ -1917,8 +1907,6 @@ private:
 
     switch (Kind) {
     case InOut:
-    case BorrowDirect:
-    case BorrowIndirect:
       llvm_unreachable("no original expr to finish in these cases");
 
     case LValueToPointer:
