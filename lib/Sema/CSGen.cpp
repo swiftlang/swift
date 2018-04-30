@@ -562,7 +562,7 @@ namespace {
   /// overloads which inhibit any overload from being favored.
   void favorCallOverloads(ApplyExpr *expr,
                           ConstraintSystem &CS,
-                          std::function<bool(ValueDecl *)> isFavored,
+                          llvm::function_ref<bool(ValueDecl *)> isFavored,
                           std::function<bool(ValueDecl *)>
                               mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.

@@ -993,8 +993,9 @@ private:
 
   bool diagnoseTrailingClosureErrors(ApplyExpr *expr);
 
-  bool diagnoseClosureExpr(ClosureExpr *closureExpr, Type contextualType,
-                           std::function<bool(Type, Type)> resultTypeProcessor);
+  bool
+  diagnoseClosureExpr(ClosureExpr *closureExpr, Type contextualType,
+                      llvm::function_ref<bool(Type, Type)> resultTypeProcessor);
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
@@ -6283,7 +6284,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
 
 bool FailureDiagnosis::diagnoseClosureExpr(
     ClosureExpr *CE, Type contextualType,
-    std::function<bool(Type, Type)> resultTypeProcessor) {
+    llvm::function_ref<bool(Type, Type)> resultTypeProcessor) {
   // Look through IUO because it doesn't influence
   // neither parameter nor return type diagnostics itself,
   // but if we have function type inside, that might
