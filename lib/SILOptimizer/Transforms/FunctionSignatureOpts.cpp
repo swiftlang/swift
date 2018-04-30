@@ -53,6 +53,7 @@ using namespace swift;
 STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
 STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
+STATISTIC(NumGuaranteedConvertedToOwned, "Total guaranteed args -> owned args");
 STATISTIC(NumOwnedConvertedToNotOwnedResult, "Total owned result -> not owned result");
 STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
@@ -83,6 +84,13 @@ static llvm::cl::opt<bool> FSODisableArgExplosion(
     "sil-fso-disable-arg-explosion",
     llvm::cl::desc("Do not perform argument explosion during FSO. Intended "
                    "only for testing purposes"));
+
+bool swift::FSOEnableGuaranteedToOwned = false;
+
+static llvm::cl::opt<bool, true> FSOEnableGuaranteedToOwnedParser(
+    "sil-fso-enable-guaranteed-to-owned",
+    llvm::cl::desc("Enable Guaranteed To Owned Transformation"),
+    llvm::cl::Hidden, llvm::cl::location(swift::FSOEnableGuaranteedToOwned));
 
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
@@ -152,24 +160,26 @@ static SILValue findReturnValue(SILFunction *F) {
   return Term->getOperand();
 }
 
-/// Return the single apply found in this function.
-static SILInstruction *findOnlyApply(SILFunction *F) {
+//===----------------------------------------------------------------------===//
+//                  Function Signature Transform Descriptor
+//===----------------------------------------------------------------------===//
+
+// Return the single apply found in this function. It only works on thunks that
+// we have generated.
+SILInstruction *FunctionSignatureTransformDescriptor::findOnlyApplyInThunk() {
   SILInstruction *OnlyApply = nullptr;
-  for (auto &B : *F) {
-    for (auto &X : B) {
-      if (!isa<ApplyInst>(X) && !isa<TryApplyInst>(X))
+  // Original function is going to be our thunk.
+  for (auto &B : *OriginalFunction) {
+    for (auto &II : B) {
+      if (!isa<ApplyInst>(II) && !isa<TryApplyInst>(II))
         continue;
       assert(!OnlyApply && "There are more than 1 function calls");
-      OnlyApply = &X;
+      OnlyApply = &II;
     }
   }
   assert(OnlyApply && "There is no function calls");
   return OnlyApply;
 }
-
-//===----------------------------------------------------------------------===//
-//                  Function Signature Transform Descriptor
-//===----------------------------------------------------------------------===//
 
 void FunctionSignatureTransformDescriptor::addThunkArgument(
     ArgumentDescriptor &AD, SILBuilder &Builder, SILBasicBlock *BB,
@@ -213,6 +223,12 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
     // convert the argument to guaranteed.
     if (Arg.OwnedToGuaranteed) {
       Mangler.setArgumentOwnedToGuaranteed(i);
+    }
+
+    if (Arg.GuaranteedToOwned) {
+      assert(!Arg.OwnedToGuaranteed && "Argument should never be guaranteed to "
+                                       "owned *AND* owned to gauranteed");
+      Mangler.setArgumentGuaranteedToOwned(i);
     }
 
     // If this argument is not dead and we can explode it, add 's' to the
@@ -480,14 +496,26 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
       // Ty is not trivial, pass it through as the original calling convention.
       auto ParameterConvention = AD.PInfo.getValue().getConvention();
       if (AD.OwnedToGuaranteed) {
-        if (ParameterConvention == ParameterConvention::Direct_Owned)
+        if (ParameterConvention == ParameterConvention::Direct_Owned) {
           ParameterConvention = ParameterConvention::Direct_Guaranteed;
-        else if (ParameterConvention == ParameterConvention::Indirect_In)
+        } else if (ParameterConvention == ParameterConvention::Indirect_In) {
           ParameterConvention = ParameterConvention::Indirect_In_Guaranteed;
-        else {
+        } else {
           llvm_unreachable("Unknown parameter convention transformation");
         }
       }
+
+      if (AD.GuaranteedToOwned) {
+        assert(
+            !AD.OwnedToGuaranteed &&
+            "Should only have one of OwnedToGuaranteed or GuaranteedToOwned");
+        if (ParameterConvention == ParameterConvention::Direct_Guaranteed) {
+          ParameterConvention = ParameterConvention::Direct_Owned;
+        } else {
+          llvm_unreachable("Unknown parameter convention transformation");
+        }
+      }
+
       SILParameterInfo NewInfo(Ty.getASTType(), ParameterConvention);
       Out.push_back(NewInfo);
     }
@@ -498,13 +526,30 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
   // If we found releases in the callee in the last BB on an @owned
   // parameter, change the parameter to @guaranteed and continue...
   if (AD.OwnedToGuaranteed) {
+    assert(!AD.GuaranteedToOwned && "Should only have one of owned to "
+                                    "guaranteed or guaranteed to owned set");
     ++NumOwnedConvertedToGuaranteed;
     auto ParameterConvention = AD.PInfo.getValue().getConvention();
-    if (ParameterConvention == ParameterConvention::Direct_Owned)
+    if (ParameterConvention == ParameterConvention::Direct_Owned) {
       ParameterConvention = ParameterConvention::Direct_Guaranteed;
-    else if (ParameterConvention == ParameterConvention::Indirect_In)
+    } else if (ParameterConvention == ParameterConvention::Indirect_In) {
       ParameterConvention = ParameterConvention::Indirect_In_Guaranteed;
-    else {
+    } else {
+      llvm_unreachable("Unknown parameter convention transformation");
+    }
+
+    SILParameterInfo NewInfo(AD.PInfo.getValue().getType(),
+                             ParameterConvention);
+    Out.push_back(NewInfo);
+    return;
+  }
+
+  if (AD.GuaranteedToOwned) {
+    ++NumGuaranteedConvertedToOwned;
+    auto ParameterConvention = AD.PInfo.getValue().getConvention();
+    if (ParameterConvention == ParameterConvention::Direct_Guaranteed) {
+      ParameterConvention = ParameterConvention::Direct_Owned;
+    } else {
       llvm_unreachable("Unknown parameter convention transformation");
     }
 
@@ -642,7 +687,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Do the last bit work to finalize the thunk.
+  //
+  // *NOTE* Only one of these two functions will actually do anything.
   OwnedToGuaranteedFinalizeThunkFunction(Builder, F);
+  GuaranteedToOwnedFinalizeThunkFunction(Builder, F);
 
   assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
 }
@@ -658,10 +706,20 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   }
 
   // Run OwnedToGuaranteed optimization.
+  bool DidOwnedToGuaranteed = false;
   if (OwnedToGuaranteedAnalyze()) {
     Changed = true;
+    DidOwnedToGuaranteed = true;
     DEBUG(llvm::dbgs() << "  transform owned-to-guaranteed\n");
     OwnedToGuaranteedTransform();
+  }
+
+  if (GuaranteedToOwnedAnalyze()) {
+    assert(!DidOwnedToGuaranteed &&
+           "Should only do one of guaranteed to owned or owned to guaranteed");
+    Changed = true;
+    DEBUG(llvm::dbgs() << "  transform guaranteed-to-owned\n");
+    GuaranteedToOwnedTransform();
   }
 
   // Run DeadArgument elimination transformation. We only specialize
@@ -969,10 +1027,10 @@ void FunctionSignatureTransform::
 OwnedToGuaranteedFinalizeThunkFunction(SILBuilder &Builder, SILFunction *F) {
   // Finish the epilogue work for the argument as well as result.
   for (auto &ArgDesc : TransformDescriptor.ArgumentDescList) {
-    OwnedToGuaranteedAddArgumentRelease(ArgDesc, Builder, F);
+    OwnedToGuaranteedAddArgumentRelease(ArgDesc, Builder);
   }
   for (auto &ResDesc : TransformDescriptor.ResultDescList) {
-    OwnedToGuaranteedAddResultRelease(ResDesc, Builder, F);
+    OwnedToGuaranteedAddResultRelease(ResDesc, Builder);
   }
 }
 
@@ -995,15 +1053,14 @@ static void createArgumentRelease(SILBuilder &Builder, ArgumentDescriptor &AD) {
 /// Default implementation simply passes it through.
 void
 FunctionSignatureTransform::
-OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD, SILBuilder &Builder,
-                                    SILFunction *F) {
+OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD, SILBuilder &Builder) {
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a releasing RC instruction.
   if (!AD.OwnedToGuaranteed) {
     return;
   }
 
-  SILInstruction *Call = findOnlyApply(F);
+  SILInstruction *Call = TransformDescriptor.findOnlyApplyInThunk();
   if (isa<ApplyInst>(Call)) {
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
     createArgumentRelease(Builder, AD);
@@ -1018,17 +1075,15 @@ OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD, SILBuilder &Builder,
   }
 }
 
-void
-FunctionSignatureTransform::
-OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
-                                  SILFunction *F) {
+void FunctionSignatureTransform::OwnedToGuaranteedAddResultRelease(
+    ResultDescriptor &RD, SILBuilder &Builder) {
   // If we have any result that were consumed but are now guaranteed,
   // insert a releasing RC instruction.
   if (!RD.OwnedToGuaranteed) {
     return;
   }
 
-  SILInstruction *Call = findOnlyApply(F);
+  SILInstruction *Call = TransformDescriptor.findOnlyApplyInThunk();
   if (auto AI = dyn_cast<ApplyInst>(Call)) {
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(AI)));
     Builder.createRetainValue(RegularLocation::getAutoGeneratedLocation(),

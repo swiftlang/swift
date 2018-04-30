@@ -1,0 +1,34 @@
+// This file tests the guaranteed -> owned transformation in isolation.
+
+// RUN: %target-sil-opt -sil-fso-disable-owned-to-guaranteed -sil-fso-disable-dead-argument -sil-fso-disable-arg-explosion -sil-fso-enable-guaranteed-to-owned -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+enum FakeOptional<T> {
+case some(T)
+case none
+}
+
+class Klass {
+  var k: FakeOptional<Klass>
+  init()
+}
+
+// CHECK: foo
+sil @return_value_test : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
+bb0(%0 : $Klass):
+  strong_retain %0 : $Klass
+  return %0 : $Klass
+}
+
+sil @store_into_memory_test : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = alloc_stack $Klass
+  strong_retain %0 : $Klass
+  store %0 to %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

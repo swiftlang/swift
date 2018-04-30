@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_TRANSFORMS_FUNCTIONSIGNATUREOPTS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -65,6 +66,9 @@ struct ArgumentDescriptor {
   /// Is this parameter an indirect result?
   bool IsIndirectResult;
 
+  /// This parameter will be transformed from guaranteed to owned.
+  bool GuaranteedToOwned;
+
   /// If non-null, this is the release in the return block of the callee, which
   /// is associated with this parameter if it is @owned. If the parameter is not
   /// @owned or we could not find such a release in the callee, this is null.
@@ -90,7 +94,8 @@ struct ArgumentDescriptor {
       : Arg(A), PInfo(A->getKnownParameterInfo()), Index(A->getIndex()),
         Decl(A->getDecl()), IsEntirelyDead(false), WasErased(false),
         Explode(false), OwnedToGuaranteed(false),
-        IsIndirectResult(A->isIndirectResult()), CalleeRelease(),
+        IsIndirectResult(A->isIndirectResult()), GuaranteedToOwned(false),
+	CalleeRelease(),
         CalleeReleaseInThrowBlock(), ProjTree(A->getModule(), A->getType()) {
     if (!A->isIndirectResult()) {
       PInfo = Arg->getKnownParameterInfo();
@@ -244,6 +249,10 @@ struct FunctionSignatureTransformDescriptor {
   /// simply passes it through.
   void addThunkArgument(ArgumentDescriptor &AD, SILBuilder &Builder,
                         SILBasicBlock *BB, SmallVectorImpl<SILValue> &NewArgs);
+
+  /// Given that we have create a thunk, find the apply in the thunk that we
+  /// have created.
+  SILInstruction *findOnlyApplyInThunk();
 };
 
 class FunctionSignatureTransform {
@@ -259,9 +268,19 @@ class FunctionSignatureTransform {
   EpilogueARCAnalysis *EA;
 
 private:
-  /// ----------------------------------------------------------///
-  /// Dead argument transformation.                             ///
-  /// ----------------------------------------------------------///
+  /// After we have generated our thunk, this returns the single apply/try_apply
+  /// in our thunk.
+  ///
+  /// NOTE: Do not call this before the thunk has been generated.
+  ///
+  /// FIXME: I am worried about this getting used too early. We may want to add
+  /// some sort of phasing to the TransformDescriptor to enforce this.
+  SILInstruction *findOnlyApplyInThunk();
+
+  //===--------------------------------------------------------------------===//
+  // Dead Argument Transformation
+  //===--------------------------------------------------------------------===//
+
   /// Find any dead argument opportunities.
   bool DeadArgumentAnalyzeParameters();
   /// Modify the current function so that later function signature analysis
@@ -270,9 +289,10 @@ private:
   /// Remove the dead argument once the new function is created.
   void DeadArgumentFinalizeOptimizedFunction();
 
-  /// ----------------------------------------------------------///
-  /// Owned to guaranteed transformation.                       ///
-  /// ----------------------------------------------------------///
+  //===--------------------------------------------------------------------===//
+  // Owned To Guaranteed Transformation
+  //===--------------------------------------------------------------------===//
+
   bool OwnedToGuaranteedAnalyzeResults();
   bool OwnedToGuaranteedAnalyzeParameters();
 
@@ -289,23 +309,39 @@ private:
 
   /// Set up epilogue work for the thunk result based in the given argument.
   void OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD,
-                                         SILBuilder &Builder, SILFunction *F);
+                                         SILBuilder &Builder);
 
   /// Set up epilogue work for the thunk argument based in the given argument.
   void OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD,
-                                           SILBuilder &Builder, SILFunction *F);
+                                           SILBuilder &Builder);
 
   /// Add the release for converted arguments and result.
   void OwnedToGuaranteedFinalizeThunkFunction(SILBuilder &B, SILFunction *F);
 
-  /// ----------------------------------------------------------///
-  /// Argument explosion transformation.                        ///
-  /// ----------------------------------------------------------///
+  //===--------------------------------------------------------------------===//
+  // Guaranteed To Owned Transformation
+  //===--------------------------------------------------------------------===//
+
+  bool GuaranteedToOwnedAnalyze();
+  void GuaranteedToOwnedTransform();
+  void GuaranteedToOwnedFinalizeThunkFunction(SILBuilder &Builder,
+                                              SILFunction *F);
+  void GuaranteedToOwnedAddArgumentRetain(ArgumentDescriptor &AD,
+                                          SILBuilder &Builder);
+
+  //===--------------------------------------------------------------------===//
+  // Argument Explosion Transformation
+  //===--------------------------------------------------------------------===//
+
   /// Find any argument explosion opportunities.
   bool ArgumentExplosionAnalyzeParameters();
   /// Explode the argument in the optimized function and replace the uses of
   /// the original argument.
   void ArgumentExplosionFinalizeOptimizedFunction();
+
+  //===--------------------------------------------------------------------===//
+  // Utility
+  //===--------------------------------------------------------------------===//
 
   /// Take ArgumentDescList and ResultDescList and create an optimized function
   /// based on the current function we are analyzing. This also has the side
@@ -337,6 +373,8 @@ public:
   /// by a direct reference to the specialized function.
   bool removeDeadArgs(int minPartialAppliedArgs);
 };
+
+extern bool FSOEnableGuaranteedToOwned;
 
 } // namespace swift
 

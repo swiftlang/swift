@@ -13,6 +13,7 @@ set(TRANSFORMS_SOURCES
   Transforms/Devirtualizer.cpp
   Transforms/FunctionSignatureOpts.cpp
   Transforms/GenericSpecializer.cpp
+  Transforms/GuaranteedToOwnedFunctionSignatureOpts.cpp
   Transforms/MergeCondFail.cpp
   Transforms/MarkUninitializedFixup.cpp
   Transforms/Outliner.cpp
