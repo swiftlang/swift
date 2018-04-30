@@ -659,6 +659,7 @@ SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createGradient(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getOriginal()),
+                                Inst->getSourceIndex(),
                                 Inst->getParameterIndices(),
                                 Inst->isSeedable(),
                                 Inst->isPreservingResult()));

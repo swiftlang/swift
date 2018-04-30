@@ -579,10 +579,13 @@ TryApplyInst *TryApplyInst::create(
 
 /// SWIFT_ENABLE_TENSORFLOW
 GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
-                           SILValue original, ArrayRef<unsigned> paramIndices,
+                           SILValue original, unsigned sourceIndex,
+                           ArrayRef<unsigned> paramIndices,
                            bool seedable, bool preservingResult)
-  : InstructionBase(debugLoc, getGradientSILType(module, original, paramIndices,
-                                                 seedable, preservingResult)),
+  : InstructionBase(debugLoc, getGradientSILType(module, original, sourceIndex,
+                                                 paramIndices, seedable,
+                                                 preservingResult)),
+    SourceIndex(sourceIndex),
     NumParamIndices(paramIndices.size()), Seedable(seedable),
     PreservingResult(preservingResult), Operands(this, original) {
   std::copy(paramIndices.begin(), paramIndices.end(),
@@ -590,6 +593,7 @@ GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
 }
 
 SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
+                                         unsigned sourceIndex,
                                          ArrayRef<unsigned> paramIndices,
                                          bool seedable,
                                          bool preservingResult) {
@@ -608,12 +612,13 @@ SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
 
 GradientInst *
 GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
-                     SILValue original, ArrayRef<unsigned> paramIndices,
+                     SILValue original, unsigned sourceIndex,
+                     ArrayRef<unsigned> paramIndices,
                      bool seedable, bool preservingResult) {
   unsigned size = sizeof(GradientInst) + paramIndices.size() * sizeof(unsigned);
   void *buffer = M.allocateInst(size, alignof(GradientInst));
-  return ::new (buffer) GradientInst(M, debugLoc, original, paramIndices,
-                                     seedable, preservingResult);
+  return ::new (buffer) GradientInst(M, debugLoc, original, sourceIndex,
+                                     paramIndices, seedable, preservingResult);
 }
 
 ArrayRef<unsigned> GradientInst::getParameterIndices() const {
