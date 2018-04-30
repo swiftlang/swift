@@ -25,6 +25,6 @@ let _ = #valueAndGradient(of: foo)
 // let _: (Float, Float, [Int]) -> (Float, Float) = #gradient(of: foo_indir_ret, withRespectTo: .0, .1)
 
 // CHECK-LABEL: sil @main :
-// CHECK: %{{[0-9]+}} = gradient [wrt 0, 1] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
-// CHECK: %{{[0-9]+}} = gradient [wrt 0] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
-// CHECK: %{{[0-9]+}} = gradient [wrt 0, 1] [preserving_result] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
+// CHECK: %{{[0-9]+}} = gradient [source 0] [wrt 0, 1] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
+// CHECK: %{{[0-9]+}} = gradient [source 0] [wrt 0] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float
+// CHECK: %{{[0-9]+}} = gradient [source 0] [wrt 0, 1] [preserving_result] %{{[0-9]+}} : $@callee_guaranteed (Float, Float) -> Float

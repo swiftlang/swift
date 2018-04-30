@@ -1149,6 +1149,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *GI) {
+    *this << "[source " << GI->getSourceIndex() << "] ";
     if (!GI->getParameterIndices().empty()) {
       *this << "[wrt ";
       interleave(GI->getParameterIndices(), [&](unsigned idx) {
