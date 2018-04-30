@@ -719,7 +719,7 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
-      if (!replacedInReq)
+      if (!replacedInReq || replacedInReq->hasError())
         continue;
 
       if (reqGenericEnv) {
