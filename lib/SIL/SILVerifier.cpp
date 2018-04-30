@@ -4204,6 +4204,10 @@ public:
                     SILFunctionTypeRepresentation::Thick,
             "is_escaping_closure must have a thick "
             "function operand");
+    require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
+                IEC->getVerificationType() ==
+                    IsEscapingClosureInst::WithoutActuallyEscaping,
+            "unknown verfication type");
   }
 
   // This verifies that the entry block of a SIL function doesn't have

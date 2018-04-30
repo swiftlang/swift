@@ -2892,7 +2892,7 @@ Performs a copy of an Objective-C block. Unlike retains of other
 reference-counted types, this can produce a different value from the operand if
 the block is copied from the stack to the heap.
 
-Additionally consumes the ``withoutEscaping`` operand ``%1`` which is the
+Additionally, consumes the ``withoutEscaping`` operand ``%1`` which is the
 closure sentinel. SILGen emits these instructions when it passes @noescape
 swift closures to Objective C. A mandatory SIL pass will lower this instruction
 into a ``copy_block`` and a ``is_escaping``/``cond_fail``/``destroy_value`` at

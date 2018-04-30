@@ -3919,7 +3919,8 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
   assert(closure.empty());
   if (context->getType()->isIntegerTy())
     context = Builder.CreateIntToPtr(context, IGM.RefCountedPtrTy);
-  auto result = emitIsEscapingClosureCall(context, i->getLoc().getSourceLoc());
+  auto result = emitIsEscapingClosureCall(context, i->getLoc().getSourceLoc(),
+                                          i->getVerificationType());
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);

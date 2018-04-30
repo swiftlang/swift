@@ -41,7 +41,7 @@ public func test() {
 }
 
 testSuite.test("testEscaping") {
-// CHECK: closure argument was escaped in withoutActuallyEscaping block
+// CHECK: closure argument passed as @noescape to Objective-C has escaped: file {{.*}}main.swift, line 19, column 26
   expectCrashLater()
   test()
 }

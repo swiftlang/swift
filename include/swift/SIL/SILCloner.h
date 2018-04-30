@@ -2031,8 +2031,9 @@ void SILCloner<ImplClass>::visitIsEscapingClosureInst(
     IsEscapingClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(
-      Inst, getBuilder().createIsEscapingClosure(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+      Inst, getBuilder().createIsEscapingClosure(getOpLocation(Inst->getLoc()),
+                                                 getOpValue(Inst->getOperand()),
+                                                 Inst->getVerificationType()));
 }
 
 template<typename ImplClass>

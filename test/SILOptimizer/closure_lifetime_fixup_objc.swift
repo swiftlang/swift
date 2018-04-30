@@ -52,7 +52,7 @@ public protocol DangerousEscaper {
 
 // Release sentinel closure copy (5).
 // CHECK:   strong_release [[BLOCK_COPY]] : $@convention(block) @noescape () -> ()
-// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [[OPT_SENTINEL]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [objc] [[OPT_SENTINEL]] : $Optional<@callee_guaranteed () -> ()>
 // CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
 
 // Release of sentinel copy (4).

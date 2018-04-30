@@ -1253,11 +1253,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UnownedReleaseInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
-  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
+  case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::ThrowInst: {
     unsigned Attr = 0;
     if (auto *LI = dyn_cast<LoadInst>(&SI))
@@ -1274,6 +1274,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = RCI->isNonAtomic();
     else if (auto *UOCI = dyn_cast<UncheckedOwnershipConversionInst>(&SI)) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
+    } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
+      Attr = IEC->getVerificationType();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;

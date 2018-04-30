@@ -1569,10 +1569,11 @@ public:
         getSILDebugLocation(Loc), value, Int1Ty));
   }
   IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
-                                                 SILValue operand) {
+                                                 SILValue operand,
+                                                 unsigned VerificationType) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsEscapingClosureInst(
-        getSILDebugLocation(Loc), operand, Int1Ty));
+        getSILDebugLocation(Loc), operand, Int1Ty, VerificationType));
   }
 
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {

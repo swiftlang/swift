@@ -6341,9 +6341,17 @@ class IsEscapingClosureInst
                                   SingleValueInstruction> {
   friend SILBuilder;
 
+  unsigned VerificationType;
+
   IsEscapingClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
-                        SILType BoolTy)
-      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
+                        SILType BoolTy, unsigned VerificationType)
+      : UnaryInstructionBase(DebugLoc, Operand, BoolTy),
+        VerificationType(VerificationType) {}
+
+public:
+  enum { WithoutActuallyEscaping, ObjCEscaping };
+
+  unsigned getVerificationType() const { return VerificationType; }
 };
 
 //===----------------------------------------------------------------------===//

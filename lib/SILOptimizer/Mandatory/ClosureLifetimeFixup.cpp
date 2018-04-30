@@ -441,7 +441,8 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
   for (auto LifetimeEndPoint : LifetimeEndPoints) {
     SILBuilderWithScope B(LifetimeEndPoint);
     auto IsEscaping =
-        B.createIsEscapingClosure(Loc, B.createLoadBorrow(generatedLoc, Slot));
+        B.createIsEscapingClosure(Loc, B.createLoadBorrow(generatedLoc, Slot),
+                                  IsEscapingClosureInst::ObjCEscaping);
     B.createCondFail(Loc, IsEscaping);
     B.createDestroyAddr(generatedLoc, Slot);
   }
