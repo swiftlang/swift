@@ -889,3 +889,54 @@ bb0( %0 : $Int):
   %7 = tuple ()
   return %7 : $()
 }
+
+sil hidden @testDirectInout : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %box = alloc_box ${ var Int }, var, name "i"
+  %boxadr = project_box %box : ${ var Int }, 0
+  store %0 to [trivial] %boxadr : $*Int
+  %f = function_ref @testDirectInoutClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%boxadr) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %nepa = convert_escape_to_noescape %pa : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [unknown] %boxadr : $*Int  // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %call = apply %nepa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  destroy_value %box : ${ var Int }
+  %v = tuple ()
+  return %v : $()
+}
+
+sil private @testDirectInoutClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %access = begin_access [read] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+sil hidden @testDirectPartialApplyChain : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %box = alloc_box ${ var Int }, var, name "i"
+  %boxadr = project_box %box : ${ var Int }, 0
+  store %0 to [trivial] %boxadr : $*Int
+  %f = function_ref @testDirectPartialApplyChainClosure : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f(%boxadr) : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %pa1(%0) : $@callee_guaranteed (@inout Int, Int) -> ()
+  %nepa = convert_escape_to_noescape %pa2 : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [unknown] %boxadr : $*Int   // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %call = apply %nepa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  destroy_value %box : ${ var Int }
+  %v = tuple ()
+  return %v : $()
+}
+
+sil private @testDirectPartialApplyChainClosure : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $Int, %2 : $*Int):
+  %access = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}

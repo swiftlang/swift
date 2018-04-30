@@ -796,9 +796,21 @@ static void checkForViolationsInNoEscapeClosures(
   //
   SILFunction *Callee = FAS.getCalleeFunction();
   if (Callee && !Callee->empty()) {
-    // Check for violation with directly called closure
-    checkForViolationWithCall(Accesses, Callee, 0, FAS.getArguments(), ASA,
-                              /*DiagnoseAsWarning=*/false, ConflictingAccesses);
+    unsigned CalleeArgStartIndex = 0;
+    ApplySite AS = FAS;
+    // Walk the chain of applies, checking all applied arguments.
+    while (true) {
+      // Check for violation on the (@inout_aliasable) arguments of this apply.
+      checkForViolationWithCall(
+          Accesses, Callee, CalleeArgStartIndex, AS.getArguments(), ASA,
+          /*DiagnoseAsWarning=*/false, ConflictingAccesses);
+      CalleeArgStartIndex += AS.getNumArguments();
+      auto *PAI = dyn_cast<PartialApplyInst>(AS.getCalleeOrigin());
+      if (!PAI)
+        break;
+
+      AS = ApplySite(PAI);
+    }
   }
 
   // Check to make sure that any arguments to the apply are not themselves
