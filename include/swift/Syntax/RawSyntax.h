@@ -241,6 +241,8 @@ class RawSyntax final
       uint64_t : bitmax(NumRawSyntaxBits, 32); // align to 32 bits
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
+      /// Number of bytes this node takes up spelled out in the source code
+      unsigned TextLength : 32;
     };
 
     // For "token" nodes.
@@ -438,6 +440,22 @@ public:
   /// the position of the terms in the production of the Swift grammar.
   const RC<RawSyntax> &getChild(CursorIndex Index) const {
     return getLayout()[Index];
+  }
+
+  /// Return the number of bytes this node takes when spelled out in the source
+  size_t getTextLength() {
+    // For tokens the computation of the length is fast enough to justify the
+    // space for caching it. For layout nodes, we cache the length to avoid
+    // traversing the tree
+
+    // FIXME: Or would it be sensible to cache the size of token nodes as well?
+    if (isToken()) {
+      AbsolutePosition Pos;
+      accumulateAbsolutePosition(Pos);
+      return Pos.getOffset();
+    } else {
+      return Bits.TextLength;
+    }
   }
 
   /// @}
