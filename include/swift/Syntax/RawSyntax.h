@@ -263,8 +263,10 @@ class RawSyntax final
     return isToken() ? Bits.NumLeadingTrivia + Bits.NumTrailingTrivia : 0;
   }
 
+  /// Constructor for creating layout nodes
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
             SourcePresence Presence, bool ManualMemory);
+  /// Constructor for creating token nodes
   RawSyntax(tok TokKind, OwnedString Text,
             ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia,
