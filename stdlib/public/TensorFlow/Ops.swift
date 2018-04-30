@@ -807,7 +807,7 @@ public func pow<T : TensorProtocol>(_ lhs: T, _ rhs: T.Scalar) -> T
 /// Computes the element-wise maximum of two tensors.
 /// - Note: `max` supports broadcasting.
 @_inlineable @inline(__always)
-@differentiable(reverse, adjoint: _adjointMax(_:_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointMinMax(_:_:originalValue:seed:))
 public func max<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
   where T.Scalar : Numeric & Comparable {
   return #tfop("Maximum", lhs, rhs)
@@ -832,7 +832,7 @@ public func max<T : TensorProtocol>(_ lhs: T, _ rhs: T.Scalar) -> T
 /// Computes the element-wise minimum of two tensors.
 /// - Note: `min` supports broadcasting.
 @_inlineable @inline(__always)
-@differentiable(reverse, adjoint: _adjointMin(_:_:originalValue:seed:))
+@differentiable(reverse, adjoint: _adjointMinMax(_:_:originalValue:seed:))
 public func min<T : TensorProtocol>(_ lhs: T, _ rhs: T) -> T
   where T.Scalar : Numeric & Comparable {
   return #tfop("Minimum", lhs, rhs)
