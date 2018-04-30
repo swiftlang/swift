@@ -236,14 +236,18 @@ class RawSyntax final
 
     // For "layout" nodes.
     struct {
-      uint64_t : bitmax(NumRawSyntaxBits, 32);
+      static_assert(NumRawSyntaxBits <= 32,
+                    "Only 32 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 32); // align to 32 bits
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
     };
 
     // For "token" nodes.
     struct {
-      uint64_t : bitmax(NumRawSyntaxBits, 16);
+      static_assert(NumRawSyntaxBits <= 16,
+                    "Only 16 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 16); // align to 16 bits
       /// The kind of token this "token" node represents.
       unsigned TokenKind : 16;
       /// Number of leading  trivia pieces.
