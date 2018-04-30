@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name generic_casts -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-emit-silgen -module-name generic_casts -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}

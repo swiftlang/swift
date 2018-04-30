@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -parse-stdlib %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib %s
 
 protocol P {
   associatedtype Assoc
@@ -68,16 +68,16 @@ struct FooBar<T: Fooable>: Barrable {
 
 // Test that associated types can be constrained to concrete types
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(_: T) -> T.Foo {
+func concreteJungle<T>(_: T) -> T.Foo where T : Fooable, T.Foo == C {
   return C()
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(_: T, t: T.Foo) -> C {
+func concreteJungle<T>(_: T, t: T.Foo) -> C where T : Fooable, T.Foo == C {
   let c: C = t
   return c
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(_: T, f: @escaping (T.Foo) -> C) -> T.Foo {
+func concreteJungle<T>(_: T, f: @escaping (T.Foo) -> C) -> T.Foo where T : Fooable, T.Foo == C {
   let ff: (C) -> T.Foo = f
   return ff(C())
 }

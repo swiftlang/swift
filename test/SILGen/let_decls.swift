@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name let_decls -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name let_decls -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 

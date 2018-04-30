@@ -1,11 +1,11 @@
 
-// RUN: %target-swift-frontend -module-name witness_same_type -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name witness_same_type -enable-sil-ownership -emit-ir %s
+// RUN: %target-swift-emit-silgen -module-name witness_same_type -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -module-name witness_same_type -enable-sil-ownership %s
 
 protocol Fooable {
   associatedtype Bar
 
-  func foo<T: Fooable where T.Bar == Self.Bar>(x x: T) -> Self.Bar
+  func foo<T: Fooable>(x x: T) -> Self.Bar where T.Bar == Self.Bar
 }
 
 struct X {}

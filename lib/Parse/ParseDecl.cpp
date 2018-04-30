@@ -3874,6 +3874,8 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
                                         SyntaxParsingContext *&SyntaxContext) {
   SyntaxParsingContext BlockItemListContext(SyntaxContext,
                                             SyntaxKind::CodeBlockItemList);
+  SyntaxParsingContext BlockItemContext(SyntaxContext,
+                                        SyntaxKind::CodeBlockItem);
   SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
   unsigned OpenBraces = 1;
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
@@ -4250,6 +4252,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         return true;
       }
       ExternalAsmName = true;
+      BlockCtx.setTransparent();
     }
 
     // Set up a function declaration.
