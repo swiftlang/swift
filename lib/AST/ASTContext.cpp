@@ -309,6 +309,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
+    /// The set of substitution maps (uniqued by their storage).
+    llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
+
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
@@ -2908,11 +2911,9 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
   }
 }
 
-NameAliasType *NameAliasType::get(
-                                        TypeAliasDecl *typealias,
-                                        Type parent,
-                                        const SubstitutionMap &substitutions,
-                                        Type underlying) {
+NameAliasType *NameAliasType::get(TypeAliasDecl *typealias, Type parent,
+                                  const SubstitutionMap &substitutions,
+                                  Type underlying) {
   // Compute the recursive properties.
   //
   auto properties = underlying->getRecursiveProperties();
@@ -4305,6 +4306,64 @@ CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
 
 CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
   delete Log;
+}
+
+void SubstitutionMap::Storage::Profile(
+                               llvm::FoldingSetNodeID &id,
+                               GenericSignature *genericSig,
+                               ArrayRef<Type> replacementTypes,
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  id.AddPointer(genericSig);
+  id.AddInteger(replacementTypes.size());
+  for (auto type : replacementTypes)
+    id.AddPointer(type.getPointer());
+  id.AddInteger(conformances.size());
+  for (auto conformance : conformances)
+    id.AddPointer(conformance.getOpaqueValue());
+}
+
+SubstitutionMap::Storage *SubstitutionMap::Storage::get(
+                            GenericSignature *genericSig,
+                            ArrayRef<Type> replacementTypes,
+                            ArrayRef<ProtocolConformanceRef> conformances) {
+  // If there is no generic signature, we need no storage.
+  if (!genericSig) {
+    assert(replacementTypes.empty());
+    assert(conformances.empty());
+    return nullptr;
+  }
+
+  // Figure out which arena this should go in.
+  RecursiveTypeProperties properties;
+  for (auto type : replacementTypes) {
+    if (type)
+      properties |= type->getRecursiveProperties();
+  }
+
+  // Profile the substitution map.
+  llvm::FoldingSetNodeID id;
+  SubstitutionMap::Storage::Profile(id, genericSig, replacementTypes,
+                                    conformances);
+
+  auto arena = getArena(properties);
+
+  // Did we already record this substitution map?
+  auto &ctx = genericSig->getASTContext();
+  void *insertPos;
+  auto &substitutionMaps = ctx.Impl.getArena(arena).SubstitutionMaps;
+  if (auto result = substitutionMaps.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Allocate the appropriate amount of storage for the signature and its
+  // replacement types and conformances.
+  auto size = Storage::totalSizeToAlloc<Type, ProtocolConformanceRef>(
+                                                      replacementTypes.size(),
+                                                      conformances.size());
+  auto mem = ctx.Allocate(size, alignof(Storage), arena);
+
+  auto result = new (mem) Storage(genericSig, replacementTypes, conformances);
+  substitutionMaps.InsertNode(result, insertPos);
+  return result;
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,

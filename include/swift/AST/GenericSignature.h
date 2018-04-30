@@ -223,6 +223,17 @@ public:
       });
   }
 
+  /// Compute the number of conformance requirements in this signature.
+  unsigned getNumConformanceRequirements() const {
+    unsigned result = 0;
+    for (const auto &req : getRequirements()) {
+      if (req.getKind() == RequirementKind::Conformance)
+        ++result;
+    }
+
+    return result;
+  }
+
   /// Return the size of a SubstitutionList built from this signature.
   ///
   /// Don't add new calls of this -- the representation of SubstitutionList
