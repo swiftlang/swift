@@ -743,10 +743,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
