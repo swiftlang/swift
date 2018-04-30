@@ -145,6 +145,17 @@ static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
     addGetterToReadOnlyDerivedProperty(tc, propDecl, rawType);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
+  // If the containing module is not resilient, make sure clients can get at
+  // the raw value without function call overhead.
+  if (parentDC->getParentModule()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient) {
+    AccessScope access =
+        enumDecl->getFormalAccessScope(nullptr,
+                                       /*treatUsableFromInlineAsPublic*/true);
+    if (access.isPublic())
+      getterDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
+  }
+
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);
@@ -342,6 +353,17 @@ static ConstructorDecl *deriveRawRepresentable_init(TypeChecker &tc,
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
   initDecl->setValidationStarted();
+
+  // If the containing module is not resilient, make sure clients can construct
+  // an instance without function call overhead.
+  if (parentDC->getParentModule()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient) {
+    AccessScope access =
+        enumDecl->getFormalAccessScope(nullptr,
+                                       /*treatUsableFromInlineAsPublic*/true);
+    if (access.isPublic())
+      initDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
+  }
 
   tc.Context.addSynthesizedDecl(initDecl);
 
