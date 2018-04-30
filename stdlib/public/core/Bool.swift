@@ -145,18 +145,6 @@ public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
 extension Bool : Equatable, Hashable {
-  /// The hash value for the Boolean value.
-  ///
-  /// Two values that are equal always have equal hash values.
-  ///
-  /// - Note: The hash value is not guaranteed to be stable across different
-  ///   invocations of the same program. Do not persist the hash value across
-  ///   program runs.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine((self ? 1 : 0) as UInt8)

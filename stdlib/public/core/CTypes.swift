@@ -174,16 +174,6 @@ extension OpaquePointer: Equatable {
 }
 
 extension OpaquePointer: Hashable {
-  /// The pointer's hash value.
-  ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))

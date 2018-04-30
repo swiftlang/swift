@@ -484,20 +484,9 @@ extension Set: Equatable {
 }
 
 extension Set: Hashable {
-  /// The hash value for the set.
-  ///
-  /// Two sets that are equal will always have equal hash values.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
-    return _hashValue(for: self)
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var hash = 0
     for member in self {
       hash ^= _hashValue(for: member)
@@ -3662,18 +3651,28 @@ extension Set.Index {
 
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
-    if _fastPath(_guaranteedNative) {
-      return _nativeIndex.offset
-    }
+    return _hashValue(for: self)
+  }
 
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+  #if _runtime(_ObjC)
+    if _fastPath(_guaranteedNative) {
+      hasher.combine(0 as UInt8)
+      hasher.combine(_nativeIndex.offset)
+      return
+    }
     switch _value {
     case ._native(let nativeIndex):
-      return nativeIndex.offset
-  #if _runtime(_ObjC)
+      hasher.combine(0 as UInt8)
+      hasher.combine(nativeIndex.offset)
     case ._cocoa(let cocoaIndex):
-      return cocoaIndex.currentKeyIndex
-  #endif
+      hasher.combine(1 as UInt8)
+      hasher.combine(cocoaIndex.currentKeyIndex)
     }
+  #else
+    hasher.combine(_nativeIndex.offset)
+  #endif
   }
 }
 
