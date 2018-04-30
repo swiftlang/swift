@@ -290,30 +290,23 @@ SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
 
 SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
                                        LookupConformanceFn conformances) const {
-  SubstitutionMap result(*this);
+  SubstitutionMap result(genericSig);
+  if (!genericSig) return result;
 
-  for (auto &replacementType : result.getReplacementTypes()) {
-    if (replacementType) {
-      replacementType = replacementType.subst(subs, conformances,
-                                              SubstFlags::UseErrorType);
-    }
-  }
-
-  for (auto iter = result.conformanceMap.begin(),
-            end = result.conformanceMap.end();
-       iter != end; ++iter) {
-    auto origType = Type(iter->first).subst(
-        *this, SubstFlags::UseErrorType);
-    for (auto citer = iter->second.begin(),
-              cend = iter->second.end();
-         citer != cend; ++citer) {
-      *citer = citer->subst(origType, subs, conformances);
-    }
-  }
-
-  result.verify();
-
-  return result;
+  return genericSig->getSubstitutionMap(
+    [&](SubstitutableType *type) {
+      return Type(type).subst(*this, SubstFlags::UseErrorType)
+               .subst(subs, conformances, SubstFlags::UseErrorType);
+    },
+    [&](CanType dependentType, Type replacementType,
+        ProtocolType *conformedProtocol) ->Optional<ProtocolConformanceRef> {
+      auto proto = conformedProtocol->getDecl();
+      auto conformance =
+        lookupConformance(dependentType, proto)
+          .getValueOr(ProtocolConformanceRef(proto));
+      auto substType = dependentType.subst(*this, SubstFlags::UseErrorType);
+      return conformance.subst(substType, subs, conformances);
+    });
 }
 
 SubstitutionMap
