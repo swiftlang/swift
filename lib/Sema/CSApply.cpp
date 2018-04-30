@@ -607,63 +607,6 @@ namespace {
           = simplifyType(openedFnType)->castTo<FunctionType>();
         auto baseTy = getBaseType(simplifiedFnType);
 
-        // Handle operator requirements found in protocols.
-        if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-          // If we don't have an archetype or existential, we have to call the
-          // witness.
-          // FIXME: This is awful. We should be able to handle this as a call to
-          // the protocol requirement with Self == the concrete type, and SILGen
-          // (or later) can devirtualize as appropriate.
-          if (!baseTy->is<ArchetypeType>() && !baseTy->isAnyExistentialType()) {
-            auto &tc = cs.getTypeChecker();
-            auto conformance =
-              tc.conformsToProtocol(
-                        baseTy, proto, cs.DC,
-                        (ConformanceCheckFlags::InExpression|
-                         ConformanceCheckFlags::Used));
-            if (conformance && conformance->isConcrete()) {
-              if (auto witness =
-                      conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
-                // Hack up an AST that we can type-check (independently) to get
-                // it into the right form.
-                // FIXME: the hop through 'getDecl()' is because
-                // SpecializedProtocolConformance doesn't substitute into
-                // witnesses' ConcreteDeclRefs.
-                Type expectedFnType = simplifiedFnType->getResult();
-                Expr *refExpr;
-                if (witness->getDeclContext()->isTypeContext()) {
-                  Expr *base =
-                    TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,
-                                                 ctx);
-                  refExpr = new (ctx) MemberRefExpr(base, SourceLoc(), witness,
-                                                    loc, /*Implicit=*/true);
-                } else {
-                  auto declRefExpr =  new (ctx) DeclRefExpr(witness, loc,
-                                                            /*Implicit=*/false);
-                  declRefExpr->setFunctionRefKind(functionRefKind);
-                  refExpr = declRefExpr;
-                }
-
-                auto resultTy = tc.typeCheckExpression(
-                    refExpr, cs.DC, TypeLoc::withoutLoc(expectedFnType),
-                    CTP_CannotFail);
-                if (!resultTy)
-                  return nullptr;
-
-                cs.cacheExprTypes(refExpr);
-
-                // Remove an outer function-conversion expression. This
-                // happens when we end up referring to a witness for a
-                // superclass conformance, and 'Self' differs.
-                if (auto fnConv = dyn_cast<FunctionConversionExpr>(refExpr))
-                  refExpr = fnConv->getSubExpr();
-
-                return forceUnwrapIfExpected(refExpr, choice, locator);
-              }
-            }
-          }
-        }
-
         // Build a reference to the protocol requirement.
         Expr *base =
           TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
@@ -7014,21 +6957,15 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
                                     AccessSemantics semantics,
                                     DeclContext *UseDC) {
   auto baseObjectTy = baseTy->getWithoutSpecifierType();
-  if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+
+  if (isa<ConstructorDecl>(member))
+    return baseObjectTy;
+
+  if (auto func = dyn_cast<FuncDecl>(member)) {
     // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
-    auto selfParam = func->getInterfaceType()->getAs<AnyFunctionType>()->getParams();
-    assert(selfParam.size() == 1 && "found invalid arity of self param");
-    if (selfParam[0].getParameterFlags().isInOut()) {
-      // Unless we're looking at a nonmutating existential member.  In which
-      // case, the member will be modeled as an inout but ExistentialMemberRef
-      // and ArchetypeMemberRef want to take the base as an rvalue.
-      if (auto *fd = dyn_cast<FuncDecl>(func))
-        if (!fd->isMutating() && baseObjectTy->is<ArchetypeType>())
-          return baseObjectTy;
-      
+    if (func->isMutating())
       return InOutType::get(baseObjectTy);
-    }
 
     // Otherwise, return the rvalue type.
     return baseObjectTy;
@@ -7036,23 +6973,22 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
 
   // If the base of the access is mutable, then we may be invoking a getter or
   // setter that requires the base to be mutable.
-  if (auto *SD = dyn_cast<AbstractStorageDecl>(member)) {
-    bool isSettableFromHere = SD->isSettable(UseDC)
-      && (!UseDC->getASTContext().LangOpts.EnableAccessControl
-          || SD->isSetterAccessibleFrom(UseDC));
+  auto *SD = cast<AbstractStorageDecl>(member);
+  bool isSettableFromHere = SD->isSettable(UseDC)
+    && (!UseDC->getASTContext().LangOpts.EnableAccessControl
+        || SD->isSetterAccessibleFrom(UseDC));
 
-    // If neither the property's getter nor its setter are mutating, the base
-    // can be an rvalue.
-    if (!SD->isGetterMutating()
-        && (!isSettableFromHere || !SD->isSetterMutating()))
-      return baseObjectTy;
+  // If neither the property's getter nor its setter are mutating, the base
+  // can be an rvalue.
+  if (!SD->isGetterMutating()
+      && (!isSettableFromHere || !SD->isSetterMutating()))
+    return baseObjectTy;
 
-    // If we're calling an accessor, keep the base as an inout type, because the
-    // getter may be mutating.
-    if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
-        semantics != AccessSemantics::DirectToStorage)
-      return InOutType::get(baseObjectTy);
-  }
+  // If we're calling an accessor, keep the base as an inout type, because the
+  // getter may be mutating.
+  if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
+      semantics != AccessSemantics::DirectToStorage)
+    return InOutType::get(baseObjectTy);
 
   // Accesses to non-function members in value types are done through an @lvalue
   // type.
@@ -7296,24 +7232,16 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       return nullptr;
 
     // Form a reference to the builtin conversion function.
-    // FIXME: Bogus location info.
-    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context);
-
-    Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
-                                             base, SourceLoc(),
-                                             witness->getFullName(),
-                                             DeclNameLoc(base->getEndLoc()),
-                                             /*Implicit=*/true);
-    (void)tc.typeCheckExpression(unresolvedDot, dc);
-
-    cs.cacheExprTypes(unresolvedDot);
-
-    ConcreteDeclRef builtinRef = unresolvedDot->getReferencedDecl();
-    if (!builtinRef) {
-      tc.diagnose(base->getLoc(), brokenBuiltinProtocolDiag);
-      return nullptr;
+    SubstitutionMap subMap;
+    SmallVector<Substitution, 2> subs;
+    if (auto *genericSig = witness->getGenericSignature()) {
+      auto *concreteConformance = builtinConformance->getConcrete();
+      subMap = cast<SpecializedProtocolConformance>(concreteConformance)
+        ->getSubstitutionMap();
+      genericSig->getSubstitutions(subMap, subs);
     }
+
+    ConcreteDeclRef builtinRef(tc.Context, witness, subs);
 
     // Set the builtin initializer.
     if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
@@ -7361,23 +7289,16 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     return nullptr;
 
   // Form a reference to the conversion function.
-  // FIXME: Bogus location info.
-  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                            tc.Context);
-
-  Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
-                                           base, SourceLoc(),
-                                           witness->getFullName(),
-                                           DeclNameLoc(base->getEndLoc()),
-                                           /*Implicit=*/true);
-  (void)tc.typeCheckExpression(unresolvedDot, dc);
-  cs.cacheExprTypes(unresolvedDot);
-
-  ConcreteDeclRef ref = unresolvedDot->getReferencedDecl();
-  if (!ref) {
-    tc.diagnose(base->getLoc(), brokenProtocolDiag);
-    return nullptr;
+  SubstitutionMap subMap;
+  SmallVector<Substitution, 2> subs;
+  if (auto *genericSig = witness->getGenericSignature()) {
+    auto *concreteConformance = conformance->getConcrete();
+    subMap = cast<SpecializedProtocolConformance>(concreteConformance)
+      ->getSubstitutionMap();
+    genericSig->getSubstitutions(subMap, subs);
   }
+
+  ConcreteDeclRef ref(tc.Context, witness, subs);
 
   // Set the initializer.
   if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
@@ -8511,37 +8432,55 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
     return nullptr;
   }
 
-  // Form a reference to the builtin method.
-  Expr *memberRef = new (ctx) MemberRefExpr(expr, SourceLoc(),
-                                            builtinMethod,
-                                            DeclNameLoc(expr->getLoc()),
-                                            /*Implicit=*/true);
-  cs.cacheSubExprTypes(memberRef);
-  cs.setSubExprTypes(memberRef);
-  bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-  cs.cacheExprTypes(memberRef);
-  assert(!failed && "Could not reference witness?");
-  (void)failed;
+  // The method is not generic, so there are no substitutions.
+  auto builtinMethodType = builtinMethod->getInterfaceType()
+    ->castTo<FunctionType>();
 
-  // Call the builtin method.
+  // Form an unbound reference to the builtin method.
+  auto *declRef = new (ctx) DeclRefExpr(builtinMethod,
+                                        DeclNameLoc(expr->getLoc()),
+                                        /*Implicit=*/true);
+  declRef->setType(builtinMethodType);
+  declRef->setFunctionRefKind(FunctionRefKind::DoubleApply);
+  cs.cacheType(declRef);
+
   auto getType = [&](const Expr *E) -> Type {
     return cs.getType(E);
   };
 
-  expr = CallExpr::createImplicit(ctx, memberRef, { }, { }, getType);
-  cs.cacheSubExprTypes(expr);
-  cs.setSubExprTypes(expr);
-  failed = tc.typeCheckExpressionShallow(expr, cs.DC);
-  cs.cacheExprTypes(expr);
-  assert(!failed && "Could not call witness?");
-  (void)failed;
+  // Apply 'self' to get the method value.
+  auto *methodRef = CallExpr::create(ctx, declRef,
+                                     expr->getLoc(),
+                                     { expr }, { }, { },
+                                     expr->getLoc(),
+                                     /*trailingClosure=*/nullptr,
+                                     /*implicit=*/true,
+                                     getType);
+  methodRef->setType(builtinMethodType->getResult());
+  methodRef->getArg()->setType(cs.getType(expr));
+  cs.cacheType(methodRef->getArg());
+  cs.cacheType(methodRef);
 
-  if (expr && !cs.getType(expr)->isBuiltinIntegerType(1)) {
+  // Apply the empty argument list to get the final result.
+  auto *result = CallExpr::create(ctx, methodRef,
+                                  expr->getLoc(),
+                                  { }, { }, { },
+                                  expr->getLoc(),
+                                  /*trailingClosure=*/nullptr,
+                                  /*implicit=*/true,
+                                  getType);
+  result->setType(builtinMethodType->getResult()
+                  ->castTo<FunctionType>()->getResult());
+  result->getArg()->setType(ctx.TheEmptyTupleType);
+  cs.cacheType(result->getArg());
+  cs.cacheType(result);
+
+  if (!cs.getType(result)->isBuiltinIntegerType(1)) {
     tc.diagnose(expr->getLoc(), diag::broken_bool);
     return nullptr;
   }
 
-  return expr;
+  return result;
 }
 
 Expr *Solution::convertOptionalToBool(Expr *expr,
