@@ -232,7 +232,7 @@ class RawSyntax final
       /// memory.
       unsigned ManualMemory : 1;
     };
-    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 };
+    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 + 1 };
 
     // For "layout" nodes.
     struct {
