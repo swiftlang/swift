@@ -2270,6 +2270,17 @@ extension ${Self}: Hashable where Element: Hashable {
       hasher.combine(element)
     }
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    var hasher = Hasher(_seed: seed)
+    // Note that we don't need to use delimiters/discriminators for top-level
+    // hashing.
+    for element in self {
+      hasher.combine(element)
+    }
+    return hasher._finalize()
+  }
 }
 
 extension ${Self} {

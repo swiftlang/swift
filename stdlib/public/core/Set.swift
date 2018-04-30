@@ -488,8 +488,9 @@ extension Set: Hashable {
   public func hash(into hasher: inout Hasher) {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var hash = 0
+    let seed = hasher._generateSeed()
     for member in self {
-      hash ^= _hashValue(for: member)
+      hash ^= member._rawHashValue(seed: seed)
     }
     hasher.combine(hash)
   }
@@ -2038,9 +2039,7 @@ extension _NativeSetBuffer where Element: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher._finalize() & _bucketMask
+    return k._rawHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3647,11 +3646,6 @@ extension Set.Index {
       _preconditionFailure("Comparing indexes from different sets")
   #endif
     }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
   }
 
   @inlinable // FIXME(sil-serialize-all)

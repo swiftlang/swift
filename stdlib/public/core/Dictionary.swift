@@ -1453,7 +1453,9 @@ extension Dictionary: Hashable where Value: Hashable {
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
-      var elementHasher = Hasher()
+      // Note that we use a copy of our own hasher here. This makes hash values
+      // dependent on its state, eliminating static collision patterns.
+      var elementHasher = hasher
       elementHasher.combine(k)
       elementHasher.combine(v)
       commutativeHash ^= elementHasher._finalize()
@@ -2437,9 +2439,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher.finalize() & _bucketMask
+    return k._rawHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -4325,11 +4325,6 @@ extension Dictionary.Index {
       _preconditionFailure("Comparing indexes from different sets")
   #endif
     }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
   }
 
   @inlinable // FIXME(sil-serialize-all)

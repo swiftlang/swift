@@ -120,15 +120,32 @@ public protocol Hashable : Equatable {
   /// not call `finalize()` on it. Doing so may become a compile-time error in
   /// the future.
   func hash(into hasher: inout Hasher)
+
+  // Raw top-level hashing interface. Some standard library types (mostly
+  // primitives) specialize this to eliminate small resiliency overheads. (This
+  // only matters for tiny keys.)
+  //
+  // FIXME(hasher): Change to take a Hasher instead. To achieve the same
+  // performance, this requires Set and Dictionary to store their fully
+  // initialized local hashers, not just their seeds.
+  func _rawHashValue(seed: (UInt64, UInt64)) -> Int
+}
+
+extension Hashable {
+  @inlinable
+  @inline(__always)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    var hasher = Hasher(_seed: seed)
+    hasher.combine(self)
+    return hasher._finalize()
+  }
 }
 
 // Called by synthesized `hashValue` implementations.
 @inlinable
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
-  var hasher = Hasher()
-  hasher.combine(value)
-  return hasher._finalize()
+  return value._rawHashValue(seed: Hasher._seed)
 }
 
 // Called by the SwiftValue implementation.
