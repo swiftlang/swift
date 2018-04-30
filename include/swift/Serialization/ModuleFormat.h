@@ -88,6 +88,11 @@ using GenericSignatureIDField = DeclIDField;
 using GenericEnvironmentID = DeclID;
 using GenericEnvironmentIDField = DeclIDField;
 
+// SubstitutionMapID must be the same as DeclID because it is stored in the
+// same way.
+using SubstitutionMapID = DeclID;
+using SubstitutionMapIDField = DeclIDField;
+
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
 using ModuleIDField = IdentifierIDField;
@@ -1224,6 +1229,14 @@ namespace decls_block {
     BCArray<TypeIDField>         // generic parameter types
   >;
 
+  using SubstitutionMapLayout = BCRecordLayout<
+    SUBSTITUTION_MAP,
+    GenericSignatureIDField,     // generic signature
+    BCVBR<5>,                    // # of conformances
+    BCArray<TypeIDField>         // replacement types
+    // Conformances trail the record.
+  >;
+
   using SILGenericEnvironmentLayout = BCRecordLayout<
     SIL_GENERIC_ENVIRONMENT,
     BCArray<TypeIDField>         // (generic parameter name, sugared interface
@@ -1599,7 +1612,8 @@ namespace index_block {
     DECL_MEMBER_NAMES,
 
     GENERIC_SIGNATURE_OFFSETS,
-    LastRecordKind = GENERIC_SIGNATURE_OFFSETS,
+    SUBSTITUTION_MAP_OFFSETS,
+    LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;
