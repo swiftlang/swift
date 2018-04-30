@@ -63,7 +63,7 @@ NullablePtr<SILInstruction> createDecrementBefore(SILValue Ptr,
 void
 recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
-  std::function<void(SILInstruction *)> C = [](SILInstruction *){});
+  llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief If the given instruction is dead, delete it along with its dead
 /// operands.
@@ -76,7 +76,7 @@ void
 recursivelyDeleteTriviallyDeadInstructions(
   SILInstruction *I,
   bool Force = false,
-  std::function<void(SILInstruction *)> C = [](SILInstruction *){});
+  llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
@@ -96,7 +96,7 @@ collectUsesOfValue(SILValue V, llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
 /// instruction itself)
 void eraseUsesOfInstruction(
     SILInstruction *Inst,
-    std::function<void(SILInstruction *)> C = [](SILInstruction *){});
+    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief Recursively erase all of the uses of the value (but not the
 /// value itself)
