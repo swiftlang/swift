@@ -8,6 +8,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: static_stdlib
 
+// SWIFT_ENABLE_TENSORFLOW: This test is unsupported because TensorFlow currently doesn't work with static-stdlib.
+// UNSUPPORTED: tensorflow
+
 import StdlibUnittest
 
 class Bar: Foo {
