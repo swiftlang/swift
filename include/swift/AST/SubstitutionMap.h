@@ -48,13 +48,18 @@ enum class CombineSubstitutionMaps {
 /// abstract types to replacement types, together with associated conformances
 /// to use for deriving nested types and conformances.
 ///
-/// Depending on how the SubstitutionMap is constructed, the abstract types are
-/// either archetypes or interface types. Care must be exercised to only look
-/// up one or the other.
+/// Substitution maps are primarily used when performing substitutions into
+/// any entity that can reference type parameters, e.g., types (via
+/// Type::subst()) and conformances (via ProtocolConformanceRef::subst()).
 ///
 /// SubstitutionMaps are constructed by calling the getSubstitutionMap() method
 /// on a GenericSignature or (equivalently) by calling one of the static
-/// \c SubstitutionMap::get() methods.
+/// \c SubstitutionMap::get() methods. However, most substitution maps are
+/// computed using higher-level entry points such as
+/// TypeBase::getMemberSubstitutionMap().
+///
+/// Substitution maps are ASTContext-allocated and are uniqued on construction,
+/// so they can be used as fields in AST nodes.
 class SubstitutionMap {
 public:
   /// Stored data for a substitution map, which uses tail allocation for the
