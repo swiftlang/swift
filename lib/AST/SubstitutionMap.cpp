@@ -50,26 +50,6 @@ SubstitutionMap::Storage::Storage(
             getConformances().data());
 }
 
-SubstitutionMap::Storage *SubstitutionMap::Storage::get(
-                            GenericSignature *genericSig,
-                            ArrayRef<Type> replacementTypes,
-                            ArrayRef<ProtocolConformanceRef> conformances) {
-  // If there is no generic signature, we need no storage.
-  if (!genericSig) {
-    assert(replacementTypes.empty());
-    assert(conformances.empty());
-    return nullptr;
-  }
-
-  // Allocate the appropriate amount of storage for the signature and its
-  // replacement types and conformances.
-  auto size = Storage::totalSizeToAlloc<Type, ProtocolConformanceRef>(
-                                                      replacementTypes.size(),
-                                                      conformances.size());
-  auto mem = malloc(size);
-  return new (mem) Storage(genericSig, replacementTypes, conformances);
-}
-
 bool SubstitutionMap::hasArchetypes() const {
   for (Type replacementTy : getReplacementTypes()) {
     if (replacementTy && replacementTy->hasArchetype())
@@ -587,20 +567,6 @@ void SubstitutionMap::dump() const {
 }
 
 void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
-  // Generic signature.
-  auto genericSig = getGenericSignature();
-  id.AddPointer(genericSig);
-
-  if (empty() || !genericSig) return;
-
-  // Replacement types.
-  for (Type gp : genericSig->getGenericParams()) {
-    id.AddPointer(gp.subst(*this).getPointer());
-  }
-
-  // Conformance requirements.
-  for (const auto conformance : getConformances()) {
-    id.AddPointer(conformance.getOpaqueValue());
-  }
+  id.AddPointer(storage);
 }
 

@@ -22,9 +22,9 @@
 #include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/TrailingObjects.h"
-#include <memory>
 
 namespace llvm {
   class FoldingSetNodeID;
@@ -56,10 +56,12 @@ enum class CombineSubstitutionMaps {
 /// on a GenericSignature or (equivalently) by calling one of the static
 /// \c SubstitutionMap::get() methods.
 class SubstitutionMap {
+public:
   /// Stored data for a substitution map, which uses tail allocation for the
   /// replacement types and conformances.
   class Storage final
-    : llvm::TrailingObjects<Storage, Type, ProtocolConformanceRef>
+    : public llvm::FoldingSetNode,
+      llvm::TrailingObjects<Storage, Type, ProtocolConformanceRef>
   {
     friend TrailingObjects;
 
@@ -126,13 +128,26 @@ class SubstitutionMap {
                                 getTrailingObjects<ProtocolConformanceRef>(),
                                 numConformanceRequirements);
     }
+
+    /// Profile the substitution map storage, for use with LLVM's FoldingSet.
+    void Profile(llvm::FoldingSetNodeID &id) const {
+      Profile(id, getGenericSignature(), getReplacementTypes(),
+              getConformances());
+    }
+
+    /// Profile the substitution map storage, for use with LLVM's FoldingSet.
+    static void Profile(llvm::FoldingSetNodeID &id,
+                        GenericSignature *genericSig,
+                        ArrayRef<Type> replacementTypes,
+                        ArrayRef<ProtocolConformanceRef> conformances);
   };
 
+private:
   /// The storage needed to describe the set of substitutions.
   ///
   /// When null, this substitution map is empty, having neither a generic
   /// signature nor any replacement types/conformances.
-  std::shared_ptr<Storage> storage;
+  Storage *storage = nullptr;
 
   /// Retrieve the array of replacement types, which line up with the
   /// generic parameters.
