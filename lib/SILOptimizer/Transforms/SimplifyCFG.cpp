@@ -266,7 +266,7 @@ static SILValue getTerminatorCondition(TermInst *Term) {
 
 /// Is this basic block jump threadable.
 static bool isThreadableBlock(SILBasicBlock *BB,
-                              SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders) {
+                              SmallPtrSetImpl<SILBasicBlock *> &LoopHeaders) {
   if (isa<ReturnInst>(BB->getTerminator()))
     return false;
 
@@ -444,7 +444,7 @@ static SILValue createValueForEdge(SILInstruction *UserInst,
 /// of the operand of 'DominatingBB's terminator.
 static bool tryDominatorBasedSimplifications(
     SILBasicBlock *DominatingBB, DominanceInfo *DT,
-    SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders,
+    SmallPtrSetImpl<SILBasicBlock *> &LoopHeaders,
     SmallVectorImpl<ThreadInfo> &JumpThreadableEdges,
     llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>>
         &ThreadedEdgeSet,
@@ -767,7 +767,7 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
 
 static NullablePtr<EnumElementDecl>
 getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
-                     llvm::SmallPtrSet<SILArgument *, 8> &HandledArgs) {
+                     llvm::SmallPtrSetImpl<SILArgument *> &HandledArgs) {
   // Limit the number of recursions. This is an easy way to cope with cycles
   // in the SSA graph.
   if (RecursionDepth > 3)
