@@ -1975,10 +1975,7 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
   BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
                             /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
   auto *error = (SwiftError *)errorBox.object;
-  id result =  _swift_stdlib_bridgeErrorToNSError(error);
-  // Now that we have bridged the error to nserror, release the error.
-  SWIFT_CC_PLUSZERO_GUARD(swift_errorRelease(error));
-  return result;
+  return _swift_stdlib_bridgeErrorToNSError(error);
 }
 
 #endif
