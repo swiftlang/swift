@@ -148,7 +148,7 @@ public:
 
   /// Filter out any results that aren't accepted by the given predicate.
   void
-  filter(const std::function<bool(LookupResultEntry, /*isOuter*/ bool)> &pred);
+  filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
 };
 
 /// The result of name lookup for types.
