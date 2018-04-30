@@ -119,7 +119,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
       auto conformances = sub.getConformances();
       assert(reqts.size() == conformances.size());
 
-      for (unsigned i = 0, e = conformances.size(); i < e; i++) {
+      for (auto i : indices(conformances)) {
         assert(reqts[i].getSecondType()->getAnyNominal() ==
                conformances[i].getRequirement());
         storedConformances.push_back(conformances[i]);
@@ -599,14 +599,8 @@ void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   }
 
   // Conformance requirements.
-  for (const auto &req : genericSig->getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
-
-    auto conformance =
-      lookupConformance(req.getFirstType()->getCanonicalType(),
-                        req.getSecondType()->castTo<ProtocolType>()->getDecl());
-    id.AddPointer(conformance ? conformance->getOpaqueValue() : nullptr);
+  for (const auto conformance : getConformances()) {
+    id.AddPointer(conformance.getOpaqueValue());
   }
 }
 
