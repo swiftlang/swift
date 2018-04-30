@@ -624,7 +624,7 @@ private:
                          bool Curried, bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, Type paramListTy, bool isCurried,
-                          std::function<bool()> isAPINameByDefault);
+                          llvm::function_ref<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -2310,7 +2310,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
 void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
                                   bool isCurried,
-                                  std::function<bool()> isAPINameByDefault) {
+                                  llvm::function_ref<bool()> isAPINameByDefault) {
   SmallVector<ParameterTypeFlags, 4> paramFlags;
   if (paramListTy && !paramListTy->hasError()) {
     if (auto parenTy = dyn_cast<ParenType>(paramListTy.getPointer())) {

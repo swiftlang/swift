@@ -459,13 +459,13 @@ public:
   /// Enumerate each immediate child expression of this node, invoking the
   /// specific functor on it.  This ignores statements and other non-expression
   /// children.
-  void forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback);
+  void forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
 
   /// Enumerate each expr node within this expression subtree, invoking the
   /// specific functor on it.  This ignores statements and other non-expression
   /// children, and if there is a closure within the expression, this does not
   /// walk into the body of it (unless it is single-expression).
-  void forEachChildExpr(const std::function<Expr*(Expr*)> &callback);
+  void forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
 
   /// Determine whether this expression refers to a type by name.
   ///
