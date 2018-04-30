@@ -190,7 +190,9 @@ public:
 
   /// Get the absolute position of this raw syntax: its offset, line,
   /// and column.
-  AbsolutePosition getAbsolutePosition() const;
+  AbsolutePosition getAbsolutePosition() const {
+    return Data->getAbsolutePosition();
+  }
 
   // TODO: hasSameStructureAs ?
 };
