@@ -3666,14 +3666,13 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(
-                             Out, ScratchRecord, abbrCode,
-                             addDeclRef(typeAlias,
-                                        /*forceSerialization*/false,
-                                        /*allowTypeAliasXRef*/true),
-                             addTypeRef(alias->getParent()),
-                             addTypeRef(alias->getSinglyDesugaredType()));
-    // Write the set of substitutions.
-    writeSubstitutions(alias->getSubstitutionList(), DeclTypeAbbrCodes);
+                           Out, ScratchRecord, abbrCode,
+                           addDeclRef(typeAlias,
+                                      /*forceSerialization*/false,
+                                      /*allowTypeAliasXRef*/true),
+                           addTypeRef(alias->getParent()),
+                           addTypeRef(alias->getSinglyDesugaredType()),
+                           addSubstitutionMapRef(alias->getSubstitutionMap()));
     break;
   }
 

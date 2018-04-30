@@ -4288,9 +4288,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
+    SubstitutionMapID substitutionsID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
-                                                      parentTypeID,
-                                                      underlyingTypeID);
+                                                 parentTypeID,
+                                                 underlyingTypeID,
+                                                 substitutionsID);
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
       return aliasOrError.takeError();
@@ -4318,16 +4320,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     Type parentType = getType(parentTypeID);
 
     // Read the substitutions.
-    SubstitutionMap subMap;
-    if (auto genericSig = alias->getGenericSignature()) {
-      SmallVector<Substitution, 4> substitutions;
-      for (unsigned i : range(genericSig->getSubstitutionListSize())) {
-        (void)i;
-        substitutions.push_back(*maybeReadSubstitution(DeclTypeCursor));
-      }
-
-      subMap = genericSig->getSubstitutionMap(substitutions);
-    }
+    SubstitutionMap subMap = getSubstitutionMap(substitutionsID);
 
     // Look through compatibility aliases that are now unavailable.
     if (alias->getAttrs().isUnavailable(ctx) &&
@@ -4337,7 +4330,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
 
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
-                                           underlyingType);
+                                      underlyingType);
     break;
   }
   case decls_block::NOMINAL_TYPE: {

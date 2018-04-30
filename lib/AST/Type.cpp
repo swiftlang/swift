@@ -1340,33 +1340,24 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   return UnderlyingType;
 }
 
-SubstitutionMap NameAliasType::getSubstitutionMap() const {
-  if (auto genericSig = getGenericSignature())
-    return genericSig->getSubstitutionMap(getSubstitutionList());
-
-  return SubstitutionMap();
-}
-
 SmallVector<Type, 2> NameAliasType::getInnermostGenericArgs() const {
   SmallVector<Type, 2> result;
 
   // If the typealias is not generic, there are no generic arguments
   if (!typealias->isGeneric()) return result;
 
-  auto genericSig = typealias->getGenericSignature();
-  if (!genericSig) return result;
-
-  // If the substitution list was empty, bail out.
-  if (getSubstitutionList().empty()) return result;
+  // If the substitution map is empty, bail out.
+  auto subMap = getSubstitutionMap();
+  if (subMap.empty()) return result;
 
   // Retrieve the substitutions for the generic parameters (only).
+  auto genericSig = subMap.getGenericSignature();
   unsigned numAllGenericParams = genericSig->getGenericParams().size();
-  auto genericArgSubs = getSubstitutionList().slice(0, numAllGenericParams);
-
-  // Copy the replacement types for the innermost generic arguments.
   unsigned numMyGenericParams = typealias->getGenericParams()->size();
-  for (const auto &sub : genericArgSubs.take_back(numMyGenericParams)) {
-    result.push_back(sub.getReplacement());
+  result.reserve(numMyGenericParams);
+  unsigned startIndex = numAllGenericParams - numMyGenericParams;
+  for (auto gp : genericSig->getGenericParams().slice(startIndex)) {
+    result.push_back(Type(gp).subst(subMap, SubstFlags::UseErrorType));
   }
   return result;
 }

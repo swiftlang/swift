@@ -25,6 +25,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SubstitutionList.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -373,14 +374,14 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+16,
+  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+1,
     : NumPadBits,
 
     /// Whether we have a parent type.
     HasParent : 1,
 
-    /// The number of substitutions.
-    NumSubstitutions : 16
+    /// Whether we have a substitution map.
+    HasSubstitutionMap : 1
   );
 
   } Bits;
@@ -1592,8 +1593,7 @@ public:
 /// set of substitutions to apply to make the type concrete.
 class NameAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<NameAliasType, Type, GenericSignature *,
-                          Substitution>
+    llvm::TrailingObjects<NameAliasType, Type, SubstitutionMap>
 {
   TypeAliasDecl *typealias;
 
@@ -1601,30 +1601,20 @@ class NameAliasType final
   friend TrailingObjects;
 
   NameAliasType(TypeAliasDecl *typealias, Type parent,
-                     const SubstitutionMap &substitutions, Type underlying,
-                     RecursiveTypeProperties properties);
-
-  unsigned getNumSubstitutions() const {
-    return Bits.NameAliasType.NumSubstitutions;
-  }
+                const SubstitutionMap &substitutions, Type underlying,
+                RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
     return Bits.NameAliasType.HasParent ? 1 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericSignature *>) const {
-    return getNumSubstitutions() > 0 ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<Substitution>) const {
-    return getNumSubstitutions();
+  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
+    return Bits.NameAliasType.HasSubstitutionMap ? 1 : 0;
   }
 
   /// Retrieve the generic signature used for substitutions.
   GenericSignature *getGenericSignature() const {
-    return getNumSubstitutions() > 0
-             ? *getTrailingObjects<GenericSignature *>()
-             : nullptr;
+    return getSubstitutionMap().getGenericSignature();
   }
 
 public:
@@ -1642,18 +1632,17 @@ public:
   /// written before ".", if provided.
   Type getParent() const {
     return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
-                                             : Type();
-  }
-
-  /// Retrieve the set of substitutions to be applied to the declaration to
-  /// produce the underlying type.
-  SubstitutionList getSubstitutionList() const {
-    return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
+                                        : Type();
   }
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
-  SubstitutionMap getSubstitutionMap() const;
+  SubstitutionMap getSubstitutionMap() const {
+    if (!Bits.NameAliasType.HasSubstitutionMap)
+      return SubstitutionMap();
+
+    return *getTrailingObjects<SubstitutionMap>();
+  }
 
   /// Get the innermost generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration in
@@ -5395,6 +5384,14 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   }
 }
 
+inline ArrayRef<CanTypeWrapper<GenericTypeParamType>>
+CanGenericSignature::getGenericParams() const{
+  auto params = Signature->getGenericParams().getOriginalArray();
+  auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
+                                                                 params.data());
+  return {base, params.size()};
+}
+
 } // end namespace swift
 
 namespace llvm {
@@ -5420,7 +5417,6 @@ struct DenseMapInfo<swift::BuiltinIntegerWidth> {
     return a == b;
   }
 };
-
 
 }
   

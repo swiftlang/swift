@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 409; // Last change: standalone requirement subs
+const uint16_t VERSION_MINOR = 410; // Last change: NameAlias substitution map
 
 using DeclIDField = BCFixed<31>;
 
@@ -654,10 +654,10 @@ namespace decls_block {
 
   using NameAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
-    DeclIDField, // typealias decl
-    TypeIDField, // parent type
-    TypeIDField  // underlying type
-    // trailing substitutions
+    DeclIDField,      // typealias decl
+    TypeIDField,      // parent type
+    TypeIDField,      // underlying type
+    SubstitutionMapIDField // substitution map
   >;
 
   using GenericTypeParamTypeLayout = BCRecordLayout<

@@ -30,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
@@ -2883,9 +2884,9 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
 //===----------------------------------------------------------------------===//
 
 NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
-                                       const SubstitutionMap &substitutions,
-                                       Type underlying,
-                                       RecursiveTypeProperties properties)
+                             const SubstitutionMap &substitutions,
+                             Type underlying,
+                             RecursiveTypeProperties properties)
     : SugarType(TypeKind::NameAlias, underlying, properties),
       typealias(typealias) {
   // Record the parent (or absence of a parent).
@@ -2898,15 +2899,10 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
 
   // Record the substitutions.
   if (auto genericSig = substitutions.getGenericSignature()) {
-    SmallVector<Substitution, 4> flatSubs;
-    genericSig->getSubstitutions(substitutions, flatSubs);
-    Bits.NameAliasType.NumSubstitutions = flatSubs.size();
-    std::copy(flatSubs.begin(), flatSubs.end(),
-              getTrailingObjects<Substitution>());
-
-    *getTrailingObjects<GenericSignature *>() = genericSig;
+    Bits.NameAliasType.HasSubstitutionMap = true;
+    *getTrailingObjects<SubstitutionMap>() = substitutions;
   } else {
-    Bits.NameAliasType.NumSubstitutions = 0;
+    Bits.NameAliasType.HasSubstitutionMap = false;
   }
 }
 
@@ -2947,11 +2943,8 @@ NameAliasType *NameAliasType::get(TypeAliasDecl *typealias, Type parent,
     return result;
 
   // Build a new type.
-  unsigned numSubstitutions =
-    genericSig ? genericSig->getSubstitutionListSize() : 0;
-  auto size =
-    totalSizeToAlloc<Type, GenericSignature *, Substitution>(
-                        parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
+  auto size = totalSizeToAlloc<Type, SubstitutionMap>(parent ? 1 : 0,
+                                                      genericSig ? 1 : 0);
   auto mem = ctx.Allocate(size, alignof(NameAliasType), arena);
   auto result = new (mem) NameAliasType(typealias, parent, substitutions,
                                         underlying, storedProperties);
