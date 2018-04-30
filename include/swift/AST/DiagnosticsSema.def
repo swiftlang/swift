@@ -1697,9 +1697,18 @@ ERROR(witness_unavailable,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
+ERROR(redundant_conformance_conditional,none,
+      "conflicting conformance of %0 to protocol %1; there cannot be more "
+      "than one conformance, even with different conditional bounds",
+      (Type, DeclName))
 WARNING(redundant_conformance_adhoc,none,
         "conformance of %0 to protocol %1 was already stated in "
         "%select{the protocol's|the type's}2 module %3",
+        (Type, DeclName, bool, Identifier))
+WARNING(redundant_conformance_adhoc_conditional,none,
+        "conformance of %0 to protocol %1 conflicts with that stated in "
+        "%select{the protocol's|the type's}2 module %3 and will be ignored; "
+        "there cannot be more than one conformance, even with different conditional bounds",
         (Type, DeclName, bool, Identifier))
 NOTE(redundant_conformance_witness_ignored,none,
      "%0 %1 will not be used to satisfy the conformance to %2",

@@ -322,13 +322,13 @@ struct TwoConformances<T> {}
 extension TwoConformances: P2 where T: P1 {}
 // expected-note@-1{{'TwoConformances<T>' declares conformance to protocol 'P2' here}}
 extension TwoConformances: P2 where T: P3 {}
-// expected-error@-1{{redundant conformance of 'TwoConformances<T>' to protocol 'P2'}}
+// expected-error@-1{{conflicting conformance of 'TwoConformances<T>' to protocol 'P2'; there cannot be more than one conformance, even with different conditional bounds}}
 
 struct TwoDisjointConformances<T> {}
 extension TwoDisjointConformances: P2 where T == Int {}
 // expected-note@-1{{'TwoDisjointConformances<T>' declares conformance to protocol 'P2' here}}
 extension TwoDisjointConformances: P2 where T == String {}
-// expected-error@-1{{redundant conformance of 'TwoDisjointConformances<T>' to protocol 'P2'}}
+// expected-error@-1{{conflicting conformance of 'TwoDisjointConformances<T>' to protocol 'P2'; there cannot be more than one conformance, even with different conditional bounds}}
 
 
 // FIXME: these cases should be equivalent (and both with the same output as the
