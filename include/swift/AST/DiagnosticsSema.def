@@ -327,7 +327,7 @@ ERROR(cannot_throw_error_code,none,
       "instance", (Type, Type))
 
 ERROR(cannot_throw_nil,none,
-      "cannot infer concrete Error for thrown 'nil value", ())
+      "cannot infer concrete Error for thrown 'nil' value", ())
 
 
 ERROR(cannot_convert_raw_initializer_value,none,
