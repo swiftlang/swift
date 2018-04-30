@@ -142,14 +142,14 @@ func _adjointSin<T : TensorProtocol>(
 func _adjointCos<T : TensorProtocol>(
   _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return -seed * cos(x)
+  return -seed * sin(x)
 }
 
 @_inlineable @_versioned
 func _adjointTan<T : TensorProtocol>(
   _ x: T, originalValue: T, seed: T
 ) -> T where T.Scalar : FloatingPoint {
-  return seed / (1 + originalValue.squared())
+  return seed * (1 + originalValue.squared())
 }
 
 @_inlineable @_versioned
