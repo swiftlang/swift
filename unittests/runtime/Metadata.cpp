@@ -297,12 +297,11 @@ ProtocolDescriptor ProtocolNoWitnessTable{
 };
 
 TEST(MetadataTest, getExistentialMetadata) {
-  const ProtocolDescriptor *const proto = nullptr;
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       auto any = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
                                                   /*superclass=*/nullptr,
-                                                  0, &proto);
+                                                  0, nullptr);
       EXPECT_EQ(MetadataKind::Existential, any->getKind());
       EXPECT_EQ(0U, any->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, any->Flags.getClassConstraint());
