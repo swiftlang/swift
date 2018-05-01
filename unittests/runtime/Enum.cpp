@@ -57,7 +57,7 @@ OpaqueValue *asOpaque(void *v) {
   return reinterpret_cast<OpaqueValue*>(v);
 }
 
-unsigned test_getEnumCaseSinglePayload(std::initializer_list<uint8_t> repr,
+int test_getEnumCaseSinglePayload(std::initializer_list<uint8_t> repr,
                                        const FullOpaqueMetadata &metadata,
                                        unsigned numEmptyCases) {
   return swift_getEnumCaseSinglePayload(asOpaque(repr.begin()),

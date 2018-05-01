@@ -99,6 +99,7 @@
 // ----------------------------------------------------------------------------
 
 #include <float.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -1068,7 +1069,7 @@ size_t swift_format_double(double d, char *dest, size_t length)
             uint64_t payload = raw & ((1ull << (significandBitCount - 2)) - 1);
             char buff[32];
             if (payload != 0) {
-                snprintf(buff, sizeof(buff), "%s%snan(0x%llx)",
+                snprintf(buff, sizeof(buff), "%s%snan(0x%" PRIx64 ")",
                          sign, signaling, payload);
             } else {
                 snprintf(buff, sizeof(buff), "%s%snan",
@@ -1124,7 +1125,7 @@ size_t swift_format_float80(long double d, char *dest, size_t length)
             uint64_t payload = significandBitPattern & (((uint64_t)1 << 61) - 1);
             char buff[32];
             if (payload != 0) {
-                snprintf(buff, sizeof(buff), "%s%snan(0x%llx)",
+                snprintf(buff, sizeof(buff), "%s%snan(0x%" PRIx64 ")",
                          sign, signaling, payload);
             } else {
                 snprintf(buff, sizeof(buff), "%s%snan",

@@ -62,7 +62,7 @@ static void errnoAndExit(const char *message) {
 }
 
 static swift_reflection_section_t
-makeLocalSection(void *Buffer, RemoteSection Section,
+makeLocalSection(const void *Buffer, RemoteSection Section,
                  RemoteReflectionInfo Info) {
   if (Section.Size == 0) {
     swift_reflection_section_t LS = {NULL, NULL};
@@ -174,7 +174,8 @@ void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
     else if (bytesRead == 0)
       errorAndExit("collectBytesFromPipe: Unexpected end of file");
     Size -= bytesRead;
-    Dest += bytesRead;
+    // Arithmetic on a void pointer is a GNU extension.
+    Dest = (char*)(Dest) + bytesRead;
   }
 }
 
@@ -204,8 +205,7 @@ static void PipeMemoryReader_freeBytes(void *reader_context, const void *bytes,
 
 static
 const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
-                                       uint64_t Size,
-                                       void **outFreeContext) {
+                                       uint64_t Size, void **outFreeContext) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   uintptr_t TargetAddress = Address;
   size_t TargetSize = (size_t)Size;
@@ -342,13 +342,12 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
   for (size_t i = 0; i < NumReflectionInfos; ++i) {
     RemoteReflectionInfo RemoteInfo = RemoteInfos[i];
 
-    void *Buffer = malloc(RemoteInfo.TotalSize);
-
-    int Success = PipeMemoryReader_readBytes((void *)Reader,
-                                             RemoteInfo.StartAddress,
-                                             Buffer,
-                                             RemoteInfo.TotalSize);
-    if (!Success)
+    void *outFreeContext = NULL;
+    const void *Buffer = PipeMemoryReader_readBytes((void *)Reader,
+                                                    RemoteInfo.StartAddress,
+                                                    RemoteInfo.TotalSize,
+                                                    &outFreeContext);
+    if (!Buffer)
       errorAndExit("Couldn't read reflection information");
 
     swift_reflection_info_t Info = {

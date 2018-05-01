@@ -1222,36 +1222,37 @@ struct SILDebugVariable {
 /// A DebugVariable where storage for the strings has been
 /// tail-allocated following the parent SILInstruction.
 class TailAllocatedDebugVariable {
+  using int_type = uint32_t;
   union {
-    uint32_t RawValue;
+    int_type RawValue;
     struct {
       /// Whether this is a debug variable at all.
-      unsigned HasValue : 1;
+      int_type HasValue : 1;
       /// True if this is a let-binding.
-      unsigned Constant : 1;
-      /// The source function argument position from left to right
-      /// starting with 1 or 0 if this is a local variable.
-      unsigned ArgNo : 16;
+      int_type Constant : 1;
       /// When this is nonzero there is a tail-allocated string storing
       /// variable name present. This typically only happens for
       /// instructions that were created from parsing SIL assembler.
-      unsigned NameLength : 14;
+      int_type NameLength : 14;
+      /// The source function argument position from left to right
+      /// starting with 1 or 0 if this is a local variable.
+      int_type ArgNo : 16;
     } Data;
-  };
+  } Bits;
 public:
   TailAllocatedDebugVariable(Optional<SILDebugVariable>, char *buf);
-  TailAllocatedDebugVariable(uint32_t RawValue) : RawValue(RawValue) {}
-  uint32_t getRawValue() const { return RawValue; }
+  TailAllocatedDebugVariable(int_type RawValue) { Bits.RawValue = RawValue; }
+  int_type getRawValue() const { return Bits.RawValue; }
 
-  unsigned getArgNo() const { return Data.ArgNo; }
-  void setArgNo(unsigned N) { Data.ArgNo = N; }
+  unsigned getArgNo() const { return Bits.Data.ArgNo; }
+  void setArgNo(unsigned N) { Bits.Data.ArgNo = N; }
   /// Returns the name of the source variable, if it is stored in the
   /// instruction.
   StringRef getName(const char *buf) const;
-  bool isLet() const  { return Data.Constant; }
+  bool isLet() const  { return Bits.Data.Constant; }
 
   Optional<SILDebugVariable> get(VarDecl *VD, const char *buf) const {
-    if (!Data.HasValue)
+    if (!Bits.Data.HasValue)
       return None;
     if (VD)
       return SILDebugVariable(VD->getName().empty() ? "" : VD->getName().str(),
