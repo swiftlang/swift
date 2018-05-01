@@ -361,6 +361,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(CopyBlockInst, copy_block,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+  SINGLE_VALUE_INST(CopyBlockWithoutEscapingInst, copy_block_without_escaping,
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(CopyValueInst, copy_value,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(CopyUnownedValueInst, copy_unowned_value,

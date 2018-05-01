@@ -1433,16 +1433,18 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
   return call;
 }
 
-llvm::Value *IRGenFunction::emitIsEscapingClosureCall(llvm::Value *value,
-                                                      SourceLoc sourceLoc) {
+llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
+    llvm::Value *value, SourceLoc sourceLoc, unsigned verificationType) {
   auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
   auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
+  auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.Column);
   auto filename = IGM.getAddrOfGlobalString(loc.Filename);
   auto filenameLength =
       llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
+  auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
   llvm::CallInst *call =
       Builder.CreateCall(IGM.getIsEscapingClosureAtFileLocationFn(),
-                         {value, filename, filenameLength, line});
+                         {value, filename, filenameLength, line, col, type});
   call->setDoesNotThrow();
   return call;
 }

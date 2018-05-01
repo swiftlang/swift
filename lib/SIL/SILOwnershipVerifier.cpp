@@ -1182,6 +1182,21 @@ OwnershipCompatibilityUseChecker::visitStoreInst(StoreInst *I) {
 }
 
 OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitCopyBlockWithoutEscapingInst(
+    CopyBlockWithoutEscapingInst *I) {
+  // Consumes the closure parameter.
+  if (getValue() == I->getClosure()) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
+            UseLifetimeConstraint::MustBeInvalidated};
+  }
+  bool compatible = hasExactOwnership(ValueOwnershipKind::Any) ||
+                    !compatibleWithOwnership(ValueOwnershipKind::Trivial);
+
+  return { compatible, UseLifetimeConstraint::MustBeLive };
+}
+
+
+OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
     MarkDependenceInst *MDI) {
 
