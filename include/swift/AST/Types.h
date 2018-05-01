@@ -4901,6 +4901,9 @@ public:
     }
   }
 
+  /// Is this storage type known to be loadable in the given resilience scope?
+  bool isLoadable(ResilienceExpansion resilience) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_ReferenceStorageType &&
@@ -4928,10 +4931,6 @@ public:
     return static_cast<UnownedStorageType *>(
         ReferenceStorageType::get(referent, ReferenceOwnership::Unowned, C));
   }
-
-  /// Is this unowned storage type known to be loadable within the given
-  /// resilience scope?
-  bool isLoadable(ResilienceExpansion resilience) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
