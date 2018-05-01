@@ -743,6 +743,7 @@ static NominalTypeDecl *getStdlibTypeDecl(StringRef name, ASTContext &ctx) {
   return cast<NominalTypeDecl>(lookupResults[0]);
 }
 
+// FIXME: Unify with similar code in TFUtilities.
 static
 void lookupProtocolRequiredMembers(NominalTypeDecl *typeDecl,
                                    ProtocolDecl *proto,
@@ -762,6 +763,7 @@ void lookupProtocolRequiredMembers(NominalTypeDecl *typeDecl,
     results.push_back(decl);
 }
 
+// FIXME: Unify with similar code in TFUtilities.
 static SILFunction *
 findSILFunctionForRequiredProtocolMember(NominalTypeDecl *typeDecl,
                                          ProtocolDecl *proto, DeclName name,
@@ -797,6 +799,7 @@ static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
   return nullptr;
 }
 
+// FIXME: Unify with similar code in TFUtilities.
 /// Looks up a function in the current module. If it exists, returns it.
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.

@@ -18,7 +18,8 @@ public func test1Send() {
 
 // CHECK: integer_literal $Builtin.Int64, 0
 // CHECK-NEXT: [[TENSOR_ID:%.*]] = struct $Int
-// CHECK:      [[RECEIVE_H:%.*]] = function_ref @_swift_tfc_ReceiveTensorHandle
+// CHECK:      // function_ref static TensorHandle.receiveFromDevice(_:_:)
+// CHECK-NEXT:      [[RECEIVE_H:%.*]] = function_ref @
 // CHECK-NEXT: apply [[RECEIVE_H]]<Float>([[TC]], [[TENSOR_ID]]
 
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
@@ -43,14 +44,16 @@ public func test2Sends() {
 // The first receive is over tensor id 0.
 // CHECK: integer_literal $Builtin.Int64, 0
 // CHECK-NEXT: [[TENSOR_ID0:%.*]] = struct $Int
-// CHECK:      [[RECEIVE_H0:%.*]] = function_ref @_swift_tfc_ReceiveTensorHandle
+// CHECK:      // function_ref static TensorHandle.receiveFromDevice(_:_:)
+// CHECK-NEXT:      [[RECEIVE_H0:%.*]] = function_ref @
 // CHECK-NEXT: apply [[RECEIVE_H0]]<Float>([[TC]], [[TENSOR_ID0]]
 
 // The second receive is over tensor id 1.
 // CHECK: function_ref print(_:separator:terminator:)
 // CHECK: integer_literal $Builtin.Int64, 1
 // CHECK-NEXT: [[TENSOR_ID1:%.*]] = struct $Int
-// CHECK:      [[RECEIVE_H1:%.*]] = function_ref @_swift_tfc_ReceiveTensorHandle
+// CHECK:      // function_ref static TensorHandle.receiveFromDevice(_:_:)
+// CHECK-NEXT:      [[RECEIVE_H1:%.*]] = function_ref @
 // CHECK-NEXT: apply [[RECEIVE_H1]]<Float>([[TC]], [[TENSOR_ID1]]
 
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
@@ -68,4 +71,13 @@ public func testSendsInALoop() {
   a += a
   // This one should not be a send.
   print(a.toHost())
+}
+
+public func testCannotSendResource() {
+  // expected-error @+2 {{This value is not receivable}}
+  let iterator: ResourceHandle =
+    #tfop("Iterator", shared_name: "foo", container: "bar")
+
+  print(iterator)
+  let _ = Tensor<Float>(1.0)
 }

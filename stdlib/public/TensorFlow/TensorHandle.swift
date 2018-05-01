@@ -85,6 +85,27 @@ internal extension TensorHandle {
   }
 }
 
+extension TensorHandle : TensorSendableReceivable {
+  @_inlineable @_versioned
+  static func receiveFromDevice(_ computation: _TensorComputation,
+                                _ tensorId: Int
+  ) -> TensorHandle<Scalar> {
+    debugLog("Receiving tensor of id \(tensorId) and type \(Scalar.self).")
+    let status = TF_NewStatus()
+    let cTensor: CTensor = TF_DequeueNamedTensor(
+      computation.cSession, Int32(tensorId), status)
+    checkOk(status)
+    TF_DeleteStatus(status)
+    let tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor)
+    TF_DeleteTensor(cTensor)
+    if _RuntimeConfig.printsDebugLog {
+      debugLog("The received tensor of id \(tensorId) has content:")
+      dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
+    }
+    return tensorHandle
+  }
+}
+
 internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
   @_versioned
   @inline(never)

@@ -994,26 +994,3 @@ public func _TFCCreateCTensorHandle<T>(_ value : T,
   TF_DeleteTensor(tensor)
   return cTensorHandle!
 }
-
-/// Receive a tensor based on a tensor computation handle (equivalent to a TF
-/// session handle), and a tensor ID.
-@_inlineable
-@_silgen_name("_swift_tfc_ReceiveTensorHandle")
-public func _TFCReceiveTensorHandle<Scalar : AccelerableByTensorFlow>(
-  _ computation: _TensorComputation,
-  _ tensorId: Int
-) -> TensorHandle<Scalar> {
-  debugLog("Receiving tensor of id \(tensorId) and type \(Scalar.self).")
-  let status = TF_NewStatus()
-  let cTensor: CTensor = TF_DequeueNamedTensor(
-    computation.cSession, Int32(tensorId), status)
-  checkOk(status)
-  TF_DeleteStatus(status)
-  let tensorHandle = TensorHandle<Scalar>(copyingFromCTensor: cTensor)
-  TF_DeleteTensor(cTensor)
-  if _RuntimeConfig.printsDebugLog {
-    debugLog("The received tensor of id \(tensorId) has content:")
-    dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
-  }
-  return tensorHandle
-}

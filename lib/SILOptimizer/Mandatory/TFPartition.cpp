@@ -1878,11 +1878,14 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
         tensorFlowModule(tensorFlowModule) {}
 
   void cloneFunction(ArrayRef<SILValue> resultValues);
-  void finalizeOriginal();
+  // On error, returns false.
+  bool finalizeOriginal();
 
   void insertSend(SILInstruction &inst);
-  void insertReceive(SILValue value, SILLocation loc);
-  void handleHostReferencesOfMovedValue(SILValue value, SILLocation loc);
+  // On error, returns false.
+  bool insertReceive(SILValue value, SILLocation loc);
+  // On error, returns false.
+  bool handleHostReferencesOfMovedValue(SILValue value, SILLocation loc);
 
   // Handle references to blocks from cloned code.
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) {
@@ -1964,6 +1967,12 @@ private:
 
   void initBlock(SILBasicBlock *BB);
   void cloneBlock(SILBasicBlock *BB);
+
+  // Confirms that the type T of `value` conforms to TensorSendableReceivable
+  // protocol, and looks up SIL function associated with based on `fnName`.
+  // On error, returns false.
+  bool lookupSendReceiveFunction(StringRef fnName, SILValue value,
+                                 SILLocation loc, SILFunction *&fn);
 };
 } // end anonymous namespace
 
@@ -2259,30 +2268,34 @@ static SILValue createDeviceReceive(SILBuilder &B, SILLocation loc,
                          Substitution(valueTy.getSwiftRValueType(), {}), {});
 }
 
-// Create a call to runtime API @_swift_tfc_ReceiveTensorHandle() for the host
-// program to receive a tensor from a TF-managed Fifo queue.
+// Create a runtime call for the host program to receive a tensor from device
+// based on `tensorComputation` and a tensor ID given by `idNumber`.
 static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
                                   SILType valueTy, SILValue tensorComputation,
-                                  int idNumber, ModuleDecl &tensorFlowModule) {
-  // @_silgen_name("_swift_tfc_ReceiveTensorHandle")
-  // public func _TFCReceiveTensorHandle<Scalar : AccelerableByTensorFlow>(
-  //   _ computation: _TensorComputation,
-  //   _ tensorId: Int) -> TensorHandle<Scalar> {...}
-  auto receiveTensorHandleFn = B.getModule().findFunction(
-      "_swift_tfc_ReceiveTensorHandle", SILLinkage::PublicExternal);
-  // We have checked earlier that other runtime entry points like
-  // "_swift_tfc_StartTensorComputation" exist, so we can assert that this
-  // function also exist here.
-  assert(receiveTensorHandleFn);
+                                  int idNumber, ModuleDecl &tensorFlowModule,
+                                  SILFunction *receiveFn) {
+  assert(receiveFn);
+  // The function signature is:
+  // public static func receiveFromDevice(_ computation: _TensorComputation,
+  //                                      _ tensorId: Int
+  // ) -> TensorHandle<Scalar> {...}
+  // In SIL:
+  // function_ref @... : $@convention(method)
+  //   <T where T : AccelerableByTensorFlow> (@owned _TensorComputation,
+  //                                          Int,
+  //                                          @thick TensorHandle<T>.Type
+  // ) -> @owned TensorHandle<T>
 
   // Example SIL code to generate:
-  // %0 = integer_literal $Builtin.Int64, 0          // user: %1
-  // %1 = struct $Int (%0 : $Builtin.Int64)          // user: %4
-  // // function_ref _swift_tfc_ReceiveCTensorHandle
-  // %2 = function_ref @_swift_tfc_ReceiveCTensorHandle ...
-  // %3 = apply %3<Float>(..., %1)
+  // %0 = integer_literal $Builtin.Int64, 0
+  // %1 = struct $Int (%0 : $Builtin.Int64)
+  // %2 = function_ref @...
+  // %3 = metatype $@thick TensorHandle<Float>.Type
+  // %4 = apply %2<Float>(..., %1, %3)
   auto tensorId = createIntValue(idNumber, B, loc);
 
+  // FIXME: Access how to call `receiveFn` without referencing the
+  // `AccelerableByTensorFlow protocol.
   auto scalarType = getTensorHandleElementType(valueTy.getSwiftRValueType());
   assert(scalarType && "valueTy is not TensorHandle<T>");
   auto &ctx = B.getASTContext();
@@ -2298,13 +2311,22 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   conformanceRefs.push_back(ProtocolConformanceRef(conformances[0]));
   Substitution sub(scalarType, ctx.AllocateCopy(conformanceRefs));
 
+  // Generate an instruction like:
+  // %3 = metatype $@thick TensorHandle<Float>.Type
+  auto tensorHandleType =
+      convertToTensorValueType(valueTy).getSwiftRValueType();
+  auto metatypeType =
+      MetatypeType::get(tensorHandleType, MetatypeRepresentation::Thick)
+          ->getCanonicalType();
+  auto *metaTypeInst =
+      B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType));
+
   // tensorComputation is passed in as an owned parameter below, so we need a
   // strong retain here to balance it.
   B.createStrongRetain(loc, tensorComputation, Atomicity::Atomic);
-  auto receiveTensorHandleFnRef =
-      B.createFunctionRef(loc, receiveTensorHandleFn);
-  return B.createApply(loc, receiveTensorHandleFnRef, sub,
-                       /*args*/ {tensorComputation, tensorId},
+  auto receiveFnRef = B.createFunctionRef(loc, receiveFn);
+  return B.createApply(loc, receiveFnRef, sub,
+                       /*args*/ {tensorComputation, tensorId, metaTypeInst},
                        /*isNonThrowing*/ false);
 }
 
@@ -2318,6 +2340,32 @@ static void createSend(SILBuilder &B, SILLocation loc, SILValue value,
   B.createBuiltin(loc, name, voidTy,
                   Substitution(value->getType().getSwiftRValueType(), {}),
                   {value});
+}
+// Confirms that the type T of `value` conforms to TensorSendableReceivable
+// protocol, and looks up SIL function associated with based on `fnName`.
+// On error, returns false.
+bool PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
+                                                SILValue value,
+                                                SILLocation loc,
+                                                SILFunction *&fn) {
+  auto &ctx = FP.fn.getASTContext();
+  // If `value` is not receivable, reject the program with diagnostics.
+  auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
+  SmallVector<ProtocolConformance *, 1> conformances;
+  auto nominal = value->getType().getSwiftRValueType()->getAnyNominal();
+  auto lookup =
+      nominal->lookupConformance(&tensorFlowModule, proto, conformances);
+  if (!lookup) {
+    diagnose(ctx, loc.getSourceLoc(), diag::tfop_incorrect_definition,
+             "This value is not receivable");
+    return false;
+  }
+  assert(conformances.size() == 1 && "Found multiple conformance candidates.");
+  DeclName fnDeclName(ctx.getIdentifier(fnName));
+  fn = findSILFunctionForRequiredProtocolMember(
+      nominal, proto, fnDeclName, &tensorFlowModule, FP.fn.getModule());
+  assert(fn);
+  return true;
 }
 
 /// Insert a send of values from the specified instruction result(s) to the
@@ -2342,10 +2390,13 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   }
 }
 
-void PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
+bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   assert(isa<SILInstruction>((SILNode*)value) || isa<SILArgument>(value) &&
          "Don't know how to receive this value");
-
+  SILFunction *receiveFn;
+  if (!lookupSendReceiveFunction("receiveFromDevice", value, loc, receiveFn)) {
+    return false;
+  }
   // Diagnose implicit data transfers if they are implicit.
   FP.diagnoseUsesFromHost(value, loc);
 
@@ -2372,13 +2423,15 @@ void PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   createSend(BA, loc, remapValue(value), nextSendID);
 
   // Create the receive in the host code.
-  auto newVal = createHostReceive(BH, loc, value->getType(), tensorComputation,
-                                  nextSendID, tensorFlowModule);
+  auto newVal =
+      createHostReceive(BH, loc, value->getType(), tensorComputation,
+                        nextSendID, tensorFlowModule, receiveFn);
   value->replaceAllUsesWith(newVal);
   nextSendID++;
+  return true;
 }
 
-void PartitionCloner::
+bool PartitionCloner::
 handleHostReferencesOfMovedValue(SILValue value, SILLocation loc) {
   // If the argument has any non-debug-non-retain/release instructions using
   // it, then we need to insert a copy.
@@ -2396,11 +2449,12 @@ handleHostReferencesOfMovedValue(SILValue value, SILLocation loc) {
 
   if (needsCopy) {
     // If we need the value on the host, then keep the retain/release ops.
-    insertReceive(value, loc);
+    return insertReceive(value, loc);
   } else {
     // Otherwise, drop them.
     for (auto *inst : instToRemove)
       inst->eraseFromParent();
+    return true;
   }
 }
 
@@ -2513,8 +2567,10 @@ void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
 /// Now that all of the interesting instructions are cloned over, we need to
 /// clean up the input function by removing the instructions, and inserting
 /// sends of results from the accelerator code back to the host code.
+/// We can still reject the program here, if the values to send do not conform
+/// to the TensorSendableReceivable protocol (e.g. a ResourceHandle)
 ///
-void PartitionCloner::finalizeOriginal() {
+bool PartitionCloner::finalizeOriginal() {
 
   // Build a set of the instructions we're going to remove so we can add new
   // values without fear of adding duplicates.
@@ -2649,7 +2705,8 @@ void PartitionCloner::finalizeOriginal() {
       continue;
 
     auto arg = argInfo.first;
-    handleHostReferencesOfMovedValue(arg, argInfo.second.second);
+    if (!handleHostReferencesOfMovedValue(arg, argInfo.second.second))
+      return false;
 
     // Remove it from the block that it lives in.
     arg->getParent()->eraseArgument(arg->getIndex());
@@ -2659,7 +2716,9 @@ void PartitionCloner::finalizeOriginal() {
   // remove the original instruction.
   for (auto inst : instructionsToRemove) {
     for (auto result : inst->getResults())
-      handleHostReferencesOfMovedValue(result, getUserSourceLocation(inst));
+      if (!handleHostReferencesOfMovedValue(result,
+                                            getUserSourceLocation(inst)))
+        return false;
 
     inst->eraseFromParent();
   }
@@ -2676,6 +2735,7 @@ void PartitionCloner::finalizeOriginal() {
     if (callee->use_empty())  // Remove the function_ref too.
       cast<SingleValueInstruction>(callee)->eraseFromParent();
   }
+  return true;
 }
 
 /// Convert the specified scalar value (e.g. an i32) into a 0d CTensorHandle
@@ -3295,21 +3355,24 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
                          /*interfaceYields*/{},
                          results, /*interfaceErrorResult*/None,
                          fn.getModule().getASTContext());
-  result.fn =
+  auto resultFn =
     fn.getModule().getOrCreateFunction(fn.getLocation(),
                                        fn.getName().str()+".tf_partition",
                                        SILLinkage::Private, newFnType,
                                        /*What's this*/IsBare, IsNotTransparent,
                                        IsNotSerialized);
 
-  PartitionCloner PC(*this, *result.fn, result.theTensorComputation,
+  PartitionCloner PC(*this, *resultFn, result.theTensorComputation,
                      tensorFlowModule);
 
   // Fill in the cloned function body.
   PC.cloneFunction(resultValues);
 
   // Clean up the source function, removing the tensor code.
-  PC.finalizeOriginal();
+  if (!PC.finalizeOriginal()) return result;
+
+  // Success!
+  result.fn = resultFn;
   return result;
 }
 
