@@ -130,7 +130,7 @@ int _stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr);
 // Environment
 #if defined(__APPLE__) || defined(__FreeBSD__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *_stdlib_getEnviron();
+char * _Nullable * _Null_unspecified _stdlib_getEnviron();
 #endif
 
 // System error numbers <errno.h>
