@@ -1849,7 +1849,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
     return;
 
   // This must stay in sync with diag::generic_param_access.
-  enum ACEK {
+  enum class ACEK {
     Parameter = 0,
     Requirement
   } accessControlErrorKind;
@@ -1934,7 +1934,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
                           owner->getDescriptiveKind(), isExplicit,
                           contextAccess, minAccess,
                           isa<FileUnit>(owner->getDeclContext()),
-                          accessControlErrorKind);
+                          accessControlErrorKind == ACEK::Requirement);
   highlightOffendingType(TC, diag, complainRepr);
 }
 
