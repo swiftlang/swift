@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SIL/DebugUtils.h"
 
 using namespace swift;
 
@@ -149,6 +150,37 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   case SILInstructionKind::BeginBorrowInst:
     return llvm::all_of(cast<BeginBorrowInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
+
+  // Look through mark_dependence.
+  case SILInstructionKind::MarkDependenceInst:
+    return llvm::all_of(cast<MarkDependenceInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
+    return partialApplyUse->getOperandNumber() ==
+           CopyBlockWithoutEscapingInst::Closure;
+
+  // A copy_value that is only used by the store to a block storage is fine.
+  // It is part of the pattern we emit for verifying that a noescape closure
+  // passed to objc has not escaped.
+  //  %4 = convert_escape_to_noescape [not_guaranteed] %3 :
+  //    $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  //  %5 = function_ref @withoutEscapingThunk
+  //  %6 = partial_apply [callee_guaranteed] %5(%4) :
+  //    $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  //  %7 = mark_dependence %6 : $@callee_guaranteed () -> () on %4 :
+  //    $@noescape @callee_guaranteed () -> ()
+  //  %8 = copy_value %7 : $@callee_guaranteed () -> ()
+  //  %9 = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  //  %10 = project_block_storage %9 :
+  //    $*@block_storage @callee_guaranteed () -> ()
+  //  store %8 to [init] %10 : $*@callee_guaranteed () -> ()
+  //  %13 = init_block_storage_header %9 :
+  //    $*@block_storage @callee_guaranteed () -> (),
+  //    invoke %12
+  //  %14 = copy_block_without_escaping %13 : $() -> () withoutEscaping %7
+  case SILInstructionKind::CopyValueInst:
+    return isa<StoreInst>(getSingleNonDebugUser(cast<CopyValueInst>(user)));
 
   // End borrow is always ok.
   case SILInstructionKind::EndBorrowInst:
