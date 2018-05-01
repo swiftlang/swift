@@ -465,7 +465,7 @@ enum ContainsOverlyLargeEnum {
 }
 
 func quiteBigEnough() -> Bool {
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{cannot promptly guarantee switch is exhaustive}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
   // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
@@ -481,7 +481,7 @@ func quiteBigEnough() -> Bool {
   case (.case11, .case11): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{cannot promptly guarantee switch is exhaustive}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
   // expected-note@-1 {{do you want to add a default clause?}}
   case (.case0, _): return true
   case (.case1, _): return true
@@ -496,7 +496,7 @@ func quiteBigEnough() -> Bool {
   case (.case10, _): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{cannot promptly guarantee switch is exhaustive}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
