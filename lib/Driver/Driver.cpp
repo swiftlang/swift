@@ -2798,7 +2798,8 @@ void Driver::printHelp(bool ShowHidden) const {
     ExcludedFlagsBitmask |= HelpHidden;
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
-                      IncludedFlagsBitmask, ExcludedFlagsBitmask);
+                      IncludedFlagsBitmask, ExcludedFlagsBitmask,
+                      /*ShowAllAliases*/false);
 }
 
 bool OutputInfo::mightHaveExplicitPrimaryInputs(
