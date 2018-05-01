@@ -570,3 +570,11 @@ void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   id.AddPointer(storage);
 }
 
+SmallVector<Substitution, 4> SubstitutionMap::toList() const {
+  SmallVector<Substitution, 4> subs;
+  if (empty()) return subs;
+
+  getGenericSignature()->getSubstitutions(*this, subs);
+  return subs;
+}
+

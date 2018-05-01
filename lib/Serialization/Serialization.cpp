@@ -1588,10 +1588,10 @@ void Serializer::writeNormalConformance(
         data.push_back(/*null generic signature*/0);
       }
 
-      auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
-
-      data.push_back(reqToSyntheticSubs.size());
-      data.push_back(witness.getSubstitutions().size());
+      data.push_back(
+        addSubstitutionMapRef(witness.getRequirementToSyntheticSubs()));
+      data.push_back(
+        addSubstitutionMapRef(witness.getSubstitutions()));
   });
 
   unsigned numSignatureConformances =
@@ -1610,21 +1610,6 @@ void Serializer::writeNormalConformance(
   // Write requirement signature conformances.
   for (auto reqConformance : conformance->getSignatureConformances())
     writeConformance(reqConformance, DeclTypeAbbrCodes);
-  
-  conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req, Witness witness) {
-   // Bail out early for simple witnesses.
-   if (!witness.getDecl()) return;
-
-   // Write requirement-to-synthetic substitutions.
-   writeSubstitutions(witness.getRequirementToSyntheticSubs(),
-                      DeclTypeAbbrCodes, nullptr);
-
-   // Write the witness substitutions.
-   writeSubstitutions(witness.getSubstitutions(),
-                      DeclTypeAbbrCodes,
-                      witness.getSyntheticEnvironment());
-  });
 }
 
 void

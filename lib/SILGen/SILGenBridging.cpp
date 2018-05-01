@@ -206,9 +206,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
 
   CanType swiftValueType = conformance->getType()->getCanonicalType();
   auto genericSig = witnessFnTy->getGenericSignature();
-  SubstitutionMap typeSubMap;
-  if (genericSig)
-    typeSubMap = genericSig->getSubstitutionMap(witness.getSubstitutions());
+  SubstitutionMap typeSubMap = witness.getSubstitutions();
 
   // Substitute into the witness function type.
   witnessFnTy = witnessFnTy->substGenericArgs(SGF.SGM.M, typeSubMap);
@@ -243,7 +241,8 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   ArgumentScope argScope(SGF, loc);
   RValue result =
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
-                    ManagedValue::forUnmanaged(witnessRef), subs,
+                    ManagedValue::forUnmanaged(witnessRef),
+                    subs.toList(),
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
                     calleeTypeInfo, ApplyOptions::None, context);
   return std::move(result).getAsSingleValue(SGF, loc);

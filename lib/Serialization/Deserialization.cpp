@@ -5368,28 +5368,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     };
 
     // Requirement -> synthetic map.
-    SmallVector<Substitution, 4> reqToSyntheticSubs;
     if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
       // Create the synthetic environment.
       syntheticEnv = syntheticSig->createGenericEnvironment();
     }
 
     // Requirement -> synthetic substitutions.
-    if (unsigned numReqSubstitutions = *rawIDIter++) {
-      while (numReqSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
-        reqToSyntheticSubs.push_back(*sub);
-      }
-    }
+    SubstitutionMap reqToSyntheticSubs = getSubstitutionMap(*rawIDIter++);
 
     // Witness substitutions.
-    SmallVector<Substitution, 4> witnessSubstitutions;
-    if (unsigned numWitnessSubstitutions = *rawIDIter++) {
-      while (numWitnessSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, syntheticEnv);
-        witnessSubstitutions.push_back(*sub);
-      }
-    }
+    SubstitutionMap witnessSubstitutions = getSubstitutionMap(*rawIDIter++);
 
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {

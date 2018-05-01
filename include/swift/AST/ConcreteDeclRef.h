@@ -18,12 +18,11 @@
 #define SWIFT_AST_CONCRETEDECLREF_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/SubstitutionList.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/TrailingObjects.h"
 #include <cstring>
 
 namespace swift {
@@ -38,35 +37,26 @@ class ValueDecl;
 class ConcreteDeclRef {
   /// A specialized declaration reference, which provides substitutions
   /// that fully specialize a generic declaration.
-  class SpecializedDeclRef final :
-      private llvm::TrailingObjects<SpecializedDeclRef, Substitution> {
-    friend TrailingObjects;
-
+  class SpecializedDeclRef final {
     /// The declaration.
-    ValueDecl *TheDecl;
+    ValueDecl *decl;
 
-    /// The number of substitutions, which are tail allocated.
-    unsigned NumSubstitutions;
+    /// The substitutions.
+    SubstitutionMap substitutions;
 
-    SpecializedDeclRef(ValueDecl *decl, SubstitutionList substitutions)
-      : TheDecl(decl), NumSubstitutions(substitutions.size())
-    {
-      std::uninitialized_copy(substitutions.begin(), substitutions.end(),
-                              getTrailingObjects<Substitution>());
-    }
+    SpecializedDeclRef(ValueDecl *decl, SubstitutionMap substitutions)
+      : decl(decl), substitutions(substitutions) { }
 
   public:
     /// Retrieve the generic declaration.
-    ValueDecl *getDecl() const { return TheDecl; }
+    ValueDecl *getDecl() const { return decl; }
 
-    /// Retrieve the substitutions.
-    SubstitutionList getSubstitutions() const {
-      return {getTrailingObjects<Substitution>(), NumSubstitutions};
-    }
-    
+    /// Retrieve the substitution.
+    SubstitutionMap getSubstitutions() const { return substitutions; }
+
     /// Allocate a new specialized declaration reference.
     static SpecializedDeclRef *create(ASTContext &ctx, ValueDecl *decl,
-                                      SubstitutionList substitutions);
+                                      SubstitutionMap substitutions);
   };
 
   llvm::PointerUnion<ValueDecl *, SpecializedDeclRef *> Data;
@@ -93,7 +83,7 @@ public:
   /// given declaration. This array will be copied into the ASTContext by the
   /// constructor.
   ConcreteDeclRef(ASTContext &ctx, ValueDecl *decl,
-                  SubstitutionList substitutions) {
+                  SubstitutionMap substitutions) {
     if (substitutions.empty())
       Data = decl;
     else
@@ -121,9 +111,9 @@ public:
 
   /// For a specialized reference, return the set of substitutions applied to
   /// the declaration reference.
-  SubstitutionList getSubstitutions() const {
+  SubstitutionMap getSubstitutions() const {
     if (!isSpecialized())
-      return { };
+      return SubstitutionMap();
     
     return Data.get<SpecializedDeclRef *>()->getSubstitutions();
   }

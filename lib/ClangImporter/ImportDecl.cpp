@@ -476,10 +476,12 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   paramRef->setType(param->getType());
 
   auto reinterpretCast
-    = getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast"));
-  ConcreteDeclRef concreteDeclRef(C, reinterpretCast,
-                                  { Substitution(rawTy, {}),
-                                    Substitution(enumTy, {}) });
+    = cast<FuncDecl>(
+        getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                         { rawTy, enumTy }, { });
+  ConcreteDeclRef concreteDeclRef(C, reinterpretCast, subMap);
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   reinterpretCastRef->setType(FunctionType::get({rawTy}, enumTy));
@@ -563,10 +565,13 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   selfRef->setType(selfDecl->getType());
 
   auto reinterpretCast
-    = getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast"));
-  ConcreteDeclRef concreteDeclRef(C, reinterpretCast,
-                                  { Substitution(enumTy, {}),
-                                    Substitution(rawTy, {}) });
+    = cast<FuncDecl>(
+        getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                         { enumTy, rawTy }, { });
+  ConcreteDeclRef concreteDeclRef(C, reinterpretCast, subMap);
+
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   reinterpretCastRef->setType(FunctionType::get({enumTy}, rawTy));
@@ -1207,9 +1212,12 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
 
   // Construct the right-hand call to Builtin.zeroInitializer.
   Identifier zeroInitID = context.getIdentifier("zeroInitializer");
-  auto zeroInitializerFunc = getBuiltinValueDecl(context, zeroInitID);
-  ConcreteDeclRef concreteDeclRef(context, zeroInitializerFunc,
-                                  { Substitution(selfType, {}) });
+  auto zeroInitializerFunc =
+    cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
+                         llvm::makeArrayRef(selfType), { });
+  ConcreteDeclRef concreteDeclRef(context, zeroInitializerFunc, subMap);
   auto zeroInitializerRef =
     new (context) DeclRefExpr(concreteDeclRef, DeclNameLoc(),
                               /*implicit*/ true);

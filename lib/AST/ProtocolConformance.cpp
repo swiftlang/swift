@@ -38,9 +38,9 @@ STATISTIC(NumConformanceLookupTables, "# of conformance lookup tables built");
 
 using namespace swift;
 
-Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
+Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
                  GenericEnvironment *syntheticEnv,
-                 SubstitutionList reqToSynthesizedEnvSubs) {
+                 SubstitutionMap reqToSynthesizedEnvSubs) {
   if (!syntheticEnv && substitutions.empty() &&
       reqToSynthesizedEnvSubs.empty()) {
     storage = decl;
@@ -50,10 +50,8 @@ Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
   auto &ctx = decl->getASTContext();
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
-  auto stored = new (storedMem)
-      StoredWitness{declRef, syntheticEnv,
-                    ctx.AllocateCopy(reqToSynthesizedEnvSubs)};
-  ctx.addDestructorCleanup(*stored);
+  auto stored = new (storedMem) StoredWitness{declRef, syntheticEnv,
+                                              reqToSynthesizedEnvSubs};
 
   storage = stored;
 }
@@ -893,8 +891,9 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
 }
 
 ConcreteDeclRef
-SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
-                                                  LazyResolver *resolver) const {
+SpecializedProtocolConformance::getWitnessDeclRef(
+                                              ValueDecl *requirement,
+                                              LazyResolver *resolver) const {
   auto baseWitness = GenericConformance->getWitnessDeclRef(requirement, resolver);
   if (!baseWitness || !baseWitness.isSpecialized())
     return baseWitness;
@@ -904,8 +903,7 @@ SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
   auto witnessDecl = baseWitness.getDecl();
   auto witnessSig =
     witnessDecl->getInnermostDeclContext()->getGenericSignatureOfContext();
-  auto witnessMap =
-    witnessSig->getSubstitutionMap(baseWitness.getSubstitutions());
+  auto witnessMap = baseWitness.getSubstitutions();
 
   auto combinedMap = witnessMap.subst(specializationMap);
 
@@ -913,10 +911,11 @@ SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
   witnessSig->getSubstitutions(combinedMap, substSubs);
 
   // Fast path if the substitutions didn't change.
-  if (SubstitutionList(substSubs) == baseWitness.getSubstitutions())
+  if (combinedMap == baseWitness.getSubstitutions())
     return baseWitness;
 
-  return ConcreteDeclRef(witnessDecl->getASTContext(), witnessDecl, substSubs);
+  return ConcreteDeclRef(witnessDecl->getASTContext(), witnessDecl,
+                         combinedMap);
 }
 
 ProtocolConformanceRef

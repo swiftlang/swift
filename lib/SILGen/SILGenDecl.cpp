@@ -148,6 +148,10 @@ SubstitutionList SILGenFunction::getForwardingSubstitutions() {
   return F.getForwardingSubstitutions();
 }
 
+SubstitutionMap SILGenFunction::getForwardingSubstitutionMap() {
+  return F.getForwardingSubstitutionMap();
+}
+
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
   SGM.emitFunction(fd);

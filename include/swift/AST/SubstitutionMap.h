@@ -273,6 +273,14 @@ public:
                            GenericSignature *derivedSig,
                            Optional<SubstitutionMap> derivedSubs);
 
+  /// Produce a substitution list for the given substitution map.
+  ///
+  /// Note: we are moving away from using Substitutions, so this should only
+  /// be used at the edges where part of the compiler is still working
+  /// directly with Substitution/SubstitutionList and hasn't been converted
+  /// to SubstitutionMap.
+  SmallVector<Substitution, 4> toList() const;
+
   /// Combine two substitution maps as follows.
   ///
   /// The result is written in terms of the generic parameters of 'genericSig'.
@@ -322,6 +330,14 @@ public:
   static SubstitutionMap getTombstoneKey() {
     return SubstitutionMap(
                (Storage *)llvm::DenseMapInfo<void*>::getTombstoneKey());
+  }
+
+  friend bool operator ==(SubstitutionMap lhs, SubstitutionMap rhs) {
+    return lhs.storage == rhs.storage;
+  }
+
+  friend bool operator !=(SubstitutionMap lhs, SubstitutionMap rhs) {
+    return lhs.storage != rhs.storage;
   }
 
 private:
