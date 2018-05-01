@@ -4782,14 +4782,13 @@ namespace {
 ///
 /// \returns the decl to which the locator resolved.
 ///
-static ConcreteDeclRef
-resolveLocatorToDecl(ConstraintSystem &cs, ConstraintLocator *locator,
-   std::function<Optional<SelectedOverload>(ConstraintLocator *)> findOvlChoice,
-   std::function<ConcreteDeclRef (ValueDecl *decl,
-                                  Type openedType,
-                                  ConstraintLocator *declLocator)>
-     getConcreteDeclRef)
-{
+static ConcreteDeclRef resolveLocatorToDecl(
+    ConstraintSystem &cs, ConstraintLocator *locator,
+    llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
+        findOvlChoice,
+    llvm::function_ref<ConcreteDeclRef(ValueDecl *decl, Type openedType,
+                                       ConstraintLocator *declLocator)>
+        getConcreteDeclRef) {
   assert(locator && "Null locator");
   if (!locator->getAnchor())
     return ConcreteDeclRef();

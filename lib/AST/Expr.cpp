@@ -540,12 +540,12 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
 void Expr::
-forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
+forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    const std::function<Expr*(Expr*)> &callback;
+    llvm::function_ref<Expr *(Expr *)> callback;
     Expr *ThisNode;
     
-    ChildWalker(const std::function<Expr*(Expr*)> &callback, Expr *ThisNode)
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -576,11 +576,11 @@ forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
 /// Enumerate each immediate child expression of this node, invoking the
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
-void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
+void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    const std::function<Expr*(Expr*)> &callback;
+    llvm::function_ref<Expr *(Expr *)> callback;
 
-    ChildWalker(const std::function<Expr*(Expr*)> &callback)
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
     : callback(callback) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
