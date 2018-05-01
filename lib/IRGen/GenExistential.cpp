@@ -1545,12 +1545,11 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
 
 /// Emit protocol witness table pointers for the given protocol conformances,
 /// passing each emitted witness table index into the given function body.
-static void forEachProtocolWitnessTable(IRGenFunction &IGF,
-                          CanType srcType, llvm::Value **srcMetadataCache,
-                          CanType destType,
-                          ArrayRef<ProtocolEntry> protocols,
-                          ArrayRef<ProtocolConformanceRef> conformances,
-                          std::function<void (unsigned, llvm::Value*)> body) {
+static void forEachProtocolWitnessTable(
+    IRGenFunction &IGF, CanType srcType, llvm::Value **srcMetadataCache,
+    CanType destType, ArrayRef<ProtocolEntry> protocols,
+    ArrayRef<ProtocolConformanceRef> conformances,
+    llvm::function_ref<void(unsigned, llvm::Value *)> body) {
   // Collect the conformances that need witness tables.
   auto layout = destType.getExistentialLayout();
   auto destProtocols = layout.getProtocols();

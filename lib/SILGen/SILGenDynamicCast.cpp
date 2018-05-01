@@ -116,8 +116,8 @@ namespace {
     /// Emit a conditional cast.
     void emitConditional(
         ManagedValue operand, CastConsumptionKind consumption, SGFContext ctx,
-        const std::function<void(ManagedValue)> &handleTrue,
-        const std::function<void(Optional<ManagedValue>)> &handleFalse,
+        llvm::function_ref<void(ManagedValue)> handleTrue,
+        llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
         ProfileCounter TrueCount = ProfileCounter(),
         ProfileCounter FalseCount = ProfileCounter()) {
       // The cast instructions don't know how to work with anything
@@ -286,8 +286,8 @@ namespace {
 
 void SILGenFunction::emitCheckedCastBranch(
     SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
-    std::function<void(ManagedValue)> handleTrue,
-    std::function<void(Optional<ManagedValue>)> handleFalse,
+    llvm::function_ref<void(ManagedValue)> handleTrue,
+    llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
@@ -298,8 +298,8 @@ void SILGenFunction::emitCheckedCastBranch(
 void SILGenFunction::emitCheckedCastBranch(
     SILLocation loc, ConsumableManagedValue src, Type sourceType,
     CanType targetType, SGFContext ctx,
-    std::function<void(ManagedValue)> handleTrue,
-    std::function<void(Optional<ManagedValue>)> handleFalse,
+    llvm::function_ref<void(ManagedValue)> handleTrue,
+    llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
@@ -397,8 +397,8 @@ namespace {
     /// Emit a conditional cast.
     void emitConditional(ManagedValue operand, CastConsumptionKind consumption,
                          SGFContext ctx,
-                         const std::function<void(ManagedValue)> &handleTrue,
-                         const std::function<void()> &handleFalse,
+                         llvm::function_ref<void(ManagedValue)> handleTrue,
+                         llvm::function_ref<void()> handleFalse,
                          ProfileCounter TrueCount = ProfileCounter(),
                          ProfileCounter FalseCount = ProfileCounter()) {
       // The cast instructions don't know how to work with anything
@@ -544,8 +544,8 @@ namespace {
 
 void SILGenFunction::emitCheckedCastBranchOld(
     SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
-    std::function<void(ManagedValue)> handleTrue,
-    std::function<void()> handleFalse, ProfileCounter TrueCount,
+    llvm::function_ref<void(ManagedValue)> handleTrue,
+    llvm::function_ref<void()> handleFalse, ProfileCounter TrueCount,
     ProfileCounter FalseCount) {
   CheckedCastEmitterOld emitter(*this, loc, source->getType(), targetType);
   ManagedValue operand = emitter.emitOperand(source);
@@ -556,8 +556,8 @@ void SILGenFunction::emitCheckedCastBranchOld(
 void SILGenFunction::emitCheckedCastBranchOld(
     SILLocation loc, ConsumableManagedValue src, Type sourceType,
     CanType targetType, SGFContext ctx,
-    std::function<void(ManagedValue)> handleTrue,
-    std::function<void()> handleFalse, ProfileCounter TrueCount,
+    llvm::function_ref<void(ManagedValue)> handleTrue,
+    llvm::function_ref<void()> handleFalse, ProfileCounter TrueCount,
     ProfileCounter FalseCount) {
   CheckedCastEmitterOld emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
