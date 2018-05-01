@@ -310,62 +310,6 @@ PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
 }
 #endif
 
-static void
-PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
-                                       const PipeMemoryReader *Reader) {
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_REFLECTION_INFO, 2);
-  size_t NumReflectionInfos;
-  PipeMemoryReader_collectBytesFromPipe(Reader, &NumReflectionInfos,
-                                        sizeof(NumReflectionInfos));
-
-  if (NumReflectionInfos == 0)
-    return;
-
-  RemoteReflectionInfo *RemoteInfos = calloc(NumReflectionInfos,
-                                             sizeof(RemoteReflectionInfo));
-  if (RemoteInfos == NULL)
-    errnoAndExit("malloc failed");
-
-  for (size_t i = 0; i < NumReflectionInfos; ++i) {
-    RemoteInfos[i] = makeRemoteReflectionInfo(
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader),
-      makeRemoteSection(Reader));
-  }
-
-  // Now pull in the remote sections into our address space.
-
-  for (size_t i = 0; i < NumReflectionInfos; ++i) {
-    RemoteReflectionInfo RemoteInfo = RemoteInfos[i];
-
-    void *outFreeContext = NULL;
-    const void *Buffer = PipeMemoryReader_readBytes((void *)Reader,
-                                                    RemoteInfo.StartAddress,
-                                                    RemoteInfo.TotalSize,
-                                                    &outFreeContext);
-    if (!Buffer)
-      errorAndExit("Couldn't read reflection information");
-
-    swift_reflection_info_t Info = {
-      {makeLocalSection(Buffer, RemoteInfo.fieldmd, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.assocty, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.builtin, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.capture, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.typeref, RemoteInfo), 0},
-      {makeLocalSection(Buffer, RemoteInfo.reflstr, RemoteInfo), 0},
-      /*LocalStartAddress*/ (uintptr_t) Buffer,
-      /*RemoteStartAddress*/ RemoteInfo.StartAddress,
-    };
-    swift_reflection_addReflectionInfo(RC, Info);
-  }
-
-  free(RemoteInfos);
-}
-
 uint64_t PipeMemoryReader_getStringLength(void *Context, swift_addr_t Address) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
   int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
