@@ -78,6 +78,9 @@ class SyntaxData final
   /// If there is no parent, this is 0.
   const CursorIndex IndexInParent;
 
+  /// Cache the absolute position of this node.
+  Optional<AbsolutePosition> PositionCache;
+
   size_t numTrailingObjects(OverloadToken<AtomicCache<SyntaxData>>) const {
     return Raw->getNumChildren();
   }
@@ -128,6 +131,13 @@ class SyntaxData final
   ArrayRef<AtomicCache<SyntaxData>> getChildren() const {
     return {getTrailingObjects<AtomicCache<SyntaxData>>(), getNumChildren()};
   }
+
+  /// Get the node immediately before this current node. Return 0 if we cannot
+  /// find such node.
+  RC<SyntaxData> getPreviousNode() const;
+
+  /// Get the absolute position without skipping the leading trivia of this node.
+  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const;
 
 public:
   ~SyntaxData() {
@@ -234,6 +244,10 @@ public:
       return realizeSyntaxNode(Index);
     });
   }
+
+  /// Calculate the absolute position of this node, use cache if the cache
+  /// is populated.
+  AbsolutePosition getAbsolutePosition() const;
 
   /// Returns true if the data node represents type syntax.
   bool isType() const;

@@ -189,6 +189,24 @@ RawSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   return Ret;
 }
 
+bool RawSyntax::accumulateLeadingTrivia(AbsolutePosition &Pos) const {
+ if (isToken()) {
+    if (!isMissing()) {
+      for (auto &Leader: getLeadingTrivia())
+        Leader.accumulateAbsolutePosition(Pos);
+      return true;
+    }
+  } else {
+    for (auto &Child: getLayout()) {
+      if (!Child)
+        continue;
+      if (Child->accumulateLeadingTrivia(Pos))
+        return true;
+    }
+  }
+  return false;
+}
+
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
   if (isMissing())
     return;
