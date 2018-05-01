@@ -279,7 +279,7 @@ int main(int argc, char *argv[]) {
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);
   if (Start.empty()) {
-    llvm::errs() << "cannot parse position pair.";
+    llvm::errs() << "cannot parse position pair.\n";
     return 1;
   }
 
