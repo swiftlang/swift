@@ -272,7 +272,6 @@ int doDeserializeRawTree(const char *MainExecutablePath,
   auto os = llvm::make_unique<llvm::raw_fd_ostream>(
               OutputFileName, errorCode, llvm::sys::fs::F_None);
   swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
-  swift::SyntaxPrintOptions opt;
   deserializer.getSourceFileSyntax()->print(*os);
   return EXIT_SUCCESS;
 }
@@ -301,7 +300,6 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
   CompilerInstance Instance;
   SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
   auto BufferId = *SF->getBufferID();
-  SyntaxPrintOptions Opts;
   auto Root = SF->getSyntaxRoot();
   auto AbPos = Root.getEOFToken().getAbsolutePosition();
 

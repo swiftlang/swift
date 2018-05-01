@@ -218,7 +218,7 @@ class BridgedProperty : public OutlinePattern {
   SingleValueInstruction *FirstInst; // A load or class_method
   SILBasicBlock *StartBB;
   SwitchInfo switchInfo;
-  ObjCMethodInst *ObjCMethod;;
+  ObjCMethodInst *ObjCMethod;
   StrongReleaseInst *Release;
   ApplyInst *PropApply;
 

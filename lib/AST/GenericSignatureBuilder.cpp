@@ -552,7 +552,6 @@ namespace {
 
     EquivalenceClassVizNode node;
     BaseIterator base;
-    BaseIterator baseEnd;
 
   public:
     using difference_type = ptrdiff_t;
@@ -563,7 +562,7 @@ namespace {
 
     EquivalenceClassVizIterator(EquivalenceClassVizNode node,
                                 BaseIterator base, BaseIterator baseEnd)
-        : node(node), base(base), baseEnd(baseEnd) {
+        : node(node), base(base) {
     }
 
     BaseIterator &getBase() { return base; }
