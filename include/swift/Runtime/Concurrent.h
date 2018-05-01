@@ -12,10 +12,12 @@
 #ifndef SWIFT_RUNTIME_CONCURRENTUTILS_H
 #define SWIFT_RUNTIME_CONCURRENTUTILS_H
 #include <iterator>
+#include <algorithm>
 #include <atomic>
 #include <functional>
 #include <stdint.h>
 #include "llvm/Support/Allocator.h"
+#include "Debug.h"
 #include "Mutex.h"
 
 #if defined(__FreeBSD__) || defined(__CYGWIN__) || defined(__HAIKU__)
@@ -408,8 +410,15 @@ public:
 };
 
 
+/// An append-only array that can be read without taking locks. Writes
+/// are still locked and serialized, but only with respect to other
+/// writes.
 template <class ElemTy> struct ConcurrentReadableArray {
 private:
+  /// The struct used for the array's storage. The `Elem` member is
+  /// considered to be the first element of a variable-length array,
+  /// whose size is determined by the allocation. The `Capacity` member
+  /// from `ConcurrentReadableArray` indicates how large it can be.
   struct Storage {
     std::atomic<size_t> Count;
     typename std::aligned_storage<sizeof(ElemTy), alignof(ElemTy)>::type Elem;
@@ -419,7 +428,7 @@ private:
     }
   };
   
-  std::atomic<size_t> Capacity;
+  size_t Capacity;
   std::atomic<size_t> ReaderCount;
   std::atomic<Storage *> Elements;
   Mutex WriterLock;
@@ -428,6 +437,7 @@ private:
   Storage *allocate(size_t capacity) {
     auto size = sizeof(Storage) + (capacity - 1) * sizeof(Storage().Elem);
     auto *ptr = reinterpret_cast<Storage *>(malloc(size));
+    if (!ptr) swift::crash("Could not allocate memory.");
     ptr->Count.store(0, std::memory_order_relaxed);
     return ptr;
   }
@@ -442,28 +452,27 @@ private:
     free(storage);
   }
   
-  
 public:
   void push_back(const ElemTy &elem) {
     ScopedLock guard(WriterLock);
     
     auto *storage = Elements.load(std::memory_order_relaxed);
-    if (storage == nullptr) {
-      storage = allocate(16);
-      Capacity = 16;
-      Elements.store(storage, std::memory_order_release);
-    } else if (storage->Count >= Capacity) {
-      auto *newStorage = allocate(Capacity * 2);
-      std::copy(storage->data(), storage->data() + storage->Count, newStorage->data());
-      FreeList.push_back(storage);
+    auto count = storage ? storage->Count.load(std::memory_order_relaxed) : 0;
+    if (count >= Capacity) {
+      auto newCapacity = std::max((size_t)16, count * 2);
+      auto *newStorage = allocate(newCapacity);
+      if (storage) {
+        std::copy(storage->data(), storage->data() + count, newStorage->data());
+        FreeList.push_back(storage);
+      }
       
       storage = newStorage;
-      Capacity = Capacity * 2;
+      Capacity = newCapacity;
       Elements.store(storage, std::memory_order_release);
     }
     
     auto Count = storage->Count.load(std::memory_order_relaxed);
-    storage->data()[Count] = elem;
+    new(&storage->data()[Count]) ElemTy(elem);
     storage->Count.store(Count + 1, std::memory_order_release);
     
     if (ReaderCount.load(std::memory_order_relaxed) == 0)
@@ -471,6 +480,10 @@ public:
         deallocate(storage);
   }
   
+  /// Read the contents of the array. The parameter `f` is called with
+  /// two parameters: a pointer to the elements in the array, and the
+  /// count. This represents a snapshot of the contents at the time
+  /// `read` was called. The pointer becomes invalid after `f` returns.
   template <class F> auto read(F f) -> decltype(f(nullptr, 0)) {
     ReaderCount.fetch_add(1, std::memory_order_relaxed);
     auto *storage = Elements.load(std::memory_order_consume);
