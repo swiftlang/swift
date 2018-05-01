@@ -1368,33 +1368,27 @@ namespace {
       bool InEditor = TC.Context.LangOpts.DiagnosticsEditorMode;
 
       // Decide whether we want an error or a warning.
-      bool mainDiagnosticIsJustAWarning = false;
-
-      auto mainDiagnosticType = [&]() -> swift::Diagnostic {
-        if (defaultReason == RequiresDefault::SpaceTooLarge)
-          return mainDiagnosticIsJustAWarning
-                     ? diag::possibly_non_exhaustive_switch_warn
-                     : diag::possibly_non_exhaustive_switch;
-        return mainDiagnosticIsJustAWarning ? diag::non_exhaustive_switch_warn
-                                            : diag::non_exhaustive_switch;
-      };
-
+      auto mainDiagType = diag::non_exhaustive_switch;
       if (unknownCase) {
         switch (defaultReason) {
         case RequiresDefault::EmptySwitchBody:
           llvm_unreachable("there's an @unknown case; the body can't be empty");
         case RequiresDefault::No:
           if (!uncovered.isEmpty())
-            mainDiagnosticIsJustAWarning = true;
+            mainDiagType = diag::non_exhaustive_switch_warn;
           break;
         case RequiresDefault::UncoveredSwitch:
-        case RequiresDefault::SpaceTooLarge:
-          TC.diagnose(startLoc, mainDiagnosticType());
+        case RequiresDefault::SpaceTooLarge: {
+          auto diagnostic = defaultReason == RequiresDefault::UncoveredSwitch
+                                ? diag::non_exhaustive_switch
+                                : diag::possibly_non_exhaustive_switch;
+          TC.diagnose(startLoc, diagnostic);
           TC.diagnose(unknownCase->getLoc(),
                       diag::non_exhaustive_switch_drop_unknown)
             .fixItRemoveChars(unknownCase->getStartLoc(),
                               unknownCase->getLoc());
           return;
+        }
         }
       }
 
@@ -1405,7 +1399,7 @@ namespace {
         // If someone's used one of the cases introduced in the Swift 4
         // timeframe, force them to handle all of them.
         if (!sawDowngradablePattern)
-          mainDiagnosticIsJustAWarning = true;
+          mainDiagType = diag::non_exhaustive_switch_warn;
         break;
       case DowngradeToWarning::ForUnknownCase:
         if (TC.Context.LangOpts.DebuggerSupport ||
@@ -1416,7 +1410,7 @@ namespace {
           return;
         }
         // Missing '@unknown' is just a warning.
-        mainDiagnosticIsJustAWarning = true;
+        mainDiagType = diag::non_exhaustive_switch_warn;
         break;
       }
 
@@ -1431,14 +1425,14 @@ namespace {
         return;
       case RequiresDefault::UncoveredSwitch: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
-        TC.diagnose(startLoc, mainDiagnosticType());
+        TC.diagnose(startLoc, mainDiagType);
         TC.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
         return;
       case RequiresDefault::SpaceTooLarge: {
         OS << tok::kw_default << ":\n" << "<#fatalError()#>" << "\n";
-        TC.diagnose(startLoc, mainDiagnosticType());
+        TC.diagnose(startLoc, diag::possibly_non_exhaustive_switch);
         TC.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
@@ -1448,7 +1442,7 @@ namespace {
       // If there's nothing else to diagnose, bail.
       if (uncovered.isEmpty()) return;
 
-      TC.diagnose(startLoc, mainDiagnosticType());
+      TC.diagnose(startLoc, mainDiagType);
 
       // Add notes to explain what's missing.
       auto processUncoveredSpaces =
