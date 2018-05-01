@@ -5437,6 +5437,9 @@ public:
   }
 
   Action walkToTypePost(Type ty) override {
+    if (ty->hasError())
+      return Action::Continue;
+
     // Infer from generic typealiases.
     if (auto NameAlias = dyn_cast<NameAliasType>(ty.getPointer())) {
       auto decl = NameAlias->getDecl();
