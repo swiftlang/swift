@@ -1251,6 +1251,9 @@ static bool performCompileStepsPostSILGen(
   // FIXME: These passes should be moved to the mandatory pass pipeline that
   // runs at -O0.  We need a proper deabstraction pass to do that though.
   runSILTFPartitionPass(*SM);
+  // Check if we had any errors; if we did, don't proceed to SIL verification.
+  if (Context.hadError())
+    return true;
 #endif
 
   if (observer)
