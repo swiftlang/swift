@@ -2622,11 +2622,11 @@ RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
 
 RValue
 SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
-                                               ConcreteDeclRef defaultArgsOwner,
-                                               unsigned destIndex,
-                                               CanType resultType,
+                                             ConcreteDeclRef defaultArgsOwner,
+                                             unsigned destIndex,
+                                             CanType resultType,
                                              AbstractionPattern origResultType,
-                                               SGFContext C) {
+                                             SGFContext C) {
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
