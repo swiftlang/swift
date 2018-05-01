@@ -53,6 +53,12 @@ namespace tf {
     return convertSwiftTypeToTF(ty) != 0;
   }
 
+  /// Looks up a function by `name` in the context of `typeDecl`, `proto` and
+  /// `module`, and returns that function.
+  SILFunction *findSILFunctionForRequiredProtocolMember(
+      NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
+      ModuleDecl *module, SILModule &silModule);
+
   /// Represent information about a TensorFlow operation as represented in SIL
   /// as Builtin instructions.
   struct SILTensorOpInfo {

@@ -82,3 +82,20 @@ public protocol ParameterAggregate {
   mutating func update(with gradient: Self,
                        by updateParameter: (inout Parameter, Parameter) -> Void)
 }
+
+// FIXME: Consider moving to CompilerProtocols.swift when the interaction
+// between compiler and runtime becomes general enough.
+//
+/// The protocol on tensor sends and receives.
+///
+/// - Note: The compiler knows about this protocol and generates code to use
+/// it. So changing the protocol design requires changing the compiler
+/// accordingly too.
+protocol TensorSendableReceivable {
+  /// Receive a tensor based on a tensor computation handle (equivalent to a TF
+  /// session handle), and a tensor ID.
+  static func receiveFromDevice(_ computation: _TensorComputation,
+                                _ tensorId: Int) -> Self
+
+  // FIXME: add sendToTensorFlow()
+}
