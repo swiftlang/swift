@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -module-name Swift -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -module-name Swift -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
 
 // This test checks specific codegen related to converting curry thunks to
 // canonical representations when we are emitting guaranteed normal

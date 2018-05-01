@@ -108,6 +108,9 @@ private:
   llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
     GenericEnvironmentIDs;
 
+  /// A map from substitution maps to their serialized IDs.
+  llvm::DenseMap<SubstitutionMap, SubstitutionMapID> SubstitutionMapIDs;
+
   // A map from NormalProtocolConformances to their serialized IDs.
   llvm::DenseMap<const NormalProtocolConformance *, NormalConformanceID>
     NormalConformances;
@@ -177,6 +180,9 @@ private:
   /// Generic environments that need to be serialized.
   std::queue<const GenericEnvironment*> GenericEnvironmentsToWrite;
 
+  /// Substitution maps that need to be serialized.
+  std::queue<SubstitutionMap> SubstitutionMapsToWrite;
+
   /// NormalProtocolConformances that need to be serialized.
   std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
 
@@ -216,6 +222,10 @@ private:
   /// The offset of each GenericEnvironment in the bitstream, indexed by
   /// GenericEnvironmentID.
   std::vector<BitOffset> GenericEnvironmentOffsets;
+
+  /// The offset of each SubstitutionMap in the bitstream, indexed by
+  /// SubstitutionMapID.
+  std::vector<BitOffset> SubstitutionMapOffsets;
 
   /// The offset of each NormalProtocolConformance in the bitstream, indexed by
   /// NormalConformanceID.
@@ -261,6 +271,10 @@ private:
   /// module.
   uint32_t /*GenericEnvironmentID*/ LastGenericEnvironmentID = 0;
 
+  /// The last assigned SubstitutionMapID for substitution maps from this
+  /// module.
+  uint32_t /*SubstitutionMapID*/ LastSubstitutionMapID = 0;
+
   /// Returns the record code for serializing the given vector of offsets.
   ///
   /// This allows the offset-serialization code to be generic over all kinds
@@ -280,6 +294,8 @@ private:
       return index_block::GENERIC_SIGNATURE_OFFSETS;
     if (&values == &GenericEnvironmentOffsets)
       return index_block::GENERIC_ENVIRONMENT_OFFSETS;
+    if (&values == &SubstitutionMapOffsets)
+      return index_block::SUBSTITUTION_MAP_OFFSETS;
     if (&values == &NormalConformanceOffsets)
       return index_block::NORMAL_CONFORMANCE_OFFSETS;
     if (&values == &SILLayoutOffsets)
@@ -377,6 +393,9 @@ private:
   /// Writes a generic environment.
   void writeGenericEnvironment(const GenericEnvironment *env);
 
+  /// Writes a substitution map.
+  void writeSubstitutionMap(const SubstitutionMap substitutions);
+
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
   void registerDeclTypeAbbr() {
@@ -465,6 +484,11 @@ public:
   ///
   /// The GenericEnvironment will be scheduled for serialization if necessary.
   GenericEnvironmentID addGenericEnvironmentRef(const GenericEnvironment *env);
+
+  /// Records the use of the given substitution map.
+  ///
+  /// The SubstitutionMap will be scheduled for serialization if necessary.
+  SubstitutionMapID addSubstitutionMapRef(SubstitutionMap substitutions);
 
   /// Records the use of the given normal protocol conformance.
   ///

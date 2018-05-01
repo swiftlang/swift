@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name indirect_enum -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name indirect_enum -Xllvm -sil-print-debuginfo %s | %FileCheck %s
 
 indirect enum TreeA<T> {
   case Nil

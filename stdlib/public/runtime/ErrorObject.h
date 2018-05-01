@@ -218,6 +218,8 @@ void swift_unexpectedError(SwiftError *object);
 #if SWIFT_OBJC_INTEROP
 
 /// Initialize an Error box to make it usable as an NSError instance.
+///
+/// errorObject is assumed to be passed at +1 and consumed in this function.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 id _swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject);
 

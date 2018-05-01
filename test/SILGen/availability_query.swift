@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil %s -target x86_64-apple-macosx10.50 -verify
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s -target x86_64-apple-macosx10.50 | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -target x86_64-apple-macosx10.50 -verify
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -target x86_64-apple-macosx10.50 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 

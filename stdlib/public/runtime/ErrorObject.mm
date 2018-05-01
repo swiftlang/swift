@@ -392,7 +392,8 @@ NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
   return foundationGetDefaultUserInfo(error, T, Error);
 }
 
-/// Take an Error box and turn it into a valid NSError instance.
+/// Take an Error box and turn it into a valid NSError instance. Error is passed
+/// at +1.
 id
 swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
@@ -410,7 +411,6 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   // that the domain can be used alone as a flag for the initialization of the
   // object.
   if (errorObject->domain.load(std::memory_order_acquire)) {
-    SWIFT_CC_PLUSZERO_GUARD([ns retain]);
     return ns;
   }
 
@@ -453,7 +453,6 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
                                                    std::memory_order_acq_rel))
     objc_release(domain);
 
-  SWIFT_CC_PLUSZERO_GUARD([ns retain]);
   return ns;
 }
 

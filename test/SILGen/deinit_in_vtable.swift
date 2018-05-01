@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-full-demangle -O %s | %FileCheck %s
 
 // The second run tests is it can be compiled without crashes.
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -O -S %s

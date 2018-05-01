@@ -458,6 +458,10 @@ public:
   llvm::Optional<AbsolutePosition>
   accumulateAbsolutePosition(AbsolutePosition &Pos) const;
 
+  /// Advance the provided AbsolutePosition by the first trivia of this node.
+  /// Return true if we found this trivia; otherwise false.
+  bool accumulateLeadingTrivia(AbsolutePosition &Pos) const;
+
   /// Print this piece of syntax recursively.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const;
 

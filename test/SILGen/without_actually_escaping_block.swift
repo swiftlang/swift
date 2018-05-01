@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name without_actually_escaping -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name without_actually_escaping -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

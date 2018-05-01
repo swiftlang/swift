@@ -2264,16 +2264,22 @@ extension ${Self} : Equatable where Element : Equatable {
 
 extension ${Self}: Hashable where Element: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // discriminator
     for element in self {
       hasher.combine(element)
     }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    var hasher = Hasher(_seed: seed)
+    // Note that we don't need to use delimiters/discriminators for top-level
+    // hashing.
+    for element in self {
+      hasher.combine(element)
+    }
+    return hasher._finalize()
   }
 }
 

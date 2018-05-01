@@ -30,6 +30,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
@@ -308,6 +309,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
+
+    /// The set of substitution maps (uniqued by their storage).
+    llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
@@ -2881,9 +2885,9 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
 //===----------------------------------------------------------------------===//
 
 NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
-                                       const SubstitutionMap &substitutions,
-                                       Type underlying,
-                                       RecursiveTypeProperties properties)
+                             const SubstitutionMap &substitutions,
+                             Type underlying,
+                             RecursiveTypeProperties properties)
     : SugarType(TypeKind::NameAlias, underlying, properties),
       typealias(typealias) {
   // Record the parent (or absence of a parent).
@@ -2896,23 +2900,16 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
 
   // Record the substitutions.
   if (auto genericSig = substitutions.getGenericSignature()) {
-    SmallVector<Substitution, 4> flatSubs;
-    genericSig->getSubstitutions(substitutions, flatSubs);
-    Bits.NameAliasType.NumSubstitutions = flatSubs.size();
-    std::copy(flatSubs.begin(), flatSubs.end(),
-              getTrailingObjects<Substitution>());
-
-    *getTrailingObjects<GenericSignature *>() = genericSig;
+    Bits.NameAliasType.HasSubstitutionMap = true;
+    *getTrailingObjects<SubstitutionMap>() = substitutions;
   } else {
-    Bits.NameAliasType.NumSubstitutions = 0;
+    Bits.NameAliasType.HasSubstitutionMap = false;
   }
 }
 
-NameAliasType *NameAliasType::get(
-                                        TypeAliasDecl *typealias,
-                                        Type parent,
-                                        const SubstitutionMap &substitutions,
-                                        Type underlying) {
+NameAliasType *NameAliasType::get(TypeAliasDecl *typealias, Type parent,
+                                  const SubstitutionMap &substitutions,
+                                  Type underlying) {
   // Compute the recursive properties.
   //
   auto properties = underlying->getRecursiveProperties();
@@ -2947,11 +2944,8 @@ NameAliasType *NameAliasType::get(
     return result;
 
   // Build a new type.
-  unsigned numSubstitutions =
-    genericSig ? genericSig->getSubstitutionListSize() : 0;
-  auto size =
-    totalSizeToAlloc<Type, GenericSignature *, Substitution>(
-                        parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
+  auto size = totalSizeToAlloc<Type, SubstitutionMap>(parent ? 1 : 0,
+                                                      genericSig ? 1 : 0);
   auto mem = ctx.Allocate(size, alignof(NameAliasType), arena);
   auto result = new (mem) NameAliasType(typealias, parent, substitutions,
                                         underlying, storedProperties);
@@ -4305,6 +4299,64 @@ CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
 
 CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
   delete Log;
+}
+
+void SubstitutionMap::Storage::Profile(
+                               llvm::FoldingSetNodeID &id,
+                               GenericSignature *genericSig,
+                               ArrayRef<Type> replacementTypes,
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  id.AddPointer(genericSig);
+  id.AddInteger(replacementTypes.size());
+  for (auto type : replacementTypes)
+    id.AddPointer(type.getPointer());
+  id.AddInteger(conformances.size());
+  for (auto conformance : conformances)
+    id.AddPointer(conformance.getOpaqueValue());
+}
+
+SubstitutionMap::Storage *SubstitutionMap::Storage::get(
+                            GenericSignature *genericSig,
+                            ArrayRef<Type> replacementTypes,
+                            ArrayRef<ProtocolConformanceRef> conformances) {
+  // If there is no generic signature, we need no storage.
+  if (!genericSig) {
+    assert(replacementTypes.empty());
+    assert(conformances.empty());
+    return nullptr;
+  }
+
+  // Figure out which arena this should go in.
+  RecursiveTypeProperties properties;
+  for (auto type : replacementTypes) {
+    if (type)
+      properties |= type->getRecursiveProperties();
+  }
+
+  // Profile the substitution map.
+  llvm::FoldingSetNodeID id;
+  SubstitutionMap::Storage::Profile(id, genericSig, replacementTypes,
+                                    conformances);
+
+  auto arena = getArena(properties);
+
+  // Did we already record this substitution map?
+  auto &ctx = genericSig->getASTContext();
+  void *insertPos;
+  auto &substitutionMaps = ctx.Impl.getArena(arena).SubstitutionMaps;
+  if (auto result = substitutionMaps.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Allocate the appropriate amount of storage for the signature and its
+  // replacement types and conformances.
+  auto size = Storage::totalSizeToAlloc<Type, ProtocolConformanceRef>(
+                                                      replacementTypes.size(),
+                                                      conformances.size());
+  auto mem = ctx.Allocate(size, alignof(Storage), arena);
+
+  auto result = new (mem) Storage(genericSig, replacementTypes, conformances);
+  substitutionMaps.InsertNode(result, insertPos);
+  return result;
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,

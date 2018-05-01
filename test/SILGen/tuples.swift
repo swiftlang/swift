@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name tuples -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name tuples -enable-sil-ownership %s | %FileCheck %s
 class C {}
 
 enum Foo {

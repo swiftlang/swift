@@ -268,9 +268,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   CE->setBody(Body, false);
   TC.typeCheckClosureBody(CE);
 
-  Expr *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
-  if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
-    return ;
+  auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
+  TheCall->getArg()->setType(ParenType::get(Context, E->getType()));
+  TheCall->setType(Context.TheEmptyTupleType);
 
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),
