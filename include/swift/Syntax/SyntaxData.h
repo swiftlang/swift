@@ -136,6 +136,10 @@ class SyntaxData final
   /// find such node.
   RC<SyntaxData> getPreviousNode() const;
 
+  /// Get the node immediately after this current node. Return 0 if we cannot
+  /// find such node.
+  RC<SyntaxData> getNextNode() const;
+
   /// Get the absolute position without skipping the leading trivia of this node.
   AbsolutePosition getAbsolutePositionWithLeadingTrivia() const;
 
@@ -248,6 +252,10 @@ public:
   /// Calculate the absolute position of this node, use cache if the cache
   /// is populated.
   AbsolutePosition getAbsolutePosition() const;
+
+  /// Calculate the absolute end position of this node, use cache of the immediate
+  /// next node if populated.
+  AbsolutePosition getAbsoluteEndPosition() const;
 
   /// Returns true if the data node represents type syntax.
   bool isType() const;
