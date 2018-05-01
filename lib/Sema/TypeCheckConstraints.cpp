@@ -2613,7 +2613,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
     // Convert the result to a Builtin.i1.
     Expr *appliedSolution(constraints::Solution &solution,
-                                  Expr *expr) override {
+                          Expr *expr) override {
       auto &cs = solution.getConstraintSystem();
 
       auto converted =

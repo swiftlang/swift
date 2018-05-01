@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s
+// RUN: %target-typecheck-verify-swift
 
 precedencegroup BindingPrecedence {
   higherThan: DefaultPrecedence
