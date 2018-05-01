@@ -351,14 +351,14 @@ RequirementMatch
 swift::matchWitness(
              TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             const std::function<
+             llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)> 
-               &setup,
-             const std::function<Optional<RequirementMatch>(Type, Type)> 
-               &matchTypes,
-             const std::function<
+               setup,
+             llvm::function_ref<Optional<RequirementMatch>(Type, Type)>
+               matchTypes,
+             llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > &finalize) {
+                   > finalize) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -719,7 +719,7 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
-      if (!replacedInReq)
+      if (!replacedInReq || replacedInReq->hasError())
         continue;
 
       if (reqGenericEnv) {
@@ -1495,15 +1495,21 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
       return conformance;
     }
     // And... even if it isn't conditional, we still don't currently support
-    // @objc protocols in extensions.
+    // @objc protocols in extensions of Swift generic classes, because there's
+    // no stable Objective-C class object to install the protocol conformance
+    // category onto.
     if (isa<ExtensionDecl>(DC)) {
       if (auto genericT = T->getGenericAncestor()) {
-        auto isSubclass = !genericT->isEqual(T);
-        auto genericTIsGeneric = (bool)genericT->getAnyGeneric()->getGenericParams();
-        TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension, T,
-                    ProtoType, isSubclass, genericTIsGeneric);
-        conformance->setInvalid();
-        return conformance;
+        if (!cast<ClassDecl>(genericT->getAnyNominal())
+               ->usesObjCGenericsModel()) {
+          auto isSubclass = !genericT->isEqual(T);
+          auto genericTIsGeneric = (bool)genericT->getAnyGeneric()
+                                                 ->getGenericParams();
+          TC.diagnose(ComplainLoc, diag::objc_protocol_in_generic_extension, T,
+                      ProtoType, isSubclass, genericTIsGeneric);
+          conformance->setInvalid();
+          return conformance;
+        }
       }
     }
   }
@@ -1654,7 +1660,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
       auto sigWithoutReqts
         = GenericSignature::get(genericFn->getGenericParams(), {});
       return GenericFunctionType::get(sigWithoutReqts,
-                                      resultFn->getInput(),
+                                      resultFn->getParams(),
                                       resultFn->getResult(),
                                       resultFn->getExtInfo());
     }
@@ -4024,6 +4030,7 @@ void TypeChecker::checkConformanceRequirements(
   llvm::SetVector<ValueDecl *> globalMissingWitnesses;
   ConformanceChecker checker(*this, conformance, globalMissingWitnesses);
   checker.ensureRequirementsAreSatisfied(/*failUnsubstituted=*/true);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 
 /// Determine the score when trying to match two identifiers together.
@@ -4596,6 +4603,12 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     // Complain about the redundant conformance.
 
+    auto currentSig = dc->getGenericSignatureOfContext();
+    auto existingSig = diag.ExistingDC->getGenericSignatureOfContext();
+    auto differentlyConditional = currentSig && existingSig &&
+                                  currentSig->getCanonicalSignature() !=
+                                      existingSig->getCanonicalSignature();
+
     // If we've redundantly stated a conformance for which the original
     // conformance came from the module of the type or the module of the
     // protocol, just warn; we'll pick up the original conformance.
@@ -4607,11 +4620,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
            extendedNominal->getParentModule()->getName() ||
          existingModule == diag.Protocol->getParentModule())) {
       // Warn about the conformance.
-      diagnose(diag.Loc, diag::redundant_conformance_adhoc,
-               dc->getDeclaredInterfaceType(),
+      auto diagID = differentlyConditional
+                        ? diag::redundant_conformance_adhoc_conditional
+                        : diag::redundant_conformance_adhoc;
+      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
                diag.Protocol->getName(),
                existingModule->getName() ==
-                 extendedNominal->getParentModule()->getName(),
+                   extendedNominal->getParentModule()->getName(),
                existingModule->getName());
 
       // Complain about any declarations in this extension whose names match
@@ -4642,8 +4657,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         }
       }
     } else {
-      diagnose(diag.Loc, diag::redundant_conformance,
-               dc->getDeclaredInterfaceType(),
+      auto diagID = differentlyConditional
+                        ? diag::redundant_conformance_conditional
+                        : diag::redundant_conformance;
+      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
                diag.Protocol->getName());
     }
 
@@ -4931,6 +4948,7 @@ void TypeChecker::resolveTypeWitness(
     checker.resolveTypeWitnesses();
   else
     checker.resolveSingleTypeWitness(assocType);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 
 void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
@@ -4941,6 +4959,7 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
                        const_cast<NormalProtocolConformance*>(conformance),
                        MissingWitnesses);
   checker.resolveSingleWitness(requirement);
+  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 
 ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,

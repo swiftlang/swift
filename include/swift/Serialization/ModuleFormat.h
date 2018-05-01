@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 408; // Last change: begin_access [nontracking]
+const uint16_t VERSION_MINOR = 409; // Last change: standalone requirement subs
 
 using DeclIDField = BCFixed<31>;
 
@@ -583,7 +583,7 @@ namespace input_block {
     LINK_LIBRARY,
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
-    MODULE_FLAGS,
+    MODULE_FLAGS, // [unused]
     SEARCH_PATH
   };
 
@@ -614,11 +614,6 @@ namespace input_block {
   using ImportedHeaderContentsLayout = BCRecordLayout<
     IMPORTED_HEADER_CONTENTS,
     BCBlob
-  >;
-
-  using ModuleFlagsLayout = BCRecordLayout<
-    MODULE_FLAGS,
-    BCFixed<1> // has underlying module? [[UNUSED]]
   >;
 
   using SearchPathLayout = BCRecordLayout<

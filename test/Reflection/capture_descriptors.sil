@@ -41,8 +41,7 @@ bb0(%i: $Int, %p: $@thick P.Type):
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
-// CHECK-NEXT: (sil_box
-// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: (builtin Builtin.NativeObject)
 // CHECK-NEXT: (existential_metatype
 // CHECK-NEXT:   (protocol_composition
 // CHECK-NEXT:     (protocol capture_descriptors.P)))
@@ -76,8 +75,7 @@ bb0:
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
-// CHECK-NEXT: (sil_box
-// CHECK-NEXT:   (struct Swift.String))
+// CHECK-NEXT: (builtin Builtin.NativeObject)
 // CHECK-NEXT:   - Metadata sources:
 
 

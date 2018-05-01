@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name property_abstraction -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name property_abstraction -enable-sil-ownership %s | %FileCheck %s
 
 struct Int {
   mutating func foo() {}
@@ -130,7 +130,7 @@ protocol Factory {
   associatedtype Product
   var builder : () -> Product { get set }
 }
-func setBuilder<F: Factory where F.Product == MyClass>(_ factory: inout F) {
+func setBuilder<F: Factory>(_ factory: inout F) where F.Product == MyClass {
   factory.builder = { return MyClass() }
 }
 // CHECK: sil hidden @$S20property_abstraction10setBuilder{{[_0-9a-zA-Z]*}}F : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()

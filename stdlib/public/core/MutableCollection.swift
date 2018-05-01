@@ -25,7 +25,7 @@ public typealias MutableIndexable = MutableCollection
 /// modify one of the names in an array of students.
 ///
 ///     var students = ["Ben", "Ivy", "Jordell", "Maxime"]
-///     if let i = students.index(of: "Maxime") {
+///     if let i = students.firstIndex(of: "Maxime") {
 ///         students[i] = "Max"
 ///     }
 ///     print(students)
@@ -112,7 +112,7 @@ where SubSequence: MutableCollection
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     streets[index!] = "Eustace"
   ///     print(streets[index!])
   ///     // Prints "Eustace"
@@ -211,7 +211,7 @@ extension MutableCollection {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     streets[index!] = "Eustace"
   ///     print(streets[index!])
   ///     // Prints "Eustace"

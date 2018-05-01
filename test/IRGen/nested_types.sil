@@ -19,7 +19,7 @@ bb0(%0 : $@thick Outer.Inner.Type):
   %1 = metatype $@thick Outer.Type
   return %1 : $@thick Outer.Type
 }
-// CHECK-LABEL: define{{ | protected }}swiftcc %swift.type* @test0(%swift.type*)
+// CHECK-LABEL: define{{ | dllexport | protected }}swiftcc %swift.type* @test0(%swift.type*)
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S12nested_types5OuterCMa"([[INT]] 0)
 // CHECK-NEXT: [[T1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: ret %swift.type* [[T1]]

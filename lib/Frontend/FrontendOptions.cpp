@@ -108,7 +108,7 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
 }
 
 void FrontendOptions::forAllOutputPaths(
-    const InputFile &input, std::function<void(StringRef)> fn) const {
+    const InputFile &input, llvm::function_ref<void(StringRef)> fn) const {
   if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
       RequestedAction != FrontendOptions::ActionType::MergeModules) {
     if (InputsAndOutputs.isWholeModule())

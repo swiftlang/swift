@@ -334,6 +334,21 @@ struct OverloadedFuncInfo: public APIDiffItem {
   }
 };
 
+struct NameCorrectionInfo {
+  StringRef OriginalName;
+  StringRef CorrectedName;
+  StringRef ModuleName;
+  NameCorrectionInfo(StringRef OriginalName, StringRef CorrectedName,
+    StringRef ModuleName): OriginalName(OriginalName),
+    CorrectedName(CorrectedName), ModuleName(ModuleName) {}
+  bool operator<(NameCorrectionInfo Other) const {
+    if (ModuleName != Other.ModuleName)
+      return ModuleName.compare(Other.ModuleName) < 0;
+    else
+      return OriginalName.compare(Other.OriginalName) < 0;
+  }
+};
+
 /// APIDiffItem store is the interface that migrator should communicates with;
 /// Given a key, usually the usr of the system entity under migration, the store
 /// should return a slice of related changes in the same format of
@@ -343,6 +358,7 @@ struct APIDiffItemStore {
   struct Implementation;
   Implementation &Impl;
   static void serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items);
+  static void serialize(llvm::raw_ostream &os, ArrayRef<NameCorrectionInfo> Items);
   APIDiffItemStore(const APIDiffItemStore& that) = delete;
   APIDiffItemStore();
   ~APIDiffItemStore();

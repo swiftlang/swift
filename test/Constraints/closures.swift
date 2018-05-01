@@ -299,7 +299,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> (Thing) }}
+let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> Thing }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -552,7 +552,7 @@ extension A_SR_5030 {
   func foo() -> B_SR_5030<Int> {
     let tt : B_SR_5030<Int> = sr5030_exFalso()
     return tt.map { x in (idx: x) }
-    // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
+    // expected-error@-1 {{cannot convert value of type '(idx: Int)' to closure result type 'Int'}}
   }
 }
 
@@ -689,4 +689,25 @@ func rdar37790062() {
   _ = S({ bzz(((), (()))) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
   _ = S({ bzz(C1()) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
   _ = S({ faz(C2()) }, { bar() }) // expected-warning {{result of call to 'faz' is unused}}
+}
+
+// <rdar://problem/39489003>
+typealias KeyedItem<K, T> = (key: K, value: T)
+
+protocol Node {
+  associatedtype T
+  associatedtype E
+  associatedtype K
+  var item: E {get set}
+  var children: [(key: K, value: T)] {get set}
+}
+
+extension Node {
+  func getChild(for key:K)->(key: K, value: T) {
+    return children.first(where: { (item:KeyedItem) -> Bool in
+        return item.key == key
+        // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '_' and 'Self.K'}}
+        // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists:}}
+      })
+  }
 }

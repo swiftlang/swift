@@ -2115,11 +2115,17 @@ public:
 
     void verifyChecked(ValueDecl *VD) {
       if (VD->hasAccess()) {
-        if (VD->getFormalAccess() == AccessLevel::Open &&
-            !isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
-          Out << "decl cannot be 'open'\n";
-          VD->dump(Out);
-          abort();
+        if (VD->getFormalAccess() == AccessLevel::Open) {
+          if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+            Out << "decl cannot be 'open'\n";
+            VD->dump(Out);
+            abort();
+          }
+          if (VD->isFinal()) {
+            Out << "decl cannot be both 'open' and 'final'\n";
+            VD->dump(Out);
+            abort();
+          }
         }
       } else {
         if (!VD->getDeclContext()->isLocalContext() &&
@@ -2516,13 +2522,18 @@ public:
           // Check the witness substitutions.
           const auto &witness = normal->getWitness(req, nullptr);
 
-          if (witness.requiresSubstitution()) {
-            GenericEnv.push_back({witness.getSyntheticEnvironment()});
-            for (const auto &sub : witness.getSubstitutions()) {
-              verifyChecked(sub.getReplacement());
-            }
+          if (auto *genericEnv = witness.getSyntheticEnvironment())
+            GenericEnv.push_back({genericEnv});
+
+          for (const auto &sub : witness.getRequirementToSyntheticSubs())
+            verifyChecked(sub.getReplacement());
+
+          for (const auto &sub : witness.getSubstitutions())
+            verifyChecked(sub.getReplacement());
+
+          if (auto *genericEnv = witness.getSyntheticEnvironment()) {
             assert(GenericEnv.back().storage.dyn_cast<GenericEnvironment *>()
-                     == witness.getSyntheticEnvironment());
+                     == genericEnv);
             GenericEnv.pop_back();
           }
 
@@ -3403,9 +3414,8 @@ public:
 
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
-    void checkSourceRanges(SourceRange Current,
-                           ASTWalker::ParentTy Parent,
-                           std::function<void()> printEntity) {
+    void checkSourceRanges(SourceRange Current, ASTWalker::ParentTy Parent,
+                           llvm::function_ref<void()> printEntity) {
       SourceRange Enclosing;
       if (Parent.isNull())
           return;

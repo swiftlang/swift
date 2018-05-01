@@ -1097,7 +1097,7 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   public mutating func removeAll(
     where predicate: (Element) throws -> Bool
   ) rethrows {
-    if var i = try index(where: predicate) {
+    if var i = try firstIndex(where: predicate) {
       var j = index(after: i)
       while j != endIndex {
         if try !predicate(self[j]) {

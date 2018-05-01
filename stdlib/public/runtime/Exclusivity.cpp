@@ -260,6 +260,16 @@ public:
 
     swift_runtime_unreachable("access not found in set");
   }
+
+#ifndef NDEBUG
+  /// Only available with asserts. Intended to be used with
+  /// swift_dumpTrackedAccess().
+  void forEach(std::function<void (Access *)> action) {
+    for (auto *iter = Head; iter != nullptr; iter = iter->getNext()) {
+      action(iter);
+    }
+  }
+#endif
 };
 
 } // end anonymous namespace
@@ -348,3 +358,17 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
 
   getAccessSet().remove(access);
 }
+
+#ifndef NDEBUG
+
+// Dump the accesses that are currently being tracked by the runtime.
+//
+// This is only intended to be used in the debugger.
+void swift::swift_dumpTrackedAccesses() {
+  getAccessSet().forEach([](Access *a) {
+      fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s",
+              a->Pointer, a->PC, getAccessName(a->getAccessAction()));
+  });
+}
+
+#endif

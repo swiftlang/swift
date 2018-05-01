@@ -554,14 +554,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // We care about whether the parameter list of the callee syntactically
       // has more than one argument.  It has to *syntactically* have a tuple
       // type as its argument.  A ParenType wrapping a TupleType is a single
-      // parameter. 
-      if (isa<TupleType>(FT->getInput().getPointer())) {
-        auto TT = FT->getInput()->getAs<TupleType>();
-        if (TT->getNumElements() > 1) {
-          TC.diagnose(Call->getLoc(), diag::tuple_splat_use,
-                      TT->getNumElements())
-            .highlight(Call->getArg()->getSourceRange());
-        }
+      // parameter.
+      auto params = FT->getParams();
+      if (params.size() > 1) {
+        TC.diagnose(Call->getLoc(), diag::tuple_splat_use, params.size())
+          .highlight(Call->getArg()->getSourceRange());
       }
     }
 
@@ -873,7 +870,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
       UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
-                               /*knownPrivate*/true);
+                               /*Loc=*/SourceLoc(),
+                               UnqualifiedLookup::Flags::KnownPrivate);
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
@@ -2128,8 +2126,7 @@ static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
     storageKind = SK_Property;
 
   TC.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
-              varDecl->getName(),
-              (unsigned) ownershipAttr->get(), (unsigned) storageKind)
+              varDecl->getName(), ownershipAttr->get(), unsigned(storageKind))
     .highlight(diagRange);
 
   TC.diagnose(diagLoc, diag::unowned_assignment_requires_strong)

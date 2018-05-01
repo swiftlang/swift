@@ -101,7 +101,7 @@ extension _StringGuts {
   @inlinable
   @inline(__always)
   public // @testable
-  mutating func isUniqueNative() -> Bool {
+  mutating func _isUniqueNative() -> Bool {
     guard _isNative else { return false }
     // Note that the isUnique test must be in a separate statement;
     // `isNative && _isUnique` always evaluates to false in debug builds,
@@ -450,7 +450,7 @@ extension _StringGuts {
 
 #if _runtime(_ObjC)
 extension _StringGuts {
-  public // @testable
+  @usableFromInline
   var _underlyingCocoaString: _CocoaString? {
     if _object.isNative {
       return _object.nativeRawStorage
@@ -637,10 +637,9 @@ extension _StringGuts {
     return _copyToNativeStorage(of: CodeUnit.self, from: 0..<count)
   }
 
+  @inlinable
   @_specialize(where CodeUnit == UInt8)
   @_specialize(where CodeUnit == UInt16)
-  @_specialize(where CodeUnit == UTF16.CodeUnit)
-  @inlinable
   internal
   func _copyToNativeStorage<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self,
@@ -708,7 +707,7 @@ extension _StringGuts {
     }
     // We have enough space; check if it's unique and of the correct width.
     if _fastPath(_object.bitWidth == CodeUnit.bitWidth) {
-      if _fastPath(isUniqueNative()) {
+      if _fastPath(_isUniqueNative()) {
         return nil
       }
     }
@@ -862,7 +861,6 @@ extension _StringGuts {
 
   /// Get the UTF-16 code unit stored at the specified position in this string.
   @inlinable // FIXME(sil-serialize-all)
-  public // @testable
   func codeUnit(atCheckedOffset offset: Int) -> UTF16.CodeUnit {
     if _slowPath(_isOpaque) {
       return _opaqueCodeUnit(atCheckedOffset: offset)
@@ -931,7 +929,7 @@ extension _StringGuts {
     _ unusedCapacity: Int,
     ascii: Bool = false
   ) {
-    if _fastPath(isUniqueNative()) {
+    if _fastPath(_isUniqueNative()) {
       if _fastPath(
         ascii == (_object.bitWidth == 8) &&
         _object.nativeRawStorage.unusedCapacity >= unusedCapacity) {
@@ -960,7 +958,7 @@ extension _StringGuts {
   @inlinable
   public // TODO(StringGuts): for testing
   mutating func reserveCapacity(_ capacity: Int) {
-    if _fastPath(isUniqueNative()) {
+    if _fastPath(_isUniqueNative()) {
       if _fastPath(_object.nativeRawStorage.capacity >= capacity) {
         return
       }

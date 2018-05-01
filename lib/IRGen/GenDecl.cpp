@@ -1838,7 +1838,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
-  return LinkInfo::get(IGM, IGM.getSwiftModule(), entity, isDefinition);
+  return LinkInfo::get(UniversalLinkageInfo(IGM), IGM.getSwiftModule(), entity,
+                       isDefinition);
 }
 
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
@@ -1847,27 +1848,21 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   LinkInfo result;
 
   entity.mangle(result.Name);
-
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
-                   isDefinition, entity.isWeakImported(swiftModule));
-
+      getIRLinkage(linkInfo, entity.getLinkage(isDefinition), isDefinition,
+                   entity.isWeakImported(swiftModule));
   result.ForDefinition = isDefinition;
-
   return result;
 }
 
-LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
-                       StringRef name,
-                       SILLinkage linkage,
-                       ForDefinition_t isDefinition,
+LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
+                       SILLinkage linkage, ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
 
   result.Name += name;
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-    getIRLinkage(linkInfo, linkage,
-                 isDefinition, isWeakImported);
+      getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2310,11 +2305,19 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  if (f->getInlineStrategy() == NoInline) {
+  switch (f->getInlineStrategy()) {
+  case NoInline:
     attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::NoInline);
+    break;
+  case AlwaysInline:
+    // FIXME: We do not currently transfer AlwaysInline since doing so results
+    // in test failures, which must be investigated first.
+  case InlineDefault:
+    break;
   }
+
   if (isReadOnlyFunction(f)) {
     attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,

@@ -925,6 +925,10 @@ private:
       awaitSatisfyingState(concurrency, request, curTrackingInfo);
     }
 
+#if !NDEBUG
+    verifyMangledNameRoundtrip(value);
+#endif
+
     return { value, curTrackingInfo.getAccomplishedRequestState() };
   }
 

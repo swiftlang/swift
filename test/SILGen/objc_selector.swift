@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -enable-sil-ownership -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

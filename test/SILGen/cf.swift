@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name cf -import-cf-types -sdk %S/Inputs %s -emit-silgen -o - | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name cf -import-cf-types -sdk %S/Inputs %s -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 

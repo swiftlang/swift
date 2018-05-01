@@ -1,10 +1,12 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -import-objc-header %S/Inputs/extension-generic-objc-protocol.h -typecheck -verify %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 @objc protocol P {}
+@objc protocol Q {}
+@objc protocol R {}
 
 public class C1<T> {}
 extension C1: P {}
@@ -27,3 +29,32 @@ class SubInner: Outer<Int>.Inner2 {}
 
 extension SubInner: P {}
 // expected-error@-1 {{conformance of subclass of a class from generic context 'SubInner' to @objc protocol 'P' cannot be in an extension}}
+
+// Lightweight generic ObjC classes can still be extended to conform.
+
+extension OBJCGeneric: OBJCProtocol1 {}
+extension OBJCGeneric: P {}
+extension OBJCGenericSubclass: OBJCProtocol2 {}
+extension OBJCGenericSubclass: Q {}
+extension OBJCNongenericSubclass: OBJCProtocol3 {}
+extension OBJCNongenericSubclass: R {}
+
+public class SwiftSubclassOfObjCGeneric: OBJCGeneric<AnyObject> {}
+
+extension SwiftSubclassOfObjCGeneric: OBJCProtocol2 {}
+extension SwiftSubclassOfObjCGeneric: Q {}
+
+public class SwiftGenericSubclassOfObjCGeneric<T: AnyObject>
+  : OBJCGeneric<AnyObject>
+{}
+
+extension SwiftGenericSubclassOfObjCGeneric: OBJCProtocol2 {} // expected-error {{cannot be in an extension}}
+extension SwiftGenericSubclassOfObjCGeneric: Q {} // expected-error {{cannot be in an extension}}
+
+public class SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric
+  : SwiftGenericSubclassOfObjCGeneric<AnyObject>
+{}
+
+extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: OBJCProtocol3 {} // expected-error {{cannot be in an extension}}
+extension SwiftNongenericSubclassOfGenericSubclassOfObjCGeneric: R {} // expected-error {{cannot be in an extension}}
+

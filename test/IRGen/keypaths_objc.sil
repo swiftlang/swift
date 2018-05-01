@@ -1,6 +1,6 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %utils/chex.py < %s > %t/keypaths_objc.sil
+// RUN: %{python} %utils/chex.py < %s > %t/keypaths_objc.sil
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %t/keypaths_objc.sil | %FileCheck %t/keypaths_objc.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: objc_interop
 

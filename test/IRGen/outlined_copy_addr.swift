@@ -37,7 +37,7 @@ struct MyPrivate<T: P> {
   var otherHelper: OtherInternal<T>? = nil
 
   // CHECK-LABEL: define hidden swiftcc {{i32|i64}} @"$S11outcopyaddr9MyPrivateVyACyxGxcfC"(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.P) {{.*}} {
-  // CHECK: call %T11outcopyaddr9MyPrivateV* @"$S11outcopyaddr9MyPrivateVyxGAA1PRzlWOh"(%T11outcopyaddr9MyPrivateV* %self)
+  // CHECK: call %T11outcopyaddr9MyPrivateV* @"$S11outcopyaddr9MyPrivateVyxGAA1PRzlWOh"(%T11outcopyaddr9MyPrivateV* {{%.*}})
   // CHECK: ret
   init(_: T) { }
 }

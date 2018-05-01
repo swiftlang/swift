@@ -813,6 +813,7 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer Node,
 
   assert(
       ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
+       (V & unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned)) ||
        (V & unsigned(FunctionSigSpecializationParamKind::SROA)) ||
        (V & unsigned(FunctionSigSpecializationParamKind::Dead))) &&
       "Invalid OptionSet");
@@ -1225,6 +1226,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << "Owned To Guaranteed";
     }
 
+    if (raw & uint64_t(FunctionSigSpecializationParamKind::GuaranteedToOwned)) {
+      if (printedOptionSet)
+        Printer << " and ";
+      printedOptionSet = true;
+      Printer << "Guaranteed To Owned";
+    }
+
     if (raw & uint64_t(FunctionSigSpecializationParamKind::SROA)) {
       if (printedOptionSet)
         Printer << " and ";
@@ -1262,6 +1270,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       return nullptr;
     case FunctionSigSpecializationParamKind::Dead:
     case FunctionSigSpecializationParamKind::OwnedToGuaranteed:
+    case FunctionSigSpecializationParamKind::GuaranteedToOwned:
     case FunctionSigSpecializationParamKind::SROA:
       printer_unreachable("option sets should have been handled earlier");
     }

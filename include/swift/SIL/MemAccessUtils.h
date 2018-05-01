@@ -276,6 +276,11 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 /// storage.
 AccessedStorage findAccessedStorageOrigin(SILValue sourceAddr);
 
+/// Return true if the given address operand is used by a memory operation that
+/// initializes the memory at that address, implying that the previous value is
+/// uninitialized.
+bool memInstMustInitialize(Operand *memOper);
+
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
 ///
@@ -290,7 +295,7 @@ bool isPossibleFormalAccessBase(const AccessedStorage &storage, SILFunction *F);
 /// This only visits instructions that modify memory in some user-visible way,
 /// which could be considered part of a formal access.
 void visitAccessedAddress(SILInstruction *I,
-                          std::function<void(Operand *)> visitor);
+                          llvm::function_ref<void(Operand *)> visitor);
 
 } // end namespace swift
 

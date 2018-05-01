@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // Check that string literals that are unicode scalar literals 
 // are emitted as string_literal instead of integers.

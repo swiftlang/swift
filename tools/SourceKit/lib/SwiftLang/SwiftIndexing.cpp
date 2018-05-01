@@ -198,11 +198,25 @@ static void indexModule(llvm::MemoryBuffer *Input,
 // IndexSource
 //===----------------------------------------------------------------------===//
 
+template <typename Str>
+static void initTraceInfoImpl(trace::SwiftInvocation &SwiftArgs,
+                              StringRef InputFile,
+                              ArrayRef<Str> Args) {
+  llvm::raw_string_ostream OS(SwiftArgs.Args.Arguments);
+  interleave(Args, [&OS](StringRef arg) { OS << arg; }, [&OS] { OS << ' '; });
+  SwiftArgs.Args.PrimaryFile = InputFile;
+}
+
 void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                           StringRef InputFile,
                           ArrayRef<const char *> Args) {
-  SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-  SwiftArgs.Args.PrimaryFile = InputFile;
+  initTraceInfoImpl(SwiftArgs, InputFile, Args);
+}
+
+void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
+                          StringRef InputFile,
+                          ArrayRef<std::string> Args) {
+  initTraceInfoImpl(SwiftArgs, InputFile, Args);
 }
 
 void SwiftLangSupport::indexSource(StringRef InputFile,

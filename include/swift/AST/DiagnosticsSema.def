@@ -1697,9 +1697,18 @@ ERROR(witness_unavailable,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
+ERROR(redundant_conformance_conditional,none,
+      "conflicting conformance of %0 to protocol %1; there cannot be more "
+      "than one conformance, even with different conditional bounds",
+      (Type, DeclName))
 WARNING(redundant_conformance_adhoc,none,
         "conformance of %0 to protocol %1 was already stated in "
         "%select{the protocol's|the type's}2 module %3",
+        (Type, DeclName, bool, Identifier))
+WARNING(redundant_conformance_adhoc_conditional,none,
+        "conformance of %0 to protocol %1 conflicts with that stated in "
+        "%select{the protocol's|the type's}2 module %3 and will be ignored; "
+        "there cannot be more than one conformance, even with different conditional bounds",
         (Type, DeclName, bool, Identifier))
 NOTE(redundant_conformance_witness_ignored,none,
      "%0 %1 will not be used to satisfy the conformance to %2",
@@ -1960,9 +1969,8 @@ ERROR(override_argument_name_mismatch,none,
       "of overridden %select{method|initializer}0 %2",
       (bool, DeclName, DeclName))
 ERROR(override_ownership_mismatch,none,
-      "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
-      "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
-      (/*ReferenceOwnership*/unsigned, /*ReferenceOwnership*/unsigned))
+      "cannot override %0 property with %1 property",
+      (ReferenceOwnership, ReferenceOwnership))
 ERROR(override_dynamic_self_mismatch,none,
       "cannot override a Self return type with a non-Self return type",
       ())
@@ -2008,10 +2016,18 @@ ERROR(override_mutable_covariant_property,none,
 ERROR(override_mutable_covariant_subscript,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
-ERROR(decl_already_final,none,
+ERROR(static_decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
+ERROR(implicitly_final_cannot_be_open,none,
+      "%select{'let' properties|members of 'final' classes|"
+      "static declarations}0 are implicitly 'final'; use 'public' instead of "
+      "'open'", (unsigned))
+WARNING(implicitly_final_cannot_be_open_swift4,none,
+        "%select{'let' properties|members of 'final' classes|"
+        "static declarations}0 are implicitly 'final'; use 'public' instead of "
+        "'open'", (unsigned))
 
 WARNING(override_swift3_objc_inference,none,
         "override of %0 %1 from extension of %2 depends on deprecated "
@@ -2154,6 +2170,8 @@ ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
+ERROR(broken_hashable_no_hasher,none,
+      "Hashable protocol is broken: Hasher type not found", ())
 ERROR(broken_errortype_requirement,none,
       "Error protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,none,
@@ -2739,6 +2757,15 @@ NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
      (StringRef, DescriptiveDeclKind, Identifier))
 
+WARNING(warn_deprecated_conditional_conformance_outer_access,none,
+        "use of %0 as reference to %1 in %2 %3 will change in future versions of Swift to reference %4 in %5 %6 "
+        "which comes via a conditional conformance",
+        (DeclName, DescriptiveDeclKind, DescriptiveDeclKind, DeclName,
+        DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+NOTE(fix_deprecated_conditional_conformance_outer_access,none,
+     "use '%0' to continue to reference the %1",
+     (StringRef, DescriptiveDeclKind, Identifier))
+
 ERROR(unsupported_special_decl_ref, none,
       "referencing %0 as a function value is not implemented", (Identifier))
 
@@ -2893,7 +2920,7 @@ WARNING(expression_unused_result_call,none,
 WARNING(expression_unused_result_operator,none,
         "result of operator %0 is unused", (DeclName))
 WARNING(expression_unused_result_unknown, none,
-        "result of call is unused, but produces %0", (Type))
+        "result of call to %select{function|closure}0 returning %1 is unused", (bool, Type))
 WARNING(expression_unused_result, none,
         "expression of type %0 is unused", (Type))
 WARNING(expression_unused_init_result,none,
@@ -2907,6 +2934,8 @@ WARNING(expression_unused_literal,none,
 
 ERROR(assignment_lhs_not_lvalue,none,
       "cannot assign to immutable expression of type %0", (Type))
+ERROR(assignment_lhs_is_apply_expression,none,
+      "expression is not assignable: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_variable,none,
       "cannot assign to value: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_property,none,
@@ -3061,10 +3090,9 @@ NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
 
 WARNING(unowned_assignment_immediate_deallocation,none,
-        "instance will be immediately deallocated as %0 is "
-        "%select{a 'strong'|a 'weak'|an 'unowned'|an 'unowned'}1 "
-        "%select{variable|property}2",
-        (Identifier, /*Ownership*/unsigned, /*Is Property*/unsigned))
+        "instance will be immediately deallocated because "
+        "%select{variable|property}2 %0 is %1",
+        (Identifier, ReferenceOwnership, /*Is Property*/unsigned))
 NOTE(unowned_assignment_requires_strong,none,
      "a strong reference is required to prevent the instance from being "
      "deallocated", ())
@@ -3225,24 +3253,25 @@ ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
 
 // Ownership
 ERROR(invalid_ownership_type,none,
-      "'%select{strong|weak|unowned|unowned}0' may only be applied to "
-      "class and class-bound protocol types, not %1",
-      (/*ReferenceOwnership*/unsigned, Type))
+      "%0 may only be applied to class and class-bound protocol types, not %1",
+      (ReferenceOwnership, Type))
 ERROR(invalid_ownership_protocol_type,none,
-      "'%select{strong|weak|unowned|unowned}0' must not be applied to "
-      "non-class-bound %1; consider adding a protocol conformance that has a class bound",
-      (/*ReferenceOwnership*/unsigned, Type))
+      "%0 must not be applied to non-class-bound %1; "
+      "consider adding a protocol conformance that has a class bound",
+      (ReferenceOwnership, Type))
+ERROR(invalid_ownership_with_optional,none,
+      "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
 ERROR(ownership_invalid_in_protocols,none,
-      "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
-      (/*ReferenceOwnership*/unsigned))
+      "%0 cannot be applied to a property declaration in a protocol",
+      (ReferenceOwnership))
 WARNING(ownership_invalid_in_protocols_compat_warning,none,
-      "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
+      "%0 should not be applied to a property declaration "
       "in a protocol and will be disallowed in future versions",
-      (/*ReferenceOwnership*/unsigned))
+      (ReferenceOwnership))
 
 // required
 ERROR(required_initializer_nonclass,none,

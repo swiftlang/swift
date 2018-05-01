@@ -403,7 +403,7 @@ public:
   Type getType() const { return Ty; }
 
   /// setType - Sets the type of this expression.
-  void setType(Type T) { Ty = T; }
+  void setType(Type T);
 
   /// \brief Return the source range of the expression.
   SourceRange getSourceRange() const;
@@ -459,13 +459,13 @@ public:
   /// Enumerate each immediate child expression of this node, invoking the
   /// specific functor on it.  This ignores statements and other non-expression
   /// children.
-  void forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback);
+  void forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
 
   /// Enumerate each expr node within this expression subtree, invoking the
   /// specific functor on it.  This ignores statements and other non-expression
   /// children, and if there is a closure within the expression, this does not
   /// walk into the body of it (unless it is single-expression).
-  void forEachChildExpr(const std::function<Expr*(Expr*)> &callback);
+  void forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback);
 
   /// Determine whether this expression refers to a type by name.
   ///
@@ -717,12 +717,19 @@ public:
 /// can help us preserve the context of the code completion position.
 class CodeCompletionExpr : public Expr {
   SourceRange Range;
+  bool Activated;
+
 public:
   CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(Range) {}
+      Range(Range) {
+    Activated = false;
+  }
 
   SourceRange getSourceRange() const { return Range; }
+
+  bool isActivated() const { return Activated; }
+  void setActivated() { Activated = true; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CodeCompletion;
@@ -2353,11 +2360,16 @@ class UnresolvedDotExpr : public Expr {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
+  ArrayRef<ValueDecl *> OuterAlternatives;
+
 public:
-  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, DeclName name,
-                    DeclNameLoc nameloc, bool Implicit)
-    : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
-      NameLoc(nameloc), Name(name) {
+  UnresolvedDotExpr(
+      Expr *subexpr, SourceLoc dotloc, DeclName name, DeclNameLoc nameloc,
+      bool Implicit,
+      ArrayRef<ValueDecl *> outerAlternatives = ArrayRef<ValueDecl *>())
+      : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr),
+        DotLoc(dotloc), NameLoc(nameloc), Name(name),
+        OuterAlternatives(outerAlternatives) {
     Bits.UnresolvedDotExpr.FunctionRefKind =
       static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefKind::Compound
                                                  : FunctionRefKind::Unapplied);
@@ -2379,6 +2391,10 @@ public:
 
   DeclName getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
+
+  ArrayRef<ValueDecl *> getOuterAlternatives() const {
+    return OuterAlternatives;
+  }
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {

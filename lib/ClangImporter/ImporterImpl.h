@@ -196,8 +196,14 @@ enum class Bridgeability {
 ///
 /// In either case we end up losing sugar at some uses sites, so this is more
 /// about what the right default is.
-static inline Bridgeability getTypedefBridgeability(clang::QualType type) {
-  return type->isBlockPointerType() ? Bridgeability::Full : Bridgeability::None;
+static inline Bridgeability getTypedefBridgeability(
+                                          const clang::TypedefNameDecl *decl,
+                                          clang::QualType type) {
+    return decl->hasAttr<clang::SwiftBridgedTypedefAttr>()
+      ? Bridgeability::Full
+        : type->isBlockPointerType()
+        ? Bridgeability::Full
+          : Bridgeability::None;
 }
 
 /// \brief Describes the kind of the C type that can be mapped to a stdlib

@@ -365,8 +365,8 @@ namespace {
     }
     
     void addExtendedContext() {
-      auto string = getTypeRef(IGM,
-                               E->getSelfInterfaceType()->getCanonicalType());
+      auto string = IGM.getTypeRef(
+          E->getSelfInterfaceType()->getCanonicalType());
       B.addRelativeAddress(string);
     }
     
@@ -2424,6 +2424,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     IGM.addObjCClass(var,
               classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
   }
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(classDecl);
 }
 
 llvm::Value *IRGenFunction::emitInvariantLoad(Address address,
@@ -2820,6 +2822,19 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          canBeConstant, init.finishAndCreateFuture());
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(structDecl);
+}
+
+void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
+  // If this is a nested type we also potentially might need the outer types.
+  auto *declCtxt = type->getDeclContext();
+  auto *parentNominalDecl =
+    declCtxt->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!parentNominalDecl)
+    return;
+
+  noteUseOfTypeMetadata(parentNominalDecl);
 }
 
 // Enums
@@ -3024,6 +3039,8 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          canBeConstant, init.finishAndCreateFuture());
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(theEnum);
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
@@ -3841,7 +3858,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        getTypeRef(IGM, requirement.getSecondType()->getCanonicalType());
+        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType());
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

@@ -339,6 +339,18 @@ Type TypeChecker::resolveTypeInContext(
                                  selfType);
 }
 
+static TypeResolutionOptions
+adjustOptionsForGenericArgs(TypeResolutionOptions options) {
+  options -= TypeResolutionFlags::SILType;
+  options -= TypeResolutionFlags::ImmediateFunctionInput;
+  options -= TypeResolutionFlags::FunctionInput;
+  options -= TypeResolutionFlags::TypeAliasUnderlyingType;
+  options -= TypeResolutionFlags::AllowUnavailableProtocol;
+  options -= TypeResolutionFlags::AllowIUO;
+
+  return options;
+}
+
 /// This function checks if a bound generic type is UnsafePointer<Void> or
 /// UnsafeMutablePointer<Void>. For these two type representations, we should
 /// warn users that they are deprecated and replace them with more handy
@@ -462,15 +474,35 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
     return ErrorType::get(Context);
   }
 
-  SmallVector<TypeLoc, 8> args;
-  for (auto tyR : genericArgs)
-    args.push_back(tyR);
+  // Resolve the types of the generic arguments.
+  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
+         "should not touch generic arguments when resolving structure");
+  options = adjustOptionsForGenericArgs(options);
+
+  SmallVector<Type, 2> args;
+  for (auto tyR : genericArgs) {
+    // Propagate failure.
+    TypeLoc genericArg = tyR;
+    if (validateType(genericArg, dc, options, resolver,
+                     unsatisfiedDependency))
+      return ErrorType::get(Context);
+
+    auto substTy = genericArg.getType();
+
+    // Unsatisfied dependency case.
+    if (!substTy)
+      return nullptr;
+
+    args.push_back(substTy);
+  }
 
   auto result = applyUnboundGenericArguments(unboundType, genericDecl, loc,
-                                             dc, args, options,
-                                             resolver, unsatisfiedDependency);
+                                             dc, args, resolver,
+                                             unsatisfiedDependency);
   if (!result)
     return result;
+
+  // Migration hack.
   bool isMutablePointer;
   if (isPointerToVoid(dc->getASTContext(), result, isMutablePointer)) {
     if (isMutablePointer)
@@ -487,19 +519,9 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
 Type TypeChecker::applyUnboundGenericArguments(
     UnboundGenericType *unboundType, GenericTypeDecl *decl,
     SourceLoc loc, DeclContext *dc,
-    MutableArrayRef<TypeLoc> genericArgs,
-    TypeResolutionOptions options,
+    ArrayRef<Type> genericArgs,
     GenericTypeResolver *resolver,
     UnsatisfiedDependency *unsatisfiedDependency) {
-  assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
-         "should not touch generic arguments when resolving structure");
-  options -= TypeResolutionFlags::SILType;
-  options -= TypeResolutionFlags::ImmediateFunctionInput;
-  options -= TypeResolutionFlags::FunctionInput;
-  options -= TypeResolutionFlags::TypeAliasUnderlyingType;
-  options -= TypeResolutionFlags::AllowUnavailableProtocol;
-  options -= TypeResolutionFlags::AllowIUO;
-
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
@@ -527,23 +549,7 @@ Type TypeChecker::applyUnboundGenericArguments(
       // If we're working with a nominal type declaration, just construct
       // a bound generic type without checking the generic arguments.
       if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl)) {
-        SmallVector<Type, 2> args;
-        for (auto &genericArg : genericArgs) {
-          // Propagate failure.
-          if (validateType(genericArg, dc, options, resolver,
-                           unsatisfiedDependency))
-            return ErrorType::get(Context);
-
-          auto substTy = genericArg.getType();
-
-          // Unsatisfied dependency case.
-          if (!substTy)
-            return nullptr;
-
-          args.push_back(substTy);
-        }
-
-        return BoundGenericType::get(nominalDecl, parentType, args);
+        return BoundGenericType::get(nominalDecl, parentType, genericArgs);
       }
 
       assert(!resultType->hasTypeParameter());
@@ -563,18 +569,8 @@ Type TypeChecker::applyUnboundGenericArguments(
   // Realize the types of the generic arguments and add them to the
   // substitution map.
   for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
-    auto &genericArg = genericArgs[i];
-
-    // Propagate failure.
-    if (validateType(genericArg, dc, options, resolver, unsatisfiedDependency))
-      return ErrorType::get(Context);
-
     auto origTy = genericSig->getInnermostGenericParams()[i];
-    auto substTy = genericArg.getType();
-
-    // Unsatisfied dependency case.
-    if (!substTy)
-      return nullptr;
+    auto substTy = genericArgs[i];
 
     // Enter a substitution.
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
@@ -1467,7 +1463,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
     // which would wrap the NameAliasType or ParenType, and apply the
     // isNoEscape bit when de-sugaring.
     // <https://bugs.swift.org/browse/SR-2520>
-    return FunctionType::get(funcTy->getInput(), funcTy->getResult(), extInfo);
+    return FunctionType::get(funcTy->getParams(), funcTy->getResult(), extInfo);
   }
 
   // Note: original sugared type
@@ -2734,6 +2730,8 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
 
 Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          TypeResolutionOptions options) {
+  options = adjustOptionsForGenericArgs(options);
+
   // FIXME: diagnose non-materializability of key/value type?
   Type keyTy = resolveType(repr->getKey(), withoutContext(options));
   if (!keyTy || keyTy->hasError()) return keyTy;
@@ -2749,12 +2747,10 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
 
     if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
-      TypeLoc args[2] = {TypeLoc(repr->getKey()), TypeLoc(repr->getValue())};
-      args[0].setType(keyTy, true);
-      args[1].setType(valueTy, true);
+      Type args[] = {keyTy, valueTy};
 
       if (!TC.applyUnboundGenericArguments(
-              unboundTy, dictDecl, repr->getStartLoc(), DC, args, options,
+              unboundTy, dictDecl, repr->getStartLoc(), DC, args,
               Resolver, UnsatisfiedDependency)) {
         return nullptr;
       }

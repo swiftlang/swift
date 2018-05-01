@@ -15,7 +15,7 @@ extension NSString {
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} private void @runtime_registration
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @runtime_registration
 // CHECK:         [[GET_CLASS_PROP:%.*]] = call i8* @sel_registerName({{.*}}(classProp)
 // CHECK:         call i8* @class_replaceMethod(%objc_class* @"OBJC_METACLASS_$_NSString", i8* [[GET_CLASS_PROP]]
 // CHECK:         [[SET_CLASS_PROP:%.*]] = call i8* @sel_registerName({{.*}}(setClassProp:)

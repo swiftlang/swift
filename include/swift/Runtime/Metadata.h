@@ -4389,6 +4389,12 @@ void swift_getFieldAt(
     const Metadata *type, unsigned index,
     std::function<void(llvm::StringRef name, FieldType type)> callback);
 
+#if !NDEBUG
+/// Verify that the given metadata pointer correctly roundtrips its
+/// mangled name through the demangler.
+void verifyMangledNameRoundtrip(const Metadata *metadata);
+#endif
+
 } // end namespace swift
 
 #pragma clang diagnostic pop

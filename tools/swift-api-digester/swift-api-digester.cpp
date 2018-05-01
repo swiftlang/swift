@@ -70,6 +70,7 @@ namespace  {
     // The following two are for testing purposes
     DeserializeDiffItems,
     DeserializeSDK,
+    GenerateNameCorrectionTemplate,
   };
 } // end anonymous namespace
 
@@ -141,7 +142,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Deserialize diff items in a JSON file"),
           clEnumValN(ActionType::DeserializeSDK,
                      "deserialize-sdk",
-                     "Deserialize sdk digester in a JSON file")));
+                     "Deserialize sdk digester in a JSON file"),
+          clEnumValN(ActionType::GenerateNameCorrectionTemplate,
+                     "generate-name-correction",
+                     "Generate name correction template")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
@@ -862,7 +866,6 @@ public:
   }
 
   bool isConformingTo(KnownProtocolKind Kind) const {
-    StringRef Usr;
     switch (Kind) {
 #define KNOWN_PROTOCOL(NAME)                                                  \
       case KnownProtocolKind::NAME:                                           \
@@ -2727,15 +2730,13 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
   }
 
   bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
-    if (!IsVisitingLeft)
-      return false;
-
     // We only care if this the top-level type node.
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
-    if (L->getTypeKind() == KnownTypeKind::Optional &&
-        R->getTypeKind() == KnownTypeKind::Optional) {
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+      R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
       // Detect [String: Any]? to [StringRepresentableStruct: Any]? Chnage
       KeyChangedTo =
         detectDictionaryKeyChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
@@ -2745,10 +2746,16 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
       KeyChangedTo = detectDictionaryKeyChangeInternal(L, R);
     }
     if (!KeyChangedTo.empty()) {
-      L->annotate(L->getTypeKind() == KnownTypeKind::Optional ?
+      if (IsVisitingLeft) {
+        L->annotate(HasOptional ?
                     NodeAnnotation::OptionalDictionaryKeyUpdate :
                     NodeAnnotation::DictionaryKeyUpdate);
-      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+      } else {
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertOptionalDictionaryKeyUpdate :
+                    NodeAnnotation::RevertDictionaryKeyUpdate);
+      }
       return true;
     }
     return false;
@@ -2769,14 +2776,13 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
   }
 
   bool detectArrayMemberChange(SDKNodeType* L, SDKNodeType *R) {
-    if (!IsVisitingLeft)
-      return false;
     // We only care if this the top-level type node.
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
-    if (L->getTypeKind() == KnownTypeKind::Optional &&
-        R->getTypeKind() == KnownTypeKind::Optional) {
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+      R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
       // Detect [String]? to [StringRepresentableStruct]? Chnage
       KeyChangedTo =
         detectArrayMemberChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
@@ -2786,18 +2792,22 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
       KeyChangedTo = detectArrayMemberChangeInternal(L, R);
     }
     if (!KeyChangedTo.empty()) {
-      L->annotate(L->getTypeKind() == KnownTypeKind::Optional ?
+      if (IsVisitingLeft) {
+        L->annotate(HasOptional ?
                     NodeAnnotation::OptionalArrayMemberUpdate :
                     NodeAnnotation::ArrayMemberUpdate);
-      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+      } else {
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertOptionalArrayMemberUpdate :
+                    NodeAnnotation::RevertArrayMemberUpdate);
+      }
       return true;
     }
     return false;
   }
 
   bool detectSimpleStringRepresentableUpdate(SDKNodeType *L, SDKNodeType *R) {
-    if (!IsVisitingLeft)
-      return false;
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
@@ -2813,11 +2823,15 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
       KeyChangedTo = getStringRepresentableChange(L, R);
     }
     if (!KeyChangedTo.empty()) {
-      L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
-      if (HasOptional) {
-        L->annotate(NodeAnnotation::SimpleOptionalStringRepresentableUpdate);
+      if (IsVisitingLeft) {
+        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(HasOptional ?
+                    NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+                    NodeAnnotation::SimpleStringRepresentableUpdate);
       } else {
-        L->annotate(NodeAnnotation::SimpleStringRepresentableUpdate);
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
+                    NodeAnnotation::RevertSimpleStringRepresentableUpdate);
       }
       return true;
     }
@@ -3965,6 +3979,33 @@ static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
   return 0;
 }
 
+static int deserializeNameCorrection(APIDiffItemStore &Store,
+                                     StringRef OutputPath) {
+  std::error_code EC;
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  std::set<NameCorrectionInfo> Result;
+  for (auto *Item: Store.getAllDiffItems()) {
+    if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+      if (CI->DiffKind == NodeAnnotation::Rename) {
+        auto NewName = CI->getNewName();
+        auto Module = CI->ModuleName;
+        DeclNameViewer Viewer(NewName);
+        auto HasUnderScore =
+          [](StringRef S) { return S.find('_') != StringRef::npos; };
+        auto Args = Viewer.args();
+        if (HasUnderScore(Viewer.base()) ||
+            std::any_of(Args.begin(), Args.end(), HasUnderScore)) {
+          Result.insert(NameCorrectionInfo(NewName, NewName, Module));
+        }
+      }
+    }
+  }
+  std::vector<NameCorrectionInfo> Vec;
+  Vec.insert(Vec.end(), Result.begin(), Result.end());
+  APIDiffItemStore::serialize(FS, Vec);
+  return EC.value();
+}
+
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,
 /// the contents in dumpPath and OutputPath should be identical.
@@ -4028,6 +4069,13 @@ int main(int argc, char *argv[]) {
       return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
     else
       return deserializeSDKDump(options::SDKJsonPaths[0], options::OutputFile);
+  }
+  case ActionType::GenerateNameCorrectionTemplate: {
+    APIDiffItemStore Store;
+    auto &Paths = options::SDKJsonPaths;
+    for (unsigned I = 0; I < Paths.size(); I ++)
+      Store.addStorePath(Paths[I]);
+    return deserializeNameCorrection(Store, options::OutputFile);
   }
   case ActionType::None:
     llvm::errs() << "Action required\n";

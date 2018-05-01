@@ -188,12 +188,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _combineHashValues(Int, Int) -> Int
-  FuncDecl *CombineHashValuesDecl = nullptr;
+  /// func _hashValue<H: Hashable>(for: H) -> Int
+  FuncDecl *HashValueForDecl = nullptr;
 
-  /// func _mixInt(Int) -> Int
-  FuncDecl *MixIntDecl = nullptr;
-  
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -311,6 +308,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
+
+    /// The set of substitution maps (uniqued by their storage).
+    llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
@@ -989,44 +989,29 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getCombineHashValuesDecl() const {
-  if (Impl.CombineHashValuesDecl)
-    return Impl.CombineHashValuesDecl;
+FuncDecl *ASTContext::getHashValueForDecl() const {
+  if (Impl.HashValueForDecl)
+    return Impl.HashValueForDecl;
 
-  auto resolver = getLazyResolver();
-  auto intType = getIntDecl()->getDeclaredType();
-
-  auto callback = [&](Type inputType, Type resultType) {
-    // Look for the signature (Int, Int) -> Int
-    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
-    assert(tupleType);
-    return tupleType->getNumElements() == 2 &&
-        tupleType->getElementType(0)->isEqual(intType) &&
-        tupleType->getElementType(1)->isEqual(intType) &&
-        resultType->isEqual(intType);
-  };
-
-  auto decl = lookupLibraryIntrinsicFunc(
-      *this, "_combineHashValues", resolver, callback);
-  Impl.CombineHashValuesDecl = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getMixIntDecl() const {
-  if (Impl.MixIntDecl)
-    return Impl.MixIntDecl;
-
-  auto resolver = getLazyResolver();
-  auto intType = getIntDecl()->getDeclaredType();
-
-  auto callback = [&](Type inputType, Type resultType) {
-    // Look for the signature (Int) -> Int
-    return inputType->isEqual(intType) && resultType->isEqual(intType);
-  };
-
-  auto decl = lookupLibraryIntrinsicFunc(*this, "_mixInt", resolver, callback);
-  Impl.MixIntDecl = decl;
-  return decl;
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("_hashValue", results);
+  for (auto result : results) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    auto paramLists = fd->getParameterLists();
+    if (paramLists.size() != 1 || paramLists[0]->size() != 1)
+      continue;
+    auto paramDecl = paramLists[0]->get(0);
+    if (paramDecl->getArgumentName() != Id_for)
+      continue;
+    auto genericParams = fd->getGenericParams();
+    if (!genericParams || genericParams->size() != 1)
+      continue;
+    Impl.HashValueForDecl = fd;
+    return fd;
+  }
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getArrayAppendElementDecl() const {
@@ -1430,8 +1415,9 @@ ClangModuleLoader *ASTContext::getClangModuleLoader() const {
 static void recordKnownProtocol(ModuleDecl *Stdlib, StringRef Name,
                                 KnownProtocolKind Kind) {
   Identifier ID = Stdlib->getASTContext().getIdentifier(Name);
-  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, /*IsKnownPrivate=*/true,
-                           SourceLoc(), /*IsTypeLookup=*/true);
+  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, SourceLoc(),
+                           UnqualifiedLookup::Flags::KnownPrivate |
+                               UnqualifiedLookup::Flags::TypeLookup);
   if (auto Proto
         = dyn_cast_or_null<ProtocolDecl>(Lookup.getSingleTypeResult()))
     Proto->setKnownProtocolKind(Kind);
@@ -2365,6 +2351,7 @@ void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
     if (import.second->getName() == Id_Foundation)
       ImportsFoundationModule = true;
+    return true;
   });
 
   if (ImportsFoundationModule)
@@ -2924,11 +2911,9 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
   }
 }
 
-NameAliasType *NameAliasType::get(
-                                        TypeAliasDecl *typealias,
-                                        Type parent,
-                                        const SubstitutionMap &substitutions,
-                                        Type underlying) {
+NameAliasType *NameAliasType::get(TypeAliasDecl *typealias, Type parent,
+                                  const SubstitutionMap &substitutions,
+                                  Type underlying) {
   // Compute the recursive properties.
   //
   auto properties = underlying->getRecursiveProperties();
@@ -3696,6 +3681,19 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
   return TupleType::get(elements, ctx);
 }
 
+bool AnyFunctionType::equalParams(ArrayRef<AnyFunctionType::Param> a,
+                                  ArrayRef<AnyFunctionType::Param> b) {
+  if (a.size() != b.size())
+    return false;
+
+  for (unsigned i = 0, n = a.size(); i != n; ++i) {
+    if (a[i] != b[i])
+      return false;
+  }
+
+  return true;
+}
+
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, const ExtInfo &info,
                                 bool canonicalVararg) {
@@ -4308,6 +4306,64 @@ CapturingTypeCheckerDebugConsumer::CapturingTypeCheckerDebugConsumer()
 
 CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
   delete Log;
+}
+
+void SubstitutionMap::Storage::Profile(
+                               llvm::FoldingSetNodeID &id,
+                               GenericSignature *genericSig,
+                               ArrayRef<Type> replacementTypes,
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  id.AddPointer(genericSig);
+  id.AddInteger(replacementTypes.size());
+  for (auto type : replacementTypes)
+    id.AddPointer(type.getPointer());
+  id.AddInteger(conformances.size());
+  for (auto conformance : conformances)
+    id.AddPointer(conformance.getOpaqueValue());
+}
+
+SubstitutionMap::Storage *SubstitutionMap::Storage::get(
+                            GenericSignature *genericSig,
+                            ArrayRef<Type> replacementTypes,
+                            ArrayRef<ProtocolConformanceRef> conformances) {
+  // If there is no generic signature, we need no storage.
+  if (!genericSig) {
+    assert(replacementTypes.empty());
+    assert(conformances.empty());
+    return nullptr;
+  }
+
+  // Figure out which arena this should go in.
+  RecursiveTypeProperties properties;
+  for (auto type : replacementTypes) {
+    if (type)
+      properties |= type->getRecursiveProperties();
+  }
+
+  // Profile the substitution map.
+  llvm::FoldingSetNodeID id;
+  SubstitutionMap::Storage::Profile(id, genericSig, replacementTypes,
+                                    conformances);
+
+  auto arena = getArena(properties);
+
+  // Did we already record this substitution map?
+  auto &ctx = genericSig->getASTContext();
+  void *insertPos;
+  auto &substitutionMaps = ctx.Impl.getArena(arena).SubstitutionMaps;
+  if (auto result = substitutionMaps.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Allocate the appropriate amount of storage for the signature and its
+  // replacement types and conformances.
+  auto size = Storage::totalSizeToAlloc<Type, ProtocolConformanceRef>(
+                                                      replacementTypes.size(),
+                                                      conformances.size());
+  auto mem = ctx.Allocate(size, alignof(Storage), arena);
+
+  auto result = new (mem) Storage(genericSig, replacementTypes, conformances);
+  substitutionMaps.InsertNode(result, insertPos);
+  return result;
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,

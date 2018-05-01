@@ -20,6 +20,7 @@
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;

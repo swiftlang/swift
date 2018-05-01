@@ -154,6 +154,7 @@ UID_KEYS = [
     KEY('ActionUID', 'key.actionuid'),
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),
+    KEY('CompilerArgsString', 'key.compilerargs-string'),
 ]
 
 

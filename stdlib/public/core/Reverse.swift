@@ -129,7 +129,7 @@ extension ReversedCollection {
     ///
     ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
     ///         let reversedNumbers = numbers.reversed()
-    ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
+    ///         guard let i = reversedNumbers.firstIndex(where: { $0 % 2 == 0 })
     ///             else { return nil }
     ///
     ///         return numbers.index(before: i.base)
@@ -152,7 +152,7 @@ extension ReversedCollection {
     /// `"a"` character in a string's character view.
     ///
     ///     let name = "Horatio"
-    ///     let aIndex = name.index(of: "a")!
+    ///     let aIndex = name.firstIndex(of: "a")!
     ///     // name[aIndex] == "a"
     ///
     ///     let reversedName = name.reversed()
@@ -192,12 +192,7 @@ extension ReversedCollection.Index: Comparable {
 
 extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return base.hashValue
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(base)
   }
 }

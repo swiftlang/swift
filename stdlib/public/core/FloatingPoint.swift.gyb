@@ -1225,6 +1225,31 @@ public enum FloatingPointSign: Int {
 
   /// The sign for a negative value.
   case minus
+
+  // Explicit declarations of otherwise-synthesized members to make them
+  // @inlinable, promising that we will never change the implementation.
+
+  @inlinable
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .plus
+    case 1: self = .minus
+    default: return nil
+    }
+  }
+
+  @inlinable
+  public var rawValue: Int {
+    switch self {
+    case .plus: return 0
+    case .minus: return 1
+    }
+  }
+
+  @inlinable
+  public static func ==(a: FloatingPointSign, b: FloatingPointSign) -> Bool {
+    return a.rawValue == b.rawValue
+  }
 }
 
 /// The IEEE 754 floating-point classes.

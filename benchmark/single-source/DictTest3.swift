@@ -56,10 +56,10 @@ class Box<T : Hashable> : Hashable {
     value = v
   }
 
-  var hashValue: Int {
-    return value.hashValue
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
-  
+
   static func ==(lhs: Box, rhs: Box) -> Bool {
     return lhs.value == rhs.value
   }

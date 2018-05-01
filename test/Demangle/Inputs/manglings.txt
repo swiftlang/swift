@@ -310,3 +310,7 @@ $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
 $S20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAg_AiJ1QAAg1_GF -> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
 _T0LiteralAByxGxd_tcfC ---> _T0LiteralAByxGxd_tcfC
 _T0XZ ---> _T0XZ
+_TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Guaranteed To Owned and Exploded> of Swift._LegacyStringCore._invariantCheck() -> ()
+_TTSf2o___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2do___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2dos___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned and Exploded> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore

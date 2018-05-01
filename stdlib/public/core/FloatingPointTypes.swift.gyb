@@ -1521,17 +1521,8 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 % end
 
 extension ${Self} : Hashable {
-  /// The number's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     var v = self
     if isZero {
       // To satisfy the axiom that equality implies hash equality, we need to
@@ -1546,6 +1537,22 @@ extension ${Self} : Hashable {
   %end
   }
 
+  @inlinable // FIXME(sil-serialize-all)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    // To satisfy the axiom that equality implies hash equality, we need to
+    // finesse the hash value of -0.0 to match +0.0.
+    let v = isZero ? 0 : self
+  %if bits == 80:
+    var hasher = Hasher(_seed: seed)
+    hasher.combine(v._representation.signAndExponent)
+    hasher.combine(v.significandBitPattern)
+    return hasher._finalize()
+  %elif bits == 64:
+    return Hasher._hash(seed: seed, v.bitPattern)
+  %elif bits == 32:
+    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: 4)
+  %end
+  }
 }
 
 extension ${Self} {

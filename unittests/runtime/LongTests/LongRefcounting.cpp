@@ -25,8 +25,8 @@
 # define EXPECT_UNALLOCATED(p)  EXPECT_EQ(0u, malloc_size(p))
 #else
 // FIXME: heap assertion for other platforms?
-# define EXPECT_ALLOCATED(p) do {} while (0)
-# define EXPECT_UNALLOCATED(p) do {} while (0)
+# define EXPECT_ALLOCATED(p) (void)(p)
+# define EXPECT_UNALLOCATED(p) (void)(p)
 #endif
 
 using namespace swift;

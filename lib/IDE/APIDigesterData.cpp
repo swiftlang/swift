@@ -444,11 +444,36 @@ struct ArrayTraits<ArrayRef<APIDiffItem*>> {
     return const_cast<APIDiffItem *&>(seq[index]);
   }
 };
+
+template<>
+struct ObjectTraits<NameCorrectionInfo> {
+  static void mapping(Output &out, NameCorrectionInfo &value) {
+    out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldPrintedName),value.OriginalName);
+    out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewPrintedName), value.CorrectedName);
+    out.mapRequired(getKeyContent(DiffItemKeyKind::KK_ModuleName), value.ModuleName);
+  }
+};
+template<>
+struct ArrayTraits<ArrayRef<NameCorrectionInfo>> {
+  static size_t size(Output &out, ArrayRef<NameCorrectionInfo> &seq) {
+    return seq.size();
+  }
+  static NameCorrectionInfo &element(Output &, ArrayRef<NameCorrectionInfo> &seq,
+                                     size_t index) {
+    return const_cast<NameCorrectionInfo&>(seq[index]);
+  }
+};
 } // namespace json
 } // namespace swift
 
 void swift::ide::api::APIDiffItemStore::
 serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items) {
+  json::Output yout(os);
+  yout << Items;
+}
+
+void swift::ide::api::APIDiffItemStore::
+serialize(llvm::raw_ostream &os, ArrayRef<NameCorrectionInfo> Items) {
   json::Output yout(os);
   yout << Items;
 }

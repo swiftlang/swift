@@ -539,16 +539,11 @@ void DeclAttribute::print(llvm::raw_ostream &OS, const Decl *D) const {
 }
 
 uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
-  // FIXME: Update Attr.def to use OnAccessor.
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("getOptions needs a valid attribute");
 #define DECL_ATTR(_, CLASS, OPTIONS, ...)\
-  case DAK_##CLASS: { \
-    uint64_t options = OPTIONS; \
-    if (options & OnFunc) options |= OnAccessor; \
-    return options; \
-  }
+  case DAK_##CLASS: return OPTIONS;
 #include "swift/AST/Attr.def"
   }
   llvm_unreachable("bad DeclAttrKind");
