@@ -56,7 +56,7 @@ public:
   /// \param NumberOfParallelTasks indicates the number of tasks which should
   /// be run in parallel. If 0, the TaskQueue will choose the most appropriate
   /// number of parallel tasks for the current system.
-  /// \param Optional stats reporter to count I/O and subprocess events.
+  /// \param USR Optional stats reporter to count I/O and subprocess events.
   TaskQueue(unsigned NumberOfParallelTasks = 0,
             UnifiedStatsReporter *USR = nullptr);
   virtual ~TaskQueue();
