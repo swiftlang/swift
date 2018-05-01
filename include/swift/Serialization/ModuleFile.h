@@ -308,6 +308,9 @@ private:
   /// Generic environments referenced by this module.
   std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
 
+  /// Substitution maps referenced by this module.
+  std::vector<Serialized<SubstitutionMap>> SubstitutionMaps;
+
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
   /// If \c Offset is non-zero, the identifier has not been loaded yet.
@@ -835,6 +838,10 @@ public:
   /// needed.
   GenericEnvironment *getGenericEnvironment(
                                         serialization::GenericEnvironmentID ID);
+
+  /// Returns the substitution map for the given ID, deserializing it if
+  /// needed.
+  SubstitutionMap getSubstitutionMap(serialization::SubstitutionMapID id);
 
   /// Reads a substitution record from \c DeclTypeCursor.
   ///
