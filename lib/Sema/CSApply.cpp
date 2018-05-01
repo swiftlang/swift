@@ -166,8 +166,14 @@ ConcreteDeclRef findNamedWitnessImpl(
 
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
-  if (!conformance->isConcrete())
-    return requirement;
+  if (!conformance->isConcrete()) {
+    auto subMap = SubstitutionMap::getProtocolSubstitutions(proto, type,
+                                                            *conformance);
+    SmallVector<Substitution, 2> subs;
+    proto->getGenericSignature()->getSubstitutions(subMap, subs);
+    return ConcreteDeclRef(tc.Context, requirement, subs);
+  }
+
   auto concrete = conformance->getConcrete();
   return concrete->getWitnessDeclRef(requirement, &tc);
 }
