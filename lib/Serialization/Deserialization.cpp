@@ -1097,7 +1097,77 @@ GenericEnvironment *ModuleFile::getGenericEnvironment(
                                        serialization::GenericEnvironmentID ID) {
   return getGenericSignatureOrEnvironment(ID, /*wantEnvironment=*/true)
            .get<GenericEnvironment *>();
-;
+}
+
+SubstitutionMap ModuleFile::getSubstitutionMap(
+                                        serialization::SubstitutionMapID id) {
+  using namespace decls_block;
+
+  // Zero is a sentinel for having an empty substitution map.
+  if (id == 0) return SubstitutionMap();
+
+  assert(id <= SubstitutionMaps.size() && "invalid SubstitutionMap ID");
+  auto &substitutionsOrOffset = SubstitutionMaps[id-1];
+
+  // If we've already deserialized this substitution map, return it.
+  if (substitutionsOrOffset.isComplete()) {
+    return substitutionsOrOffset.get();
+  }
+
+  // Read the substitution map.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(substitutionsOrOffset);
+  DeserializingEntityRAII deserializingEntity(*this);
+
+  // Read the substitution map.
+  auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    error();
+    return SubstitutionMap();
+  }
+
+  StringRef blobData;
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  if (recordID != SUBSTITUTION_MAP) {
+    error();
+    return SubstitutionMap();
+  }
+
+  GenericSignatureID genericSigID;
+  uint64_t numConformances;
+  ArrayRef<uint64_t> replacementTypeIDs;
+  SubstitutionMapLayout::readRecord(scratch, genericSigID, numConformances,
+                                    replacementTypeIDs);
+
+  // Generic signature.
+  auto genericSig = getGenericSignature(genericSigID);
+  if (!genericSig) {
+    error();
+    return SubstitutionMap();
+  }
+
+  // Load the replacement types.
+  SmallVector<Type, 4> replacementTypes;
+  replacementTypes.reserve(replacementTypeIDs.size());
+  for (auto typeID : replacementTypeIDs) {
+    replacementTypes.push_back(getType(typeID));
+  }
+
+  // Read the conformances.
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  conformances.reserve(numConformances);
+  for (unsigned i : range(numConformances)) {
+    (void)i;
+    conformances.push_back(readConformance(DeclTypeCursor));
+  }
+
+  // Form the substitution map and record it.
+  auto substitutions =
+    SubstitutionMap::get(genericSig, ArrayRef<Type>(replacementTypes),
+                         ArrayRef<ProtocolConformanceRef>(conformances));
+  substitutionsOrOffset = substitutions;
+  return substitutions;
 }
 
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
@@ -4218,9 +4288,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
+    SubstitutionMapID substitutionsID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
-                                                      parentTypeID,
-                                                      underlyingTypeID);
+                                                 parentTypeID,
+                                                 underlyingTypeID,
+                                                 substitutionsID);
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
       return aliasOrError.takeError();
@@ -4248,16 +4320,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     Type parentType = getType(parentTypeID);
 
     // Read the substitutions.
-    SubstitutionMap subMap;
-    if (auto genericSig = alias->getGenericSignature()) {
-      SmallVector<Substitution, 4> substitutions;
-      for (unsigned i : range(genericSig->getSubstitutionListSize())) {
-        (void)i;
-        substitutions.push_back(*maybeReadSubstitution(DeclTypeCursor));
-      }
-
-      subMap = genericSig->getSubstitutionMap(substitutions);
-    }
+    SubstitutionMap subMap = getSubstitutionMap(substitutionsID);
 
     // Look through compatibility aliases that are now unavailable.
     if (alias->getAttrs().isUnavailable(ctx) &&
@@ -4267,7 +4330,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
 
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
-                                           underlyingType);
+                                      underlyingType);
     break;
   }
   case decls_block::NOMINAL_TYPE: {
