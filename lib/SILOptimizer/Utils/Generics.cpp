@@ -2068,7 +2068,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
 ApplySite swift::
 replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
                                const ReabstractionInfo &ReInfo) {
-  SILBuilderWithScope Builder(AI.getInstruction());
+  SILBuilderForCodeExpansion Builder(AI.getInstruction());
   FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
   return replaceWithSpecializedCallee(AI, FRI, Builder, ReInfo);
 }
@@ -2410,7 +2410,7 @@ void swift::trySpecializeApplyOfGeneric(
     // thunk which converts from the re-abstracted function back to the
     // original function with indirect parameters/results.
     auto *PAI = cast<PartialApplyInst>(Apply.getInstruction());
-    SILBuilderWithScope Builder(PAI);
+    SILBuilderForCodeExpansion Builder(PAI);
     SILFunction *Thunk =
         ReabstractionThunkGenerator(ReInfo, PAI, SpecializedF).createThunk();
     NewFunctions.push_back(Thunk);

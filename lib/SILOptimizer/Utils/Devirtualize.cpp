@@ -577,7 +577,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
     SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
   SILFunctionConventions substConv(SubstCalleeType, Mod);
 
-  SILBuilderWithScope B(AI.getInstruction());
+  SILBuilderForCodeExpansion B(AI.getInstruction());
   FunctionRefInst *FRI = B.createFunctionRef(AI.getLoc(), F);
 
   // Create the argument list for the new apply, casting when needed
@@ -885,7 +885,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
 
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
-  SILBuilderWithScope B(AI.getInstruction());
+  SILBuilderForCodeExpansion B(AI.getInstruction());
   SILFunctionConventions substConv(SubstCalleeCanType, Module);
   unsigned substArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
   for (auto arg : AI.getArguments()) {
@@ -899,7 +899,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
 
   // Replace old apply instruction by a new apply instruction that invokes
   // the witness thunk.
-  SILBuilderWithScope Builder(AI.getInstruction());
+  SILBuilderForCodeExpansion Builder(AI.getInstruction());
   SILLocation Loc = AI.getLoc();
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 

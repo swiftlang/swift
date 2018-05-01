@@ -72,7 +72,8 @@ enum class PartialInitializationKind {
 /// Emit the sequence that an assign instruction lowers to once we know
 /// if it is an initialization or an assignment.  If it is an assignment,
 /// a live-in value can be provided to optimize out the reload.
-static void LowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
+static void LowerAssignInstruction(SILBuilderForCodeExpansion &B,
+                                   AssignInst *Inst,
                                    PartialInitializationKind isInitialization) {
   DEBUG(llvm::dbgs() << "  *** Lowering [isInit=" << unsigned(isInitialization)
                      << "]: " << *Inst << "\n");
@@ -1911,7 +1912,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     unsigned NumElements = Use.NumElements;
 
     SmallVector<SILInstruction*, 4> InsertedInsts;
-    SILBuilderWithScope B(Inst, &InsertedInsts);
+    SILBuilderForCodeExpansion B(Inst, &InsertedInsts);
     LowerAssignInstruction(B, AI, PartialInitKind);
 
     // If lowering of the assign introduced any new loads or stores, keep track
@@ -1943,8 +1944,8 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   // may have to do a load of the 'self' box to get the class reference.
   if (TheMemory.isClassInitSelf()) {
     auto Loc = Release->getLoc();
-    
-    SILBuilderWithScope B(Release);
+
+    SILBuilderForCodeExpansion B(Release);
     B.setInsertionPoint(InsertPt);
 
     SILValue Pointer = Release->getOperand(0);
@@ -2233,7 +2234,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
         continue;
 
       APInt Bitmask = Use.getElementBitmask(NumMemoryElements);
-      SILBuilderWithScope SB(Use.Inst);
+      SILBuilderForCodeExpansion SB(Use.Inst);
       updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, SB);
       continue;
     }
@@ -2326,7 +2327,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 /// to emit branching logic when an element may or may not be initialized.
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
-  SILBuilderWithScope B(TheMemory.MemoryInst);
+  SILBuilderForCodeExpansion B(TheMemory.MemoryInst);
   Identifier ShiftRightFn, TruncateFn;
 
   unsigned NumMemoryElements = TheMemory.NumElements;
@@ -2922,7 +2923,7 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
 
       // Unprocessed assigns just lower into assignments, not initializations.
       if (auto *AI = dyn_cast<AssignInst>(Inst)) {
-        SILBuilderWithScope B(AI);
+        SILBuilderForCodeExpansion B(AI);
         LowerAssignInstruction(B, AI,
             PartialInitializationKind::IsNotInitialization);
         // Assign lowering may split the block. If it did,

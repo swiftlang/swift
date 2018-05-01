@@ -210,7 +210,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       // Replace the access to a let property by the value
       // computed by this initializer.
       SILValue clonedInit = cloneInitAt(proj);
-      SILBuilderWithScope B(proj);
+      SILBuilderForCodeExpansion B(proj);
       for (auto UI = proj->use_begin(), E = proj->use_end(); UI != E;) {
         auto *User = UI->getUser();
         ++UI;

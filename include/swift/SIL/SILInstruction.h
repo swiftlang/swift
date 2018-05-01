@@ -291,7 +291,7 @@ class SILInstruction
   bool hasIdenticalState(const SILInstruction *RHS) const;
 
   /// Update this instruction's SILDebugScope. This function should
-  /// never be called directly. Use SILBuilder, SILBuilderWithScope or
+  /// never be called directly. Use SILBuilder, SILBuilderForCodeExpansion or
   /// SILClonerWithScope instead.
   void setDebugScope(SILBuilder &B, const SILDebugScope *DS);
 

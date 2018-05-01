@@ -349,7 +349,7 @@ namespace {
 /// available.
 class AvailableValueAggregator {
   SILModule &M;
-  SILBuilderWithScope B;
+  SILBuilderForCodeExpansion B;
   SILLocation Loc;
   MutableArrayRef<AvailableValue> AvailableValueList;
   SmallVectorImpl<DIMemoryUse> &Uses;
@@ -520,7 +520,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   ArrayRef<SILInstruction *> InsertPts = Val.getInsertionPoints();
   if (InsertPts.size() == 1) {
     // Use the scope and location of the store at the insertion point.
-    SILBuilderWithScope Builder(InsertPts[0]);
+    SILBuilderForCodeExpansion Builder(InsertPts[0]);
     SILLocation Loc = InsertPts[0]->getLoc();
     SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
     assert(EltVal->getType() == LoadTy && "Subelement types mismatch");
@@ -533,7 +533,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   Updater.Initialize(LoadTy);
   for (auto *I : Val.getInsertionPoints()) {
     // Use the scope and location of the store at the insertion point.
-    SILBuilderWithScope Builder(I);
+    SILBuilderForCodeExpansion Builder(I);
     SILLocation Loc = I->getLoc();
     SILValue EltVal = nonDestructivelyExtractSubElement(Val, Builder, Loc);
     Updater.AddAvailableValue(I->getParent(), EltVal);
@@ -1210,7 +1210,8 @@ void AllocOptimize::promoteDestroyAddr(
   DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
   DEBUG(llvm::dbgs() << "      To value: " << *NewVal << "\n");
 
-  SILBuilderWithScope(DAI).emitDestroyValueOperation(DAI->getLoc(), NewVal);
+  SILBuilderForCodeExpansion(DAI).emitDestroyValueOperation(DAI->getLoc(),
+                                                            NewVal);
   DAI->eraseFromParent();
 }
 

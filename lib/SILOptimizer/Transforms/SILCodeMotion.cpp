@@ -545,7 +545,7 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
   DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
                      << (*FindResult)->first);
 
-  SILBuilderWithScope Builder(RVI);
+  SILBuilderForCodeExpansion Builder(RVI);
   createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
   RVI->eraseFromParent();
   return true;
@@ -566,7 +566,7 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
   DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: "
                      << (*FindResult)->first);
 
-  SILBuilderWithScope Builder(RVI);
+  SILBuilderForCodeExpansion Builder(RVI);
   createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
   RVI->eraseFromParent();
   return true;
@@ -658,7 +658,7 @@ bool BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(
       // predecessor.
       assert(P.first->getSingleSuccessorBlock() &&
              "Cannot hoist release into BB that has multiple successors");
-      SILBuilderWithScope Builder(P.first->getTerminator(), RVI);
+      SILBuilderForCodeExpansion Builder(P.first->getTerminator(), RVI);
       createRefCountOpForPayload(Builder, RVI, P.second);
     }
 
@@ -1511,7 +1511,7 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     return false;
 
   // Ok, we have a ref count instruction, sink it!
-  SILBuilderWithScope Builder(Switch, &*RV);
+  SILBuilderForCodeExpansion Builder(Switch, &*RV);
   for (unsigned i = 0, e = Switch->getNumCases(); i != e; ++i) {
     auto Case = Switch->getCase(i);
     EnumElementDecl *Enum = Case.first;
@@ -1596,7 +1596,7 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
 
   Elts[1] = OtherElt;
 
-  SILBuilderWithScope Builder(SEI, &*I);
+  SILBuilderForCodeExpansion Builder(SEI, &*I);
 
   // Ok, we have a ref count instruction, sink it!
   for (unsigned i = 0; i != 2; ++i) {

@@ -297,7 +297,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
                              SILFunction *NewF) {
   FullApplySite AI = CSDesc.getApplyInst();
   SingleValueInstruction *Closure = CSDesc.getClosure();
-  SILBuilderWithScope Builder(Closure);
+  SILBuilderForCodeExpansion Builder(Closure);
   FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
 
   // Create the args for the new apply by removing the closure argument...
@@ -469,7 +469,7 @@ void CallSiteDescriptor::extendArgumentLifetime(
   auto ArgTy = Arg->getType();
 
   // Extend the lifetime of a captured argument to cover the callee.
-  SILBuilderWithScope Builder(getClosure());
+  SILBuilderForCodeExpansion Builder(getClosure());
 
   // Indirect non-inout arguments are not supported yet.
   assert(!isNonInoutIndirectSILArgument(Arg, ArgConvention));

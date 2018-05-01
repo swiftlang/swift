@@ -112,7 +112,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   SILBasicBlock *Continue = Entry->split(It);
 
-  SILBuilderWithScope Builder(Entry, AI.getInstruction());
+  SILBuilderForCodeExpansion Builder(Entry, AI.getInstruction());
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
 
@@ -123,8 +123,8 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
                                        Virt);
   It = CCBI->getIterator();
 
-  SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
-  SILBuilderWithScope IdenBuilder(Iden, AI.getInstruction());
+  SILBuilderForCodeExpansion VirtBuilder(Virt, AI.getInstruction());
+  SILBuilderForCodeExpansion IdenBuilder(Iden, AI.getInstruction());
   // This is the class reference downcasted into subclass SubType.
   SILValue DownCastedClassInstance = Iden->getArgument(0);
 
@@ -520,7 +520,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   // a direct call of this remaining implementation.
   if (LastCCBI && SubTypeValue == LastCCBI->getOperand()) {
     // Remove last checked_cast_br, because it will always succeed.
-    SILBuilderWithScope B(LastCCBI);
+    SILBuilderForCodeExpansion B(LastCCBI);
     auto CastedValue = B.createUncheckedBitCast(LastCCBI->getLoc(),
                                                 LastCCBI->getOperand(),
                                                 LastCCBI->getCastType());

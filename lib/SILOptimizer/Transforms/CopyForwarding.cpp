@@ -687,7 +687,7 @@ propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
     if (!CurrentCopy->isInitializationOfDest()) {
       // Replace the original copy with a destroy. We may be able to hoist it
       // more in another pass but don't currently iterate.
-      SILBuilderWithScope(CurrentCopy)
+      SILBuilderForCodeExpansion(CurrentCopy)
           .createDestroyAddr(CurrentCopy->getLoc(), CurrentCopy->getDest());
     }
     CurrentCopy->eraseFromParent();
@@ -787,8 +787,8 @@ forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
   // - copy_addr %src, %temp
   // + destroy %temp
   if (!srcCopy->isInitializationOfDest()) {
-    SILBuilderWithScope(srcCopy)
-      .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
+    SILBuilderForCodeExpansion(srcCopy).createDestroyAddr(srcCopy->getLoc(),
+                                                          srcCopy->getDest());
   }
 
   // Either `destCopy` is a take, or the caller is hoisting a destroy:
@@ -1029,7 +1029,8 @@ bool CopyForwarding::forwardPropagateCopy() {
       assert(!Copy->isInitializationOfDest() && "expected a deinit");
 
       DestroyAddrInst *Destroy =
-          SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopyDest);
+          SILBuilderForCodeExpansion(Copy).createDestroyAddr(Copy->getLoc(),
+                                                             CopyDest);
       Copy->setIsInitializationOfDest(IsInitialization);
 
       assert(ValueUses.back()->getUser() == Copy && "bad value use");
@@ -1157,7 +1158,8 @@ bool CopyForwarding::backwardPropagateCopy() {
   // init copy may be eliminated later.
   if (auto Copy = dyn_cast<CopyAddrInst>(&*SI)) {
     if (Copy->getDest() == CopySrc && !Copy->isInitializationOfDest()) {
-      SILBuilderWithScope(Copy).createDestroyAddr(Copy->getLoc(), CopySrc);
+      SILBuilderForCodeExpansion(Copy).createDestroyAddr(Copy->getLoc(),
+                                                         CopySrc);
       Copy->setIsInitializationOfDest(IsInitialization);
     }
   }
@@ -1237,7 +1239,7 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
       return false;
 
     DEBUG(llvm::dbgs() << "  Hoisting to Use:" << *Inst);
-    SILBuilderWithScope(std::next(SI), Inst)
+    SILBuilderForCodeExpansion(std::next(SI), Inst)
         .createDestroyAddr(DestroyLoc, CurrentDef);
     HasChanged = true;
     return true;

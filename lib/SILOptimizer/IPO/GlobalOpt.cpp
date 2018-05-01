@@ -323,7 +323,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
     }
     if (auto *SI = dyn_cast<StoreInst>(&I)) {
       Val = SI->getSrc();
-      SILBuilderWithScope B(SI);
+      SILBuilderForCodeExpansion B(SI);
       B.createReturn(SI->getLoc(), Val);
       eraseUsesOfInstruction(SI);
       recursivelyDeleteTriviallyDeadInstructions(SI, true);
@@ -583,7 +583,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
     }
 
     if (auto *RI = dyn_cast<ReturnInst>(&I)) {
-      SILBuilderWithScope B(RI);
+      SILBuilderForCodeExpansion B(RI);
       B.createReturn(RI->getLoc(), Val);
       eraseUsesOfInstruction(RI);
       recursivelyDeleteTriviallyDeadInstructions(RI, true);
@@ -731,7 +731,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
 
   for (int i = 0, e = Calls.size(); i < e; ++i) {
     auto *Call = Calls[i];
-    SILBuilderWithScope B(Call);
+    SILBuilderForCodeExpansion B(Call);
     SmallVector<SILValue, 1> Args;
     auto *NewAI = B.createApply(Call->getLoc(), Call->getCallee(), Args, false);
     Call->replaceAllUsesWith(NewAI);
@@ -760,7 +760,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     if (!isValid)
       continue;
 
-    SILBuilderWithScope B(Call);
+    SILBuilderForCodeExpansion B(Call);
     SmallVector<SILValue, 1> Args;
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
     auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args, false);
@@ -977,7 +977,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   // invocation should happen at the common dominator of all
   // loads inside this function.
   for (auto *Load : GlobalLoadMap[SILG]) {
-    SILBuilderWithScope B(Load);
+    SILBuilderForCodeExpansion B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
 

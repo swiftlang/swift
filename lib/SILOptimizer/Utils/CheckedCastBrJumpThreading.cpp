@@ -251,7 +251,7 @@ modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner) {
   Cloner->clone();
   SILBasicBlock *TargetFailureBB = Cloner->getDestBB();
   auto *TI = TargetFailureBB->getTerminator();
-  SILBuilderWithScope Builder(TI);
+  SILBuilderForCodeExpansion Builder(TI);
   // This BB copy branches to a FailureBB.
   auto *CCBI = cast<CheckedCastBranchInst>(CCBBlock->getTerminator());
   Builder.createBranch(TI->getLoc(), CCBI->getFailureBB());
@@ -288,7 +288,7 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
       Cloner->clone();
       SILBasicBlock *TargetSuccessBB = Cloner->getDestBB();
       auto *TI = TargetSuccessBB->getTerminator();
-      SILBuilderWithScope Builder(TI);
+      SILBuilderForCodeExpansion Builder(TI);
       // This BB copy branches to SuccessBB.
       // Take argument value from the dominating BB.
       Builder.createBranch(TI->getLoc(), CCBI->getSuccessBB(), {SuccessArg});

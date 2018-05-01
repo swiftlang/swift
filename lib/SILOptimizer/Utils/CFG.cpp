@@ -28,7 +28,7 @@ using namespace swift;
 /// The argument is appended at the end of the argument tuple.
 TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
                                          SILValue Val) {
-  SILBuilderWithScope Builder(Branch);
+  SILBuilderForCodeExpansion Builder(Branch);
   TermInst *NewBr = nullptr;
 
   if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
@@ -87,7 +87,7 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
 /// specified index.
 TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
                                  size_t Idx, SILValue Val) {
-  SILBuilderWithScope Builder(Branch);
+  SILBuilderForCodeExpansion Builder(Branch);
 
   if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
     SmallVector<SILValue, 8> TrueArgs;
@@ -171,7 +171,7 @@ SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
 
 void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
                                SILBasicBlock *NewDest, bool PreserveArgs) {
-  SILBuilderWithScope B(T);
+  SILBuilderForCodeExpansion B(T);
 
   switch (T->getTermKind()) {
   // Only Branch and CondBranch may have arguments.
@@ -355,7 +355,7 @@ SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
 /// \param PreserveArgs If set, preserve arguments on the replaced edge.
 void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
                                SILBasicBlock *NewDest, bool PreserveArgs) {
-  SILBuilderWithScope B(T);
+  SILBuilderForCodeExpansion B(T);
 
   switch (T->getTermKind()) {
   // Only Branch and CondBranch may have arguments.

@@ -84,7 +84,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
   auto expansionKind = expand ? TypeExpansionKind::MostDerivedDescendents
                               : TypeExpansionKind::None;
 
-  SILBuilderWithScope Builder(CA);
+  SILBuilderForCodeExpansion Builder(CA);
 
   // %new = load %0 : $*T
   LoadInst *New = Builder.createLoad(CA->getLoc(), Source,
@@ -137,7 +137,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
 
 static bool expandDestroyAddr(DestroyAddrInst *DA) {
   SILModule &Module = DA->getModule();
-  SILBuilderWithScope Builder(DA);
+  SILBuilderForCodeExpansion Builder(DA);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.
@@ -168,7 +168,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 
 static bool expandReleaseValue(ReleaseValueInst *DV) {
   SILModule &Module = DV->getModule();
-  SILBuilderWithScope Builder(DV);
+  SILBuilderForCodeExpansion Builder(DV);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.
@@ -195,7 +195,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
 
 static bool expandRetainValue(RetainValueInst *CV) {
   SILModule &Module = CV->getModule();
-  SILBuilderWithScope Builder(CV);
+  SILBuilderForCodeExpansion Builder(CV);
 
   // Strength reduce destroy_addr inst into release/store if
   // we have a non-address only type.

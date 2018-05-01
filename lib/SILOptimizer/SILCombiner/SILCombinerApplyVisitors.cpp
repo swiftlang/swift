@@ -1269,7 +1269,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   assert(Call->getNumArguments() == 1 && "Expect a unary call");
 
   // Emit a retain for the @owned return.
-  SILBuilderWithScope Builder(Call);
+  SILBuilderForCodeExpansion Builder(Call);
   Builder.createRetainValue(Call->getLoc(), OnX, Builder.getDefaultAtomicity());
 
   // Emit a release for the @owned parameter, or none for a @guaranteed
@@ -1323,14 +1323,14 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
     // X might not be strong_retain/release'able. Replace it by a
     // retain/release_value on X instead.
     if (isa<StrongRetainInst>(User)) {
-      SILBuilderWithScope Builder(User);
+      SILBuilderForCodeExpansion Builder(User);
       Builder.createRetainValue(User->getLoc(), X,
                                 cast<StrongRetainInst>(User)->getAtomicity());
       eraseInstFromFunction(*User);
       continue;
     }
     if (isa<StrongReleaseInst>(User)) {
-      SILBuilderWithScope Builder(User);
+      SILBuilderForCodeExpansion Builder(User);
       Builder.createReleaseValue(User->getLoc(), X,
                                  cast<StrongReleaseInst>(User)->getAtomicity());
       eraseInstFromFunction(*User);

@@ -285,7 +285,7 @@ void CapturePropagation::rewritePartialApply(PartialApplyInst *OrigPAI,
         llvm::dbgs() << "\nThe function being rewritten is:\n";
         OrigPAI->getFunction()->dump());
 
-  SILBuilderWithScope Builder(OrigPAI);
+  SILBuilderForCodeExpansion Builder(OrigPAI);
   auto FuncRef = Builder.createFunctionRef(OrigPAI->getLoc(), SpecialF);
   auto *T2TF = Builder.createThinToThickFunction(OrigPAI->getLoc(), FuncRef,
                                                  OrigPAI->getType());

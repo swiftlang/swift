@@ -1006,16 +1006,16 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
     LoadInst *optimizableLoad) {
   SILValue value = optimizableLoad->getOperand();
 
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
-  SILBuilderWithScope outlinedBuilder(optimizableLoad);
+  SILBuilderForCodeExpansion outlinedBuilder(optimizableLoad);
   createOutlinedCopyCall(outlinedBuilder, value, allocInstr, pass);
 
   // Insert stack deallocations.
   for (TermInst *termInst : pass.returnInsts) {
-    SILBuilderWithScope deallocBuilder(termInst);
+    SILBuilderForCodeExpansion deallocBuilder(termInst);
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 
@@ -1130,16 +1130,16 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
   }
   SILValue value = unoptimizableLoad->getOperand();
 
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
-  SILBuilderWithScope outlinedBuilder(unoptimizableLoad);
+  SILBuilderForCodeExpansion outlinedBuilder(unoptimizableLoad);
   createOutlinedCopyCall(outlinedBuilder, value, allocInstr, pass);
 
   // Insert stack deallocations.
   for (TermInst *termInst : pass.returnInsts) {
-    SILBuilderWithScope deallocBuilder(termInst);
+    SILBuilderForCodeExpansion deallocBuilder(termInst);
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 
@@ -1306,7 +1306,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
 
 void LoadableStorageAllocation::convertIndirectFunctionArgs() {
   SILBasicBlock *entry = pass.F->getEntryBlock();
-  SILBuilderWithScope argBuilder(entry->begin());
+  SILBuilderForCodeExpansion argBuilder(entry->begin());
 
   GenericEnvironment *genEnv = pass.F->getGenericEnvironment();
 
@@ -1388,7 +1388,7 @@ void LoadableStorageAllocation::convertApplyResults() {
       } else {
         auto tryApplyIns = cast<TryApplyInst>(currIns);
         auto *normalBB = tryApplyIns->getNormalBB();
-        SILBuilderWithScope argBuilder(normalBB->begin());
+        SILBuilderForCodeExpansion argBuilder(normalBB->begin());
         assert(normalBB->getNumArguments() == 1 &&
                "Expected only one arg for try_apply normal BB");
         auto arg = normalBB->getArgument(0);
@@ -1404,7 +1404,7 @@ void LoadableStorageAllocation::convertApplyResults() {
 void LoadableStorageAllocation::
     convertIndirectFunctionPointerArgsForUnmodifiable() {
   SILBasicBlock *entry = pass.F->getEntryBlock();
-  SILBuilderWithScope argBuilder(entry->begin());
+  SILBuilderForCodeExpansion argBuilder(entry->begin());
 
   for (SILArgument *arg : entry->getArguments()) {
     SILType storageType = arg->getType();
@@ -1429,7 +1429,7 @@ void LoadableStorageAllocation::convertIndirectBasicBlockArgs() {
       // Already took care of function args
       continue;
     }
-    SILBuilderWithScope argBuilder(BB.begin());
+    SILBuilderForCodeExpansion argBuilder(BB.begin());
     for (SILArgument *arg : BB.getArguments()) {
       if (!pass.Mapper.shouldConvertBBArg(arg, pass.Mod)) {
         continue;
@@ -1456,7 +1456,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
     auto *applyInst = pass.allocToApplyRetMap[allocInstr];
     assert(applyInst && "Value is not an apply");
     auto II = applyInst->getIterator();
-    SILBuilderWithScope loadBuilder(II);
+    SILBuilderForCodeExpansion loadBuilder(II);
     if (auto *tryApply = dyn_cast<TryApplyInst>(applyInst)) {
       auto *tgtBB = tryApply->getNormalBB();
       assert(tgtBB && "Could not find try apply's target BB");
@@ -1478,7 +1478,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   assert(!ApplySite::isa(value) && "Unexpected instruction");
 
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1497,7 +1497,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   // Insert stack deallocations.
   for (TermInst *termInst : pass.returnInsts) {
-    SILBuilderWithScope deallocBuilder(termInst);
+    SILBuilderForCodeExpansion deallocBuilder(termInst);
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 }
@@ -1505,7 +1505,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 AllocStackInst *
 LoadableStorageAllocation::allocateForApply(SILInstruction *apply,
                                             SILType type) {
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
   auto *allocInstr = allocBuilder.createAllocStack(apply->getLoc(), type);
 
   pass.largeLoadableArgs.push_back(allocInstr);
@@ -1513,7 +1513,7 @@ LoadableStorageAllocation::allocateForApply(SILInstruction *apply,
   pass.applyRetToAllocMap[apply] = allocInstr;
 
   for (TermInst *termInst : pass.returnInsts) {
-    SILBuilderWithScope deallocBuilder(termInst);
+    SILBuilderForCodeExpansion deallocBuilder(termInst);
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 
@@ -1575,12 +1575,12 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
       assert(std::find(pass.storeInstsToMod.begin(), pass.storeInstsToMod.end(),
                        storeUser) == pass.storeInstsToMod.end() &&
              "Did not expect this instr in storeInstsToMod");
-      SILBuilderWithScope copyBuilder(storeUser);
+      SILBuilderForCodeExpansion copyBuilder(storeUser);
       SILValue tgt = storeUser->getDest();
       createOutlinedCopyCall(copyBuilder, allocInstr, tgt, pass);
       storeUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
-      SILBuilderWithScope dbgBuilder(dbgInst);
+      SILBuilderForCodeExpansion dbgBuilder(dbgInst);
       // Rewrite the debug_value to point to the variable in the alloca.
       dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), allocInstr,
                                       *dbgInst->getVarInfo());
@@ -1592,13 +1592,13 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
 static void allocateAndSetForInstrOperand(StructLoweringState &pass,
                                           SingleValueInstruction *instrOperand){
   assert(instrOperand->getType().isObject());
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr = allocBuilder.createAllocStack(
       instrOperand->getLoc(), instrOperand->getType());
 
   auto II = instrOperand->getIterator();
   ++II;
-  SILBuilderWithScope storeBuilder(II);
+  SILBuilderForCodeExpansion storeBuilder(II);
   StoreInst *store = nullptr;
   if (pass.F->hasQualifiedOwnership()) {
     store = storeBuilder.createStore(instrOperand->getLoc(), instrOperand,
@@ -1611,7 +1611,7 @@ static void allocateAndSetForInstrOperand(StructLoweringState &pass,
 
   // Insert stack deallocations.
   for (TermInst *termInst : pass.returnInsts) {
-    SILBuilderWithScope deallocBuilder(termInst);
+    SILBuilderForCodeExpansion deallocBuilder(termInst);
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 
@@ -1626,7 +1626,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
   auto *arg = dyn_cast<SILArgument>(value);
   assert(arg && "non-instr operand must be an argument");
 
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(applyInst->getLoc(), value->getType());
 
@@ -1635,7 +1635,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
     // Store should happen *after* allocInstr
     ++storeIt;
   }
-  SILBuilderWithScope storeBuilder(storeIt);
+  SILBuilderForCodeExpansion storeBuilder(storeIt);
   SILLocation Loc = applyInst->getLoc();
   Loc.markAutoGenerated();
 
@@ -1650,7 +1650,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
 
   // Insert stack deallocations.
   for (TermInst *termInst : pass.returnInsts) {
-    SILBuilderWithScope deallocBuilder(termInst);
+    SILBuilderForCodeExpansion deallocBuilder(termInst);
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 
@@ -1721,7 +1721,7 @@ static void castTupleInstr(SingleValueInstruction *instr, IRGenModule &Mod,
 
   auto II = instr->getIterator();
   ++II;
-  SILBuilderWithScope castBuilder(II);
+  SILBuilderForCodeExpansion castBuilder(II);
   SingleValueInstruction *castInstr = nullptr;
   switch (instr->getKind()) {
   // Add cast to the new sil function type:
@@ -1747,11 +1747,11 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
   auto value = orig->getOperand();
   auto type = value->getType();
   if (type.isObject()) {
-    SILBuilderWithScope allocBuilder(&*pass.F->begin());
+    SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
 
     // support for non-address operands / enums
     auto *allocInstr = allocBuilder.createAllocStack(orig->getLoc(), type);
-    SILBuilderWithScope storeBuilder(orig);
+    SILBuilderForCodeExpansion storeBuilder(orig);
     StoreInst *store = nullptr;
     if (pass.F->hasQualifiedOwnership()) {
       store = storeBuilder.createStore(orig->getLoc(), value, allocInstr,
@@ -1762,19 +1762,19 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
     }
     // Insert stack deallocations.
     for (TermInst *termInst : pass.returnInsts) {
-      SILBuilderWithScope deallocBuilder(termInst);
+      SILBuilderForCodeExpansion deallocBuilder(termInst);
       deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
     }
     value = allocInstr;
   }
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
   auto *allocInstr = allocBuilder.createAllocStack(value.getLoc(), type);
 
-  SILBuilderWithScope copyBuilder(orig);
+  SILBuilderForCodeExpansion copyBuilder(orig);
   createOutlinedCopyCall(copyBuilder, value, allocInstr, pass);
 
   for (TermInst *termInst : pass.returnInsts) {
-    SILBuilderWithScope deallocBuilder(termInst);
+    SILBuilderForCodeExpansion deallocBuilder(termInst);
     deallocBuilder.createDeallocStack(allocInstr->getLoc(), allocInstr);
   }
 
@@ -1788,7 +1788,7 @@ static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
   if (updateResultTy) {
     pass.resultTyInstsToMod.remove(instr);
   }
-  SILBuilderWithScope builder(instr);
+  SILBuilderForCodeExpansion builder(instr);
   auto *currStructExtractInst = dyn_cast<StructExtractInst>(instr);
   assert(currStructExtractInst && "Expected StructExtractInst");
   SingleValueInstruction *newInstr = builder.createStructElementAddr(
@@ -1835,13 +1835,13 @@ static void rewriteFunction(StructLoweringState &pass,
       /* unchecked_take_enum_data_addr can be destructive.
        * work on a copy instead of the original enum */
       auto copiedValue = createCopyOfEnum(pass, instr);
-      SILBuilderWithScope enumBuilder(instr);
+      SILBuilderForCodeExpansion enumBuilder(instr);
       unsigned numOfCases = instr->getNumCases();
       SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 16> caseBBs;
       for (unsigned i = 0; i < numOfCases; ++i) {
         auto currCase = instr->getCase(i);
         auto *currBB = currCase.second;
-        SILBuilderWithScope argBuilder(currBB->begin());
+        SILBuilderForCodeExpansion argBuilder(currBB->begin());
         assert(currBB->getNumArguments() <= 1 && "Unhandled BB Type");
         EnumElementDecl *decl = currCase.first;
         for (SILArgument *arg : currBB->getArguments()) {
@@ -1953,7 +1953,7 @@ static void rewriteFunction(StructLoweringState &pass,
 
   while (!pass.allocStackInstsToMod.empty()) {
     auto *instr = pass.allocStackInstsToMod.pop_back_val();
-    SILBuilderWithScope allocBuilder(instr);
+    SILBuilderForCodeExpansion allocBuilder(instr);
     SILType currSILType = instr->getType();
     SILType newSILType =
         pass.Mapper.getNewSILType(genEnv, currSILType, pass.Mod);
@@ -1965,7 +1965,7 @@ static void rewriteFunction(StructLoweringState &pass,
 
   while (!pass.pointerToAddrkInstsToMod.empty()) {
     auto *instr = pass.pointerToAddrkInstsToMod.pop_back_val();
-    SILBuilderWithScope pointerBuilder(instr);
+    SILBuilderForCodeExpansion pointerBuilder(instr);
     SILType currSILType = instr->getType();
     SILType newSILType =
         pass.Mapper.getNewSILType(genEnv, currSILType, pass.Mod);
@@ -1990,7 +1990,7 @@ static void rewriteFunction(StructLoweringState &pass,
       } else {
         assert(currOperand->getType().isAddress() &&
                "Expected an address type");
-        SILBuilderWithScope debugBuilder(instr);
+        SILBuilderForCodeExpansion debugBuilder(instr);
         debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
                                           *instr->getVarInfo());
         instr->getParent()->erase(instr);
@@ -2004,7 +2004,7 @@ static void rewriteFunction(StructLoweringState &pass,
     for (Operand &operand : instr->getAllOperands()) {
       auto currOperand = operand.get();
       assert(currOperand->getType().isAddress() && "Expected an address type");
-      SILBuilderWithScope destroyBuilder(instr);
+      SILBuilderForCodeExpansion destroyBuilder(instr);
       destroyBuilder.createDestroyAddr(instr->getLoc(), currOperand);
       instr->getParent()->erase(instr);
     }
@@ -2019,20 +2019,20 @@ static void rewriteFunction(StructLoweringState &pass,
     assert(tgtType.isAddress() && "Expected an address-type target");
     assert(srcType == tgtType && "Source and target type do not match");
 
-    SILBuilderWithScope copyBuilder(instr);
+    SILBuilderForCodeExpansion copyBuilder(instr);
     createOutlinedCopyCall(copyBuilder, src, tgt, pass);
     instr->getParent()->erase(instr);
   }
 
   for (RetainValueInst *instr : pass.retainInstsToMod) {
-    SILBuilderWithScope retainBuilder(instr);
+    SILBuilderForCodeExpansion retainBuilder(instr);
     retainBuilder.createRetainValueAddr(
         instr->getLoc(), instr->getOperand(), instr->getAtomicity());
     instr->getParent()->erase(instr);
   }
 
   for (ReleaseValueInst *instr : pass.releaseInstsToMod) {
-    SILBuilderWithScope releaseBuilder(instr);
+    SILBuilderForCodeExpansion releaseBuilder(instr);
     releaseBuilder.createReleaseValueAddr(
         instr->getLoc(), instr->getOperand(), instr->getAtomicity());
     instr->getParent()->erase(instr);
@@ -2044,7 +2044,7 @@ static void rewriteFunction(StructLoweringState &pass,
     SILType currSILType = instr->getType().getObjectType();
     SILType newSILType =
         pass.Mapper.getNewSILType(genEnv, currSILType, pass.Mod);
-    SILBuilderWithScope resultTyBuilder(instr);
+    SILBuilderForCodeExpansion resultTyBuilder(instr);
     SILLocation Loc = instr->getLoc();
     SingleValueInstruction *newInstr = nullptr;
     switch (instr->getKind()) {
@@ -2116,7 +2116,7 @@ static void rewriteFunction(StructLoweringState &pass,
             genEnvForMethod, currSILFunctionType, pass.Mod));
     auto member = instr->getMember();
     auto loc = instr->getLoc();
-    SILBuilderWithScope methodBuilder(instr);
+    SILBuilderForCodeExpansion methodBuilder(instr);
     MethodInst *newInstr = nullptr;
 
     switch (instr->getKind()) {
@@ -2151,7 +2151,7 @@ static void rewriteFunction(StructLoweringState &pass,
     auto *instr = pass.modReturnInsts.pop_back_val();
     auto loc = instr->getLoc(); // SILLocation::RegularKind
     auto regLoc = RegularLocation(loc.getSourceLoc());
-    SILBuilderWithScope retBuilder(instr);
+    SILBuilderForCodeExpansion retBuilder(instr);
     assert(modNonFuncTypeResultType(pass.F, pass.Mod) &&
            "Expected a regular type");
     // Before we return an empty tuple, init return arg:
@@ -2174,7 +2174,7 @@ static void rewriteFunction(StructLoweringState &pass,
       auto II = (IIR != instr->getParent()->rend())
                     ? IIR->getIterator()
                     : instr->getParent()->begin();
-      SILBuilderWithScope retCopyBuilder(II);
+      SILBuilderForCodeExpansion retCopyBuilder(II);
       createOutlinedCopyCall(retCopyBuilder, retOp, retArg, pass, &regLoc);
     } else {
       if (pass.F->hasQualifiedOwnership()) {
@@ -2348,7 +2348,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
   SILFunctionConventions newSILFunctionConventions(newSILFunctionType,
                                                    *getModule());
   SmallVector<SILValue, 8> callArgs;
-  SILBuilderWithScope applyBuilder(applyInst);
+  SILBuilderForCodeExpansion applyBuilder(applyInst);
   // If we turned a direct result into an indirect parameter
   // Find the new alloc we created earlier.
   // and pass it as first parameter:
@@ -2457,7 +2457,7 @@ void LoadableByAddress::recreateApplies() {
 
 void LoadableByAddress::recreateLoadInstrs() {
   for (auto *loadInstr : loadInstrsOfFunc) {
-    SILBuilderWithScope loadBuilder(loadInstr);
+    SILBuilderForCodeExpansion loadBuilder(loadInstr);
     // If this is a load of a function for which we changed the return type:
     // add UncheckedBitCast before the load
     auto loadOp = loadInstr->getOperand();
@@ -2472,7 +2472,7 @@ void LoadableByAddress::recreateLoadInstrs() {
 
 void LoadableByAddress::recreateUncheckedEnumDataInstrs() {
   for (auto *enumInstr : uncheckedEnumDataOfFunc) {
-    SILBuilderWithScope enumBuilder(enumInstr);
+    SILBuilderForCodeExpansion enumBuilder(enumInstr);
     SILFunction *F = enumInstr->getFunction();
     IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
     SILType origType = enumInstr->getType();
@@ -2502,7 +2502,7 @@ void LoadableByAddress::recreateUncheckedEnumDataInstrs() {
 
 void LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst() {
   for (auto *enumInstr : uncheckedTakeEnumDataAddrOfFunc) {
-    SILBuilderWithScope enumBuilder(enumInstr);
+    SILBuilderForCodeExpansion enumBuilder(enumInstr);
     SILFunction *F = enumInstr->getFunction();
     IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
     SILType origType = enumInstr->getType();
@@ -2536,7 +2536,7 @@ void LoadableByAddress::fixStoreToBlockStorageInstrs() {
     SILType srcType = src->getType();
     if (destType.getObjectType() != srcType) {
       // Add cast to destType
-      SILBuilderWithScope castBuilder(instr);
+      SILBuilderForCodeExpansion castBuilder(instr);
       auto *castInstr = castBuilder.createUncheckedBitCast(
           instr->getLoc(), src, destType.getObjectType());
       instr->setOperand(StoreInst::Src, castInstr);
@@ -2558,7 +2558,7 @@ void LoadableByAddress::recreateConvInstrs() {
     CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
         genEnv, currSILFunctionType, *currIRMod);
     SILType newType = SILType::getPrimitiveObjectType(newFnType);
-    SILBuilderWithScope convBuilder(convInstr);
+    SILBuilderForCodeExpansion convBuilder(convInstr);
     SingleValueInstruction *newInstr = nullptr;
     switch (convInstr->getKind()) {
     case SILInstructionKind::ThinToThickFunctionInst: {
@@ -2616,7 +2616,7 @@ void LoadableByAddress::recreateBuiltinInstrs() {
       newArgs.push_back(oldArg);
     }
 
-    SILBuilderWithScope builtinBuilder(builtinInstr);
+    SILBuilderForCodeExpansion builtinBuilder(builtinInstr);
     auto *newInstr = builtinBuilder.createBuiltin(
         builtinInstr->getLoc(), builtinInstr->getName(), newResultTy,
         builtinInstr->getSubstitutions(),
@@ -2763,7 +2763,7 @@ void LoadableByAddress::run() {
   // The pointer does not change
   for (FunctionRefInst *instr : funcRefs) {
     SILFunction *F = instr->getReferencedFunction();
-    SILBuilderWithScope refBuilder(instr);
+    SILBuilderForCodeExpansion refBuilder(instr);
     FunctionRefInst *newInstr =
         refBuilder.createFunctionRef(instr->getLoc(), F);
     instr->replaceAllUsesWith(newInstr);

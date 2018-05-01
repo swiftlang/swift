@@ -196,7 +196,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
   case BuiltinValueKind::ICMP_UGT:
   case BuiltinValueKind::FCMP_ONE:
     if (auto Ty = I->getType().getAs<BuiltinIntegerType>()) {
-      // FIXME: Should also use SILBuilderWithScope?
+      // FIXME: Should also use SILBuilderForCodeExpansion?
       return Builder.createIntegerLiteral(I->getLoc(), I->getType(),
                                           APInt(Ty->getGreatestWidth(), 0));
     }
@@ -214,7 +214,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
   case BuiltinValueKind::SDiv:
   case BuiltinValueKind::UDiv:
     if (auto Ty = I->getType().getAs<BuiltinIntegerType>()) {
-      // FIXME: Should also use SILBuilderWithScope?
+      // FIXME: Should also use SILBuilderForCodeExpansion?
       return Builder.createIntegerLiteral(I->getLoc(), I->getType(),
                                           APInt(Ty->getGreatestWidth(), 1));
     }
@@ -226,7 +226,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
     SILType Ty = I->getType();
     SILType IntTy = Ty.getTupleElementType(0);
     SILType BoolTy = Ty.getTupleElementType(1);
-    SILBuilderWithScope B(I);
+    SILBuilderForCodeExpansion B(I);
     SILValue Elements[] = {
       B.createIntegerLiteral(I->getLoc(), IntTy, /* Result */ 0),
       B.createIntegerLiteral(I->getLoc(), BoolTy, /* Overflow */ 0)

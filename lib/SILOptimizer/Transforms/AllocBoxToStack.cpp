@@ -496,7 +496,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 
   // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
   // at the beginning of the function.
-  SILBuilderWithScope Builder(ABI);
+  SILBuilderForCodeExpansion Builder(ABI);
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
@@ -521,7 +521,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   for (auto LastRelease : FinalReleases) {
-    SILBuilderWithScope Builder(LastRelease);
+    SILBuilderForCodeExpansion Builder(LastRelease);
     if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
       // For non-trivial types, insert destroys for each final release-like
       // instruction we found that isn't an explicit dealloc_box.
@@ -860,12 +860,12 @@ specializePartialApply(PartialApplyInst *PartialApply,
     // Insert destroys of the box at each point where the partial_apply becomes
     // dead.
     for (SILInstruction *FrontierInst : PAFrontier) {
-      SILBuilderWithScope Builder(FrontierInst);
+      SILBuilderForCodeExpansion Builder(FrontierInst);
       Builder.createDestroyValue(PartialApply->getLoc(), Box);
     }
   }
 
-  SILBuilderWithScope Builder(PartialApply);
+  SILBuilderForCodeExpansion Builder(PartialApply);
 
   // Build the function_ref and partial_apply.
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),

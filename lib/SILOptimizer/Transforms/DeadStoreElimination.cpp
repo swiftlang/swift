@@ -1217,7 +1217,7 @@ bool DSEContext::run() {
       auto I = S->LiveStores.find(X);
       SILInstruction *Inst = I->first->getDefiningInstruction();
       auto *IT = &*std::next(Inst->getIterator());
-      SILBuilderWithScope Builder(IT);
+      SILBuilderForCodeExpansion Builder(IT);
       Builder.createStore(Inst->getLoc(), I->second, I->first,
                           StoreOwnershipQualifier::Unqualified);
     }

@@ -365,7 +365,7 @@ void swift::placeFuncRef(ApplyInst *AI, DominanceInfo *DT) {
 /// instruction.
 TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
                                      TermInst *Branch) {
-  SILBuilderWithScope Builder(Branch);
+  SILBuilderForCodeExpansion Builder(Branch);
 
   if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
     SmallVector<SILValue, 8> TrueArgs;
@@ -1002,7 +1002,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
 static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
                                                   ReleaseTracker &Tracker,
                                                   InstModCallbacks Callbacks) {
-  SILBuilderWithScope Builder(PAI);
+  SILBuilderForCodeExpansion Builder(PAI);
   SILLocation Loc = PAI->getLoc();
   CanSILFunctionType PAITy =
       PAI->getCallee()->getType().getAs<SILFunctionType>();

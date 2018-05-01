@@ -398,7 +398,7 @@ static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
 
   // Emit matching release for owned self if we are moving the original call.
   if (!LeaveOriginal && IsOwnedSelf) {
-    SILBuilderWithScope Builder(SemanticsCall);
+    SILBuilderForCodeExpansion Builder(SemanticsCall);
     Builder.createReleaseValue(SemanticsCall->getLoc(), Self, Builder.getDefaultAtomicity());
   }
 
@@ -406,7 +406,7 @@ static SILValue hoistOrCopySelf(ApplyInst *SemanticsCall,
 
   // Retain the array.
   if (IsOwnedSelf) {
-    SILBuilderWithScope Builder(InsertBefore, SemanticsCall);
+    SILBuilderForCodeExpansion Builder(InsertBefore, SemanticsCall);
     Builder.createRetainValue(SemanticsCall->getLoc(), NewArrayStructValue,
                               Builder.getDefaultAtomicity());
   }
@@ -468,7 +468,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
       // Replace all uses of the check subscript call by a use of the empty
       // dependence. The check subscript call is no longer associated with
       // another operation.
-      auto EmptyDep = SILBuilderWithScope(SemanticsCall)
+      auto EmptyDep = SILBuilderForCodeExpansion(SemanticsCall)
                           .createStruct(SemanticsCall->getLoc(),
                                         SemanticsCall->getType(), {});
       SemanticsCall->replaceAllUsesWith(EmptyDep);
@@ -503,7 +503,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
 void swift::ArraySemanticsCall::removeCall() {
   if (getSelfParameterConvention(SemanticsCall) ==
       ParameterConvention::Direct_Owned) {
-    SILBuilderWithScope Builder(SemanticsCall);
+    SILBuilderForCodeExpansion Builder(SemanticsCall);
     Builder.createReleaseValue(SemanticsCall->getLoc(), getSelf(),
                                Builder.getDefaultAtomicity());
   }
@@ -512,7 +512,7 @@ void swift::ArraySemanticsCall::removeCall() {
   default: break;
   case ArrayCallKind::kCheckSubscript: {
     // Remove all uses with the empty tuple ().
-    auto EmptyDep = SILBuilderWithScope(SemanticsCall)
+    auto EmptyDep = SILBuilderForCodeExpansion(SemanticsCall)
                         .createStruct(SemanticsCall->getLoc(),
                                       SemanticsCall->getType(), {});
     SemanticsCall->replaceAllUsesWith(EmptyDep);
@@ -694,7 +694,7 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
   if (!Check && (!EmptyDep || !EmptyDep->getElements().empty()))
     return false;
 
-  SILBuilderWithScope Builder(SemanticsCall);
+  SILBuilderForCodeExpansion Builder(SemanticsCall);
   auto &ValLowering = Builder.getModule().getTypeLowering(V->getType());
   if (hasGetElementDirectResult()) {
     ValLowering.emitCopyValue(Builder, SemanticsCall->getLoc(), V);
@@ -730,7 +730,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
   
   CanSILFunctionType AppendFnTy = AppendFn->getLoweredFunctionType();
   SILValue ArrRef = SemanticsCall->getArgument(1);
-  SILBuilderWithScope Builder(SemanticsCall);
+  SILBuilderForCodeExpansion Builder(SemanticsCall);
   auto Loc = SemanticsCall->getLoc();
   auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
 

@@ -158,7 +158,7 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
        PI != PE; ++PI) {
     SILBasicBlock *PredB = *PI;
     BranchInst *BI = cast<BranchInst>(PredB->getTerminator());
-    SILBuilderWithScope Bldr(PredB, BI);
+    SILBuilderForCodeExpansion Bldr(PredB, BI);
     Bldr.createBranch(BI->getLoc(), BI->getDestBB());
     ToBeDeleted.push_back(BI);
   }
@@ -196,7 +196,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
 
     if (IntegerLiteralInst *ConstCond =
           dyn_cast_or_null<IntegerLiteralInst>(V)) {
-      SILBuilderWithScope B(&BB, CBI);
+      SILBuilderForCodeExpansion B(&BB, CBI);
 
       // Determine which of the successors is unreachable and create a new
       // terminator that only branches to the reachable successor.
@@ -281,7 +281,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
         return false;
 
       // Replace the switch with a branch to the TheSuccessorBlock.
-      SILBuilderWithScope B(&BB, TI);
+      SILBuilderForCodeExpansion B(&BB, TI);
       SILLocation Loc = TI->getLoc();
       if (!TheSuccessorBlock->args_empty()) {
         assert(TheEnum->hasOperand());
@@ -354,7 +354,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
 
       // Add the branch instruction with the block.
       if (TheSuccessorBlock) {
-        SILBuilderWithScope B(&BB, TI);
+        SILBuilderForCodeExpansion B(&BB, TI);
         B.createBranch(TI->getLoc(), TheSuccessorBlock);
         recursivelyDeleteTriviallyDeadInstructions(TI, true);
         NumTerminatorsFolded++;

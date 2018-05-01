@@ -96,7 +96,7 @@ public:
     SILValue MergedCond;
     auto *LastCFI = CondFailToMerge.back();
     auto InsertPt = ++SILBasicBlock::iterator(LastCFI);
-    SILBuilderWithScope Builder(InsertPt);
+    SILBuilderForCodeExpansion Builder(InsertPt);
     SILLocation Loc = LastCFI->getLoc();
 
     // Merge conditions and remove the merged cond_fail instructions.

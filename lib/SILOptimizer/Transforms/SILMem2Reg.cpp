@@ -350,7 +350,7 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
 
   assert(NewValue && "Expected a value to release!");
 
-  SILBuilderWithScope Builder(DAI);
+  SILBuilderForCodeExpansion Builder(DAI);
 
   auto Ty = DAI->getOperand()->getType();
   auto &TL = DAI->getModule().getTypeLowering(Ty);

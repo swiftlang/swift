@@ -464,7 +464,7 @@ static void getScalarizedElements(SILValue V,
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
                               SmallVectorImpl<SILValue> &ElementAddrs) {
-  SILBuilderWithScope B(LI);
+  SILBuilderForCodeExpansion B(LI);
   SmallVector<SILValue, 4> ElementTmps;
 
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
@@ -989,8 +989,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   if (!UsesToScalarize.empty()) {
     SILInstruction *PointerInst = Pointer->getDefiningInstruction();
     SmallVector<SILValue, 4> ElementAddrs;
-    SILBuilderWithScope AddrBuilder(++SILBasicBlock::iterator(PointerInst),
-                                    PointerInst);
+    SILBuilderForCodeExpansion AddrBuilder(
+        ++SILBasicBlock::iterator(PointerInst), PointerInst);
     getScalarizedElementAddresses(Pointer, AddrBuilder, PointerInst->getLoc(),
                                   ElementAddrs);
 
@@ -1010,7 +1010,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
       // Scalarize AssignInst
       if (auto *AI = dyn_cast<AssignInst>(User)) {
-        SILBuilderWithScope B(User, AI);
+        SILBuilderForCodeExpansion B(User, AI);
         getScalarizedElements(AI->getOperand(0), ElementTmps, AI->getLoc(), B);
 
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
@@ -1021,7 +1021,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
       // Scalarize StoreInst
       if (auto *SI = dyn_cast<StoreInst>(User)) {
-        SILBuilderWithScope B(User, SI);
+        SILBuilderForCodeExpansion B(User, SI);
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
 
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
@@ -1033,7 +1033,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
       // Scalarize CopyAddrInst.
       auto *CAI = cast<CopyAddrInst>(User);
-      SILBuilderWithScope B(User, CAI);
+      SILBuilderForCodeExpansion B(User, CAI);
 
       // Determine if this is a copy *from* or *to* "Pointer".
       if (CAI->getSrc() == Pointer) {

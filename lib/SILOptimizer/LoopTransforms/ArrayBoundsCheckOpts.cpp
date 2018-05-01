@@ -930,7 +930,7 @@ public:
                              DominanceInfo *DT) {
     ApplyInst *AI = CheckToHoist;
     SILLocation Loc = AI->getLoc();
-    SILBuilderWithScope Builder(Preheader->getTerminator(), AI);
+    SILBuilderForCodeExpansion Builder(Preheader->getTerminator(), AI);
 
     // Get the first induction value.
     auto FirstVal = Ind->getFirstValue();
@@ -1208,7 +1208,8 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     SILValue FalseVal;
     for (auto *Arg : Header->getArguments()) {
       if (auto *IV = IndVars[Arg]) {
-        SILBuilderWithScope B(Preheader->getTerminator(), IV->getInstruction());
+        SILBuilderForCodeExpansion B(Preheader->getTerminator(),
+                                     IV->getInstruction());
 
         // Only if the loop has a single exiting block (which contains the
         // induction variable check) we may hoist the overflow check.

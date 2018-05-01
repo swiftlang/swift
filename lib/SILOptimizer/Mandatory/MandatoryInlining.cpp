@@ -156,8 +156,8 @@ static SILValue cleanupLoadedCalleeValue(SILValue CalleeValue, LoadInst *LI) {
   // source of the store and erase it.
   if (SRI) {
     if (CalleeValue)
-      SILBuilderWithScope(SRI).emitStrongReleaseAndFold(SRI->getLoc(),
-                                                        CalleeValue);
+      SILBuilderForCodeExpansion(SRI).emitStrongReleaseAndFold(SRI->getLoc(),
+                                                               CalleeValue);
     SRI->eraseFromParent();
   }
 

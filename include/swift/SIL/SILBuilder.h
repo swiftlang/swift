@@ -32,7 +32,7 @@ class FloatLiteralExpr;
 class SILGlobalVariable;
 
 class SILBuilder {
-  friend class SILBuilderWithScope;
+  friend class SILBuilderForCodeExpansion;
 
   SILFunction *F;
   SILModule &Mod;
@@ -2057,18 +2057,22 @@ private:
   }
 };
 
-/// An wrapper on top of SILBuilder's constructor that automatically sets the
-/// current SILDebugScope based on the specified insertion point. This is useful
-/// for situations where a single SIL instruction is lowered into a sequence of
-/// SIL instructions.
-class SILBuilderWithScope : public SILBuilder {
+/// Use this SILBuilder variant when expanding an instruction sequence. It
+/// is a safer wrapper around SILBuilder designed to maintain a valid debug
+/// scope. It provides constructors which support inheriting a debug scope
+/// from the instruction being expanded, and constructors of convenience which
+/// infer the correct debug scope based on the insertion point.
+class SILBuilderForCodeExpansion : public SILBuilder {
   void inheritScopeFrom(SILInstruction *I) {
     assert(I->getDebugScope() && "instruction has no debug scope");
     setCurrentDebugScope(I->getDebugScope());
   }
 
 public:
-  explicit SILBuilderWithScope(
+  /// Creates a new SILBuilder with an insertion point before I. If
+  /// InsertedInstrs is specified, instructions emitted by the builder are
+  /// stored into it.
+  explicit SILBuilderForCodeExpansion(
       SILInstruction *I,
       SmallVectorImpl<SILInstruction *> *InsertedInstrs = nullptr)
       : SILBuilder(I, InsertedInstrs) {
@@ -2076,23 +2080,23 @@ public:
     setCurrentDebugScope(I->getDebugScope());
   }
 
-  explicit SILBuilderWithScope(SILBasicBlock::iterator I)
-      : SILBuilderWithScope(&*I) {}
+  explicit SILBuilderForCodeExpansion(SILBasicBlock::iterator I)
+      : SILBuilderForCodeExpansion(&*I) {}
 
-  explicit SILBuilderWithScope(SILInstruction *I,
-                               SILInstruction *InheritScopeFrom)
-      : SILBuilderWithScope(I) {
+  explicit SILBuilderForCodeExpansion(SILInstruction *I,
+                                      SILInstruction *InheritScopeFrom)
+      : SILBuilderForCodeExpansion(I) {
     inheritScopeFrom(InheritScopeFrom);
   }
 
-  explicit SILBuilderWithScope(SILBasicBlock::iterator I,
-                               SILInstruction *InheritScopeFrom)
-      : SILBuilderWithScope(&*I) {
+  explicit SILBuilderForCodeExpansion(SILBasicBlock::iterator I,
+                                      SILInstruction *InheritScopeFrom)
+      : SILBuilderForCodeExpansion(&*I) {
     inheritScopeFrom(InheritScopeFrom);
   }
 
-  explicit SILBuilderWithScope(SILBasicBlock *BB,
-                               SILInstruction *InheritScopeFrom)
+  explicit SILBuilderForCodeExpansion(SILBasicBlock *BB,
+                                      SILInstruction *InheritScopeFrom)
       : SILBuilder(BB) {
     inheritScopeFrom(InheritScopeFrom);
   }
@@ -2100,7 +2104,8 @@ public:
   /// Creates a new SILBuilder with an insertion point at the
   /// beginning of BB and the debug scope from the first
   /// non-metainstruction in the BB.
-  explicit SILBuilderWithScope(SILBasicBlock *BB) : SILBuilder(BB->begin()) {
+  explicit SILBuilderForCodeExpansion(SILBasicBlock *BB)
+      : SILBuilder(BB->begin()) {
     const SILDebugScope *DS = BB->getScopeOfFirstNonMetaInstruction();
     assert(DS && "Instruction without debug scope associated!");
     setCurrentDebugScope(DS);

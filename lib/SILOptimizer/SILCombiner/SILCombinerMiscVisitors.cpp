@@ -859,7 +859,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
       }
 
       // Replace switch_enum_addr by a branch instruction.
-      SILBuilderWithScope B(SEI);
+      SILBuilderForCodeExpansion B(SEI);
       SmallVector<std::pair<EnumElementDecl *, SILValue>, 8> CaseValues;
       SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> CaseBBs;
 

@@ -350,8 +350,8 @@ public:
       auto Args = ThreadedSuccessorIdx == 0 ? CondTerm->getTrueArgs()
                                             : CondTerm->getFalseArgs();
 
-      SILBuilderWithScope(CondTerm)
-        .createBranch(CondTerm->getLoc(), ThreadedSuccessorBlock, Args);
+      SILBuilderForCodeExpansion(CondTerm).createBranch(
+          CondTerm->getLoc(), ThreadedSuccessorBlock, Args);
 
       CondTerm->eraseFromParent();
     } else {
@@ -361,7 +361,7 @@ public:
       auto *ThreadedSuccessorBlock = SEI->getCaseDestination(EnumCase);
 
       // Instantiate the payload if necessary.
-      SILBuilderWithScope Builder(SEI);
+      SILBuilderForCodeExpansion Builder(SEI);
       if (!ThreadedSuccessorBlock->args_empty()) {
         auto EnumVal = SEI->getOperand();
         auto EnumTy = EnumVal->getType();
@@ -427,7 +427,7 @@ static SILValue createEnumElement(SILBuilder &Builder,
 static SILValue createValueForEdge(SILInstruction *UserInst,
                                    SILInstruction *DominatingTerminator,
                                    unsigned EdgeIdx) {
-  SILBuilderWithScope Builder(UserInst);
+  SILBuilderForCodeExpansion Builder(UserInst);
 
   if (auto *CBI = dyn_cast<CondBranchInst>(DominatingTerminator))
     return Builder.createIntegerLiteral(
@@ -623,10 +623,11 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
         DEBUG(llvm::dbgs() << "simplify threaded " << *SEI);
         auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
         if (EI->hasOperand() && !LiveBlock->args_empty())
-          SILBuilderWithScope(SEI)
-              .createBranch(SEI->getLoc(), LiveBlock, EI->getOperand());
+          SILBuilderForCodeExpansion(SEI).createBranch(SEI->getLoc(), LiveBlock,
+                                                       EI->getOperand());
         else
-          SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), LiveBlock);
+          SILBuilderForCodeExpansion(SEI).createBranch(SEI->getLoc(),
+                                                       LiveBlock);
         SEI->eraseFromParent();
         if (EI->use_empty())
           EI->eraseFromParent();
@@ -645,8 +646,8 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
         bool isFalse = !IL->getValue();
         auto LiveArgs = isFalse ? FalseArgs : TrueArgs;
         auto *LiveBlock = isFalse ? FalseSide : TrueSide;
-        SILBuilderWithScope(CondBr)
-            .createBranch(CondBr->getLoc(), LiveBlock, LiveArgs);
+        SILBuilderForCodeExpansion(CondBr).createBranch(CondBr->getLoc(),
+                                                        LiveBlock, LiveArgs);
         CondBr->eraseFromParent();
         if (IL->use_empty())
           IL->eraseFromParent();
@@ -1293,8 +1294,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   if (SILBasicBlock *TrampolineDest = getTrampolineDest(DestBB)) {
     DEBUG(llvm::dbgs() << "jump to trampoline from bb" << BB->getDebugID() <<
           " to bb" << TrampolineDest->getDebugID() << '\n');
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrampolineDest,
-                                            BI->getArgs());
+    SILBuilderForCodeExpansion(BI).createBranch(BI->getLoc(), TrampolineDest,
+                                                BI->getArgs());
     // Eliminating the trampoline can expose opportunities to improve the
     // new block we branch to.
     if (LoopHeaders.count(DestBB))
@@ -1452,7 +1453,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
     DEBUG(llvm::dbgs() << "replace cond_br with br: " << *BI);
 
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
+    SILBuilderForCodeExpansion(BI).createBranch(BI->getLoc(), LiveBlock,
+                                                LiveArgs);
     BI->eraseFromParent();
     if (IL->use_empty()) IL->eraseFromParent();
 
@@ -1475,7 +1477,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
         if (IL->getValue().isAllOnesValue()) {
           DEBUG(llvm::dbgs() << "canonicalize cond_br: " << *BI);
           auto Cond = Args[0];
-          SILBuilderWithScope Builder(BI);
+          SILBuilderForCodeExpansion Builder(BI);
           Builder.createCondBranch(
               BI->getLoc(),
               invertExpectAndApplyTo(Builder, BI->getCondition(), Cond),
@@ -1495,7 +1497,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (TrueTrampolineDest && TrueTrampolineDest != FalseSide) {
     DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID() <<
           " to bb" << TrueTrampolineDest->getDebugID() << '\n');
-    SILBuilderWithScope(BI).createCondBranch(
+    SILBuilderForCodeExpansion(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueTrampolineDest, TrueArgs,
         FalseSide, FalseArgs, BI->getTrueBBCount(), BI->getFalseBBCount());
     BI->eraseFromParent();
@@ -1511,7 +1513,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (FalseTrampolineDest && FalseTrampolineDest != TrueSide) {
     DEBUG(llvm::dbgs() << "false-trampoline from bb" << ThisBB->getDebugID() <<
           " to bb" << FalseTrampolineDest->getDebugID() << '\n');
-    SILBuilderWithScope(BI).createCondBranch(
+    SILBuilderForCodeExpansion(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueSide, TrueArgs,
         FalseTrampolineDest, FalseArgs, BI->getTrueBBCount(),
         BI->getFalseBBCount());
@@ -1528,8 +1530,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (TrueArgs == FalseArgs && (TrueSide == FalseTrampolineDest ||
                                 FalseSide == TrueTrampolineDest)) {
     DEBUG(llvm::dbgs() << "replace cond_br with same dests with br: " << *BI);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(),
-                      TrueTrampolineDest ? FalseSide : TrueSide, TrueArgs);
+    SILBuilderForCodeExpansion(BI).createBranch(
+        BI->getLoc(), TrueTrampolineDest ? FalseSide : TrueSide, TrueArgs);
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     addToWorklist(TrueSide);
@@ -1542,7 +1544,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
       !wouldIntroduceCriticalEdge(BI, TrueTrampolineBr->getDestBB())) {
     DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID() <<
           " to bb" << TrueTrampolineBr->getDestBB()->getDebugID() << '\n');
-    SILBuilderWithScope(BI).createCondBranch(
+    SILBuilderForCodeExpansion(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueTrampolineBr->getDestBB(),
         TrueTrampolineBr->getArgs(), FalseSide, FalseArgs, BI->getTrueBBCount(),
         BI->getFalseBBCount());
@@ -1560,7 +1562,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
       !wouldIntroduceCriticalEdge(BI, FalseTrampolineBr->getDestBB())) {
     DEBUG(llvm::dbgs() << "false-trampoline from bb" << ThisBB->getDebugID() <<
           " to bb" << FalseTrampolineBr->getDestBB()->getDebugID() << '\n');
-    SILBuilderWithScope(BI).createCondBranch(
+    SILBuilderForCodeExpansion(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueSide, TrueArgs,
         FalseTrampolineBr->getDestBB(), FalseTrampolineBr->getArgs(),
         BI->getTrueBBCount(), BI->getFalseBBCount());
@@ -1609,13 +1611,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
         };
 
         DEBUG(llvm::dbgs() << "canonicalize " << *SEI);
-        auto *NewSEI = SILBuilderWithScope(SEI)
-          .createSelectEnum(SEI->getLoc(),
-                            SEI->getEnumOperand(),
-                            SEI->getType(),
-                            SILValue(),
-                            SwappedCases);
-        
+        auto *NewSEI = SILBuilderForCodeExpansion(SEI).createSelectEnum(
+            SEI->getLoc(), SEI->getEnumOperand(), SEI->getType(), SILValue(),
+            SwappedCases);
+
         // We only change the condition to be NewEITI instead of all uses since
         // EITI may have other uses besides this one that need to be updated.
         BI->setCondition(NewSEI);
@@ -1637,9 +1636,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   auto CFCondition = BI->getCondition();
   if (auto *TrueCFI = getUnConditionalFail(TrueSide, CFCondition, false)) {
     DEBUG(llvm::dbgs() << "replace with cond_fail:" << *BI);
-    SILBuilderWithScope Builder(BI);
+    SILBuilderForCodeExpansion Builder(BI);
     createCondFail(TrueCFI, CFCondition, false, Builder);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), FalseSide, FalseArgs);
+    SILBuilderForCodeExpansion(BI).createBranch(BI->getLoc(), FalseSide,
+                                                FalseArgs);
 
     BI->eraseFromParent();
     addToWorklist(ThisBB);
@@ -1649,10 +1649,11 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   }
   if (auto *FalseCFI = getUnConditionalFail(FalseSide, CFCondition, true)) {
     DEBUG(llvm::dbgs() << "replace with inverted cond_fail:" << *BI);
-    SILBuilderWithScope Builder(BI);
+    SILBuilderForCodeExpansion Builder(BI);
     createCondFail(FalseCFI, CFCondition, true, Builder);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
-    
+    SILBuilderForCodeExpansion(BI).createBranch(BI->getLoc(), TrueSide,
+                                                TrueArgs);
+
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     simplifyAfterDroppingPredecessor(FalseSide);
@@ -1702,7 +1703,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
 
   if (!Dest) {
     addToWorklist(SEI->getParent());
-    SILBuilderWithScope(SEI).createUnreachable(SEI->getLoc());
+    SILBuilderForCodeExpansion(SEI).createUnreachable(SEI->getLoc());
     SEI->eraseFromParent();
     return true;
   }
@@ -1710,7 +1711,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   if (!Element || !Element->hasAssociatedValues() || Dest->args_empty()) {
     assert(Dest->args_empty() && "Unexpected argument at destination!");
 
-    SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
+    SILBuilderForCodeExpansion(SEI).createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
     addToWorklist(Dest);
@@ -1724,13 +1725,13 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   auto &Mod = SEI->getModule();
   auto OpndTy = SEI->getOperand()->getType();
   auto Ty = OpndTy.getEnumElementType(Element, Mod);
-  auto *UED = SILBuilderWithScope(SEI)
-    .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
+  auto *UED = SILBuilderForCodeExpansion(SEI).createUncheckedEnumData(
+      SEI->getLoc(), SEI->getOperand(), Element, Ty);
 
   assert(Dest->args_size() == 1 && "Expected only one argument!");
   SmallVector<SILValue, 1> Args;
   Args.push_back(UED);
-  SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest, Args);
+  SILBuilderForCodeExpansion(SEI).createBranch(SEI->getLoc(), Dest, Args);
 
   addToWorklist(SEI->getParent());
   addToWorklist(Dest);
@@ -1764,7 +1765,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   DEBUG(llvm::dbgs() << "remove " << *SEI);
 
   auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
-  SILBuilderWithScope Builder(SEI);
+  SILBuilderForCodeExpansion Builder(SEI);
   if (!LiveBlock->args_empty()) {
     SILValue PayLoad;
     if (EI) {
@@ -1833,7 +1834,7 @@ bool SimplifyCFG::simplifySwitchValueBlock(SwitchValueInst *SVI) {
 
       DEBUG(llvm::dbgs() << "remove " << *SVI);
 
-      SILBuilderWithScope(SVI).createBranch(SVI->getLoc(), LiveBlock);
+      SILBuilderForCodeExpansion(SVI).createBranch(SVI->getLoc(), LiveBlock);
       SVI->eraseFromParent();
       if (ILI->use_empty())
         ILI->eraseFromParent();
@@ -2080,7 +2081,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto ResultTy = calleeConv.getSILResultType();
     auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
 
-    SILBuilderWithScope Builder(TAI);
+    SILBuilderForCodeExpansion Builder(TAI);
 
     auto TargetFnTy = CalleeFnTy;
     if (TargetFnTy->isPolymorphic()) {
@@ -2153,8 +2154,8 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
 
   TermInst *Term = BB->getTerminator();
   DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
-  SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest,
-                                         ArrayRef<SILValue>());
+  SILBuilderForCodeExpansion(Term).createBranch(Term->getLoc(), commonDest,
+                                                ArrayRef<SILValue>());
   Term->eraseFromParent();
   addToWorklist(BB);
   addToWorklist(commonDest);
@@ -2264,8 +2265,8 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   // Move the cond_fail to the predecessor blocks.
   for (auto *Pred : BB->getPredecessorBlocks()) {
     SILValue incoming = condArg->getIncomingValue(Pred);
-    SILBuilderWithScope Builder(Pred->getTerminator());
-    
+    SILBuilderForCodeExpansion Builder(Pred->getTerminator());
+
     createCondFail(CFI, incoming, inverted, Builder);
   }
   CFI->eraseFromParent();
@@ -2377,12 +2378,12 @@ bool SimplifyCFG::canonicalizeSwitchEnums() {
     CaseBBs.push_back(std::make_pair(elementDecl.get(), SWI->getDefaultBB()));
 
     if (isa<SwitchEnumInst>(SWI)) {
-      SILBuilderWithScope(SWI)
-          .createSwitchEnum(SWI->getLoc(), SWI->getOperand(), nullptr, CaseBBs);
+      SILBuilderForCodeExpansion(SWI).createSwitchEnum(
+          SWI->getLoc(), SWI->getOperand(), nullptr, CaseBBs);
     } else {
       assert(isa<SwitchEnumAddrInst>(SWI) &&
              "unknown switch_enum instruction");
-      SILBuilderWithScope(SWI).createSwitchEnumAddr(
+      SILBuilderForCodeExpansion(SWI).createSwitchEnumAddr(
           SWI->getLoc(), SWI->getOperand(), nullptr, CaseBBs);
     }
     SWI->eraseFromParent();
@@ -2492,7 +2493,7 @@ deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> TermOperands,
 static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
                                          int idx) {
   TermInst *Branch = BB->getTerminator();
-  SILBuilderWithScope Builder(Branch);
+  SILBuilderForCodeExpansion Builder(Branch);
   DEBUG(llvm::dbgs() << "remove dead argument " << idx << " from " << *Branch);
 
   if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
@@ -2743,7 +2744,7 @@ bool ArgumentSplitter::split() {
     SILBasicBlock *Pred = P.first;
     SILValue Base = P.second;
     auto *OldTerm = Pred->getTerminator();
-    SILBuilderWithScope B(OldTerm->getParent(), OldTerm);
+    SILBuilderForCodeExpansion B(OldTerm->getParent(), OldTerm);
 
     auto Loc = RegularLocation::getAutoGeneratedLocation();
     assert(NewIncomingValues.empty() && "NewIncomingValues was not cleared?");

@@ -1175,7 +1175,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
   // If we have a copy_value, just create a project_box on the copy and return.
   if (auto *CVI = dyn_cast<CopyValueInst>(PartialOperand)) {
-    SILBuilderWithScope B(std::next(CVI->getIterator()));
+    SILBuilderForCodeExpansion B(std::next(CVI->getIterator()));
     return B.createProjectBox(CVI->getLoc(), CVI, 0);
   }
 
@@ -1189,7 +1189,7 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
   }
 
   // Just return a project_box.
-  SILBuilderWithScope B(std::next(Box->getIterator()));
+  SILBuilderForCodeExpansion B(std::next(Box->getIterator()));
   return B.createProjectBox(Box->getLoc(), Box, 0);
 }
 
@@ -1211,7 +1211,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
-  SILBuilderWithScope B(PAI);
+  SILBuilderForCodeExpansion B(PAI);
   B.addOpenedArchetypeOperands(PAI);
   SILValue FnVal = B.createFunctionRef(PAI->getLoc(), ClonedFn);
 

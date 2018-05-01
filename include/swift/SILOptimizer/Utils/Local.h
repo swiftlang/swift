@@ -373,7 +373,8 @@ public:
     }
 
     // Redirect the branch.
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), EdgeBB, BI->getArgs());
+    SILBuilderForCodeExpansion(BI).createBranch(BI->getLoc(), EdgeBB,
+                                                BI->getArgs());
     BI->eraseFromParent();
     return EdgeBB;
   }
