@@ -361,7 +361,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     let pj = (_position! + j)
     let tmp = pi.move()
     pi.moveInitialize(from: pj, count: 1)
-    pj.initialize(to: tmp, count: 1)
+    pj.initialize(to: tmp)
   }
 % end # mutable
 }
