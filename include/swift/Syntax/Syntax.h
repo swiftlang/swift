@@ -194,6 +194,11 @@ public:
     return Data->getAbsolutePosition();
   }
 
+  /// Get the absolute end position (exclusively) of this raw syntax: its offset,
+  /// line, and column.
+  AbsolutePosition getAbsoluteEndPosition() const {
+    return Data->getAbsoluteEndPosition();
+  }
   // TODO: hasSameStructureAs ?
 };
 
