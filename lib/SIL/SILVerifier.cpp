@@ -3325,6 +3325,8 @@ public:
     auto operandType = I->getOperand()->getType().getSwiftRValueType();
     auto resultType = requireObjectType(UnmanagedStorageType, I,
                                         "Result of ref_to_unmanaged");
+    require(resultType->isLoadable(ResilienceExpansion::Maximal),
+            "ref_to_unmanaged requires unowned type to be loadable");
     require(resultType.getReferentType() == operandType,
             "Result of ref_to_unmanaged does not have the "
             "operand's type as its referent type");
@@ -3334,6 +3336,8 @@ public:
     auto operandType = requireObjectType(UnmanagedStorageType,
                                          I->getOperand(),
                                          "Operand of unmanaged_to_ref");
+    require(operandType->isLoadable(ResilienceExpansion::Maximal),
+            "unmanaged_to_ref requires unowned type to be loadable");
     requireReferenceStorageCapableValue(I, "Result of unmanaged_to_ref");
     auto resultType = I->getType().getSwiftRValueType();
     require(operandType.getReferentType() == resultType,

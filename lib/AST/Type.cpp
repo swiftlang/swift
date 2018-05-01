@@ -4023,7 +4023,7 @@ bool Type::isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
-bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
+bool ReferenceStorageType::isLoadable(ResilienceExpansion resilience) const {
   return getReferentType()->usesNativeReferenceCounting(resilience);
 }
 
