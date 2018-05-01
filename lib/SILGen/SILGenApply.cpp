@@ -1677,465 +1677,7 @@ public:
   Expr *getExpr() const { return ExprAndIsIndirect.getPointer(); }
   bool isIndirect() const { return ExprAndIsIndirect.getInt(); }
 };
-
-/// A delayed argument.  Call arguments are evaluated in two phases:
-/// a formal evaluation phase and a formal access phase.  The primary
-/// example of this is an l-value that is passed by reference, where
-/// the access to the l-value does not begin until the formal access
-/// phase, but there are other examples, generally relating to pointer
-/// conversions.
-///
-/// A DelayedArgument represents the part of evaluating an argument
-/// that's been delayed until the formal access phase.
-class DelayedArgument {
-public:
-  enum KindTy {
-    /// This is a true inout argument.
-    InOut,
-
-    LastLVKindWithoutExtra = InOut,
-
-    /// The l-value needs to be converted to a pointer type.
-    LValueToPointer,
-
-    /// An array l-value needs to be converted to a pointer type.
-    LValueArrayToPointer,
-
-    LastLVKind = LValueArrayToPointer,
-
-    /// An array r-value needs to be converted to a pointer type.
-    RValueArrayToPointer,
-
-    /// A string r-value needs to be converted to a pointer type.
-    RValueStringToPointer,
-  };
-
-private:
-  KindTy Kind;
-
-  struct LValueStorage {
-    LValue LV;
-    SILLocation Loc;
-
-    LValueStorage(LValue &&lv, SILLocation loc) : LV(std::move(lv)), Loc(loc) {}
-  };
-  struct RValueStorage {
-    ManagedValue RV;
-
-    RValueStorage(ManagedValue rv) : RV(rv) {}
-  };
-
-  using ValueMembers = ExternalUnionMembers<RValueStorage, LValueStorage>;
-  static ValueMembers::Index getValueMemberIndexForKind(KindTy kind) {
-    return (kind <= LastLVKind ? ValueMembers::indexOf<LValueStorage>()
-                               : ValueMembers::indexOf<RValueStorage>());
-  }
-
-  /// Storage for either the l-value or the r-value.
-  ExternalUnion<KindTy, ValueMembers, getValueMemberIndexForKind> Value;
-
-  LValueStorage &LV() { return Value.get<LValueStorage>(Kind); }
-  const LValueStorage &LV() const { return Value.get<LValueStorage>(Kind); }
-  RValueStorage &RV() { return Value.get<RValueStorage>(Kind); }
-  const RValueStorage &RV() const { return Value.get<RValueStorage>(Kind); }
-
-  /// The original argument expression, which will be emitted down
-  /// to the point from which the l-value or r-value was generated.
-  OriginalArgument Original;
-
-  using PointerAccessInfo = SILGenFunction::PointerAccessInfo;
-  using ArrayAccessInfo = SILGenFunction::ArrayAccessInfo;
-
-  using ExtraMembers =
-    ExternalUnionMembers<void, ArrayAccessInfo, PointerAccessInfo>;
-  static ExtraMembers::Index getExtraMemberIndexForKind(KindTy kind) {
-    switch (kind) {
-    case LValueToPointer:
-      return ExtraMembers::indexOf<PointerAccessInfo>();
-    case LValueArrayToPointer:
-    case RValueArrayToPointer:
-      return ExtraMembers::indexOf<ArrayAccessInfo>();
-    default:
-      return ExtraMembers::indexOf<void>();
-    }
-  }
-
-  ExternalUnion<KindTy, ExtraMembers, getExtraMemberIndexForKind> Extra;
-
-public:
-  DelayedArgument(KindTy kind, LValue &&lv, SILLocation loc)
-      : Kind(kind) {
-    assert(kind <= LastLVKindWithoutExtra &&
-           "this constructor should only be used for simple l-value kinds");
-    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
-  }
-
-  DelayedArgument(KindTy kind, ManagedValue rv, OriginalArgument original)
-      : Kind(kind), Original(original) {
-    Value.emplace<RValueStorage>(Kind, rv);
-  }
-
-  DelayedArgument(SILGenFunction::PointerAccessInfo pointerInfo,
-                  LValue &&lv, SILLocation loc, OriginalArgument original)
-      : Kind(LValueToPointer), Original(original) {
-    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
-    Extra.emplace<PointerAccessInfo>(Kind, pointerInfo);
-  }
-
-  DelayedArgument(SILGenFunction::ArrayAccessInfo arrayInfo,
-                  LValue &&lv, SILLocation loc, OriginalArgument original)
-      : Kind(LValueArrayToPointer), Original(original) {
-    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
-    Extra.emplace<ArrayAccessInfo>(Kind, arrayInfo);
-  }
-
-  DelayedArgument(KindTy kind,
-                  SILGenFunction::ArrayAccessInfo arrayInfo,
-                  ManagedValue rv, OriginalArgument original)
-      : Kind(kind), Original(original) {
-    Value.emplace<RValueStorage>(Kind, rv);
-    Extra.emplace<ArrayAccessInfo>(Kind, arrayInfo);
-  }
-
-  DelayedArgument(DelayedArgument &&other)
-      : Kind(other.Kind), Original(other.Original) {
-    Value.moveConstruct(Kind, std::move(other.Value));
-    Extra.moveConstruct(Kind, std::move(other.Extra));
-  }
-
-  DelayedArgument &operator=(DelayedArgument &&other) {
-    Value.moveAssign(Kind, other.Kind, std::move(other.Value));
-    Extra.moveAssign(Kind, other.Kind, std::move(other.Extra));
-    Kind = other.Kind;
-    Original = other.Original;
-    return *this;
-  }
-
-  ~DelayedArgument() {
-    Extra.destruct(Kind);
-    Value.destruct(Kind);
-  }
-
-  bool isSimpleInOut() const { return Kind == InOut; }
-  SILLocation getInOutLocation() const {
-    assert(isSimpleInOut());
-    return LV().Loc;
-  }
-
-  ManagedValue emit(SILGenFunction &SGF) {
-    switch (Kind) {
-    case InOut:
-      return emitInOut(SGF);
-    case LValueToPointer:
-    case LValueArrayToPointer:
-    case RValueArrayToPointer:
-    case RValueStringToPointer:
-      return finishOriginalArgument(SGF);
-    }
-    llvm_unreachable("bad kind");
-  }
-
-private:
-  ManagedValue emitInOut(SILGenFunction &SGF) {
-    return emitAddress(SGF, AccessKind::ReadWrite);
-  }
-
-  ManagedValue emitBorrowIndirect(SILGenFunction &SGF) {
-    return emitAddress(SGF, AccessKind::Read);
-  }
-
-  ManagedValue emitBorrowDirect(SILGenFunction &SGF) {
-    ManagedValue address = emitAddress(SGF, AccessKind::Read);
-    return SGF.B.createLoadBorrow(LV().Loc, address);
-  }
-
-  ManagedValue emitAddress(SILGenFunction &SGF, AccessKind accessKind) {
-    auto tsanKind =
-      (accessKind == AccessKind::Read ? TSanKind::None : TSanKind::InoutAccess);
-    return SGF.emitAddressOfLValue(LV().Loc, std::move(LV().LV),
-                                   accessKind, tsanKind);
-  }
-
-  /// Replay the original argument expression.
-  ManagedValue finishOriginalArgument(SILGenFunction &SGF) {
-    auto results = finishOriginalExpr(SGF, Original.getExpr());
-    auto value = results.first; // just let the owner go
-
-    if (Original.isIndirect() && !value.getType().isAddress()) {
-      value = value.materialize(SGF, Original.getExpr());
-    }
-
-    return value;
-  }
-
-  // (value, owner)
-  std::pair<ManagedValue, ManagedValue>
-  finishOriginalExpr(SILGenFunction &SGF, Expr *expr) {
-
-    // This needs to handle all of the recursive cases from
-    // ArgEmission::maybeEmitDelayed.
-
-    expr = expr->getSemanticsProvidingExpr();
-
-    // Handle injections into optionals.
-    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(expr)) {
-      auto ownedValue =
-        finishOriginalExpr(SGF, inject->getSubExpr());
-      auto &optionalTL = SGF.getTypeLowering(expr->getType());
-
-      auto optValue = SGF.emitInjectOptional(inject, optionalTL, SGFContext(),
-                              [&](SGFContext ctx) { return ownedValue.first; });
-      return {optValue, ownedValue.second};
-    }
-
-    // Handle try!.
-    if (auto forceTry = dyn_cast<ForceTryExpr>(expr)) {
-      // Handle throws from the accessor?  But what if the writeback throws?
-      SILGenFunction::ForceTryEmission emission(SGF, forceTry);
-      return finishOriginalExpr(SGF, forceTry->getSubExpr());
-    }
-
-    // Handle optional evaluations.
-    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
-      return finishOptionalEvaluation(SGF, optEval);
-    }
-
-    // Done with the recursive cases.  Make sure we handled everything.
-    assert(isa<InOutToPointerExpr>(expr) ||
-           isa<ArrayToPointerExpr>(expr) ||
-           isa<StringToPointerExpr>(expr));
-
-    switch (Kind) {
-    case InOut:
-      llvm_unreachable("no original expr to finish in these cases");
-
-    case LValueToPointer:
-      return {SGF.emitLValueToPointer(LV().Loc, std::move(LV().LV),
-                                      Extra.get<PointerAccessInfo>(Kind)),
-              /*owner*/ ManagedValue()};
-
-    case LValueArrayToPointer:
-      return SGF.emitArrayToPointer(LV().Loc, std::move(LV().LV),
-                                    Extra.get<ArrayAccessInfo>(Kind));
-
-    case RValueArrayToPointer: {
-      auto pointerExpr = cast<ArrayToPointerExpr>(expr);
-      auto optArrayValue = RV().RV;
-      auto arrayValue = emitBindOptionals(SGF, optArrayValue,
-                                          pointerExpr->getSubExpr());
-      return SGF.emitArrayToPointer(pointerExpr, arrayValue,
-                                    Extra.get<ArrayAccessInfo>(Kind));
-    }
-
-    case RValueStringToPointer: {
-      auto pointerExpr = cast<StringToPointerExpr>(expr);
-      auto optStringValue = RV().RV;
-      auto stringValue =
-        emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
-      return SGF.emitStringToPointer(pointerExpr, stringValue,
-                                     pointerExpr->getType());
-    }
-    }
-    llvm_unreachable("bad kind");
-  }
-
-  ManagedValue emitBindOptionals(SILGenFunction &SGF, ManagedValue optValue,
-                                 Expr *expr) {
-    expr = expr->getSemanticsProvidingExpr();
-    auto bind = dyn_cast<BindOptionalExpr>(expr);
-
-    // If we don't find a bind, the value isn't optional.
-    if (!bind) return optValue;
-
-    // Recurse.
-    optValue = emitBindOptionals(SGF, optValue, bind->getSubExpr());
-
-    // Check whether the value is non-nil and if the value is not-nil, return
-    // the unwrapped value.
-    return SGF.emitBindOptional(bind, optValue, bind->getDepth());
-  }
-
-  std::pair<ManagedValue, ManagedValue>
-  finishOptionalEvaluation(SILGenFunction &SGF, OptionalEvaluationExpr *eval) {
-    SmallVector<ManagedValue, 2> results;
-
-    SGF.emitOptionalEvaluation(eval, eval->getType(), results, SGFContext(),
-      [&](SmallVectorImpl<ManagedValue> &results, SGFContext C) {
-        // Recurse.
-        auto values = finishOriginalExpr(SGF, eval->getSubExpr());
-
-        // Our primary result is the value.
-        results.push_back(values.first);
-
-        // Our secondary result is the owner, if we have one.
-        if (auto owner = values.second) results.push_back(owner);
-      });
-
-    assert(results.size() == 1 || results.size() == 2);
-
-    ManagedValue value = results[0];
-
-    ManagedValue owner;
-    if (results.size() == 2) {
-      owner = results[1];
-
-      // Create a new value-dependence here if the primary result is
-      // trivial.
-      auto &valueTL = SGF.getTypeLowering(value.getType());
-      if (valueTL.isTrivial()) {
-        SILValue dependentValue =
-          SGF.B.createMarkDependence(eval, value.forward(SGF),
-                                     owner.getValue());
-        value = SGF.emitManagedRValueWithCleanup(dependentValue, valueTL);
-      }
-    }
-
-    return {value, owner};
-  }
-};
-
-} // end anonymous namespace
-
-/// Perform the formal-access phase of call argument emission by emitting
-/// all of the delayed arguments.
-static void emitDelayedArguments(SILGenFunction &SGF,
-                                 MutableArrayRef<DelayedArgument> delayedArgs,
-                         MutableArrayRef<SmallVector<ManagedValue, 4>> args) {
-  assert(!delayedArgs.empty());
-
-  SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
-  auto delayedNext = delayedArgs.begin();
-
-  // The assumption we make is that 'args' and 'inoutArgs' were built
-  // up in parallel, with empty spots being dropped into 'args'
-  // wherever there's an inout argument to insert.
-  //
-  // Note that this also begins the formal accesses in evaluation order.
-  for (auto &siteArgs : args) {
-    for (ManagedValue &siteArg : siteArgs) {
-      if (siteArg) continue;
-
-      assert(delayedNext != delayedArgs.end());
-      auto &delayedArg = *delayedNext;
-
-      // Emit the delayed argument and replace it in the arguments array.
-      auto value = delayedArg.emit(SGF);
-      siteArg = value;
-
-      // Remember all the simple inouts we emitted so we can perform
-      // a basic inout-aliasing analysis.
-      // This should be completely obviated by static enforcement.
-      if (delayedArg.isSimpleInOut()) {
-        emittedInoutArgs.push_back({value.getValue(),
-                                    delayedArg.getInOutLocation()});
-      }
-
-      if (++delayedNext == delayedArgs.end())
-        goto done;
-    }
-  }
-
-  llvm_unreachable("ran out of null arguments before we ran out of inouts");
-
-done:
-
-  // Check to see if we have multiple inout arguments which obviously
-  // alias.  Note that we could do this in a later SILDiagnostics pass
-  // as well: this would be stronger (more equivalences exposed) but
-  // would have worse source location information.
-  for (auto i = emittedInoutArgs.begin(), e = emittedInoutArgs.end();
-         i != e; ++i) {
-    for (auto j = emittedInoutArgs.begin(); j != i; ++j) {
-      if (!RValue::areObviouslySameValue(i->first, j->first)) continue;
-
-      SGF.SGM.diagnose(i->second, diag::inout_argument_alias)
-        .highlight(i->second.getSourceRange());
-      SGF.SGM.diagnose(j->second, diag::previous_inout_alias)
-        .highlight(j->second.getSourceRange());
-    }
-  }
-}
-
-namespace {
-
-/// A destination for an argument other than just "onto to the end
-/// of the arguments lists".
-///
-/// This allows us to re-use the argument expression emitter for
-/// some weird cases, like a shuffled tuple where some of the
-/// arguments are going into a varargs array.
-struct ArgSpecialDest {
-  VarargsInfo *SharedInfo;
-  unsigned Index;
-  CleanupHandle Cleanup;
-
-  ArgSpecialDest() : SharedInfo(nullptr) {}
-  explicit ArgSpecialDest(VarargsInfo &info, unsigned index)
-    : SharedInfo(&info), Index(index) {}
-
-  // Reference semantics: need to preserve the cleanup handle.
-  ArgSpecialDest(const ArgSpecialDest &) = delete;
-  ArgSpecialDest &operator=(const ArgSpecialDest &) = delete;
-  ArgSpecialDest(ArgSpecialDest &&other)
-    : SharedInfo(other.SharedInfo), Index(other.Index),
-      Cleanup(other.Cleanup) {
-    other.SharedInfo = nullptr;
-  }
-  ArgSpecialDest &operator=(ArgSpecialDest &&other) {
-    assert(!isValid() && "overwriting valid special destination!");
-    SharedInfo = other.SharedInfo;
-    Index = other.Index;
-    Cleanup = other.Cleanup;
-    other.SharedInfo = nullptr;
-    return *this;
-  }
-
-  ~ArgSpecialDest() {
-    assert(!isValid() && "failed to deactivate special dest");
-  }
-
-  /// Is this a valid special destination?
-  ///
-  /// Most of the time, most arguments don't have special
-  /// destinations, and making an array of Optional<Special special
-  /// destinations has t
-  bool isValid() const { return SharedInfo != nullptr; }
-
-  /// Fill this special destination with a value.
-  void fill(SILGenFunction &SGF, ArgumentSource &&arg,
-            AbstractionPattern _unused_origType,
-            SILType loweredSubstParamType) {
-    assert(isValid() && "filling an invalid destination");
-
-    SILLocation loc = arg.getLocation();
-    auto destAddr = SharedInfo->getBaseAddress();
-    if (Index != 0) {
-      SILValue index = SGF.B.createIntegerLiteral(loc,
-                  SILType::getBuiltinWordType(SGF.getASTContext()), Index);
-      destAddr = SGF.B.createIndexAddr(loc, destAddr, index);
-    }
-
-    assert(destAddr->getType() == loweredSubstParamType.getAddressType());
-
-    auto &destTL = SharedInfo->getBaseTypeLowering();
-    Cleanup =
-        SGF.enterDormantFormalAccessTemporaryCleanup(destAddr, loc, destTL);
-
-    TemporaryInitialization init(destAddr, Cleanup);
-    std::move(arg).forwardInto(SGF, SharedInfo->getBaseAbstractionPattern(),
-                               &init, destTL);
-  }
-
-  /// Deactivate this special destination.  Must always be called
-  /// before destruction.
-  void deactivate(SILGenFunction &SGF) {
-    assert(isValid() && "deactivating an invalid destination");
-    if (Cleanup.isValid())
-      SGF.Cleanups.forwardCleanup(Cleanup);
-    SharedInfo = nullptr;
-  }
-};
-
+  
 /// A possibly-discontiguous slice of function parameters claimed by a
 /// function application.
 class ClaimedParamsRef {
@@ -2291,6 +1833,522 @@ public:
     if (newSkip < count)
       return ClaimedParamsRef(Params.slice(start, count+1), newSkip);
     return ClaimedParamsRef(Params.slice(start, count), NoSkip);
+  }
+};
+
+/// A delayed argument.  Call arguments are evaluated in two phases:
+/// a formal evaluation phase and a formal access phase.  The primary
+/// example of this is an l-value that is passed by reference, where
+/// the access to the l-value does not begin until the formal access
+/// phase, but there are other examples, generally relating to pointer
+/// conversions.
+///
+/// A DelayedArgument represents the part of evaluating an argument
+/// that's been delayed until the formal access phase.
+class DelayedArgument {
+public:
+  enum KindTy {
+    /// This is a true inout argument.
+    InOut,
+
+    LastLVKindWithoutExtra = InOut,
+
+    /// The l-value needs to be converted to a pointer type.
+    LValueToPointer,
+
+    /// An array l-value needs to be converted to a pointer type.
+    LValueArrayToPointer,
+
+    LastLVKind = LValueArrayToPointer,
+
+    /// An array r-value needs to be converted to a pointer type.
+    RValueArrayToPointer,
+
+    /// A string r-value needs to be converted to a pointer type.
+    RValueStringToPointer,
+    
+    LastRVKind = RValueStringToPointer,
+    
+    /// A default argument that needs to be evaluated.
+    DefaultArgument,
+  };
+
+private:
+  KindTy Kind;
+
+  struct LValueStorage {
+    LValue LV;
+    SILLocation Loc;
+
+    LValueStorage(LValue &&lv, SILLocation loc) : LV(std::move(lv)), Loc(loc) {}
+  };
+  struct RValueStorage {
+    ManagedValue RV;
+
+    RValueStorage(ManagedValue rv) : RV(rv) {}
+  };
+  struct DefaultArgumentStorage {
+    SILLocation loc;
+    ConcreteDeclRef defaultArgsOwner;
+    unsigned destIndex;
+    CanType resultType;
+    AbstractionPattern origResultType;
+    ClaimedParamsRef paramsToEmit;
+    
+    DefaultArgumentStorage(SILLocation loc,
+                           ConcreteDeclRef defaultArgsOwner,
+                           unsigned destIndex,
+                           CanType resultType,
+                           AbstractionPattern origResultType,
+                           ClaimedParamsRef paramsToEmit)
+      : loc(loc), defaultArgsOwner(defaultArgsOwner), destIndex(destIndex),
+        resultType(resultType), origResultType(origResultType),
+        paramsToEmit(paramsToEmit)
+    {}
+  };
+
+  using ValueMembers =
+    ExternalUnionMembers<RValueStorage, LValueStorage,
+                         DefaultArgumentStorage>;
+  static ValueMembers::Index getValueMemberIndexForKind(KindTy kind) {
+    return (kind <= LastLVKind ? ValueMembers::indexOf<LValueStorage>() :
+            kind <= LastRVKind ? ValueMembers::indexOf<RValueStorage>()
+                               : ValueMembers::indexOf<DefaultArgumentStorage>());
+  }
+
+  /// Storage for either the l-value or the r-value.
+  ExternalUnion<KindTy, ValueMembers, getValueMemberIndexForKind> Value;
+
+  LValueStorage &LV() { return Value.get<LValueStorage>(Kind); }
+  const LValueStorage &LV() const { return Value.get<LValueStorage>(Kind); }
+  RValueStorage &RV() { return Value.get<RValueStorage>(Kind); }
+  const RValueStorage &RV() const { return Value.get<RValueStorage>(Kind); }
+
+  /// The original argument expression, which will be emitted down
+  /// to the point from which the l-value or r-value was generated.
+  OriginalArgument Original;
+
+  using PointerAccessInfo = SILGenFunction::PointerAccessInfo;
+  using ArrayAccessInfo = SILGenFunction::ArrayAccessInfo;
+  
+  using ExtraMembers =
+    ExternalUnionMembers<void,
+                         ArrayAccessInfo,
+                         PointerAccessInfo>;
+  static ExtraMembers::Index getExtraMemberIndexForKind(KindTy kind) {
+    switch (kind) {
+    case LValueToPointer:
+      return ExtraMembers::indexOf<PointerAccessInfo>();
+    case LValueArrayToPointer:
+    case RValueArrayToPointer:
+      return ExtraMembers::indexOf<ArrayAccessInfo>();
+    default:
+      return ExtraMembers::indexOf<void>();
+    }
+  }
+
+  ExternalUnion<KindTy, ExtraMembers, getExtraMemberIndexForKind> Extra;
+
+public:
+  DelayedArgument(KindTy kind, LValue &&lv, SILLocation loc)
+      : Kind(kind) {
+    assert(kind <= LastLVKindWithoutExtra &&
+           "this constructor should only be used for simple l-value kinds");
+    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
+  }
+
+  DelayedArgument(KindTy kind, ManagedValue rv, OriginalArgument original)
+      : Kind(kind), Original(original) {
+    Value.emplace<RValueStorage>(Kind, rv);
+  }
+
+  DelayedArgument(SILGenFunction::PointerAccessInfo pointerInfo,
+                  LValue &&lv, SILLocation loc, OriginalArgument original)
+      : Kind(LValueToPointer), Original(original) {
+    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
+    Extra.emplace<PointerAccessInfo>(Kind, pointerInfo);
+  }
+
+  DelayedArgument(SILGenFunction::ArrayAccessInfo arrayInfo,
+                  LValue &&lv, SILLocation loc, OriginalArgument original)
+      : Kind(LValueArrayToPointer), Original(original) {
+    Value.emplace<LValueStorage>(Kind, std::move(lv), loc);
+    Extra.emplace<ArrayAccessInfo>(Kind, arrayInfo);
+  }
+
+  DelayedArgument(KindTy kind,
+                  SILGenFunction::ArrayAccessInfo arrayInfo,
+                  ManagedValue rv, OriginalArgument original)
+      : Kind(kind), Original(original) {
+    Value.emplace<RValueStorage>(Kind, rv);
+    Extra.emplace<ArrayAccessInfo>(Kind, arrayInfo);
+  }
+  
+  DelayedArgument(SILLocation loc,
+                  ConcreteDeclRef defaultArgsOwner,
+                  unsigned destIndex,
+                  CanType resultType,
+                  AbstractionPattern origResultType,
+                  ClaimedParamsRef params)
+    : Kind(DefaultArgument) {
+    Value.emplace<DefaultArgumentStorage>(Kind, loc, defaultArgsOwner,
+                                          destIndex,
+                                          resultType,
+                                          origResultType, params);
+  }
+
+  DelayedArgument(DelayedArgument &&other)
+      : Kind(other.Kind), Original(other.Original) {
+    Value.moveConstruct(Kind, std::move(other.Value));
+    Extra.moveConstruct(Kind, std::move(other.Extra));
+  }
+
+  DelayedArgument &operator=(DelayedArgument &&other) {
+    Value.moveAssign(Kind, other.Kind, std::move(other.Value));
+    Extra.moveAssign(Kind, other.Kind, std::move(other.Extra));
+    Kind = other.Kind;
+    Original = other.Original;
+    return *this;
+  }
+
+  ~DelayedArgument() {
+    Extra.destruct(Kind);
+    Value.destruct(Kind);
+  }
+
+  bool isSimpleInOut() const { return Kind == InOut; }
+  SILLocation getInOutLocation() const {
+    assert(isSimpleInOut());
+    return LV().Loc;
+  }
+
+  void emit(SILGenFunction &SGF,
+            SmallVectorImpl<ManagedValue> &args,
+            int &argIndex) {
+    switch (Kind) {
+    case InOut:
+      args[argIndex] = emitInOut(SGF);
+      return;
+    case LValueToPointer:
+    case LValueArrayToPointer:
+    case RValueArrayToPointer:
+    case RValueStringToPointer:
+      args[argIndex] = finishOriginalArgument(SGF);
+      return;
+    case DefaultArgument:
+      emitDefaultArgument(SGF, Value.get<DefaultArgumentStorage>(Kind),
+                          args, argIndex);
+      return;
+    }
+    llvm_unreachable("bad kind");
+  }
+
+private:
+  ManagedValue emitInOut(SILGenFunction &SGF) {
+    return emitAddress(SGF, AccessKind::ReadWrite);
+  }
+
+  ManagedValue emitBorrowIndirect(SILGenFunction &SGF) {
+    return emitAddress(SGF, AccessKind::Read);
+  }
+
+  ManagedValue emitBorrowDirect(SILGenFunction &SGF) {
+    ManagedValue address = emitAddress(SGF, AccessKind::Read);
+    return SGF.B.createLoadBorrow(LV().Loc, address);
+  }
+
+  ManagedValue emitAddress(SILGenFunction &SGF, AccessKind accessKind) {
+    auto tsanKind =
+      (accessKind == AccessKind::Read ? TSanKind::None : TSanKind::InoutAccess);
+    return SGF.emitAddressOfLValue(LV().Loc, std::move(LV().LV),
+                                   accessKind, tsanKind);
+  }
+
+  /// Replay the original argument expression.
+  ManagedValue finishOriginalArgument(SILGenFunction &SGF) {
+    auto results = finishOriginalExpr(SGF, Original.getExpr());
+    auto value = results.first; // just let the owner go
+
+    if (Original.isIndirect() && !value.getType().isAddress()) {
+      value = value.materialize(SGF, Original.getExpr());
+    }
+
+    return value;
+  }
+  
+  void emitDefaultArgument(SILGenFunction &SGF,
+                           const DefaultArgumentStorage &info,
+                           SmallVectorImpl<ManagedValue> &args,
+                           int &argIndex);
+
+  // (value, owner)
+  std::pair<ManagedValue, ManagedValue>
+  finishOriginalExpr(SILGenFunction &SGF, Expr *expr) {
+
+    // This needs to handle all of the recursive cases from
+    // ArgEmission::maybeEmitDelayed.
+
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Handle injections into optionals.
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(expr)) {
+      auto ownedValue =
+        finishOriginalExpr(SGF, inject->getSubExpr());
+      auto &optionalTL = SGF.getTypeLowering(expr->getType());
+
+      auto optValue = SGF.emitInjectOptional(inject, optionalTL, SGFContext(),
+                              [&](SGFContext ctx) { return ownedValue.first; });
+      return {optValue, ownedValue.second};
+    }
+
+    // Handle try!.
+    if (auto forceTry = dyn_cast<ForceTryExpr>(expr)) {
+      // Handle throws from the accessor?  But what if the writeback throws?
+      SILGenFunction::ForceTryEmission emission(SGF, forceTry);
+      return finishOriginalExpr(SGF, forceTry->getSubExpr());
+    }
+
+    // Handle optional evaluations.
+    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)) {
+      return finishOptionalEvaluation(SGF, optEval);
+    }
+
+    // Done with the recursive cases.  Make sure we handled everything.
+    assert(isa<InOutToPointerExpr>(expr) ||
+           isa<ArrayToPointerExpr>(expr) ||
+           isa<StringToPointerExpr>(expr));
+
+    switch (Kind) {
+    case InOut:
+    case DefaultArgument:
+      llvm_unreachable("no original expr to finish in these cases");
+
+    case LValueToPointer:
+      return {SGF.emitLValueToPointer(LV().Loc, std::move(LV().LV),
+                                      Extra.get<PointerAccessInfo>(Kind)),
+              /*owner*/ ManagedValue()};
+
+    case LValueArrayToPointer:
+      return SGF.emitArrayToPointer(LV().Loc, std::move(LV().LV),
+                                    Extra.get<ArrayAccessInfo>(Kind));
+
+    case RValueArrayToPointer: {
+      auto pointerExpr = cast<ArrayToPointerExpr>(expr);
+      auto optArrayValue = RV().RV;
+      auto arrayValue = emitBindOptionals(SGF, optArrayValue,
+                                          pointerExpr->getSubExpr());
+      return SGF.emitArrayToPointer(pointerExpr, arrayValue,
+                                    Extra.get<ArrayAccessInfo>(Kind));
+    }
+
+    case RValueStringToPointer: {
+      auto pointerExpr = cast<StringToPointerExpr>(expr);
+      auto optStringValue = RV().RV;
+      auto stringValue =
+        emitBindOptionals(SGF, optStringValue, pointerExpr->getSubExpr());
+      return SGF.emitStringToPointer(pointerExpr, stringValue,
+                                     pointerExpr->getType());
+    }
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  ManagedValue emitBindOptionals(SILGenFunction &SGF, ManagedValue optValue,
+                                 Expr *expr) {
+    expr = expr->getSemanticsProvidingExpr();
+    auto bind = dyn_cast<BindOptionalExpr>(expr);
+
+    // If we don't find a bind, the value isn't optional.
+    if (!bind) return optValue;
+
+    // Recurse.
+    optValue = emitBindOptionals(SGF, optValue, bind->getSubExpr());
+
+    // Check whether the value is non-nil and if the value is not-nil, return
+    // the unwrapped value.
+    return SGF.emitBindOptional(bind, optValue, bind->getDepth());
+  }
+
+  std::pair<ManagedValue, ManagedValue>
+  finishOptionalEvaluation(SILGenFunction &SGF, OptionalEvaluationExpr *eval) {
+    SmallVector<ManagedValue, 2> results;
+
+    SGF.emitOptionalEvaluation(eval, eval->getType(), results, SGFContext(),
+      [&](SmallVectorImpl<ManagedValue> &results, SGFContext C) {
+        // Recurse.
+        auto values = finishOriginalExpr(SGF, eval->getSubExpr());
+
+        // Our primary result is the value.
+        results.push_back(values.first);
+
+        // Our secondary result is the owner, if we have one.
+        if (auto owner = values.second) results.push_back(owner);
+      });
+
+    assert(results.size() == 1 || results.size() == 2);
+
+    ManagedValue value = results[0];
+
+    ManagedValue owner;
+    if (results.size() == 2) {
+      owner = results[1];
+
+      // Create a new value-dependence here if the primary result is
+      // trivial.
+      auto &valueTL = SGF.getTypeLowering(value.getType());
+      if (valueTL.isTrivial()) {
+        SILValue dependentValue =
+          SGF.B.createMarkDependence(eval, value.forward(SGF),
+                                     owner.getValue());
+        value = SGF.emitManagedRValueWithCleanup(dependentValue, valueTL);
+      }
+    }
+
+    return {value, owner};
+  }
+};
+
+} // end anonymous namespace
+
+/// Perform the formal-access phase of call argument emission by emitting
+/// all of the delayed arguments.
+static void emitDelayedArguments(SILGenFunction &SGF,
+                                 MutableArrayRef<DelayedArgument> delayedArgs,
+                         MutableArrayRef<SmallVector<ManagedValue, 4>> args) {
+  assert(!delayedArgs.empty());
+
+  SmallVector<std::pair<SILValue, SILLocation>, 4> emittedInoutArgs;
+  auto delayedNext = delayedArgs.begin();
+
+  // The assumption we make is that 'args' and 'delayedArgs' were built
+  // up in parallel, with empty spots being dropped into 'args'
+  // wherever there's a delayed argument to insert.
+  //
+  // Note that this also begins the formal accesses in evaluation order.
+  for (auto &siteArgs : args) {
+    // NB: siteArgs.size() may change during iteration
+    for (int i = 0; i < (int)siteArgs.size(); ++i) {
+      auto &siteArg = siteArgs[i];
+      
+      if (siteArg) continue;
+
+      assert(delayedNext != delayedArgs.end());
+      auto &delayedArg = *delayedNext;
+
+      // Emit the delayed argument and replace it in the arguments array.
+      delayedArg.emit(SGF, siteArgs, i);
+
+      // Remember all the simple inouts we emitted so we can perform
+      // a basic inout-aliasing analysis.
+      // This should be completely obviated by static enforcement.
+      if (delayedArg.isSimpleInOut()) {
+        emittedInoutArgs.push_back({siteArg.getValue(),
+                                    delayedArg.getInOutLocation()});
+      }
+
+      if (++delayedNext == delayedArgs.end())
+        goto done;
+    }
+  }
+
+  llvm_unreachable("ran out of null arguments before we ran out of inouts");
+
+done:
+
+  // Check to see if we have multiple inout arguments which obviously
+  // alias.  Note that we could do this in a later SILDiagnostics pass
+  // as well: this would be stronger (more equivalences exposed) but
+  // would have worse source location information.
+  for (auto i = emittedInoutArgs.begin(), e = emittedInoutArgs.end();
+         i != e; ++i) {
+    for (auto j = emittedInoutArgs.begin(); j != i; ++j) {
+      if (!RValue::areObviouslySameValue(i->first, j->first)) continue;
+
+      SGF.SGM.diagnose(i->second, diag::inout_argument_alias)
+        .highlight(i->second.getSourceRange());
+      SGF.SGM.diagnose(j->second, diag::previous_inout_alias)
+        .highlight(j->second.getSourceRange());
+    }
+  }
+}
+
+namespace {
+
+/// A destination for an argument other than just "onto to the end
+/// of the arguments lists".
+///
+/// This allows us to re-use the argument expression emitter for
+/// some weird cases, like a shuffled tuple where some of the
+/// arguments are going into a varargs array.
+struct ArgSpecialDest {
+  VarargsInfo *SharedInfo;
+  unsigned Index;
+  CleanupHandle Cleanup;
+
+  ArgSpecialDest() : SharedInfo(nullptr) {}
+  explicit ArgSpecialDest(VarargsInfo &info, unsigned index)
+    : SharedInfo(&info), Index(index) {}
+
+  // Reference semantics: need to preserve the cleanup handle.
+  ArgSpecialDest(const ArgSpecialDest &) = delete;
+  ArgSpecialDest &operator=(const ArgSpecialDest &) = delete;
+  ArgSpecialDest(ArgSpecialDest &&other)
+    : SharedInfo(other.SharedInfo), Index(other.Index),
+      Cleanup(other.Cleanup) {
+    other.SharedInfo = nullptr;
+  }
+  ArgSpecialDest &operator=(ArgSpecialDest &&other) {
+    assert(!isValid() && "overwriting valid special destination!");
+    SharedInfo = other.SharedInfo;
+    Index = other.Index;
+    Cleanup = other.Cleanup;
+    other.SharedInfo = nullptr;
+    return *this;
+  }
+
+  ~ArgSpecialDest() {
+    assert(!isValid() && "failed to deactivate special dest");
+  }
+
+  /// Is this a valid special destination?
+  ///
+  /// Most of the time, most arguments don't have special
+  /// destinations, and making an array of Optional<Special special
+  /// destinations has t
+  bool isValid() const { return SharedInfo != nullptr; }
+
+  /// Fill this special destination with a value.
+  void fill(SILGenFunction &SGF, ArgumentSource &&arg,
+            AbstractionPattern _unused_origType,
+            SILType loweredSubstParamType) {
+    assert(isValid() && "filling an invalid destination");
+
+    SILLocation loc = arg.getLocation();
+    auto destAddr = SharedInfo->getBaseAddress();
+    if (Index != 0) {
+      SILValue index = SGF.B.createIntegerLiteral(loc,
+                  SILType::getBuiltinWordType(SGF.getASTContext()), Index);
+      destAddr = SGF.B.createIndexAddr(loc, destAddr, index);
+    }
+
+    assert(destAddr->getType() == loweredSubstParamType.getAddressType());
+
+    auto &destTL = SharedInfo->getBaseTypeLowering();
+    Cleanup =
+        SGF.enterDormantFormalAccessTemporaryCleanup(destAddr, loc, destTL);
+
+    TemporaryInitialization init(destAddr, Cleanup);
+    std::move(arg).forwardInto(SGF, SharedInfo->getBaseAbstractionPattern(),
+                               &init, destTL);
+  }
+
+  /// Deactivate this special destination.  Must always be called
+  /// before destruction.
+  void deactivate(SILGenFunction &SGF) {
+    assert(isValid() && "deactivating an invalid destination");
+    if (Cleanup.isValid())
+      SGF.Cleanups.forwardCleanup(Cleanup);
+    SharedInfo = nullptr;
   }
 };
 
@@ -2820,6 +2878,38 @@ private:
   }
 };
 
+void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
+                                          const DefaultArgumentStorage &info,
+                                          SmallVectorImpl<ManagedValue> &args,
+                                          int &argIndex) {
+  auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
+                                                  info.defaultArgsOwner,
+                                                  info.destIndex,
+                                                  info.resultType,
+                                                  info.origResultType);
+  
+  SmallVector<ManagedValue, 4> loweredArgs;
+  SmallVector<DelayedArgument, 4> delayedArgs;
+  auto emitter = ArgEmitter(SGF, SILFunctionTypeRepresentation::Thin,
+                            info.paramsToEmit,
+                            loweredArgs, delayedArgs,
+                            None, ImportAsMemberStatus());
+  
+  emitter.emitTopLevel(ArgumentSource(info.loc, std::move(value)),
+                       info.origResultType);
+  assert(delayedArgs.empty());
+  
+  // Splice the emitted default argument into the argument list.
+  if (loweredArgs.size() == 1) {
+    args[argIndex] = loweredArgs.front();
+  } else {
+    args.erase(args.begin() + argIndex);
+    args.insert(args.begin() + argIndex,
+                loweredArgs.begin(), loweredArgs.end());
+    argIndex += loweredArgs.size() - 1;
+  }
+}
+
 struct ElementExtent {
   /// The parameters which go into this tuple element.
   /// This is set in the first pass.
@@ -3104,16 +3194,21 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
       continue;
     }
 
-    // If this is default initialization, call the default argument
-    // generator.
+    // If this is default initialization, prepare to emit the default argument
+    // generator later.
     if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
       // Otherwise, emit the default initializer, then map that as a
       // default argument.
       CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
       auto origType = getOutputOrigElementType(outerIndex);
-      RValue value = parent.SGF.emitApplyOfDefaultArgGenerator(
-          outer, defaultArgsOwner, outerIndex, eltType, origType);
-      parent.emit(ArgumentSource(outer, std::move(value)), origType);
+      
+      auto numParams = getFlattenedValueCount(origType, eltType,
+                                              ImportAsMemberStatus());
+      parent.DelayedArguments.emplace_back(outer, defaultArgsOwner,
+                                         outerIndex, eltType, origType,
+                                         parent.ParamInfos.slice(0, numParams));
+      parent.ParamInfos = parent.ParamInfos.slice(numParams);
+      parent.Args.push_back(ManagedValue());
       continue;
     }
 
