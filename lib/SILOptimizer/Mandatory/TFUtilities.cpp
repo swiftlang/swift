@@ -208,6 +208,49 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
   return 0;
 }
 
+/// Looks up a function in the current module. If it exists, returns it.
+/// Otherwise, attempt to link it from imported modules. Returns null if such
+/// function name does not exist.
+static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
+  if (auto *localFn = module.lookUpFunction(name))
+    return localFn;
+  if (module.linkFunction(name))
+    return module.findFunction(name, SILLinkage::PublicExternal);
+  return nullptr;
+}
+
+/// Looks up members by `name` in the context of `typeDecl`, `proto` and
+/// `module`, and populates `results`.
+static void lookupProtocolRequiredMembers(
+    NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
+    ModuleDecl *module, SmallVectorImpl<ValueDecl *> &results) {
+  // Make sure the given type conforms to the given protocol.
+  SmallVector<ProtocolConformance *, 2> conformances;
+  auto type = typeDecl->getDeclaredInterfaceType();
+  typeDecl->lookupConformance(module, proto, conformances);
+  assert(!conformances.empty() && "Type doesn't conform to the protocol?");
+  // Look up nominal type candidates and protocol requirement candidates.
+  SmallVector<ValueDecl *, 2> lookupResults;
+  typeDecl->lookupQualified(
+    type, name, NLOptions::NL_ProtocolMembers, nullptr, lookupResults);
+  // Append matches to results.
+  for (ValueDecl *decl : lookupResults)
+    results.push_back(decl);
+}
+
+SILFunction *tf::findSILFunctionForRequiredProtocolMember(
+    NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
+    ModuleDecl *module, SILModule &silModule) {
+  SmallVector<ValueDecl *, 4> results;
+  lookupProtocolRequiredMembers(typeDecl, proto, name, module, results);
+  for (auto *result : results) {
+    std::string name = SILDeclRef(result).mangle();
+    if (auto *fn = lookupOrLinkFunction(name, silModule))
+      return fn;
+  }
+  return nullptr;
+}
+
 /// If the specified value is a single-element struct_inst wrapper, look through
 /// them.  We special case arrays, and return Array<T> values as themselves.
 static SILValue getValueInsideStructInst(SILValue value) {
