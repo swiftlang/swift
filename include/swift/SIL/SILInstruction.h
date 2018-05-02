@@ -153,6 +153,9 @@ public:
 
   class iterator;
 
+  friend bool operator==(iterator, iterator);
+  friend bool operator!=(iterator, iterator);
+
   iterator begin() const;
   iterator end() const;
 
