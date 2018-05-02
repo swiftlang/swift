@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines an interopability layer for talking to Python from Swift.
+// This file defines an interoperability layer for talking to Python from Swift.
 //
 //===----------------------------------------------------------------------===//
 //
@@ -642,18 +642,18 @@ public struct PythonInterface {
 // MARK: Python List, Dictionary, Slice and Tuple Helpers
 //===----------------------------------------------------------------------===//
 
-private func pySlice(_ start: PythonConvertible,
-                     _ end: PythonConvertible,
+private func pySlice(_ start: PythonConvertible?,
+                     _ stop: PythonConvertible?,
                      _ step: PythonConvertible? = nil) -> OwnedPyObject {
-  let startP = start.ownedPyObject
-  let endP = end.ownedPyObject
+  let startP = start?.ownedPyObject
+  let stopP = stop?.ownedPyObject
   let stepP = step?.ownedPyObject
 
   // PySlice_New takes each operand at +0, and returns +1.
-  let result = PySlice_New(startP, endP, stepP)!
+  let result = PySlice_New(startP, stopP, stepP)!
 
   Py_DecRef(startP)
-  Py_DecRef(endP)
+  Py_DecRef(stopP)
   Py_DecRef(stepP)  // Py_DecRef is nil safe.
   return result
 }
@@ -672,7 +672,7 @@ private func pyTuple<T : Collection>(_ vals: T) -> OwnedPyObject
 
 public extension PyValue {
   /// - FIXME: This should be subsumed by Swift ranges + strides.  Python has a
-  ///   very extravagent model though, it isn't clear how best to represent this
+  ///   very extravagant model though, it isn't clear how best to represent this
   ///   in Swift.
   ///
   /// Initial thoughts are that we should sugar the obvious cases (so you can
@@ -682,10 +682,10 @@ public extension PyValue {
   /// We also need conditional conformances to allow range if PyValue's to be a
   /// Slice.  We can probably get away with a bunch of overloads for now given
   /// that slices are typically used with concrete operands.
-  init(slice start: PythonConvertible,
-       _ end: PythonConvertible,
-       _ step: PythonConvertible? = nil) {
-    self.init(owned: pySlice(start, end, step))
+  init(sliceStart start: PythonConvertible?,
+       stop: PythonConvertible?,
+       step: PythonConvertible? = nil) {
+    self.init(owned: pySlice(start, stop, step))
   }
 
   // Tuples will require explicit support until Tuples can conform to protocols,
@@ -945,6 +945,61 @@ extension Dictionary : PythonConvertible
     }
 
     return PyValue(owned: dict)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Range Conformances to PythonConvertible
+//===----------------------------------------------------------------------===//
+
+extension Range : PythonConvertible where Bound : PythonConvertible {
+  public init?(_ pyValue: PyValue) {
+    guard isType(pyValue, type: &PySlice_Type) else { return nil }
+    guard let lowerBound = Bound(pyValue.start),
+          let upperBound = Bound(pyValue.stop) else {
+       return nil
+    }
+    guard pyValue.step == Python.None else { return nil }
+    self.init(uncheckedBounds: (lowerBound, upperBound))
+  }
+
+  public var pythonValue: PyValue {
+    _ = Python // ensure Python is initialized.
+    return PyValue(sliceStart: self.lowerBound,
+                   stop: self.upperBound,
+                   step: nil)
+  }
+}
+
+extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
+  public init?(_ pyValue: PyValue) {
+    guard isType(pyValue, type: &PySlice_Type) else { return nil }
+    guard let lowerBound = Bound(pyValue.start) else { return nil }
+    guard pyValue.stop == Python.None, pyValue.step == Python.None else {
+       return nil
+    }
+    self.init(lowerBound)
+  }
+
+  public var pythonValue: PyValue {
+    _ = Python // ensure Python is initialized.
+    return PyValue(sliceStart: self.lowerBound, stop: nil, step: nil)
+  }
+}
+
+extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
+  public init?(_ pyValue: PyValue) {
+    guard isType(pyValue, type: &PySlice_Type) else { return nil }
+    guard let upperBound = Bound(pyValue.stop) else { return nil }
+    guard pyValue.start == Python.None, pyValue.step == Python.None else {
+       return nil
+    }
+    self.init(upperBound)
+  }
+
+  public var pythonValue: PyValue {
+    _ = Python // ensure Python is initialized.
+    return PyValue(sliceStart: nil, stop: self.upperBound, step: nil)
   }
 }
 
