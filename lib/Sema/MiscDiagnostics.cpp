@@ -2085,14 +2085,10 @@ static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
     return;
 
   // Only diagnose for non-owning ownerships such as 'weak' and 'unowned'.
-  switch (ownershipAttr->get()) {
-  case ReferenceOwnership::Strong:
+  // Zero is the default/strong ownership strength.
+  if (ReferenceOwnership::Strong == ownershipAttr->get() ||
+      isLessStrongThan(ReferenceOwnership::Strong, ownershipAttr->get()))
     return;
-  case ReferenceOwnership::Weak:
-  case ReferenceOwnership::Unowned:
-  case ReferenceOwnership::Unmanaged:
-    break;
-  }
 
   // Try to find a call to a constructor.
   initExpr = lookThroughExprsToImmediateDeallocation(initExpr);

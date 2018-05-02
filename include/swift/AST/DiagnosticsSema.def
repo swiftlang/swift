@@ -3392,10 +3392,12 @@ ERROR(invalid_ownership_protocol_type,none,
       (ReferenceOwnership, Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
-ERROR(invalid_weak_ownership_not_optional,none,
-      "'weak' variable should have optional type %0", (Type))
-ERROR(invalid_weak_let,none,
-      "'weak' must be a mutable variable, because it may change at runtime", ())
+ERROR(invalid_ownership_not_optional,none,
+      "%0 variable should have optional type %1",
+      (ReferenceOwnership, Type))
+ERROR(invalid_ownership_is_let,none,
+      "%0 must be a mutable variable, because it may change at runtime",
+      (ReferenceOwnership))
 ERROR(ownership_invalid_in_protocols,none,
       "%0 cannot be applied to a property declaration in a protocol",
       (ReferenceOwnership))
