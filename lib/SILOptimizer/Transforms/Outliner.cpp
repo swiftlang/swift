@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-outliner"
 
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
@@ -217,7 +218,7 @@ class BridgedProperty : public OutlinePattern {
   SingleValueInstruction *FirstInst; // A load or class_method
   SILBasicBlock *StartBB;
   SwitchInfo switchInfo;
-  ObjCMethodInst *ObjCMethod;;
+  ObjCMethodInst *ObjCMethod;
   StrongReleaseInst *Release;
   ApplyInst *PropApply;
 

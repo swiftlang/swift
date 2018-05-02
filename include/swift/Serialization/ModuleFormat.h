@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 409; // Last change: standalone requirement subs
+const uint16_t VERSION_MINOR = 411; // Last change: copy_block_without_escaping
 
 using DeclIDField = BCFixed<31>;
 
@@ -87,6 +87,11 @@ using GenericSignatureIDField = DeclIDField;
 // same way.
 using GenericEnvironmentID = DeclID;
 using GenericEnvironmentIDField = DeclIDField;
+
+// SubstitutionMapID must be the same as DeclID because it is stored in the
+// same way.
+using SubstitutionMapID = DeclID;
+using SubstitutionMapIDField = DeclIDField;
 
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
@@ -583,7 +588,7 @@ namespace input_block {
     LINK_LIBRARY,
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
-    MODULE_FLAGS,
+    MODULE_FLAGS, // [unused]
     SEARCH_PATH
   };
 
@@ -616,11 +621,6 @@ namespace input_block {
     BCBlob
   >;
 
-  using ModuleFlagsLayout = BCRecordLayout<
-    MODULE_FLAGS,
-    BCFixed<1> // has underlying module? [[UNUSED]]
-  >;
-
   using SearchPathLayout = BCRecordLayout<
     SEARCH_PATH,
     BCFixed<1>, // framework?
@@ -649,10 +649,10 @@ namespace decls_block {
 
   using NameAliasTypeLayout = BCRecordLayout<
     NAME_ALIAS_TYPE,
-    DeclIDField, // typealias decl
-    TypeIDField, // parent type
-    TypeIDField  // underlying type
-    // trailing substitutions
+    DeclIDField,      // typealias decl
+    TypeIDField,      // parent type
+    TypeIDField,      // underlying type
+    SubstitutionMapIDField // substitution map
   >;
 
   using GenericTypeParamTypeLayout = BCRecordLayout<
@@ -1224,6 +1224,14 @@ namespace decls_block {
     BCArray<TypeIDField>         // generic parameter types
   >;
 
+  using SubstitutionMapLayout = BCRecordLayout<
+    SUBSTITUTION_MAP,
+    GenericSignatureIDField,     // generic signature
+    BCVBR<5>,                    // # of conformances
+    BCArray<TypeIDField>         // replacement types
+    // Conformances trail the record.
+  >;
+
   using SILGenericEnvironmentLayout = BCRecordLayout<
     SIL_GENERIC_ENVIRONMENT,
     BCArray<TypeIDField>         // (generic parameter name, sugared interface
@@ -1599,7 +1607,8 @@ namespace index_block {
     DECL_MEMBER_NAMES,
 
     GENERIC_SIGNATURE_OFFSETS,
-    LastRecordKind = GENERIC_SIGNATURE_OFFSETS,
+    SUBSTITUTION_MAP_OFFSETS,
+    LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;

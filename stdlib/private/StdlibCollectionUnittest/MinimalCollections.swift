@@ -333,7 +333,7 @@ internal struct _CollectionStateTransition {
       transitions = Box<[_CollectionStateTransition]>([])
       _CollectionStateTransition._allTransitions[previousState] = transitions
     }
-    if let i = transitions!.value.index(where: { $0._operation == operation }) {
+    if let i = transitions!.value.firstIndex(where: { $0._operation == operation }) {
       self = transitions!.value[i]
       return
     }

@@ -871,7 +871,7 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
   return A;
 }
 
-using RemainingArgsHandler = std::function<void(InputArgList &, unsigned)>;
+using RemainingArgsHandler = llvm::function_ref<void(InputArgList &, unsigned)>;
 
 std::unique_ptr<InputArgList>
 parseArgsUntil(const llvm::opt::OptTable& Opts,
@@ -1832,7 +1832,8 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
       OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
-                   llvm::toString(std::move(Err)));
+                   llvm::toString(std::move(Err)), A->getValue());
+    return None;
   }
   return *OFM;
 }

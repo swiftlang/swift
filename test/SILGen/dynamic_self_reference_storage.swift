@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 class Foo {
   // CHECK-LABEL: sil hidden @$S30dynamic_self_reference_storage3FooC0A4Self{{[_0-9a-zA-Z]*}}F

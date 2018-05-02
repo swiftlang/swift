@@ -805,7 +805,7 @@ public func withUnsafeBytes<T, Result>(
 ///     If you want to mutate a value by writing through a pointer, use
 ///     `withUnsafeMutableBytes(of:_:)` instead.
 /// - Returns: The return value, if any, of the `body` closure.
-@_inlineable
+@inlinable
 public func withUnsafeBytes<T, Result>(
   of value: T,
   _ body: (UnsafeRawBufferPointer) throws -> Result

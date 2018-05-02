@@ -3895,7 +3895,7 @@ namespace {
     }
 
     void forNontrivialPayloads(IRGenFunction &IGF, llvm::Value *tag,
-               std::function<void (unsigned, EnumImplStrategy::Element)> f)
+               llvm::function_ref<void(unsigned, EnumImplStrategy::Element)> f)
     const {
       auto *endBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
 

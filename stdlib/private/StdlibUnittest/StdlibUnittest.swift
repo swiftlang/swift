@@ -2397,24 +2397,55 @@ public func checkEquatable<T : Equatable>(
   checkEquatable(
     [lhs, rhs],
     oracle: { expectedEqual || $0 == $1 }, message(),
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false)
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
+}
+
+internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
+  var hasher = Hasher()
+  if let seed = seed {
+    hasher.combine(seed)
+  }
+  hasher.combine(value)
+  return hasher.finalize()
+}
+
+/// Test that the elements of `instances` satisfy the semantic requirements of
+/// `Hashable`, using `equalityOracle` to generate equality and hashing
+/// expectations from pairs of positions in `instances`.
+public func checkHashable<Instances: Collection>(
+  _ instances: Instances,
+  equalityOracle: (Instances.Index, Instances.Index) -> Bool,
+  allowBrokenTransitivity: Bool = false,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where Instances.Iterator.Element: Hashable {
+  checkHashable(
+    instances,
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: equalityOracle,
+    allowBrokenTransitivity: allowBrokenTransitivity,
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
 }
 
 /// Test that the elements of `instances` satisfy the semantic
 /// requirements of `Hashable`, using `equalityOracle` to generate
-/// equality expectations from pairs of positions in `instances`.
-public func checkHashable<Instances : Collection>(
+/// equality expectations from pairs of positions in `instances`,
+/// and `hashEqualityOracle` to do the same for hashing.
+public func checkHashable<Instances: Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
+  hashEqualityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
-
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Hashable {
-
+  Instances.Iterator.Element: Hashable {
   checkEquatable(
     instances,
     oracle: equalityOracle,
@@ -2426,11 +2457,69 @@ public func checkHashable<Instances : Collection>(
     let x = instances[i]
     for j in instances.indices {
       let y = instances[j]
+      let predicted = hashEqualityOracle(i, j)
+      expectEqual(
+        predicted, hashEqualityOracle(j, i),
+        "bad hash oracle: broken symmetry between indices \(i), \(j)",
+        stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
       if x == y {
+        expectTrue(
+          predicted,
+          """
+          bad hash oracle: equality must imply hash equality
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+      }
+      if predicted {
+        expectEqual(
+          hash(x), hash(y),
+          """
+          hash(into:) expected to match, found to differ
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         expectEqual(
           x.hashValue, y.hashValue,
-          "lhs (at index \(i)): \(x)\nrhs (at index \(j)): \(y)",
-            stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+          """
+          hashValue expected to match, found to differ
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        expectEqual(
+          x._rawHashValue(seed: (0, 0)), y._rawHashValue(seed: (0, 0)),
+          """
+          _rawHashValue expected to match, found to differ
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+      } else {
+        // Try a few different seeds; at least one of them should discriminate
+        // between the hashes. It is extremely unlikely this check will fail
+        // all ten attempts, unless the type's hash encoding is not unique,
+        // or unless the hash equality oracle is wrong.
+        expectTrue(
+          (0..<10).contains { hash(x, seed: $0) != hash(y, seed: $0) },
+          """
+          hash(into:) expected to differ, found to match
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        expectTrue(
+          (0..<10 as Range<UInt64>).contains { i in
+            x._rawHashValue(seed: (0, i)) != y._rawHashValue(seed: (0, i))
+          },
+          """
+          _rawHashValue(seed:) expected to differ, found to match
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
       }
     }
   }

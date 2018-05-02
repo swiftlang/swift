@@ -866,7 +866,6 @@ public:
   }
 
   bool isConformingTo(KnownProtocolKind Kind) const {
-    StringRef Usr;
     switch (Kind) {
 #define KNOWN_PROTOCOL(NAME)                                                  \
       case KnownProtocolKind::NAME:                                           \
@@ -3990,12 +3989,7 @@ static int deserializeNameCorrection(APIDiffItemStore &Store,
       if (CI->DiffKind == NodeAnnotation::Rename) {
         auto NewName = CI->getNewName();
         auto Module = CI->ModuleName;
-        DeclNameViewer Viewer(NewName);
-        auto HasUnderScore =
-          [](StringRef S) { return S.find('_') != StringRef::npos; };
-        auto Args = Viewer.args();
-        if (HasUnderScore(Viewer.base()) ||
-            std::any_of(Args.begin(), Args.end(), HasUnderScore)) {
+        if (CI->rightCommentUnderscored()) {
           Result.insert(NameCorrectionInfo(NewName, NewName, Module));
         }
       }

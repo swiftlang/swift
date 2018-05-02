@@ -2158,7 +2158,7 @@ public:
   }
 
   void forwardDeclare(const NominalTypeDecl *NTD,
-                      std::function<void (void)> Printer) {
+                      llvm::function_ref<void(void)> Printer) {
     if (NTD->getModuleContext()->isStdlibModule())
       return;
     auto &state = seenTypes[NTD];

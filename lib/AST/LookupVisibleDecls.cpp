@@ -124,6 +124,10 @@ static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       const DeclContext *FromContext,
                                       LazyResolver *TypeResolver) {
+  // Accessors are never visible directly in the source language.
+  if (isa<AccessorDecl>(Member))
+    return false;
+
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
     TypeResolver->resolveAccessControl(Member);
@@ -383,6 +387,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
   CurrDC->getParentSourceFile()->forAllVisibleModules(
       [&](ModuleDecl::ImportedModule Import) {
         Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
+        return true;
       });
 }
 

@@ -189,7 +189,7 @@ extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     hasher.combine(base)
   }
 }

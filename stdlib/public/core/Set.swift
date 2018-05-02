@@ -349,7 +349,7 @@ extension Set: Collection {
   ///
   /// - Complexity: O(1)
   @inlinable // FIXME(sil-serialize-all)
-  public func index(of member: Element) -> Index? {
+  public func firstIndex(of member: Element) -> Index? {
     return _variantBuffer.index(forKey: member)
   }
 
@@ -357,7 +357,15 @@ extension Set: Collection {
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
-    return Optional(index(of: member))
+    return Optional(firstIndex(of: member))
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _customLastIndexOfEquatableElement(
+     _ member: Element
+    ) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(member)
   }
 
   /// The number of elements in the set.
@@ -476,23 +484,13 @@ extension Set: Equatable {
 }
 
 extension Set: Hashable {
-  /// The hash value for the set.
-  ///
-  /// Two sets that are equal will always have equal hash values.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
+  public func hash(into hasher: inout Hasher) {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
     var hash = 0
+    let seed = hasher._generateSeed()
     for member in self {
-      hash ^= _hashValue(for: member)
+      hash ^= member._rawHashValue(seed: seed)
     }
     hasher.combine(hash)
   }
@@ -1778,7 +1776,7 @@ internal struct _NativeSetBuffer<Element> {
     //
     // FIXME: Use an approximation of true per-instance seeding. We can't just
     // use the base address, because COW copies need to share the same seed.
-    let seed = _Hasher._seed
+    let seed = Hasher._seed
     let perturbation = bucketCount
     _storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
   }
@@ -2041,9 +2039,7 @@ extension _NativeSetBuffer where Element: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher.finalize() & _bucketMask
+    return k._rawHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3653,19 +3649,24 @@ extension Set.Index {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
+  public func hash(into hasher: inout Hasher) {
+  #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
-      return _nativeIndex.offset
+      hasher.combine(0 as UInt8)
+      hasher.combine(_nativeIndex.offset)
+      return
     }
-
     switch _value {
     case ._native(let nativeIndex):
-      return nativeIndex.offset
-  #if _runtime(_ObjC)
+      hasher.combine(0 as UInt8)
+      hasher.combine(nativeIndex.offset)
     case ._cocoa(let cocoaIndex):
-      return cocoaIndex.currentKeyIndex
-  #endif
+      hasher.combine(1 as UInt8)
+      hasher.combine(cocoaIndex.currentKeyIndex)
     }
+  #else
+    hasher.combine(_nativeIndex.offset)
+  #endif
   }
 }
 

@@ -144,3 +144,15 @@ func test_overloaded() {
   overloadd(0)
   // expected-error@-1 {{use of unresolved identifier 'overloadd'; did you mean 'overloaded'?}}{{3-12=overloaded}}
 }
+
+// This is one of the backtraces from rdar://36434823 but got fixed along
+// the way.
+class CircularValidationWithTypo {
+  var cdcdcdcd = ababab { // expected-error {{use of unresolved identifier 'ababab'}}
+    didSet { }
+  }
+
+  var abababab = cdcdcdc { // expected-error {{use of unresolved identifier 'cdcdcdc'}}
+    didSet { }
+  }
+}

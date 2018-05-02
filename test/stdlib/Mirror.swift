@@ -112,7 +112,7 @@ mirrors.test("BidirectionalStructure") {
   let description = y.testDescription
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
-    description[description.startIndex..<description.index(of: "d")!])
+    description[description.startIndex..<description.firstIndex(of: "d")!])
 }
 
 mirrors.test("LabeledStructure") {
@@ -478,6 +478,30 @@ mirrors.test("ObjC") {
   // a mirror; make sure we are not automatically exposing ivars of
   // Objective-C classes from the default mirror implementation.
   expectEqual(0, Mirror(reflecting: HasIVars()).children.count)
+}
+
+// rdar://problem/39629937
+@objc class ObjCClass : NSObject {
+  let value: Int
+
+  init(value: Int) { self.value = value }
+
+  override var description: String {
+    return "\(value)"
+  }
+}
+
+struct WrapObjCClassArray {
+  var array: [ObjCClass]
+}
+
+mirrors.test("struct/WrapNSArray") {
+  let nsArray: NSArray = [
+    ObjCClass(value: 1), ObjCClass(value: 2),
+    ObjCClass(value: 3), ObjCClass(value: 4)
+  ]
+  let s = String(describing: WrapObjCClassArray(array: nsArray as! [ObjCClass]))
+  expectEqual("WrapObjCClassArray(array: [1, 2, 3, 4])", s)
 }
 
 #endif // _runtime(_ObjC)

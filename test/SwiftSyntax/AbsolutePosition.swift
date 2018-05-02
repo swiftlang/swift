@@ -31,11 +31,11 @@ PositionTests.test("Visitor") {
     let content = try SwiftLang.parse(getInput("visitor.swift"))
     let source = try String(contentsOf: getInput("visitor.swift"))
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
-    expectEqual(parsed.position.byteOffset, 0)
-    expectEqual(parsed.eofToken.positionAfterSkippingLeadingTrivia.byteOffset,
-                source.count)
-    expectEqual(parsed.position.byteOffset, 0)
-    expectEqual(parsed.byteSize, source.count)
+    expectEqual(0, parsed.position.utf8Offset)
+    expectEqual(source.count,
+      parsed.eofToken.positionAfterSkippingLeadingTrivia.utf8Offset)
+    expectEqual(0, parsed.position.utf8Offset)
+    expectEqual(source.count, parsed.byteSize)
   })
 }
 
@@ -44,10 +44,10 @@ PositionTests.test("Closure") {
     let content = try SwiftLang.parse(getInput("closure.swift"))
     let source = try String(contentsOf: getInput("closure.swift"))
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
-    expectEqual(parsed.eofToken.positionAfterSkippingLeadingTrivia.byteOffset,
-                source.count)
-    expectEqual(parsed.position.byteOffset, 0)
-    expectEqual(parsed.byteSize, source.count)
+    expectEqual(source.count, 
+      parsed.eofToken.positionAfterSkippingLeadingTrivia.utf8Offset)
+    expectEqual(0, parsed.position.utf8Offset)
+    expectEqual(source.count, parsed.byteSize)
   })
 }
 
@@ -57,9 +57,9 @@ PositionTests.test("Rename") {
     let parsed = try SourceFileSyntax.decodeSourceFileSyntax(content)
     let renamed = FuncRenamer().visit(parsed) as! SourceFileSyntax
     let renamedSource = renamed.description
-    expectEqual(renamed.eofToken.positionAfterSkippingLeadingTrivia.byteOffset,
-                renamedSource.count)
-    expectEqual(renamed.byteSize, renamedSource.count)
+    expectEqual(renamedSource.count, 
+      renamed.eofToken.positionAfterSkippingLeadingTrivia.utf8Offset)
+    expectEqual(renamedSource.count, renamed.byteSize)
   })
 }
 
@@ -74,8 +74,8 @@ PositionTests.test("CurrentFile") {
         _ = node.positionAfterSkippingLeadingTrivia
       }
       override func visit(_ node: TokenSyntax) {
-        expectEqual(node.position.byteOffset + node.leadingTrivia.byteSize,
-                    node.positionAfterSkippingLeadingTrivia.byteOffset)
+        expectEqual(node.positionAfterSkippingLeadingTrivia.utf8Offset,
+          node.position.utf8Offset + node.leadingTrivia.byteSize)
       }
     }
     Visitor().visit(parsed)
@@ -125,13 +125,14 @@ PositionTests.test("Trivias") {
   expectDoesNotThrow({
     let idx = 5
     let root = createSourceFile(idx + 1)
-    expectEqual(root.leadingTrivia!.count, 3)
-    expectEqual(root.trailingTrivia!.count, 0)
+    expectEqual(3, root.leadingTrivia!.count)
+    expectEqual(0, root.trailingTrivia!.count)
     let state = root.statements[idx]
-    expectEqual(state.leadingTrivia!.count, 3)
-    expectEqual(state.trailingTrivia!.count, 1)
-    expectEqual(state.leadingTrivia!.byteSize + state.trailingTrivia!.byteSize
-      + state.byteSizeAfterTrimmingTrivia, state.byteSize)
+    expectEqual(3, state.leadingTrivia!.count)
+    expectEqual(1, state.trailingTrivia!.count)
+    expectEqual(state.byteSize,
+      state.leadingTrivia!.byteSize + state.trailingTrivia!.byteSize
+        + state.byteSizeAfterTrimmingTrivia)
     expectFalse(root.statements.isImplicit)
   })
 }

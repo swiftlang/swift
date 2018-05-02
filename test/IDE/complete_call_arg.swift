@@ -45,6 +45,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FORCED_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TO_GENERIC | %FileCheck %s -check-prefix=GENERIC_TO_GENERIC
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -372,6 +374,14 @@ struct TestBoundGeneric1 {
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
 }
+
+func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
+  _ = zip(lhs, #^GENERIC_TO_GENERIC^#)
+}
+// GENERIC_TO_GENERIC: Begin completions
+// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: lhs[#Collection#]; name=lhs
+// GENERIC_TO_GENERIC: Decl[LocalVar]/Local: rhs[#Collection#]; name=rhs
+// GENERIC_TO_GENERIC: End completions
 
 func emptyOverload() {}
 func emptyOverload(foo foo: Int) {}

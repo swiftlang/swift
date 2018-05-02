@@ -1322,7 +1322,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         .highlight(SR1).highlight(SR2);
     } else
       diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
-               valueE->getType())
+               isa<ClosureExpr>(fn), valueE->getType())
         .highlight(SR1).highlight(SR2);
 
     return;

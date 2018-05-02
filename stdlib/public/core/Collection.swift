@@ -161,7 +161,7 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// that position.
 ///
 ///     let text = "Buffalo buffalo buffalo buffalo."
-///     if let firstSpace = text.index(of: " ") {
+///     if let firstSpace = text.firstIndex(of: " ") {
 ///         print(text[..<firstSpace])
 ///     }
 ///     // Prints "Buffalo"
@@ -226,7 +226,7 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// You can retrieve the same slice using the string's ranged subscript, which
 /// takes a range expression.
 ///
-///     if let firstSpace = text.index(of: " ") {
+///     if let firstSpace = text.firstIndex(of: " ") {
 ///         print(text[..<firstSpace]
 ///         // Prints "Buffalo"
 ///     }
@@ -373,7 +373,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// safe to use with `endIndex`. For example:
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let index = numbers.index(of: 30) {
+  ///     if let index = numbers.firstIndex(of: 30) {
   ///         print(numbers[index ..< numbers.endIndex])
   ///     }
   ///     // Prints "[30, 40, 50]"
@@ -439,7 +439,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// original collection. This example searches `streetsSlice` for one of the
   /// strings in the slice, and then uses that index in the original array.
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")!    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")!    // 4
   ///     print(streets[index])
   ///     // "Evarts"
   ///
@@ -497,7 +497,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(upTo: i))
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -512,7 +512,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// half-open range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(upTo:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[..<i])
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -532,7 +532,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.suffix(from: i))
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -547,7 +547,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// from the index as the collection's subscript. The subscript notation is
   /// preferred over `suffix(from:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[i...])
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -568,7 +568,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(through: i))
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -577,7 +577,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// closed range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(through:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -621,14 +621,27 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   of the collection.
   var count: Int { get }
   
-  // The following requirement enables dispatching for index(of:) when
-  // the element type is Equatable.
+  // The following requirements enable dispatching for firstIndex(of:) and
+  // lastIndex(of:) when the element type is Equatable.
+
   /// Returns `Optional(Optional(index))` if an element was found
   /// or `Optional(nil)` if an element was determined to be missing;
   /// otherwise, `nil`.
   ///
   /// - Complexity: O(*n*)
   func _customIndexOfEquatableElement(_ element: Element) -> Index??
+
+  /// Customization point for `Collection.lastIndex(of:)`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(*n*) by exploiting collection-specific knowledge.
+  ///
+  /// - Returns: `nil` if a linear search should be attempted instead,
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
+  ///
+  /// - Complexity: Hopefully less than O(`count`).
+  func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
 
   /// The first element of the collection.
   ///
@@ -1067,7 +1080,7 @@ extension Collection where SubSequence == Slice<Self> {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // Prints "Evarts"
   ///
@@ -1180,7 +1193,7 @@ extension Collection {
   }
 
   // TODO: swift-3-indexing-model - rename the following to _customIndexOfEquatable(element)?
-  /// Customization point for `Collection.index(of:)`.
+  /// Customization point for `Collection.firstIndex(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(*n*) by exploiting collection-specific knowledge.
@@ -1189,10 +1202,26 @@ extension Collection {
   ///   `Optional(nil)` if the element was not found, or
   ///   `Optional(Optional(index))` if an element was found.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: Hopefully less than O(`count`).
   @inlinable
   public // dispatching
   func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
+    return nil
+  }
+
+  /// Customization point for `Collection.lastIndex(of:)`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(*n*) by exploiting collection-specific knowledge.
+  ///
+  /// - Returns: `nil` if a linear search should be attempted instead,
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
+  ///
+  /// - Complexity: Hopefully less than O(`count`).
+  @inlinable
+  public // dispatching
+  func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
     return nil
   }
 }
@@ -1402,7 +1431,7 @@ extension Collection {
   /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(upTo: i))
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -1417,7 +1446,7 @@ extension Collection {
   /// half-open range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(upTo:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[..<i])
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -1440,7 +1469,7 @@ extension Collection {
   /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.suffix(from: i))
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -1455,7 +1484,7 @@ extension Collection {
   /// from the index as the collection's subscript. The subscript notation is
   /// preferred over `suffix(from:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[i...])
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -1479,7 +1508,7 @@ extension Collection {
   /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(through: i))
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -1488,7 +1517,7 @@ extension Collection {
   /// closed range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(through:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"

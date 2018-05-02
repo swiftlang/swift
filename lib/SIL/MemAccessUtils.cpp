@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILUndef.h"
 
 using namespace swift;
 
@@ -115,6 +116,30 @@ static void checkSwitchEnumBlockArg(SILPHIArgument *arg) {
   }
 }
 
+/// Return true if the given address value is produced by a special address
+/// producer that is only used for local initialization, not formal access.
+static bool isAddressForLocalInitOnly(SILValue sourceAddr) {
+  switch (sourceAddr->getKind()) {
+  default:
+    return false;
+
+  // Value to address conversions: the operand is the non-address source
+  // value. These allow local mutation of the value but should never be used
+  // for formal access of an lvalue.
+  case ValueKind::OpenExistentialBoxInst:
+  case ValueKind::ProjectExistentialBoxInst:
+    return true;
+
+  // Self-evident local initialization.
+  case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::InitExistentialAddrInst:
+  case ValueKind::AllocExistentialBoxInst:
+  case ValueKind::AllocValueBufferInst:
+  case ValueKind::ProjectValueBufferInst:
+    return true;
+  }
+}
+
 AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
   SILValue address = sourceAddr;
   while (true) {
@@ -127,9 +152,12 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     // Handle other unidentified address sources.
     switch (address->getKind()) {
     default:
+      if (isAddressForLocalInitOnly(address))
+        return AccessedStorage(address, AccessedStorage::Unidentified);
       return AccessedStorage();
 
     case ValueKind::PointerToAddressInst:
+    case ValueKind::SILUndef:
       return AccessedStorage(address, AccessedStorage::Unidentified);
 
     // A block argument may be a box value projected out of
@@ -181,22 +209,6 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     case ValueKind::IndexAddrInst:
       address = cast<SingleValueInstruction>(address)->getOperand(0);
       continue;
-
-    // Value to address conversions: the operand is the non-address source
-    // value. These allow local mutation of the value but should never be used
-    // for formal access of an lvalue.
-    case ValueKind::OpenExistentialBoxInst:
-    case ValueKind::ProjectExistentialBoxInst:
-    case ValueKind::ProjectValueBufferInst:
-      return AccessedStorage(address, AccessedStorage::Unidentified);
-
-    // Local initialization: these cases are skipped.
-    case ValueKind::InitEnumDataAddrInst:
-    case ValueKind::InitExistentialAddrInst:
-    case ValueKind::AllocExistentialBoxInst:
-    case ValueKind::AllocValueBufferInst:
-    case ValueKind::SILUndef:
-      return AccessedStorage(address, AccessedStorage::Unidentified);
     }
   }
 }
@@ -231,6 +243,35 @@ static bool isScratchBuffer(SILValue value) {
     value->getType().getSwiftRValueType());
 }
 
+bool swift::memInstMustInitialize(Operand *memOper) {
+  SILValue address = memOper->get();
+  SILInstruction *memInst = memOper->getUser();
+
+  switch (memInst->getKind()) {
+  default:
+    return false;
+
+  case SILInstructionKind::CopyAddrInst: {
+    auto *CAI = cast<CopyAddrInst>(memInst);
+    return CAI->getDest() == address && CAI->isInitializationOfDest();
+  }
+  case SILInstructionKind::InitExistentialAddrInst:
+  case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::InjectEnumAddrInst:
+    return true;
+
+  case SILInstructionKind::StoreInst:
+    return cast<StoreInst>(memInst)->getOwnershipQualifier()
+           == StoreOwnershipQualifier::Init;
+
+  case SILInstructionKind::StoreWeakInst:
+    return cast<StoreWeakInst>(memInst)->isInitializationOfDest();
+
+  case SILInstructionKind::StoreUnownedInst:
+    return cast<StoreUnownedInst>(memInst)->isInitializationOfDest();
+  }
+}
+
 bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
                                        SILFunction *F) {
   switch (storage.getKind()) {
@@ -259,6 +300,9 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     return isPossibleFormalAccessBase(nestedStorage, F);
   }
   case AccessedStorage::Unidentified:
+    if (isAddressForLocalInitOnly(storage.getValue()))
+      return false;
+
     if (isa<SILPHIArgument>(storage.getValue())) {
       checkSwitchEnumBlockArg(cast<SILPHIArgument>(storage.getValue()));
       return false;
@@ -268,12 +312,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     if (isa<PointerToAddressInst>(storage.getValue()))
       return false;
 
-    // Existential initialization is just initialization.
-    if (isa<InitExistentialAddrInst>(storage.getValue()))
-      return false;
-
-    // Enum initialization is just initialization.
-    if (isa<InitEnumDataAddrInst>(storage.getValue()))
+    if (isa<SILUndef>(storage.getValue()))
       return false;
 
     if (isScratchBuffer(storage.getValue()))
@@ -292,7 +331,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
 /// including arguments to @noescape functions that are passed as closures to
 /// the current call.
 static void visitApplyAccesses(ApplySite apply,
-                               std::function<void(Operand *)> visitor) {
+                               llvm::function_ref<void(Operand *)> visitor) {
   for (Operand &oper : apply.getArgumentOperands()) {
     // Consider any address-type operand an access. Whether it is read or modify
     // depends on the argument convention.
@@ -316,7 +355,7 @@ static void visitApplyAccesses(ApplySite apply,
 }
 
 static void visitBuiltinAddress(BuiltinInst *builtin,
-                                std::function<void(Operand *)> visitor) {
+                                llvm::function_ref<void(Operand *)> visitor) {
   if (auto kind = builtin->getBuiltinKind()) {
     switch (kind.getValue()) {
     default:
@@ -391,7 +430,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
 }
 
 void swift::visitAccessedAddress(SILInstruction *I,
-                                 std::function<void(Operand *)> visitor) {
+                                 llvm::function_ref<void(Operand *)> visitor) {
   assert(I->mayReadOrWriteMemory());
 
   // Reference counting instructions do not access user visible memory.
@@ -474,6 +513,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::CopyUnownedValueInst:
   case SILInstructionKind::DeinitExistentialAddrInst:

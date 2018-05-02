@@ -48,6 +48,19 @@ enum Result<T> {
   }
 }
 
+func overParenthesized() {
+  // SR-7492: Space projection needs to treat extra paren-patterns explicitly.
+  let x: Result<(Result<Int>, String)> = .Ok((.Ok(1), "World"))
+  switch x {
+  case let .Error(e):
+    print(e)
+  case let .Ok((.Error(e), b)):
+    print(e, b)
+  case let .Ok((.Ok(a), b)): // No warning here.
+    print(a, b)
+  }
+}
+
 enum Foo {
   case A(Int)
   case B(Int)
@@ -314,6 +327,7 @@ func switcheroo(a: XX, b: XX) -> Int {
 enum PatternCasts {
   case one(Any)
   case two
+  case three(String)
 }
 
 func checkPatternCasts() {
@@ -323,6 +337,7 @@ func checkPatternCasts() {
   case .one(let s as String): print(s)
   case .one: break
   case .two: break
+  case .three: break
   }
 
   // But should warn here.
@@ -330,6 +345,14 @@ func checkPatternCasts() {
   case .one(_): print(s)
   case .one: break // expected-warning {{case is already handled by previous patterns; consider removing it}}
   case .two: break
+  case .three: break
+  }
+
+  // And not here
+  switch x {
+  case .one: break
+  case .two: break
+  case .three(let s as String?): print(s as Any)
   }
 }
 

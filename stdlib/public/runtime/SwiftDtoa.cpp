@@ -30,21 +30,18 @@
 ///
 /// Loitsch' original Grisu2 implementation guarantees round-trip
 /// accuracy but only generates the shortest decimal expansion about 99%
-/// of the time.  Grisu3 addresses this by essentially running two
-/// copies of Grisu2 in parallel: one copy biased to avoid inaccuracy,
-/// the other biased to avoid generating excess digits. If they agree,
-/// then the result must be both accurate and short. But if they
-/// disagree, then Grisu3 gives up and must defer to another algorithm.
+/// of the time.  Grisu3 is similar, but fails rather than producing
+/// a result that is not the shortest possible.
 ///
 /// The Errol paper provides a deeper analysis of the cases where
 /// Grisu2 fails to find the shortest decimal expansion. There
 /// are two root causes of such failures:
 ///
 /// * Insufficient precision leads to scattered failures across the
-///   entire range.  Theorem 7 in the Errol paper shows a way to
-///   construct a superset of the numbers subject to such failures.
-///   With this list, we can simply test whether we have sufficient
-///   precision.
+///   entire range.  The enumeration technique described in the Errol
+///   paper shows a way to construct a superset of the numbers subject
+///   to such failures.  With this list, we can simply test whether we
+///   have sufficient precision.
 ///
 ///   For Double, the Errol3 algorithm uses double-double arithmetic
 ///   with about 106 bits precision. This turns out to be not quite
@@ -59,19 +56,16 @@
 ///   that for all three cases, an n-bit significand can be formatted
 ///   optimally with no more than 2n+7 bits of intermediate precision.
 ///
-/// * For numbers with even significands and a specific range of
-///   exponents, the shortest value might occur exactly at the midpoint
-///   between two adjacent binary floating-point values. Theorem 6 of
-///   the Errol paper characterizes this sufficiently to allow us to
-///   vary our strategy. Errol3 uses a separate formatter for this
-///   case. This implementation instead widens the interval (as in
-///   Grisu3), which allows us to use the same fast digit generation in
-///   all cases, providing uniform performance across the entire range.
+/// * Sometimes, the shortest value might occur exactly at the
+///   midpoint between two adjacent binary floating-point values.
+///   When converted back to binary, this will round to the adjacent
+///   even significand.  We handle this by widening the interval
+///   whenever the significand is even in order to allow these
+///   exact midpoints to be considered.
 ///
-/// In addition to addressing the shortness failures characterized in
-/// the Errol paper, the implementation here also incorporates
-/// final-digit corrections from Grisu3, allowing it to produce the
-/// optimal decimal decomposition in all cases.
+/// In addition to addressing the shortness failures characterized in the Errol
+/// paper, the implementation here also incorporates final-digit corrections
+/// that allow it to produce the optimal decimal decomposition in all cases.
 ///
 /// In summary, this implementation is:
 ///
@@ -80,7 +74,8 @@
 ///
 /// * Simple. It is only a little more complex than Loitsch' original
 ///   implementation of Grisu2.  The full digit decomposition for double
-///   is less than 300 lines of standard C.
+///   is less than 300 lines of standard C, including routine arithmetic
+///   helper functions.
 ///
 /// * Always Accurate. Converting the decimal form back to binary
 ///   will always yield exactly the same value.  For the IEEE 754
@@ -94,16 +89,17 @@
 ///   chooses the result that is closest to the exact floating-point
 ///   value. (In case of an exact tie, it rounds the last digit even.)
 ///
-/// For single-precision Float, these claims have been exhaustively
-/// tested -- all 2^32 values can be checked in under an hour on a
-/// mid-range modern laptop. The Double and Float80 formatters rely on
-/// results from the Errol paper to ensure correctness.  In addition,
-/// we have verified more than 10^13 randomly-chosen values by comparing
-/// the results to the output of Errol4.
+/// For single-precision Float, we can simply test all 2^32 values.
+/// This requires only a few minutes on a mid-range modern laptop. The
+/// Double and Float80 formatters rely on results from the Errol paper
+/// to ensure correctness.  In addition, we have verified more than
+/// 10^14 randomly-chosen Double values by comparing the results to the
+/// output of Grisu3 (where Grisu3 fails, we've compared to Errol4).
 ///
 // ----------------------------------------------------------------------------
 
 #include <float.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -162,19 +158,6 @@
 //
 
 #if SWIFT_DTOA_FLOAT_SUPPORT || SWIFT_DTOA_DOUBLE_SUPPORT || SWIFT_DTOA_FLOAT80_SUPPORT
-#if HAVE_UINT128_T
-typedef __uint128_t swift_uint128_t;
-#define initialize128WithHighLow64(dest, high64, low64) ((dest) = ((__uint128_t)(high64) << 64) | (low64))
-#else
-typedef struct {
-    uint32_t low, b, c, high;
-} swift_uint128_t;
-#define initialize128WithHighLow64(dest, high64, low64) \
-    ((dest).low = (uint32_t)(low64),                    \
-     (dest).b = (uint32_t)((low64) >> 32),              \
-     (dest).c = (uint32_t)(high64),                     \
-     (dest).high = (uint32_t)((high64) >> 32))
-#endif
 static int binaryExponentFor10ToThe(int p);
 static int decimalExponentFor2ToThe(int e);
 #endif
@@ -188,9 +171,29 @@ static uint64_t multiply64x32RoundingDown(uint64_t lhs, uint32_t rhs);
 static uint64_t multiply64x32RoundingUp(uint64_t lhs, uint32_t rhs);
 static uint64_t multiply64x64RoundingDown(uint64_t lhs, uint64_t rhs);
 static uint64_t multiply64x64RoundingUp(uint64_t lhs, uint64_t rhs);
-static uint64_t shiftRightRoundingUp64(uint64_t lhs, int shift);
 static void intervalContainingPowerOf10_Float(int p, uint64_t *lower, uint64_t *upper, int *exponent);
 #endif
+
+//
+// Helpers used by both the double-precision and float80 formatters
+//
+
+#if SWIFT_DTOA_DOUBLE_SUPPORT || SWIFT_DTOA_FLOAT80_SUPPORT
+#if HAVE_UINT128_T
+typedef __uint128_t swift_uint128_t;
+#define initialize128WithHighLow64(dest, high64, low64) ((dest) = ((__uint128_t)(high64) << 64) | (low64))
+#else
+typedef struct {
+    uint32_t low, b, c, high;
+} swift_uint128_t;
+#define initialize128WithHighLow64(dest, high64, low64) \
+    ((dest).low = (uint32_t)(low64),                    \
+     (dest).b = (uint32_t)((low64) >> 32),              \
+     (dest).c = (uint32_t)(high64),                     \
+     (dest).high = (uint32_t)((high64) >> 32))
+#endif
+#endif
+
 
 //
 // Helper functions used only by the double-precision formatter
@@ -415,16 +418,12 @@ int swift_decompose_double(double d,
     static const int integerBits = 14;
     static const int fractionBits = 128 - integerBits;
 
-    // We scale the interval in one of two different ways...
+    // We scale the interval in one of two different ways,
+    // depending on whether the significand is even or odd...
 
-    // This value comes from the Errol paper, Theorem 6
-    static const int maxIntegerMidpointExponent = 131;
     swift_uint128_t u, l;
-    if (((significandBitPattern & 1) != 0)
-        || (binaryExponent < significandBitCount + 3)
-        || (binaryExponent > maxIntegerMidpointExponent)) {
-
-        // Case A: Narrow the interval
+    if (significandBitPattern & 1) {
+        // Case A: Narrow the interval (odd significand)
 
         // Loitsch' original Grisu2 always narrows the interval.
         // Since our digit generation will select a value within
@@ -438,9 +437,12 @@ int swift_decompose_double(double d,
         // miss.  This risk obviously gets lower with increased
         // precision, but it wasn't until the Errol paper that anyone
         // had a good way to test whether a particular implementation
-        // had sufficient precision.  Using Errol Theorem 7 and tinkering
-        // with the `fractionBits` parameter above, you can show that
-        // 110 fraction bits is sufficient for Double.
+        // had sufficient precision.  That paper shows a way to enumerate
+        // the worst-case numbers; those numbers that are extremely close
+        // to the mid-points between adjacent floating-point values.
+        // These are the values that might sit just outside of the
+        // narrowed interval.  By testing these values, we can verify
+        // the correctness of our implementation.
 
         // Multiply out the upper midpoint, rounding down...
         swift_uint128_t u1 = multiply128x64RoundingDown(powerOfTenRoundedDown,
@@ -455,38 +457,22 @@ int swift_decompose_double(double d,
         l = shiftRightRoundingUp128(l1, integerBits - extraBits);
 
     } else {
+        // Case B: Widen the interval (even significand)
 
-        // Case B: Widen the interval
+        // As explained in Errol Theorem 6, in certain cases there is
+        // a short decimal representation at the exact boundary of the
+        // scaled interval.  When such a number is converted back to
+        // binary, it will get rounded to the adjacent even
+        // significand.
 
-        // As explained in Errol Theorem 6, in certain cases the true
-        // shortest decimal result is at one of the exact scaled
-        // midpoints.  Any narrowing will exclude the exact midpoints,
-        // so we must widen here to ensure we consider those cases.
-        // Errol Theorem 6 explains that this can only happen if the
-        // exact midpoints are integers with even significands and
-        // exponents less than a particular bound.  (See the `if`
-        // condition above.)
+        // So when the significand is even, we widen the interval in
+        // order to ensure that the exact midpoints are considered.
+        // Of couse, this ensures that we find a short result but
+        // carries a risk of selecting a result outside of the exact
+        // scaled interval (which would be inaccurate).
 
-        // Widening the interval in this case ensures that we find a
-        // short result but carries a risk of selecting a result
-        // outside of the exact scaled interval (which would be
-        // inaccurate). For Float and Float80, it's easy to see this
-        // never happens: they use more fraction bits here than the
-        // maximum exponent for this case so any number outside the
-        // exact interval will not be an integer.  Since any
-        // non-integer will always have more digits than the adjacent
-        // integers, the digit generation will never select it.  For
-        // double, we've cut things a bit finer (114 bit fraction here
-        // is not higher than the exponent limit of 131 above), so
-        // we've had to rely on Errol Theorem 7 to enumerate possible
-        // failures to test those cases.
-
-        // Note: Grisu3 converts every number twice: once with the
-        // narrowed interval to ensure accuracy and once with the
-        // wider interval to ensure shortness.  If both agree, the
-        // result must meet both conditions.  In essence, the Errol
-        // paper provides a way to select narrowing or widening
-        // appropriately so we can avoid Grisu3's double conversion.
+        // The same testing approach described above also applies
+        // to this case.
 
         swift_uint128_t u1 = multiply128x64RoundingUp(powerOfTenRoundedUp,
                                                   upperMidpointExact);
@@ -584,9 +570,8 @@ int swift_decompose_double(double d,
         clearIntegerPart128(&t, fractionBits);
     }
 
-    // Adjust the final digit to be closer to the original value.
-    // This is basically the same as Grisu3.  It accounts for the
-    // fact that sometimes there is more than one shortest digit
+    // Adjust the final digit to be closer to the original value.  It accounts
+    // for the fact that sometimes there is more than one shortest digit
     // sequence.
 
     // For example, consider how the above would work if you had the
@@ -695,11 +680,11 @@ int swift_decompose_float(float f,
     }
 
     // Step 2: Determine the exact unscaled target interval
-    uint32_t halfUlp = (uint32_t)1 << (32 - significandBitCount - 2);
-    uint32_t quarterUlp = halfUlp >> 1;
+    static const uint32_t halfUlp = (uint32_t)1 << (32 - significandBitCount - 2);
     uint32_t upperMidpointExact = significand + halfUlp;
 
     int isBoundary = significandBitPattern == 0;
+    static const uint32_t quarterUlp = halfUlp >> 1;
     uint32_t lowerMidpointExact
         = significand - (isBoundary ? quarterUlp : halfUlp);
 
@@ -718,31 +703,28 @@ int swift_decompose_float(float f,
 
     // Step 5: Scale the interval (with rounding)
     static const int integerBits = 5;
+    const int shift = integerBits - extraBits;
+    const int roundUpBias = (1 << shift) - 1;
     static const int fractionBits = 64 - integerBits;
-    // This value comes from the Errol paper, Theorem 6
-    static const int maxIntegerMidpointExponent = 57;
     uint64_t u, l;
-    if (((significandBitPattern & 1) != 0)
-        || (binaryExponent < significandBitCount + 3)
-        || (binaryExponent > maxIntegerMidpointExponent)) {
-
-        // Narrow the interval
+    if (significandBitPattern & 1) {
+        // Narrow the interval (odd significand)
         uint64_t u1 = multiply64x32RoundingDown(powerOfTenRoundedDown,
                                                 upperMidpointExact);
-        u = u1 >> (integerBits - extraBits); // Rounding down
+        u = u1 >> shift; // Rounding down
 
         uint64_t l1 = multiply64x32RoundingUp(powerOfTenRoundedUp,
                                               lowerMidpointExact);
-        l = shiftRightRoundingUp64(l1, integerBits - extraBits);
+        l = (l1 + roundUpBias) >> shift; // Rounding Up
     } else {
-        // Widen the interval
+        // Widen the interval (even significand)
         uint64_t u1 = multiply64x32RoundingUp(powerOfTenRoundedUp,
                                               upperMidpointExact);
-        u = shiftRightRoundingUp64(u1, integerBits - extraBits);
+        u = (u1 + roundUpBias) >> shift; // Rounding Up
 
         uint64_t l1 = multiply64x32RoundingDown(powerOfTenRoundedDown,
                                                 lowerMidpointExact);
-        l = l1 >> (integerBits - extraBits); // Rounding down
+        l = l1 >> shift; // Rounding down
     }
 
     // Step 6: Align first digit, adjust exponent
@@ -761,8 +743,6 @@ int swift_decompose_float(float f,
 
     // Step 7: Generate digits
     int8_t *digit_p = digits;
-
-    // Adjustment above already set up the first digit:
     int nextDigit = (int)(t >> fractionBits);
     t &= fixedPointMask;
 
@@ -784,12 +764,13 @@ int swift_decompose_float(float f,
             skew = delta / 2 - t;
         }
         uint64_t one = (uint64_t)(1) << (64 - integerBits);
-        uint64_t fractionMask = one - 1;
+        uint64_t lastAccurateBit = 1ULL << 24;
+        uint64_t fractionMask = (one - 1) & ~(lastAccurateBit - 1);
         uint64_t oneHalf = one >> 1;
-        if ((skew & fractionMask) == oneHalf) {
+        if (((skew + (lastAccurateBit >> 1)) & fractionMask) == oneHalf) {
+            // If the skew is exactly integer + 1/2, round the last
+            // digit even after adjustment
             int adjust = (int)(skew >> (64 - integerBits));
-            // If the skew is integer + 1/2, round the last digit even
-            // after adjustment
             nextDigit = (nextDigit - adjust) & ~1;
         } else {
             // Else round to nearest...
@@ -809,8 +790,6 @@ int swift_decompose_float(float f,
 int swift_decompose_float80(long double d,
     int8_t *digits, size_t digits_length, int *decimalExponent)
 {
-    // Omit leading bit, as if we were an IEEE 754 format
-    static const int significandBitCount = LDBL_MANT_DIG - 1;
     static const int exponentBitCount = 15;
     static const int exponentMask = (1 << exponentBitCount) - 1;
     // See comments in swift_decompose_double to understand
@@ -881,14 +860,9 @@ int swift_decompose_float80(long double d,
 #else
     static const int highFractionBits = fractionBits % 32;
 #endif
-    // This value comes from the Errol paper, Theorem 6
-    static const int maxIntegerMidpointExponent = 153;
     swift_uint192_t u, l;
-    if (((significandBitPattern & 1) != 0)
-        || (binaryExponent < significandBitCount + 3)
-        || (binaryExponent > maxIntegerMidpointExponent)) {
-
-        // Narrow the interval
+    if (significandBitPattern & 1) {
+        // Narrow the interval (odd significand)
         u = powerOfTenRoundedDown;
         multiply192x128RoundingDown(&u, upperMidpointExact);
         shiftRightRoundingDown192(&u, integerBits - extraBits);
@@ -897,7 +871,7 @@ int swift_decompose_float80(long double d,
         multiply192x128RoundingUp(&l, lowerMidpointExact);
         shiftRightRoundingUp192(&l, integerBits - extraBits);
     } else {
-        // Widen the interval
+        // Widen the interval (even significand)
         u = powerOfTenRoundedUp;
         multiply192x128RoundingUp(&u, upperMidpointExact);
         shiftRightRoundingUp192(&u, integerBits - extraBits);
@@ -1095,7 +1069,7 @@ size_t swift_format_double(double d, char *dest, size_t length)
             uint64_t payload = raw & ((1ull << (significandBitCount - 2)) - 1);
             char buff[32];
             if (payload != 0) {
-                snprintf(buff, sizeof(buff), "%s%snan(0x%llx)",
+                snprintf(buff, sizeof(buff), "%s%snan(0x%" PRIx64 ")",
                          sign, signaling, payload);
             } else {
                 snprintf(buff, sizeof(buff), "%s%snan",
@@ -1151,7 +1125,7 @@ size_t swift_format_float80(long double d, char *dest, size_t length)
             uint64_t payload = significandBitPattern & (((uint64_t)1 << 61) - 1);
             char buff[32];
             if (payload != 0) {
-                snprintf(buff, sizeof(buff), "%s%snan(0x%llx)",
+                snprintf(buff, sizeof(buff), "%s%snan(0x%" PRIx64 ")",
                          sign, signaling, payload);
             } else {
                 snprintf(buff, sizeof(buff), "%s%snan",
@@ -1362,35 +1336,23 @@ size_t swift_format_decimal(char *dest, size_t length,
 // low-order part (rounding).  So most of the arithmetic helpers here
 // are for multiplication.
 
-// Note: With 64-bit GCC and Clang, we get a lot of performance gain
-// and code simplification by using `__uint128_t`.  Otherwise, we have
-// to break things down into 32-bit chunks so we don't overflow 64-bit
-// temporaries.
+// Note: With 64-bit GCC and Clang, we get a noticable performance
+// gain by using `__uint128_t`.  Otherwise, we have to break things
+// down into 32-bit chunks so we don't overflow 64-bit temporaries.
 
 #if SWIFT_DTOA_FLOAT_SUPPORT
 // Multiply a 64-bit fraction by a 32-bit fraction, rounding down.
 static uint64_t multiply64x32RoundingDown(uint64_t lhs, uint32_t rhs) {
-#if HAVE_UINT128_T
-    __uint128_t full = (__uint128_t)lhs * rhs;
-    return (uint64_t)(full >> 32);
-#else
     static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = ((lhs & mask32) * rhs) >> 32;
     return t + (lhs >> 32) * rhs;
-#endif
 }
 
 // Multiply a 64-bit fraction by a 32-bit fraction, rounding up.
 static uint64_t multiply64x32RoundingUp(uint64_t lhs, uint32_t rhs) {
-#if HAVE_UINT128_T
-    static const __uint128_t roundingFactor = UINT32_MAX;
-    __uint128_t full = (__uint128_t)lhs * rhs;
-    return (uint64_t)((full + roundingFactor) >> 32);
-#else
     static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = (((lhs & mask32) * rhs) + mask32) >> 32;
     return t + (lhs >> 32) * rhs;
-#endif
 }
 
 // Multiply a 64-bit fraction by a 64-bit fraction, rounding down.
@@ -1404,9 +1366,19 @@ static uint64_t multiply64x64RoundingDown(uint64_t lhs, uint64_t rhs) {
     t >>= 32;
     uint64_t a = (lhs >> 32) * (rhs & mask32);
     uint64_t b = (lhs & mask32) * (rhs >> 32);
-    t += (a & mask32) + (b & mask32);
+    // Useful: If w,x,y,z are all 32-bit values, then:
+    // w * x + y + z
+    //   <= (2^64 - 2^33 + 1) + (2^32 - 1) + (2^32 - 1)
+    //   <= 2^64 - 1
+    //
+    // That is, a product of two 32-bit values plus two more 32-bit
+    // values can't overflow 64 bits.  (But "three more" can, so be
+    // careful!)
+    //
+    // Here: t + a + (b & mask32) <= 2^64 - 1
+    t += a + (b & mask32);
     t >>= 32;
-    t += (a >> 32) + (b >> 32);
+    t += (b >> 32);
     return t + (lhs >> 32) * (rhs >> 32);
 #endif
 }
@@ -1414,28 +1386,22 @@ static uint64_t multiply64x64RoundingDown(uint64_t lhs, uint64_t rhs) {
 // Multiply a 64-bit fraction by a 64-bit fraction, rounding up.
 static uint64_t multiply64x64RoundingUp(uint64_t lhs, uint64_t rhs) {
 #if HAVE_UINT128_T
-    static const __uint128_t roundingFactor = ((__uint128_t)1 << 64) - 1;
+    static const __uint128_t roundingUpBias = ((__uint128_t)1 << 64) - 1;
     __uint128_t full = (__uint128_t)lhs * rhs;
-    return (uint64_t)((full + roundingFactor) >> 64);
+    return (uint64_t)((full + roundingUpBias) >> 64);
 #else
     static const uint64_t mask32 = UINT32_MAX;
     uint64_t t = (lhs & mask32) * (rhs & mask32);
     t = (t + mask32) >> 32;
     uint64_t a = (lhs >> 32) * (rhs & mask32);
     uint64_t b = (lhs & mask32) * (rhs >> 32);
-    t += (a & mask32) + (b & mask32);
-    t = (t + mask32) >> 32;
+    t += (a & mask32) + (b & mask32) + mask32;
+    t >>= 32;
     t += (a >> 32) + (b >> 32);
     return t + (lhs >> 32) * (rhs >> 32);
 #endif
 }
 
-// Shift a 64-bit integer right, rounding up.
-static uint64_t shiftRightRoundingUp64(uint64_t lhs, int shift) {
-    uint64_t mask = ((uint64_t)1 << shift) - 1;
-    uint64_t round = ((lhs & mask) == 0) ? 0 : 1;
-    return (lhs >> shift) + round;
-}
 #endif
 
 #if SWIFT_DTOA_DOUBLE_SUPPORT
@@ -1456,9 +1422,9 @@ static swift_uint128_t multiply128x64RoundingDown(swift_uint128_t lhs, uint64_t 
     t >>= 32;
     uint64_t a = (lhs.b) * rhs0;
     uint64_t b = (lhs.low) * rhs1;
-    t += (a & mask32) + (b & mask32);
+    t += a + (b & mask32);
     t >>= 32;
-    t += (a >> 32) + (b >> 32);
+    t += (b >> 32);
     a = lhs.c * rhs0;
     b = lhs.b * rhs1;
     t += (a & mask32) + (b & mask32);
@@ -1485,9 +1451,8 @@ static swift_uint128_t multiply128x64RoundingUp(swift_uint128_t lhs, uint64_t rh
     uint64_t lhsh = (uint64_t)(lhs >> 64);
     swift_uint128_t h = (swift_uint128_t)lhsh * rhs;
     swift_uint128_t l = (swift_uint128_t)lhsl * rhs;
-    uint64_t remainder = (uint64_t)l;
-    uint64_t round = (remainder != 0) ? 1 : 0;
-    return h + (l >> 64) + round;
+    const static __uint128_t bias = ((__uint128_t)1 << 64) - 1;
+    return h + ((l + bias) >> 64);
 #else
     swift_uint128_t result;
     static const uint64_t mask32 = UINT32_MAX;
@@ -1627,9 +1592,9 @@ static void multiply192x64RoundingDown(swift_uint192_t *lhs, uint64_t rhs) {
     t >>= 32;
     uint64_t a = lhs->low * rhs1;
     uint64_t b = lhs->b * rhs0;
-    t += (a & mask32) + (b & mask32);
+    t += a + (b & mask32);
     t >>= 32;
-    t += (a >> 32) + (b >> 32);
+    t += (b >> 32);
     a = lhs->b * rhs1;
     b = lhs->c * rhs0;
     t += (a & mask32) + (b & mask32);
@@ -1782,9 +1747,9 @@ static void multiply192x128RoundingDown(swift_uint192_t *lhs, swift_uint128_t rh
     t >>= 32;
     a = (uint64_t)lhs->low * rhs.b;
     b = (uint64_t)lhs->b * rhs.low;
-    t += (a & mask32) + (b & mask32);
+    t += a + (b & mask32);
     t >>= 32;
-    t += (a >> 32) + (b >> 32);
+    t += (b >> 32);
     a = (uint64_t)lhs->low * rhs.c;
     b = (uint64_t)lhs->b * rhs.b;
     c = (uint64_t)lhs->c * rhs.low;
@@ -2326,26 +2291,19 @@ static int decimalExponentFor2ToThe(int e) {
 //    lower * 2^exponent <= 10^p <= upper * 2^exponent
 // ```
 //
-// In particular, if `10^p` can be exactly represented, this routine
-// may return the same value for `lower` and `upper`.
-//
+// Note: Max(*upper - *lower) = 3
 static void intervalContainingPowerOf10_Float(int p, uint64_t *lower, uint64_t *upper, int *exponent) {
     if (p < 0) {
         uint64_t base = powersOf10_Float[p + 40];
         int baseExponent = binaryExponentFor10ToThe(p + 40);
         uint64_t tenToTheMinus40 = 0x8b61313bbabce2c6; // x 2^-132 ~= 10^-40
-        *lower = multiply64x64RoundingDown(base, tenToTheMinus40);
         *upper = multiply64x64RoundingUp(base + 1, tenToTheMinus40 + 1);
+        *lower = multiply64x64RoundingDown(base, tenToTheMinus40);
         *exponent = baseExponent - 132;
-    } else if (p <= 27) {
-        uint64_t exact = powersOf10_Float[p];
-        *upper = exact;
-        *lower = exact;
-        *exponent = binaryExponentFor10ToThe(p);
     } else {
-        uint64_t exact = powersOf10_Float[p];
-        *upper = exact + 1;
-        *lower = exact;
+        uint64_t base = powersOf10_Float[p];
+        *upper = base + 1;
+        *lower = base;
         *exponent = binaryExponentFor10ToThe(p);
     }
 }

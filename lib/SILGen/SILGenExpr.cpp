@@ -3640,7 +3640,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
     SILValue hashCode;
 
-    // TODO: Combine hashes of the indexes using an inout _Hasher
+    // TODO: Combine hashes of the indexes using an inout Hasher
     {
       auto &index = indexes[0];
       
@@ -5499,8 +5499,9 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   // Now create the verification of the withoutActuallyEscaping operand.
   // Either we fail the uniquenes check (which means the closure has escaped)
   // and abort or we continue and destroy the ultimate reference.
-  auto isEscaping =
-      SGF.B.createIsEscapingClosure(loc, borrowedClosure.getValue());
+  auto isEscaping = SGF.B.createIsEscapingClosure(
+      loc, borrowedClosure.getValue(),
+      IsEscapingClosureInst::WithoutActuallyEscaping);
   SGF.B.createCondFail(loc, isEscaping);
   return rvalue;
 }

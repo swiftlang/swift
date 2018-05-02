@@ -554,14 +554,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // We care about whether the parameter list of the callee syntactically
       // has more than one argument.  It has to *syntactically* have a tuple
       // type as its argument.  A ParenType wrapping a TupleType is a single
-      // parameter. 
-      if (isa<TupleType>(FT->getInput().getPointer())) {
-        auto TT = FT->getInput()->getAs<TupleType>();
-        if (TT->getNumElements() > 1) {
-          TC.diagnose(Call->getLoc(), diag::tuple_splat_use,
-                      TT->getNumElements())
-            .highlight(Call->getArg()->getSourceRange());
-        }
+      // parameter.
+      auto params = FT->getParams();
+      if (params.size() > 1) {
+        TC.diagnose(Call->getLoc(), diag::tuple_splat_use, params.size())
+          .highlight(Call->getArg()->getSourceRange());
       }
     }
 

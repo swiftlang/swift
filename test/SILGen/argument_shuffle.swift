@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s
 
 struct Horse<T> {
   func walk(_: (String, Int), reverse: Bool) {}

@@ -12,7 +12,7 @@ struct HugeAlignment {
 }
 
 // TODO: could be the context param
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @huge_method(%T17indirect_argument4HugeV* noalias nocapture swiftself dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @huge_method(%T17indirect_argument4HugeV* noalias nocapture swiftself dereferenceable({{.*}}))
 // CHECK-NOT:     alloca
 // CHECK:         call swiftcc void @huge_method(%T17indirect_argument4HugeV* noalias nocapture swiftself dereferenceable({{.*}}) %0)
 sil @huge_method : $@convention(method) Huge -> () {
@@ -22,7 +22,7 @@ entry(%x : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @huge_param(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @huge_param(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NOT:         alloca
 // CHECK:         call swiftcc void @huge_param(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %0)
 sil @huge_param : $@convention(thin) Huge -> () {
@@ -32,7 +32,7 @@ entry(%x : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @huge_alignment_param(%T17indirect_argument13HugeAlignmentV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @huge_alignment_param(%T17indirect_argument13HugeAlignmentV* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NOT:     alloca
 // CHECK:         call swiftcc void @huge_alignment_param(%T17indirect_argument13HugeAlignmentV* noalias nocapture dereferenceable({{.*}}) %0)
 sil @huge_alignment_param : $@convention(thin) HugeAlignment -> () {
@@ -42,7 +42,7 @@ entry(%x : $HugeAlignment):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @huge_param_and_return(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @huge_param_and_return(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP_RET:%.*]] = alloca
 // CHECK:         call swiftcc void @huge_param_and_return(%T17indirect_argument4HugeV* noalias nocapture sret [[TMP_RET]], %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1)
 sil @huge_param_and_return : $@convention(thin) Huge -> Huge {
@@ -52,7 +52,7 @@ entry(%x : $Huge):
   return %z : $Huge
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @huge_param_and_indirect_return(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @huge_param_and_indirect_return(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NOT:     alloca
 // CHECK:         call swiftcc void @huge_param_and_indirect_return(%T17indirect_argument4HugeV* noalias nocapture sret %0, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1)
 sil @huge_param_and_indirect_return : $@convention(thin) (Huge) -> @out Huge {
@@ -62,7 +62,7 @@ entry(%o : $*Huge, %x : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @huge_partial_application(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @huge_partial_application(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NOT:     alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %T17indirect_argument4HugeV }>*
@@ -79,7 +79,7 @@ entry(%x : $Huge, %y : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @huge_partial_application_stret(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @huge_partial_application_stret(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP_RET:%.*]] = alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %T17indirect_argument4HugeV }>*

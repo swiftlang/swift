@@ -507,6 +507,26 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
                                              CanSILFunctionType loweredBlockTy){
   auto loweredFuncTy = fn.getType().castTo<SILFunctionType>();
 
+  // If we store a @noescape closure in a block verify that the block has not
+  // escaped by storing a withoutActuallyEscaping closure in the block and after
+  // the block is ultimately destroyed checking that the closure is uniquely
+  // referenced.
+  bool useWithoutEscapingVerifcation = false;
+	ManagedValue escaping;
+  if (loweredFuncTy->isNoEscape()) {
+    auto escapingTy = loweredFuncTy->getWithExtInfo(
+        loweredFuncTy->getExtInfo().withNoEscape(false));
+
+    escaping = createWithoutActuallyEscapingClosure(
+        loc, fn, SILType::getPrimitiveObjectType(escapingTy));
+    loweredFuncTy = escapingTy;
+    auto escapingAnyTy =
+        funcType.withExtInfo(funcType->getExtInfo().withNoEscape(false));
+    funcType = escapingAnyTy;
+    fn = B.createCopyValue(loc, escaping);
+    useWithoutEscapingVerifcation = true;
+  }
+
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnInterfaceTy = cast<SILFunctionType>(
@@ -586,7 +606,15 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
                                                    subs);
 
   // Copy the block so we have an independent heap object we can hand off.
-  auto heapBlock = B.createCopyBlock(loc, stackBlock);
+
+  // If withoutActuallyEscaping verification is requested we emit a
+  // copy_block_without_escaping %block withoutEscaping %closure instruction.
+  // A mandatory SIL pass will replace this instruction by the required
+  // verification instruction sequence.
+  auto heapBlock = useWithoutEscapingVerifcation
+                       ? SILValue(B.createCopyBlockWithoutEscaping(
+                             loc, stackBlock, escaping.forward(*this)))
+                       : SILValue(B.createCopyBlock(loc, stackBlock));
   return emitManagedRValueWithCleanup(heapBlock);
 }
 

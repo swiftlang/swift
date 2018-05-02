@@ -27,7 +27,7 @@
 using namespace swift;
 
 void LookupResult::filter(
-    const std::function<bool(LookupResultEntry, bool)> &pred) {
+    llvm::function_ref<bool(LookupResultEntry, bool)> pred) {
   size_t index = 0;
   size_t originalFirstOuter = IndexOfFirstOuterResult;
   Results.erase(std::remove_if(Results.begin(), Results.end(),

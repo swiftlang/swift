@@ -21,6 +21,11 @@ module visualc [system] {
     export *
   }
 
+  module vcruntime {
+    header "vcruntime.h"
+    export *
+  }
+
   module stdint {
     header "stdint.h"
     export *

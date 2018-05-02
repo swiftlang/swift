@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s
+// RUN: %target-swift-emit-silgen -module-name materializeForSet %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name materializeForSet -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s
 
 class Base {
   var stored: Int = 0

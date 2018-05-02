@@ -258,9 +258,9 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// For example, this code finds the first letter after the first space:
   ///
   ///     let str = "Greetings, friend! How are you?"
-  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  ///     let firstSpace = str.firstIndex(of: " ") ?? str.endIndex
   ///     let substr = str[firstSpace...]
-  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///     if let nextCapital = substr.firstIndex(where: { $0 >= "A" && $0 <= "Z" }) {
   ///         print("Capital after a space: \(str[nextCapital])")
   ///     }
   ///     // Prints "Capital after a space: H"
@@ -436,7 +436,7 @@ extension String {
   /// removes the hyphen from the middle of a string.
   ///
   ///     var nonempty = "non-empty"
-  ///     if let i = nonempty.index(of: "-") {
+  ///     if let i = nonempty.firstIndex(of: "-") {
   ///         nonempty.remove(at: i)
   ///     }
   ///     print(nonempty)

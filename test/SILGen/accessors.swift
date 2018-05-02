@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name accessors -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name accessors -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}

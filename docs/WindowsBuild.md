@@ -126,8 +126,8 @@ set llvm_bin_dir="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windo
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt and could take up to
-  two hours depending on your system.
+- This must be done from within a developer command prompt and could take hours 
+  depending on your system.
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
 ```cmd
@@ -170,6 +170,25 @@ cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
 cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
  -DCMAKE_GENERATOR_PLATFORM="x64"^
  ...
+```
+
+### 8. Build lldb
+- This must be done from within a developer command prompt and could take hours
+  depending on your system.
+```cmd
+mkdir "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+cmake -G "Ninja" "%swift_source_dir%/lldb"^
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+  -DLLDB_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
+  -DLLDB_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"^
+  -DLLDB_PATH_TO_LLVM_SOURCE="%swift_source_dir%/llvm"^
+  -DLLDB_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+  -DLLDB_PATH_TO_CLANG_SOURCE="%swift_source_dir%/clang"^
+  -DLLDB_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+  -DLLVM_ENABLE_ASSERTIONS=YES
+popd
+cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
 ```
 
 ## MSVC

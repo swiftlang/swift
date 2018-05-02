@@ -173,7 +173,8 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
   case SyntaxKind::OptionalChainingExpr:
   case SyntaxKind::ForcedValueExpr:
   case SyntaxKind::PostfixUnaryExpr:
-  case SyntaxKind::TernaryExpr: {
+  case SyntaxKind::TernaryExpr:
+  case SyntaxKind::AvailabilityLabeledArgument: {
     auto Pair = SyntaxFactory::countChildren(Kind);
     assert(Pair.first == Pair.second);
     createNodeInPlace(Kind, Pair.first);
@@ -234,7 +235,21 @@ public:
                             "expression");
     visitChildren(Node);
   }
-
+  void visit(UnknownStmtSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "statement");
+    visitChildren(Node);
+  }
+  void visit(UnknownTypeSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "type");
+    visitChildren(Node);
+  }
+  void visit(UnknownPatternSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "pattern");
+    visitChildren(Node);
+  }
   void verify(Syntax Node) {
     Node.accept(*this);
   }
@@ -301,6 +316,20 @@ void SyntaxParsingContext::finalizeRoot() {
   // Clear the parts because we will call this function again when destroying
   // the root context.
   getRootData().Storage.clear();
+}
+
+void SyntaxParsingContext::synthesize(tok Kind, StringRef Text) {
+  if (!Enabled)
+    return;
+  if (Text.empty())
+    Text = getTokenText(Kind);
+  Storage.push_back(RawSyntax::missing(Kind, Text));
+}
+
+void SyntaxParsingContext::synthesize(SyntaxKind Kind) {
+  if (!Enabled)
+    return;
+  Storage.push_back(RawSyntax::missing(Kind));
 }
 
 SyntaxParsingContext::~SyntaxParsingContext() {
