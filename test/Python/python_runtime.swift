@@ -44,6 +44,44 @@ PythonRuntimeTestSuite.test("pydict") {
   expectEqual("d", dict["b"])
 }
 
+PythonRuntimeTestSuite.test("range") {
+  let slice = PyValue(5..<10)
+  expectEqual(Python.slice.call(with: 5, 10), slice)
+  expectEqual(5, slice.start)
+  expectEqual(10, slice.stop)
+
+  let range = Range<Int>(slice)
+  expectNotNil(range)
+  expectEqual(5, range?.lowerBound)
+  expectEqual(10, range?.upperBound)
+
+  expectNil(Range<Int>(PyValue(5...)))
+}
+
+PythonRuntimeTestSuite.test("partialrangefrom") {
+  let slice = PyValue(5...)
+  expectEqual(Python.slice.call(with: 5, Python.None), slice)
+  expectEqual(5, slice.start)
+
+  let range = PartialRangeFrom<Int>(slice)
+  expectNotNil(range)
+  expectEqual(5, range?.lowerBound)
+
+  expectNil(PartialRangeFrom<Int>(PyValue(..<5)))
+}
+
+PythonRuntimeTestSuite.test("partialrangeupto") {
+  let slice = PyValue(..<5)
+  expectEqual(Python.slice.call(with: 5), slice)
+  expectEqual(5, slice.stop)
+
+  let range = PartialRangeUpTo<Int>(slice)
+  expectNotNil(range)
+  expectEqual(5, range?.upperBound)
+
+  expectNil(PartialRangeUpTo<Int>(PyValue(5...)))
+}
+
 PythonRuntimeTestSuite.test("binary-ops") {
   expectEqual(42, PyValue(42))
   expectEqual(42, PyValue(2) + PyValue(40))
