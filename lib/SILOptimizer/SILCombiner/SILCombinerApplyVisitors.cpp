@@ -600,6 +600,51 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return tryToConcatenateStrings(AI, Builder);
 }
 
+/// Determine the pattern for global_addr.
+/// %3 = global_addr @$P : $*SomeP
+/// %4 = init_existential_addr %3 : $*SomeP, $SomeC
+/// %5 = alloc_ref $SomeC
+/// store %5 to %4 : $*SomeC
+/// %8 = alloc_stack $SomeP
+/// copy_addr %3 to [initialization] %8 : $*SomeP
+/// %9 = open_existential_addr immutable_access %8 : $*SomeP to $*@opened SomeP
+static SILValue findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
+                                                  CopyAddrInst *CAI) {
+  assert(CAI->getSrc() == SILValue(GAI) &&
+         "Broken Assumption! Global Addr is not the source of the passed in "
+         "copy_addr?!");
+
+  /// Check for a single InitExistential usage for GAI and
+  /// a simple dominance check: both InitExistential and CAI are in
+  /// the same basic block and only one InitExistential
+  /// occurs between GAI and CAI.
+  llvm::SmallPtrSet<SILInstruction *, 8> IEUses;
+  for (auto *Use : GAI->getUses()) {
+    if (auto *InitExistential =
+            dyn_cast<InitExistentialAddrInst>(Use->getUser())) {
+      IEUses.insert(InitExistential);
+    }
+  }
+
+  /// No InitExistential found in the basic block.
+  if (IEUses.empty())
+    return SILValue();
+
+  /// Walk backwards from CAI instruction till the begining of the basic block
+  /// looking for InitExistential.
+  SILValue SingleIE;
+  for (auto II = CAI->getIterator().getReverse(), IE = CAI->getParent()->rend();
+       II != IE; ++II) {
+    if (!IEUses.count(&*II))
+      continue;
+    if (SingleIE)
+      return SILValue();
+
+    SingleIE = cast<InitExistentialAddrInst>(&*II);
+  }
+  return SingleIE;
+}
+
 /// Returns the address of an object with which the stack location \p ASI is
 /// initialized. This is either a init_existential_addr or the destination of a
 /// copy_addr. Returns a null value if the address does not dominate the
@@ -666,6 +711,10 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
       return getAddressOfStackInit(ASI, CAI, isCopied);
+    // Check if the CAISrc is a global_addr.
+    if (auto *GAI = dyn_cast<GlobalAddrInst>(CAISrc)) {
+      return findInitExistentialFromGlobalAddr(GAI, CAI);
+    }
     return CAISrc;
   }
   return cast<InitExistentialAddrInst>(SingleWrite);
