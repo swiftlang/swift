@@ -85,8 +85,8 @@ func testBridgeDowncastExact(_ obj: BridgedClass, objOpt: BridgedClass?,
   _ = objImplicitOpt as! BridgedStruct // expected-warning{{forced cast from 'BridgedClass?' to 'BridgedStruct' only unwraps and bridges; did you mean to use '!' with 'as'?}}{{21-21=!}}{{22-25=as}}
 
   _ = obj is BridgedStruct // expected-warning{{'is' test is always true}}
-  _ = objOpt is BridgedStruct // expected-warning{{checking a value with optional type 'BridgedClass?' against dynamic type 'BridgedStruct' succeeds whenever the value is non-'nil'; did you mean to use '!= nil'?}}{{14-30=!= nil}}
-  _ = objImplicitOpt is BridgedStruct // expected-warning{{checking a value with optional type 'BridgedClass?' against dynamic type 'BridgedStruct' succeeds whenever the value is non-'nil'; did you mean to use '!= nil'?}}{{22-38=!= nil}}
+  _ = objOpt is BridgedStruct // expected-warning{{checking a value with optional type 'BridgedClass?' against dynamic type 'BridgedStruct' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}{{14-30=!= nil}}
+  _ = objImplicitOpt is BridgedStruct // expected-warning{{checking a value with optional type 'BridgedClass?' against dynamic type 'BridgedStruct' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}{{22-38=!= nil}}
 }
 
 func testExplicitBridging(_ object: BridgedClass, value: BridgedStruct) {
