@@ -424,6 +424,7 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
 static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
   auto M = ModuleDecl::create(ctx.getIdentifier(BUILTIN_NAME), ctx);
   M->addFile(*new (ctx) BuiltinUnit(*M));
+  M->setHasResolvedImports();
   return M;
 }
 

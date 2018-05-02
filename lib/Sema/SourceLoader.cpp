@@ -154,6 +154,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     performTypeChecking(*importFile, persistentState.getTopLevelContext(),
                         None);
+  importMod->setHasResolvedImports();
   return importMod;
 }
 

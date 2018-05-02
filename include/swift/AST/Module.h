@@ -206,6 +206,7 @@ private:
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
     unsigned ResilienceStrategy : 1;
+    unsigned HasResolvedImports : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);
@@ -255,6 +256,13 @@ public:
   }
   void setFailedToLoad(bool failed = true) {
     Flags.FailedToLoad = failed;
+  }
+
+  bool hasResolvedImports() const {
+    return Flags.HasResolvedImports;
+  }
+  void setHasResolvedImports() {
+    Flags.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
