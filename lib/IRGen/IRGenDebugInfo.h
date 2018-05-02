@@ -136,11 +136,13 @@ public:
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
                         const SILDebugScope *DS);
 
+  enum { NotHeapAllocated = false };
+  
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit,
+                                     bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
