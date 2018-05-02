@@ -373,8 +373,9 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Extension of the above hack. Identical to getImportedModulesForLookup()
-  /// for imported modules, otherwise also includes @usableFromInline imports.
+  /// Extension of the above hack. Behaves identically to
+  /// getImportedModulesForLookup() for Clang modules, otherwise also
+  /// includes @usableFromInline imports.
   void
   getImportedModulesForLinking(SmallVectorImpl<ImportedModule> &imports) const;
 
