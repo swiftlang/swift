@@ -3460,9 +3460,20 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
 ReferenceStorageType *ReferenceStorageType::get(Type T,
                                                 ReferenceOwnership ownership,
                                                 const ASTContext &C) {
-  assert(ownership != ReferenceOwnership::Strong &&
-         "ReferenceStorageType is unnecessary for strong ownership");
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
+  switch (optionalityOf(ownership)) {
+  case ReferenceOwnershipOptionality::Disallowed:
+    assert(!T->getOptionalObjectType() && "optional type is disallowed");
+    break;
+  case ReferenceOwnershipOptionality::Allowed:
+    break;
+  case ReferenceOwnershipOptionality::AllowedIfImporting:
+    break;
+  case ReferenceOwnershipOptionality::Required:
+    assert(T->getOptionalObjectType() && "optional type is required");
+    break;
+  }
+
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -3470,21 +3481,14 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
   auto &entry = C.getImpl().getArena(arena).ReferenceStorageTypes[key];
   if (entry) return entry;
 
-
   switch (ownership) {
   case ReferenceOwnership::Strong:
-    llvm_unreachable("not possible");
-  case ReferenceOwnership::Unowned:
-    return entry = new (C, arena) UnownedStorageType(
-               T, T->isCanonical() ? &C : nullptr, properties);
-  case ReferenceOwnership::Weak:
-    assert(T->getOptionalObjectType() &&
-           "object of weak storage type is not optional");
-    return entry = new (C, arena)
-               WeakStorageType(T, T->isCanonical() ? &C : nullptr, properties);
-  case ReferenceOwnership::Unmanaged:
-    return entry = new (C, arena) UnmanagedStorageType(
-               T, T->isCanonical() ? &C : nullptr, properties);
+    llvm_unreachable("strong ownership does not use ReferenceStorageType");
+#define REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    return entry = new (C, arena) \
+      Name##StorageType(T, T->isCanonical() ? &C : nullptr, properties);
+#include "swift/AST/ReferenceStorage.def"
   }
   llvm_unreachable("bad ownership");
 }

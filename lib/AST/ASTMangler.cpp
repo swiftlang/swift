@@ -21,6 +21,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Ownership.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -803,17 +804,11 @@ void ASTMangler::appendType(Type type) {
       appendType(cast<InOutType>(tybase)->getObjectType());
       return appendOperator("z");
 
-    case TypeKind::UnmanagedStorage:
-      appendType(cast<UnmanagedStorageType>(tybase)->getReferentType());
-      return appendOperator("Xu");
-
-    case TypeKind::UnownedStorage:
-      appendType(cast<UnownedStorageType>(tybase)->getReferentType());
-      return appendOperator("Xo");
-
-    case TypeKind::WeakStorage:
-      appendType(cast<WeakStorageType>(tybase)->getReferentType());
-      return appendOperator("Xw");
+#define REF_STORAGE(Name, ...) \
+    case TypeKind::Name##Storage: \
+      appendType(cast<Name##StorageType>(tybase)->getReferentType()); \
+      return appendOperator(manglingOf(ReferenceOwnership::Name));
+#include "swift/AST/ReferenceStorage.def"
 
     case TypeKind::Tuple:
       appendTypeList(type);

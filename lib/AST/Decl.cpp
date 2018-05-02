@@ -302,13 +302,9 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      ReferenceOwnership RO) {
-  switch (RO) {
-  case ReferenceOwnership::Strong: return OS << "'strong'";
-  case ReferenceOwnership::Weak: return OS << "'weak'";
-  case ReferenceOwnership::Unowned: return OS << "'unowned'";
-  case ReferenceOwnership::Unmanaged: return OS << "'unowned(unsafe)'";
-  }
-  llvm_unreachable("bad ReferenceOwnership kind");
+  if (RO == ReferenceOwnership::Strong)
+    return OS << "'strong'";
+  return OS << "'" << keywordOf(RO) << "'";
 }
 
 DeclContext *Decl::getInnermostDeclContext() const {
@@ -1218,8 +1214,9 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
 static bool isDefaultInitializable(const TypeRepr *typeRepr) {
   // Look through most attributes.
   if (const auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-    // Weak ownership implies optionality.
-    if (attributed->getAttrs().getOwnership() == ReferenceOwnership::Weak)
+    // Ownership kinds have optionalness requirements.
+    if (optionalityOf(attributed->getAttrs().getOwnership()) ==
+        ReferenceOwnershipOptionality::Required)
       return true;
 
     return isDefaultInitializable(attributed->getTypeRepr());

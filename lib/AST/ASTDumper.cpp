@@ -3229,23 +3229,13 @@ namespace {
       OS << ")";
     }
 
-    void visitUnownedStorageType(UnownedStorageType *T, StringRef label) {
-      printCommon(label, "unowned_storage_type");
-      printRec(T->getReferentType());
-      OS << ")";
+#define REF_STORAGE(Name, name, ...) \
+    void visit##Name##StorageType(Name##StorageType *T, StringRef label) { \
+      printCommon(label, #name "_storage_type"); \
+      printRec(T->getReferentType()); \
+      OS << ")"; \
     }
-
-    void visitUnmanagedStorageType(UnmanagedStorageType *T, StringRef label) {
-      printCommon(label, "unmanaged_storage_type");
-      printRec(T->getReferentType());
-      OS << ")";
-    }
-
-    void visitWeakStorageType(WeakStorageType *T, StringRef label) {
-      printCommon(label, "weak_storage_type");
-      printRec(T->getReferentType());
-      OS << ")";
-    }
+#include "swift/AST/ReferenceStorage.def"
 
     void visitEnumType(EnumType *T, StringRef label) {
       printCommon(label, "enum_type");

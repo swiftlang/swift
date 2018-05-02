@@ -3871,23 +3871,13 @@ public:
     Printer.printName(T->getName());
   }
 
-  void visitUnownedStorageType(UnownedStorageType *T) {
-    if (Options.PrintStorageRepresentationAttrs)
-      Printer << "@sil_unowned ";
-    visit(T->getReferentType());
+#define REF_STORAGE(Name, name, ...) \
+  void visit##Name##StorageType(Name##StorageType *T) { \
+    if (Options.PrintStorageRepresentationAttrs) \
+      Printer << "@sil_" #name " "; \
+    visit(T->getReferentType()); \
   }
-
-  void visitUnmanagedStorageType(UnmanagedStorageType *T) {
-    if (Options.PrintStorageRepresentationAttrs)
-      Printer << "@sil_unmanaged ";
-    visit(T->getReferentType());
-  }
-
-  void visitWeakStorageType(WeakStorageType *T) {
-    if (Options.PrintStorageRepresentationAttrs)
-      Printer << "@sil_weak ";
-    visit(T->getReferentType());
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   void visitTypeVariableType(TypeVariableType *T) {
     if (T->getASTContext().LangOpts.DebugConstraintSolver) {

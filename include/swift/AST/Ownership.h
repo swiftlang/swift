@@ -33,7 +33,6 @@ namespace swift {
 enum class ReferenceOwnership : uint8_t {
   /// \brief a strong reference (the default semantics)
   Strong,
-  Default = Strong,
 
 #define REF_STORAGE(Name, ...) Name,
 #define REF_STORAGE_RANGE(First, Last) Last_Kind = Last

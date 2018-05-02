@@ -4882,13 +4882,12 @@ public:
   Type getReferentType() const { return Referent; }
   ReferenceOwnership getOwnership() const {
     switch (getKind()) {
-    case TypeKind::WeakStorage:
-      return ReferenceOwnership::Weak;
-    case TypeKind::UnownedStorage:
-      return ReferenceOwnership::Unowned;
-    case TypeKind::UnmanagedStorage:
-      return ReferenceOwnership::Unmanaged;
-    default: llvm_unreachable("Unhandled reference storage type");
+#define REF_STORAGE(Name, ...) \
+    case TypeKind::Name##Storage: \
+      return ReferenceOwnership::Name;
+#include "swift/AST/ReferenceStorage.def"
+    default:
+      llvm_unreachable("Unhandled reference storage type");
     }
   }
 
@@ -4907,86 +4906,38 @@ static CanReferenceStorageType get(CanType referent,
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
 
-/// \brief The storage type of a variable with @unowned ownership semantics.
-class UnownedStorageType : public ReferenceStorageType {
-  friend class ReferenceStorageType;
-  UnownedStorageType(Type referent, const ASTContext *C,
-                     RecursiveTypeProperties properties)
-    : ReferenceStorageType(TypeKind::UnownedStorage, referent, C, properties) {}
-
-public:
-  static UnownedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnownedStorageType *>(
-        ReferenceStorageType::get(referent, ReferenceOwnership::Unowned, C));
-  }
-
-  /// Is this unowned storage type known to be loadable within the given
-  /// resilience scope?
-  bool isLoadable(ResilienceExpansion resilience) const;
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::UnownedStorage;
-  }
-};
-BEGIN_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
-  static CanUnownedStorageType get(CanType referent) {
-    return cast<UnownedStorageType>(
-        CanType(UnownedStorageType::get(referent, referent->getASTContext())));
-  }
-END_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
-
-/// \brief The storage type of a variable with @unowned(unsafe)
-/// ownership semantics, akin to the library Unmanaged<> type.
-class UnmanagedStorageType : public ReferenceStorageType {
-  friend class ReferenceStorageType;
-  UnmanagedStorageType(Type referent, const ASTContext *C,
-                       RecursiveTypeProperties properties)
-    : ReferenceStorageType(TypeKind::UnmanagedStorage, referent, C,
-                           properties) {}
-
-public:
-  static UnmanagedStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<UnmanagedStorageType *>(
-        ReferenceStorageType::get(referent, ReferenceOwnership::Unmanaged, C));
-  }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::UnmanagedStorage;
-  }
-};
-BEGIN_CAN_TYPE_WRAPPER(UnmanagedStorageType, ReferenceStorageType)
-  static CanUnmanagedStorageType get(CanType referent) {
-    return cast<UnmanagedStorageType>(
-       CanType(UnmanagedStorageType::get(referent, referent->getASTContext())));
-  }
-END_CAN_TYPE_WRAPPER(UnmanagedStorageType, ReferenceStorageType)
-
-/// \brief The storage type of a variable with [weak] ownership semantics.
-class WeakStorageType : public ReferenceStorageType {
-  friend class ReferenceStorageType;
-  WeakStorageType(Type referent, const ASTContext *C,
-                  RecursiveTypeProperties properties)
-    : ReferenceStorageType(TypeKind::WeakStorage, referent, C, properties) {}
-
-public:
-  static WeakStorageType *get(Type referent, const ASTContext &C) {
-    return static_cast<WeakStorageType *>(
-        ReferenceStorageType::get(referent, ReferenceOwnership::Weak, C));
-  }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::WeakStorage;
-  }
-};
-BEGIN_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
-  static CanWeakStorageType get(CanType referent) {
-    return cast<WeakStorageType>(
-       CanType(WeakStorageType::get(referent, referent->getASTContext())));
-  }
-END_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
+#define REF_STORAGE_HELPER(Name, isLoadable) \
+class Name##StorageType : public ReferenceStorageType { \
+  friend class ReferenceStorageType; \
+  Name##StorageType(Type referent, const ASTContext *C, \
+                    RecursiveTypeProperties properties) \
+    : ReferenceStorageType(TypeKind::Name##Storage, referent, C, properties){} \
+public: \
+  static Name##StorageType *get(Type referent, const ASTContext &C) { \
+    return static_cast<Name##StorageType *>( \
+        ReferenceStorageType::get(referent, ReferenceOwnership::Name, C)); \
+  } \
+  isLoadable \
+  static bool classof(const TypeBase *T) { \
+    return T->getKind() == TypeKind::Name##Storage; \
+  } \
+}; \
+BEGIN_CAN_TYPE_WRAPPER(Name##StorageType, ReferenceStorageType) \
+  static Can##Name##StorageType get(CanType referent) { \
+    return cast<Name##StorageType>( \
+        CanType(Name##StorageType::get(referent, referent->getASTContext()))); \
+  } \
+END_CAN_TYPE_WRAPPER(Name##StorageType, ReferenceStorageType)
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  REF_STORAGE_HELPER(Name, )
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  REF_STORAGE_HELPER(Name, )
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  REF_STORAGE_HELPER(Name, )
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  REF_STORAGE_HELPER(Name, bool isLoadable(ResilienceExpansion resilience) const;)
+#include "swift/AST/ReferenceStorage.def"
+#undef REF_STORAGE_HELPER
 
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {
