@@ -231,11 +231,18 @@ namespace {
         return Space(C);
       }
       static Space forDisjunct(ArrayRef<Space> SP) {
-        if (SP.empty())
+        SmallVector<Space, 4> spaces(SP.begin(), SP.end());
+        spaces.erase(
+            std::remove_if(spaces.begin(), spaces.end(),
+                           [](const Space &space) { return space.isEmpty(); }),
+            spaces.end());
+
+        if (spaces.empty())
           return Space();
-        if (SP.size() == 1)
-          return SP.front();
-        return Space(SP);
+        if (spaces.size() == 1)
+          return spaces.front();
+
+        return Space(spaces);
       }
 
       bool operator==(const Space &other) const {
@@ -805,7 +812,23 @@ namespace {
             // into each parameter.
             SmallVector<Space, 4> copyParams(this->getSpaces().begin(),
                                              this->getSpaces().end());
-            copyParams[idx] = s1.minus(s2, TC, DC);
+
+            auto reducedSpace = s1.minus(s2, TC, DC);
+            // If one of the constructor parameters is empty it means
+            // the whole constructor space is empty as well, so we can
+            // safely skip it.
+            if (reducedSpace.isEmpty())
+              continue;
+
+            // If reduced produced the same space as original one, we
+            // should return it directly instead of trying to create
+            // a disjunction of its sub-spaces because nothing got reduced.
+            // This is especially helpful when dealing with `unknown` case
+            // in parameter positions.
+            if (s1 == reducedSpace)
+              return *this;
+
+            copyParams[idx] = reducedSpace;
             Space CS = Space::forConstructor(this->getType(), this->getHead(),
                                              this->canDowngradeToWarning(),
                                              copyParams);
