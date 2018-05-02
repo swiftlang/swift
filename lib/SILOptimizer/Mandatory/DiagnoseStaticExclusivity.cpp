@@ -689,7 +689,14 @@ findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
                            *BestArgAccess);
 }
 
-//-----------------------------------------------------------------------------
+// =============================================================================
+// The data flow algorithm that drives diagnostics.
+
+// Forward declare verification entry points.
+#ifndef NDEBUG
+static void checkNoEscapePartialApply(PartialApplyInst *PAI);
+#endif
+static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses);
 
 namespace {
 /// Track the current state of formal accesses, including exclusivity
@@ -701,6 +708,9 @@ struct AccessState {
   // emitting diagnostics until we can determine whether they should
   // be suppressed.
   llvm::SmallVector<ConflictingAccess, 4> ConflictingAccesses;
+
+  // Collects calls the Standard Library swap() for Fix-Its.
+  llvm::SmallVector<ApplyInst *, 8> CallsToSwap;
 
   StorageMap *Accesses = nullptr;
 
@@ -809,6 +819,148 @@ static void checkForViolationAtApply(ApplySite Apply, AccessState &State) {
   if (auto *PAI = dyn_cast<PartialApplyInst>(Apply.getCalleeOrigin()))
     checkForViolationAtApply(ApplySite(PAI), State);
 }
+
+// Apply transfer function to the AccessState. Beginning an access
+// increments the read or write count for the storage location;
+// Ending one decrements the count.
+static void checkForViolationsAtInstruction(SILInstruction &I,
+                                            AccessState &State) {
+  if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
+    SILAccessKind Kind = BAI->getAccessKind();
+    const AccessedStorage &Storage =
+      findValidAccessedStorage(BAI->getSource());
+    AccessInfo &Info = (*State.Accesses)[Storage];
+    const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
+    if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
+      State.ConflictingAccesses.emplace_back(Storage, *Conflict,
+                                             RecordedAccess(BAI, SubPath));
+    }
+
+    Info.beginAccess(BAI, SubPath);
+    return;
+  }
+
+  if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
+    auto It =
+      State.Accesses->find(findValidAccessedStorage(EAI->getSource()));
+    AccessInfo &Info = It->getSecond();
+
+    BeginAccessInst *BAI = EAI->getBeginAccess();
+    const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
+    Info.endAccess(EAI, SubPath);
+
+    // If the storage location has no more in-progress accesses, remove
+    // it to keep the StorageMap lean.
+    if (!Info.hasAccessesInProgress())
+      State.Accesses->erase(It);
+    return;
+  }
+
+  if (I.getModule().getOptions().VerifyExclusivity && I.mayReadOrWriteMemory()) {
+    visitAccessedAddress(&I, [&State](Operand *memOper) {
+        checkAccessedAddress(memOper, *State.Accesses);
+      });
+  }
+
+  if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+    // Record calls to swap() for potential Fix-Its.
+    if (isCallToStandardLibrarySwap(AI, I.getFunction()->getASTContext()))
+      State.CallsToSwap.push_back(AI);
+    else
+      checkForViolationAtApply(AI, State);
+    return;
+  }
+
+  if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
+    checkForViolationAtApply(TAI, State);
+    return;
+  }
+#ifndef NDEBUG
+  // FIXME: Once AllocBoxToStack is fixed to correctly set noescape
+  // closure types, move this PartialApply verification into the
+  // SILVerifier to better pinpoint the offending pass.
+  if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
+    ApplySite apply(PAI);
+    if (llvm::any_of(range(apply.getNumArguments()),
+                     [apply](unsigned argIdx) {
+                       return apply.getArgumentConvention(argIdx)
+                         == SILArgumentConvention::Indirect_InoutAliasable;
+                     })) {
+      checkNoEscapePartialApply(PAI);
+    }
+  }
+#endif
+  // Sanity check to make sure entries are properly removed.
+  assert((!isa<ReturnInst>(&I) || State.Accesses->empty())
+         && "Entries were not properly removed?!");
+}
+
+static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
+                                   AccessSummaryAnalysis *ASA) {
+  // The implementation relies on the following SIL invariants:
+  //    - All incoming edges to a block must have the same in-progress
+  //      accesses. This enables the analysis to not perform a data flow merge
+  //      on incoming edges.
+  //    - Further, for a given address each of the in-progress
+  //      accesses must have begun in the same order on all edges. This ensures
+  //      consistent diagnostics across changes to the exploration of the CFG.
+  //    - On return from a function there are no in-progress accesses. This
+  //      enables a sanity check for lean analysis state at function exit.
+  //    - Each end_access instruction corresponds to exactly one begin access
+  //      instruction. (This is encoded in the EndAccessInst itself)
+  //    - begin_access arguments cannot be basic block arguments.
+  //      This enables the analysis to look back to find the *single* storage
+  //      storage location accessed.
+
+  if (Fn.empty())
+    return;
+
+  AccessState State(ASA);
+
+  // For each basic block, track the stack of current accesses on
+  // exit from that block.
+  llvm::SmallDenseMap<SILBasicBlock *, Optional<StorageMap>, 32>
+      BlockOutAccesses;
+
+  BlockOutAccesses[Fn.getEntryBlock()] = StorageMap();
+
+  for (auto *BB : PO->getReversePostOrder()) {
+    Optional<StorageMap> &BBState = BlockOutAccesses[BB];
+
+    // Because we use a reverse post-order traversal, unless this is the entry
+    // at least one of its predecessors must have been reached. Use the out
+    // state for that predecessor as our in state. The SIL verifier guarantees
+    // that all incoming edges must have the same current accesses.
+    for (auto *Pred : BB->getPredecessorBlocks()) {
+      auto it = BlockOutAccesses.find(Pred);
+      if (it == BlockOutAccesses.end())
+        continue;
+
+      const Optional<StorageMap> &PredAccesses = it->getSecond();
+      if (PredAccesses) {
+        BBState = PredAccesses;
+        break;
+      }
+    }
+
+    // The in-progress accesses for the current program point, represented
+    // as map from storage locations to the accesses in progress for the
+    // location.
+    State.Accesses = BBState.getPointer();
+    for (auto &I : *BB)
+      checkForViolationsAtInstruction(I, State);
+  }
+
+  // Now that we've collected violations and suppressed calls, emit
+  // diagnostics.
+  for (auto &Violation : State.ConflictingAccesses) {
+    diagnoseExclusivityViolation(Violation, State.CallsToSwap,
+                                 Fn.getASTContext());
+  }
+}
+
+// =============================================================================
+// Verification
 
 #ifndef NDEBUG
 // If a partial apply has @inout_aliasable arguments, it may only be used as
@@ -952,145 +1104,8 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   error();
 }
 
-static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
-                                   AccessSummaryAnalysis *ASA) {
-  // The implementation relies on the following SIL invariants:
-  //    - All incoming edges to a block must have the same in-progress
-  //      accesses. This enables the analysis to not perform a data flow merge
-  //      on incoming edges.
-  //    - Further, for a given address each of the in-progress
-  //      accesses must have begun in the same order on all edges. This ensures
-  //      consistent diagnostics across changes to the exploration of the CFG.
-  //    - On return from a function there are no in-progress accesses. This
-  //      enables a sanity check for lean analysis state at function exit.
-  //    - Each end_access instruction corresponds to exactly one begin access
-  //      instruction. (This is encoded in the EndAccessInst itself)
-  //    - begin_access arguments cannot be basic block arguments.
-  //      This enables the analysis to look back to find the *single* storage
-  //      storage location accessed.
-
-  if (Fn.empty())
-    return;
-
-  bool VerifyMemOps = Fn.getModule().getOptions().VerifyExclusivity;
-
-  AccessState State(ASA);
-
-  // Collects calls the Standard Library swap() for Fix-Its.
-  llvm::SmallVector<ApplyInst *, 8> CallsToSwap;
-
-  // For each basic block, track the stack of current accesses on
-  // exit from that block.
-  llvm::SmallDenseMap<SILBasicBlock *, Optional<StorageMap>, 32>
-      BlockOutAccesses;
-
-  BlockOutAccesses[Fn.getEntryBlock()] = StorageMap();
-
-  for (auto *BB : PO->getReversePostOrder()) {
-    Optional<StorageMap> &BBState = BlockOutAccesses[BB];
-
-    // Because we use a reverse post-order traversal, unless this is the entry
-    // at least one of its predecessors must have been reached. Use the out
-    // state for that predecessor as our in state. The SIL verifier guarantees
-    // that all incoming edges must have the same current accesses.
-    for (auto *Pred : BB->getPredecessorBlocks()) {
-      auto it = BlockOutAccesses.find(Pred);
-      if (it == BlockOutAccesses.end())
-        continue;
-
-      const Optional<StorageMap> &PredAccesses = it->getSecond();
-      if (PredAccesses) {
-        BBState = PredAccesses;
-        break;
-      }
-    }
-
-    // The in-progress accesses for the current program point, represented
-    // as map from storage locations to the accesses in progress for the
-    // location.
-    State.Accesses = BBState.getPointer();
-
-    for (auto &I : *BB) {
-      // Apply transfer functions. Beginning an access
-      // increments the read or write count for the storage location;
-      // Ending onr decrements the count.
-      if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
-        SILAccessKind Kind = BAI->getAccessKind();
-        const AccessedStorage &Storage =
-          findValidAccessedStorage(BAI->getSource());
-        AccessInfo &Info = (*State.Accesses)[Storage];
-        const IndexTrieNode *SubPath = ASA->findSubPathAccessed(BAI);
-        if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
-          State.ConflictingAccesses.emplace_back(Storage, *Conflict,
-                                                 RecordedAccess(BAI, SubPath));
-        }
-
-        Info.beginAccess(BAI, SubPath);
-        continue;
-      }
-
-      if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
-        auto It =
-            State.Accesses->find(findValidAccessedStorage(EAI->getSource()));
-        AccessInfo &Info = It->getSecond();
-
-        BeginAccessInst *BAI = EAI->getBeginAccess();
-        const IndexTrieNode *SubPath = ASA->findSubPathAccessed(BAI);
-        Info.endAccess(EAI, SubPath);
-
-        // If the storage location has no more in-progress accesses, remove
-        // it to keep the StorageMap lean.
-        if (!Info.hasAccessesInProgress())
-          State.Accesses->erase(It);
-        continue;
-      }
-
-      if (VerifyMemOps && I.mayReadOrWriteMemory()) {
-        visitAccessedAddress(&I, [&State](Operand *memOper) {
-          checkAccessedAddress(memOper, *State.Accesses);
-        });
-      }
-
-      if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-        // Record calls to swap() for potential Fix-Its.
-        if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
-          CallsToSwap.push_back(AI);
-        else
-          checkForViolationAtApply(AI, State);
-        continue;
-      }
-
-      if (auto *TAI = dyn_cast<TryApplyInst>(&I)) {
-        checkForViolationAtApply(TAI, State);
-        continue;
-      }
-#ifndef NDEBUG
-      // FIXME: Once AllocBoxToStack is fixed to correctly set noescape
-      // closure types, move this PartialApply verification into the
-      // SILVerifier to better pinpoint the offending pass.
-      if (auto *PAI = dyn_cast<PartialApplyInst>(&I)) {
-        ApplySite apply(PAI);
-        if (llvm::any_of(range(apply.getNumArguments()),
-                         [apply](unsigned argIdx) {
-                           return apply.getArgumentConvention(argIdx)
-                             == SILArgumentConvention::Indirect_InoutAliasable;
-                         })) {
-          checkNoEscapePartialApply(PAI);
-        }
-      }
-#endif
-      // Sanity check to make sure entries are properly removed.
-      assert((!isa<ReturnInst>(&I) || State.Accesses->empty())
-             && "Entries were not properly removed?!");
-    }
-  }
-
-  // Now that we've collected violations and suppressed calls, emit
-  // diagnostics.
-  for (auto &Violation : State.ConflictingAccesses) {
-    diagnoseExclusivityViolation(Violation, CallsToSwap, Fn.getASTContext());
-  }
-}
+// =============================================================================
+// Function Pass Driver
 
 namespace {
 
