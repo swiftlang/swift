@@ -3052,6 +3052,7 @@ void ClangModuleUnit::getImportedModules(
     imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
     break;
   case ModuleDecl::ImportFilter::Public:
+  case ModuleDecl::ImportFilter::ForLinking:
     break;
   }
 
@@ -3061,6 +3062,7 @@ void ClangModuleUnit::getImportedModules(
     switch (filter) {
     case ModuleDecl::ImportFilter::All:
     case ModuleDecl::ImportFilter::Public:
+    case ModuleDecl::ImportFilter::ForLinking:
       imported.append(owner.ImportedHeaderExports.begin(),
                       owner.ImportedHeaderExports.end());
       break;
@@ -3109,6 +3111,7 @@ void ClangModuleUnit::getImportedModules(
     }
 
     case ModuleDecl::ImportFilter::Public:
+    case ModuleDecl::ImportFilter::ForLinking:
       break;
     }
   }

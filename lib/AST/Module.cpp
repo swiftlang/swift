@@ -974,6 +974,11 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
       if (importPair.second.contains(ImportFlags::Exported))
         continue;
       break;
+    case ModuleDecl::ImportFilter::ForLinking:
+      if (!importPair.second.contains(ImportFlags::UsableFromInline) &&
+          !importPair.second.contains(ImportFlags::Exported))
+        continue;
+      break;
     }
 
     modules.push_back(importPair.first);
@@ -983,6 +988,11 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
 void ModuleDecl::getImportedModulesForLookup(
     SmallVectorImpl<ImportedModule> &modules) const {
   FORWARD(getImportedModulesForLookup, (modules));
+}
+
+void ModuleDecl::getImportedModulesForLinking(
+    SmallVectorImpl<ImportedModule> &modules) const {
+  FORWARD(getImportedModulesForLinking, (modules));
 }
 
 bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
@@ -1128,11 +1138,15 @@ bool ModuleDecl::isSystemModule() const {
 }
 
 bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                  llvm::function_ref<bool(ImportedModule)> fn) {
+                                    llvm::function_ref<bool(ImportedModule)> fn,
+                                      bool includeLinkOnlyModules) {
   llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
-  getImportedModules(stack, ModuleDecl::ImportFilter::Public);
+  if (includeLinkOnlyModules)
+    getImportedModules(stack, ModuleDecl::ImportFilter::ForLinking);
+  else
+    getImportedModules(stack, ModuleDecl::ImportFilter::Public);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
   stack.push_back(ImportedModule(thisPath, this));
@@ -1158,15 +1172,20 @@ bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
     if (!fn(next))
       return false;
 
-    next.second->getImportedModulesForLookup(stack);
+    if (includeLinkOnlyModules)
+      next.second->getImportedModulesForLinking(stack);
+    else
+      next.second->getImportedModulesForLookup(stack);
   }
 
   return true;
 }
 
 bool FileUnit::forAllVisibleModules(
-    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
-  if (!getParentModule()->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn))
+    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn,
+    bool includeLinkOnlyModules) {
+  if (!getParentModule()->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn,
+                                               includeLinkOnlyModules))
     return false;
 
   if (auto SF = dyn_cast<SourceFile>(this)) {
@@ -1175,7 +1194,8 @@ bool FileUnit::forAllVisibleModules(
     SmallVector<ModuleDecl::ImportedModule, 4> imports;
     SF->getImportedModules(imports, ModuleDecl::ImportFilter::Private);
     for (auto importPair : imports)
-      if (!importPair.second->forAllVisibleModules(importPair.first, fn))
+      if (!importPair.second->forAllVisibleModules(importPair.first, fn,
+                                                   includeLinkOnlyModules))
         return false;
   }
 
@@ -1198,7 +1218,8 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
 
       next->collectLinkLibraries(callback);
       return true;
-    });
+    },
+    /*includeLinkOnlyModules=*/true);
 }
 
 bool ModuleDecl::walk(ASTWalker &Walker) {

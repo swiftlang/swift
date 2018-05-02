@@ -132,20 +132,32 @@ public:
     const StringRef RawPath;
 
   private:
-    unsigned IsExported : 1;
     const unsigned IsHeader : 1;
+    const unsigned IsExported : 1;
+    const unsigned IsUsableFromInline : 1;
     const unsigned IsScoped : 1;
 
-    Dependency(StringRef path, bool isHeader, bool exported, bool isScoped)
-      : RawPath(path), IsExported(exported), IsHeader(isHeader),
-        IsScoped(isScoped) {}
+    Dependency(bool isHeader,
+               StringRef path, bool exported,
+               bool isUsableFromInline, bool isScoped)
+      : RawPath(path),
+        IsHeader(isHeader),
+        IsExported(exported),
+        IsUsableFromInline(isUsableFromInline),
+        IsScoped(isScoped) {
+      assert(!(IsExported && IsUsableFromInline));
+      assert(!(IsHeader && IsScoped));
+    }
 
   public:
-    Dependency(StringRef path, bool exported, bool isScoped)
-      : Dependency(path, false, exported, isScoped) {}
+    Dependency(StringRef path, bool exported, bool isUsableFromInline,
+               bool isScoped)
+      : Dependency(false, path, exported, isUsableFromInline, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
-      return Dependency(headerPath, true, exported, false);
+      return Dependency(true, headerPath, exported,
+                        /*isUsableFromInline=*/false,
+                        /*isScoped=*/false);
     }
 
     bool isLoaded() const {
@@ -153,6 +165,7 @@ public:
     }
 
     bool isExported() const { return IsExported; }
+    bool isUsableFromInline() const { return IsUsableFromInline; }
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
 
