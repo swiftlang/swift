@@ -77,8 +77,8 @@ class Task {
   /// Once the Task has finished, this contains the buffered output of the Task.
   std::string Output;
 
-  /// Once the Task has finished, if SeparateErrors is true, this contains the errors
-  /// from the Task.
+  /// Once the Task has finished, if SeparateErrors is true, this contains the
+  /// errors from the Task.
   std::string Errors;
 
   /// Optional place to count I/O and subprocess events.
@@ -105,14 +105,14 @@ public:
   int getErrorPipe() const { return ErrorPipe; }
 
   /// \brief Begins execution of this Task.
-  /// \returns true on error, false on success
+  /// \returns true on error.
   bool execute();
 
   /// \brief Reads data from the pipes, if any is available.
   ///
   /// If \p UntilEnd is true, reads until the end of the stream; otherwise reads
   /// once (possibly with a retry on EINTR), and returns.
-  /// \returns true on error, false on success.
+  /// \returns true on error.
   bool readFromPipes(bool UntilEnd);
 
   /// \brief Performs any post-execution work for this Task, such as reading
@@ -257,8 +257,13 @@ static bool readFromAPipe(std::string &Output, int Pipe,
     if (readBytes < 0) {
       if (errno == EINTR)
         // read() was interrupted, so try again.
-        // FIXME: There should probably be a counter to break out of this loop
-        // if there are more than some number of EINTRs.
+        // Q: Why isn't there a counter to break out of this loop if there are
+        //    more than some number of EINTRs?
+        // A: EINTR on a blocking read means only one thing: the syscall was
+        //    interrupted and the program should retry. So there is no need to
+        //    stop retrying after any particular number of interruptions (any
+        //    more than the program would stop reading after a particular number
+        //    of bytes or whatever).
         continue;
       return true;
     }
@@ -286,7 +291,7 @@ void Task::finishExecution() {
   State = TaskState::Finished;
 
   // Read the output of the command, so we can use it later.
-  readFromPipes(/*UntilEnd*/false);
+  readFromPipes(/*UntilEnd*/ false);
 
   close(Pipe);
   if (SeparateErrors) {
@@ -355,8 +360,9 @@ public:
 /// A task is executing iff it is in TasksBeingExecuted,
 /// A task is executing iff any of its fds being polled are in FdsBeingPolled
 /// (These should be all of its output fds, but today is only stdout.)
-/// When a task finished executing, it gets cleaned up by TaskCompleter,
-/// then its storage is reclaimed.
+/// When a task has finished executing, TaskHospice waits for it to die, takes
+/// action appropriate to the cause of death, then TaskMonitor reclaims its
+/// storage.
 class TaskMonitor {
   std::queue<std::unique_ptr<Task>> &TasksToBeExecuted;
   TaskMap TasksBeingExecuted;
@@ -365,27 +371,27 @@ class TaskMonitor {
 
   const unsigned MaxNumberOfParallelTasks;
 
- public:
+public:
   struct CallBacks {
     const TaskQueue::TaskBeganCallback TaskBegan;
     const TaskQueue::TaskFinishedCallback TaskFinished;
     const TaskQueue::TaskSignalledCallback TaskSignalled;
     const llvm::function_ref<void()> PolledAnFd;
   };
- private:
 
+private:
   CallBacks callBacks;
 
 public:
   TaskMonitor(std::queue<std::unique_ptr<Task>> &TasksToBeExecuted,
-               const unsigned NumberOfParallelTasks,
-               const CallBacks &callBacks)
+              const unsigned NumberOfParallelTasks, const CallBacks &callBacks)
       : TasksToBeExecuted(TasksToBeExecuted),
         MaxNumberOfParallelTasks(
             NumberOfParallelTasks == 0 ? 1 : NumberOfParallelTasks),
         callBacks(callBacks) {}
 
-  /// Run the tasks in the queue, \return true on error.
+  /// Run the tasks to be executed.
+  /// \return true on error.
   bool executeTasks();
 
 private:
@@ -393,12 +399,12 @@ private:
     return TasksBeingExecuted.empty() && TasksToBeExecuted.empty();
   }
 
-  /// Start up tasks if we aren't
-  /// already at the parallel limit, and no earlier subtasks have failed.
-  /// \return true for error;
+  /// Start up tasks if we aren't already at the parallel limit, and no earlier
+  /// subtasks have failed.
+  /// \return true on error.
   bool startUpSomeTasks();
 
-  /// Start \param T and \return true on error.
+  /// \return true on error.
   bool beginExecutingATask(Task &T);
 
   /// Enter the task and its outputs in this TaskMonitor's data structures so
@@ -410,41 +416,40 @@ private:
   enum class PollResult { HardError, SoftError, NoError };
   PollResult pollTheFds();
 
-  /// \return None on error
+  /// \return None on error.
   Optional<std::vector<int>> readFromReadyFdsReturningFinishedOnes();
 
   /// Ensure that events bits returned from polling are what's expected.
   void verifyEvents(short events) const;
-  
+
   void readDataIfAvailable(short events, int fd, Task &T) const;
-  
+
   bool didTaskHangup(short events) const;
 };
 
-/// Do everything required to handle a task when its output has hung up.
+/// Do everything required to clean up a task when its output has hung up.
 /// Encapsulates the knowledge of how to wait, and then how to clean up.
-class TaskCompleter {
-  Task &T; // CONST? UNIQ?
-  const TaskQueue::TaskFinishedCallback FinishedCallBack;
-  const TaskQueue::TaskSignalledCallback SignalledCallBack;
+class TaskHospice {
 
 public:
-  TaskCompleter(Task &T, const TaskQueue::TaskFinishedCallback FinishedCallBack,
-                const TaskQueue::TaskSignalledCallback SignalledCallBack)
-      : T(T), FinishedCallBack(FinishedCallBack),
-        SignalledCallBack(SignalledCallBack) {}
-
-  /// \return true if had error
-  bool waitForExitThenCleanUp() const;
+  /// \return true on error.
+  static bool waitForThenDealWithDeath(
+      Task &T, const TaskQueue::TaskFinishedCallback FinishedCallBack,
+      const TaskQueue::TaskSignalledCallback SignalledCallBack);
 
 private:
-  /// \return true if had error
-  bool cleanupExitedTask(int Status) const;
-  /// \return true if had error
-  bool cleanupSignalledTask(int Status) const;
-
   /// Block until process \p pid exits then return the exit status.
   static Optional<int> waitForPid(pid_t pid);
+
+  /// \return true on error.
+  static bool
+  cleanUpAfterExit(int Status, const Task &T,
+                   const TaskQueue::TaskFinishedCallback FinishedCallBack);
+
+  /// \return true on error.
+  static bool
+  cleanUpAfterSignal(int Status, const Task &T,
+                     const TaskQueue::TaskSignalledCallback SignalledCallBack);
 };
 
 bool TaskMonitor::executeTasks() {
@@ -520,8 +525,8 @@ TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
     if (!didTaskHangup(receivedEvents))
       continue;
     finishedFds.push_back(fileDes);
-    const bool hadError = TaskCompleter(T, callBacks.TaskFinished, callBacks.TaskSignalled)
-                              .waitForExitThenCleanUp();
+    const bool hadError = TaskHospice::waitForThenDealWithDeath(
+        T, callBacks.TaskFinished, callBacks.TaskSignalled);
     TasksBeingExecuted.destroyTask(T);
     if (hadError)
       return None;
@@ -537,10 +542,11 @@ void TaskMonitor::verifyEvents(const short events) const {
     llvm_unreachable("Asked poll() to watch a closed fd");
   }
   const short expectedEvents = POLLIN | POLLPRI | POLLHUP | POLLERR;
-  assert((events & ~expectedEvents) == 0  &&  "Received unexpected event");
+  assert((events & ~expectedEvents) == 0 && "Received unexpected event");
 }
 
-void TaskMonitor::readDataIfAvailable(const short events, const int fd, Task &T) const {
+void TaskMonitor::readDataIfAvailable(const short events, const int fd,
+                                      Task &T) const {
   if (events & (POLLIN | POLLPRI)) {
     // There's data available to read. Read _some_ of it here, but not
     // necessarily _all_, since the pipe is in blocking mode and we might
@@ -550,7 +556,7 @@ void TaskMonitor::readDataIfAvailable(const short events, const int fd, Task &T)
     // FIXME: longer term, this should probably either be restructured to
     // use O_NONBLOCK, or at very least poll the stderr file descriptor as
     // well; the whole loop here is a bit of a mess.
-    T.readFromPipes(/*UntilEnd*/false);
+    T.readFromPipes(/*UntilEnd*/ false);
   }
 }
 
@@ -558,7 +564,9 @@ bool TaskMonitor::didTaskHangup(const short events) const {
   return (events & (POLLHUP | POLLERR)) != 0;
 }
 
-bool TaskCompleter::waitForExitThenCleanUp() const {
+bool TaskHospice::waitForThenDealWithDeath(
+    Task &T, const TaskQueue::TaskFinishedCallback FinishedCallBack,
+    const TaskQueue::TaskSignalledCallback SignalledCallBack) {
   const Optional<int> StatusIfOK = waitForPid(T.getPid());
   if (!StatusIfOK)
     return true;
@@ -566,12 +574,13 @@ bool TaskCompleter::waitForExitThenCleanUp() const {
   T.finishExecution();
   int Status = *StatusIfOK;
   return WIFEXITED(Status)
-             ? cleanupExitedTask(Status)
-             : WIFSIGNALED(Status) ? cleanupSignalledTask(Status)
-                                   : false /* Can this case ever happen? */;
+             ? cleanUpAfterExit(Status, T, FinishedCallBack)
+             : WIFSIGNALED(Status)
+                   ? cleanUpAfterSignal(Status, T, SignalledCallBack)
+                   : false /* Can this case ever happen? */;
 }
 
-Optional<int> TaskCompleter::waitForPid(const pid_t pidToWaitFor) {
+Optional<int> TaskHospice::waitForPid(const pid_t pidToWaitFor) {
   for (;;) {
     int Status = 0;
     const pid_t pidFromWait = waitpid(pidToWaitFor, &Status, 0);
@@ -581,13 +590,16 @@ Optional<int> TaskCompleter::waitForPid(const pid_t pidToWaitFor) {
       llvm_unreachable(
           "We asked to wait for this Task, but we got another process ID!");
     if (pidFromWait == 0)
-      llvm_unreachable("We do not pass WNOHANG, so we should always get a process ID");
+      llvm_unreachable(
+          "We do not pass WNOHANG, so we should always get a process ID");
     if (errno == ECHILD || errno == EINVAL)
       return None;
   }
 }
 
-bool TaskCompleter::cleanupExitedTask(int Status) const {
+bool TaskHospice::cleanUpAfterExit(
+    int Status, const Task &T,
+    const TaskQueue::TaskFinishedCallback FinishedCallBack) {
   const int Result = WEXITSTATUS(Status);
   if (!FinishedCallBack) {
     // Since we don't have a TaskFinishedCallback, treat a subtask
@@ -601,7 +613,9 @@ bool TaskCompleter::cleanupExitedTask(int Status) const {
                           T.getContext());
 }
 
-bool TaskCompleter::cleanupSignalledTask(int Status) const {
+bool TaskHospice::cleanUpAfterSignal(
+    int Status, const Task &T,
+    const TaskQueue::TaskSignalledCallback SignalledCallBack) {
   // The process exited due to a signal.
   const int Signal = WTERMSIG(Status);
   StringRef ErrorMsg = strsignal(Signal);
@@ -622,10 +636,10 @@ void TaskMonitor::stopPolling(ArrayRef<int> FinishedFds) {
   // Remove any fds which we've closed from FdsBeingPolled.
   for (int fd : FinishedFds) {
     auto predicate = [&fd](struct pollfd &i) { return i.fd == fd; };
-    auto iter = std::find_if(FdsBeingPolled.begin(), FdsBeingPolled.end(),
-                             predicate);
+    auto iter =
+        std::find_if(FdsBeingPolled.begin(), FdsBeingPolled.end(), predicate);
     assert(iter != FdsBeingPolled.end() &&
-                   "The finished fd must be in FdsBeingPolled!");
+           "The finished fd must be in FdsBeingPolled!");
     FdsBeingPolled.erase(iter);
   }
 }
@@ -633,9 +647,11 @@ void TaskMonitor::stopPolling(ArrayRef<int> FinishedFds) {
 bool TaskQueue::execute(TaskBeganCallback BeganCallBack,
                         TaskFinishedCallback FinishedCallBack,
                         TaskSignalledCallback SignalledCallBack) {
-  TaskMonitor::CallBacks callBacks
-    { BeganCallBack, FinishedCallBack, SignalledCallBack,
-      [&] { if (Stats) ++Stats->getDriverCounters().NumDriverPipePolls; } };
+  TaskMonitor::CallBacks callBacks{
+      BeganCallBack, FinishedCallBack, SignalledCallBack, [&] {
+        if (Stats)
+          ++Stats->getDriverCounters().NumDriverPipePolls;
+      }};
 
   TaskMonitor TE(QueuedTasks, getNumberOfParallelTasks(), callBacks);
   return TE.executeTasks();
