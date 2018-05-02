@@ -2602,6 +2602,110 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
+static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
+                            SourceManager &SM,
+                            SmallVectorImpl<std::string>& memberNameVector,
+                            SmallVectorImpl<std::string>& memberTypeVector,
+                            SourceLoc targetLocation) {
+  
+  assert(!memberTypeVector.empty());
+  assert(memberTypeVector.size() == memberNameVector.size());
+  
+  EditConsumer.accept(SM, targetLocation, "\ninternal init(");
+  
+  for (size_t i = 0, n = memberTypeVector.size(); i < n ; i++) {
+    EditConsumer.accept(SM, targetLocation, memberNameVector[i] + ": " +
+                        memberTypeVector[i]);
+    
+    if (i != memberTypeVector.size() - 1) {
+      EditConsumer.accept(SM, targetLocation, ", ");
+    }
+  }
+  
+  EditConsumer.accept(SM, targetLocation, ") {\n");
+  
+  for (auto varName: memberNameVector) {
+    EditConsumer.accept(SM, targetLocation,
+                        "self." + varName + " = " + varName + "\n");
+  }
+  
+  EditConsumer.accept(SM, targetLocation, "}\n");
+}
+  
+static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
+                           SmallVectorImpl<std::string>& memberNameVector,
+                           SmallVectorImpl<std::string>& memberTypeVector) {
+  
+  if (!CursorInfo.ValueD)
+    return SourceLoc();
+  
+  ClassDecl *classDecl = dyn_cast<ClassDecl>(CursorInfo.ValueD);
+  if (!classDecl || classDecl->getStoredProperties().empty() ||
+      CursorInfo.IsRef) {
+    return SourceLoc();
+  }
+  
+  SourceLoc bracesStart = classDecl->getBraces().Start;
+  if (!bracesStart.isValid())
+    return SourceLoc();
+  
+  SourceLoc targetLocation = bracesStart.getAdvancedLoc(1);
+  if (!targetLocation.isValid())
+    return SourceLoc();
+  
+  for (auto varDecl : classDecl->getStoredProperties()) {
+    auto parentPatternBinding = varDecl->getParentPatternBinding();
+    if (!parentPatternBinding)
+      continue;
+    
+    auto varDeclIndex =
+      parentPatternBinding->getPatternEntryIndexForVarDecl(varDecl);
+    
+    if (auto init = varDecl->getParentPatternBinding()->getInit(varDeclIndex)) {
+      if (init->getStartLoc().isValid())
+        continue;
+    }
+    
+    StringRef memberName = varDecl->getName().str();
+    memberNameVector.push_back(memberName.str());
+    
+    std::string memberType = varDecl->getType().getString();
+    memberTypeVector.push_back(memberType);
+  }
+  
+  if (memberNameVector.empty() || memberTypeVector.empty()) {
+    return SourceLoc();
+  }
+  
+  return targetLocation;
+}
+
+bool RefactoringActionMemberwiseInitLocalRefactoring::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  return collectMembersForInit(Tok, memberNameVector,
+                               memberTypeVector).isValid();
+}
+    
+bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberNameVector,
+                                         memberTypeVector);
+  if (targetLocation.isInvalid())
+    return true;
+  
+  generateMemberwiseInit(EditConsumer, SM, memberNameVector,
+                         memberTypeVector, targetLocation);
+  
+  return false;
+}
+
 static CharSourceRange
   findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
                                SourceFile *TheFile,
