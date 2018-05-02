@@ -683,6 +683,48 @@ public extension TensorProtocol {
 // Element-wise math functions
 //===----------------------------------------------------------------------===//
 
+// Export Glibc/Darwin math functions. We should not require users to import
+// Foundation/Darwin/Glibc in order to use scalar math functions.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+@_exported import func Darwin.C.sin
+@_exported import func Darwin.C.cos
+@_exported import func Darwin.C.tan
+@_exported import func Darwin.C.sinf
+@_exported import func Darwin.C.cosf
+@_exported import func Darwin.C.tanf
+@_exported import func Darwin.C.sinh
+@_exported import func Darwin.C.cosh
+@_exported import func Darwin.C.tanh
+@_exported import func Darwin.C.sinhf
+@_exported import func Darwin.C.coshf
+@_exported import func Darwin.C.tanhf
+@_exported import func Darwin.C.log
+@_exported import func Darwin.C.logf
+@_exported import func Darwin.C.exp
+@_exported import func Darwin.C.expf
+@_exported import func Darwin.C.pow
+@_exported import func Darwin.C.powf
+#else
+@_exported import func Glibc.sin
+@_exported import func Glibc.cos
+@_exported import func Glibc.tan
+@_exported import func Glibc.sinf
+@_exported import func Glibc.cosf
+@_exported import func Glibc.tanf
+@_exported import func Glibc.sinh
+@_exported import func Glibc.cosh
+@_exported import func Glibc.tanh
+@_exported import func Glibc.sinhf
+@_exported import func Glibc.coshf
+@_exported import func Glibc.tanhf
+@_exported import func Glibc.log
+@_exported import func Glibc.logf
+@_exported import func Glibc.exp
+@_exported import func Glibc.expf
+@_exported import func Glibc.pow
+@_exported import func Glibc.powf
+#endif
+
 public extension TensorProtocol where Scalar : SignedNumeric {
   /// Computes the negation of the specified tensor element-wise.
   @_inlineable @inline(__always)
