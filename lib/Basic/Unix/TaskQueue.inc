@@ -247,8 +247,8 @@ bool Task::execute() {
 
 /// Read the data in \p Pipe, and append it to \p Output.
 /// \p Pipe must be in blocking mode, and must contain unread data.
-/// If \p UntilEnd is true, keep reading, and possibly hanging, till the pipe is
-/// closed. If \p UntilEnd is false, just read once. Return true if error
+/// If \p UntilEnd is true, keep reading, and possibly blocking, till the pipe
+/// is closed. If \p UntilEnd is false, just read once. Return true if error
 static bool readFromAPipe(std::string &Output, int Pipe,
                           UnifiedStatsReporter *Stats, bool UntilEnd) {
   char outputBuffer[1024];
@@ -348,16 +348,16 @@ public:
 };
 
 /// Concurrently execute the tasks in the TaskQueue, collecting the outputs from
-/// each task. The typical task is a Swift frontend job.
+/// each task.
 /// Maintain invarients connecting tasks to execute, tasks currently executing,
 /// and fds being polled. These invarients include:
 /// A task is not in both TasksToBeExecuted and TasksBeingExecuted,
 /// A task is executing iff it is in TasksBeingExecuted,
-/// Iff a task is executing any of its fds being polled are in FdsBeingPolled.
+/// A task is executing iff any of its fds being polled are in FdsBeingPolled
 /// (These should be all of its output fds, but today is only stdout.)
 /// When a task finished executing, it gets cleaned up by TaskCompleter,
 /// then its storage is reclaimed.
-class TaskShepherd {
+class TaskMonitor {
   std::queue<std::unique_ptr<Task>> &TasksToBeExecuted;
   TaskMap TasksBeingExecuted;
 
@@ -377,7 +377,7 @@ class TaskShepherd {
   CallBacks callBacks;
 
 public:
-  TaskShepherd(std::queue<std::unique_ptr<Task>> &TasksToBeExecuted,
+  TaskMonitor(std::queue<std::unique_ptr<Task>> &TasksToBeExecuted,
                const unsigned NumberOfParallelTasks,
                const CallBacks &callBacks)
       : TasksToBeExecuted(TasksToBeExecuted),
@@ -399,11 +399,11 @@ private:
   bool startUpSomeTasks();
 
   /// Start \param T and \return true on error.
-  bool beginExecutingATask(Task *T);
+  bool beginExecutingATask(Task &T);
 
-  /// Enter the task and its outputs in this TaskShepherd's data structures so
+  /// Enter the task and its outputs in this TaskMonitor's data structures so
   /// it can be polled.
-  void startPollingFdsOfTask(const Task *T);
+  void startPollingFdsOfTask(const Task &T);
 
   void stopPolling(ArrayRef<int> FinishedFds);
 
@@ -413,10 +413,12 @@ private:
   /// \return None on error
   Optional<std::vector<int>> readFromReadyFdsReturningFinishedOnes();
 
-  /// Parse event bits returned from polling to see if data are available or if
-  /// fd "hung up". Read such data.
-  /// \return true if fd "hung up"
-  bool reactToFdEvents(short events, int fd, Task &T);
+  /// Ensure that events bits returned from polling are what's expected.
+  void verifyEvents(short events) const;
+  
+  void readDataIfAvailable(short events, int fd, Task &T) const;
+  
+  bool didTaskHangup(short events) const;
 };
 
 /// Do everything required to handle a task when its output has hung up.
@@ -445,7 +447,7 @@ private:
   static Optional<int> waitForPid(pid_t pid);
 };
 
-bool TaskShepherd::executeTasks() {
+bool TaskMonitor::executeTasks() {
   while (!isFinishedExecutingTasks()) {
     if (startUpSomeTasks())
       return true;
@@ -468,26 +470,26 @@ bool TaskShepherd::executeTasks() {
   return false;
 }
 
-bool TaskShepherd::startUpSomeTasks() {
+bool TaskMonitor::startUpSomeTasks() {
   while (!TasksToBeExecuted.empty() &&
          TasksBeingExecuted.size() < MaxNumberOfParallelTasks) {
     std::unique_ptr<Task> T(TasksToBeExecuted.front().release());
     TasksToBeExecuted.pop();
-    if (beginExecutingATask(T.get()))
+    if (beginExecutingATask(*T))
       return true;
-    startPollingFdsOfTask(T.get());
+    startPollingFdsOfTask(*T);
     TasksBeingExecuted.add(std::move(T));
   }
   return false;
 }
 
-void TaskShepherd::startPollingFdsOfTask(const Task *T) {
-  FdsBeingPolled.push_back({T->getPipe(), POLLIN | POLLPRI | POLLHUP, 0});
+void TaskMonitor::startPollingFdsOfTask(const Task &T) {
+  FdsBeingPolled.push_back({T.getPipe(), POLLIN | POLLPRI | POLLHUP, 0});
   // We should also poll T->getErrorPipe(), but this introduces timing
   // issues with shutting down the task after reading getPipe().
 }
 
-TaskShepherd::PollResult TaskShepherd::pollTheFds() {
+TaskMonitor::PollResult TaskMonitor::pollTheFds() {
   assert(!FdsBeingPolled.empty() &&
          "We should only call poll() if we have fds to watch!");
   int ReadyFdCount = poll(FdsBeingPolled.data(), FdsBeingPolled.size(), -1);
@@ -498,23 +500,24 @@ TaskShepherd::PollResult TaskShepherd::pollTheFds() {
                                            : PollResult::HardError;
 }
 
-bool TaskShepherd::beginExecutingATask(Task *T) {
-  if (T->execute())
+bool TaskMonitor::beginExecutingATask(Task &T) {
+  if (T.execute())
     return true;
-  callBacks.TaskBegan(T->getPid(), T->getContext());
+  callBacks.TaskBegan(T.getPid(), T.getContext());
   return false;
 }
 
 Optional<std::vector<int>>
-TaskShepherd::readFromReadyFdsReturningFinishedOnes() {
+TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
   std::vector<int> finishedFds;
   for (struct pollfd &fd : FdsBeingPolled) {
     const int fileDes = fd.fd;
     const short receivedEvents = fd.revents;
     fd.revents = 0;
+    verifyEvents(receivedEvents);
     Task &T = TasksBeingExecuted.findTaskForFd(fileDes);
-    const bool fdHungUp = reactToFdEvents(receivedEvents, fileDes, T);
-    if (!fdHungUp)
+    readDataIfAvailable(receivedEvents, fileDes, T);
+    if (!didTaskHangup(receivedEvents))
       continue;
     finishedFds.push_back(fileDes);
     const bool hadError = TaskCompleter(T, callBacks.TaskFinished, callBacks.TaskSignalled)
@@ -526,19 +529,19 @@ TaskShepherd::readFromReadyFdsReturningFinishedOnes() {
   return finishedFds;
 }
 
-bool TaskShepherd::reactToFdEvents(const short events, const int fd, Task &T) {
+void TaskMonitor::verifyEvents(const short events) const {
   if (events & POLLNVAL) {
     // We passed an invalid fd; this should never happen,
     // since we always mark fds as finished after calling
     // Task::finishExecution() (which closes the Task's fd).
     llvm_unreachable("Asked poll() to watch a closed fd");
   }
-  const bool isDataAvailable = events & POLLIN || events & POLLPRI;
-  const bool didFdHangUp = events & POLLHUP || events & POLLERR;
-  assert(!(events != 0 && !isDataAvailable && !didFdHangUp) &&
-         "Received unexpected event");
+  const short expectedEvents = POLLIN | POLLPRI | POLLHUP | POLLERR;
+  assert((events & ~expectedEvents) == 0  &&  "Received unexpected event");
+}
 
-  if (isDataAvailable) {
+void TaskMonitor::readDataIfAvailable(const short events, const int fd, Task &T) const {
+  if (events & (POLLIN | POLLPRI)) {
     // There's data available to read. Read _some_ of it here, but not
     // necessarily _all_, since the pipe is in blocking mode and we might
     // have other input pending (or soon -- before this subprocess is done
@@ -547,9 +550,12 @@ bool TaskShepherd::reactToFdEvents(const short events, const int fd, Task &T) {
     // FIXME: longer term, this should probably either be restructured to
     // use O_NONBLOCK, or at very least poll the stderr file descriptor as
     // well; the whole loop here is a bit of a mess.
-    T.readFromPipes(/*UntilEnd = */ false);
+    T.readFromPipes(/*UntilEnd*/false);
   }
-  return didFdHangUp;
+}
+
+bool TaskMonitor::didTaskHangup(const short events) const {
+  return (events & (POLLHUP | POLLERR)) != 0;
 }
 
 bool TaskCompleter::waitForExitThenCleanUp() const {
@@ -612,7 +618,7 @@ bool TaskCompleter::cleanupSignalledTask(int Status) const {
                            T.getContext(), Signal);
 }
 
-void TaskShepherd::stopPolling(ArrayRef<int> FinishedFds) {
+void TaskMonitor::stopPolling(ArrayRef<int> FinishedFds) {
   // Remove any fds which we've closed from FdsBeingPolled.
   for (int fd : FinishedFds) {
     auto predicate = [&fd](struct pollfd &i) { return i.fd == fd; };
@@ -627,10 +633,10 @@ void TaskShepherd::stopPolling(ArrayRef<int> FinishedFds) {
 bool TaskQueue::execute(TaskBeganCallback BeganCallBack,
                         TaskFinishedCallback FinishedCallBack,
                         TaskSignalledCallback SignalledCallBack) {
-  TaskShepherd::CallBacks callBacks
+  TaskMonitor::CallBacks callBacks
     { BeganCallBack, FinishedCallBack, SignalledCallBack,
       [&] { if (Stats) ++Stats->getDriverCounters().NumDriverPipePolls; } };
 
-  TaskShepherd TE(QueuedTasks, getNumberOfParallelTasks(), callBacks);
+  TaskMonitor TE(QueuedTasks, getNumberOfParallelTasks(), callBacks);
   return TE.executeTasks();
 }
