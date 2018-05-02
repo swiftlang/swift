@@ -2516,9 +2516,7 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
         return true;
 
       auto *SF = cast<SourceFile>(DC->getModuleScopeContext());
-      auto *M = D->getDeclContext()->getParentModule();
-      if (SF->getParentModule() != M)
-        SF->markUsableFromInlineImport(M);
+      SF->markUsableFromInline(D->getModuleContext());
     }
   }
 

@@ -975,13 +975,27 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
         continue;
       break;
     case ModuleDecl::ImportFilter::ForLinking:
-      if (!importPair.second.contains(ImportFlags::UsableFromInline) &&
-          !importPair.second.contains(ImportFlags::Exported))
+      if (!importPair.second.contains(ImportFlags::Exported))
         continue;
       break;
     }
 
     modules.push_back(importPair.first);
+  }
+
+  switch (filter) {
+  case ModuleDecl::ImportFilter::Public:
+  case ModuleDecl::ImportFilter::Private:
+    break;
+
+  case ModuleDecl::ImportFilter::All:
+  case ModuleDecl::ImportFilter::ForLinking:
+    // Treat UsableAsInline modules like imports.
+    // This isn't strictly necessary because we would have already found them
+    // through one of the modules listed above, but it's better for testing.
+    for (ModuleDecl *module : getUsableFromInlineModules())
+      modules.emplace_back(ModuleDecl::AccessPathTy(), module);
+    break;
   }
 }
 
@@ -1287,12 +1301,10 @@ bool SourceFile::hasTestableImport(const swift::ModuleDecl *module) const {
   });
 }
 
-void SourceFile::markUsableFromInlineImport(const ModuleDecl *module) {
-  for (auto &Import : Imports) {
-    if (Import.first.second == module) {
-      Import.second |= ImportFlags::UsableFromInline;
-    }
-  }
+void SourceFile::markUsableFromInline(ModuleDecl *module) {
+  if (module == getParentModule())
+    return;
+  ModulesUsedFromInline.insert(module);
 }
 
 void SourceFile::clearLookupCache() {

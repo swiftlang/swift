@@ -351,7 +351,7 @@ public:
     // @_exported only.
     Public,
 
-    // Not @_exported only. Also includes @_usableFromInline.
+    // Neither @_usableFromInline nor @_exported.
     Private,
 
     // @_usableFromInline and @_exported only.
@@ -770,10 +770,6 @@ public:
     /// This source file has access to testable declarations in the imported
     /// module.
     Testable = 0x2,
-
-    /// Modules that depend on the module containing this source file will
-    /// autolink this dependency.
-    UsableFromInline = 0x4,
   };
 
   /// \see ImportFlags
@@ -786,7 +782,10 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  MutableArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+
+  /// A list of modules where declarations were used in inline functions.
+  llvm::SetVector<ModuleDecl *> ModulesUsedFromInline;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -892,7 +891,10 @@ public:
 
   bool hasTestableImport(const ModuleDecl *module) const;
 
-  void markUsableFromInlineImport(const ModuleDecl *module);
+  void markUsableFromInline(ModuleDecl *module);
+  ArrayRef<ModuleDecl *> getUsableFromInlineModules() const {
+    return ModulesUsedFromInline.getArrayRef();
+  }
 
   void clearLookupCache();
 
