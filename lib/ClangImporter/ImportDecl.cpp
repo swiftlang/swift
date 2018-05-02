@@ -481,7 +481,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   SubstitutionMap subMap =
     SubstitutionMap::get(reinterpretCast->getGenericSignature(),
                          { rawTy, enumTy }, { });
-  ConcreteDeclRef concreteDeclRef(C, reinterpretCast, subMap);
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   reinterpretCastRef->setType(FunctionType::get({rawTy}, enumTy));
@@ -570,7 +570,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   SubstitutionMap subMap =
     SubstitutionMap::get(reinterpretCast->getGenericSignature(),
                          { enumTy, rawTy }, { });
-  ConcreteDeclRef concreteDeclRef(C, reinterpretCast, subMap);
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
 
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
@@ -1217,7 +1217,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   SubstitutionMap subMap =
     SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
                          llvm::makeArrayRef(selfType), { });
-  ConcreteDeclRef concreteDeclRef(context, zeroInitializerFunc, subMap);
+  ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
   auto zeroInitializerRef =
     new (context) DeclRefExpr(concreteDeclRef, DeclNameLoc(),
                               /*implicit*/ true);

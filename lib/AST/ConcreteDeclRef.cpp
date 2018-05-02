@@ -25,16 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
-ConcreteDeclRef::SpecializedDeclRef *
-ConcreteDeclRef::SpecializedDeclRef::create(
-                                       ASTContext &ctx, ValueDecl *decl,
-                                       SubstitutionMap substitutions) {
-  return new (ctx.getAllocator()) SpecializedDeclRef(decl,
-                                                     substitutions);
-}
-
-ConcreteDeclRef
-ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx) const {
+ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl() const {
   auto *derivedDecl = getDecl();
   auto *baseDecl = derivedDecl->getOverriddenDecl();
 
@@ -51,7 +42,7 @@ ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx) const {
     subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
                                                      derivedSubMap);
   }
-  return ConcreteDeclRef(ctx, baseDecl, subs);
+  return ConcreteDeclRef(baseDecl, subs);
 }
 
 void ConcreteDeclRef::dump(raw_ostream &os) {

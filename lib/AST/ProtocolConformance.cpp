@@ -48,7 +48,7 @@ Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
   }
 
   auto &ctx = decl->getASTContext();
-  auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
+  auto declRef = ConcreteDeclRef(decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
   auto stored = new (storedMem) StoredWitness{declRef, syntheticEnv,
                                               reqToSynthesizedEnvSubs};
@@ -906,8 +906,7 @@ SpecializedProtocolConformance::getWitnessDeclRef(
   if (combinedMap == baseWitness.getSubstitutions())
     return baseWitness;
 
-  return ConcreteDeclRef(witnessDecl->getASTContext(), witnessDecl,
-                         combinedMap);
+  return ConcreteDeclRef(witnessDecl, combinedMap);
 }
 
 ProtocolConformanceRef

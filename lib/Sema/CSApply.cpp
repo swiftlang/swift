@@ -689,7 +689,7 @@ namespace {
       }
 
       auto declRefExpr =
-        new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
+        new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
                               loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
@@ -969,7 +969,7 @@ namespace {
         solution.computeSubstitutions(
             member->getInnermostDeclContext()->getGenericSignatureOfContext(),
             memberLocator);
-      auto memberRef = ConcreteDeclRef(context, member, substitutions);
+      auto memberRef = ConcreteDeclRef(member, substitutions);
 
       cs.TC.requestMemberLayout(member);
 
@@ -1644,7 +1644,7 @@ namespace {
         solution.computeSubstitutions(
           subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
           locator.withPathElement(locatorKind));
-      ConcreteDeclRef subscriptRef(tc.Context, subscript, substitutions);
+      ConcreteDeclRef subscriptRef(subscript, substitutions);
 
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
@@ -1699,7 +1699,7 @@ namespace {
       SubstitutionMap substitutions =
         solution.computeSubstitutions(ctor->getGenericSignature(), locator);
 
-      auto ref = ConcreteDeclRef(ctx, ctor, substitutions);
+      auto ref = ConcreteDeclRef(ctor, substitutions);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -1842,7 +1842,7 @@ namespace {
           return *bridgedToObjectiveCConformance;
         });
 
-      ConcreteDeclRef fnSpecRef(tc.Context, fn, subMap);
+      ConcreteDeclRef fnSpecRef(fn, subMap);
 
       auto resultType = OptionalType::get(valueType);
 
@@ -1998,7 +1998,7 @@ namespace {
         SubstitutionMap subs =
           SubstitutionMap::get(genericSig, llvm::makeArrayRef(objectType),
                                { });
-        ConcreteDeclRef concreteDeclRef(tc.Context, nilDecl, subs);
+        ConcreteDeclRef concreteDeclRef(nilDecl, subs);
 
         auto nilType = FunctionType::get(
             {MetatypeType::get(type)}, type);
@@ -4448,7 +4448,7 @@ namespace {
           auto resolvedTy = foundDecl->openedType;
           resolvedTy = simplifyType(resolvedTy);
           
-          auto ref = ConcreteDeclRef(cs.getASTContext(), property, subs);
+          auto ref = ConcreteDeclRef(property, subs);
 
           component = KeyPathExpr::Component::forProperty(ref,
                                                        resolvedTy,
@@ -4518,7 +4518,7 @@ namespace {
           
           resolvedTy = simplifyType(resolvedTy);
           
-          auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
+          auto ref = ConcreteDeclRef(subscript, subs);
           
           // Coerce the indices to the type the subscript expects.
           auto indexExpr = coerceToType(origComponent.getIndexExpr(),
@@ -4923,7 +4923,7 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
                   decl->getInnermostDeclContext()
                       ->getGenericSignatureOfContext(),
                 locator);
-              return ConcreteDeclRef(cs.getASTContext(), decl, subs);
+              return ConcreteDeclRef(decl, subs);
             })) {
     return resolved;
   }
@@ -5034,7 +5034,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
 
   case DefaultArgumentKind::Inherited:
     // Update the owner to reflect inheritance here.
-    owner = owner.getOverriddenDecl(tc.Context);
+    owner = owner.getOverriddenDecl();
     return getCallerDefaultArg(cs, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:

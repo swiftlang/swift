@@ -1185,7 +1185,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   // Initialize the storage immediately, if we can.
   Expr *InitStorageExpr = nullptr;
   auto Method = DefaultInitStorage ? DefaultInitStorage : ParamInitStorage;
-  auto SpecializeInitStorage = ConcreteDeclRef(Context, Method, contextMap);
+  auto SpecializeInitStorage = ConcreteDeclRef(Method, contextMap);
 
   if (DefaultInitStorage ||
       (ParamInitStorage && VD->getParentInitializer())) {
@@ -1487,7 +1487,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
 
     Expr *selfExpr = makeSelfExpr(getter, ValueImpl->getGetter());
     
-    auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
+    auto implRef = ConcreteDeclRef(ValueImpl, SelfContextSubs);
     auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
                                                       SourceLoc(),
                                                       implRef,
@@ -1518,7 +1518,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
   
   if (auto setter = VD->getSetter()) {
     Expr *selfExpr = makeSelfExpr(setter, ValueImpl->getSetter());
-    auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
+    auto implRef = ConcreteDeclRef(ValueImpl, SelfContextSubs);
     auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
                                                       SourceLoc(),
                                                       implRef,
