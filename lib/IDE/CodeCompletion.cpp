@@ -939,10 +939,15 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
       Ty->is<ErrorType>() ||
       ExpectedTy->is<ErrorType>())
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
-  if (Ty->isEqual(ExpectedTy))
-    return CodeCompletionResult::ExpectedTypeRelation::Identical;
-  if (isConvertibleTo(Ty, ExpectedTy, *DC))
-    return CodeCompletionResult::ExpectedTypeRelation::Convertible;
+
+  // Equality/Conversion of GenericTypeParameterType won't account for
+  // requirements – ignore them
+  if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
+    if (Ty->isEqual(ExpectedTy))
+      return CodeCompletionResult::ExpectedTypeRelation::Identical;
+    if (isConvertibleTo(Ty, ExpectedTy, *DC))
+      return CodeCompletionResult::ExpectedTypeRelation::Convertible;
+  }
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
     if (FT->getResult()->isVoid())
       return CodeCompletionResult::ExpectedTypeRelation::Invalid;
