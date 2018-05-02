@@ -235,6 +235,8 @@ void NameBinder::addImport(
   ImportOptions options;
   if (ID->isExported())
     options |= SourceFile::ImportFlags::Exported;
+  if (ID->isUsableFromInline())
+    options |= SourceFile::ImportFlags::UsableFromInline;
   if (testableAttr)
     options |= SourceFile::ImportFlags::Testable;
   imports.push_back({ { ID->getDeclPath(), M }, options });
