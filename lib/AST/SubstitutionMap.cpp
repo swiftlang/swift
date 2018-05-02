@@ -155,6 +155,9 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
 }
 
 Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
+  if (empty())
+    return Type();
+
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
