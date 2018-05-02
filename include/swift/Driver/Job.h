@@ -265,6 +265,14 @@ private:
   /// Whether the job wants a list of input or output files created.
   std::vector<FilelistInfo> FilelistFileInfos;
 
+  /// Response file path
+  const char *ResponseFilePath;
+
+  /// Argument vector containing a single argument pointing to the response file
+  /// path with the '@' prefix.
+  /// The argument string must be kept alive as long as the Job is alive.
+  llvm::opt::ArgStringList ResponseFileArg;
+
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
@@ -275,12 +283,16 @@ public:
       const char *Executable,
       llvm::opt::ArgStringList Arguments,
       EnvironmentVector ExtraEnvironment = {},
-      std::vector<FilelistInfo> Infos = {})
+      std::vector<FilelistInfo> Infos = {},
+      const char *ResponseFilePath = nullptr,
+      llvm::opt::ArgStringList ResponseFileArg = {})
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
-        FilelistFileInfos(std::move(Infos)) {}
+        FilelistFileInfos(std::move(Infos)),
+        ResponseFilePath(ResponseFilePath),
+        ResponseFileArg(std::move(ResponseFileArg)) {}
 
   virtual ~Job();
 
@@ -290,6 +302,7 @@ public:
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
+  const llvm::opt::ArgStringList &getResponseFileArg() const { return ResponseFileArg; }
   ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
@@ -332,6 +345,10 @@ public:
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);
+
+  bool hasResponseFile() const { return ResponseFilePath != nullptr; }
+
+  void writeArgsToResponseFile() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar

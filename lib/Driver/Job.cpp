@@ -352,7 +352,11 @@ void Job::printCommandLineAndEnvironment(raw_ostream &Stream,
 void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   escapeAndPrintString(os, Executable);
   os << ' ';
-  printArguments(os, Arguments);
+  if (hasResponseFile()) {
+    printArguments(os, ResponseFileArg);
+  } else {
+    printArguments(os, Arguments);
+  }
   os << Terminator;
 }
 
@@ -401,6 +405,30 @@ void Job::printSummary(raw_ostream &os) const {
     os << " ... " << (actual_in-limit) << " more";
   }
   os << "}";
+}
+
+static void
+writeResponseFile(llvm::raw_ostream &OS, const llvm::opt::ArgStringList &Arguments) {
+  // wrap arguments in quotes to ensure compatibility with Unix and Windows
+  for (const char *arg : Arguments) {
+    OS << '"';
+    for (; *arg != '\0'; arg++) {
+      if (*arg == '\"' || *arg == '\\') {
+        OS << '\\'; // escape quote and backslash characters
+      }
+      OS << *arg;
+    }
+    OS << "\" ";
+  }
+}
+
+void Job::writeArgsToResponseFile() const {
+  std::string responseContents;
+  llvm::raw_string_ostream SS(responseContents);
+  writeResponseFile(SS, Arguments);
+  SS.flush();
+  llvm::sys::writeFileWithEncoding(ResponseFilePath, responseContents,
+                                   llvm::sys::WEM_UTF8);
 }
 
 BatchJob::BatchJob(const JobAction &Source,

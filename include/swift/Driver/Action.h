@@ -124,6 +124,8 @@ public:
     return (A->getKind() >= Kind::JobFirst &&
             A->getKind() <= Kind::JobLast);
   }
+
+  virtual bool allowsResponseFiles() const { return false; }
 };
 
 class CompileJobAction : public JobAction {
@@ -146,6 +148,8 @@ public:
       return InputInfo(Status::NewlyAdded, llvm::sys::TimePoint<>::max());
     }
   };
+
+  virtual bool allowsResponseFiles() const { return true; }
 
 private:
   virtual void anchor();
@@ -321,6 +325,8 @@ public:
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::LinkJob;
   }
+
+  virtual bool allowsResponseFiles() const { return true; }
 };
 
 } // end namespace driver

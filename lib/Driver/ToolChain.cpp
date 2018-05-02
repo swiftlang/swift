@@ -118,11 +118,23 @@ ToolChain::constructJob(const JobAction &JA,
     }
   }
 
+  const char *responseFilePath = nullptr;
+  llvm::opt::ArgStringList responseFileArg = {};
+  if (!llvm::sys::commandLineFitsWithinSystemLimits(executablePath,
+                                                    invocationInfo.Arguments)
+      && JA.allowsResponseFiles()) {
+    responseFilePath = context.getTemporaryFilePath("arguments", "resp");
+    responseFileArg.push_back(
+        C.getArgs().MakeArgString(Twine("@") + responseFilePath));
+  }
+
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
                                 executablePath,
                                 std::move(invocationInfo.Arguments),
                                 std::move(invocationInfo.ExtraEnvironment),
-                                std::move(invocationInfo.FilelistInfos));
+                                std::move(invocationInfo.FilelistInfos),
+                                responseFilePath,
+                                std::move(responseFileArg));
 }
 
 std::string
