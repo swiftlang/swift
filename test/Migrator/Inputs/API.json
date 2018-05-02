@@ -19,6 +19,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SA@SomeItemSet@FI@theSimpleOldNameNotToRename",
+    "LeftComment": "theSimpleOldNameNotToRename",
+    "RightUsr": "",
+    "RightComment": "__theSimpleNewName",
+    "ModuleName": "SomeModule"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
