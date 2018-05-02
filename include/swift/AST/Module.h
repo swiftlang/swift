@@ -373,8 +373,11 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Extension of the above hack. Identical to getImportedModulesForLookup()
-  /// for imported modules, otherwise also includes @usableFromInline imports.
+  /// Looks up which modules are imported by this module, ignoring any that
+  /// definitely don't represent distinct libraries.
+  ///
+  /// This is a performance hack for the ClangImporter. Do not use for
+  /// anything but linking. May go away in the future.
   void
   getImportedModulesForLinking(SmallVectorImpl<ImportedModule> &imports) const;
 
