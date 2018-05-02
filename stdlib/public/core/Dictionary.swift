@@ -1254,7 +1254,7 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-      return _variantBuffer.index(forKey: element) != nil
+      return _variantBuffer.containsKey(element)
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -3415,6 +3415,23 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
         return ._cocoa(cocoaIndex)
       }
       return nil
+#endif
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func containsKey(_ key: Key) -> Bool {
+    if _fastPath(guaranteedNative) {
+      return asNative.index(forKey: key) != nil
+    }
+
+    switch self {
+    case .native:
+      return asNative.index(forKey: key) != nil
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
+      return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key) != nil
 #endif
     }
   }
