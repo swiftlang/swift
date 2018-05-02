@@ -783,7 +783,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+  MutableArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -888,6 +888,8 @@ public:
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
 
   bool hasTestableImport(const ModuleDecl *module) const;
+
+  void markUsableFromInlineImport(const ModuleDecl *module);
 
   void clearLookupCache();
 
