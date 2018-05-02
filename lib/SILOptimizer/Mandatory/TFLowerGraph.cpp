@@ -531,6 +531,19 @@ private:  // Helpers to create TensorFlow graph nodes.
 };
 }
 
+static void escapeNodeName(std::string &name) {
+  // Node names must match the regex "[A-Za-z0-9.][A-Za-z0-9_./]*".
+  // Currently, invalid characters are simply replaced with underscores.
+  // TODO: Use a more robust escaping transformation. It should handle unicode
+  // characters (using llvm::UTF8 or some other means) and be reversible.
+  for (unsigned i = 0, n = name.size(); i < n; i++) {
+    char c = name[i];
+    if (!std::isalnum(c) && c != '.')
+      if (i == 0 || (i != '_' && i != '/'))
+        name[i] = '_';
+  }
+}
+
 /// Produce a "stack trace" for the specified location, producing it in a form
 /// that we can use as a uniqued op name.
 std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
@@ -582,6 +595,9 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       name += "."+llvm::utostr(lineCol.second);
     }
   }
+
+  // Escape node name.
+  escapeNodeName(name);
 
   // If we've already used this name, rename it to make it unique.
   while (!usedOpNames.insert(name).second) {
