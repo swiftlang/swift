@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_public.swift -emit-module-path %t/autolinking_public.swiftmodule -module-link-name autolinking_public -swift-version 4
-// RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_other.swift -emit-module-path %t/autolinking_other.swiftmodule -module-link-name autolinking_other -swift-version 4
+// RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_other3.swift -emit-module-path %t/autolinking_other3.swiftmodule -module-link-name autolinking_other3 -swift-version 4
+// RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_other2.swift -emit-module-path %t/autolinking_other2.swiftmodule -module-link-name autolinking_other2 -I %t -swift-version 4
+// RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_other.swift -emit-module-path %t/autolinking_other.swiftmodule -module-link-name autolinking_other -I %t -swift-version 4
 // RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_private.swift -emit-module-path %t/autolinking_private.swiftmodule -module-link-name autolinking_private -I %t -swift-version 4
 // RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_module.swift -emit-module-path %t/autolinking_module.swiftmodule -module-link-name autolinking_module -I %t -swift-version 4
 // RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 | %FileCheck %s
