@@ -508,7 +508,46 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   return P;
 }
 
-raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
+void Projection::print(raw_ostream &os, SILType baseType) const {
+  if (isNominalKind()) {
+    auto *Decl = getVarDecl(baseType);
+    os << "Field: ";
+    Decl->print(os);
+    return;
+  }
+
+  if (getKind() == ProjectionKind::Tuple) {
+    os << "Index: " << getIndex();
+    return;
+  }
+  if (getKind() == ProjectionKind::BitwiseCast) {
+    os << "BitwiseCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::Index) {
+    os << "Index: " << getIndex();
+    return;
+  }
+  if (getKind() == ProjectionKind::Upcast) {
+    os << "UpCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::RefCast) {
+    os << "RefCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::Box) {
+    os << " Box over";
+    return;
+  }
+  if (getKind() == ProjectionKind::TailElems) {
+    os << " TailElems";
+    return;
+  }
+  os << "<unexpected projection>";
+}
+
+raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) const {
   os << "Projection Path [";
   SILType IterType = getBaseType();
   for (const Projection &IterProj : Path) {
@@ -517,50 +556,14 @@ raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
 
     os << BaseType.getAddressType() << "\n  ";
 
-    if (IterProj.isNominalKind()) {
-      auto *Decl = IterProj.getVarDecl(BaseType);
-      os << "Field: ";
-      Decl->print(os);
-      os << " of: ";
-      continue;
-    }
-
-    if (IterProj.getKind() == ProjectionKind::Tuple) {
-      os << "Index: " << IterProj.getIndex() << " into: ";
-      continue;
-    }
-
-    if (IterProj.getKind() == ProjectionKind::BitwiseCast) {
-      os << "BitwiseCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Index) {
-      os << "Index: " << IterProj.getIndex() << " into: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Upcast) {
-      os << "UpCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::RefCast) {
-      os << "RefCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Box) {
-      os << " Box over: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::TailElems) {
-      os << " TailElems of: ";
-      continue;
-    }
-    os << "<unexpected projection> into: ";
+    IterProj.print(os, BaseType);
+    os << " in: ";
   }
   os << IterType.getAddressType() << "]\n";
   return os;
 }
 
-void ProjectionPath::dump(SILModule &M) {
+void ProjectionPath::dump(SILModule &M) const {
   print(llvm::dbgs(), M);
 }
 
