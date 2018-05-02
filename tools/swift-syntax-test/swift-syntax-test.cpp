@@ -81,11 +81,11 @@ Action(llvm::cl::desc("Action (required):"),
                    "comparing against the input"),
         clEnumValN(ActionType::SerializeRawTree,
                    "serialize-raw-tree",
-                   "Parse the source file and serialize the raw tree"
+                   "Parse the source file and serialize the raw tree "
                    "to JSON"),
         clEnumValN(ActionType::DeserializeRawTree,
                    "deserialize-raw-tree",
-                   "Parse the JSON file from the serialized raw tree"
+                   "Parse the JSON file from the serialized raw tree "
                    "to the original"),
         clEnumValN(ActionType::IncrementalParse,
                    "incremental-parse",
@@ -103,8 +103,8 @@ InputSourceFilename("input-source-filename",
 
 static llvm::cl::opt<std::string>
 InputSourceDirectory("input-source-directory",
-                     llvm::cl::desc("Directory to be scanned recursively and"
-                                    "run the selected action on every .swift"
+                     llvm::cl::desc("Directory to be scanned recursively and "
+                                    "run the selected action on every .swift "
                                     "file"));
 
 static llvm::cl::opt<std::string>
