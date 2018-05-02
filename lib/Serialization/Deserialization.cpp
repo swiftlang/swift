@@ -489,9 +489,9 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
-    unsigned numSubstitutions;
+    SubstitutionMapID substitutionMapID;
     SpecializedProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                     numSubstitutions);
+                                                     substitutionMapID);
 
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
@@ -503,13 +503,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
                                "reading specialized conformance for",
                                conformingType);
 
-    // Read the substitutions.
-    SmallVector<Substitution, 4> substitutions;
-    while (numSubstitutions--) {
-      auto sub = maybeReadSubstitution(Cursor, genericEnv);
-      assert(sub.hasValue() && "Missing substitution?");
-      substitutions.push_back(*sub);
-    }
+    auto subMap = getSubstitutionMap(substitutionMapID);
 
     ProtocolConformanceRef genericConformance =
       readConformance(Cursor, genericEnv);
@@ -519,7 +513,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto conformance =
            ctx.getSpecializedConformance(conformingType,
                                          genericConformance.getConcrete(),
-                                         substitutions);
+                                         subMap);
     return ProtocolConformanceRef(conformance);
   }
 

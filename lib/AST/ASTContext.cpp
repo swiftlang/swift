@@ -1867,16 +1867,13 @@ static ProtocolConformance *collapseSpecializedConformance(
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
-                                      SubstitutionList substitutions,
-                                      bool alreadyCheckedCollapsed) {
+                                      SubstitutionMap substitutions) {
   // If we are performing a substitution that would get us back to the
   // a prior conformance (e.g., mapping into and then out of a conformance),
   // return the existing conformance.
-  if (!alreadyCheckedCollapsed) {
-    if (auto existing = collapseSpecializedConformance(type, generic)) {
-      ++NumCollapsedSpecializedProtocolConformances;
-      return existing;
-    }
+  if (auto existing = collapseSpecializedConformance(type, generic)) {
+    ++NumCollapsedSpecializedProtocolConformances;
+    return existing;
   }
 
   llvm::FoldingSetNodeID id;
@@ -1892,32 +1889,11 @@ ASTContext::getSpecializedConformance(Type type,
     return result;
 
   // Build a new specialized conformance.
-  substitutions = AllocateCopy(substitutions, arena);
   auto result
     = new (*this, arena) SpecializedProtocolConformance(type, generic,
                                                         substitutions);
   specializedConformances.InsertNode(result, insertPos);
   return result;
-}
-
-ProtocolConformance *
-ASTContext::getSpecializedConformance(Type type,
-                                      ProtocolConformance *generic,
-                                      const SubstitutionMap &subMap) {
-  // If we are performing a substitution that would get us back to the
-  // a prior conformance (e.g., mapping into and then out of a conformance),
-  // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic)) {
-    ++NumCollapsedSpecializedProtocolConformances;
-    return existing;
-  }
-
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = generic->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
-
-  return getSpecializedConformance(type, generic, subs,
-                                   /*alreadyCheckedCollapsed=*/true);
 }
 
 InheritedProtocolConformance *

@@ -240,6 +240,12 @@ public:
   /// Query whether any replacement type sin the map contain dynamic Self.
   bool hasDynamicSelf() const;
 
+  /// Whether the replacement types are all canonical.
+  bool isCanonical() const;
+
+  /// Return the canonical form of this substitution map.
+  SubstitutionMap getCanonical() const;
+
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
   SubstitutionMap subst(const SubstitutionMap &subMap) const;

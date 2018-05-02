@@ -4157,9 +4157,16 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
-    interleave(spec->getGenericSubstitutions(),
-               [&](const Substitution &s) { s.print(os, PO); },
+    auto subMap = spec->getSubstitutionMap();
+    auto genericParams =
+      spec->getGenericConformance()->getGenericSignature()->getGenericParams();
+    interleave(genericParams,
+               [&](Type type) {
+                 type.subst(subMap).print(os, PO);
+
+               },
                [&] { os << ", "; });
+
     os << "> (";
     spec->getGenericConformance()->printName(os, PO);
     os << ")";

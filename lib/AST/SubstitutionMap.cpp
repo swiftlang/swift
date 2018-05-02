@@ -74,6 +74,42 @@ bool SubstitutionMap::hasDynamicSelf() const {
   return false;
 }
 
+bool SubstitutionMap::isCanonical() const {
+  for (Type replacementTy : getReplacementTypes()) {
+    if (replacementTy && !replacementTy->isCanonical())
+      return false;
+  }
+
+  for (auto conf : getConformances()) {
+    if (!conf.isCanonical())
+      return false;
+  }
+
+  return true;
+}
+
+SubstitutionMap SubstitutionMap::getCanonical() const {
+  if (empty()) return *this;
+
+  SmallVector<Type, 4> replacementTypes;
+  for (Type replacementType : getReplacementTypes()) {
+    if (replacementType)
+      replacementTypes.push_back(replacementType->getCanonicalType());
+    else
+      replacementTypes.push_back(nullptr);
+  }
+
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (auto conf : getConformances()) {
+    conformances.push_back(conf.getCanonicalConformanceRef());
+  }
+
+  return SubstitutionMap::get(getGenericSignature(),
+                              ArrayRef<Type>(replacementTypes),
+                              ArrayRef<ProtocolConformanceRef>(conformances));
+}
+
+
 SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
                                      SubstitutionList substitutions) {
   if (!genericSig) {

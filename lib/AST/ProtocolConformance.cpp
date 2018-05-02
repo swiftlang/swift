@@ -775,7 +775,7 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
-    SubstitutionList substitutions)
+    SubstitutionMap substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
     GenericConformance(genericConformance),
     GenericSubstitutions(substitutions)
@@ -799,14 +799,6 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     auto &ctxt = getProtocol()->getASTContext();
     ConditionalRequirements = ctxt.AllocateCopy(newReqs);
   }
-}
-
-SubstitutionMap SpecializedProtocolConformance::getSubstitutionMap() const {
-  auto *genericSig = GenericConformance->getGenericSignature();
-  if (genericSig)
-    return genericSig->getSubstitutionMap(GenericSubstitutions);
-
-  return SubstitutionMap();
 }
 
 bool SpecializedProtocolConformance::hasTypeWitness(
@@ -1260,11 +1252,7 @@ bool ProtocolConformance::isCanonical() const {
     auto genericConformance = spec->getGenericConformance();
     if (!genericConformance->isCanonical())
       return false;
-    auto specSubs = spec->getGenericSubstitutions();
-    for (const auto &sub : specSubs) {
-      if (!sub.isCanonical())
-        return false;
-    }
+    if (!spec->getSubstitutionMap().isCanonical()) return false;
     return true;
   }
   }
@@ -1353,13 +1341,10 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
     auto genericConformance = spec->getGenericConformance();
-    auto specSubs = spec->getGenericSubstitutions();
-    SmallVector<Substitution, 4> newSpecSubs;
-    auto canSpecSubs = getCanonicalSubstitutionList(specSubs, newSpecSubs);
     return Ctx.getSpecializedConformance(
-        getType()->getCanonicalType(),
-        genericConformance->getCanonicalConformance(),
-        newSpecSubs.empty() ? canSpecSubs : Ctx.AllocateCopy(canSpecSubs));
+                                getType()->getCanonicalType(),
+                                genericConformance->getCanonicalConformance(),
+                                spec->getSubstitutionMap().getCanonical());
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
