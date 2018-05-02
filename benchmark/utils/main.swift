@@ -54,6 +54,7 @@ import DictTest4Legacy
 import DictionaryBridge
 import DictionaryCopy
 import DictionaryGroup
+import DictionaryKeysContains
 import DictionaryLiteral
 import DictionaryRemove
 import DictionarySubscriptDefault
@@ -208,6 +209,7 @@ registerBenchmark(Dictionary4Legacy)
 registerBenchmark(DictionaryBridge)
 registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
+registerBenchmark(DictionaryKeysContains)
 registerBenchmark(DictionaryLiteral)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
