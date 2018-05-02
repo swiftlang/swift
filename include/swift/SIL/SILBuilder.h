@@ -2095,20 +2095,17 @@ public:
     inheritScopeFrom(InheritScopeFrom);
   }
 
+  /// Creates a new SILBuilder with an insertion point at the end of BB.
   explicit SILBuilderForCodeExpansion(SILBasicBlock *BB,
                                       SILInstruction *InheritScopeFrom)
       : SILBuilder(BB) {
     inheritScopeFrom(InheritScopeFrom);
   }
 
-  /// Creates a new SILBuilder with an insertion point at the
-  /// beginning of BB and the debug scope from the first
-  /// non-metainstruction in the BB.
-  explicit SILBuilderForCodeExpansion(SILBasicBlock *BB)
-      : SILBuilder(BB->begin()) {
-    const SILDebugScope *DS = BB->getScopeOfFirstNonMetaInstruction();
-    assert(DS && "Instruction without debug scope associated!");
-    setCurrentDebugScope(DS);
+  /// Creates a new SILBuilder with an insertion point at the beginning of BB.
+  static SILBuilderForCodeExpansion
+  atBeginning(SILBasicBlock *BB, SILInstruction *InheritScopeFrom) {
+    return SILBuilderForCodeExpansion(BB->begin(), InheritScopeFrom);
   }
 };
 

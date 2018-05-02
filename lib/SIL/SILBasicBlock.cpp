@@ -379,10 +379,3 @@ bool SILBasicBlock::isTrampoline() const {
 bool SILBasicBlock::isLegalToHoistInto() const {
   return true;
 }
-
-const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
-  for (auto &Inst : *this)
-    if (Inst.isMetaInstruction())
-      return Inst.getDebugScope();
-  return begin()->getDebugScope();
-}

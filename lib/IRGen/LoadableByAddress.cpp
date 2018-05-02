@@ -1002,11 +1002,18 @@ static SILInstruction *createOutlinedCopyCall(SILBuilder &copyBuilder,
   return copy;
 }
 
+/// Create a SILBuilder for building alloc instructions.
+static SILBuilderForCodeExpansion
+getAllocBuilder(SILFunction *F, SILInstruction *InheritScopeFrom) {
+  return SILBuilderForCodeExpansion::atBeginning(&*F->begin(),
+                                                 InheritScopeFrom);
+}
+
 void LoadableStorageAllocation::replaceLoadWithCopyAddr(
     LoadInst *optimizableLoad) {
   SILValue value = optimizableLoad->getOperand();
 
-  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+  auto allocBuilder = getAllocBuilder(pass.F, optimizableLoad);
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1130,7 +1137,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
   }
   SILValue value = unoptimizableLoad->getOperand();
 
-  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+  auto allocBuilder = getAllocBuilder(pass.F, unoptimizableLoad);
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1478,7 +1485,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   assert(!ApplySite::isa(value) && "Unexpected instruction");
 
-  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+  auto allocBuilder = getAllocBuilder(pass.F, &*pass.F->begin()->begin());
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -1505,7 +1512,7 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 AllocStackInst *
 LoadableStorageAllocation::allocateForApply(SILInstruction *apply,
                                             SILType type) {
-  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+  auto allocBuilder = getAllocBuilder(pass.F, apply);
   auto *allocInstr = allocBuilder.createAllocStack(apply->getLoc(), type);
 
   pass.largeLoadableArgs.push_back(allocInstr);
@@ -1592,7 +1599,7 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
 static void allocateAndSetForInstrOperand(StructLoweringState &pass,
                                           SingleValueInstruction *instrOperand){
   assert(instrOperand->getType().isObject());
-  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+  auto allocBuilder = getAllocBuilder(pass.F, instrOperand);
   AllocStackInst *allocInstr = allocBuilder.createAllocStack(
       instrOperand->getLoc(), instrOperand->getType());
 
@@ -1626,7 +1633,7 @@ static void allocateAndSetForArgumentOperand(StructLoweringState &pass,
   auto *arg = dyn_cast<SILArgument>(value);
   assert(arg && "non-instr operand must be an argument");
 
-  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+  auto allocBuilder = getAllocBuilder(pass.F, applyInst);
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(applyInst->getLoc(), value->getType());
 
@@ -1747,7 +1754,7 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
   auto value = orig->getOperand();
   auto type = value->getType();
   if (type.isObject()) {
-    SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+    auto allocBuilder = getAllocBuilder(pass.F, orig);
 
     // support for non-address operands / enums
     auto *allocInstr = allocBuilder.createAllocStack(orig->getLoc(), type);
@@ -1767,7 +1774,7 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
     }
     value = allocInstr;
   }
-  SILBuilderForCodeExpansion allocBuilder(&*pass.F->begin());
+  auto allocBuilder = getAllocBuilder(pass.F, orig);
   auto *allocInstr = allocBuilder.createAllocStack(value.getLoc(), type);
 
   SILBuilderForCodeExpansion copyBuilder(orig);
@@ -2790,6 +2797,13 @@ void LoadableByAddress::run() {
 
   // Fix all instructions that rely on block storage type
   fixStoreToBlockStorageInstrs();
+
+  DEBUG({
+    for (auto *F : modFuncs) {
+      llvm::dbgs() << "\nLoadableByAddress REWROTE: " << F->getName() << "\n";
+      F->dump();
+    }
+  });
 
   // Clean up the data structs:
   modFuncs.clear();
