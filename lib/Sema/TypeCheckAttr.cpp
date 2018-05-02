@@ -70,6 +70,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(Available)
   IGNORED_ATTR(CDecl)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -115,14 +116,6 @@ public:
   IGNORED_ATTR(UsableFromInlineImport)
   IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
-
-  void visitAvailableAttr(AvailableAttr *attr) {
-    if (!isa<ExtensionDecl>(D))
-      return;
-    if (attr->hasPlatform())
-      return;
-    diagnoseAndRemoveAttr(attr, diag::availability_extension_platform_agnostic);
-  }
 
   // @noreturn has been replaced with a 'Never' return type.
   void visitNoReturnAttr(NoReturnAttr *attr) {
