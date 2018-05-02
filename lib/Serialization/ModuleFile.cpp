@@ -1148,10 +1148,12 @@ ModuleFile::ModuleFile(
         unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
         switch (kind) {
         case input_block::IMPORTED_MODULE: {
-          bool exported, scoped;
+          bool exported, usableFromInline, scoped;
           input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        exported, scoped);
-          Dependencies.push_back({blobData, exported, scoped});
+                                                        exported,
+                                                        usableFromInline,
+                                                        scoped);
+          Dependencies.push_back({blobData, exported, usableFromInline, scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1606,6 +1608,13 @@ void ModuleFile::getImportedModules(
         continue;
 
       break;
+
+    case ModuleDecl::ImportFilter::ForLinking:
+      // Only include @_exported and @usableFromInline imports.
+      if (!dep.isExported() && !dep.isUsableFromInline())
+        continue;
+
+      break;
     }
 
     assert(dep.isLoaded());
@@ -1674,6 +1683,9 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isExported())
         ID->getAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+      if (Dep.isUsableFromInline())
+        ID->getAttrs().add(
+            new (Ctx) UsableFromInlineImportAttr(/*IsImplicit=*/true));
       ImportDecls.push_back(ID);
     }
     Bits.ComputedImportDecls = true;
