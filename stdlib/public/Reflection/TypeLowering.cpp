@@ -158,18 +158,10 @@ public:
       printHeader("reference");
       auto &ReferenceTI = cast<ReferenceTypeInfo>(TI);
       switch (ReferenceTI.getReferenceKind()) {
-      case ReferenceKind::Strong:
-        printField("kind", "strong");
-        break;
-      case ReferenceKind::Unowned:
-        printField("kind", "unowned");
-        break;
-      case ReferenceKind::Weak:
-        printField("kind", "weak");
-        break;
-      case ReferenceKind::Unmanaged:
-        printField("kind", "unmanaged");
-        break;
+      case ReferenceKind::Strong: printField("kind", "strong"); break;
+#define REF_STORAGE(Name, name, ...) \
+      case ReferenceKind::Name: printField("kind", #name); break;
+#include "swift/AST/ReferenceStorage.def"
       }
 
       switch (ReferenceTI.getReferenceCounting()) {
@@ -706,19 +698,12 @@ public:
     return true;
   }
 
-  bool
-  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return true;
+#define REF_STORAGE(Name, ...) \
+  bool \
+  visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return true; \
   }
-
-  bool visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return true;
-  }
-
-  bool
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return true;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   bool
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
@@ -840,19 +825,12 @@ public:
     return MetatypeRepresentation::Unknown;
   }
 
-  MetatypeRepresentation
-  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return MetatypeRepresentation::Unknown;
+#define REF_STORAGE(Name, ...) \
+  MetatypeRepresentation \
+  visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return MetatypeRepresentation::Unknown; \
   }
-
-  MetatypeRepresentation visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return MetatypeRepresentation::Unknown;
-  }
-
-  MetatypeRepresentation
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return MetatypeRepresentation::Unknown;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   MetatypeRepresentation visitOpaqueTypeRef(const OpaqueTypeRef *O) {
     return MetatypeRepresentation::Unknown;
@@ -1255,19 +1233,12 @@ public:
     return rebuildStorageTypeInfo(TC.getTypeInfo(TR), Kind);
   }
 
-  const TypeInfo *
-  visitUnownedStorageTypeRef(const UnownedStorageTypeRef *US) {
-    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unowned);
+#define REF_STORAGE(Name, name, ...) \
+  const TypeInfo * \
+  visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
+    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Name); \
   }
-
-  const TypeInfo *visitWeakStorageTypeRef(const WeakStorageTypeRef *WS) {
-    return visitAnyStorageTypeRef(WS->getType(), ReferenceKind::Weak);
-  }
-
-  const TypeInfo *
-  visitUnmanagedStorageTypeRef(const UnmanagedStorageTypeRef *US) {
-    return visitAnyStorageTypeRef(US->getType(), ReferenceKind::Unmanaged);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   const TypeInfo *visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return TC.getReferenceTypeInfo(ReferenceKind::Strong,
