@@ -1,0 +1,2 @@
+@_usableFromInline import InlinableImport
+

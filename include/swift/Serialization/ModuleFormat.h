@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 409; // Last change: standalone requirement subs
+const uint16_t VERSION_MINOR = 410; // Last change: @usableFromInline import
 
 using DeclIDField = BCFixed<31>;
 
@@ -590,6 +590,7 @@ namespace input_block {
   using ImportedModuleLayout = BCRecordLayout<
     IMPORTED_MODULE,
     BCFixed<1>, // exported?
+    BCFixed<1>, // usable from inlinable functions?
     BCFixed<1>, // scoped?
     BCBlob // module name, with submodule path pieces separated by \0s.
            // If the 'scoped' flag is set, the final path piece is an access

@@ -112,6 +112,7 @@ public:
   IGNORED_ATTR(UIApplicationMain)
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(UsableFromInline)
+  IGNORED_ATTR(UsableFromInlineImport)
   IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
 
@@ -844,6 +845,7 @@ public:
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(Transparent)
+    IGNORED_ATTR(UsableFromInlineImport)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
