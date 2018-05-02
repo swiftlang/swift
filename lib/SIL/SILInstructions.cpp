@@ -2211,7 +2211,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
       
     case KeyPathPatternComponent::Kind::External: {
       ID.AddPointer(component.getExternalDecl());
-      profileSubstitutionList(ID, component.getExternalSubstitutions());
+      component.getExternalSubstitutions().profile(ID);
       profileIndices(component.getSubscriptIndices());
       break;
     }

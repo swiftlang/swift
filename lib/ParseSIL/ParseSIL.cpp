@@ -1984,6 +1984,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       return true;
     }
 
+    SubstitutionMap subsMap;
     if (!parsedSubs.empty()) {
       auto genericEnv = externalDecl->getInnermostDeclContext()
                                     ->getGenericEnvironmentOfContext();
@@ -1998,20 +1999,17 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       
       // Map the substitutions out of the pattern context so that they
       // use interface types.
-      auto subsMap = genericEnv->getGenericSignature()
+      subsMap = genericEnv->getGenericSignature()
         ->getSubstitutionMap(subs);
       subsMap = subsMap.mapReplacementTypesOutOfContext().getCanonical();
-      subs.clear();
-      genericEnv->getGenericSignature()->getSubstitutions(subsMap, subs);
     }
     
 
     auto indexesCopy = P.Context.AllocateCopy(indexes);
-    auto subsCopy = P.Context.AllocateCopy(subs);
     
     component = KeyPathPatternComponent::forExternal(
         cast<AbstractStorageDecl>(externalDecl),
-        subsCopy, indexesCopy, equals, hash, ty);
+        subsMap, indexesCopy, equals, hash, ty);
     return false;
   } else if (componentKind.str() == "gettable_property"
              || componentKind.str() == "settable_property") {
