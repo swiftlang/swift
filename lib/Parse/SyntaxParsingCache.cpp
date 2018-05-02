@@ -15,11 +15,28 @@
 using namespace swift;
 using namespace swift::syntax;
 
-llvm::Optional<Syntax> lookUpFrom(Syntax Node, size_t Position,
-                                  SyntaxKind Kind) {
+llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(Syntax Node,
+                                                      size_t Position,
+                                                      SyntaxKind Kind) const {
   if (Node.getAbsolutePosition().getOffset() == Position &&
       Node.getKind() == Kind) {
-    return Node;
+    // Check if this node has been edited. If it has, we cannot reuse it.
+    bool NodeEdited = false;
+
+    auto NodeStart = Node.getAbsolutePosition().getOffset();
+    auto NodeEnd = NodeStart + Node.getTextLength();
+    for (auto Edit : Edits) {
+      if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd)) {
+        NodeEdited = true;
+      }
+    }
+
+    // FIXME: Node can also not be reused if an edit has been made in the next
+    // token's leading trivia
+
+    if (!NodeEdited) {
+      return Node;
+    }
   }
 
   for (size_t I = 0, E = Node.getNumChildren(); I < E; ++I) {
@@ -38,6 +55,15 @@ llvm::Optional<Syntax> lookUpFrom(Syntax Node, size_t Position,
 
 llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
                                                   SyntaxKind Kind) const {
-  // FIXME: Transform the new position into the position in the old file
-  return lookUpFrom(OldSyntaxTree, NewPosition, Kind);
+  // Undo the edits in reverse order
+  size_t OldPosition = NewPosition;
+  for (auto I = Edits.rbegin(), E = Edits.rend(); I != E; ++I) {
+    auto Edit = *I;
+    if (Edit.End < OldPosition) {
+      OldPosition =
+          OldPosition - Edit.ReplacementLength + Edit.originalLength();
+    }
+  }
+
+  return lookUpFrom(OldSyntaxTree, OldPosition, Kind);
 }

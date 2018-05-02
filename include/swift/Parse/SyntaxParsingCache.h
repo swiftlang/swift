@@ -15,6 +15,32 @@
 
 #include "swift/Syntax/SyntaxNodes.h"
 
+namespace {
+
+/// A single edit to the original source file in which a continuous range of
+/// characters have been replaced by a new string
+struct SourceEdit {
+  /// The byte offset from which on characters were replaced.
+  size_t Start;
+
+  /// The byte offset to which on characters were replaced.
+  size_t End;
+
+  /// The length of the string that replaced the range described above.
+  size_t ReplacementLength;
+
+  /// The length of the range that has been replaced
+  size_t originalLength() { return End - Start; }
+
+  /// Check if the characters replaced by this edit fall into the given range
+  /// or are directly adjacent to it
+  bool intersectsOrTouchesRange(size_t RangeStart, size_t RangeEnd) {
+    return !(End <= RangeStart || Start >= RangeEnd);
+  }
+};
+
+} // anonymous namespace
+
 namespace swift {
 
 using namespace swift::syntax;
@@ -23,11 +49,29 @@ class SyntaxParsingCache {
   /// The syntax tree prior to the edit
   SourceFileSyntax OldSyntaxTree;
 
+  /// The edits that were made from the source file that created this cache to
+  /// the source file that is now parsed incrementally
+  llvm::SmallVector<SourceEdit, 4> Edits;
+
 public:
   SyntaxParsingCache(SourceFileSyntax OldSyntaxTree)
       : OldSyntaxTree(OldSyntaxTree) {}
 
+  /// Add an edit that transformed the source file which created this cache into
+  /// the source file that is now being parsed incrementally. The order in which
+  /// the edits are added using this method needs to be the same order in which
+  /// the edits were applied to the source file.
+  void addEdit(size_t Start, size_t End, size_t ReplacementLength) {
+    Edits.push_back({Start, End, ReplacementLength});
+  }
+
+  /// Check if a syntax node of the given kind at the given position can be
+  /// reused for a new syntax tree.
   llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind) const;
+
+private:
+  llvm::Optional<Syntax> lookUpFrom(Syntax Node, size_t Position,
+                                    SyntaxKind Kind) const;
 };
 
 } // namespace swift

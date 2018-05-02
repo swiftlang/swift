@@ -19,6 +19,7 @@
 
 #include "swift/Syntax/SyntaxKind.h"
 #include "swift/Syntax/TokenKinds.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -123,3 +124,21 @@ SyntaxKind getUnknownKind(SyntaxKind Kind) {
 }
 } // end namespace syntax
 } // end namespace swift
+
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &OS,
+                                    swift::syntax::SyntaxKind Kind) {
+  switch (Kind) {
+% for node in SYNTAX_NODES:
+    case swift::syntax::SyntaxKind::${node.syntax_kind}:
+    OS << "${node.syntax_kind}";
+    break;
+% end
+    case swift::syntax::SyntaxKind::Token:
+    OS << "TokenSyntax";
+    break;
+    case swift::syntax::SyntaxKind::Unknown:
+    OS << "UnknownSyntax";
+    break;
+  }
+  return OS;
+}

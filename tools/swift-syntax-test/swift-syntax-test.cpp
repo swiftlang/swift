@@ -35,6 +35,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Regex.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -110,6 +111,17 @@ static llvm::cl::opt<std::string>
 OldSyntaxTreeFilename("old-syntax-tree-filename",
                       llvm::cl::desc("Path to the serialized syntax tree of "
                                      "the pre-edit file"));
+
+static llvm::cl::list<std::string>
+IncrementalEdits("incremental-edit",
+                 llvm::cl::desc("An edit that was applied to reach the input "
+                                "file from the source file that generated the "
+                                "old syntax tree in the format "
+                                "<start>:<end>=<replacement> where <start> and "
+                                "<end> are byte offsets in the original file "
+                                "and <replacement> is the string that shall "
+                                "replace the selected range. "
+                                "Can be passed multiple times."));
 
 static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
@@ -320,6 +332,25 @@ int doIncrementalParse(const char *MainExecutablePath,
     return EXIT_FAILURE;
   }
   SyntaxParsingCache *Cache = new SyntaxParsingCache(OldSyntaxTree.getValue());
+
+  for (auto EditPattern : options::IncrementalEdits) {
+    llvm::Regex MatchRegex("([0-9]+):([0-9]+)=(.*)");
+    SmallVector<StringRef, 4> Matches;
+    if (!MatchRegex.match(EditPattern, &Matches)) {
+      llvm::errs() << "Invalid edit pattern: " << EditPattern;
+      return EXIT_FAILURE;
+    }
+    int EditStart, EditEnd;
+    if (Matches[1].getAsInteger(10, EditStart)) {
+      llvm::errs() << "Could not parse edit start as integer: " << EditStart;
+      return EXIT_FAILURE;
+    }
+    if (Matches[2].getAsInteger(10, EditEnd)) {
+      llvm::errs() << "Could not parse edit end as integer: " << EditStart;
+      return EXIT_FAILURE;
+    }
+    Cache->addEdit(EditStart, EditEnd, /*ReplacmentLength=*/Matches[3].size());
+  }
 
   // Parse the new libSyntax tree incrementally
   CompilerInstance Instance;
