@@ -12,7 +12,7 @@ sil_vtable C {}
 @objc protocol ObjC {}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @retain_release_bridge_object
-// CHECK:         call [[BRIDGE:%swift.bridge\*]] @swift_bridgeObjectRetain
+// CHECK:         call [[BRIDGE:%swift.bridge\*]] @swift_bridgeObjectRetain{{.*}}returned
 // CHECK:         call void @swift_bridgeObjectRelease
 sil @retain_release_bridge_object : $(Builtin.BridgeObject) -> () {
 entry(%b : $Builtin.BridgeObject):
