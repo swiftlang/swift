@@ -4541,6 +4541,8 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
     callee.emplace(Callee::forWitnessMethod(
         SGF, selfMetaVal.getType().getSwiftRValueType(),
         initRef, subs, loc));
+  } else if (getMethodDispatch(ctor) == MethodDispatch::Class) {
+    callee.emplace(Callee::forClassMethod(SGF, initRef, subs, loc));
   } else {
     callee.emplace(Callee::forDirect(SGF, initRef, subs, loc));
   }
@@ -4550,7 +4552,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   // For an inheritable initializer, determine whether we'll need to adjust the
   // result type.
   bool requiresDowncast = false;
-  if (ctor->isInheritable() && overriddenSelfType) {
+  if (ctor->isRequired() && overriddenSelfType) {
     CanType substResultType = substFormalType;
     for (unsigned i : range(ctor->getNumParameterLists())) {
       (void)i;

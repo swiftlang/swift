@@ -166,8 +166,14 @@ ConcreteDeclRef findNamedWitnessImpl(
 
   // For a type with dependent conformance, just return the requirement from
   // the protocol. There are no protocol conformance tables.
-  if (!conformance->isConcrete())
-    return requirement;
+  if (!conformance->isConcrete()) {
+    auto subMap = SubstitutionMap::getProtocolSubstitutions(proto, type,
+                                                            *conformance);
+    SmallVector<Substitution, 2> subs;
+    proto->getGenericSignature()->getSubstitutions(subMap, subs);
+    return ConcreteDeclRef(tc.Context, requirement, subs);
+  }
+
   auto concrete = conformance->getConcrete();
   return concrete->getWitnessDeclRef(requirement, &tc);
 }
@@ -7286,31 +7292,13 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
       return nullptr;
 
     // Form a reference to the builtin conversion function.
-    // FIXME: Bogus location info.
-    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context);
-
-    Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
-                                             base, SourceLoc(),
-                                             witness.getDecl()->getFullName(),
-                                             DeclNameLoc(base->getEndLoc()),
-                                             /*Implicit=*/true);
-    (void)tc.typeCheckExpression(unresolvedDot, dc);
-
-    cs.cacheExprTypes(unresolvedDot);
-
-    ConcreteDeclRef builtinRef = unresolvedDot->getReferencedDecl();
-    if (!builtinRef) {
-      tc.diagnose(base->getLoc(), brokenBuiltinProtocolDiag);
-      return nullptr;
-    }
 
     // Set the builtin initializer.
     if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
-      stringLiteral->setBuiltinInitializer(builtinRef);
+      stringLiteral->setBuiltinInitializer(witness);
     else {
       cast<MagicIdentifierLiteralExpr>(literal)
-        ->setBuiltinInitializer(builtinRef);
+        ->setBuiltinInitializer(witness);
     }
 
     // The literal expression has this type.
@@ -7350,30 +7338,11 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
     return nullptr;
 
-  // Form a reference to the conversion function.
-  // FIXME: Bogus location info.
-  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                            tc.Context);
-
-  Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
-                                           base, SourceLoc(),
-                                           witness.getDecl()->getFullName(),
-                                           DeclNameLoc(base->getEndLoc()),
-                                           /*Implicit=*/true);
-  (void)tc.typeCheckExpression(unresolvedDot, dc);
-  cs.cacheExprTypes(unresolvedDot);
-
-  ConcreteDeclRef ref = unresolvedDot->getReferencedDecl();
-  if (!ref) {
-    tc.diagnose(base->getLoc(), brokenProtocolDiag);
-    return nullptr;
-  }
-
   // Set the initializer.
   if (auto stringLiteral = dyn_cast<StringLiteralExpr>(literal))
-    stringLiteral->setInitializer(ref);
+    stringLiteral->setInitializer(witness);
   else
-    cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(ref);
+    cast<MagicIdentifierLiteralExpr>(literal)->setInitializer(witness);
 
   // The literal expression has this type.
   cs.setType(literal, type);
