@@ -855,16 +855,11 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::External: {
     auto declID = ListOfValues[nextValue++];
     auto decl = cast<AbstractStorageDecl>(MF->getDecl(declID));
-    auto numComponentSubstitutions = ListOfValues[nextValue++];
-    SmallVector<Substitution, 4> subs;
-    while (numComponentSubstitutions-- > 0) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      subs.push_back(*sub);
-    }
+    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
     handleComputedIndices();
-    return KeyPathPatternComponent::forExternal(decl,
-        MF->getContext().AllocateCopy(subs),
-        indices, indicesEquals, indicesHash, type);
+    return KeyPathPatternComponent::forExternal(decl, subMap, indices,
+                                                indicesEquals, indicesHash,
+                                                type);
   }
   }
 }

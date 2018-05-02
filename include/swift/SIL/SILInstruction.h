@@ -2360,7 +2360,7 @@ private:
       ComputedPropertyId::ValueType IdValue;
     } Computed;
     // Valid if Kind == External
-    ArrayRef<Substitution> ExternalSubstitutions;
+    SubstitutionMap ExternalSubstitutions;
   };
   ArrayRef<Index> Indices;
   struct {
@@ -2392,7 +2392,7 @@ private:
   
   /// Constructor for external components
   KeyPathPatternComponent(AbstractStorageDecl *externalStorage,
-                          ArrayRef<Substitution> substitutions,
+                          SubstitutionMap substitutions,
                           ArrayRef<Index> indices,
                           SILFunction *indicesEqual,
                           SILFunction *indicesHash,
@@ -2553,7 +2553,7 @@ public:
     return (AbstractStorageDecl*)ValueAndKind.getPointer();
   }
   
-  ArrayRef<Substitution> getExternalSubstitutions() const {
+  SubstitutionMap getExternalSubstitutions() const {
     assert(getKind() == Kind::External
            && "not an external property");
     return ExternalSubstitutions;
@@ -2605,7 +2605,7 @@ public:
   
   static KeyPathPatternComponent
   forExternal(AbstractStorageDecl *externalDecl,
-              ArrayRef<Substitution> substitutions,
+              SubstitutionMap substitutions,
               ArrayRef<Index> indices,
               SILFunction *indicesEquals,
               SILFunction *indicesHash,

@@ -369,7 +369,7 @@ void verifyKeyPathComponent(SILModule &M,
     CanGenericSignature canSig = nullptr;
     if (sig) {
       canSig = sig->getCanonicalSignature();
-      subs = sig->getSubstitutionMap(component.getExternalSubstitutions());
+      subs = component.getExternalSubstitutions();
     }
     auto substType = component.getExternalDecl()->getStorageInterfaceType()
       .subst(subs);
