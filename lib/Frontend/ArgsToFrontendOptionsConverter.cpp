@@ -212,10 +212,10 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
 }
 
 void ArgsToFrontendOptionsConverter::setUnsignedIntegerArgument(
-    options::ID optionID, unsigned max, unsigned &valueToSet) {
+    options::ID optionID, unsigned radix, unsigned &valueToSet) {
   if (const Arg *A = Args.getLastArg(optionID)) {
     unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(max, attempt)) {
+    if (StringRef(A->getValue()).getAsInteger(radix, attempt)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     } else {
