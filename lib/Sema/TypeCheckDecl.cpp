@@ -3358,43 +3358,17 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   }
 
   // Build interface and context substitution maps.
-  auto protoSelfType = behaviorProto->getProtocolSelfType();
-  auto sig = behaviorProto->getGenericSignatureOfContext();
   auto interfaceSubsMap =
-    sig->getSubstitutionMap(
-      [&](SubstitutableType *depType) {
-        if (depType->isEqual(protoSelfType))
-          return behaviorInterfaceSelf;
-
-        return Type();
-      },
-      [&](CanType dependentType, Type replacementType,
-          ProtocolType *conformedProtocol)
-            ->Optional<ProtocolConformanceRef> {
-        if (dependentType->isEqual(protoSelfType) &&
-            conformedProtocol->getDecl() == behaviorProto)
-          return ProtocolConformanceRef(conformance);
-
-        return None;
-      });
+    SubstitutionMap::getProtocolSubstitutions(
+                                behaviorProto,
+                                behaviorInterfaceSelf,
+                                ProtocolConformanceRef(conformance));
 
   auto contextSubsMap =
-    sig->getSubstitutionMap(
-      [&](SubstitutableType *depType) {
-        if (depType->isEqual(protoSelfType))
-          return behaviorSelf;
-
-        return Type();
-      },
-      [&](CanType dependentType, Type replacementType,
-          ProtocolType *conformedProtocol)
-            ->Optional<ProtocolConformanceRef> {
-        if (dependentType->isEqual(protoSelfType) &&
-            conformedProtocol->getDecl() == behaviorProto)
-          return ProtocolConformanceRef(conformance);
-
-        return None;
-      });
+    SubstitutionMap::getProtocolSubstitutions(
+                                  behaviorProto,
+                                  behaviorSelf,
+                                  ProtocolConformanceRef(conformance));
 
   // Now that type witnesses are done, satisfy property and method requirements.
   conformance->setState(ProtocolConformanceState::Checking);

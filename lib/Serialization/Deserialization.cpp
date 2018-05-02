@@ -4734,8 +4734,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::SIL_BOX_TYPE: {
     SILLayoutID layoutID;
-
-    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID);
+    SubstitutionMapID subMapID;
+    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
     
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
@@ -4761,24 +4761,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto layout = getLayout();
     if (!layout)
       return nullptr;
-    
-    SmallVector<Substitution, 4> genericArgs;
-    if (auto sig = layout->getGenericSignature()) {
-      for (unsigned i : range(sig->getSubstitutionListSize())) {
-        (void)i;
-        auto sub = maybeReadSubstitution(DeclTypeCursor);
-        if (!sub) {
-          error();
-          return nullptr;
-        }
 
-        genericArgs.push_back(
-          Substitution(sub->getReplacement()->getCanonicalType(),
-                       sub->getConformances()));
-      }
-    }
-
-    typeOrOffset = SILBoxType::get(getContext(), layout, genericArgs);
+    auto subMap = getSubstitutionMap(subMapID);
+    typeOrOffset = SILBoxType::get(getContext(), layout, subMap);
     break;
   }
       

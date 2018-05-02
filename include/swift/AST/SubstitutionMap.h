@@ -155,7 +155,16 @@ private:
   /// signature nor any replacement types/conformances.
   Storage *storage = nullptr;
 
-  MutableArrayRef<Type> getReplacementTypes() {
+  /// Retrieve the array of replacement types, which line up with the
+  /// generic parameters.
+  ///
+  /// Note that the types may be null, for cases where the generic parameter
+  /// is concrete but hasn't been queried yet.
+  ArrayRef<Type> getReplacementTypesBuffer() const {
+    return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
+  }
+
+  MutableArrayRef<Type> getReplacementTypesBuffer() {
     return storage ? storage->getReplacementTypes() : MutableArrayRef<Type>();
   }
 
@@ -223,12 +232,7 @@ public:
 
   /// Retrieve the array of replacement types, which line up with the
   /// generic parameters.
-  ///
-  /// Note that the types may be null, for cases where the generic parameter
-  /// is concrete but hasn't been queried yet.
-  ArrayRef<Type> getReplacementTypes() const {
-    return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
-  }
+  ArrayRef<Type> getReplacementTypes() const;
 
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;

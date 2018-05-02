@@ -582,13 +582,12 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
   auto fieldTy = getLayout()->getFields()[index].getLoweredType();
   
   // Apply generic arguments if the layout is generic.
-  if (!getGenericArgs().empty()) {
+  if (auto subMap = getSubstitutions()) {
     auto sig = getLayout()->getGenericSignature();
-    auto subs = sig->getSubstitutionMap(getGenericArgs());
     return SILType::getPrimitiveObjectType(fieldTy)
       .subst(M,
-             QuerySubstitutionMap{subs},
-             LookUpConformanceInSubstitutionMap(subs),
+             QuerySubstitutionMap{subMap},
+             LookUpConformanceInSubstitutionMap(subMap),
              sig)
       .getSwiftRValueType();
   }

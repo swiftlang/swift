@@ -2472,10 +2472,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
     -> ProtocolConformanceRef {
       return ProtocolConformanceRef(conformedTy->getDecl());
     });
-  SmallVector<Substitution, 4> genericArgs;
-  signature->getSubstitutions(subMap, genericArgs);
 
-  auto boxTy = SILBoxType::get(C, layout, genericArgs);
+  auto boxTy = SILBoxType::get(C, layout, subMap);
 #ifndef NDEBUG
   // FIXME: Map the box type out of context when asserting the field so
   // we don't need to push a GenericContextScope (which really ought to die).
@@ -2554,10 +2552,8 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
   // Instantiate the layout with enum's substitution list.
   auto subMap = boundEnum->getContextSubstitutionMap(
       M.getSwiftModule(), enumDecl, enumDecl->getGenericEnvironment());
-  SmallVector<Substitution, 4> genericArgs;
-  boxSignature->getSubstitutions(subMap, genericArgs);
 
-  auto boxTy = SILBoxType::get(C, layout, genericArgs);
+  auto boxTy = SILBoxType::get(C, layout, subMap);
   return boxTy;
 }
 

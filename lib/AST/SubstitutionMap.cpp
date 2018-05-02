@@ -50,6 +50,17 @@ SubstitutionMap::Storage::Storage(
             getConformances().data());
 }
 
+ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
+  if (empty()) return { };
+
+  // Make sure we've filled in all of the replacement types.
+  for (auto gp : getGenericSignature()->getGenericParams()) {
+    (void)Type(gp).subst(*this);
+  }
+
+  return getReplacementTypesBuffer();
+}
+
 bool SubstitutionMap::hasArchetypes() const {
   for (Type replacementTy : getReplacementTypes()) {
     if (replacementTy && replacementTy->hasArchetype())
@@ -75,6 +86,10 @@ bool SubstitutionMap::hasDynamicSelf() const {
 }
 
 bool SubstitutionMap::isCanonical() const {
+  if (empty()) return true;
+
+  if (!getGenericSignature()->isCanonical()) return false;
+
   for (Type replacementTy : getReplacementTypes()) {
     if (replacementTy && !replacementTy->isCanonical())
       return false;
@@ -91,6 +106,7 @@ bool SubstitutionMap::isCanonical() const {
 SubstitutionMap SubstitutionMap::getCanonical() const {
   if (empty()) return *this;
 
+  auto canonicalSig = getGenericSignature()->getCanonicalSignature();
   SmallVector<Type, 4> replacementTypes;
   for (Type replacementType : getReplacementTypes()) {
     if (replacementType)
@@ -104,7 +120,7 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
     conformances.push_back(conf.getCanonicalConformanceRef());
   }
 
-  return SubstitutionMap::get(getGenericSignature(),
+  return SubstitutionMap::get(canonicalSig,
                               ArrayRef<Type>(replacementTypes),
                               ArrayRef<ProtocolConformanceRef>(conformances));
 }
@@ -206,7 +222,7 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   // have.
   auto genericParam = cast<GenericTypeParamType>(type);
   auto mutableThis = const_cast<SubstitutionMap *>(this);
-  auto replacementTypes = mutableThis->getReplacementTypes();
+  auto replacementTypes = mutableThis->getReplacementTypesBuffer();
   auto genericSig = getGenericSignature();
   assert(genericSig);
   auto genericParams = genericSig->getGenericParams();
@@ -571,7 +587,7 @@ void SubstitutionMap::dump(llvm::raw_ostream &out) const {
   out << "\n";
   out << "Substitutions:\n";
   auto genericParams = genericSig->getGenericParams();
-  auto replacementTypes = getReplacementTypes();
+  auto replacementTypes = getReplacementTypesBuffer();
   for (unsigned i : indices(genericParams)) {
     out.indent(2);
     genericParams[i]->print(out);

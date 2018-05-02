@@ -1295,27 +1295,6 @@ Substitution Substitution::getCanonicalSubstitution(bool *wasCanonical) const {
   return *this;
 }
 
-SubstitutionList
-swift::getCanonicalSubstitutionList(SubstitutionList subs,
-                                    SmallVectorImpl<Substitution> &canSubs) {
-  bool subListWasCanonical = true;
-  for (auto &sub : subs) {
-    bool subWasCanonical = false;
-    auto canSub = sub.getCanonicalSubstitution(&subWasCanonical);
-    if (!subWasCanonical)
-      subListWasCanonical = false;
-    canSubs.push_back(canSub);
-  }
-
-  if (subListWasCanonical) {
-    canSubs.clear();
-    return subs;
-  }
-
-  subs = canSubs;
-  return subs;
-}
-
 /// Check of all types used by the conformance are canonical.
 ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
   if (isCanonical())

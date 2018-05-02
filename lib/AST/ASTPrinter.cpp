@@ -3714,11 +3714,11 @@ public:
     }
 
     // The arguments to the layout, if any, do come from the outer environment.
-    if (!T->getGenericArgs().empty()) {
+    if (auto subMap = T->getSubstitutions()) {
       Printer << " <";
-      interleave(T->getGenericArgs(),
-                 [&](const Substitution &arg) {
-                   visit(arg.getReplacement());
+      interleave(subMap.getReplacementTypes(),
+                 [&](Type type) {
+                   visit(type);
                  }, [&]{
                    Printer << ", ";
                  });

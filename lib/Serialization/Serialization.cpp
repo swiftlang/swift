@@ -3847,17 +3847,8 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
 
-#ifndef NDEBUG
-    if (auto sig = boxTy->getLayout()->getGenericSignature()) {
-      assert(sig->getSubstitutionListSize()
-               == boxTy->getGenericArgs().size());
-    }
-#endif
-
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef);
-
-    // Write the set of substitutions.
-    writeSubstitutions(boxTy->getGenericArgs(), DeclTypeAbbrCodes);
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef,
+                          addSubstitutionMapRef(boxTy->getSubstitutions()));
     break;
   }
       
