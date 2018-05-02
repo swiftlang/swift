@@ -997,17 +997,16 @@ public:
   }
 
 /// A helper class for defining some basic boilerplate.
-template <SILInstructionKind Kind, typename Base,
+template <SILInstructionKind Kind, typename InstBase,
           bool IsSingleResult =
-            std::is_base_of<SingleValueInstruction, Base>::value>
+              std::is_base_of<SingleValueInstruction, InstBase>::value>
 class InstructionBase;
 
-template <SILInstructionKind Kind, typename Base>
-class InstructionBase<Kind, Base, /*HasResult*/ true> : public Base {
+template <SILInstructionKind Kind, typename InstBase>
+class InstructionBase<Kind, InstBase, /*HasResult*/ true> : public InstBase {
 protected:
   template <typename... As>
-  InstructionBase(As &&...args)
-    : Base(Kind, std::forward<As>(args)...) {}
+  InstructionBase(As &&... args) : InstBase(Kind, std::forward<As>(args)...) {}
 
 public:
   /// Override to statically return the kind.
@@ -1023,12 +1022,11 @@ public:
   }
 };
 
-template <SILInstructionKind Kind, typename Base>
-class InstructionBase<Kind, Base, /*HasResult*/ false> : public Base {
+template <SILInstructionKind Kind, typename InstBase>
+class InstructionBase<Kind, InstBase, /*HasResult*/ false> : public InstBase {
 protected:
   template <typename... As>
-  InstructionBase(As &&...args)
-    : Base(Kind, std::forward<As>(args)...) {}
+  InstructionBase(As &&... args) : InstBase(Kind, std::forward<As>(args)...) {}
 
 public:
   static constexpr SILInstructionKind getKind() {
