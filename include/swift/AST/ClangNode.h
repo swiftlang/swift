@@ -111,7 +111,7 @@ public:
 namespace llvm {
 template <typename T>
 struct PointerLikeTypeTraits<swift::detail::ClangNodeBox<T>> {
-  using Box = swift::detail::ClangNodeBox<T>;
+  using Box = ::swift::detail::ClangNodeBox<T>;
 
   static inline void *getAsVoidPointer(Box P) {
     return const_cast<void *>(static_cast<const void *>(P.value));
