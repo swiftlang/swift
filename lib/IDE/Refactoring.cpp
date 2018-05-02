@@ -2601,6 +2601,17 @@ bool RefactoringActionLocalizeString::performChange() {
   EditConsumer.insertAfter(SM, Target->getEndLoc(), ", comment: \"\")");
   return false;
 }
+    
+bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+#warning Implement here
+    
+    return false;
+}
+    
+bool RefactoringActionDocCommentBoilerplate::performChange() {
+#warning Implement here
+    return false;
+}
 
 static CharSourceRange
   findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
