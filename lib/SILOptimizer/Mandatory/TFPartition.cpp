@@ -593,6 +593,12 @@ enum class Marking {
   Delete,    // This instruction is simply deleted (e.g. debug_value)
 };
 
+// Each string should be no more than 6 characters, so that a string like
+// "[Delete]\t" can be aligned with "[Arg]\t" or just "\t".
+static const char *markingStr[]{
+    "Copy", "Move", "Send", "Arg", "Delete",
+};
+
 class TFFunctionPartition {
 public:
   SILFunction &fn;
@@ -1685,6 +1691,10 @@ void TFFunctionPartition::markTensorBBArgumentsForDeletion() {
   }
 }
 
+static const char* markingEnumToStr(Marking m) {
+  return markingStr[static_cast<int>(m)];
+}
+
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
@@ -1840,6 +1850,40 @@ bool TFFunctionPartition::markFunction() {
     }
   }
   assert(tensorEndPoint && "Failed to compute an end point");
+
+  if (auto *outs = getTFDumpIntermediateStream()) {
+    *outs << "\n---- ANALYSIS STATE FOR FUNCTION " << fn.getName()
+          << " ----------\n";
+    *outs << "Tensor start point: ";
+    tensorStartPoint->print(*outs);
+    *outs << "Tensor end point: ";
+    tensorEndPoint->print(*outs);
+
+    *outs << "SIL with markings:\n";
+    for (auto &BB : fn.getBlocks()) {
+      SILPrintContext Ctx(*outs);
+      *outs << "\n" << Ctx.getID(&BB) << ":\n";
+      for (auto *arg : BB.getArguments()) {
+        if (markedBBArguments.count(arg)) {
+          auto it = markedBBArguments.find(arg);
+          assert (it != markedBBArguments.end());
+          *outs << "[" << markingEnumToStr(it->second.first) << "]";
+        }
+        *outs << "\t";
+        arg->print(*outs);
+      }
+      for (auto &I : BB) {
+        if (markedInstructions.count(&I)) {
+          *outs << "[" << markingEnumToStr(markedInstructions[&I]) << "]";
+        }
+        *outs << "\t";
+        I.print(*outs);
+      }
+    }
+
+    *outs << "---- END OF ANALYSIS STATE FOR FUNCTION ----------\n";
+    outs->flush();
+  }
 
   return true;
 }
@@ -2715,6 +2759,9 @@ bool PartitionCloner::finalizeOriginal() {
   // Next, add sends back of any values that are used by the host code, and
   // remove the original instruction.
   for (auto inst : instructionsToRemove) {
+    // These insts cannot contain types like unconditional branch, which do not
+    // have getResults() defined.
+    assert(!isa<NonValueInstruction>(inst));
     for (auto result : inst->getResults())
       if (!handleHostReferencesOfMovedValue(result,
                                             getUserSourceLocation(inst)))
@@ -3320,6 +3367,19 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
         resultValues.append(inst.getResults().begin(),
                             inst.getResults().end());
     }
+  }
+
+  if (auto *outs = getTFDumpIntermediateStream()) {
+    *outs << "\n---- PARTITION STATE FOR FUNCTION " << fn.getName()
+          << " ----------\n";
+    *outs << "(Possibly updated) tensor end point: ";
+    tensorEndPoint->print(*outs);
+    *outs << "There are " << resultValues.size() << " result values:\n";
+    for (auto& resultValue : resultValues) {
+      resultValue->print(*outs);
+    }
+    *outs << "---- END OF PARTITION STATE FOR FUNCTION ----------\n\n";
+    outs->flush();
   }
 
   // Insert the start/finish and any terminate runtime calls.
