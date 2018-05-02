@@ -14,6 +14,8 @@
 #define SWIFT_PARSE_SYNTAXPARSINGCACHE_H
 
 #include "swift/Syntax/SyntaxNodes.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace {
 
@@ -53,6 +55,10 @@ class SyntaxParsingCache {
   /// the source file that is now parsed incrementally
   llvm::SmallVector<SourceEdit, 4> Edits;
 
+  /// If not \c nullptr information about syntax node reuse will be printed to
+  /// this stream.
+  llvm::raw_ostream *ReuseLog = nullptr;
+
 public:
   SyntaxParsingCache(SourceFileSyntax OldSyntaxTree)
       : OldSyntaxTree(OldSyntaxTree) {}
@@ -68,6 +74,18 @@ public:
   /// Check if a syntax node of the given kind at the given position can be
   /// reused for a new syntax tree.
   llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind) const;
+
+  /// Specify a file to which information about node reuse shall be printed.
+  void setReuseLog(StringRef Filename) {
+    std::error_code ErrorCode;
+    ReuseLog = new llvm::raw_fd_ostream(Filename, ErrorCode,
+                                        llvm::sys::fs::OpenFlags::F_RW);
+    assert(!ErrorCode && "Unable to open incremental usage log");
+  }
+
+  ~SyntaxParsingCache() {
+    delete ReuseLog;
+  }
 
 private:
   llvm::Optional<Syntax> lookUpFrom(Syntax Node, size_t Position,

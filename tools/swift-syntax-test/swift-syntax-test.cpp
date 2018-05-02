@@ -124,6 +124,12 @@ IncrementalEdits("incremental-edit",
                                 "Can be passed multiple times."));
 
 static llvm::cl::opt<std::string>
+IncrementalReuseLog("incremental-reuse-log",
+                    llvm::cl::desc("Path to which a log should be written that "
+                                   "describes all the nodes reused during "
+                                   "incremental parsing."));
+
+static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
 
@@ -331,8 +337,9 @@ int doIncrementalParse(const char *MainExecutablePath,
     llvm::errs() << "Could not deserialise old syntax tree.";
     return EXIT_FAILURE;
   }
-  SyntaxParsingCache *Cache = new SyntaxParsingCache(OldSyntaxTree.getValue());
+  SyntaxParsingCache Cache = SyntaxParsingCache(OldSyntaxTree.getValue());
 
+  // Parse the source edits
   for (auto EditPattern : options::IncrementalEdits) {
     llvm::Regex MatchRegex("([0-9]+):([0-9]+)=(.*)");
     SmallVector<StringRef, 4> Matches;
@@ -349,13 +356,18 @@ int doIncrementalParse(const char *MainExecutablePath,
       llvm::errs() << "Could not parse edit end as integer: " << EditStart;
       return EXIT_FAILURE;
     }
-    Cache->addEdit(EditStart, EditEnd, /*ReplacmentLength=*/Matches[3].size());
+    Cache.addEdit(EditStart, EditEnd, /*ReplacmentLength=*/Matches[3].size());
+  }
+
+  if (!options::IncrementalReuseLog.empty()) {
+    StringRef Filename(options::IncrementalReuseLog.getValue());
+    Cache.setReuseLog(Filename);
   }
 
   // Parse the new libSyntax tree incrementally
   CompilerInstance Instance;
   SourceFile *SF =
-      getSourceFile(Instance, InputFileName, MainExecutablePath, Cache);
+      getSourceFile(Instance, InputFileName, MainExecutablePath, &Cache);
 
   // Serialize and print the newly generated libSyntax tree
   auto Root = SF->getSyntaxRoot().getRaw();

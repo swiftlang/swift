@@ -35,6 +35,9 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(Syntax Node,
     // token's leading trivia
 
     if (!NodeEdited) {
+      if (ReuseLog) {
+        (*ReuseLog) << "Reused " << Kind << " at offset " << Position << '\n';
+      }
       return Node;
     }
   }
