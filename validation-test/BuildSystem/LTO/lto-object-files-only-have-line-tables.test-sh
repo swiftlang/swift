@@ -33,7 +33,7 @@ else
     echo "Found swift-demangle LTO object!"
 fi
 
-${DWARFDUMP} -debug-dump=line ${SWIFT_DEMANGLE_LTO_OBJECT_FILE} > ${TEMP_DIR}/line.info
+${DWARFDUMP} --debug-line ${SWIFT_DEMANGLE_LTO_OBJECT_FILE} > ${TEMP_DIR}/line.info
 
 # Make sure that we found a line table.
 if [[ -z "$(sed -n "/include_directories.*=.*include\/swift/{p;q;}" ${TEMP_DIR}/line.info)" ]] ; then
