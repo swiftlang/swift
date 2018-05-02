@@ -2000,12 +2000,9 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       // use interface types.
       auto subsMap = genericEnv->getGenericSignature()
         ->getSubstitutionMap(subs);
-      subsMap = subsMap.mapReplacementTypesOutOfContext();
+      subsMap = subsMap.mapReplacementTypesOutOfContext().getCanonical();
       subs.clear();
       genericEnv->getGenericSignature()->getSubstitutions(subsMap, subs);
-      
-      for (auto &sub : subs)
-        sub = sub.getCanonicalSubstitution();
     }
     
 
