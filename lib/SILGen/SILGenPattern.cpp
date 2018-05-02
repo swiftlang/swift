@@ -2620,7 +2620,7 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   auto genericArgsMap =
       diagnoseFailure->getGenericSignature()->getSubstitutionMap(sub);
 
-  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, sub,
+  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
                                   metatype,
                                   SGFContext());
 }
