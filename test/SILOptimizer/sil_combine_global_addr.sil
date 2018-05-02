@@ -6,13 +6,16 @@ sil_stage canonical
 
 import Builtin
 import Swift
+
 protocol SomeProtocol {
   func foo() -> Int
 }
+
 class SomeClass  : SomeProtocol {
   init()
   func foo() -> Int
 }
+
 sil hidden [thunk] [always_inline] @foo_ : $@convention(witness_method:SomeProtocol) (@in_guaranteed SomeClass) -> Int {
 bb0(%0 : $*SomeClass):
   %1 = load %0 : $*SomeClass
@@ -20,12 +23,9 @@ bb0(%0 : $*SomeClass):
   %3 = apply %2(%1) : $@convention(method) (@guaranteed SomeClass) -> Int
   return %3 : $Int
 }
-sil hidden [thunk] [always_inline] @foo : $@convention(method) (@guaranteed SomeClass) -> Int {
-bb0(%0: $SomeClass):
-  %1 = integer_literal $Builtin.Int64, 10
-  %2 = struct $Int (%1 : $Builtin.Int64)
-  return %2 : $Int
-}
+
+sil hidden_external @foo : $@convention(method) (@guaranteed SomeClass) -> Int
+
 sil_global hidden [let] @$global_var : $SomeProtocol
 
 // CHECK-LABEL: sil @witness_global_addr
