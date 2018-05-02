@@ -229,7 +229,7 @@ FUNCTION(BridgeObjectRetainN, swift_bridgeObjectRetain_n,
          C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_bridgeObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(BridgeObjectReleaseN, swift_bridgeObjectRelease_n,
@@ -243,7 +243,7 @@ FUNCTION(NonAtomicBridgeObjectRetainN, swift_nonatomic_bridgeObjectRetain_n,
          C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_nonatomic_bridgeObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(NonAtomicBridgeObjectReleaseN, swift_nonatomic_bridgeObjectRelease_n,
@@ -328,7 +328,7 @@ FUNCTION(NonAtomicUnknownRelease, swift_nonatomic_unknownRelease, C_CC,
 FUNCTION(BridgeObjectStrongRetain, swift_bridgeObjectRetain, C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_bridgeRelease(void *ptr);
 FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease, C_CC,
@@ -340,7 +340,7 @@ FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease, C_CC,
 FUNCTION(NonAtomicBridgeObjectStrongRetain, swift_nonatomic_bridgeObjectRetain, C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_nonatomic_bridgeRelease(void *ptr);
 FUNCTION(NonAtomicBridgeObjectStrongRelease, swift_nonatomic_bridgeObjectRelease, C_CC,
