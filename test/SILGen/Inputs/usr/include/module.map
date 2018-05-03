@@ -26,6 +26,10 @@ module AppKit {
   header "AppKit.h"
   export *
 }
+module CoreData {
+  header "CoreData.h"
+  export *
+}
 module Dispatch {
   header "dispatch.h"
   export *
