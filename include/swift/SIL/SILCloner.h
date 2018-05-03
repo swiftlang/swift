@@ -114,7 +114,15 @@ protected:
     }
     return NewSubs;
   }
-  
+
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    return Subs;
+  }
+
+  SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
+    return asImpl().remapSubstitutionMap(Subs);
+  }
+
   SILType getTypeInClonedContext(SILType Ty) {
     auto objectTy = Ty.getSwiftRValueType();
     // Do not substitute opened existential types, if we do not have any.
@@ -2475,7 +2483,7 @@ void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
   doPostProcess(Inst, getBuilder().createKeyPath(
                           getOpLocation(Inst->getLoc()),
                           Inst->getPattern(),
-                          getOpSubstitutions(Inst->getSubstitutions()),
+                          getOpSubstitutionMap(Inst->getSubstitutions()),
                           opValues,
                           getOpType(Inst->getType())));
 }

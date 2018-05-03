@@ -123,14 +123,10 @@ void verifyKeyPathComponent(SILModule &M,
                             const KeyPathPatternComponent &component,
                             ArrayRef<Operand> operands,
                             CanGenericSignature patternSig,
-                            SubstitutionList patternSubList,
+                            SubstitutionMap patternSubs,
                             bool forPropertyDescriptor,
                             bool hasIndices) {
   auto &C = M.getASTContext();
-  
-  SubstitutionMap patternSubs;
-  if (patternSig)
-    patternSubs  = patternSig->getSubstitutionMap(patternSubList);
   
   auto loweredBaseTy =
     M.Types.getLoweredType(AbstractionPattern::getOpaque(), baseTy);
@@ -149,7 +145,7 @@ void verifyKeyPathComponent(SILModule &M,
                         "operator");
         
         auto substEqualsType = equals->getLoweredFunctionType()
-          ->substGenericArgs(M, patternSubList);
+          ->substGenericArgs(M, patternSubs);
         
         require(substEqualsType->getParameters().size() == 2,
                 "must have two arguments");
@@ -181,7 +177,7 @@ void verifyKeyPathComponent(SILModule &M,
                       "operator");
         
         auto substHashType = hash->getLoweredFunctionType()
-          ->substGenericArgs(M, patternSubList);
+          ->substGenericArgs(M, patternSubs);
         
         require(substHashType->getParameters().size() == 1,
                 "must have two arguments");
@@ -262,7 +258,7 @@ void verifyKeyPathComponent(SILModule &M,
     {
       auto getter = component.getComputedPropertyGetter();
       auto substGetterType = getter->getLoweredFunctionType()
-        ->substGenericArgs(M, patternSubList);
+        ->substGenericArgs(M, patternSubs);
       require(substGetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::Thin,
               "getter should be a thin function");
@@ -301,7 +297,7 @@ void verifyKeyPathComponent(SILModule &M,
       
       auto setter = component.getComputedPropertySetter();
       auto substSetterType = setter->getLoweredFunctionType()
-        ->substGenericArgs(M, patternSubList);
+        ->substGenericArgs(M, patternSubs);
       
       require(substSetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::Thin,
@@ -4136,10 +4132,7 @@ public:
     
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
     auto pattern = KPI->getPattern();
-    SubstitutionMap patternSubs;
-    if (pattern->getGenericSignature())
-      patternSubs = pattern->getGenericSignature()
-                           ->getSubstitutionMap(KPI->getSubstitutions());
+    SubstitutionMap patternSubs = KPI->getSubstitutions();
     require(baseTy == pattern->getRootType().subst(patternSubs)->getCanonicalType(),
             "keypath root type should match root type of keypath pattern");
 
@@ -4783,10 +4776,10 @@ void SILProperty::verify(const SILModule &M) const {
                   ->getCanonicalType(sig);
   auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
                     ->getCanonicalType(sig);
-  SubstitutionList subs;
+  SubstitutionMap subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
-    subs = env->getForwardingSubstitutions();
+    subs = env->getForwardingSubstitutionMap();
     baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
     leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
   }

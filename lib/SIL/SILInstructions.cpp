@@ -2253,31 +2253,28 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
 KeyPathInst *
 KeyPathInst::create(SILDebugLocation Loc,
                     KeyPathPattern *Pattern,
-                    SubstitutionList Subs,
+                    SubstitutionMap Subs,
                     ArrayRef<SILValue> Args,
                     SILType Ty,
                     SILFunction &F) {
   assert(Args.size() == Pattern->getNumOperands()
          && "number of key path args doesn't match pattern");
 
-  auto totalSize = totalSizeToAlloc<Substitution, Operand>
-    (Subs.size(), Args.size());
-  void *mem = F.getModule().allocateInst(totalSize, alignof(Substitution));
+  auto totalSize = totalSizeToAlloc<Operand>(Args.size());
+  void *mem = F.getModule().allocateInst(totalSize, alignof(KeyPathInst));
   return ::new (mem) KeyPathInst(Loc, Pattern, Subs, Args, Ty);
 }
 
 KeyPathInst::KeyPathInst(SILDebugLocation Loc,
                          KeyPathPattern *Pattern,
-                         SubstitutionList Subs,
+                         SubstitutionMap Subs,
                          ArrayRef<SILValue> Args,
                          SILType Ty)
   : InstructionBase(Loc, Ty),
-    Pattern(Pattern), NumSubstitutions(Subs.size()),
-    NumOperands(Pattern->getNumOperands())
+    Pattern(Pattern),
+    NumOperands(Pattern->getNumOperands()),
+    Substitutions(Subs)
 {
-  auto *subsBuf = getTrailingObjects<Substitution>();
-  std::uninitialized_copy(Subs.begin(), Subs.end(), subsBuf);
-  
   auto *operandsBuf = getTrailingObjects<Operand>();
   for (unsigned i = 0; i < Args.size(); ++i) {
     ::new ((void*)&operandsBuf[i]) Operand(this, Args[i]);
@@ -2287,11 +2284,6 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
   for (auto component : Pattern->getComponents()) {
     component.incrementRefCounts();
   }
-}
-
-MutableArrayRef<Substitution>
-KeyPathInst::getSubstitutions() {
-  return {getTrailingObjects<Substitution>(), NumSubstitutions};
 }
 
 MutableArrayRef<Operand>

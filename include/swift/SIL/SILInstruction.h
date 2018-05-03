@@ -2694,29 +2694,27 @@ public:
 class KeyPathInst final
     : public InstructionBase<SILInstructionKind::KeyPathInst,
                              SingleValueInstruction>,
-      private llvm::TrailingObjects<KeyPathInst, Substitution, Operand> {
+      private llvm::TrailingObjects<KeyPathInst, Operand> {
   friend SILBuilder;
   friend TrailingObjects;
   
   KeyPathPattern *Pattern;
-  unsigned NumSubstitutions, NumOperands;
+  unsigned NumOperands;
+  SubstitutionMap Substitutions;
   
   static KeyPathInst *create(SILDebugLocation Loc,
                              KeyPathPattern *Pattern,
-                             SubstitutionList Subs,
+                             SubstitutionMap Subs,
                              ArrayRef<SILValue> Args,
                              SILType Ty,
                              SILFunction &F);
   
   KeyPathInst(SILDebugLocation Loc,
               KeyPathPattern *Pattern,
-              SubstitutionList Subs,
+              SubstitutionMap Subs,
               ArrayRef<SILValue> Args,
               SILType Ty);
   
-  size_t numTrailingObjects(OverloadToken<Substitution>) const {
-    return NumSubstitutions;
-  }
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return NumOperands;
   }
@@ -2730,11 +2728,8 @@ public:
   }
   MutableArrayRef<Operand> getAllOperands();
 
-  MutableArrayRef<Substitution> getSubstitutions();
-  SubstitutionList getSubstitutions() const {
-    return const_cast<KeyPathInst*>(this)->getSubstitutions();
-  }
-  
+  SubstitutionMap getSubstitutions() const { return Substitutions; }
+
   void dropReferencedPattern();
   
   ~KeyPathInst();

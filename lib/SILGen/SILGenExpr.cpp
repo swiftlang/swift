@@ -4107,8 +4107,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                                      objcString);
   auto keyPath = SGF.B.createKeyPath(SILLocation(E), pattern,
                                      needsGenericContext
-                                       ? SGF.F.getForwardingSubstitutions()
-                                       : SubstitutionList(),
+                                       ? SGF.F.getForwardingSubstitutionMap()
+                                       : SubstitutionMap(),
                                      operands,
                                      loweredTy);
   auto value = SGF.emitManagedRValueWithCleanup(keyPath);

@@ -2040,7 +2040,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(S.addTypeRef(pattern->getValueType()));
     ListOfValues.push_back(pattern->getComponents().size());
     ListOfValues.push_back(pattern->getNumOperands());
-    ListOfValues.push_back(KPI->getSubstitutions().size());
+    ListOfValues.push_back(S.addSubstitutionMapRef(KPI->getSubstitutions()));
     
     ListOfValues.push_back(
        S.addDeclBaseNameRef(Ctx.getIdentifier(pattern->getObjCString())));
@@ -2054,9 +2054,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else {
       ListOfValues.push_back(0);
     }
-    
+
     SmallVector<ProtocolConformanceRef, 4> serializeAfter;
-    
+
     for (auto &component : pattern->getComponents()) {
       writeKeyPathPatternComponent(component,
                                    ListOfValues, serializeAfter);
@@ -2078,7 +2078,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       S.writeConformance(conf, SILAbbrCodes);
     }
     S.writeGenericRequirements(reqts, SILAbbrCodes);
-    S.writeSubstitutions(KPI->getSubstitutions(), SILAbbrCodes);
 
     break;
   }
