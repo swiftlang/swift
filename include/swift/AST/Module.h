@@ -353,17 +353,9 @@ public:
 
   /// \sa getImportedModules
   enum class ImportFilter {
-    // Everything.
     All,
-
-    // @_exported only.
     Public,
-
-    // Not @_exported only. Also includes @_usableFromInline.
-    Private,
-
-    // @_usableFromInline and @_exported only.
-    ForLinking
+    Private
   };
 
   /// Looks up which modules are imported by this module.
@@ -376,15 +368,10 @@ public:
   /// Looks up which modules are imported by this module, ignoring any that
   /// won't contain top-level decls.
   ///
-  /// This is a performance hack for the ClangImporter. Do not use for
-  /// anything but name lookup. May go away in the future.
+  /// This is a performance hack. Do not use for anything but name lookup.
+  /// May go away in the future.
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
-
-  /// Extension of the above hack. Identical to getImportedModulesForLookup()
-  /// for imported modules, otherwise also includes @usableFromInline imports.
-  void
-  getImportedModulesForLinking(SmallVectorImpl<ImportedModule> &imports) const;
 
   /// Finds all top-level decls of this module.
   ///
@@ -423,16 +410,11 @@ public:
   ///        results, with the given access path.
   /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
   ///        Return \c false to abort iteration.
-  /// \param includeLinkOnlyModules Include modules that are not visible to
-  ///        name lookup but must be linked in because inlinable code can
-  ///        reference their symbols.
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            llvm::function_ref<bool(ImportedModule)> fn,
-                            bool includeLinkOnlyModules = false);
-
+                            llvm::function_ref<bool(ImportedModule)> fn);
 
   /// @}
 
@@ -664,12 +646,6 @@ public:
     return getImportedModules(imports, ModuleDecl::ImportFilter::Public);
   }
 
-  /// \see ModuleDecl::getImportedModulesForLinking
-  virtual void getImportedModulesForLinking(
-      SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
-    return getImportedModules(imports, ModuleDecl::ImportFilter::ForLinking);
-  }
-
   /// Generates the list of libraries needed to link this file, based on its
   /// imports.
   virtual void
@@ -681,15 +657,11 @@ public:
   ///
   /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
   ///           Return \c false to abort iteration.
-  /// \param includeLinkOnlyModules Include modules that are not visible to
-  ///        name lookup but must be linked in because inlinable code can
-  ///        reference their symbols.
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool
-  forAllVisibleModules(llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn,
-                       bool includeLinkOnlyModules = false);
+  forAllVisibleModules(llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn);
 
   /// @}
 
@@ -768,17 +740,13 @@ public:
   };
 
   /// Possible attributes for imports in source files.
-  enum class ImportFlags : uint8_t {
+  enum class ImportFlags {
     /// The imported module is exposed to anyone who imports the parent module.
     Exported = 0x1,
 
     /// This source file has access to testable declarations in the imported
     /// module.
-    Testable = 0x2,
-
-    /// Modules that depend on the module containing this source file will
-    /// autolink this dependency.
-    UsableFromInline = 0x4,
+    Testable = 0x2
   };
 
   /// \see ImportFlags
