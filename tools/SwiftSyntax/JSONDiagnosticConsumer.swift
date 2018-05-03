@@ -60,7 +60,7 @@ public final class JSONDiagnosticConsumer: DiagnosticConsumer {
         if FileManager.default.fileExists(atPath: url.path) {
           try FileManager.default.removeItem(at: url)
         }
-        FileManager.default.createFile(atPath: url.path, contents: data)
+        _ = FileManager.default.createFile(atPath: url.path, contents: data)
       case .stdout:
         FileHandle.standardOutput.write(data)
       }
