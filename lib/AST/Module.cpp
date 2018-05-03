@@ -1287,6 +1287,25 @@ bool SourceFile::hasTestableImport(const swift::ModuleDecl *module) const {
   });
 }
 
+void SourceFile::markUsableFromInlineImport(ModuleDecl *module) {
+  bool found = false;
+
+  for (auto &Import : Imports) {
+    if (Import.first.second == module) {
+      Import.second |= ImportFlags::UsableFromInline;
+      found = true;
+    }
+  }
+
+  if (!found) {
+    addImports(
+      llvm::makeArrayRef(
+        std::make_pair(
+          std::make_pair(ModuleDecl::AccessPathTy(), module),
+          ImportOptions(ImportFlags::UsableFromInline))));
+  }
+}
+
 void SourceFile::clearLookupCache() {
   if (!Cache)
     return;

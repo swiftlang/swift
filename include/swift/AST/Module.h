@@ -381,8 +381,9 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Extension of the above hack. Identical to getImportedModulesForLookup()
-  /// for imported modules, otherwise also includes @usableFromInline imports.
+  /// Extension of the above hack. Behaves identically to
+  /// getImportedModulesForLookup() for Clang modules, otherwise also
+  /// includes @usableFromInline imports.
   void
   getImportedModulesForLinking(SmallVectorImpl<ImportedModule> &imports) const;
 
@@ -790,8 +791,10 @@ private:
 
   /// This is the list of modules that are imported by this module.
   ///
-  /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+  /// This is filled in by the Name Binding phase. The elements here are mutable
+  /// because markUsableFromInlineImport() modifies existing entries to set
+  /// ImportFlags::UsableFromInline.
+  MutableArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -896,6 +899,8 @@ public:
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
 
   bool hasTestableImport(const ModuleDecl *module) const;
+
+  void markUsableFromInlineImport(ModuleDecl *module);
 
   void clearLookupCache();
 
