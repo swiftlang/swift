@@ -1128,7 +1128,6 @@ ModuleFile::ModuleFile(
       }
 
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
-      bool seenFlags = false;
 
       auto next = cursor.advance();
       while (next.Kind == llvm::BitstreamEntry::Record) {
@@ -1137,10 +1136,12 @@ ModuleFile::ModuleFile(
         unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
         switch (kind) {
         case input_block::IMPORTED_MODULE: {
-          bool exported, scoped;
+          bool exported, usableFromInline, scoped;
           input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        exported, scoped);
-          Dependencies.push_back({blobData, exported, scoped});
+                                                        exported,
+                                                        usableFromInline,
+                                                        scoped);
+          Dependencies.push_back({blobData, exported, usableFromInline, scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1167,15 +1168,6 @@ ModuleFile::ModuleFile(
           assert(importedHeaderInfo.contents.empty() &&
                  "contents seen already");
           importedHeaderInfo.contents = blobData;
-          break;
-        }
-        case input_block::MODULE_FLAGS: {
-          assert(!seenFlags && "only one flags record allowed");
-          seenFlags = true;
-          bool hasUnderlyingModule;
-          input_block::ModuleFlagsLayout::readRecord(scratch,
-                                                     hasUnderlyingModule);
-          Bits.HasUnderlyingModule = hasUnderlyingModule;
           break;
         }
         case input_block::SEARCH_PATH: {
@@ -1433,11 +1425,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
-    // This is for backwards-compatibility with modules that still rely on the
-    // "HasUnderlyingModule" flag.
-    if (Bits.HasUnderlyingModule && module == ShadowedModule)
-      dependency.forceExported();
-
     if (scopePath.empty()) {
       dependency.Import = { {}, module };
     } else {
@@ -1591,9 +1578,33 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (filter != ModuleDecl::ImportFilter::All &&
-        (filter == ModuleDecl::ImportFilter::Public) ^ dep.isExported())
-      continue;
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+      // We're including all imports.
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      // Skip @_exported imports.
+      if (dep.isExported())
+        continue;
+
+      break;
+
+    case ModuleDecl::ImportFilter::Public:
+      // Only include @_exported imports.
+      if (!dep.isExported())
+        continue;
+
+      break;
+
+    case ModuleDecl::ImportFilter::ForLinking:
+      // Only include @_exported and @usableFromInline imports.
+      if (!dep.isExported() && !dep.isUsableFromInline())
+        continue;
+
+      break;
+    }
+
     assert(dep.isLoaded());
     results.push_back(dep.Import);
   }
@@ -1660,6 +1671,9 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isExported())
         ID->getAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+      if (Dep.isUsableFromInline())
+        ID->getAttrs().add(
+            new (Ctx) UsableFromInlineImportAttr(/*IsImplicit=*/true));
       ImportDecls.push_back(ID);
     }
     Bits.ComputedImportDecls = true;
