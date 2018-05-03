@@ -1948,7 +1948,7 @@ bool LinkInfo::isUsed(llvm::GlobalValue::LinkageTypes Linkage,
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
     Alignment alignment, DebugTypeInfo DbgTy, Optional<SILLocation> DebugLoc,
-    StringRef DebugName) {
+    StringRef DebugName, bool inFixedBuffer) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
   if (existingValue) {
@@ -1980,7 +1980,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
   if (IGM.DebugInfo && !DbgTy.isNull() && linkInfo.isForDefinition())
     IGM.DebugInfo->emitGlobalVariableDeclaration(
         var, DebugName.empty() ? name : DebugName, name, DbgTy,
-        var->hasInternalLinkage(), DebugLoc);
+        var->hasInternalLinkage(), inFixedBuffer, DebugLoc);
 
   return var;
 }
@@ -2116,6 +2116,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   llvm::Type *storageType;
   Size fixedSize;
   Alignment fixedAlignment;
+  bool inFixedBuffer = false;
 
   if (var->isInitializedObject()) {
     assert(ti.isFixedSize(expansion));
@@ -2145,6 +2146,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   } else {
     // Allocate a fixed-size buffer and possibly heap-allocate a payload at
     // runtime if the runtime size of the type does not fit in the buffer.
+    inFixedBuffer = true;
     storageType = getFixedBufferTy();
     fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
     fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
@@ -2175,20 +2177,21 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       gvar = createVariable(*this, link, storageTypeWithContainer,
                             fixedAlignment);
     } else {
-      auto DbgTy = DebugTypeInfo::getGlobal(var, storageTypeWithContainer,
-                                            fixedSize, fixedAlignment);
+      StringRef name;
+      Optional<SILLocation> loc;
       if (var->getDecl()) {
-        // If we have the VarDecl, use it for more accurate debugging information.
-        gvar = createVariable(*this, link, storageTypeWithContainer,
-                              fixedAlignment, DbgTy, SILLocation(var->getDecl()),
-                              var->getDecl()->getName().str());
+        // Use the VarDecl for more accurate debugging information.
+        loc = var->getDecl();
+        name = var->getDecl()->getName().str();
       } else {
-        Optional<SILLocation> loc;
         if (var->hasLocation())
           loc = var->getLocation();
-        gvar = createVariable(*this, link, storageTypeWithContainer,
-                              fixedAlignment, DbgTy, loc, var->getName());
+        name = var->getName();
       }
+      auto DbgTy = DebugTypeInfo::getGlobal(var, storageTypeWithContainer,
+                                            fixedSize, fixedAlignment);
+      gvar = createVariable(*this, link, storageTypeWithContainer,
+                            fixedAlignment, DbgTy, loc, name, inFixedBuffer);
     }
     /// Add a zero initializer.
     if (forDefinition)
