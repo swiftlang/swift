@@ -55,9 +55,13 @@ class SyntaxParsingCache {
   /// the source file that is now parsed incrementally
   llvm::SmallVector<SourceEdit, 4> Edits;
 
-  /// If not \c nullptr information about syntax node reuse will be printed to
-  /// this stream.
-  llvm::raw_ostream *ReuseLog = nullptr;
+  /// Whether or not information about reused nodes shall be recored in
+  /// \c ReusedRanges
+  bool RecordReuseInformation = false;
+
+  /// If \c RecordReuseInformation buffer offsets of ranges that have been
+  /// successfully looked up in this cache are stored.
+  std::vector<std::pair<unsigned, unsigned>> ReusedRanges;
 
 public:
   SyntaxParsingCache(SourceFileSyntax OldSyntaxTree)
@@ -73,23 +77,21 @@ public:
 
   /// Check if a syntax node of the given kind at the given position can be
   /// reused for a new syntax tree.
-  llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind) const;
+  llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind);
 
-  /// Specify a file to which information about node reuse shall be printed.
-  void setReuseLog(StringRef Filename) {
-    std::error_code ErrorCode;
-    ReuseLog = new llvm::raw_fd_ostream(Filename, ErrorCode,
-                                        llvm::sys::fs::OpenFlags::F_RW);
-    assert(!ErrorCode && "Unable to open incremental usage log");
-  }
+  /// Turn recording of reused ranges on
+  void recordReuseInformation() { RecordReuseInformation = true; }
 
-  ~SyntaxParsingCache() {
-    delete ReuseLog;
+  /// Return the ranges of the new source file that have been successfully
+  /// looked up in this cache as a (start, end) pair of byte offsets in the
+  /// post-edit file.
+  std::vector<std::pair<unsigned, unsigned>> getReusedRanges() const {
+    return ReusedRanges;
   }
 
 private:
   llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t Position,
-                                    SyntaxKind Kind) const;
+                                    SyntaxKind Kind);
 
   bool nodeCanBeReused(const Syntax &Node, size_t Position,
                        SyntaxKind Kind) const;

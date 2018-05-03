@@ -257,6 +257,10 @@ public:
   /// next node if populated.
   AbsolutePosition getAbsoluteEndPosition() const;
 
+  /// Get the absolute position without skipping the leading trivia of this
+  /// node.
+  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const;
+
   /// Returns true if the data node represents type syntax.
   bool isType() const;
 

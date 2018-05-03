@@ -39,11 +39,8 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
 
 llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
                                                       size_t Position,
-                                                      SyntaxKind Kind) const {
+                                                      SyntaxKind Kind) {
   if (nodeCanBeReused(Node, Position, Kind)) {
-    if (ReuseLog) {
-      (*ReuseLog) << "Reused " << Kind << " at offset " << Position << '\n';
-    }
     return Node;
   }
 
@@ -62,7 +59,7 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
 }
 
 llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
-                                                  SyntaxKind Kind) const {
+                                                  SyntaxKind Kind) {
   // Undo the edits in reverse order
   size_t OldPosition = NewPosition;
   for (auto I = Edits.rbegin(), E = Edits.rend(); I != E; ++I) {
@@ -73,5 +70,13 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
     }
   }
 
-  return lookUpFrom(OldSyntaxTree, OldPosition, Kind);
+  auto Node = lookUpFrom(OldSyntaxTree, OldPosition, Kind);
+  if (Node.hasValue()) {
+    if (RecordReuseInformation) {
+      auto Start = NewPosition;
+      auto End = Start + Node->getTextLength();
+      ReusedRanges.push_back({Start, End});
+    }
+  }
+  return Node;
 }

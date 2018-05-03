@@ -351,13 +351,17 @@ int doIncrementalParse(const char *MainExecutablePath,
   SyntaxParsingCache Cache = SyntaxParsingCache(OldSyntaxTree.getValue());
 
   if (!options::IncrementalReuseLog.empty()) {
-    StringRef Filename(options::IncrementalReuseLog.getValue());
-    Cache.setReuseLog(Filename);
+    Cache.recordeReuseInformation();
   }
 
   // Parse the new libSyntax tree incrementally
   CompilerInstance Instance;
   setUpCompilerInstance(Instance, InputFileName, MainExecutablePath, &Cache);
+
+  auto &SourceMgr = Instance.getSourceMgr();
+  auto BufferIDs = Instance.getInputBufferIDs();
+  assert(BufferIDs.size() == 1 && "Only expecting to process one source file");
+  unsigned BufferID = BufferIDs.front();
 
   // Parse the source edits
   for (auto EditPattern : options::IncrementalEdits) {
@@ -389,11 +393,6 @@ int doIncrementalParse(const char *MainExecutablePath,
       return EXIT_FAILURE;
     }
 
-    SourceFile &MainFile =
-        Instance.getMainModule()->getMainSourceFile(SourceFileKind::Main);
-    auto BufferID = MainFile.getBufferID().getValue();
-
-    auto &SourceMgr = Instance.getSourceMgr();
     auto EditStartLoc =
         SourceMgr.getLocForLineCol(BufferID, EditStartLine, EditStartColumn);
     auto EditEndLoc =
@@ -406,6 +405,24 @@ int doIncrementalParse(const char *MainExecutablePath,
   }
 
   SourceFile *SF = parseSourceFile(Instance);
+
+  if (!options::IncrementalReuseLog.empty()) {
+    std::error_code ErrorCode;
+    llvm::raw_fd_ostream ReuseLog(options::IncrementalReuseLog, ErrorCode,
+                                  llvm::sys::fs::OpenFlags::F_RW);
+    assert(!ErrorCode && "Unable to open incremental usage log");
+
+    for (auto ReuseRange : Cache.getReusedRanges()) {
+      SourceLoc Start = SourceMgr.getLocForOffset(BufferID, ReuseRange.first);
+      SourceLoc End = SourceMgr.getLocForOffset(BufferID, ReuseRange.second);
+
+      ReuseLog << "Reused ";
+      Start.printLineAndColumn(ReuseLog, SourceMgr);
+      ReuseLog << " to ";
+      End.printLineAndColumn(ReuseLog, SourceMgr);
+      ReuseLog << '\n';
+    }
+  }
 
   // Serialize and print the newly generated libSyntax tree
   auto Root = SF->getSyntaxRoot().getRaw();

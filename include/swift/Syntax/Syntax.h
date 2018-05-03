@@ -202,6 +202,13 @@ public:
   AbsolutePosition getAbsoluteEndPosition() const {
     return Data->getAbsoluteEndPosition();
   }
+
+  /// Get the absolute position without skipping the leading trivia of this
+  /// node.
+  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const {
+    return Data->getAbsolutePositionWithLeadingTrivia();
+  }
+
   // TODO: hasSameStructureAs ?
 };
 
