@@ -1287,6 +1287,14 @@ bool SourceFile::hasTestableImport(const swift::ModuleDecl *module) const {
   });
 }
 
+void SourceFile::markUsableFromInlineImport(const ModuleDecl *module) {
+  for (auto &Import : Imports) {
+    if (Import.first.second == module) {
+      Import.second |= ImportFlags::UsableFromInline;
+    }
+  }
+}
+
 void SourceFile::clearLookupCache() {
   if (!Cache)
     return;
