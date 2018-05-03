@@ -1364,13 +1364,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                               (SILValueCategory)(unsigned)ListOfValues[i+2]);
       Args.push_back(getLocalValue(ListOfValues[i], ArgTy));
     }
-    unsigned NumSub = NumSubs;
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
+    SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
     Identifier Name = MF->getIdentifier(ValID);
     
     ResultVal = Builder.createBuiltin(Loc, Name, ResultTy, Substitutions,

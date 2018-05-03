@@ -2554,7 +2554,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
     
     SmallVector<ParsedSubstitution, 4> parsedSubs;
-    SmallVector<Substitution, 4> subs;
+    SubstitutionMap subMap;
     if (parseSubstitutions(parsedSubs))
       return true;
     
@@ -2563,8 +2563,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
       }
+      SmallVector<Substitution, 4> subs;
       if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
         return true;
+
+      subMap = genericEnv->getGenericSignature()->getSubstitutionMap(subs);
     }
     
     if (P.Tok.getKind() != tok::l_paren) {
@@ -2602,7 +2605,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subs, Args);
+    ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subMap, Args);
     break;
   }
   case SILInstructionKind::OpenExistentialAddrInst:

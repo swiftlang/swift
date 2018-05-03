@@ -893,7 +893,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::BuiltinInst: {
-    // Format: number of substitutions, the builtin name, result type, and
+    // Format: substitutions map ID, the builtin name, result type, and
     // a list of values for the arguments. Each value in the list
     // is represented with 4 IDs:
     //   ValueID, ValueResultNumber, TypeID, TypeCategory.
@@ -908,12 +908,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
                              SILAbbrCodes[SILInstApplyLayout::Code],
                              SIL_BUILTIN,
-                             BI->getSubstitutions().size(),
+                             S.addSubstitutionMapRef(BI->getSubstitutions()),
                              S.addTypeRef(BI->getType().getSwiftRValueType()),
                              (unsigned)BI->getType().getCategory(),
                              S.addDeclBaseNameRef(BI->getName()),
                              Args);
-    S.writeSubstitutions(BI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case SILInstructionKind::ApplyInst: {

@@ -101,7 +101,7 @@ public:
   }
 
   BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
-                             SubstitutionList subs, ArrayRef<SILValue> args);
+                             SubstitutionMap subs, ArrayRef<SILValue> args);
 
   // Existential containers use the conformances needed by the existential
   // box.

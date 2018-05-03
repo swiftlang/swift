@@ -367,25 +367,20 @@ AllocValueBufferInst::create(SILDebugLocation DebugLoc, SILType valueType,
 
 BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SILType ReturnType,
-                                 SubstitutionList Substitutions,
+                                 SubstitutionMap Substitutions,
                                  ArrayRef<SILValue> Args,
                                  SILModule &M) {
-  auto Size = totalSizeToAlloc<swift::Operand, Substitution>(Args.size(),
-                                                          Substitutions.size());
+  auto Size = totalSizeToAlloc<swift::Operand>(Args.size());
   auto Buffer = M.allocateInst(Size, alignof(BuiltinInst));
   return ::new (Buffer) BuiltinInst(Loc, Name, ReturnType, Substitutions,
                                     Args);
 }
 
 BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
-                         SILType ReturnType, SubstitutionList Subs,
+                         SILType ReturnType, SubstitutionMap Subs,
                          ArrayRef<SILValue> Args)
-    : InstructionBaseWithTrailingOperands(Args, Loc, ReturnType), Name(Name) {
-  SILInstruction::Bits.BuiltinInst.NumSubstitutions = Subs.size();
-  assert(SILInstruction::Bits.BuiltinInst.NumSubstitutions == Subs.size() &&
-         "Truncation");
-  std::uninitialized_copy(Subs.begin(), Subs.end(),
-                          getTrailingObjects<Substitution>());
+    : InstructionBaseWithTrailingOperands(Args, Loc, ReturnType), Name(Name),
+      Substitutions(Subs) {
 }
 
 InitBlockStorageHeaderInst *

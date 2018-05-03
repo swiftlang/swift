@@ -2740,18 +2740,21 @@ public:
 class BuiltinInst final
     : public InstructionBaseWithTrailingOperands<
                                    SILInstructionKind::BuiltinInst, BuiltinInst,
-                                   SingleValueInstruction, Substitution> {
+                                   SingleValueInstruction> {
   friend SILBuilder;
 
   /// The name of the builtin to invoke.
   Identifier Name;
 
+  /// The substitutions.
+  SubstitutionMap Substitutions;
+
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
-              SubstitutionList Substitutions, ArrayRef<SILValue> Args);
+              SubstitutionMap Substitutions, ArrayRef<SILValue> Args);
 
   static BuiltinInst *create(SILDebugLocation DebugLoc, Identifier Name,
                              SILType ReturnType,
-                             SubstitutionList Substitutions,
+                             SubstitutionMap Substitutions,
                              ArrayRef<SILValue> Args, SILModule &M);
 
 public:
@@ -2790,20 +2793,12 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return SILInstruction::Bits.BuiltinInst.NumSubstitutions != 0;
+    return !Substitutions.empty();
   }
 
   /// Return the type parameters to the builtin.
-  SubstitutionList getSubstitutions() const {
-    return {getTrailingObjects<Substitution>(),
-            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
-  }
-  /// Return the type parameters to the builtin.
-  MutableArrayRef<Substitution> getSubstitutions() {
-    return {getTrailingObjects<Substitution>(),
-            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
-  }
-  
+  SubstitutionMap getSubstitutions() const { return Substitutions; }
+
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());

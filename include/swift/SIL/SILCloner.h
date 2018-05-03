@@ -569,7 +569,7 @@ SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
         getBuilder().createBuiltin(getOpLocation(Inst->getLoc()),
                                    Inst->getName(),
                                    getOpType(Inst->getType()),
-                                   getOpSubstitutions(Inst->getSubstitutions()),
+                                   getOpSubstitutionMap(Inst->getSubstitutions()),
                                    Args));
 }
 

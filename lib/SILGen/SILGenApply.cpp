@@ -3869,7 +3869,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     // always still expressions.
     Expr *argument = std::move(uncurriedSites[0]).forward().asKnownExpr();
     ManagedValue resultMV =
-        emitter(SGF, uncurriedLoc, callee.getSubstitutions().toList(),
+        emitter(SGF, uncurriedLoc, callee.getSubstitutions(),
                 argument, uncurriedContext);
     firstLevelResult.value =
         RValue(SGF, uncurriedLoc, formalResultType, resultMV);
@@ -3889,7 +3889,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   if (specializedEmitter.isLateEmitter()) {
     auto emitter = specializedEmitter.getLateEmitter();
     ManagedValue mv = emitter(SGF, *uncurriedLoc,
-                              callee.getSubstitutions().toList(),
+                              callee.getSubstitutions(),
                               uncurriedArgs, uncurriedContext);
     firstLevelResult.value =
         RValue(SGF, *uncurriedLoc, formalApplyType.getResult(), mv);
@@ -3908,7 +3908,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   SILFunctionConventions substConv(substFnType, SGF.SGM.M);
   auto resultVal = SGF.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
                                        substConv.getSILResultType(),
-                                       callee.getSubstitutions().toList(),
+                                       callee.getSubstitutions(),
                                        consumedArgs);
   firstLevelResult.value =
       RValue(SGF, *uncurriedLoc, formalApplyType.getResult(),
