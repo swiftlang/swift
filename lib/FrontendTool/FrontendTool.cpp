@@ -1645,6 +1645,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
   if (validateTBDIfNeeded(Invocation, MSF, *IRModule.getModule()))
     return true;
 
+  // Free up some resources now that we're about to generate code.
+  // At this point, the SILModule is no longer needed, so it can be freed.
+  SM.reset();
+
   return generateCode(Instance, OutputFilename, IRModule.getModule(),
                       HashGlobal);
 }
