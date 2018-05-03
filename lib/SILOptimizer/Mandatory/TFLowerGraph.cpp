@@ -531,8 +531,9 @@ private:  // Helpers to create TensorFlow graph nodes.
 };
 }
 
-static void escapeNodeName(std::string &name) {
-  // Node names must match the regex "[A-Za-z0-9.][A-Za-z0-9_./]*".
+// Escape the specified string to be a valid TensorFlow OpDef name.
+// Op names must match the regex "[A-Za-z0-9.][A-Za-z0-9_./]*".
+static void escapeOpName(std::string &name) {
   // Currently, invalid characters are simply replaced with underscores.
   // TODO: Use a more robust escaping transformation. It should handle unicode
   // characters (using llvm::UTF8 or some other means) and be reversible.
@@ -545,7 +546,7 @@ static void escapeNodeName(std::string &name) {
 }
 
 /// Produce a "stack trace" for the specified location, producing it in a form
-/// that we can use as a uniqued op name.
+/// that we can use as a unique op name.
 std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
                                            const char *baseName) {
   std::string name = baseName;
@@ -557,7 +558,7 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
 
   // Form a name for this op based on the user's source location and "stack
   // trace" of where it got inlined in user code.  We use the form
-  // file:line:col.
+  // "file:line:col".
   for (auto ds = loc.getScope(); ds; ds = ds->InlinedCallSite) {
     // If the call site location is invalid, stop scanning.
     if (!ds->Loc.getSourceLoc().isValid())
@@ -570,17 +571,12 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       auto lineCol = SM.getLineAndColumn(ds->Loc.getSourceLoc());
       auto fnName = F->getName();
 
-      // Drop .tf_partition suffix off function names.
+      // Drop ".tf_partition" suffix off function names.
       if (fnName.endswith(".tf_partition"))
         fnName = fnName.drop_back(strlen(".tf_partition"));
 
-      // $ isn't a valid character in a tensorflow op name, and gets added to
-      // the start of some symbols.  If we see it, drop it.
-      if (fnName.startswith("$"))
-        fnName = fnName.drop_front();
-
-      name += "."+fnName.str()+"."+llvm::utostr(lineCol.first);
-      name += "."+llvm::utostr(lineCol.second);
+      name += "." + fnName.str() + "." + llvm::utostr(lineCol.first);
+      name += "." + llvm::utostr(lineCol.second);
     }
   }
 
@@ -591,17 +587,17 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
     if (sourceLoc.isValid()) {
       auto lineCol = SM.getLineAndColumn(sourceLoc);
       auto bufferID = SM.getBufferIdentifierForLoc(sourceLoc);
-      name += "."+bufferID.str()+"."+llvm::utostr(lineCol.first);
-      name += "."+llvm::utostr(lineCol.second);
+      name += "." + bufferID.str() + "." + llvm::utostr(lineCol.first);
+      name += "." + llvm::utostr(lineCol.second);
     }
   }
 
-  // Escape node name.
-  escapeNodeName(name);
+  // Escape op name.
+  escapeOpName(name);
 
   // If we've already used this name, rename it to make it unique.
   while (!usedOpNames.insert(name).second) {
-    name += "_"+llvm::utostr(OpID++);
+    name += "_" + llvm::utostr(OpID++);
   }
 
   return name;
