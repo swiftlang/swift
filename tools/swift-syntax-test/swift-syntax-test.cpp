@@ -192,11 +192,9 @@ getTokensFromFile(const StringRef InputFilename,
 
 void anchorForGetMainExecutable() {}
 
-
-SourceFile *getSourceFile(CompilerInstance &Instance,
-                          StringRef InputFileName,
-                          const char *MainExecutablePath,
-                          SyntaxParsingCache *SyntaxParsingCache = nullptr) {
+bool setUpCompilerInstance(CompilerInstance &Instance, StringRef InputFileName,
+                           const char *MainExecutablePath,
+                           SyntaxParsingCache *SyntaxParsingCache) {
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
@@ -210,9 +208,12 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
   PrintingDiagnosticConsumer DiagPrinter;
   Instance.addDiagnosticConsumer(&DiagPrinter);
   if (Instance.setup(Invocation)) {
-    return nullptr;
+    return false;
   }
+  return true;
+}
 
+SourceFile *parseSourceFile(CompilerInstance &Instance) {
   // First, parse the file normally and get the regular old AST.
   Instance.performParseOnly();
 
@@ -225,6 +226,16 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
   }
   assert(SF && "No source file");
   return SF;
+}
+
+SourceFile *getSourceFile(CompilerInstance &Instance, StringRef InputFileName,
+                          const char *MainExecutablePath) {
+  if (!setUpCompilerInstance(Instance, InputFileName, MainExecutablePath,
+                             /*SyntaxParsingCache*/ nullptr)) {
+    return nullptr;
+  }
+
+  return parseSourceFile(Instance);
 }
 
 int doFullLexRoundTrip(const StringRef InputFilename) {
@@ -339,26 +350,6 @@ int doIncrementalParse(const char *MainExecutablePath,
   }
   SyntaxParsingCache Cache = SyntaxParsingCache(OldSyntaxTree.getValue());
 
-  // Parse the source edits
-  for (auto EditPattern : options::IncrementalEdits) {
-    llvm::Regex MatchRegex("([0-9]+):([0-9]+)=(.*)");
-    SmallVector<StringRef, 4> Matches;
-    if (!MatchRegex.match(EditPattern, &Matches)) {
-      llvm::errs() << "Invalid edit pattern: " << EditPattern;
-      return EXIT_FAILURE;
-    }
-    int EditStart, EditEnd;
-    if (Matches[1].getAsInteger(10, EditStart)) {
-      llvm::errs() << "Could not parse edit start as integer: " << EditStart;
-      return EXIT_FAILURE;
-    }
-    if (Matches[2].getAsInteger(10, EditEnd)) {
-      llvm::errs() << "Could not parse edit end as integer: " << EditStart;
-      return EXIT_FAILURE;
-    }
-    Cache.addEdit(EditStart, EditEnd, /*ReplacmentLength=*/Matches[3].size());
-  }
-
   if (!options::IncrementalReuseLog.empty()) {
     StringRef Filename(options::IncrementalReuseLog.getValue());
     Cache.setReuseLog(Filename);
@@ -366,8 +357,55 @@ int doIncrementalParse(const char *MainExecutablePath,
 
   // Parse the new libSyntax tree incrementally
   CompilerInstance Instance;
-  SourceFile *SF =
-      getSourceFile(Instance, InputFileName, MainExecutablePath, &Cache);
+  setUpCompilerInstance(Instance, InputFileName, MainExecutablePath, &Cache);
+
+  // Parse the source edits
+  for (auto EditPattern : options::IncrementalEdits) {
+    llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
+    SmallVector<StringRef, 4> Matches;
+    if (!MatchRegex.match(EditPattern, &Matches)) {
+      llvm::errs() << "Invalid edit pattern: " << EditPattern << '\n';
+      return EXIT_FAILURE;
+    }
+    int EditStartLine, EditStartColumn, EditEndLine, EditEndColumn;
+    if (Matches[1].getAsInteger(10, EditStartLine)) {
+      llvm::errs() << "Could not parse edit start as integer: " << EditStartLine
+                   << '\n';
+      return EXIT_FAILURE;
+    }
+    if (Matches[2].getAsInteger(10, EditStartColumn)) {
+      llvm::errs() << "Could not parse edit start as integer: "
+                   << EditStartColumn << '\n';
+      return EXIT_FAILURE;
+    }
+    if (Matches[3].getAsInteger(10, EditEndLine)) {
+      llvm::errs() << "Could not parse edit start as integer: " << EditEndLine
+                   << '\n';
+      return EXIT_FAILURE;
+    }
+    if (Matches[4].getAsInteger(10, EditEndColumn)) {
+      llvm::errs() << "Could not parse edit end as integer: " << EditEndColumn
+                   << '\n';
+      return EXIT_FAILURE;
+    }
+
+    SourceFile &MainFile =
+        Instance.getMainModule()->getMainSourceFile(SourceFileKind::Main);
+    auto BufferID = MainFile.getBufferID().getValue();
+
+    auto &SourceMgr = Instance.getSourceMgr();
+    auto EditStartLoc =
+        SourceMgr.getLocForLineCol(BufferID, EditStartLine, EditStartColumn);
+    auto EditEndLoc =
+        SourceMgr.getLocForLineCol(BufferID, EditEndLine, EditEndColumn);
+    auto EditStartOffset =
+        SourceMgr.getLocOffsetInBuffer(EditStartLoc, BufferID);
+    auto EditEndOffset = SourceMgr.getLocOffsetInBuffer(EditEndLoc, BufferID);
+    Cache.addEdit(EditStartOffset, EditEndOffset,
+                  /*ReplacmentLength=*/Matches[5].size());
+  }
+
+  SourceFile *SF = parseSourceFile(Instance);
 
   // Serialize and print the newly generated libSyntax tree
   auto Root = SF->getSyntaxRoot().getRaw();
