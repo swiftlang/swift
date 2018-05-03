@@ -120,7 +120,7 @@ protected:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    return asImpl().remapSubstitutionMap(Subs);
+    return asImpl().remapSubstitutionMap(Subs).getCanonical();
   }
 
   SILType getTypeInClonedContext(SILType Ty) {
