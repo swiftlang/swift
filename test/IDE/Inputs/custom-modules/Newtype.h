@@ -128,3 +128,6 @@ extern void mutate_TRefRef(_Null_unspecified TRefRef* _Null_unspecified)
     __attribute((swift_name("TRefRef.mutate(self:)")));
 extern void use_ConstTRef(_Null_unspecified ConstTRefRef)
     __attribute((swift_name("ConstTRefRef.use(self:)")));
+
+typedef NSString *MyString __attribute__((__swift_newtype__(struct)));
+

@@ -35,11 +35,6 @@ module objc_extensions_helper {
   header "objc_extensions_helper.h"
 }
 
-module Newtype {
-  header "newtype.h"
-  export *
-}
-
 module NonNilTest {
   header "NonNilTest.h"
   export *
