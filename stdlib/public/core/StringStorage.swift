@@ -64,8 +64,10 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
 #if arch(i386) || arch(arm)
 #else
-    _sanityCheck((CodeUnit.self != UInt8.self || capacity > 15),
-      "Should prefer a small representation")
+    // TODO(SR-7594): Restore below invariant
+    // _sanityCheck(
+    //   CodeUnit.self != UInt8.self || capacity > _SmallUTF8String.capacity,
+    //   "Should prefer a small representation")
 #endif // 64-bit
 
     let storage = Builtin.allocWithTailElems_1(
