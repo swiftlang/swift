@@ -3585,15 +3585,14 @@ public:
 /// This is only valid in Raw SIL.
 class MarkUninitializedBehaviorInst final
     : public InstructionBase<SILInstructionKind::MarkUninitializedBehaviorInst,
-                             SingleValueInstruction>,
-      private llvm::TrailingObjects<MarkUninitializedBehaviorInst, Substitution>
+                             SingleValueInstruction>
 {
   friend SILBuilder;
-  friend TrailingObjects;
 
   FixedOperandList<4> Operands;
-  unsigned NumInitStorageSubstitutions, NumSetterSubstitutions;
-  
+  SubstitutionMap InitStorageSubstitutions;
+  SubstitutionMap SetterSubstitutions;
+
   enum {
     // The initialization function for the storage.
     InitStorageFunc,
@@ -3605,26 +3604,22 @@ class MarkUninitializedBehaviorInst final
     Self,
   };
   
-  size_t numTrailingObjects(OverloadToken<Substitution>) {
-    return NumInitStorageSubstitutions + NumSetterSubstitutions;
-  }
-  
   MarkUninitializedBehaviorInst(SILDebugLocation DebugLoc,
                                 SILValue InitStorage,
-                                SubstitutionList InitStorageSubs,
+                                SubstitutionMap InitStorageSubs,
                                 SILValue Storage,
                                 SILValue Setter,
-                                SubstitutionList SetterSubs,
+                                SubstitutionMap SetterSubs,
                                 SILValue Self,
                                 SILType Ty);
   
   static MarkUninitializedBehaviorInst *create(SILModule &M,
                                          SILDebugLocation DebugLoc,
                                          SILValue InitStorage,
-                                         SubstitutionList InitStorageSubs,
+                                         SubstitutionMap InitStorageSubs,
                                          SILValue Storage,
                                          SILValue Setter,
-                                         SubstitutionList SetterSubs,
+                                         SubstitutionMap SetterSubs,
                                          SILValue Self,
                                          SILType Ty);
 
@@ -3632,8 +3627,8 @@ public:
   SILValue getInitStorageFunc() const {
     return Operands[InitStorageFunc].get();
   }
-  SubstitutionList getInitStorageSubstitutions() const {
-    return {getTrailingObjects<Substitution>(), NumInitStorageSubstitutions};
+  SubstitutionMap getInitStorageSubstitutions() const {
+    return InitStorageSubstitutions;
   }
   SILValue getStorage() const {
     return Operands[Storage].get();
@@ -3642,9 +3637,8 @@ public:
   SILValue getSetterFunc() const {
     return Operands[SetterFunc].get();
   }
-  SubstitutionList getSetterSubstitutions() const {
-    return {getTrailingObjects<Substitution>() + NumInitStorageSubstitutions,
-            NumSetterSubstitutions};
+  SubstitutionMap getSetterSubstitutions() const {
+    return SetterSubstitutions;
   }
   SILValue getSelf() const {
     return Operands[Self].get();

@@ -1714,15 +1714,13 @@ MarkUninitializedBehaviorInst *
 MarkUninitializedBehaviorInst::create(SILModule &M,
                                       SILDebugLocation DebugLoc,
                                       SILValue InitStorage,
-                                      SubstitutionList InitStorageSubs,
+                                      SubstitutionMap InitStorageSubs,
                                       SILValue Storage,
                                       SILValue Setter,
-                                      SubstitutionList SetterSubs,
+                                      SubstitutionMap SetterSubs,
                                       SILValue Self,
                                       SILType Ty) {
-  auto totalSubs = InitStorageSubs.size() + SetterSubs.size();
-  auto mem = M.allocateInst(sizeof(MarkUninitializedBehaviorInst)
-                              + additionalSizeToAlloc<Substitution>(totalSubs),
+  auto mem = M.allocateInst(sizeof(MarkUninitializedBehaviorInst),
                             alignof(MarkUninitializedBehaviorInst));
   return ::new (mem) MarkUninitializedBehaviorInst(DebugLoc,
                                                    InitStorage, InitStorageSubs,
@@ -1735,24 +1733,17 @@ MarkUninitializedBehaviorInst::create(SILModule &M,
 MarkUninitializedBehaviorInst::MarkUninitializedBehaviorInst(
                                         SILDebugLocation DebugLoc,
                                         SILValue InitStorage,
-                                        SubstitutionList InitStorageSubs,
+                                        SubstitutionMap InitStorageSubs,
                                         SILValue Storage,
                                         SILValue Setter,
-                                        SubstitutionList SetterSubs,
+                                        SubstitutionMap SetterSubs,
                                         SILValue Self,
                                         SILType Ty)
   : InstructionBase(DebugLoc, Ty),
     Operands(this, InitStorage, Storage, Setter, Self),
-    NumInitStorageSubstitutions(InitStorageSubs.size()),
-    NumSetterSubstitutions(SetterSubs.size())
+    InitStorageSubstitutions(InitStorageSubs),
+    SetterSubstitutions(SetterSubs)
 {
-  auto *trailing = getTrailingObjects<Substitution>();
-  for (unsigned i = 0; i < InitStorageSubs.size(); ++i) {
-    ::new ((void*)trailing++) Substitution(InitStorageSubs[i]);
-  }
-  for (unsigned i = 0; i < SetterSubs.size(); ++i) {
-    ::new ((void*)trailing++) Substitution(SetterSubs[i]);
-  }
 }
 
 OpenedExistentialAccess swift::getOpenedExistentialAccessFor(AccessKind access) {

@@ -3309,14 +3309,28 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SILValue InitStorageFunc = getLocalValue(InitStorageFuncName,
                                              InitStorageTy, InstLoc, B);
     SILValue SetterFunc = getLocalValue(SetterFuncName, SetterTy, InstLoc, B);
-    
-    SmallVector<Substitution, 4> InitStorageSubs, SetterSubs;
-    if (getApplySubstitutionsFromParsed(*this, InitStorageEnv,
-                                        ParsedInitStorageSubs, InitStorageSubs)
-        || getApplySubstitutionsFromParsed(*this, SetterEnv,
-                                           ParsedSetterSubs, SetterSubs))
-      return true;
-    
+
+    SubstitutionMap InitStorageSubs, SetterSubs;
+    {
+      SmallVector<Substitution, 4> InitStorageSubsVec, SetterSubsVec;
+      if (getApplySubstitutionsFromParsed(*this, InitStorageEnv,
+                                          ParsedInitStorageSubs,
+                                          InitStorageSubsVec)
+          || getApplySubstitutionsFromParsed(*this, SetterEnv,
+                                             ParsedSetterSubs, SetterSubsVec))
+        return true;
+
+      if (InitStorageEnv) {
+        InitStorageSubs = InitStorageEnv->getGenericSignature()
+                            ->getSubstitutionMap(InitStorageSubsVec);
+      }
+
+      if (SetterEnv) {
+        SetterSubs = SetterEnv->getGenericSignature()
+                            ->getSubstitutionMap(SetterSubsVec);
+      }
+    }
+
     auto SubstInitStorageTy = InitStorageTy.castTo<SILFunctionType>()
       ->substGenericArgs(B.getModule(), InitStorageSubs);
     auto SubstSetterTy = SetterTy.castTo<SILFunctionType>()

@@ -865,10 +865,11 @@ SILCloner<ImplClass>::visitMarkUninitializedBehaviorInst(
      getBuilder().createMarkUninitializedBehavior(
                        getOpLocation(Inst->getLoc()),
                        getOpValue(Inst->getInitStorageFunc()),
-                       getOpSubstitutions(Inst->getInitStorageSubstitutions()),
+                       getOpSubstitutionMap(
+                                        Inst->getInitStorageSubstitutions()),
                        getOpValue(Inst->getStorage()),
                        getOpValue(Inst->getSetterFunc()),
-                       getOpSubstitutions(Inst->getSetterSubstitutions()),
+                       getOpSubstitutionMap(Inst->getSetterSubstitutions()),
                        getOpValue(Inst->getSelf()),
                        getOpType(Inst->getType())));
 }

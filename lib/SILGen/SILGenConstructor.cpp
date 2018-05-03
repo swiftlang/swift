@@ -1021,9 +1021,9 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
       auto self = emitSelfForMemberInit(*this, var, selfDecl);
       
       auto mark = B.createMarkUninitializedBehavior(var,
-               initFn, init.getSubstitutions().toList(),
+               initFn, init.getSubstitutions(),
                storageAddr.getValue(),
-               setterFn, getForwardingSubstitutions(), self.getValue(),
+               setterFn, getForwardingSubstitutionMap(), self.getValue(),
                getLoweredType(var->getType()).getAddressType());
       
       // The mark instruction stands in for the behavior property.
