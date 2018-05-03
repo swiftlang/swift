@@ -1880,6 +1880,16 @@ SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {
                             getOpValue(Inst->getOperand())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitCopyBlockWithoutEscapingInst(
+    CopyBlockWithoutEscapingInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                Builder.createCopyBlockWithoutEscaping(
+                    getOpLocation(Inst->getLoc()), getOpValue(Inst->getBlock()),
+                    getOpValue(Inst->getClosure())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitStrongRetainInst(StrongRetainInst *Inst) {
@@ -2021,8 +2031,9 @@ void SILCloner<ImplClass>::visitIsEscapingClosureInst(
     IsEscapingClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(
-      Inst, getBuilder().createIsEscapingClosure(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+      Inst, getBuilder().createIsEscapingClosure(getOpLocation(Inst->getLoc()),
+                                                 getOpValue(Inst->getOperand()),
+                                                 Inst->getVerificationType()));
 }
 
 template<typename ImplClass>

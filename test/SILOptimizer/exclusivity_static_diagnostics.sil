@@ -680,7 +680,8 @@ bb0(%0 : $Int):
   return %13 : $()
 }
 
-sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 
 // CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage
 sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage : $@convention(thin) (Int) -> () {
@@ -692,17 +693,21 @@ bb0(%0 : $Int):
   %5 = function_ref @closureThatModifiesCapture_1 : $@convention(thin) (@inout_aliasable Int) -> ()
   %6 = partial_apply [callee_guaranteed] %5(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
   %conv = convert_escape_to_noescape %6 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-  %7 = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
-  %8 = project_block_storage %7 : $*@block_storage @noescape @callee_guaranteed () -> ()
-  store %conv to [trivial] %8 : $*@noescape  @callee_guaranteed () -> ()
-  %10 = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
-  %11 = init_block_storage_header %7 : $*@block_storage @noescape @callee_guaranteed () -> (), invoke %10 : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %thunk = function_ref @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %sentinel = partial_apply [callee_guaranteed] %thunk(%conv) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %sentinel2 = mark_dependence %sentinel : $@callee_guaranteed () -> () on %conv : $@noescape @callee_guaranteed () -> ()
+  %sentinel3 = copy_value %sentinel2 : $@callee_guaranteed () -> ()
+  %7 = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %8 = project_block_storage %7 : $*@block_storage @callee_guaranteed () -> ()
+  store %sentinel3 to [init] %8 : $*@callee_guaranteed () -> ()
+  %10 = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %11 = init_block_storage_header %7 : $*@block_storage @callee_guaranteed () -> (), invoke %10 : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
   %12 = copy_block %11 : $@convention(block) @noescape () -> ()
   %13 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
   %14 = apply %4(%13, %12) : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
   end_access %13 : $*Int
-  destroy_addr %8 : $*@callee_guaranteed @noescape () -> ()
-  dealloc_stack %7 : $*@block_storage @callee_guaranteed @noescape () -> ()
+  destroy_addr %8 : $*@callee_guaranteed() -> ()
+  dealloc_stack %7 : $*@block_storage @callee_guaranteed () -> ()
   destroy_value %2 : ${ var Int }
   %ret = tuple ()
   return %ret : $()
@@ -718,18 +723,22 @@ bb0(%0 : $Int):
   %5 = function_ref @closureThatModifiesCapture_1 : $@convention(thin) (@inout_aliasable Int) -> ()
   %6 = partial_apply [callee_guaranteed] %5(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
   %conv = convert_escape_to_noescape %6 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-  %7 = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
-  %8 = project_block_storage %7 : $*@block_storage @noescape @callee_guaranteed () -> ()
-  store %conv to [trivial] %8 : $*@noescape  @callee_guaranteed () -> ()
-  %10 = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
-  %11 = init_block_storage_header %7 : $*@block_storage @noescape @callee_guaranteed () -> (), invoke %10 : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %thunk = function_ref @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %sentinel = partial_apply [callee_guaranteed] %thunk(%conv) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %sentinel2 = mark_dependence %sentinel : $@callee_guaranteed () -> () on %conv : $@noescape @callee_guaranteed () -> ()
+  %sentinel3 = copy_value %sentinel2 : $@callee_guaranteed () -> ()
+  %7 = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %8 = project_block_storage %7 : $*@block_storage @callee_guaranteed () -> ()
+  store %sentinel3 to [init] %8 : $*@callee_guaranteed () -> ()
+  %10 = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %11 = init_block_storage_header %7 : $*@block_storage @callee_guaranteed () -> (), invoke %10 : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
   %12 = copy_block %11 : $@convention(block) @noescape () -> ()
   %13 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, %12 : $@convention(block) @noescape () -> ()
   %14 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
   %15 = apply %4(%14, %13) : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
   end_access %14 : $*Int
-  destroy_addr %8 : $*@callee_guaranteed @noescape () -> ()
-  dealloc_stack %7 : $*@block_storage @callee_guaranteed @noescape () -> ()
+  destroy_addr %8 : $*@callee_guaranteed () -> ()
+  dealloc_stack %7 : $*@block_storage @callee_guaranteed () -> ()
   destroy_value %2 : ${ var Int }
   %ret = tuple ()
   return %ret : $()
