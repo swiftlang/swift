@@ -3890,22 +3890,7 @@ extension ${Self} : Hashable {
   ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
-    // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
-    // `AnyHashable`-boxed integers, all integer values are currently required
-    // to hash exactly the same way as the corresponding (U)Int64 value.  To fix
-    // this, we should introduce a custom AnyHashable box for integer values
-    // that sign-extends values to 64 bits.
-    % if bits <= word_bits:
-    hasher._combine(_lowWord)
-    % elif bits == 2 * word_bits:
-    if let word = ${"" if signed else "U"}Int(exactly: self) {
-      hasher._combine(word._lowWord)
-    } else {
-      hasher._combine(UInt64(_value))
-    }
-    % else:
-    fatalError("Unsupported integer width")
-    % end
+    hasher._combine(${U}${Self}(_value))
   }
 }
 
