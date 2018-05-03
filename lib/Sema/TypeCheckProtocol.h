@@ -368,7 +368,7 @@ struct RequirementMatch {
 
   /// Substitutions mapping the type of the witness to the requirement
   /// environment.
-  SmallVector<Substitution, 2> WitnessSubstitutions;
+  SubstitutionMap WitnessSubstitutions;
 
   /// \brief Determine whether this match is viable.
   bool isViable() const {

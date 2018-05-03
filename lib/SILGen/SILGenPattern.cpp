@@ -2618,7 +2618,7 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
 
   Substitution sub{switchedValueSwiftType, /*Conformances*/None};
 
-  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, sub,
+  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
                                   metatype,
                                   SGFContext());
 }

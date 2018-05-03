@@ -489,9 +489,9 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
-    unsigned numSubstitutions;
+    SubstitutionMapID substitutionMapID;
     SpecializedProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                     numSubstitutions);
+                                                     substitutionMapID);
 
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
@@ -503,13 +503,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
                                "reading specialized conformance for",
                                conformingType);
 
-    // Read the substitutions.
-    SmallVector<Substitution, 4> substitutions;
-    while (numSubstitutions--) {
-      auto sub = maybeReadSubstitution(Cursor, genericEnv);
-      assert(sub.hasValue() && "Missing substitution?");
-      substitutions.push_back(*sub);
-    }
+    auto subMap = getSubstitutionMap(substitutionMapID);
 
     ProtocolConformanceRef genericConformance =
       readConformance(Cursor, genericEnv);
@@ -519,7 +513,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto conformance =
            ctx.getSpecializedConformance(conformingType,
                                          genericConformance.getConcrete(),
-                                         substitutions);
+                                         subMap);
     return ProtocolConformanceRef(conformance);
   }
 
@@ -4740,8 +4734,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::SIL_BOX_TYPE: {
     SILLayoutID layoutID;
-
-    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID);
+    SubstitutionMapID subMapID;
+    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
     
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
@@ -4767,24 +4761,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto layout = getLayout();
     if (!layout)
       return nullptr;
-    
-    SmallVector<Substitution, 4> genericArgs;
-    if (auto sig = layout->getGenericSignature()) {
-      for (unsigned i : range(sig->getSubstitutionListSize())) {
-        (void)i;
-        auto sub = maybeReadSubstitution(DeclTypeCursor);
-        if (!sub) {
-          error();
-          return nullptr;
-        }
 
-        genericArgs.push_back(
-          Substitution(sub->getReplacement()->getCanonicalType(),
-                       sub->getConformances()));
-      }
-    }
-
-    typeOrOffset = SILBoxType::get(getContext(), layout, genericArgs);
+    auto subMap = getSubstitutionMap(subMapID);
+    typeOrOffset = SILBoxType::get(getContext(), layout, subMap);
     break;
   }
       
@@ -5368,28 +5347,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     };
 
     // Requirement -> synthetic map.
-    SmallVector<Substitution, 4> reqToSyntheticSubs;
     if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
       // Create the synthetic environment.
       syntheticEnv = syntheticSig->createGenericEnvironment();
     }
 
     // Requirement -> synthetic substitutions.
-    if (unsigned numReqSubstitutions = *rawIDIter++) {
-      while (numReqSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
-        reqToSyntheticSubs.push_back(*sub);
-      }
-    }
+    SubstitutionMap reqToSyntheticSubs = getSubstitutionMap(*rawIDIter++);
 
     // Witness substitutions.
-    SmallVector<Substitution, 4> witnessSubstitutions;
-    if (unsigned numWitnessSubstitutions = *rawIDIter++) {
-      while (numWitnessSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, syntheticEnv);
-        witnessSubstitutions.push_back(*sub);
-      }
-    }
+    SubstitutionMap witnessSubstitutions = getSubstitutionMap(*rawIDIter++);
 
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {

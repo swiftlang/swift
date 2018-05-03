@@ -333,11 +333,6 @@ protected:
     CoroutineKind : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SILBoxType, TypeBase, 32,
-    : NumPadBits,
-    NumGenericArgs : 32
-  );
-
   SWIFT_INLINE_BITFIELD(AnyMetatypeType, TypeBase, 2,
     /// The representation of the metatype.
     ///
@@ -4069,31 +4064,22 @@ typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type for boxes, which represent a reference to a (non-class)
 /// refcounted value referencing an aggregate with a given lowered layout.
-class SILBoxType final : public TypeBase,
-                         public llvm::FoldingSetNode,
-                         private llvm::TrailingObjects<SILBoxType,Substitution>
+class SILBoxType final : public TypeBase, public llvm::FoldingSetNode
 {
-  friend TrailingObjects;
-  
   SILLayout *Layout;
-
-  static RecursiveTypeProperties
-  getRecursivePropertiesFromSubstitutions(SubstitutionList Args);
+  SubstitutionMap Substitutions;
 
   SILBoxType(ASTContext &C,
-             SILLayout *Layout, SubstitutionList Args);
+             SILLayout *Layout, SubstitutionMap Substitutions);
 
 public:
   static CanSILBoxType get(ASTContext &C,
                            SILLayout *Layout,
-                           SubstitutionList Args);
+                           SubstitutionMap Substitutions);
 
   SILLayout *getLayout() const { return Layout; }
-  SubstitutionList getGenericArgs() const {
-    return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
-                              Bits.SILBoxType.NumGenericArgs);
-  }
-  
+  SubstitutionMap getSubstitutions() const { return Substitutions; }
+
   // In SILType.h:
   CanType getFieldLoweredType(SILModule &M, unsigned index) const;
   SILType getFieldType(SILModule &M, unsigned index) const;
@@ -4111,11 +4097,11 @@ public:
   /// Produce a profile of this box, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       SILLayout *Layout,
-                      SubstitutionList Args);
+                      SubstitutionMap Args);
   
   /// \brief Produce a profile of this box, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
-    Profile(id, getLayout(), getGenericArgs());
+    Profile(id, getLayout(), getSubstitutions());
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)

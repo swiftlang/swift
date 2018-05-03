@@ -1092,7 +1092,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
-                                         declRef.getSubstitutions());
+                                         declRef.getSubstitutions().toList());
   return RValue(*this, loc, refType, result);
 }
 
@@ -1760,7 +1760,8 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = subs[0].getReplacement();
+  auto nativeType =
+    Type(GenericTypeParamType::get(0, 0, SGF.getASTContext())).subst(subs);
 
   auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
   auto metatype =
@@ -2497,7 +2498,8 @@ private:
       SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                    Expr->isSuper(),
                                    Field, {},
-                                   Expr->getMember().getSubstitutions(),
+                                   Expr->getMember().getSubstitutions()
+                                     .toList(),
                                    Expr->getAccessSemantics(),
                                    Expr->getType(), Context);
     return result;
@@ -2539,7 +2541,8 @@ private:
         SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                      Expr->isSuper(),
                                      Field, {},
-                                     Expr->getMember().getSubstitutions(),
+                                     Expr->getMember().getSubstitutions()
+                                       .toList(),
                                      Expr->getAccessSemantics(),
                                      Expr->getType(), Context,
                                      base.isPlusZeroRValueOrTrivial());
@@ -2637,7 +2640,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc,generator));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
 
-  SubstitutionList subs;
+  SubstitutionMap subs;
   if (fnType->isPolymorphic())
     subs = defaultArgsOwner.getSubstitutions();
 
@@ -2647,8 +2650,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C);
+  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
+                   subs.toList(), {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -3983,26 +3986,17 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   auto makeExternalKeyPathComponent =
     [&](const KeyPathExpr::Component &component) -> KeyPathPatternComponent {
       SmallVector<KeyPathPatternComponent::Index, 4> indices;
-      SubstitutionList subs = component.getDeclRef().getSubstitutions();
+      SubstitutionMap subMap = component.getDeclRef().getSubstitutions();
       auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
       auto ty = decl->getStorageInterfaceType();
       // Map the substitutions out of context.
-      if (!subs.empty()) {
-        auto sig = decl->getInnermostDeclContext()
-                       ->getGenericSignatureOfContext();
-        auto subMap = sig->getSubstitutionMap(subs);
+      if (!subMap.empty()) {
         // If any of the substitutions involve local archetypes, then the
         // key path pattern needs to capture the generic context, and we need
         // to map the pattern substitutions out of this context.
-        if (std::any_of(subs.begin(), subs.end(),
-                        [](const Substitution &s) -> bool {
-                          return s.getReplacement()->hasArchetype();
-                        })) {
+        if (subMap.hasArchetypes()) {
           needsGenericContext = true;
           subMap = subMap.mapReplacementTypesOutOfContext();
-          SmallVector<Substitution, 4> subsBuf;
-          sig->getSubstitutions(subMap, subsBuf);
-          subs = SGF.getASTContext().AllocateCopy(subsBuf);
         }
         ty = ty.subst(subMap);
       }
@@ -4012,9 +4006,11 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         unsigned numOperands = operands.size();
         SmallVector<IndexTypePair, 4> indexTypes;
         auto sub = cast<SubscriptDecl>(component.getDeclRef().getDecl());
-        lowerKeyPathSubscriptIndexTypes(SGF.SGM, indexTypes,
-                                sub, component.getDeclRef().getSubstitutions(),
-                                needsGenericContext);
+        lowerKeyPathSubscriptIndexTypes(
+                          SGF.SGM, indexTypes, sub,
+                          SGF.getASTContext().AllocateCopy(
+                           component.getDeclRef().getSubstitutions().toList()),
+                          needsGenericContext);
         lowerKeyPathSubscriptIndexPatterns(indices, indexTypes,
              component.getSubscriptIndexHashableConformances(),
              numOperands);
@@ -4029,7 +4025,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                  indexEquals, indexHash);
       }
       return KeyPathPatternComponent::forExternal(
-        decl, subs, SGF.getASTContext().AllocateCopy(indices),
+        decl, SGF.getASTContext().AllocateCopy(subMap.toList()),
+        SGF.getASTContext().AllocateCopy(indices),
         indexEquals, indexHash,
         ty->getCanonicalType());
     };
@@ -4049,7 +4046,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                               SGF.F.getGenericEnvironment(),
                               numOperands,
                               needsGenericContext,
-                              component.getDeclRef().getSubstitutions(),
+                    component.getDeclRef().getSubstitutions().toList(),
                               decl,
                               component.getSubscriptIndexHashableConformances(),
                               baseTy,

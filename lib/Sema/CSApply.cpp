@@ -59,20 +59,20 @@ static bool isOpenedAnyObject(Type type) {
   return existential->isAnyObject();
 }
 
-void Solution::computeSubstitutions(
-       GenericSignature *sig,
-       ConstraintLocator *locator,
-       SmallVectorImpl<Substitution> &result) const {
+SubstitutionMap Solution::computeSubstitutions(
+                               GenericSignature *sig,
+                               ConstraintLocatorBuilder locatorBuilder) const {
   if (sig == nullptr)
-    return;
+    return SubstitutionMap();
 
   // Gather the substitutions from dependent types to concrete types.
+  auto locator = getConstraintSystem().getConstraintLocator(locatorBuilder);
   auto openedTypes = OpenedTypes.find(locator);
 
   // If we have a member reference on an existential, there are no
   // opened types or substitutions.
   if (openedTypes == OpenedTypes.end())
-    return;
+    return SubstitutionMap();
 
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second)
@@ -96,23 +96,8 @@ void Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  auto subMap = sig->getSubstitutionMap(
-    QueryTypeSubstitutionMap{subs},
-    lookupConformanceFn);
-
-  sig->getSubstitutions(subMap, result);
-}
-
-void Solution::computeSubstitutions(
-       GenericSignature *sig,
-       ConstraintLocatorBuilder locator,
-       SmallVectorImpl<Substitution> &result) const {
-  if (sig == nullptr)
-    return;
-
-  computeSubstitutions(sig,
-                       getConstraintSystem().getConstraintLocator(locator),
-                       result);
+  return sig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
+                                 lookupConformanceFn);
 }
 
 /// \brief Find a particular named function witness for a type that conforms to
@@ -169,9 +154,7 @@ ConcreteDeclRef findNamedWitnessImpl(
   if (!conformance->isConcrete()) {
     auto subMap = SubstitutionMap::getProtocolSubstitutions(proto, type,
                                                             *conformance);
-    SmallVector<Substitution, 2> subs;
-    proto->getGenericSignature()->getSubstitutions(subMap, subs);
-    return ConcreteDeclRef(tc.Context, requirement, subs);
+    return ConcreteDeclRef(requirement, subMap);
   }
 
   auto concrete = conformance->getConcrete();
@@ -694,19 +677,19 @@ namespace {
         return nullptr;
       }
 
-      SmallVector<Substitution, 4> substitutions;
+      SubstitutionMap substitutions;
 
       // Due to a SILGen quirk, unqualified property references do not
       // need substitutions.
       if (!isa<VarDecl>(decl)) {
-        solution.computeSubstitutions(
+        substitutions =
+          solution.computeSubstitutions(
             decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
-            locator,
-            substitutions);
+            locator);
       }
 
       auto declRefExpr =
-        new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
+        new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
                               loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
@@ -982,11 +965,11 @@ namespace {
       }
 
       // Build a member reference.
-      SmallVector<Substitution, 4> substitutions;
-      solution.computeSubstitutions(
-          member->getInnermostDeclContext()->getGenericSignatureOfContext(),
-          memberLocator, substitutions);
-      auto memberRef = ConcreteDeclRef(context, member, substitutions);
+      SubstitutionMap substitutions =
+        solution.computeSubstitutions(
+            member->getInnermostDeclContext()->getGenericSignatureOfContext(),
+            memberLocator);
+      auto memberRef = ConcreteDeclRef(member, substitutions);
 
       cs.TC.requestMemberLayout(member);
 
@@ -1657,12 +1640,11 @@ namespace {
       // Form the subscript expression.
 
       // Compute the substitutions used to reference the subscript.
-      SmallVector<Substitution, 4> substitutions;
-      solution.computeSubstitutions(
-        subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
-        locator.withPathElement(locatorKind),
-        substitutions);
-      ConcreteDeclRef subscriptRef(tc.Context, subscript, substitutions);
+      SubstitutionMap substitutions =
+        solution.computeSubstitutions(
+          subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
+          locator.withPathElement(locatorKind));
+      ConcreteDeclRef subscriptRef(subscript, substitutions);
 
       // Handle dynamic lookup.
       if (choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
@@ -1714,13 +1696,10 @@ namespace {
       auto &ctx = tc.Context;
 
       // Compute the concrete reference.
-      SmallVector<Substitution, 4> substitutions;
-      solution.computeSubstitutions(
-          ctor->getGenericSignature(),
-          locator,
-          substitutions);
+      SubstitutionMap substitutions =
+        solution.computeSubstitutions(ctor->getGenericSignature(), locator);
 
-      auto ref = ConcreteDeclRef(ctx, ctor, substitutions);
+      auto ref = ConcreteDeclRef(ctor, substitutions);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -1863,10 +1842,7 @@ namespace {
           return *bridgedToObjectiveCConformance;
         });
 
-      SmallVector<Substitution, 1> subs;
-      genericSig->getSubstitutions(subMap, subs);
-
-      ConcreteDeclRef fnSpecRef(tc.Context, fn, subs);
+      ConcreteDeclRef fnSpecRef(fn, subMap);
 
       auto resultType = OptionalType::get(valueType);
 
@@ -2017,8 +1993,12 @@ namespace {
         if (!nilDecl->hasInterfaceType())
           return nullptr;
 
-        Substitution sub(objectType, {});
-        ConcreteDeclRef concreteDeclRef(tc.Context, nilDecl, {sub});
+        auto genericSig =
+          nilDecl->getDeclContext()->getGenericSignatureOfContext();
+        SubstitutionMap subs =
+          SubstitutionMap::get(genericSig, llvm::makeArrayRef(objectType),
+                               { });
+        ConcreteDeclRef concreteDeclRef(nilDecl, subs);
 
         auto nilType = FunctionType::get(
             {MetatypeType::get(type)}, type);
@@ -4460,16 +4440,15 @@ namespace {
 
           auto dc = property->getInnermostDeclContext();
 
-          SmallVector<Substitution, 4> subs;
-          if (auto sig = dc->getGenericSignatureOfContext()) {
-            // Compute substitutions to refer to the member.
-            solution.computeSubstitutions(sig, locator, subs);
-          }
-          
+          // Compute substitutions to refer to the member.
+          SubstitutionMap subs =
+            solution.computeSubstitutions(dc->getGenericSignatureOfContext(),
+                                          locator);
+
           auto resolvedTy = foundDecl->openedType;
           resolvedTy = simplifyType(resolvedTy);
           
-          auto ref = ConcreteDeclRef(cs.getASTContext(), property, subs);
+          auto ref = ConcreteDeclRef(property, subs);
 
           component = KeyPathExpr::Component::forProperty(ref,
                                                        resolvedTy,
@@ -4504,13 +4483,13 @@ namespace {
           cs.TC.requestMemberLayout(subscript);
 
           auto dc = subscript->getInnermostDeclContext();
-          SmallVector<Substitution, 4> subs;
           auto indexType = subscript->getIndicesInterfaceType();
 
+          SubstitutionMap subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
             // Compute substitutions to refer to the member.
-            solution.computeSubstitutions(sig, locator, subs);
-            indexType = indexType.subst(sig->getSubstitutionMap(subs));
+            subs = solution.computeSubstitutions(sig, locator);
+            indexType = indexType.subst(subs);
           }
 
           // If this is a @dynamicMemberLookup reference to resolve a property
@@ -4539,7 +4518,7 @@ namespace {
           
           resolvedTy = simplifyType(resolvedTy);
           
-          auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
+          auto ref = ConcreteDeclRef(subscript, subs);
           
           // Coerce the indices to the type the subscript expects.
           auto indexExpr = coerceToType(origComponent.getIndexExpr(),
@@ -4939,11 +4918,12 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
             },
             [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
                   -> ConcreteDeclRef {
-              SmallVector<Substitution, 4> subs;
-              computeSubstitutions(
-                decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
-                locator, subs);
-              return ConcreteDeclRef(cs.getASTContext(), decl, subs);
+              SubstitutionMap subs =
+                computeSubstitutions(
+                  decl->getInnermostDeclContext()
+                      ->getGenericSignatureOfContext(),
+                locator);
+              return ConcreteDeclRef(decl, subs);
             })) {
     return resolved;
   }
@@ -5054,7 +5034,7 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
 
   case DefaultArgumentKind::Inherited:
     // Update the owner to reflect inheritance here.
-    owner = owner.getOverriddenDecl(tc.Context);
+    owner = owner.getOverriddenDecl();
     return getCallerDefaultArg(cs, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:

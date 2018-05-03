@@ -1868,16 +1868,13 @@ static ProtocolConformance *collapseSpecializedConformance(
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
-                                      SubstitutionList substitutions,
-                                      bool alreadyCheckedCollapsed) {
+                                      SubstitutionMap substitutions) {
   // If we are performing a substitution that would get us back to the
   // a prior conformance (e.g., mapping into and then out of a conformance),
   // return the existing conformance.
-  if (!alreadyCheckedCollapsed) {
-    if (auto existing = collapseSpecializedConformance(type, generic)) {
-      ++NumCollapsedSpecializedProtocolConformances;
-      return existing;
-    }
+  if (auto existing = collapseSpecializedConformance(type, generic)) {
+    ++NumCollapsedSpecializedProtocolConformances;
+    return existing;
   }
 
   llvm::FoldingSetNodeID id;
@@ -1893,32 +1890,11 @@ ASTContext::getSpecializedConformance(Type type,
     return result;
 
   // Build a new specialized conformance.
-  substitutions = AllocateCopy(substitutions, arena);
   auto result
     = new (*this, arena) SpecializedProtocolConformance(type, generic,
                                                         substitutions);
   specializedConformances.InsertNode(result, insertPos);
   return result;
-}
-
-ProtocolConformance *
-ASTContext::getSpecializedConformance(Type type,
-                                      ProtocolConformance *generic,
-                                      const SubstitutionMap &subMap) {
-  // If we are performing a substitution that would get us back to the
-  // a prior conformance (e.g., mapping into and then out of a conformance),
-  // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic)) {
-    ++NumCollapsedSpecializedProtocolConformances;
-    return existing;
-  }
-
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = generic->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
-
-  return getSpecializedConformance(type, generic, subs,
-                                   /*alreadyCheckedCollapsed=*/true);
 }
 
 InheritedProtocolConformance *
@@ -4906,25 +4882,20 @@ SILLayout *SILLayout::get(ASTContext &C,
 
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
-                              SubstitutionList Args) {
-  llvm::FoldingSetNodeID id;
-
+                              SubstitutionMap Substitutions) {
   // Canonicalize substitutions.
-  SmallVector<Substitution, 4> CanArgs;
-  Args = getCanonicalSubstitutionList(Args, CanArgs);
-
-  Profile(id, Layout, Args);
+  Substitutions = Substitutions.getCanonical();
 
   // Return an existing layout if there is one.
   void *insertPos;
   auto &SILBoxTypes = C.Impl.SILBoxTypes;
-
+  llvm::FoldingSetNodeID id;
+  Profile(id, Layout, Substitutions);
   if (auto existing = SILBoxTypes.FindNodeOrInsertPos(id, insertPos))
     return CanSILBoxType(existing);
 
-  void *memory = C.Allocate(totalSizeToAlloc<Substitution>(Args.size()),
-                            alignof(SILBoxType));
-  auto newBox = ::new (memory) SILBoxType(C, Layout, Args);
+  auto newBox = new (C, AllocationArena::Permanent) SILBoxType(C, Layout,
+                                                               Substitutions);
   SILBoxTypes.InsertNode(newBox, insertPos);
   return CanSILBoxType(newBox);
 }
@@ -4934,12 +4905,20 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
 CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto &ctx = boxedType->getASTContext();
   auto singleGenericParamSignature = ctx.getSingleGenericParameterSignature();
+  auto genericParam = singleGenericParamSignature->getGenericParams()[0];
   auto layout = SILLayout::get(ctx, singleGenericParamSignature,
-                               SILField(CanType(singleGenericParamSignature
-                                  ->getGenericParams()[0]),
-                               /*mutable*/ true));
+                               SILField(CanType(genericParam),
+                                        /*mutable*/ true));
 
-  return get(boxedType->getASTContext(), layout, Substitution(boxedType, {}));
+  SubstitutionMap subMap =
+    singleGenericParamSignature->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        if (type->isEqual(genericParam)) return boxedType;
+
+        return nullptr;
+      },
+      MakeAbstractConformanceForGenericType());
+  return get(boxedType->getASTContext(), layout, subMap);
 }
 
 LayoutConstraint

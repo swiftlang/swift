@@ -1588,10 +1588,10 @@ void Serializer::writeNormalConformance(
         data.push_back(/*null generic signature*/0);
       }
 
-      auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
-
-      data.push_back(reqToSyntheticSubs.size());
-      data.push_back(witness.getSubstitutions().size());
+      data.push_back(
+        addSubstitutionMapRef(witness.getRequirementToSyntheticSubs()));
+      data.push_back(
+        addSubstitutionMapRef(witness.getSubstitutions()));
   });
 
   unsigned numSignatureConformances =
@@ -1610,21 +1610,6 @@ void Serializer::writeNormalConformance(
   // Write requirement signature conformances.
   for (auto reqConformance : conformance->getSignatureConformances())
     writeConformance(reqConformance, DeclTypeAbbrCodes);
-  
-  conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req, Witness witness) {
-   // Bail out early for simple witnesses.
-   if (!witness.getDecl()) return;
-
-   // Write requirement-to-synthetic substitutions.
-   writeSubstitutions(witness.getRequirementToSyntheticSubs(),
-                      DeclTypeAbbrCodes, nullptr);
-
-   // Write the witness substitutions.
-   writeSubstitutions(witness.getSubstitutions(),
-                      DeclTypeAbbrCodes,
-                      witness.getSyntheticEnvironment());
-  });
 }
 
 void
@@ -1674,16 +1659,15 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
   case ProtocolConformanceKind::Specialized: {
     auto conf = cast<SpecializedProtocolConformance>(conformance);
-    auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
       type = type->mapTypeOutOfContext();
-    SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
-                                                     abbrCode,
-                                                     addTypeRef(type),
-                                                     substitutions.size());
-    writeSubstitutions(substitutions, abbrCodes, genericEnv);
+    SpecializedProtocolConformanceLayout::emitRecord(
+                           Out, ScratchRecord,
+                           abbrCode,
+                           addTypeRef(type),
+                           addSubstitutionMapRef(conf->getSubstitutionMap()));
 
     writeConformance(conf->getGenericConformance(), abbrCodes, genericEnv);
     break;
@@ -3863,17 +3847,8 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
 
-#ifndef NDEBUG
-    if (auto sig = boxTy->getLayout()->getGenericSignature()) {
-      assert(sig->getSubstitutionListSize()
-               == boxTy->getGenericArgs().size());
-    }
-#endif
-
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef);
-
-    // Write the set of substitutions.
-    writeSubstitutions(boxTy->getGenericArgs(), DeclTypeAbbrCodes);
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef,
+                          addSubstitutionMapRef(boxTy->getSubstitutions()));
     break;
   }
       

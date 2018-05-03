@@ -3714,11 +3714,11 @@ public:
     }
 
     // The arguments to the layout, if any, do come from the outer environment.
-    if (!T->getGenericArgs().empty()) {
+    if (auto subMap = T->getSubstitutions()) {
       Printer << " <";
-      interleave(T->getGenericArgs(),
-                 [&](const Substitution &arg) {
-                   visit(arg.getReplacement());
+      interleave(subMap.getReplacementTypes(),
+                 [&](Type type) {
+                   visit(type);
                  }, [&]{
                    Printer << ", ";
                  });
@@ -4157,9 +4157,16 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
-    interleave(spec->getGenericSubstitutions(),
-               [&](const Substitution &s) { s.print(os, PO); },
+    auto subMap = spec->getSubstitutionMap();
+    auto genericParams =
+      spec->getGenericConformance()->getGenericSignature()->getGenericParams();
+    interleave(genericParams,
+               [&](Type type) {
+                 type.subst(subMap).print(os, PO);
+
+               },
                [&] { os << ", "; });
+
     os << "> (";
     spec->getGenericConformance()->printName(os, PO);
     os << ")";
