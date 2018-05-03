@@ -135,24 +135,6 @@ namespace {
     }
   };
 
-  // Some key path components need to serialize additional Substitutions or
-  // ProtocolConformances after the main record is emitted.
-  struct ConformanceOrSubstitution {
-    enum { ProtocolConformance, SubstitutionList } Kind;
-    union {
-      swift::ProtocolConformanceRef Conformance;
-      swift::SubstitutionList Substitutions;
-    };
-    
-    ConformanceOrSubstitution(ProtocolConformanceRef c)
-      : Kind(ProtocolConformance), Conformance(c)
-    {}
-    
-    ConformanceOrSubstitution(swift::SubstitutionList s)
-      : Kind(SubstitutionList), Substitutions(s)
-    {}
-  };
-
   class SILSerializer {
     Serializer &S;
     ASTContext &Ctx;
@@ -271,7 +253,7 @@ namespace {
     void writeKeyPathPatternComponent(
                     const KeyPathPatternComponent &component,
                     SmallVectorImpl<ValueID> &ListOfValues,
-                    SmallVectorImpl<ConformanceOrSubstitution> &serializeAfter);
+                    SmallVectorImpl<ProtocolConformanceRef> &serializeAfter);
 
     /// Helper function to determine if given the current state of the
     /// deserialization if the function body for F should be deserialized.
@@ -612,7 +594,7 @@ void
 SILSerializer::writeKeyPathPatternComponent(
                    const KeyPathPatternComponent &component,
                    SmallVectorImpl<ValueID> &ListOfValues,
-                   SmallVectorImpl<ConformanceOrSubstitution> &serializeAfter) {
+                   SmallVectorImpl<ProtocolConformanceRef> &serializeAfter) {
   
   auto handleComponentCommon = [&](KeyPathComponentKindEncoding kind) {
     ListOfValues.push_back((unsigned)kind);
@@ -690,8 +672,8 @@ SILSerializer::writeKeyPathPatternComponent(
   case KeyPathPatternComponent::Kind::External:
     handleComponentCommon(KeyPathComponentKindEncoding::External);
     ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
-    ListOfValues.push_back(component.getExternalSubstitutions().size());
-    serializeAfter.push_back(component.getExternalSubstitutions());
+    ListOfValues.push_back(
+      S.addSubstitutionMapRef(component.getExternalSubstitutions()));
     handleComputedIndices(component);
     break;
   }
@@ -911,7 +893,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::BuiltinInst: {
-    // Format: number of substitutions, the builtin name, result type, and
+    // Format: substitutions map ID, the builtin name, result type, and
     // a list of values for the arguments. Each value in the list
     // is represented with 4 IDs:
     //   ValueID, ValueResultNumber, TypeID, TypeCategory.
@@ -926,12 +908,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
                              SILAbbrCodes[SILInstApplyLayout::Code],
                              SIL_BUILTIN,
-                             BI->getSubstitutions().size(),
+                             S.addSubstitutionMapRef(BI->getSubstitutions()),
                              S.addTypeRef(BI->getType().getSwiftRValueType()),
                              (unsigned)BI->getType().getCategory(),
                              S.addDeclBaseNameRef(BI->getName()),
                              Args);
-    S.writeSubstitutions(BI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -2038,14 +2019,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getSwiftRValueType()));
     // Always a value, don't need to save category
-    ListOfValues.push_back(IBSHI->getSubstitutions().size());
+    ListOfValues.push_back(S.addSubstitutionMapRef(IBSHI->getSubstitutions()));
     
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
              S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
              (unsigned)IBSHI->getType().getCategory(),
              ListOfValues);
-    S.writeSubstitutions(IBSHI->getSubstitutions(), SILAbbrCodes);
 
     break;
   }
@@ -2058,8 +2038,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(S.addTypeRef(pattern->getValueType()));
     ListOfValues.push_back(pattern->getComponents().size());
     ListOfValues.push_back(pattern->getNumOperands());
-    ListOfValues.push_back(KPI->getSubstitutions().size());
-    
+    ListOfValues.push_back(S.addSubstitutionMapRef(KPI->getSubstitutions()));
+
     ListOfValues.push_back(
        S.addDeclBaseNameRef(Ctx.getIdentifier(pattern->getObjCString())));
 
@@ -2072,9 +2052,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     } else {
       ListOfValues.push_back(0);
     }
-    
-    SmallVector<ConformanceOrSubstitution, 4> serializeAfter;
-    
+
+    SmallVector<ProtocolConformanceRef, 4> serializeAfter;
+
     for (auto &component : pattern->getComponents()) {
       writeKeyPathPatternComponent(component,
                                    ListOfValues, serializeAfter);
@@ -2092,18 +2072,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
          S.addTypeRef(KPI->getType().getSwiftRValueType()),
          (unsigned)KPI->getType().getCategory(),
          ListOfValues);
-    for (auto &confOrSub : serializeAfter) {
-      switch (confOrSub.Kind) {
-      case ConformanceOrSubstitution::ProtocolConformance:
-        S.writeConformance(confOrSub.Conformance, SILAbbrCodes);
-        break;
-      case ConformanceOrSubstitution::SubstitutionList:
-        S.writeSubstitutions(confOrSub.Substitutions, SILAbbrCodes);
-        break;
-      }
+    for (const auto conf : serializeAfter) {
+      S.writeConformance(conf, SILAbbrCodes);
     }
     S.writeGenericRequirements(reqts, SILAbbrCodes);
-    S.writeSubstitutions(KPI->getSubstitutions(), SILAbbrCodes);
 
     break;
   }
@@ -2240,7 +2212,7 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
   PropertyOffset.push_back(Out.GetCurrentBitNo());
   
   SmallVector<ValueID, 4> componentValues;
-  SmallVector<ConformanceOrSubstitution, 4> serializeAfter;
+  SmallVector<ProtocolConformanceRef, 4> serializeAfter;
   
   writeKeyPathPatternComponent(prop.getComponent(),
                                componentValues, serializeAfter);
@@ -2252,15 +2224,8 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
     prop.isSerialized(),
     componentValues);
   
-  for (auto &confOrSub : serializeAfter) {
-    switch (confOrSub.Kind) {
-    case ConformanceOrSubstitution::ProtocolConformance:
-      S.writeConformance(confOrSub.Conformance, SILAbbrCodes);
-      break;
-    case ConformanceOrSubstitution::SubstitutionList:
-      S.writeSubstitutions(confOrSub.Substitutions, SILAbbrCodes);
-      break;
-    }
+  for (const auto conf : serializeAfter) {
+    S.writeConformance(conf, SILAbbrCodes);
   }
 }
 

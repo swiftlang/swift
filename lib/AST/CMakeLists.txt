@@ -49,7 +49,6 @@ add_swift_library(swiftAST STATIC
   SILLayout.cpp
   Stmt.cpp
   Substitution.cpp
-  SubstitutionList.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp

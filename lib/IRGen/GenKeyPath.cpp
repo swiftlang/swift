@@ -753,8 +753,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     SmallVector<llvm::Constant*, 4> descriptorArgs;
     auto componentSig = component.getExternalDecl()->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-    auto subs = componentSig->getSubstitutionMap(
-                                        component.getExternalSubstitutions());
+    auto subs = component.getExternalSubstitutions();
     enumerateGenericSignatureRequirements(
       componentSig->getCanonicalSignature(),
       [&](GenericRequirement reqt) {

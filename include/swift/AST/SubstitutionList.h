@@ -34,9 +34,6 @@ using SubstitutionList = ArrayRef<Substitution>;
 
 void dump(SubstitutionList subs);
 
-/// Profile the substitution list for use in a folding set.
-void profileSubstitutionList(llvm::FoldingSetNodeID &id, SubstitutionList subs);
-
 } // end namespace swift
 
 #endif
