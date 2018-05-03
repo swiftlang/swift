@@ -86,15 +86,15 @@ static void emitCompareBuiltin(IRGenFunction &IGF, Explosion &result,
 static void emitTypeTraitBuiltin(IRGenFunction &IGF,
                                  Explosion &out,
                                  Explosion &args,
-                                 SubstitutionMap substitutions,
+                                 SubstitutionList substitutions,
                                  TypeTraitResult (TypeBase::*trait)()) {
-  assert(substitutions.getReplacementTypes().size() == 1
+  assert(substitutions.size() == 1
          && "type trait should have gotten single type parameter");
   args.claimNext();
   
   // Lower away the trait to a tristate 0 = no, 1 = yes, 2 = maybe.
   unsigned result;
-  switch ((substitutions.getReplacementTypes()[0].getPointer()->*trait)()) {
+  switch ((substitutions[0].getReplacement().getPointer()->*trait)()) {
   case TypeTraitResult::IsNot:
     result = 0;
     break;
@@ -119,7 +119,7 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             Identifier FnId, SILType resultType,
                             Explosion &args, Explosion &out,
-                            SubstitutionMap substitutions) {
+                            SubstitutionList substitutions) {
   if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
     // Just consume the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
@@ -146,7 +146,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+                                             substitutions[0].getReplacement());
     out.add(valueTy.second.getSize(IGF, valueTy.first));
     return;
   }
@@ -154,7 +154,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+                                             substitutions[0].getReplacement());
     out.add(valueTy.second.getStride(IGF, valueTy.first));
     return;
   }
@@ -162,7 +162,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+                                             substitutions[0].getReplacement());
     // The alignof value is one greater than the alignment mask.
     out.add(IGF.Builder.CreateAdd(
                            valueTy.second.getAlignmentMask(IGF, valueTy.first),
@@ -173,7 +173,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::IsPOD) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+                                             substitutions[0].getReplacement());
     out.add(valueTy.second.getIsPOD(IGF, valueTy.first));
     return;
   }
@@ -802,7 +802,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *count = args.claimNext();
     
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+                                             substitutions[0].getReplacement());
     
     ptr = IGF.Builder.CreateBitCast(ptr,
                               valueTy.second.getStorageType()->getPointerTo());
@@ -828,7 +828,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *count = args.claimNext();
     
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+                                             substitutions[0].getReplacement());
     
     dest = IGF.Builder.CreateBitCast(dest,
                                valueTy.second.getStorageType()->getPointerTo());
@@ -885,7 +885,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
     // Build a zero initializer of the result type.
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
+                                             substitutions[0].getReplacement());
     auto schema = valueTy.second.getSchema();
     for (auto &elt : schema) {
       out.add(llvm::Constant::getNullValue(elt.getScalarType()));
@@ -895,7 +895,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
   if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
     (void)args.claimAll();
-    Type valueTy = substitutions.getReplacementTypes()[0];
+    Type valueTy = substitutions[0].getReplacement();
     // Get the type encoding for the associated clang type.
     auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType());
     std::string encoding;

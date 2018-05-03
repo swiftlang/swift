@@ -1258,6 +1258,42 @@ bool ProtocolConformance::isCanonical() const {
   llvm_unreachable("bad ProtocolConformanceKind");
 }
 
+Substitution Substitution::getCanonicalSubstitution(bool *wasCanonical) const {
+  bool createdNewCanonicalConformances = false;
+  bool createdCanReplacement = false;
+  SmallVector<ProtocolConformanceRef, 4> newCanConformances;
+
+  CanType canReplacement = getReplacement()->getCanonicalType();
+
+  if (!getReplacement()->isCanonical()) {
+    createdCanReplacement = true;
+  }
+
+  for (auto conf : getConformances()) {
+    if (conf.isCanonical()) {
+      newCanConformances.push_back(conf);
+      continue;
+    }
+    newCanConformances.push_back(conf.getCanonicalConformanceRef());
+    createdNewCanonicalConformances = true;
+  }
+
+  ArrayRef<ProtocolConformanceRef> canConformances = getConformances();
+  if (createdNewCanonicalConformances) {
+    auto &C = canReplacement->getASTContext();
+    canConformances = C.AllocateCopy(newCanConformances);
+  }
+
+  if (createdCanReplacement || createdNewCanonicalConformances) {
+    if (wasCanonical)
+      *wasCanonical = false;
+    return Substitution(canReplacement, canConformances);
+  }
+  if (wasCanonical)
+    *wasCanonical = true;
+  return *this;
+}
+
 /// Check of all types used by the conformance are canonical.
 ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
   if (isCanonical())

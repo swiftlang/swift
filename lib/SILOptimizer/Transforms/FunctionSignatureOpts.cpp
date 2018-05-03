@@ -343,8 +343,8 @@ static bool usesGenerics(SILFunction *F,
       // Scan all substitutions of builtin instructions.
       if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
         auto Subs = BI->getSubstitutions();
-        for (auto Ty : Subs.getReplacementTypes()) {
-          Ty.visit(FindArchetypesAndGenericTypes);
+        for (auto Sub : Subs) {
+          Sub.getReplacement().visit(FindArchetypesAndGenericTypes);
         }
       }
 

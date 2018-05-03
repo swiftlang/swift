@@ -415,7 +415,7 @@ public:
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
-                             SubstitutionMap Subs,
+                             SubstitutionList Subs,
                              ArrayRef<SILValue> Args) {
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Name,
                                       ResultTy, Subs, Args, getModule()));
@@ -582,7 +582,7 @@ public:
   
   KeyPathInst *createKeyPath(SILLocation Loc,
                              KeyPathPattern *Pattern,
-                             SubstitutionMap Subs,
+                             SubstitutionList Subs,
                              ArrayRef<SILValue> Args,
                              SILType Ty) {
     return insert(KeyPathInst::create(getSILDebugLocation(Loc),
@@ -1446,7 +1446,7 @@ public:
   InitBlockStorageHeaderInst *
   createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               SubstitutionMap Subs) {
+                               SubstitutionList Subs) {
     return insert(InitBlockStorageHeaderInst::create(getFunction(),
       getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType, Subs));
   }

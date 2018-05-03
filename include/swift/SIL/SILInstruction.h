@@ -2360,7 +2360,7 @@ private:
       ComputedPropertyId::ValueType IdValue;
     } Computed;
     // Valid if Kind == External
-    SubstitutionMap ExternalSubstitutions;
+    ArrayRef<Substitution> ExternalSubstitutions;
   };
   ArrayRef<Index> Indices;
   struct {
@@ -2392,7 +2392,7 @@ private:
   
   /// Constructor for external components
   KeyPathPatternComponent(AbstractStorageDecl *externalStorage,
-                          SubstitutionMap substitutions,
+                          ArrayRef<Substitution> substitutions,
                           ArrayRef<Index> indices,
                           SILFunction *indicesEqual,
                           SILFunction *indicesHash,
@@ -2553,7 +2553,7 @@ public:
     return (AbstractStorageDecl*)ValueAndKind.getPointer();
   }
   
-  SubstitutionMap getExternalSubstitutions() const {
+  ArrayRef<Substitution> getExternalSubstitutions() const {
     assert(getKind() == Kind::External
            && "not an external property");
     return ExternalSubstitutions;
@@ -2605,7 +2605,7 @@ public:
   
   static KeyPathPatternComponent
   forExternal(AbstractStorageDecl *externalDecl,
-              SubstitutionMap substitutions,
+              ArrayRef<Substitution> substitutions,
               ArrayRef<Index> indices,
               SILFunction *indicesEquals,
               SILFunction *indicesHash,
@@ -2694,27 +2694,29 @@ public:
 class KeyPathInst final
     : public InstructionBase<SILInstructionKind::KeyPathInst,
                              SingleValueInstruction>,
-      private llvm::TrailingObjects<KeyPathInst, Operand> {
+      private llvm::TrailingObjects<KeyPathInst, Substitution, Operand> {
   friend SILBuilder;
   friend TrailingObjects;
   
   KeyPathPattern *Pattern;
-  unsigned NumOperands;
-  SubstitutionMap Substitutions;
+  unsigned NumSubstitutions, NumOperands;
   
   static KeyPathInst *create(SILDebugLocation Loc,
                              KeyPathPattern *Pattern,
-                             SubstitutionMap Subs,
+                             SubstitutionList Subs,
                              ArrayRef<SILValue> Args,
                              SILType Ty,
                              SILFunction &F);
   
   KeyPathInst(SILDebugLocation Loc,
               KeyPathPattern *Pattern,
-              SubstitutionMap Subs,
+              SubstitutionList Subs,
               ArrayRef<SILValue> Args,
               SILType Ty);
   
+  size_t numTrailingObjects(OverloadToken<Substitution>) const {
+    return NumSubstitutions;
+  }
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return NumOperands;
   }
@@ -2728,8 +2730,11 @@ public:
   }
   MutableArrayRef<Operand> getAllOperands();
 
-  SubstitutionMap getSubstitutions() const { return Substitutions; }
-
+  MutableArrayRef<Substitution> getSubstitutions();
+  SubstitutionList getSubstitutions() const {
+    return const_cast<KeyPathInst*>(this)->getSubstitutions();
+  }
+  
   void dropReferencedPattern();
   
   ~KeyPathInst();
@@ -2740,21 +2745,18 @@ public:
 class BuiltinInst final
     : public InstructionBaseWithTrailingOperands<
                                    SILInstructionKind::BuiltinInst, BuiltinInst,
-                                   SingleValueInstruction> {
+                                   SingleValueInstruction, Substitution> {
   friend SILBuilder;
 
   /// The name of the builtin to invoke.
   Identifier Name;
 
-  /// The substitutions.
-  SubstitutionMap Substitutions;
-
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
-              SubstitutionMap Substitutions, ArrayRef<SILValue> Args);
+              SubstitutionList Substitutions, ArrayRef<SILValue> Args);
 
   static BuiltinInst *create(SILDebugLocation DebugLoc, Identifier Name,
                              SILType ReturnType,
-                             SubstitutionMap Substitutions,
+                             SubstitutionList Substitutions,
                              ArrayRef<SILValue> Args, SILModule &M);
 
 public:
@@ -2793,12 +2795,20 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return !Substitutions.empty();
+    return SILInstruction::Bits.BuiltinInst.NumSubstitutions != 0;
   }
 
   /// Return the type parameters to the builtin.
-  SubstitutionMap getSubstitutions() const { return Substitutions; }
-
+  SubstitutionList getSubstitutions() const {
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
+  }
+  /// Return the type parameters to the builtin.
+  MutableArrayRef<Substitution> getSubstitutions() {
+    return {getTrailingObjects<Substitution>(),
+            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
+  }
+  
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
@@ -6029,28 +6039,39 @@ class InitBlockStorageHeaderInst
   friend SILBuilder;
 
   enum { BlockStorage, InvokeFunction };
-  SubstitutionMap Substitutions;
+  unsigned NumSubstitutions;
   FixedOperandList<2> Operands;
   
+  Substitution *getSubstitutionsStorage() {
+    return reinterpret_cast<Substitution*>(Operands.asArray().end());
+  }
+  const Substitution *getSubstitutionsStorage() const {
+    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
+  }
+
   InitBlockStorageHeaderInst(SILDebugLocation DebugLoc, SILValue BlockStorage,
                              SILValue InvokeFunction, SILType BlockType,
-                             SubstitutionMap Subs)
+                             SubstitutionList Subs)
       : InstructionBase(DebugLoc, BlockType),
-        Substitutions(Subs),
+        NumSubstitutions(Subs.size()),
         Operands(this, BlockStorage, InvokeFunction) {
+    memcpy(getSubstitutionsStorage(), Subs.begin(),
+           sizeof(Subs[0]) * Subs.size());
   }
   
   static InitBlockStorageHeaderInst *create(SILFunction &F,
                               SILDebugLocation DebugLoc, SILValue BlockStorage,
                               SILValue InvokeFunction, SILType BlockType,
-                              SubstitutionMap Subs);
+                              SubstitutionList Subs);
 public:
   /// Get the block storage address to be initialized.
   SILValue getBlockStorage() const { return Operands[BlockStorage].get(); }
   /// Get the invoke function to form the block around.
   SILValue getInvokeFunction() const { return Operands[InvokeFunction].get(); }
 
-  SubstitutionMap getSubstitutions() const { return Substitutions; }
+  SubstitutionList getSubstitutions() const {
+    return {getSubstitutionsStorage(), NumSubstitutions};
+  }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }

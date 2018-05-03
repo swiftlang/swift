@@ -1391,12 +1391,6 @@ SILGenModule::useConformancesFromSubstitutions(SubstitutionList subs) {
   }
 }
 
-void SILGenModule::useConformancesFromSubstitutions(
-                                                const SubstitutionMap subs) {
-  for (auto conf : subs.getConformances())
-    useConformance(conf);
-}
-
 namespace {
 
 /// An RAII class to scope source file codegen.

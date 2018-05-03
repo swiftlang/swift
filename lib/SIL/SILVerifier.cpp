@@ -123,10 +123,14 @@ void verifyKeyPathComponent(SILModule &M,
                             const KeyPathPatternComponent &component,
                             ArrayRef<Operand> operands,
                             CanGenericSignature patternSig,
-                            SubstitutionMap patternSubs,
+                            SubstitutionList patternSubList,
                             bool forPropertyDescriptor,
                             bool hasIndices) {
   auto &C = M.getASTContext();
+  
+  SubstitutionMap patternSubs;
+  if (patternSig)
+    patternSubs  = patternSig->getSubstitutionMap(patternSubList);
   
   auto loweredBaseTy =
     M.Types.getLoweredType(AbstractionPattern::getOpaque(), baseTy);
@@ -145,7 +149,7 @@ void verifyKeyPathComponent(SILModule &M,
                         "operator");
         
         auto substEqualsType = equals->getLoweredFunctionType()
-          ->substGenericArgs(M, patternSubs);
+          ->substGenericArgs(M, patternSubList);
         
         require(substEqualsType->getParameters().size() == 2,
                 "must have two arguments");
@@ -177,7 +181,7 @@ void verifyKeyPathComponent(SILModule &M,
                       "operator");
         
         auto substHashType = hash->getLoweredFunctionType()
-          ->substGenericArgs(M, patternSubs);
+          ->substGenericArgs(M, patternSubList);
         
         require(substHashType->getParameters().size() == 1,
                 "must have two arguments");
@@ -258,7 +262,7 @@ void verifyKeyPathComponent(SILModule &M,
     {
       auto getter = component.getComputedPropertyGetter();
       auto substGetterType = getter->getLoweredFunctionType()
-        ->substGenericArgs(M, patternSubs);
+        ->substGenericArgs(M, patternSubList);
       require(substGetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::Thin,
               "getter should be a thin function");
@@ -297,7 +301,7 @@ void verifyKeyPathComponent(SILModule &M,
       
       auto setter = component.getComputedPropertySetter();
       auto substSetterType = setter->getLoweredFunctionType()
-        ->substGenericArgs(M, patternSubs);
+        ->substGenericArgs(M, patternSubList);
       
       require(substSetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::Thin,
@@ -365,7 +369,7 @@ void verifyKeyPathComponent(SILModule &M,
     CanGenericSignature canSig = nullptr;
     if (sig) {
       canSig = sig->getCanonicalSignature();
-      subs = component.getExternalSubstitutions();
+      subs = sig->getSubstitutionMap(component.getExternalSubstitutions());
     }
     auto substType = component.getExternalDecl()->getStorageInterfaceType()
       .subst(subs);
@@ -4043,7 +4047,7 @@ public:
             invokeTy->getExtInfo().isPseudogeneric(),
             "invoke function must not take reified generic parameters");
     
-    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions().toList(),
+    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions(),
                                     SILType::getPrimitiveObjectType(invokeTy));
     
     auto storageParam = invokeTy->getParameters()[0];
@@ -4129,7 +4133,10 @@ public:
     
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
     auto pattern = KPI->getPattern();
-    SubstitutionMap patternSubs = KPI->getSubstitutions();
+    SubstitutionMap patternSubs;
+    if (pattern->getGenericSignature())
+      patternSubs = pattern->getGenericSignature()
+                           ->getSubstitutionMap(KPI->getSubstitutions());
     require(baseTy == pattern->getRootType().subst(patternSubs)->getCanonicalType(),
             "keypath root type should match root type of keypath pattern");
 
@@ -4773,10 +4780,10 @@ void SILProperty::verify(const SILModule &M) const {
                   ->getCanonicalType(sig);
   auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
                     ->getCanonicalType(sig);
-  SubstitutionMap subs;
+  SubstitutionList subs;
   if (sig) {
     auto env = dc->getGenericEnvironmentOfContext();
-    subs = env->getForwardingSubstitutionMap();
+    subs = env->getForwardingSubstitutions();
     baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
     leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
   }

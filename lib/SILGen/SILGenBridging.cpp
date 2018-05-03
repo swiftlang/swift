@@ -552,12 +552,12 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
-  SubstitutionMap subs;
+  SubstitutionList subs;
   if (funcType->hasArchetype() || blockType->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = F.getGenericEnvironment();
 
-    subs = F.getForwardingSubstitutionMap();
+    subs = F.getForwardingSubstitutions();
 
     // The block invoke function must be pseudogeneric. This should be OK for now
     // since a bridgeable function's parameters and returns should all be
