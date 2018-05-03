@@ -23,6 +23,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SubstitutionMap.h"
+#include "SubstitutionMapStorage.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -50,6 +51,31 @@ SubstitutionMap::Storage::Storage(
             getConformances().data());
 }
 
+SubstitutionMap::SubstitutionMap(
+                                GenericSignature *genericSig,
+                                ArrayRef<Type> replacementTypes,
+                                ArrayRef<ProtocolConformanceRef> conformances)
+  : storage(Storage::get(genericSig, replacementTypes, conformances)) { }
+
+ArrayRef<Type> SubstitutionMap::getReplacementTypesBuffer() const {
+  return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
+}
+
+MutableArrayRef<Type> SubstitutionMap::getReplacementTypesBuffer() {
+  return storage ? storage->getReplacementTypes() : MutableArrayRef<Type>();
+}
+
+MutableArrayRef<ProtocolConformanceRef>
+SubstitutionMap::getConformancesBuffer() {
+  return storage ? storage->getConformances()
+                 : MutableArrayRef<ProtocolConformanceRef>();
+}
+
+ArrayRef<ProtocolConformanceRef> SubstitutionMap::getConformances() const {
+  return storage ? storage->getConformances()
+                 : ArrayRef<ProtocolConformanceRef>();
+}
+
 ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   if (empty()) return { };
 
@@ -59,6 +85,10 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   }
 
   return getReplacementTypesBuffer();
+}
+
+GenericSignature *SubstitutionMap::getGenericSignature() const {
+  return storage ? storage->getGenericSignature() : nullptr;
 }
 
 bool SubstitutionMap::hasArchetypes() const {

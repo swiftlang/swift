@@ -17,15 +17,11 @@
 #ifndef SWIFT_AST_SUBSTITUTION_MAP_H
 #define SWIFT_AST_SUBSTITUTION_MAP_H
 
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
   class FoldingSetNodeID;
@@ -33,9 +29,14 @@ namespace llvm {
 
 namespace swift {
 
+class GenericSignature;
 class GenericEnvironment;
+class Substitution;
 class SubstitutableType;
 typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
+
+// FIXME: Soon this will go away.
+using SubstitutionList = ArrayRef<Substitution>;
 
 template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
@@ -65,88 +66,7 @@ class SubstitutionMap {
 public:
   /// Stored data for a substitution map, which uses tail allocation for the
   /// replacement types and conformances.
-  class Storage final
-    : public llvm::FoldingSetNode,
-      llvm::TrailingObjects<Storage, Type, ProtocolConformanceRef>
-  {
-    friend TrailingObjects;
-
-    /// The generic signature for which we are performing substitutions.
-    GenericSignature * const genericSig;
-
-    /// The number of conformance requirements, cached to avoid constantly
-    /// recomputing it on conformance-buffer access.
-    const unsigned numConformanceRequirements;
-
-    Storage() = delete;
-
-    Storage(GenericSignature *genericSig,
-            ArrayRef<Type> replacementTypes,
-            ArrayRef<ProtocolConformanceRef> conformances);
-
-  private:
-    unsigned getNumReplacementTypes() const {
-      return genericSig->getGenericParams().size();
-    }
-
-    size_t numTrailingObjects(OverloadToken<Type>) const {
-      return getNumReplacementTypes();
-    }
-
-    size_t numTrailingObjects(OverloadToken<ProtocolConformanceRef>) const {
-      return numConformanceRequirements;
-    }
-
-  public:
-    /// Form storage for the given generic signature and its replacement
-    /// types and conformances.
-    static Storage *get(GenericSignature *genericSig,
-                        ArrayRef<Type> replacementTypes,
-                        ArrayRef<ProtocolConformanceRef> conformances);
-
-    /// Retrieve the generic signature that describes the shape of this
-    /// storage.
-    GenericSignature *getGenericSignature() const { return genericSig; }
-
-    /// Retrieve the array of replacement types, which line up with the
-    /// generic parameters.
-    ///
-    /// Note that the types may be null, for cases where the generic parameter
-    /// is concrete but hasn't been queried yet.
-    ArrayRef<Type> getReplacementTypes() const {
-      return llvm::makeArrayRef(getTrailingObjects<Type>(),
-                                getNumReplacementTypes());
-    }
-
-    MutableArrayRef<Type> getReplacementTypes() {
-      return MutableArrayRef<Type>(getTrailingObjects<Type>(),
-                                   getNumReplacementTypes());
-    }
-
-    /// Retrieve the array of protocol conformances, which line up with the
-    /// requirements of the generic signature.
-    ArrayRef<ProtocolConformanceRef> getConformances() const {
-      return llvm::makeArrayRef(getTrailingObjects<ProtocolConformanceRef>(),
-                                numConformanceRequirements);
-    }
-    MutableArrayRef<ProtocolConformanceRef> getConformances() {
-      return MutableArrayRef<ProtocolConformanceRef>(
-                                getTrailingObjects<ProtocolConformanceRef>(),
-                                numConformanceRequirements);
-    }
-
-    /// Profile the substitution map storage, for use with LLVM's FoldingSet.
-    void Profile(llvm::FoldingSetNodeID &id) const {
-      Profile(id, getGenericSignature(), getReplacementTypes(),
-              getConformances());
-    }
-
-    /// Profile the substitution map storage, for use with LLVM's FoldingSet.
-    static void Profile(llvm::FoldingSetNodeID &id,
-                        GenericSignature *genericSig,
-                        ArrayRef<Type> replacementTypes,
-                        ArrayRef<ProtocolConformanceRef> conformances);
-  };
+  class Storage;
 
 private:
   /// The storage needed to describe the set of substitutions.
@@ -160,25 +80,18 @@ private:
   ///
   /// Note that the types may be null, for cases where the generic parameter
   /// is concrete but hasn't been queried yet.
-  ArrayRef<Type> getReplacementTypesBuffer() const {
-    return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
-  }
+  ArrayRef<Type> getReplacementTypesBuffer() const;
 
-  MutableArrayRef<Type> getReplacementTypesBuffer() {
-    return storage ? storage->getReplacementTypes() : MutableArrayRef<Type>();
-  }
+  MutableArrayRef<Type> getReplacementTypesBuffer();
 
-  MutableArrayRef<ProtocolConformanceRef> getConformances() {
-    return storage ? storage->getConformances()
-                   : MutableArrayRef<ProtocolConformanceRef>();
-  }
+  /// Retrieve a mutable reference to the buffer of conformances.
+  MutableArrayRef<ProtocolConformanceRef> getConformancesBuffer();
 
   /// Form a substitution map for the given generic signature with the
   /// specified replacement types and conformances.
   SubstitutionMap(GenericSignature *genericSig,
                   ArrayRef<Type> replacementTypes,
-                  ArrayRef<ProtocolConformanceRef> conformances)
-    : storage(Storage::get(genericSig, replacementTypes, conformances)) { }
+                  ArrayRef<ProtocolConformanceRef> conformances);
 
   explicit SubstitutionMap(Storage *storage) : storage(storage) { }
 
@@ -209,16 +122,11 @@ public:
 
   /// Retrieve the generic signature describing the environment in which
   /// substitutions occur.
-  GenericSignature *getGenericSignature() const {
-    return storage ? storage->getGenericSignature() : nullptr;
-  }
+  GenericSignature *getGenericSignature() const;
 
   /// Retrieve the array of protocol conformances, which line up with the
   /// requirements of the generic signature.
-  ArrayRef<ProtocolConformanceRef> getConformances() const {
-    return storage ? storage->getConformances()
-                   : ArrayRef<ProtocolConformanceRef>();
-  }
+  ArrayRef<ProtocolConformanceRef> getConformances() const;
 
   /// Look up a conformance for the given type to the given protocol.
   Optional<ProtocolConformanceRef>

@@ -19,6 +19,7 @@
 
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeAlignments.h"
