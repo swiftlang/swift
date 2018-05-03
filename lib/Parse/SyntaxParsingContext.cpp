@@ -37,11 +37,31 @@ SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
     : RootDataOrParent(new RootContextData(SF, SF.getASTContext().Diags,
                                            SF.getASTContext().SourceMgr,
                                            BufferID)),
-      CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
+      CtxtHolder(CtxtHolder), SyntaxParsingCache(SF.SyntaxParsingCache),
+      Arena(SF.getASTContext().getSyntaxArena()),
       Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
       Enabled(SF.shouldBuildSyntaxTree()) {
   CtxtHolder = this;
   Storage.reserve(128);
+}
+
+size_t SyntaxParsingContext::loadFromCache(size_t LexerOffset) {
+  assert(Storage.size() == Offset && "Cannot load from cache if nodes have "
+                                     "already been gathered");
+  assert(Mode == AccumulationMode::CreateSyntax &&
+         "Loading from cache is only supported for mode CreateSyntax");
+  if (!SyntaxParsingCache) {
+    // We don't have a cache, so there's nothing to look up
+    return 0;
+  }
+  auto CacheLookup = SyntaxParsingCache->lookUp(LexerOffset, SynKind);
+  if (!CacheLookup) {
+    return 0;
+  }
+  Mode = AccumulationMode::LoadedFromCache;
+  RC<RawSyntax> RawLookup = CacheLookup->getRaw().get();
+  Storage.push_back(RawLookup);
+  return RawLookup->getTextLength();
 }
 
 RC<RawSyntax>
@@ -378,6 +398,9 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   // Remove all parts in this context.
   case AccumulationMode::Discard:
     Storage.resize(Offset);
+    break;
+
+  case AccumulationMode::LoadedFromCache:
     break;
 
   // Accumulate parsed toplevel syntax onto the SourceFile.

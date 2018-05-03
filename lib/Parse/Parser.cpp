@@ -709,6 +709,23 @@ void Parser::skipUntilConditionalBlockClose() {
   }
 }
 
+bool Parser::loadCurrentSyntaxNodeFromCache() {
+  // Don't do a cache lookup when not building a syntax tree since otherwise
+  // the corresponding AST nodes do not get created
+  if (!SF.shouldBuildSyntaxTree()) {
+    return false;
+  }
+  unsigned LexerOffset =
+      SourceMgr.getLocOffsetInBuffer(Tok.getLoc(), L->getBufferID());
+  unsigned LeadingTriviaOffset = LexerOffset - LeadingTrivia.getTextLength();
+  if (auto TextLength = SyntaxContext->loadFromCache(LexerOffset)) {
+    L->resetToOffset(LeadingTriviaOffset + TextLength);
+    L->lex(Tok, LeadingTrivia, TrailingTrivia);
+    return true;
+  }
+  return false;
+}
+
 bool Parser::parseEndIfDirective(SourceLoc &Loc) {
   Loc = Tok.getLoc();
   if (parseToken(tok::pound_endif, diag::expected_close_to_if_directive)) {

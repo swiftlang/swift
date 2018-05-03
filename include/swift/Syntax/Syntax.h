@@ -134,6 +134,9 @@ public:
   /// if it has one, otherwise 0.
   CursorIndex getIndexInParent() const;
 
+  /// Return the number of bytes this node takes when spelled out in the source
+  size_t getTextLength() const { return getRaw()->getTextLength(); }
+
   /// Returns true if this syntax node represents a token.
   bool isToken() const;
 

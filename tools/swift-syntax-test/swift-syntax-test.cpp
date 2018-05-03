@@ -49,6 +49,7 @@ enum class ActionType {
   ParseOnly,
   ParserGen,
   EOFPos,
+  IncrementalParse,
   None
 };
 
@@ -85,6 +86,10 @@ Action(llvm::cl::desc("Action (required):"),
                    "deserialize-raw-tree",
                    "Parse the JSON file from the serialized raw tree"
                    "to the original"),
+        clEnumValN(ActionType::IncrementalParse,
+                   "incremental-parse",
+                   "Incrementally syntax parse the input file. Requires "
+                   "-old-syntax-tree-filename"),
         clEnumValN(ActionType::EOFPos,
                    "eof",
                    "Parse the source file, calculate the absolute position"
@@ -100,7 +105,12 @@ InputSourceDirectory("input-source-directory",
                      llvm::cl::desc("Directory to be scanned recursively and"
                                     "run the selected action on every .swift"
                                     "file"));
-  
+
+static llvm::cl::opt<std::string>
+OldSyntaxTreeFilename("old-syntax-tree-filename",
+                      llvm::cl::desc("Path to the serialized syntax tree of "
+                                     "the pre-edit file"));
+
 static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
@@ -167,7 +177,8 @@ void anchorForGetMainExecutable() {}
 
 SourceFile *getSourceFile(CompilerInstance &Instance,
                           StringRef InputFileName,
-                          const char *MainExecutablePath) {
+                          const char *MainExecutablePath,
+                          SyntaxParsingCache *SyntaxParsingCache = nullptr) {
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
@@ -175,6 +186,7 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
       reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+  Invocation.setMainFileSyntaxParsingCache(SyntaxParsingCache);
 
   Invocation.setModuleName("Test");
   PrintingDiagnosticConsumer DiagPrinter;
@@ -295,6 +307,34 @@ int dumpParserGen(const char *MainExecutablePath,
   return 0;
 }
 
+int doIncrementalParse(const char *MainExecutablePath,
+                       const StringRef InputFileName,
+                       const StringRef OldSyntaxTreeFileName) {
+  // Deserialise the old syntax tree
+  auto Buffer = llvm::MemoryBuffer::getFile(OldSyntaxTreeFileName);
+  swift::json::SyntaxDeserializer Deserializer(
+      llvm::MemoryBufferRef(*(Buffer.get())));
+  auto OldSyntaxTree = Deserializer.getSourceFileSyntax();
+  if (!OldSyntaxTree.hasValue()) {
+    llvm::errs() << "Could not deserialise old syntax tree.";
+    return EXIT_FAILURE;
+  }
+  SyntaxParsingCache *Cache = new SyntaxParsingCache(OldSyntaxTree.getValue());
+
+  // Parse the new libSyntax tree incrementally
+  CompilerInstance Instance;
+  SourceFile *SF =
+      getSourceFile(Instance, InputFileName, MainExecutablePath, Cache);
+
+  // Serialize and print the newly generated libSyntax tree
+  auto Root = SF->getSyntaxRoot().getRaw();
+  swift::json::Output out(llvm::outs());
+  out << *Root;
+  llvm::outs() << "\n";
+
+  return EXIT_SUCCESS;
+}
+
 int dumpEOFSourceLoc(const char *MainExecutablePath,
                      const StringRef InputFileName) {
   CompilerInstance Instance;
@@ -343,6 +383,10 @@ int invokeCommand(const char *MainExecutablePath,
       break;
     case ActionType::ParserGen:
       ExitCode = dumpParserGen(MainExecutablePath, InputSourceFilename);
+      break;
+    case ActionType::IncrementalParse:
+      ExitCode = doIncrementalParse(MainExecutablePath, InputSourceFilename,
+                                    options::OldSyntaxTreeFilename);
       break;
     case ActionType::EOFPos:
       ExitCode = dumpEOFSourceLoc(MainExecutablePath, InputSourceFilename);

@@ -295,6 +295,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
     SyntaxParsingContext NodeContext(SyntaxContext, SyntaxKind::CodeBlockItem);
+    if (loadCurrentSyntaxNodeFromCache()) {
+      continue;
+    }
 
     if (Tok.is(tok::r_brace)) {
       SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);

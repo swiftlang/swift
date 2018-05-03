@@ -20,6 +20,7 @@
 
 namespace swift {
 class SourceFile;
+class SyntaxParsingCache;
 class Token;
 class DiagnosticEngine;
 
@@ -97,6 +98,9 @@ private:
     // Discard all parts in the context.
     Discard,
 
+    // The node has been loaded from the cache and all parts shall be discarded.
+    LoadedFromCache,
+
     // Construct SourceFile syntax to the specified SF.
     Root,
 
@@ -111,6 +115,9 @@ private:
 
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
+
+  /// A cache of nodes that can be reused when creating the current syntax tree
+  SyntaxParsingCache *SyntaxParsingCache = nullptr;
 
   SyntaxArena &Arena;
 
@@ -154,11 +161,13 @@ public:
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
-        Arena(CtxtHolder->Arena),
-        Storage(CtxtHolder->Storage), Offset(Storage.size()),
-        Enabled(CtxtHolder->isEnabled()) {
+        SyntaxParsingCache(CtxtHolder->SyntaxParsingCache),
+        Arena(CtxtHolder->Arena), Storage(CtxtHolder->Storage),
+        Offset(Storage.size()), Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
+    assert(CtxtHolder->Mode != AccumulationMode::LoadedFromCache &&
+           "Cannot create child context for a node loaded from the cache");
     CtxtHolder = this;
   }
 
@@ -173,6 +182,15 @@ public:
   }
 
   ~SyntaxParsingContext();
+
+  /// Try loading the current node from the \c SyntaxParsingCache by looking up
+  /// if an unmodified node exists at \p LexerOffset of the same kind. If a node
+  /// is found, replace the node that is currently being constructed by the
+  /// parsing context with the node from the cache and return the number of
+  /// bytes the loaded node took up in the original source. The lexer should
+  /// pretend it has read these bytes and continue from the advanced offset.
+  /// If nothing is found \c 0 is returned.
+  size_t loadFromCache(size_t LexerOffset);
 
   void disable() { Enabled = false; }
   bool isEnabled() const { return Enabled; }
