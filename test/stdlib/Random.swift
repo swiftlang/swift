@@ -45,72 +45,47 @@ RandomTests.test("basic random numbers") {
 func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) 
   where T.Stride: SignedInteger, T.Magnitude: UnsignedInteger {
     
-  let testRange = 0 ..< 1_000
-  var integerSet: Set<T> = []
+  func testRange(_ range: Range<T>, iterations: Int = 1_000) {
+    var integerSet: Set<T> = []
+    for _ in 0 ..< iterations {
+      let random = T.random(in: range)
+      expectTrue(range.contains(random))
+      integerSet.insert(random)
+    }
+    expectEqual(integerSet, Set(range))
+  }
+    
+  func testClosedRange(_ range: ClosedRange<T>, iterations: Int = 1_000) {
+    var integerSet: Set<T> = []
+    for _ in 0 ..< iterations {
+      let random = T.random(in: range)
+      expectTrue(range.contains(random))
+      integerSet.insert(random)
+    }
+    expectEqual(integerSet, Set(range))
+  }
   
   // min open range
-  let minOpenRange = T.min ..< (T.min + 10)
-  for _ in testRange {
-    let random = T.random(in: minOpenRange)
-    expectTrue(minOpenRange.contains(random))
-    integerSet.insert(random)
-  }
-  expectEqual(integerSet, Set(minOpenRange))
-  integerSet.removeAll()
+  testRange(T.min ..< (T.min + 10))
   
   // min closed range
-  let minClosedRange = T.min ... (T.min + 10)
-  for _ in testRange {
-    let random = T.random(in: minClosedRange)
-    expectTrue(minClosedRange.contains(random))
-    integerSet.insert(random)
-  }
-  expectEqual(integerSet, Set(minClosedRange))
-  integerSet.removeAll()
+  testClosedRange(T.min ... (T.min + 10))
   
   // max open range
-  let maxOpenRange = (T.max - 10) ..< T.max
-  for _ in testRange {
-    let random = T.random(in: maxOpenRange)
-    expectTrue(maxOpenRange.contains(random))
-    integerSet.insert(random)
-  }
-  expectEqual(integerSet, Set(maxOpenRange))
-  integerSet.removeAll()
+  testRange((T.max - 10) ..< T.max)
   
   // max closed range
-  let maxClosedRange = (T.max - 10) ... T.max
-  for _ in testRange {
-    let random = T.random(in: maxClosedRange)
-    expectTrue(maxClosedRange.contains(random))
-    integerSet.insert(random)
-  }
-  expectEqual(integerSet, Set(maxClosedRange))
-  integerSet.removeAll()
+  testClosedRange((T.max - 10) ... T.max)
   
   // Test full ranges for Int8 and UInt8
   if T.bitWidth == 8 {
-    let fullTestRange = 0 ..< 10_000
+    let fullIterations = 10_000
     
     // full open range
-    let fullOpenRange = T.min ..< T.max
-    for _ in fullTestRange {
-      let random = T.random(in: fullOpenRange)
-      expectTrue(fullOpenRange.contains(random))
-      integerSet.insert(random)
-    }
-    expectEqual(integerSet, Set(fullOpenRange))
-    integerSet.removeAll()
+    testRange(T.min ..< T.max, iterations: fullIterations)
     
     // full closed range
-    let fullClosedRange = T.min ... T.max
-    for _ in fullTestRange {
-      let random = T.random(in: fullClosedRange)
-      expectTrue(fullClosedRange.contains(random))
-      integerSet.insert(random)
-    }
-    expectEqual(integerSet, Set(fullClosedRange))
-    integerSet.removeAll()
+    testClosedRange(T.min ... T.max, iterations: fullIterations)
   }
 }
 
