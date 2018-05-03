@@ -73,7 +73,10 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
   auto Node = lookUpFrom(OldSyntaxTree, OldPosition, Kind);
   if (Node.hasValue()) {
     if (RecordReuseInformation) {
-      auto Start = NewPosition;
+      auto LeadingTrivia =
+          Node->getAbsolutePosition().getOffset() -
+          Node->getAbsolutePositionWithLeadingTrivia().getOffset();
+      auto Start = NewPosition - LeadingTrivia;
       auto End = Start + Node->getTextLength();
       ReusedRanges.push_back({Start, End});
     }

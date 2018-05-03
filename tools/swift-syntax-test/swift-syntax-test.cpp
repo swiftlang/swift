@@ -417,9 +417,9 @@ int doIncrementalParse(const char *MainExecutablePath,
       SourceLoc End = SourceMgr.getLocForOffset(BufferID, ReuseRange.second);
 
       ReuseLog << "Reused ";
-      Start.printLineAndColumn(ReuseLog, SourceMgr);
+      Start.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
       ReuseLog << " to ";
-      End.printLineAndColumn(ReuseLog, SourceMgr);
+      End.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
       ReuseLog << '\n';
     }
   }
@@ -429,6 +429,21 @@ int doIncrementalParse(const char *MainExecutablePath,
   swift::json::Output out(llvm::outs());
   out << *Root;
   llvm::outs() << "\n";
+
+  auto CurrentOffset = 0;
+  auto SourceText = SourceMgr.getEntireTextForBuffer(BufferID);
+
+  llvm::outs() << "\n\n";
+
+  for (auto ReuseRange : Cache.getReusedRanges()) {
+    llvm::outs().changeColor(llvm::buffer_ostream::Colors::RED);
+    llvm::outs() << SourceText.substr(CurrentOffset,
+                                      ReuseRange.first - CurrentOffset);
+    llvm::outs().changeColor(llvm::buffer_ostream::Colors::GREEN);
+    llvm::outs() << SourceText.substr(ReuseRange.first,
+                                      ReuseRange.second - ReuseRange.first);
+    CurrentOffset = ReuseRange.second;
+  }
 
   return EXIT_SUCCESS;
 }
