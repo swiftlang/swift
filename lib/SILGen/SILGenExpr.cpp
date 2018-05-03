@@ -4025,8 +4025,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                  indexEquals, indexHash);
       }
       return KeyPathPatternComponent::forExternal(
-        decl, SGF.getASTContext().AllocateCopy(subMap.toList()),
-        SGF.getASTContext().AllocateCopy(indices),
+        decl, subMap, SGF.getASTContext().AllocateCopy(indices),
         indexEquals, indexHash,
         ty->getCanonicalType());
     };
@@ -4108,8 +4107,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                                      objcString);
   auto keyPath = SGF.B.createKeyPath(SILLocation(E), pattern,
                                      needsGenericContext
-                                       ? SGF.F.getForwardingSubstitutions()
-                                       : SubstitutionList(),
+                                       ? SGF.F.getForwardingSubstitutionMap()
+                                       : SubstitutionMap(),
                                      operands,
                                      loweredTy);
   auto value = SGF.emitManagedRValueWithCleanup(keyPath);
