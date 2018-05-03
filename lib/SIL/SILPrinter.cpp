@@ -396,7 +396,7 @@ static void printGenericSpecializationInfo(
     OS << "// Caller: " << SpecializationInfo->getCaller()->getName() << '\n';
     OS << "// Parent: " << SpecializationInfo->getParent()->getName() << '\n';
     OS << "// Substitutions: ";
-    PrintSubstitutions(SpecializationInfo->getSubstitutions());
+    PrintSubstitutions(SpecializationInfo->getSubstitutions().toList());
     OS << '\n';
     OS << "//\n";
     if (!SpecializationInfo->getCaller()->isSpecialization())
@@ -1063,6 +1063,10 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo());
+  }
+
+  void printSubstitutions(SubstitutionMap Subs) {
+    printSubstitutions(Subs.toList());
   }
 
   void printSubstitutions(SubstitutionList Subs) {

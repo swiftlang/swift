@@ -849,6 +849,14 @@ GenericEnvironment *CanGenericSignature::getGenericEnvironment() const {
            *this);
 }
 
+ArrayRef<CanTypeWrapper<GenericTypeParamType>>
+CanGenericSignature::getGenericParams() const{
+  auto params = Signature->getGenericParams().getOriginalArray();
+  auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
+                                                              params.data());
+  return {base, params.size()};
+}
+
 /// Remove all of the associated type declarations from the given type
 /// parameter, producing \c DependentMemberTypes with names alone.
 static Type eraseAssociatedTypes(Type type) {

@@ -5387,14 +5387,6 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   }
 }
 
-inline ArrayRef<CanTypeWrapper<GenericTypeParamType>>
-CanGenericSignature::getGenericParams() const{
-  auto params = Signature->getGenericParams().getOriginalArray();
-  auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
-                                                                 params.data());
-  return {base, params.size()};
-}
-
 } // end namespace swift
 
 namespace llvm {
