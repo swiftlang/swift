@@ -1,6 +1,8 @@
 #import "ObjectiveC.h"
 #import "dispatch.h"
 
+#define NS_OPTIONS(type, name) type name; enum
+
 #pragma clang assume_nonnull begin
 
 @interface NSString : NSObject<NSCopying>
@@ -9,6 +11,8 @@
 - (id) copyWithZone: (nullable void*)zone;
 
 @end
+
+typedef NSString *NSErrorDomain;
 
 @interface NSArray<ObjectType> : NSObject
 
