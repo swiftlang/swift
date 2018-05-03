@@ -473,7 +473,9 @@ public:
         auto fnType = type->getAs<AnyFunctionType>();
         if (!fnType) return Classification::forInvalidCode();
 
-        result.merge(classifyRethrowsArgument(arg, fnType->getInput()));
+        auto paramType = FunctionType::composeInput(fnType->getASTContext(),
+                                                    fnType->getParams(), false);
+        result.merge(classifyRethrowsArgument(arg, paramType));
         type = fnType->getResult();
       }
       return result;
