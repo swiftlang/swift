@@ -1,4 +1,4 @@
-//===--- SubstitutionMapStorage.h - Substitution Map Storage -*- C++ ----*-===//
+//===--- SubstitutionMapStorage.h - Substitution Map Storage ----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,6 +18,7 @@
 #define SWIFT_AST_SUBSTITUTION_MAP_STORAGE_H
 
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "llvm/Support/TrailingObjects.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -37,11 +38,16 @@ class SubstitutionMap::Storage final
   /// recomputing it on conformance-buffer access.
   const unsigned numConformanceRequirements;
 
+  /// Cache of an ASTContext-allocated list of flat substitutions.
+  SubstitutionList flatSubstitutions;
+
   Storage() = delete;
 
   Storage(GenericSignature *genericSig,
           ArrayRef<Type> replacementTypes,
           ArrayRef<ProtocolConformanceRef> conformances);
+
+  friend class SubstitutionMap;
 
 private:
   unsigned getNumReplacementTypes() const {

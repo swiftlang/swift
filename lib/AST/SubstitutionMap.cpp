@@ -655,11 +655,18 @@ void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   id.AddPointer(storage);
 }
 
-SmallVector<Substitution, 4> SubstitutionMap::toList() const {
-  SmallVector<Substitution, 4> subs;
-  if (empty()) return subs;
+SubstitutionList SubstitutionMap::toList() const {
+  if (empty()) return { };
 
-  getGenericSignature()->getSubstitutions(*this, subs);
-  return subs;
+  // If we don't yet have cached flat substitutions, cache them now.
+  if (storage->flatSubstitutions.empty()) {
+    SmallVector<Substitution, 4> subs;
+    getGenericSignature()->getSubstitutions(*this, subs);
+
+    auto &ctx = getGenericSignature()->getASTContext();
+    storage->flatSubstitutions = ctx.AllocateCopy(subs);
+  }
+
+  return storage->flatSubstitutions;
 }
 

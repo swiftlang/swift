@@ -4008,8 +4008,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         auto sub = cast<SubscriptDecl>(component.getDeclRef().getDecl());
         lowerKeyPathSubscriptIndexTypes(
                           SGF.SGM, indexTypes, sub,
-                          SGF.getASTContext().AllocateCopy(
-                           component.getDeclRef().getSubstitutions().toList()),
+                          component.getDeclRef().getSubstitutions().toList(),
                           needsGenericContext);
         lowerKeyPathSubscriptIndexPatterns(indices, indexTypes,
              component.getSubscriptIndexHashableConformances(),

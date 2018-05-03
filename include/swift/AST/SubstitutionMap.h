@@ -197,7 +197,7 @@ public:
   /// be used at the edges where part of the compiler is still working
   /// directly with Substitution/SubstitutionList and hasn't been converted
   /// to SubstitutionMap.
-  SmallVector<Substitution, 4> toList() const;
+  SubstitutionList toList() const;
 
   /// Combine two substitution maps as follows.
   ///
