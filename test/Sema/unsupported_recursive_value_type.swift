@@ -1,7 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
 struct SelfRecursiveStruct {
-  let a: SelfRecursiveStruct // expected-error{{value type 'SelfRecursiveStruct' cannot have a stored property that recursively contains it}}
+  let a: SelfRecursiveStruct
+  // expected-error@-1 {{value type 'SelfRecursiveStruct' cannot have a stored property that recursively contains it}}
 }
 
 struct OptionallyRecursiveStruct {
@@ -29,11 +30,13 @@ enum TerminatingSelfRecursiveEnum { // expected-error{{recursive enum 'Terminati
   case B
 }
 
-enum IndirectlyRecursiveEnum1 { // expected-error{{recursive enum 'IndirectlyRecursiveEnum1' is not marked 'indirect'}} {{1-1=indirect }}
+enum IndirectlyRecursiveEnum1 {
+  // expected-error@-1 {{recursive enum 'IndirectlyRecursiveEnum1' is not marked 'indirect'}} {{1-1=indirect }}
   case A(IndirectlyRecursiveEnum2)
   // expected-note@-1 {{cycle beginning here: IndirectlyRecursiveEnum2 -> (A(_:): IndirectlyRecursiveEnum1)}}
 }
-enum IndirectlyRecursiveEnum2 { // expected-error{{recursive enum 'IndirectlyRecursiveEnum2' is not marked 'indirect'}}
+enum IndirectlyRecursiveEnum2 {
+  // expected-error@-1 {{recursive enum 'IndirectlyRecursiveEnum2' is not marked 'indirect'}}
   case A(IndirectlyRecursiveEnum1)
   // expected-note@-1 {{cycle beginning here: IndirectlyRecursiveEnum1 -> (A(_:): IndirectlyRecursiveEnum2)}}
 }
@@ -79,7 +82,7 @@ struct Z<T, U> { // expected-error{{value type 'Z<T, U>' has infinite size}}
 
 struct RecursiveByGenericSubstitutionStruct {
   let a: RecursiveByGenericSubstitutionEnum<RecursiveByGenericSubstitutionStruct>
-  // expected-error@-1{{value type 'RecursiveByGenericSubstitutionStruct' cannot have a stored property that recursively contains it}}
+  // expected-error@-1 {{value type 'RecursiveByGenericSubstitutionStruct' cannot have a stored property that recursively contains it}}
   // expected-note@-2 {{cycle beginning here: RecursiveByGenericSubstitutionEnum<RecursiveByGenericSubstitutionStruct> -> (A(_:): RecursiveByGenericSubstitutionStruct)}}
 }
 
@@ -136,8 +139,9 @@ struct NoStorage : Holdable {
 }
 
 struct Bad {
-    var s: Holder<NoStorage> // expected-error{{value type 'Bad' cannot have a stored property that recursively contains it}}
-    // expected-note@-1 {{cycle beginning here: Holder<NoStorage> -> (x: NoStorage.Holding)}}
+    var s: Holder<NoStorage>
+    // expected-error@-1 {{value type 'Bad' cannot have a stored property that recursively contains it}}
+    // expected-note@-2 {{cycle beginning here: Holder<NoStorage> -> (x: NoStorage.Holding)}}
 }
 
 // FIXME: this diagnostic is unnecessary
@@ -151,7 +155,8 @@ struct StructCyclesWithEnum<T> {
   // expected-note@-1 {{cycle beginning here: EnumCyclesWithStruct<T> -> (eCase(_:): StructCyclesWithEnum<T>)}}
 }
 
-enum EnumCyclesWithStruct<T> { // expected-error {{recursive enum 'EnumCyclesWithStruct<T>' is not marked 'indirect'}}
+enum EnumCyclesWithStruct<T> {
+  // expected-error@-1 {{recursive enum 'EnumCyclesWithStruct<T>' is not marked 'indirect'}}
   case eCase(StructCyclesWithEnum<T>)
   // expected-note@-1 {{cycle beginning here: StructCyclesWithEnum<T> -> (sField: EnumCyclesWithStruct<T>)}}
 }
