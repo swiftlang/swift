@@ -1351,7 +1351,8 @@ namespace {
       SpaceTooLarge,
     };
 
-    void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
+    void diagnoseMissingCases(const RequiresDefault defaultReason,
+                              Space uncovered,
                               const CaseStmt *unknownCase = nullptr,
                               bool sawDowngradablePattern = false) {
       SourceLoc startLoc = Switch->getStartLoc();
@@ -1377,13 +1378,17 @@ namespace {
             mainDiagType = diag::non_exhaustive_switch_warn;
           break;
         case RequiresDefault::UncoveredSwitch:
-        case RequiresDefault::SpaceTooLarge:
-          TC.diagnose(startLoc, diag::non_exhaustive_switch);
+        case RequiresDefault::SpaceTooLarge: {
+          auto diagnostic = defaultReason == RequiresDefault::UncoveredSwitch
+                                ? diag::non_exhaustive_switch
+                                : diag::possibly_non_exhaustive_switch;
+          TC.diagnose(startLoc, diagnostic);
           TC.diagnose(unknownCase->getLoc(),
                       diag::non_exhaustive_switch_drop_unknown)
             .fixItRemoveChars(unknownCase->getStartLoc(),
                               unknownCase->getLoc());
           return;
+        }
         }
       }
 
@@ -1427,7 +1432,7 @@ namespace {
         return;
       case RequiresDefault::SpaceTooLarge: {
         OS << tok::kw_default << ":\n" << "<#fatalError()#>" << "\n";
-        TC.diagnose(startLoc, diag::non_exhaustive_switch);
+        TC.diagnose(startLoc, diag::possibly_non_exhaustive_switch);
         TC.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
