@@ -235,14 +235,18 @@ void NameBinder::addImport(
   ImportOptions options;
   if (ID->isExported())
     options |= SourceFile::ImportFlags::Exported;
-  if (ID->isUsableFromInline())
-    options |= SourceFile::ImportFlags::UsableFromInline;
   if (testableAttr)
     options |= SourceFile::ImportFlags::Testable;
   imports.push_back({ { ID->getDeclPath(), M }, options });
 
   if (topLevelModule != M)
     imports.push_back({ { ID->getDeclPath(), topLevelModule }, options });
+
+  if (ID->isUsableFromInline()) {
+    // This is a bit unfortunate; everywhere else in this function, we're not
+    // actually modifying the SourceFile yet, just building a list for later.
+    SF.markUsableFromInline(topLevelModule);
+  }
 
   if (ID->getImportKind() != ImportKind::Module) {
     // If we're importing a specific decl, validate the import kind.

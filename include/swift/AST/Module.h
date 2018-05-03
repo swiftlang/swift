@@ -359,7 +359,7 @@ public:
     // @_exported only.
     Public,
 
-    // Not @_exported only. Also includes @_usableFromInline.
+    // Neither @_usableFromInline nor @_exported.
     Private,
 
     // @_usableFromInline and @_exported only.
@@ -381,8 +381,11 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Extension of the above hack. Identical to getImportedModulesForLookup()
-  /// for imported modules, otherwise also includes @usableFromInline imports.
+  /// Looks up which modules are imported by this module, ignoring any that
+  /// definitely don't represent distinct libraries.
+  ///
+  /// This is a performance hack for the ClangImporter. Do not use for
+  /// anything but linking. May go away in the future.
   void
   getImportedModulesForLinking(SmallVectorImpl<ImportedModule> &imports) const;
 
@@ -775,10 +778,6 @@ public:
     /// This source file has access to testable declarations in the imported
     /// module.
     Testable = 0x2,
-
-    /// Modules that depend on the module containing this source file will
-    /// autolink this dependency.
-    UsableFromInline = 0x4,
   };
 
   /// \see ImportFlags
@@ -792,6 +791,9 @@ private:
   ///
   /// This is filled in by the Name Binding phase.
   ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+
+  /// A list of modules where declarations were used in inline functions.
+  llvm::SetVector<ModuleDecl *> ModulesUsedFromInline;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -896,6 +898,11 @@ public:
   addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
 
   bool hasTestableImport(const ModuleDecl *module) const;
+
+  void markUsableFromInline(ModuleDecl *module);
+  ArrayRef<ModuleDecl *> getUsableFromInlineModules() const {
+    return ModulesUsedFromInline.getArrayRef();
+  }
 
   void clearLookupCache();
 

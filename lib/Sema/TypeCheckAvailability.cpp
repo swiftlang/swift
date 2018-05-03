@@ -2509,11 +2509,16 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
       return true;
   }
 
-  if (FragileKind)
-    if (R.isValid())
+  if (FragileKind) {
+    if (R.isValid()) {
       if (TC.diagnoseInlinableDeclRef(R.Start, D, DC, *FragileKind,
                                       TreatUsableFromInlineAsPublic))
         return true;
+
+      auto *SF = cast<SourceFile>(DC->getModuleScopeContext());
+      SF->markUsableFromInline(D->getModuleContext());
+    }
+  }
 
   if (TC.diagnoseExplicitUnavailability(D, R, DC, call))
     return true;

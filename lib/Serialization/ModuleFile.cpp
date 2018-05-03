@@ -1595,8 +1595,8 @@ void ModuleFile::getImportedModules(
       break;
 
     case ModuleDecl::ImportFilter::Private:
-      // Skip @_exported imports.
-      if (dep.isExported())
+      // Skip otherwise-labeled imports.
+      if (dep.isExported() || dep.isUsableFromInline())
         continue;
 
       break;
