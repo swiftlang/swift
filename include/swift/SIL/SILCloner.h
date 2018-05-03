@@ -2442,7 +2442,7 @@ void SILCloner<ImplClass>::visitInitBlockStorageHeaderInst(
                           getOpValue(Inst->getBlockStorage()),
                           getOpValue(Inst->getInvokeFunction()),
                           getOpType(Inst->getType()),
-                          getOpSubstitutions(Inst->getSubstitutions())));
+                          getOpSubstitutionMap(Inst->getSubstitutions())));
 }
 
 template <typename ImplClass>

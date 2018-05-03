@@ -1446,7 +1446,7 @@ public:
   InitBlockStorageHeaderInst *
   createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               SubstitutionList Subs) {
+                               SubstitutionMap Subs) {
     return insert(InitBlockStorageHeaderInst::create(getFunction(),
       getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType, Subs));
   }

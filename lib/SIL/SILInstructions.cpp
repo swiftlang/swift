@@ -392,9 +392,9 @@ InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               SubstitutionList Subs) {
+                               SubstitutionMap Subs) {
   void *Buffer = F.getModule().allocateInst(
-    sizeof(InitBlockStorageHeaderInst) + sizeof(Substitution) * Subs.size(),
+    sizeof(InitBlockStorageHeaderInst),
     alignof(InitBlockStorageHeaderInst));
   
   return ::new (Buffer) InitBlockStorageHeaderInst(DebugLoc, BlockStorage,

@@ -2306,17 +2306,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue invoke
       = getLocalValue(ListOfValues[2], invokeTy);
     
-    unsigned NumSub = ListOfValues[4];
+    auto SubMap = MF->getSubstitutionMap(ListOfValues[4]);
 
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
-    
     ResultVal = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
-                                                     blockTy, Substitutions);
+                                                     blockTy, SubMap);
     break;
   }
   case SILInstructionKind::UnreachableInst: {
