@@ -162,11 +162,6 @@ protected:
   // Ensure that TupleInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(TupleInst, SingleValueInstruction);
 
-  IBWTO_BITFIELD(BuiltinInst, SingleValueInstruction,
-                             32-NumSingleValueInstructionBits,
-    NumSubstitutions : 32-NumSingleValueInstructionBits
-  );
-
   IBWTO_BITFIELD(ObjectInst, SingleValueInstruction,
                              32-NumSingleValueInstructionBits,
     NumBaseElements : 32-NumSingleValueInstructionBits

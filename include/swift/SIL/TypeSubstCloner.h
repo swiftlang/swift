@@ -188,6 +188,10 @@ protected:
                       LookUpConformanceInSubstitutionMap(SubsMap));
   }
 
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    return Subs.subst(SubsMap);
+  }
+
   void visitApplyInst(ApplyInst *Inst) {
     ApplySiteCloningHelper Helper(ApplySite(Inst), *this);
     ApplyInst *N =
