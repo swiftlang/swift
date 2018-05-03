@@ -1544,6 +1544,13 @@ extension ${Self} : Hashable {
 
 }
 
+extension ${Self}: _HasCustomAnyHashableRepresentation {
+  // Not @inlinable
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _${Self}AnyHashableBox(self))
+  }
+}
+
 extension ${Self} {
   /// The magnitude of this value.
   ///
@@ -1791,6 +1798,81 @@ extension ${Self} : Strideable {
   @_transparent
   public func advanced(by amount: ${Self}) -> ${Self} {
     return self + amount
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// AnyHashable
+//===----------------------------------------------------------------------===//
+
+internal struct _${Self}AnyHashableBox: _AnyHashableBox {
+  internal typealias Base = ${Self}
+  internal let _value: Base
+
+  internal init(_ value: Base) {
+    self._value = value
+  }
+
+  internal var _canonicalBox: _AnyHashableBox {
+    // Float and Double are bridged with NSNumber, so we have to follow
+    // NSNumber's rules for equality.  I.e., we need to make sure equal
+    // numerical values end up in identical boxes after canonicalization, so
+    // that _isEqual will consider them equal and they're hashed the same way.
+    //
+    // Note that these AnyHashable boxes don't currently feed discriminator bits
+    // to the hasher, so we allow repeatable collisions. E.g., -1 will always
+    // collide with UInt64.max.
+    if _value < 0 {
+      if let i = Int64(exactly: _value) {
+        return _IntegerAnyHashableBox(i)
+      }
+    } else {
+      if let i = UInt64(exactly: _value) {
+        return _IntegerAnyHashableBox(i)
+      }
+    }
+    if let d = Double(exactly: _value) {
+      return _DoubleAnyHashableBox(d)
+    }
+    // If a value can't be represented by a Double, keep it in its original
+    // representation so that it won't compare equal to approximations. (So that
+    // we don't round off Float80 values.)
+    return self
+  }
+
+  internal func _isEqual(to box: _AnyHashableBox) -> Bool? {
+    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
+    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    if let box = box as? _${Self}AnyHashableBox {
+      return _value == box._value
+    }
+    return nil
+  }
+
+  internal var _hashValue: Int {
+    return Swift._hashValue(for: _value)
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
+    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    hasher.combine(_value)
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
   }
 }
 

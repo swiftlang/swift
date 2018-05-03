@@ -500,6 +500,55 @@ extension Set: Hashable {
   }
 }
 
+extension Set: _HasCustomAnyHashableRepresentation {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _SetAnyHashableBox(self))
+  }
+}
+
+internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
+  internal let _value: Set<Element>
+  internal let _canonical: Set<AnyHashable>
+
+  internal init(_ value: Set<Element>) {
+    self._value = value
+    self._canonical = value as Set<AnyHashable>
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal func _isEqual(to other: _AnyHashableBox) -> Bool? {
+    guard let other = other._asSet() else { return nil }
+    return _canonical == other
+  }
+
+  internal var _hashValue: Int {
+    return _canonical.hashValue
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _canonical.hash(into: &hasher)
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
+  }
+
+  internal func _asSet() -> Set<AnyHashable>? {
+    return _canonical
+  }
+}
+
 extension Set: SetAlgebra {
 
   /// Inserts the given element in the set if it is not already present.
