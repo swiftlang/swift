@@ -39,16 +39,16 @@ func test_own_initializer() {
 
 // Report candidates that are the same distance in different ways.
 func test_close_matches() {
-  let match1 = 0 // expected-note {{did you mean 'match1'?}}
+  let match1 = 0  // expected-note {{did you mean 'match1'?}}
   let match22 = 0 // expected-note {{did you mean 'match22'?}}
-  let x = match2 // expected-error {{use of unresolved identifier 'match2'}}
+  let x = match2  // expected-error {{use of unresolved identifier 'match2'}}
 }
 
 // Report not-as-good matches if they're still close enough to the best.
 func test_keep_if_not_too_much_worse() {
-  let longmatch1 = 0 // expected-note {{did you mean 'longmatch1'?}}
+  let longmatch1 = 0  // expected-note {{did you mean 'longmatch1'?}}
   let longmatch22 = 0 // expected-note {{did you mean 'longmatch22'?}}
-  let x = longmatch // expected-error {{use of unresolved identifier 'longmatch'}}
+  let x = longmatch   // expected-error {{use of unresolved identifier 'longmatch'}}
 }
 
 // Report not-as-good matches if they're still close enough to the best.
@@ -138,7 +138,7 @@ func bar() {
 
 // Verify that we emit a fixit even if there are multiple
 // declarations with the corrected name.
-func overloaded(_: Int) {} // expected-note {{'overloaded' declared here}}
+func overloaded(_: Int) {}   // expected-note {{'overloaded' declared here}}
 func overloaded(_: Float) {} // expected-note {{'overloaded' declared here}}
 func test_overloaded() {
   overloadd(0)
@@ -148,7 +148,7 @@ func test_overloaded() {
 // This is one of the backtraces from rdar://36434823 but got fixed along
 // the way.
 class CircularValidationWithTypo {
-  var cdcdcdcd = ababab { // expected-error {{use of unresolved identifier 'ababab'}}
+  var cdcdcdcd = ababab {  // expected-error {{use of unresolved identifier 'ababab'}}
     didSet { }
   }
 
