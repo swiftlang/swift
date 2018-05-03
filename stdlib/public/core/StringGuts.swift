@@ -1030,7 +1030,6 @@ extension _StringGuts {
     self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
 
-  @inlinable
   public // TODO(StringGuts): for testing only
   mutating func append(_ other: _StringGuts) {
     // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
