@@ -1549,8 +1549,17 @@ public:
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
   }
 
+  // An exported import is visible to name lookup from other modules, and is
+  // autolinked when the containing module is autolinked.
   bool isExported() const {
     return getAttrs().hasAttribute<ExportedAttr>();
+  }
+
+  // A usable from inline import is autolinked but not visible to name lookup.
+  // This attribute is inferred when type checking inlinable and default
+  // argument bodies.
+  bool isUsableFromInline() const {
+    return getAttrs().hasAttribute<UsableFromInlineImportAttr>();
   }
 
   ModuleDecl *getModule() const { return Mod; }

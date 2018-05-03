@@ -97,6 +97,12 @@ public:
   virtual void getImportedModulesForLookup(
       SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const override;
 
+  virtual void getImportedModulesForLinking(
+      SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const override {
+    // In C, anything that's linkable is visible to the source language.
+    return getImportedModulesForLookup(imports);
+  }
+
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
