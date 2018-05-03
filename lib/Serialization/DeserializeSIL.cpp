@@ -2353,7 +2353,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto valueTy = MF->getType(ListOfValues[nextValue++]);
     auto numComponents = ListOfValues[nextValue++];
     auto numOperands = ListOfValues[nextValue++];
-    auto numSubstitutions = ListOfValues[nextValue++];
+    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
     auto objcString = MF->getIdentifier(ListOfValues[nextValue++]).str();
     auto numGenericParams = ListOfValues[nextValue++];
     
@@ -2371,12 +2371,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     SmallVector<Requirement, 4> requirements;
     MF->readGenericRequirements(requirements, SILCursor);
-    
-    SmallVector<Substitution, 4> substitutions;
-    while (numSubstitutions-- > 0) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      substitutions.push_back(*sub);
-    }
     
     CanGenericSignature sig = nullptr;
     if (!genericParams.empty() || !requirements.empty())
@@ -2399,8 +2393,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       operands.push_back(getLocalValue(opValue, getSILType(opTy, opCat)));
     }
     
-    ResultVal = Builder.createKeyPath(Loc, pattern,
-                                      substitutions, operands, kpTy);
+    ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
     break;
   }
   case SILInstructionKind::MarkUninitializedBehaviorInst:

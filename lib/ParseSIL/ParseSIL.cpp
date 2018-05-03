@@ -2006,7 +2006,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     
 
     auto indexesCopy = P.Context.AllocateCopy(indexes);
-    
+
     component = KeyPathPatternComponent::forExternal(
         cast<AbstractStorageDecl>(externalDecl),
         subsMap, indexesCopy, equals, hash, ty);
@@ -2962,13 +2962,14 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
 
     CanGenericSignature canSig = nullptr;
-    if (patternEnv && patternEnv->getGenericSignature())
+    if (patternEnv && patternEnv->getGenericSignature()) {
       canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
+    }
     auto pattern = KeyPathPattern::get(B.getModule(), canSig,
                      rootType, components.back().getComponentType(),
                      components, objcString);
 
-    ResultVal = B.createKeyPath(InstLoc, pattern, subs, operands, Ty);
+    ResultVal = B.createKeyPath(InstLoc, pattern, subMap, operands, Ty);
     break;
   }
 
