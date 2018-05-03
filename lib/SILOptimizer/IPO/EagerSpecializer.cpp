@@ -345,8 +345,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   // SubstitutableTypes, skipping DependentTypes.
   auto GenericSig =
     GenericFunc->getLoweredFunctionType()->getGenericSignature();
-  auto SubMap = GenericSig->getSubstitutionMap(
-    ReInfo.getClonerParamSubstitutions());
+  auto SubMap = ReInfo.getClonerParamSubstitutionMap();
   for (auto ParamTy : GenericSig->getSubstitutableParams()) {
     auto Replacement = Type(ParamTy).subst(SubMap);
     assert(!Replacement->hasTypeParameter());

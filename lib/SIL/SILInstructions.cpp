@@ -2312,18 +2312,17 @@ void KeyPathInst::dropReferencedPattern() {
 }
 
 GenericSpecializationInformation::GenericSpecializationInformation(
-    SILFunction *Caller, SILFunction *Parent, SubstitutionList Subs)
+    SILFunction *Caller, SILFunction *Parent, SubstitutionMap Subs)
     : Caller(Caller), Parent(Parent), Subs(Subs) {}
 
 const GenericSpecializationInformation *
 GenericSpecializationInformation::create(SILFunction *Caller,
                                          SILFunction *Parent,
-                                         SubstitutionList Subs) {
+                                         SubstitutionMap Subs) {
   auto &M = Parent->getModule();
   void *Buf = M.allocate(sizeof(GenericSpecializationInformation),
                            alignof(GenericSpecializationInformation));
-  auto NewSubs = M.allocateCopy(Subs);
-  return new (Buf) GenericSpecializationInformation(Caller, Parent, NewSubs);
+  return new (Buf) GenericSpecializationInformation(Caller, Parent, Subs);
 }
 
 const GenericSpecializationInformation *

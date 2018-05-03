@@ -20,6 +20,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
@@ -1630,20 +1631,20 @@ class GenericSpecializationInformation {
   /// The original function that was specialized.
   SILFunction *Parent;
   /// Substitutions used to produce this specialization.
-  SubstitutionList Subs;
+  SubstitutionMap Subs;
 
   GenericSpecializationInformation(SILFunction *Caller, SILFunction *Parent,
-                                   SubstitutionList Subs);
+                                   SubstitutionMap Subs);
 
 public:
   static const GenericSpecializationInformation *create(SILFunction *Caller,
                                                         SILFunction *Parent,
-                                                        SubstitutionList Subs);
+                                                        SubstitutionMap Subs);
   static const GenericSpecializationInformation *create(SILInstruction *Inst,
                                                         SILBuilder &B);
   const SILFunction *getCaller() const { return Caller; }
   const SILFunction *getParent() const { return Parent; }
-  SubstitutionList getSubstitutions() const { return Subs; }
+  SubstitutionMap getSubstitutions() const { return Subs; }
 };
 
 class PartialApplyInst;
@@ -7694,6 +7695,14 @@ public:
   /// The substitutions used to bind the generic arguments of this function.
   SubstitutionList getSubstitutions() const {
     FOREACH_IMPL_RETURN(getSubstitutions());
+  }
+
+  /// The substitutions used to bind the generic arguments of this function.
+  SubstitutionMap getSubstitutionMap() const {
+    if (auto genericSig = getOrigCalleeType()->getGenericSignature())
+      return genericSig->getSubstitutionMap(getSubstitutions());
+
+    return SubstitutionMap();
   }
 
   /// Return a begin iterator for the substitution array.

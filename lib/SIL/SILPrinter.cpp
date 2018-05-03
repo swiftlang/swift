@@ -396,7 +396,7 @@ static void printGenericSpecializationInfo(
     OS << "// Caller: " << SpecializationInfo->getCaller()->getName() << '\n';
     OS << "// Parent: " << SpecializationInfo->getParent()->getName() << '\n';
     OS << "// Substitutions: ";
-    PrintSubstitutions(SpecializationInfo->getSubstitutions());
+    PrintSubstitutions(SpecializationInfo->getSubstitutions().toList());
     OS << '\n';
     OS << "//\n";
     if (!SpecializationInfo->getCaller()->isSpecialization())
