@@ -576,7 +576,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 unsigned StartElem,
                                 unsigned WarnLongFunctionBodies,
                                 unsigned WarnLongExpressionTypeChecking,
-                                unsigned ExpressionTimeoutThreshold) {
+                                unsigned ExpressionTimeoutThreshold,
+                                unsigned SwitchCheckingInvocationThreshold) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -607,6 +608,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       MyTC->setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
       if (ExpressionTimeoutThreshold != 0)
         MyTC->setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
+
+      if (SwitchCheckingInvocationThreshold != 0)
+        MyTC->setSwitchCheckingInvocationThreshold(
+            SwitchCheckingInvocationThreshold);
 
       if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
         MyTC->enableDebugTimeFunctionBodies();

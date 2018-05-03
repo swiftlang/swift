@@ -922,6 +922,14 @@ private:
   /// than this many seconds.
   unsigned ExpressionTimeoutThreshold = 600;
 
+  /// If non-zero, abort the switch statement exhaustiveness checker if
+  /// the Space::minus function is called more than this many times.
+  ///
+  /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
+  // 4.2 GHz Intel Core i7.
+  // (It's arbitrary, but will keep the compiler from taking too much time.)
+  unsigned SwitchCheckingInvocationThreshold = 200000;
+
   /// If true, the time it takes to type-check each function will be dumped
   /// to llvm::errs().
   bool DebugTimeFunctionBodies = false;
@@ -997,8 +1005,24 @@ public:
   /// the upper bound for the number of seconds we'll let the
   /// expression type checker run before considering an expression
   /// "too complex".
+  /// If zero, do not limit the checking.
   unsigned getExpressionTimeoutThresholdInSeconds() {
     return ExpressionTimeoutThreshold;
+  }
+
+  /// Get the threshold that determines the upper bound for the number
+  /// of times we'll let the Space::minus routine run before
+  /// considering a switch statement "too complex".
+  /// If zero, do not limit the checking.
+  unsigned getSwitchCheckingInvocationThreshold() const {
+    return SwitchCheckingInvocationThreshold;
+  }
+
+  /// Set the threshold that determines the upper bound for the number
+  /// of times we'll let the Space::minus routine run before
+  /// considering a switch statement "too complex".
+  void setSwitchCheckingInvocationThreshold(unsigned invocationCount) {
+    SwitchCheckingInvocationThreshold = invocationCount;
   }
 
   bool getInImmediateMode() {
