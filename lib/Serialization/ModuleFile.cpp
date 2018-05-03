@@ -1448,6 +1448,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
     }
+
+    if (!module->hasResolvedImports()) {
+      // Notice that we check this condition /after/ recording the module that
+      // caused the problem. Clients need to be able to track down what the
+      // cycle was.
+      return error(Status::CircularDependency);
+    }
   }
 
   if (missingDependency) {
