@@ -1214,13 +1214,15 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-
-  const_cast<SourceFile *>(this)->forAllVisibleModules([&](swift::ModuleDecl::ImportedModule import) {
+  forAllImportedModules<false>(getParentModule(), /*thisPath*/{},
+                               /*includePrivateTopLevelImports*/false,
+                               [=](ModuleDecl::ImportedModule import) -> bool {
     swift::ModuleDecl *next = import.second;
     if (next->getName() == getParentModule()->getName())
-      return;
+      return true;
 
     next->collectLinkLibraries(callback);
+    return true;
   });
 }
 
