@@ -428,9 +428,6 @@ public:
   /// Mark protocol conformances from the given set of substitutions as used.
   void useConformancesFromSubstitutions(SubstitutionList subs);
 
-  /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionMap subs);
-
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
   void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,

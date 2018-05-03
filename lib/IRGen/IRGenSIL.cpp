@@ -4985,7 +4985,9 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   llvm::Value *args;
   if (!I->getSubstitutions().empty() || !I->getAllOperands().empty()) {
     auto sig = I->getPattern()->getGenericSignature();
-    SubstitutionMap subs = I->getSubstitutions();
+    SubstitutionMap subs;
+    if (sig)
+      subs = sig->getSubstitutionMap(I->getSubstitutions());
 
     SmallVector<GenericRequirement, 4> requirements;
     enumerateGenericSignatureRequirements(sig,

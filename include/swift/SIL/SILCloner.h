@@ -114,15 +114,7 @@ protected:
     }
     return NewSubs;
   }
-
-  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    return Subs;
-  }
-
-  SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
-    return asImpl().remapSubstitutionMap(Subs);
-  }
-
+  
   SILType getTypeInClonedContext(SILType Ty) {
     auto objectTy = Ty.getSwiftRValueType();
     // Do not substitute opened existential types, if we do not have any.
@@ -569,7 +561,7 @@ SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
         getBuilder().createBuiltin(getOpLocation(Inst->getLoc()),
                                    Inst->getName(),
                                    getOpType(Inst->getType()),
-                                   getOpSubstitutionMap(Inst->getSubstitutions()),
+                                   getOpSubstitutions(Inst->getSubstitutions()),
                                    Args));
 }
 
@@ -2442,7 +2434,7 @@ void SILCloner<ImplClass>::visitInitBlockStorageHeaderInst(
                           getOpValue(Inst->getBlockStorage()),
                           getOpValue(Inst->getInvokeFunction()),
                           getOpType(Inst->getType()),
-                          getOpSubstitutionMap(Inst->getSubstitutions())));
+                          getOpSubstitutions(Inst->getSubstitutions())));
 }
 
 template <typename ImplClass>
@@ -2483,7 +2475,7 @@ void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
   doPostProcess(Inst, getBuilder().createKeyPath(
                           getOpLocation(Inst->getLoc()),
                           Inst->getPattern(),
-                          getOpSubstitutionMap(Inst->getSubstitutions()),
+                          getOpSubstitutions(Inst->getSubstitutions()),
                           opValues,
                           getOpType(Inst->getType())));
 }

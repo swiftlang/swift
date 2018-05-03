@@ -1984,7 +1984,6 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       return true;
     }
 
-    SubstitutionMap subsMap;
     if (!parsedSubs.empty()) {
       auto genericEnv = externalDecl->getInnermostDeclContext()
                                     ->getGenericEnvironmentOfContext();
@@ -1999,17 +1998,23 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       
       // Map the substitutions out of the pattern context so that they
       // use interface types.
-      subsMap = genericEnv->getGenericSignature()
+      auto subsMap = genericEnv->getGenericSignature()
         ->getSubstitutionMap(subs);
-      subsMap = subsMap.mapReplacementTypesOutOfContext().getCanonical();
+      subsMap = subsMap.mapReplacementTypesOutOfContext();
+      subs.clear();
+      genericEnv->getGenericSignature()->getSubstitutions(subsMap, subs);
+      
+      for (auto &sub : subs)
+        sub = sub.getCanonicalSubstitution();
     }
     
 
     auto indexesCopy = P.Context.AllocateCopy(indexes);
-
+    auto subsCopy = P.Context.AllocateCopy(subs);
+    
     component = KeyPathPatternComponent::forExternal(
         cast<AbstractStorageDecl>(externalDecl),
-        subsMap, indexesCopy, equals, hash, ty);
+        subsCopy, indexesCopy, equals, hash, ty);
     return false;
   } else if (componentKind.str() == "gettable_property"
              || componentKind.str() == "settable_property") {
@@ -2554,7 +2559,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
     
     SmallVector<ParsedSubstitution, 4> parsedSubs;
-    SubstitutionMap subMap;
+    SmallVector<Substitution, 4> subs;
     if (parseSubstitutions(parsedSubs))
       return true;
     
@@ -2563,11 +2568,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
       }
-      SmallVector<Substitution, 4> subs;
       if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
         return true;
-
-      subMap = genericEnv->getGenericSignature()->getSubstitutionMap(subs);
     }
     
     if (P.Tok.getKind() != tok::l_paren) {
@@ -2605,7 +2607,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subMap, Args);
+    ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subs, Args);
     break;
   }
   case SILInstructionKind::OpenExistentialAddrInst:
@@ -2965,14 +2967,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
 
     CanGenericSignature canSig = nullptr;
-    if (patternEnv && patternEnv->getGenericSignature()) {
+    if (patternEnv && patternEnv->getGenericSignature())
       canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
-    }
     auto pattern = KeyPathPattern::get(B.getModule(), canSig,
                      rootType, components.back().getComponentType(),
                      components, objcString);
 
-    ResultVal = B.createKeyPath(InstLoc, pattern, subMap, operands, Ty);
+    ResultVal = B.createKeyPath(InstLoc, pattern, subs, operands, Ty);
     break;
   }
 
@@ -4830,25 +4831,21 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     
     auto invokeVal = getLocalValue(invokeName, invokeTy, InstLoc, B);
-
-    SubstitutionMap subMap;
+    
+    SmallVector<Substitution, 4> subs;
     if (!parsedSubs.empty()) {
       if (!invokeGenericEnv) {
         P.diagnose(typeLoc, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
       }
-      SmallVector<Substitution, 4> subs;
       if (getApplySubstitutionsFromParsed(*this,
                                           invokeGenericEnv,
                                           parsedSubs, subs))
         return true;
-
-      subMap = invokeGenericEnv->getGenericSignature()
-          ->getSubstitutionMap(subs);
     }
     
     ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
-                                               blockType, subMap);
+                                               blockType, subs);
     break;
   }
   }

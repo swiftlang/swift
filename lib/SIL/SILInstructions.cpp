@@ -367,29 +367,34 @@ AllocValueBufferInst::create(SILDebugLocation DebugLoc, SILType valueType,
 
 BuiltinInst *BuiltinInst::create(SILDebugLocation Loc, Identifier Name,
                                  SILType ReturnType,
-                                 SubstitutionMap Substitutions,
+                                 SubstitutionList Substitutions,
                                  ArrayRef<SILValue> Args,
                                  SILModule &M) {
-  auto Size = totalSizeToAlloc<swift::Operand>(Args.size());
+  auto Size = totalSizeToAlloc<swift::Operand, Substitution>(Args.size(),
+                                                          Substitutions.size());
   auto Buffer = M.allocateInst(Size, alignof(BuiltinInst));
   return ::new (Buffer) BuiltinInst(Loc, Name, ReturnType, Substitutions,
                                     Args);
 }
 
 BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
-                         SILType ReturnType, SubstitutionMap Subs,
+                         SILType ReturnType, SubstitutionList Subs,
                          ArrayRef<SILValue> Args)
-    : InstructionBaseWithTrailingOperands(Args, Loc, ReturnType), Name(Name),
-      Substitutions(Subs) {
+    : InstructionBaseWithTrailingOperands(Args, Loc, ReturnType), Name(Name) {
+  SILInstruction::Bits.BuiltinInst.NumSubstitutions = Subs.size();
+  assert(SILInstruction::Bits.BuiltinInst.NumSubstitutions == Subs.size() &&
+         "Truncation");
+  std::uninitialized_copy(Subs.begin(), Subs.end(),
+                          getTrailingObjects<Substitution>());
 }
 
 InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               SubstitutionMap Subs) {
+                               SubstitutionList Subs) {
   void *Buffer = F.getModule().allocateInst(
-    sizeof(InitBlockStorageHeaderInst),
+    sizeof(InitBlockStorageHeaderInst) + sizeof(Substitution) * Subs.size(),
     alignof(InitBlockStorageHeaderInst));
   
   return ::new (Buffer) InitBlockStorageHeaderInst(DebugLoc, BlockStorage,
@@ -2206,7 +2211,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
       
     case KeyPathPatternComponent::Kind::External: {
       ID.AddPointer(component.getExternalDecl());
-      component.getExternalSubstitutions().profile(ID);
+      profileSubstitutionList(ID, component.getExternalSubstitutions());
       profileIndices(component.getSubscriptIndices());
       break;
     }
@@ -2248,28 +2253,31 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
 KeyPathInst *
 KeyPathInst::create(SILDebugLocation Loc,
                     KeyPathPattern *Pattern,
-                    SubstitutionMap Subs,
+                    SubstitutionList Subs,
                     ArrayRef<SILValue> Args,
                     SILType Ty,
                     SILFunction &F) {
   assert(Args.size() == Pattern->getNumOperands()
          && "number of key path args doesn't match pattern");
 
-  auto totalSize = totalSizeToAlloc<Operand>(Args.size());
-  void *mem = F.getModule().allocateInst(totalSize, alignof(KeyPathInst));
+  auto totalSize = totalSizeToAlloc<Substitution, Operand>
+    (Subs.size(), Args.size());
+  void *mem = F.getModule().allocateInst(totalSize, alignof(Substitution));
   return ::new (mem) KeyPathInst(Loc, Pattern, Subs, Args, Ty);
 }
 
 KeyPathInst::KeyPathInst(SILDebugLocation Loc,
                          KeyPathPattern *Pattern,
-                         SubstitutionMap Subs,
+                         SubstitutionList Subs,
                          ArrayRef<SILValue> Args,
                          SILType Ty)
   : InstructionBase(Loc, Ty),
-    Pattern(Pattern),
-    NumOperands(Pattern->getNumOperands()),
-    Substitutions(Subs)
+    Pattern(Pattern), NumSubstitutions(Subs.size()),
+    NumOperands(Pattern->getNumOperands())
 {
+  auto *subsBuf = getTrailingObjects<Substitution>();
+  std::uninitialized_copy(Subs.begin(), Subs.end(), subsBuf);
+  
   auto *operandsBuf = getTrailingObjects<Operand>();
   for (unsigned i = 0; i < Args.size(); ++i) {
     ::new ((void*)&operandsBuf[i]) Operand(this, Args[i]);
@@ -2279,6 +2287,11 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
   for (auto component : Pattern->getComponents()) {
     component.incrementRefCounts();
   }
+}
+
+MutableArrayRef<Substitution>
+KeyPathInst::getSubstitutions() {
+  return {getTrailingObjects<Substitution>(), NumSubstitutions};
 }
 
 MutableArrayRef<Operand>

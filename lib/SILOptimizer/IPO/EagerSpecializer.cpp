@@ -174,7 +174,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
     Builder.createBuiltin(Loc,
                           Builder.getASTContext().getIdentifier("willThrow"),
                           Builder.getModule().Types.getEmptyTupleType(),
-                          SubstitutionMap(),
+                          SubstitutionList(),
                           {Error});
 
     EmitCleanup(Builder, Loc);
@@ -458,13 +458,6 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
   Builder.emitBlock(SuccessBB);
 }
 
-static SubstitutionMap getSingleSubstititutionMap(SILFunction *F,
-                                                  Type Ty) {
-  return F->getGenericEnvironment()->getGenericSignature()->
-    getSubstitutionMap([&](SubstitutableType *type) { return Ty; },
-                       MakeAbstractConformanceForGenericType());
-}
-
 void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
                                        SubstitutableType *ParamTy, Type SubTy,
                                        LayoutConstraint Layout) {
@@ -474,11 +467,11 @@ void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,
   auto GenericMT = Builder.createMetatype(
       Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
-  SubstitutionMap SubMap = getSingleSubstititutionMap(GenericFunc, ContextTy);
+  Substitution Sub(ContextTy, {});
 
   // Emit a check that it is a pod object.
   auto IsPOD = Builder.createBuiltin(Loc, Ctx.getIdentifier("ispod"), BoolTy,
-                                     SubMap, {GenericMT});
+                                     Sub, {GenericMT});
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
   Builder.createCondBranch(Loc, IsPOD, SuccessBB, FailedTypeCheckBB);
   Builder.emitBlock(SuccessBB);
@@ -500,9 +493,9 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
 
   auto WordTy = SILType::getBuiltinWordType(Ctx);
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
-  SubstitutionMap SubMap = getSingleSubstititutionMap(GenericFunc, ContextTy);
+  Substitution Sub(ContextTy, {});
   auto ParamSize = Builder.createBuiltin(Loc, Ctx.getIdentifier("sizeof"),
-                                         WordTy, SubMap, { GenericMT });
+                                         WordTy, Sub, { GenericMT });
   auto LayoutSize =
       Builder.createIntegerLiteral(Loc, WordTy, Layout->getTrivialSizeInBytes());
   const char *CmpOpName = Layout->isFixedSizeTrivial() ? "cmp_eq" : "cmp_le";
@@ -517,7 +510,7 @@ void EagerDispatch::emitTrivialAndSizeCheck(SILBasicBlock *FailedTypeCheckBB,
   // Emit a check that it is a pod object.
   // TODO: Perform this check before all the fixed size checks!
   auto IsPOD = Builder.createBuiltin(Loc, Ctx.getIdentifier("ispod"),
-                                         BoolTy, SubMap, { GenericMT });
+                                         BoolTy, Sub, { GenericMT });
   auto *SuccessBB2 = Builder.getFunction().createBasicBlock();
   Builder.createCondBranch(Loc, IsPOD, SuccessBB2, FailedTypeCheckBB);
   Builder.emitBlock(SuccessBB2);
@@ -535,13 +528,13 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
 
   auto Int8Ty = SILType::getBuiltinIntegerType(8, Ctx);
   auto BoolTy = SILType::getBuiltinIntegerType(1, Ctx);
-  SubstitutionMap SubMap = getSingleSubstititutionMap(GenericFunc, ContextTy);
+  Substitution Sub(ContextTy, {});
 
   // Emit a check that it is a reference-counted object.
   // TODO: Perform this check before all fixed size checks.
   // FIXME: What builtin do we use to check it????
   auto CanBeClass = Builder.createBuiltin(
-      Loc, Ctx.getIdentifier("canBeClass"), Int8Ty, SubMap, {GenericMT});
+      Loc, Ctx.getIdentifier("canBeClass"), Int8Ty, Sub, {GenericMT});
   auto ClassConst =
       Builder.createIntegerLiteral(Loc, Int8Ty, 1);
   auto Cmp1 =
@@ -570,8 +563,7 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
   Builder.emitBlock(IsClassCheckBB);
 
   auto *FRI = Builder.createFunctionRef(Loc, IsClassF);
-  auto IsClassRuntimeCheck = Builder.createApply(Loc, FRI, SubMap.toList(),
-                                                 {GenericMT},
+  auto IsClassRuntimeCheck = Builder.createApply(Loc, FRI, {Sub}, {GenericMT},
                                                  /* isNonThrowing */ false);
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Ctx.getBoolDecl());

@@ -1065,18 +1065,6 @@ public:
     printDebugVar(ABI->getVarInfo());
   }
 
-  void printSubstitutions(SubstitutionMap Subs) {
-    if (Subs.empty())
-      return;
-
-    *this << '<';
-    interleave(Subs.getReplacementTypes(),
-               [&](Type type) { *this << type; },
-               [&] { *this << ", "; });
-    *this << '>';
-
-  }
-
   void printSubstitutions(SubstitutionList Subs) {
     if (Subs.empty())
       return;
