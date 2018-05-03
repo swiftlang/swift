@@ -3334,6 +3334,8 @@ public:
           break;
         }
       }
+
+      return true;
     });
     return results;
   }
@@ -5607,7 +5609,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       // FIXME: actually check imports.
       const_cast<ModuleDecl*>(Request.TheModule)
-          ->forAllVisibleModules({}, handleImport);
+          ->forAllVisibleModules({},
+                                 [&](ModuleDecl::ImportedModule Import) {
+                                   handleImport(Import);
+                                   return true;
+                                 });
     } else {
       // Add results from current module.
       Lookup.getToplevelCompletions(Request.OnlyTypes);
@@ -5621,7 +5627,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       for (auto Imported : Imports) {
         ModuleDecl *TheModule = Imported.second;
         ModuleDecl::AccessPathTy AccessPath = Imported.first;
-        TheModule->forAllVisibleModules(AccessPath, handleImport);
+        TheModule->forAllVisibleModules(AccessPath,
+                                        [&](ModuleDecl::ImportedModule Import) {
+                                          handleImport(Import);
+                                          return true;
+                                        });
       }
     }
     Lookup.RequestedCachedResults.reset();
