@@ -1127,15 +1127,18 @@ bool ModuleDecl::isSystemModule() const {
   return false;
 }
 
-bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                  llvm::function_ref<bool(ImportedModule)> fn) {
+static bool forAllImportedModules(ModuleDecl *topLevel,
+                                  ModuleDecl::AccessPathTy thisPath,
+                                  llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
+  using ImportedModule = ModuleDecl::ImportedModule;
+  
   llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
-  getImportedModules(stack, ModuleDecl::ImportFilter::Public);
+  topLevel->getImportedModules(stack, ModuleDecl::ImportFilter::Public);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  stack.push_back(ImportedModule(thisPath, this));
+  stack.push_back(ImportedModule(thisPath, topLevel));
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val();
@@ -1162,6 +1165,11 @@ bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
   }
 
   return true;
+}
+
+bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
+                                  llvm::function_ref<bool(ImportedModule)> fn) {
+  return forAllImportedModules(this, thisPath, fn);
 }
 
 bool FileUnit::forAllVisibleModules(
