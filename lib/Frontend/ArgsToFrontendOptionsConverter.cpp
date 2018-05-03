@@ -78,6 +78,8 @@ bool ArgsToFrontendOptionsConverter::convert(
                              Opts.WarnLongExpressionTypeChecking);
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
+  setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
+                             Opts.SwitchCheckingInvocationThreshold);
 
   Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
 
