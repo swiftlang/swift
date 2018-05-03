@@ -88,8 +88,11 @@ public:
   }
 
 private:
-  llvm::Optional<Syntax> lookUpFrom(Syntax Node, size_t Position,
+  llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t Position,
                                     SyntaxKind Kind) const;
+
+  bool nodeCanBeReused(const Syntax &Node, size_t Position,
+                       SyntaxKind Kind) const;
 };
 
 } // namespace swift

@@ -15,31 +15,36 @@
 using namespace swift;
 using namespace swift::syntax;
 
-llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(Syntax Node,
+bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
+                                         SyntaxKind Kind) const {
+  if (Node.getAbsolutePosition().getOffset() != Position)
+    return false;
+  if (Node.getKind() != Kind)
+    return false;
+
+  // Check if this node has been edited. If it has, we cannot reuse it.
+  auto NodeStart = Node.getAbsolutePosition().getOffset();
+  auto NodeEnd = NodeStart + Node.getTextLength();
+  for (auto Edit : Edits) {
+    if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd)) {
+      return false;
+    }
+  }
+
+  // FIXME: Node can also not be reused if an edit has been made in the next
+  // token's leading trivia
+
+  return true;
+}
+
+llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
                                                       size_t Position,
                                                       SyntaxKind Kind) const {
-  if (Node.getAbsolutePosition().getOffset() == Position &&
-      Node.getKind() == Kind) {
-    // Check if this node has been edited. If it has, we cannot reuse it.
-    bool NodeEdited = false;
-
-    auto NodeStart = Node.getAbsolutePosition().getOffset();
-    auto NodeEnd = NodeStart + Node.getTextLength();
-    for (auto Edit : Edits) {
-      if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd)) {
-        NodeEdited = true;
-      }
+  if (nodeCanBeReused(Node, Position, Kind)) {
+    if (ReuseLog) {
+      (*ReuseLog) << "Reused " << Kind << " at offset " << Position << '\n';
     }
-
-    // FIXME: Node can also not be reused if an edit has been made in the next
-    // token's leading trivia
-
-    if (!NodeEdited) {
-      if (ReuseLog) {
-        (*ReuseLog) << "Reused " << Kind << " at offset " << Position << '\n';
-      }
-      return Node;
-    }
+    return Node;
   }
 
   for (size_t I = 0, E = Node.getNumChildren(); I < E; ++I) {
