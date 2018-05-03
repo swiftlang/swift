@@ -21,13 +21,21 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-using namespace DerivedConformance;
 
-bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
-                                                    NominalTypeDecl *nominal,
-                                                    ProtocolDecl *protocol) {
+DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+                                       NominalTypeDecl *nominal,
+                                       ProtocolDecl *protocol)
+    : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
+      Protocol(protocol) {
+  assert(cast<DeclContext>(conformanceDecl)
+             ->getAsNominalTypeOrNominalTypeExtensionContext() == nominal);
+}
+
+bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
+                                                    NominalTypeDecl *Nominal,
+                                                    ProtocolDecl *Protocol) {
   // Only known protocols can be derived.
-  auto knownProtocol = protocol->getKnownProtocolKind();
+  auto knownProtocol = Protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return false;
 
@@ -35,10 +43,10 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
     // We can always complete a partial Hashable implementation, and we can
     // synthesize a full Hashable implementation for structs and enums with
     // Hashable components.
-    return canDeriveHashable(tc, nominal, protocol);
+    return canDeriveHashable(TC, Nominal);
   }
 
-  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+  if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
         // the compiler should derive a RawRepresentable conformance.
@@ -48,7 +56,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
         // Enums without associated values can implicitly derive Equatable
         // conformance.
       case KnownProtocolKind::Equatable:
-        return canDeriveEquatable(tc, enumDecl, protocol);
+        return canDeriveEquatable(TC, Nominal);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -83,7 +91,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
       default:
         return false;
     }
-  } else if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+  } else if (isa<StructDecl>(Nominal) || isa<ClassDecl>(Nominal)) {
     // Structs and classes can explicitly derive Encodable and Decodable
     // conformance (explicitly meaning we can synthesize an implementation if
     // a type conforms manually).
@@ -101,10 +109,10 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
     }
 
     // Structs can explicitly derive Equatable conformance.
-    if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
+    if (auto structDecl = dyn_cast<StructDecl>(Nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
-          return canDeriveEquatable(tc, structDecl, protocol);
+          return canDeriveEquatable(TC, Nominal);
         default:
           return false;
       }
@@ -129,7 +137,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     if (!proto) return nullptr;
 
     // Check whether this nominal type derives conformances to the protocol.
-    if (!derivesProtocolConformance(tc, nominal, proto)) return nullptr;
+    if (!DerivedConformance::derivesProtocolConformance(tc, nominal, proto))
+      return nullptr;
 
     // Retrieve the requirement.
     auto results = proto->lookupDirect(name);
@@ -300,21 +309,18 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
 }
 
 std::pair<VarDecl *, PatternBindingDecl *>
-DerivedConformance::declareDerivedProperty(TypeChecker &tc, Decl *parentDecl,
-                                           NominalTypeDecl *typeDecl,
-                                           Identifier name,
+DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
-                                           bool isStatic,
-                                           bool isFinal) {
-  auto &C = tc.Context;
-  auto parentDC = cast<DeclContext>(parentDecl);
+                                           bool isStatic, bool isFinal) {
+  auto &C = TC.Context;
+  auto parentDC = cast<DeclContext>(ConformanceDecl);
 
   VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       propertyContextType, parentDC);
   propDecl->setImplicit();
-  propDecl->copyFormalAccessFrom(typeDecl, /*sourceIsParentContext*/true);
+  propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
   propDecl->setValidationStarted();
 

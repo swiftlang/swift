@@ -26,7 +26,6 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-using namespace DerivedConformance;
 
 static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
   LiteralExpr *clone;
@@ -114,7 +113,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
                                      SourceLoc(), body));
   }
 
-  auto selfRef = createSelfDeclRef(toRawDecl);
+  auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
                                        SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
@@ -123,29 +122,27 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   toRawDecl->setBody(body);
 }
 
-static VarDecl *deriveRawRepresentable_raw(TypeChecker &tc,
-                                           Decl *parentDecl,
+static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived,
                                            EnumDecl *enumDecl) {
-  ASTContext &C = tc.Context;
-  
-  auto parentDC = cast<DeclContext>(parentDecl);
+  ASTContext &C = derived.TC.Context;
+
+  auto parentDC = cast<DeclContext>(derived.ConformanceDecl);
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = parentDC->mapTypeIntoContext(rawInterfaceType);
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl)
-    = declareDerivedProperty(tc, parentDecl, enumDecl, C.Id_rawValue,
-                             rawInterfaceType, rawType, /*isStatic=*/false,
-                             /*isFinal=*/false);
+  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_rawValue, rawInterfaceType, rawType, /*isStatic=*/false,
+      /*isFinal=*/false);
 
   // Define the getter.
-  auto getterDecl =
-    addGetterToReadOnlyDerivedProperty(tc, propDecl, rawType);
+  auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
+      derived.TC, propDecl, rawType);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
-  auto dc = cast<IterableDeclContext>(parentDecl);
+  auto dc = cast<IterableDeclContext>(derived.ConformanceDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);
   dc->addMember(pbDecl);
@@ -394,50 +391,43 @@ static bool canSynthesizeRawRepresentable(TypeChecker &tc, Decl *parentDecl,
   return true;
 }
 
-ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
-                                                      Decl *parentDecl,
-                                                      NominalTypeDecl *type,
-                                                      ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
 
   // We can only synthesize RawRepresentable for enums.
-  auto enumDecl = dyn_cast<EnumDecl>(type);
+  auto enumDecl = dyn_cast<EnumDecl>(Nominal);
   if (!enumDecl)
     return nullptr;
 
   // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(tc, parentDecl, enumDecl))
+  if (!canSynthesizeRawRepresentable(TC, ConformanceDecl, enumDecl))
     return nullptr;
 
-  if (requirement->getBaseName() == tc.Context.Id_rawValue)
-    return deriveRawRepresentable_raw(tc, parentDecl, enumDecl);
+  if (requirement->getBaseName() == TC.Context.Id_rawValue)
+    return deriveRawRepresentable_raw(*this, enumDecl);
 
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
-    return deriveRawRepresentable_init(tc, parentDecl, enumDecl);
-  
-  tc.diagnose(requirement->getLoc(),
+    return deriveRawRepresentable_init(TC, ConformanceDecl, enumDecl);
+
+  TC.diagnose(requirement->getLoc(),
               diag::broken_raw_representable_requirement);
   return nullptr;
 }
 
-Type DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
-                                                Decl *parentDecl,
-                                                NominalTypeDecl *type,
-                                                AssociatedTypeDecl *assocType) {
+Type DerivedConformance::deriveRawRepresentable(AssociatedTypeDecl *assocType) {
 
   // We can only synthesize RawRepresentable for enums.
-  auto enumDecl = dyn_cast<EnumDecl>(type);
+  auto enumDecl = dyn_cast<EnumDecl>(Nominal);
   if (!enumDecl)
     return nullptr;
 
   // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeRawRepresentable(tc, parentDecl, enumDecl))
+  if (!canSynthesizeRawRepresentable(TC, ConformanceDecl, enumDecl))
     return nullptr;
 
-  if (assocType->getName() == tc.Context.Id_RawValue) {
-    return deriveRawRepresentable_Raw(tc, parentDecl, enumDecl);
+  if (assocType->getName() == TC.Context.Id_RawValue) {
+    return deriveRawRepresentable_Raw(TC, ConformanceDecl, enumDecl);
   }
-  
-  tc.diagnose(assocType->getLoc(),
-              diag::broken_raw_representable_requirement);
+
+  TC.diagnose(assocType->getLoc(), diag::broken_raw_representable_requirement);
   return nullptr;
 }
