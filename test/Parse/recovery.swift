@@ -555,6 +555,31 @@ class WrongDeclIntroducerKeyword1 { // expected-note{{in declaration of 'WrongDe
   class func bar() {}
 }
 
+//===--- Recovery for wrong inheritance clause.
+
+class Base2<T> {
+}
+
+class SubModule {
+    class Base1 {}
+    class Base2<T> {}
+}
+
+// expected-error @+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{34-35=}}    
+class WrongInheritanceClause1(Int) {}           
+
+// expected-error @+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{41-42=}}
+class WrongInheritanceClause2(Base2<Int>) {}
+
+// expected-error @+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} {{49-50=}}
+class WrongInheritanceClause3<T>(SubModule.Base1) where T:AnyObject {}
+
+// expected-error @+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{51-52=}}
+class WrongInheritanceClause4(SubModule.Base2<Int>) {}
+
+// expected-error @+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} {{54-55=}}
+class WrongInheritanceClause5<T>(SubModule.Base2<Int>) where T:AnyObject {}
+
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
 Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of type 'Base'}}
 

@@ -5666,13 +5666,24 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   
   // Parse python style inheritance clause and replace parentheses with a colon
   } else if (Tok.is(tok::l_paren)) {
-    SourceLoc LParenLoc = consumeToken();
-    if (Tok.is(tok::identifier) && peekToken().is(tok::r_paren)) {
-      consumeToken();
-      SourceLoc RParenLoc = consumeToken();
+    bool isParenStyleInheritance = false;
+    {
+      BacktrackingScope backtrack(*this);
+      isParenStyleInheritance = canParseType() &&
+        Tok.isAny(tok::r_paren, tok::kw_where, tok::l_brace, tok::eof);
+    }
+    if(isParenStyleInheritance) {
+      SourceLoc LParenLoc = consumeToken(tok::l_paren);
+      auto TypeResult = parseType();
+      if (TypeResult.isNull()) {
+        Status.setIsParseError();
+        return Status;
+      }
+      SourceLoc RParenLoc;
+      consumeIf(tok::r_paren, RParenLoc);
       diagnose(LParenLoc, diag::expected_colon_class)
-        .fixItReplace(LParenLoc, ": ")
-        .fixItRemove(RParenLoc);
+      .fixItReplace(LParenLoc, ": ")
+      .fixItRemove(RParenLoc);
     }
   } 
 
