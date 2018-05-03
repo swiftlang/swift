@@ -257,13 +257,4 @@ extension RawSyntax {
       piece.accumulateAbsolutePosition(pos)
     }
   }
-
-  var isSourceFile: Bool {
-    switch self {
-    case .node(let kind, _, _):
-      return kind == SyntaxKind.sourceFile
-    default:
-      return false
-    }
-  }
 }
