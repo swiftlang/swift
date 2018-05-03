@@ -1960,6 +1960,7 @@ public:
     if (auto semaE = E->getSemanticExpr()) {
       OS << '\n';
       printRec(semaE);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
       return;
     }
     for (auto elt : E->getElements()) {
