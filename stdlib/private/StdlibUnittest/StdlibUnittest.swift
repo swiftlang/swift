@@ -2410,6 +2410,33 @@ internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   return hasher.finalize()
 }
 
+/// Test that the elements of `groups` consist of instances that satisfy the
+/// semantic requirements of `Hashable`, with each group defining a distinct
+/// equivalence class under `==`.
+public func checkHashableGroups<Groups: Collection>(
+  _ groups: Groups,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where Groups.Element: Collection, Groups.Element.Element: Hashable {
+  let instances = groups.flatMap { $0 }
+  // groupIndices[i] is the index of the element in groups that contains
+  // instances[i].
+  let groupIndices =
+    zip(0..., groups).flatMap { i, group in group.map { _ in i } }
+  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    return groupIndices[lhs] == groupIndices[rhs]
+  }
+  checkHashable(
+    instances,
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: equalityOracle,
+    allowBrokenTransitivity: false,
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
+}
+
 /// Test that the elements of `instances` satisfy the semantic requirements of
 /// `Hashable`, using `equalityOracle` to generate equality and hashing
 /// expectations from pairs of positions in `instances`.

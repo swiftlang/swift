@@ -1520,6 +1520,61 @@ extension Dictionary: Hashable where Value: Hashable {
   }
 }
 
+extension Dictionary: _HasCustomAnyHashableRepresentation
+where Value: Hashable {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _DictionaryAnyHashableBox(self))
+  }
+}
+
+internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
+  : _AnyHashableBox {
+  internal let _value: Dictionary<Key, Value>
+  internal let _canonical: Dictionary<AnyHashable, AnyHashable>
+
+  internal init(_ value: Dictionary<Key, Value>) {
+    self._value = value
+    self._canonical = value as Dictionary<AnyHashable, AnyHashable>
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal func _isEqual(to other: _AnyHashableBox) -> Bool? {
+    guard let other = other._asDictionary() else { return nil }
+    return _canonical == other
+  }
+
+  internal var _hashValue: Int {
+    return _canonical.hashValue
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _canonical.hash(into: &hasher)
+  }
+
+  internal func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+    return _canonical._rawHashValue(seed: _seed)
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
+  }
+
+  internal func _asDictionary() -> Dictionary<AnyHashable, AnyHashable>? {
+    return _canonical
+  }
+}
+
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   @inlinable // FIXME(sil-serialize-all)
   internal func _makeDescription() -> String {
