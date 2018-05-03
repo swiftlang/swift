@@ -4046,7 +4046,7 @@ public:
             invokeTy->getExtInfo().isPseudogeneric(),
             "invoke function must not take reified generic parameters");
     
-    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions(),
+    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions().toList(),
                                     SILType::getPrimitiveObjectType(invokeTy));
     
     auto storageParam = invokeTy->getParameters()[0];

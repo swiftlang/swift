@@ -4827,21 +4827,25 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     
     auto invokeVal = getLocalValue(invokeName, invokeTy, InstLoc, B);
-    
-    SmallVector<Substitution, 4> subs;
+
+    SubstitutionMap subMap;
     if (!parsedSubs.empty()) {
       if (!invokeGenericEnv) {
         P.diagnose(typeLoc, diag::sil_substitutions_on_non_polymorphic_type);
         return true;
       }
+      SmallVector<Substitution, 4> subs;
       if (getApplySubstitutionsFromParsed(*this,
                                           invokeGenericEnv,
                                           parsedSubs, subs))
         return true;
+
+      subMap = invokeGenericEnv->getGenericSignature()
+          ->getSubstitutionMap(subs);
     }
     
     ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
-                                               blockType, subs);
+                                               blockType, subMap);
     break;
   }
   }

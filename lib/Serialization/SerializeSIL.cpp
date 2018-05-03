@@ -2020,14 +2020,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getSwiftRValueType()));
     // Always a value, don't need to save category
-    ListOfValues.push_back(IBSHI->getSubstitutions().size());
+    ListOfValues.push_back(S.addSubstitutionMapRef(IBSHI->getSubstitutions()));
     
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
              S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
              (unsigned)IBSHI->getType().getCategory(),
              ListOfValues);
-    S.writeSubstitutions(IBSHI->getSubstitutions(), SILAbbrCodes);
 
     break;
   }
@@ -2041,7 +2040,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(pattern->getComponents().size());
     ListOfValues.push_back(pattern->getNumOperands());
     ListOfValues.push_back(S.addSubstitutionMapRef(KPI->getSubstitutions()));
-    
+
     ListOfValues.push_back(
        S.addDeclBaseNameRef(Ctx.getIdentifier(pattern->getObjCString())));
 
