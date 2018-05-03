@@ -855,11 +855,16 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::External: {
     auto declID = ListOfValues[nextValue++];
     auto decl = cast<AbstractStorageDecl>(MF->getDecl(declID));
-    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
+    auto numComponentSubstitutions = ListOfValues[nextValue++];
+    SmallVector<Substitution, 4> subs;
+    while (numComponentSubstitutions-- > 0) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      subs.push_back(*sub);
+    }
     handleComputedIndices();
-    return KeyPathPatternComponent::forExternal(decl, subMap, indices,
-                                                indicesEquals, indicesHash,
-                                                type);
+    return KeyPathPatternComponent::forExternal(decl,
+        MF->getContext().AllocateCopy(subs),
+        indices, indicesEquals, indicesHash, type);
   }
   }
 }
@@ -1364,7 +1369,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                               (SILValueCategory)(unsigned)ListOfValues[i+2]);
       Args.push_back(getLocalValue(ListOfValues[i], ArgTy));
     }
-    SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
+    unsigned NumSub = NumSubs;
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
     Identifier Name = MF->getIdentifier(ValID);
     
     ResultVal = Builder.createBuiltin(Loc, Name, ResultTy, Substitutions,
@@ -2300,10 +2311,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue invoke
       = getLocalValue(ListOfValues[2], invokeTy);
     
-    auto SubMap = MF->getSubstitutionMap(ListOfValues[4]);
+    unsigned NumSub = ListOfValues[4];
 
+    SmallVector<Substitution, 4> Substitutions;
+    while (NumSub--) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      assert(sub.hasValue() && "missing substitution");
+      Substitutions.push_back(*sub);
+    }
+    
     ResultVal = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
-                                                     blockTy, SubMap);
+                                                     blockTy, Substitutions);
     break;
   }
   case SILInstructionKind::UnreachableInst: {
@@ -2340,7 +2358,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto valueTy = MF->getType(ListOfValues[nextValue++]);
     auto numComponents = ListOfValues[nextValue++];
     auto numOperands = ListOfValues[nextValue++];
-    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
+    auto numSubstitutions = ListOfValues[nextValue++];
     auto objcString = MF->getIdentifier(ListOfValues[nextValue++]).str();
     auto numGenericParams = ListOfValues[nextValue++];
     
@@ -2358,6 +2376,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     SmallVector<Requirement, 4> requirements;
     MF->readGenericRequirements(requirements, SILCursor);
+    
+    SmallVector<Substitution, 4> substitutions;
+    while (numSubstitutions-- > 0) {
+      auto sub = MF->maybeReadSubstitution(SILCursor);
+      substitutions.push_back(*sub);
+    }
     
     CanGenericSignature sig = nullptr;
     if (!genericParams.empty() || !requirements.empty())
@@ -2380,7 +2404,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       operands.push_back(getLocalValue(opValue, getSILType(opTy, opCat)));
     }
     
-    ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
+    ResultVal = Builder.createKeyPath(Loc, pattern,
+                                      substitutions, operands, kpTy);
     break;
   }
   case SILInstructionKind::MarkUninitializedBehaviorInst:

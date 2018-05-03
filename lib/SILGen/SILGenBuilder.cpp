@@ -118,7 +118,7 @@ SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
                                           SILType resultTy,
-                                          SubstitutionMap subs,
+                                          SubstitutionList subs,
                                           ArrayRef<SILValue> args) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createBuiltin(loc, name, resultTy, subs, args);

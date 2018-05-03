@@ -84,10 +84,10 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
   assert(BI->hasSubstitutions() && "Expected substitutions for canBeClass");
 
   auto const &Subs = BI->getSubstitutions();
-  assert((Subs.getReplacementTypes().size() == 1) &&
+  assert((Subs.size() == 1) &&
          "Expected one substitution in call to canBeClass");
 
-  auto Ty = Subs.getReplacementTypes()[0]->getCanonicalType();
+  auto Ty = Subs[0].getReplacement()->getCanonicalType();
   switch (Ty->canBeClass()) {
   case TypeTraitResult::IsNot:
     return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
@@ -514,10 +514,11 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
       [](const APInt &i) -> bool { return false; }           /* isZero */,
       Builder, this);
   case BuiltinValueKind::DestroyArray: {
-    SubstitutionMap Substs = I->getSubstitutions();
+    SubstitutionList Substs = I->getSubstitutions();
     // Check if the element type is a trivial type.
-    if (Substs.getReplacementTypes().size() == 1) {
-      Type ElemType = Substs.getReplacementTypes()[0];
+    if (Substs.size() == 1) {
+      Substitution Subst = Substs[0];
+      Type ElemType = Subst.getReplacement();
       auto &SILElemTy = I->getModule().Types.getTypeLowering(ElemType);
       // Destroying an array of trivial types is a no-op.
       if (SILElemTy.isTrivial())
