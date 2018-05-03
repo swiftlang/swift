@@ -189,7 +189,8 @@ namespace swift {
                            unsigned StartElem = 0,
                            unsigned WarnLongFunctionBodies = 0,
                            unsigned WarnLongExpressionTypeChecking = 0,
-                           unsigned ExpressionTimeoutThreshold = 0);
+                           unsigned ExpressionTimeoutThreshold = 0,
+                           unsigned SwitchCheckingInvocationThreshold = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
