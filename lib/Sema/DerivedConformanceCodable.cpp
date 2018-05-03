@@ -26,7 +26,6 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-using namespace DerivedConformance;
 
 /// Returns whether the type represented by the given ClassDecl inherits from a
 /// type which conforms to the given protocol.
@@ -616,7 +615,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
     assert(varDecl && "Should have found at least 1 var decl");
 
     // self.x
-    auto *selfRef = createSelfDeclRef(encodeDecl);
+    auto *selfRef = DerivedConformance::createSelfDeclRef(encodeDecl);
     auto *varExpr = new (C) MemberRefExpr(selfRef, SourceLoc(),
                                           ConcreteDeclRef(varDecl),
                                           DeclNameLoc(), /*Implicit=*/true);
@@ -938,7 +937,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                       /*Implicit=*/true);
 
-      auto *selfRef = createSelfDeclRef(initDecl);
+      auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
       auto *varExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
                                                 DeclName(varDecl->getName()),
                                                 DeclNameLoc(),
@@ -1229,25 +1228,22 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
   return true;
 }
 
-ValueDecl *DerivedConformance::deriveEncodable(TypeChecker &tc,
-                                               Decl *parentDecl,
-                                               NominalTypeDecl *target,
-                                               ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   // We can only synthesize Encodable for structs and classes.
-  if (!isa<StructDecl>(target) && !isa<ClassDecl>(target))
+  if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() != tc.Context.Id_encode) {
+  if (requirement->getBaseName() != TC.Context.Id_encode) {
     // Unknown requirement.
-    tc.diagnose(requirement->getLoc(), diag::broken_encodable_requirement);
+    TC.diagnose(requirement->getLoc(), diag::broken_encodable_requirement);
     return nullptr;
   }
 
   // Conformance can't be synthesized in an extension.
-  auto encodableProto = tc.Context.getProtocol(KnownProtocolKind::Encodable);
+  auto encodableProto = TC.Context.getProtocol(KnownProtocolKind::Encodable);
   auto encodableType = encodableProto->getDeclaredType();
-  if (target != parentDecl) {
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+  if (Nominal != ConformanceDecl) {
+    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
                 encodableType);
     return nullptr;
   }
@@ -1267,41 +1263,38 @@ ValueDecl *DerivedConformance::deriveEncodable(TypeChecker &tc,
   // diagnostics, then potentially collect notes. If we succeed in
   // synthesizing Encodable, we can cancel the transaction and get rid of the
   // fake failures.
-  auto diagnosticTransaction = DiagnosticTransaction(tc.Context.Diags);
-  tc.diagnose(target, diag::type_does_not_conform, target->getDeclaredType(),
+  auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
+  TC.diagnose(Nominal, diag::type_does_not_conform, Nominal->getDeclaredType(),
               encodableType);
-  tc.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
+  TC.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
               requirement->getFullName(), encodableType, /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
-  if (canSynthesize(tc, target, requirement, encodableProto)) {
+  if (canSynthesize(TC, Nominal, requirement, encodableProto)) {
     diagnosticTransaction.abort();
-    return deriveEncodable_encode(tc, parentDecl, target);
+    return deriveEncodable_encode(TC, ConformanceDecl, Nominal);
   }
 
   return nullptr;
 }
 
-ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
-                                               Decl *parentDecl,
-                                               NominalTypeDecl *target,
-                                               ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   // We can only synthesize Encodable for structs and classes.
-  if (!isa<StructDecl>(target) && !isa<ClassDecl>(target))
+  if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal))
     return nullptr;
 
   if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
     // Unknown requirement.
-    tc.diagnose(requirement->getLoc(), diag::broken_decodable_requirement);
+    TC.diagnose(requirement->getLoc(), diag::broken_decodable_requirement);
     return nullptr;
   }
 
   // Conformance can't be synthesized in an extension.
-  auto decodableProto = tc.Context.getProtocol(KnownProtocolKind::Decodable);
+  auto decodableProto = TC.Context.getProtocol(KnownProtocolKind::Decodable);
   auto decodableType = decodableProto->getDeclaredType();
-  if (target != parentDecl) {
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+  if (Nominal != ConformanceDecl) {
+    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
                 decodableType);
     return nullptr;
   }
@@ -1311,18 +1304,18 @@ ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
   // diagnostics produced by canSynthesize and deriveDecodable_init to produce
   // them in the right order -- see the comment in deriveEncodable for
   // background on this transaction.
-  auto diagnosticTransaction = DiagnosticTransaction(tc.Context.Diags);
-  tc.diagnose(target, diag::type_does_not_conform, target->getDeclaredType(),
+  auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
+  TC.diagnose(Nominal, diag::type_does_not_conform, Nominal->getDeclaredType(),
               decodableType);
-  tc.diagnose(requirement, diag::no_witnesses,
+  TC.diagnose(requirement, diag::no_witnesses,
               diag::RequirementKind::Constructor, requirement->getFullName(),
               decodableType, /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
-  if (canSynthesize(tc, target, requirement, decodableProto)) {
+  if (canSynthesize(TC, Nominal, requirement, decodableProto)) {
     diagnosticTransaction.abort();
-    return deriveDecodable_init(tc, parentDecl, target);
+    return deriveDecodable_init(TC, ConformanceDecl, Nominal);
   }
 
   return nullptr;

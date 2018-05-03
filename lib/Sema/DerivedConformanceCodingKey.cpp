@@ -25,7 +25,6 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-using namespace DerivedConformance;
 
 /// Sets the body of the given function to `return nil`.
 ///
@@ -48,7 +47,7 @@ static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl) {
   auto *parentDC = funcDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
-  auto *selfRef = createSelfDeclRef(funcDecl);
+  auto *selfRef = DerivedConformance::createSelfDeclRef(funcDecl);
   auto *memberRef = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
                                               C.Id_rawValue, DeclNameLoc(),
                                               /*Implicit=*/true);
@@ -85,7 +84,7 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
   DeclName ctorName(C, DeclBaseName::createConstructor(), paramList);
 
   // self.init(rawValue:) expr
-  auto *selfRef = createSelfDeclRef(initDecl);
+  auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
   auto *initExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(), ctorName,
                                              DeclNameLoc(), /*Implicit=*/true);
 
@@ -191,35 +190,30 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
 
 /// Synthesizes a read-only computed property with a given type and name.
 ///
-/// \param tc The type checker to use in synthesizing the property.
-///
-/// \param parentDecl The parent declaration of the enum.
-///
-/// \param enumDecl The enum on which to synthesize the property.
-///
 /// \param type The type of the property.
 ///
 /// \param name The name of the property.
 ///
 /// \param synthesizer A lambda to call to set the property's getter.
 template <typename Synthesizer>
-static ValueDecl *deriveProperty(TypeChecker &tc, Decl *parentDecl,
-                                 EnumDecl *enumDecl, Type type, Identifier name,
+static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
+                                 Identifier name,
                                  const Synthesizer &synthesizer) {
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl)
-    = declareDerivedProperty(tc, parentDecl, enumDecl, name, type, type,
-                             /*isStatic=*/false, /*isFinal=*/false);
+  std::tie(propDecl, pbDecl) =
+      derived.declareDerivedProperty(name, type, type,
+                                     /*isStatic=*/false, /*isFinal=*/false);
 
   // Define the getter.
-  auto *getterDecl = addGetterToReadOnlyDerivedProperty(tc, propDecl, type);
+  auto *getterDecl =
+      derived.addGetterToReadOnlyDerivedProperty(derived.TC, propDecl, type);
 
   // Synthesize the body.
   synthesizer(getterDecl);
 
-  auto *dc = cast<IterableDeclContext>(parentDecl);
+  auto *dc = cast<IterableDeclContext>(derived.ConformanceDecl);
   dc->addMember(getterDecl);
   dc->addMember(propDecl);
   dc->addMember(pbDecl);
@@ -281,7 +275,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
                                        SourceLoc(), caseBody));
     }
 
-    auto *selfRef = createSelfDeclRef(strValDecl);
+    auto *selfRef = DerivedConformance::createSelfDeclRef(strValDecl);
     auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),
                                           selfRef, SourceLoc(), cases,
                                           SourceLoc(), C);
@@ -324,7 +318,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
     return;
   }
 
-  auto *selfRef = createSelfDeclRef(initDecl);
+  auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
   SmallVector<ASTNode, 4> cases;
   for (auto *elt : elements) {
     auto *litExpr = new (C) StringLiteralExpr(elt->getNameStr(), SourceRange(),
@@ -405,21 +399,18 @@ static bool canSynthesizeCodingKey(TypeChecker &tc, Decl *parentDecl,
   return true;
 }
 
-ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
-                                               Decl *parentDecl,
-                                               NominalTypeDecl *type,
-                                               ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
 
   // We can only synthesize CodingKey for enums.
-  auto *enumDecl = dyn_cast<EnumDecl>(type);
+  auto *enumDecl = dyn_cast<EnumDecl>(Nominal);
   if (!enumDecl)
     return nullptr;
 
   // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeCodingKey(tc, parentDecl, enumDecl))
+  if (!canSynthesizeCodingKey(TC, Nominal, enumDecl))
     return nullptr;
 
-  auto &C = tc.Context;
+  auto &C = TC.Context;
   auto rawType = enumDecl->getRawType();
   auto name = requirement->getBaseName();
   if (name == C.Id_stringValue) {
@@ -451,8 +442,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
       }
     };
 
-    return deriveProperty(tc, parentDecl, enumDecl, stringType,
-                          C.Id_stringValue, synth);
+    return deriveProperty(*this, stringType, C.Id_stringValue, synth);
 
   } else if (name == C.Id_intValue) {
     // Synthesize `var intValue: Int? { get }`
@@ -479,8 +469,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
       }
     };
 
-    return deriveProperty(tc, parentDecl, enumDecl, optionalIntType,
-                          C.Id_intValue, synth);
+    return deriveProperty(*this, optionalIntType, C.Id_intValue, synth);
   } else if (name == DeclBaseName::createConstructor()) {
     auto argumentNames = requirement->getFullName().getArgumentNames();
     if (argumentNames.size() == 1) {
@@ -516,7 +505,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
           }
         };
 
-        return deriveInitDecl(tc, parentDecl, enumDecl, stringType,
+        return deriveInitDecl(TC, ConformanceDecl, enumDecl, stringType,
                               C.Id_stringValue, synth);
       } else if (argumentNames[0] == C.Id_intValue) {
         // Synthesize `init?(intValue:)`
@@ -541,12 +530,12 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
           }
         };
 
-        return deriveInitDecl(tc, parentDecl, enumDecl, intType, C.Id_intValue,
-                              synthesizer);
+        return deriveInitDecl(TC, ConformanceDecl, enumDecl, intType,
+                              C.Id_intValue, synthesizer);
       }
     }
   }
 
-  tc.diagnose(requirement->getLoc(), diag::broken_coding_key_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_coding_key_requirement);
   return nullptr;
 }

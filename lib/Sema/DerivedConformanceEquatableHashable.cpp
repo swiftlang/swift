@@ -31,7 +31,6 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-using namespace DerivedConformance;
 
 /// Returns true if, for every element of the given enum, it either has no
 /// associated values or all of them conform to a protocol.
@@ -677,24 +676,20 @@ deriveEquatable_eq(TypeChecker &tc, Decl *parentDecl, NominalTypeDecl *typeDecl,
 }
 
 bool DerivedConformance::canDeriveEquatable(TypeChecker &tc,
-                                            NominalTypeDecl *type,
-                                            ValueDecl *requirement) {
+                                            NominalTypeDecl *type) {
   auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
   return canDeriveConformance(tc, type, equatableProto);
 }
 
-ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
-                                               Decl *parentDecl,
-                                               NominalTypeDecl *type,
-                                               ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
   // Conformance can't be synthesized in an extension; we allow it as a special
   // case for enums with no associated values to preserve source compatibility.
-  auto theEnum = dyn_cast<EnumDecl>(type);
+  auto theEnum = dyn_cast<EnumDecl>(Nominal);
   if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
-      type != parentDecl) {
-    auto equatableProto = tc.Context.getProtocol(KnownProtocolKind::Equatable);
+      Nominal != ConformanceDecl) {
+    auto equatableProto = TC.Context.getProtocol(KnownProtocolKind::Equatable);
     auto equatableType = equatableProto->getDeclaredType();
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
                 equatableType);
     return nullptr;
   }
@@ -706,19 +701,17 @@ ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
           theEnum->hasOnlyCasesWithoutAssociatedValues()
               ? &deriveBodyEquatable_enum_noAssociatedValues_eq
               : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
-      return deriveEquatable_eq(tc, parentDecl, theEnum,
-                                tc.Context.Id_derived_enum_equals,
+      return deriveEquatable_eq(TC, ConformanceDecl, theEnum,
+                                TC.Context.Id_derived_enum_equals,
                                 bodySynthesizer);
-    }
-    else if (auto theStruct = dyn_cast<StructDecl>(type))
-      return deriveEquatable_eq(tc, parentDecl, theStruct,
-                                tc.Context.Id_derived_struct_equals,
+    } else if (auto theStruct = dyn_cast<StructDecl>(Nominal))
+      return deriveEquatable_eq(TC, ConformanceDecl, theStruct,
+                                TC.Context.Id_derived_struct_equals,
                                 &deriveBodyEquatable_struct_eq);
     else
       llvm_unreachable("todo");
   }
-  tc.diagnose(requirement->getLoc(),
-              diag::broken_equatable_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_equatable_requirement);
   return nullptr;
 }
 
@@ -1169,8 +1162,7 @@ getHashableConformance(Decl *parentDecl) {
 }
 
 bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
-                                           NominalTypeDecl *type,
-                                           ValueDecl *requirement) {
+                                           NominalTypeDecl *type) {
   if (!isa<EnumDecl>(type) && !isa<StructDecl>(type) && !isa<ClassDecl>(type))
     return false;
   // FIXME: This is not actually correct. We cannot promise to always
@@ -1181,25 +1173,22 @@ bool DerivedConformance::canDeriveHashable(TypeChecker &tc,
   return true;
 }
 
-ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
-                                              Decl *parentDecl,
-                                              NominalTypeDecl *type,
-                                              ValueDecl *requirement) {
-  ASTContext &C = parentDecl->getASTContext();
+ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
+  ASTContext &C = ConformanceDecl->getASTContext();
 
   // var hashValue: Int
   if (requirement->getBaseName() == C.Id_hashValue) {
     // We always allow hashValue to be synthesized; invalid cases are diagnosed
     // during hash(into:) synthesis.
-    return deriveHashable_hashValue(tc, parentDecl, type);
+    return deriveHashable_hashValue(TC, ConformanceDecl, Nominal);
   }
 
   // Hashable.hash(into:)
   if (requirement->getBaseName() == C.Id_hash) {
     // Start by resolving hashValue conformance.
     auto hashValueReq = getHashValueRequirement(C);
-    auto conformance = getHashableConformance(parentDecl);
-    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq, &tc);
+    auto conformance = getHashableConformance(ConformanceDecl);
+    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq, &TC);
     if (!hashValueDecl) {
       // We won't derive hash(into:) if hashValue cannot be resolved.
       // The hashValue failure will produce a diagnostic elsewhere.
@@ -1212,19 +1201,21 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
       // Refuse to synthesize Hashable if type isn't a struct or enum, or if it
       // has non-Hashable stored properties/associated values.
       auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-      if (!canDeriveConformance(tc, type, hashableProto)) {
-        tc.diagnose(parentDecl->getLoc(), diag::type_does_not_conform,
-                    type->getDeclaredType(), hashableProto->getDeclaredType());
+      if (!canDeriveConformance(TC, Nominal, hashableProto)) {
+        TC.diagnose(ConformanceDecl->getLoc(), diag::type_does_not_conform,
+                    Nominal->getDeclaredType(),
+                    hashableProto->getDeclaredType());
         return nullptr;
       }
       // Hashable can't be fully synthesized in an extension; we allow it as a
       // special case for enums with no associated values to preserve source
       // compatibility.
-      auto theEnum = dyn_cast<EnumDecl>(type);
+      auto theEnum = dyn_cast<EnumDecl>(Nominal);
       auto hasAssociatedValues =
         theEnum && !theEnum->hasOnlyCasesWithoutAssociatedValues();
-      if ((!theEnum || hasAssociatedValues) && type != parentDecl) {
-        tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
+      if ((!theEnum || hasAssociatedValues) && Nominal != ConformanceDecl) {
+        TC.diagnose(ConformanceDecl->getLoc(),
+                    diag::cannot_synthesize_in_extension,
                     hashableProto->getDeclaredType());
         return nullptr;
       }
@@ -1232,10 +1223,10 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
         auto bodySynthesizer = hasAssociatedValues
           ? &deriveBodyHashable_enum_hasAssociatedValues_hashInto
           : &deriveBodyHashable_enum_noAssociatedValues_hashInto;
-        return deriveHashable_hashInto(tc, parentDecl, theEnum,
+        return deriveHashable_hashInto(TC, ConformanceDecl, theEnum,
                                        bodySynthesizer);
-      } else if (auto theStruct = dyn_cast<StructDecl>(type))
-        return deriveHashable_hashInto(tc, parentDecl, theStruct,
+      } else if (auto theStruct = dyn_cast<StructDecl>(Nominal))
+        return deriveHashable_hashInto(TC, ConformanceDecl, theStruct,
                                        &deriveBodyHashable_struct_hashInto);
       else // This should've been caught by canDeriveHashable above.
         llvm_unreachable("Attempt to derive Hashable for a type other "
@@ -1243,11 +1234,11 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
     } else {
       // We can always derive hash(into:) if hashValue has an explicit
       // implementation.
-      return deriveHashable_hashInto(tc, parentDecl, type,
+      return deriveHashable_hashInto(TC, ConformanceDecl, Nominal,
                                      &deriveBodyHashable_compat_hashInto);
     }
   }
 
-  tc.diagnose(requirement->getLoc(), diag::broken_hashable_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_hashable_requirement);
   return nullptr;
 }
