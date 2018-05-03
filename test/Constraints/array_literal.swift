@@ -44,7 +44,7 @@ func useDict<K,V>(_ d: Dict<K,V>) {}
 
 useIntList([1,2,3])
 useIntList([1.0,2,3]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}
-useIntList([nil])  // expected-error {{nil is not compatible with expected element type 'Int'}}
+useIntList([nil])  // expected-error {{'nil' is not compatible with expected element type 'Int'}}
 
 useDoubleList([1.0,2,3])
 useDoubleList([1.0,2.0,3.0])
