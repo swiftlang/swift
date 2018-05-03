@@ -1827,8 +1827,6 @@ void TypeChecker::checkSwitchExhaustiveness(const SwitchStmt *stmt,
 }
 
 void SpaceEngine::Space::dump() const {
-  SmallString<128> buf;
-  llvm::raw_svector_ostream os(buf);
-  this->show(os, /*normalize*/false);
-  llvm::errs() << buf.str();
+  this->show(llvm::errs(), /*normalize*/ false);
+  llvm::errs() << '\n';
 }
