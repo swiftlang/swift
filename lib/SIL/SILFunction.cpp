@@ -494,6 +494,16 @@ SubstitutionList SILFunction::getForwardingSubstitutions() {
   return *ForwardingSubs;
 }
 
+SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
+  if (ForwardingSubMap)
+    return ForwardingSubMap;
+
+  if (auto *env = getGenericEnvironment())
+    ForwardingSubMap = env->getForwardingSubstitutionMap();
+
+  return ForwardingSubMap;
+}
+
 bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
 }

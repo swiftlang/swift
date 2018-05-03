@@ -2427,7 +2427,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   assert(lv.isValid());
 
   CanType substFormalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
+  lv.addMemberVarComponent(SGF, e, var,
+                           e->getMember().getSubstitutions().toList(),
                            options, e->isSuper(), accessKind,
                            e->getAccessSemantics(),
                            strategy, substFormalRValueType);
@@ -2526,7 +2527,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   RValue index = SGF.emitRValue(indexExpr);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberSubscriptComponent(SGF, e, decl, e->getDecl().getSubstitutions(),
+  lv.addMemberSubscriptComponent(SGF, e, decl,
+                                 e->getDecl().getSubstitutions().toList(),
                                  options, e->isSuper(), accessKind,
                                  accessSemantics, strategy,
                                  formalRValueType, std::move(index),

@@ -965,16 +965,19 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (DRE->getDecl() != TC.Context.getUnsafeBitCast(&TC))
         return;
       
-      if (DRE->getDeclRef().getSubstitutions().size() != 2)
+      if (DRE->getDeclRef().getSubstitutions().empty())
         return;
       
       // Don't check the same use of unsafeBitCast twice.
       if (!AlreadyDiagnosedBitCasts.insert(DRE).second)
         return;
-      
-      auto fromTy = DRE->getDeclRef().getSubstitutions()[0].getReplacement();
-      auto toTy = DRE->getDeclRef().getSubstitutions()[1].getReplacement();
-    
+
+      auto subMap = DRE->getDeclRef().getSubstitutions();
+      auto fromTy =
+        Type(GenericTypeParamType::get(0, 0, TC.Context)).subst(subMap);
+      auto toTy =
+        Type(GenericTypeParamType::get(0, 1, TC.Context)).subst(subMap);
+
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.
       

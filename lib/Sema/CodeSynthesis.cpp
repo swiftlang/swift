@@ -1147,19 +1147,15 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
-                               SubstitutionList SelfInterfaceSubs,
-                               SubstitutionList SelfContextSubs) {
+                               SubstitutionMap interfaceMap,
+                               SubstitutionMap contextMap) {
   assert(BehaviorStorage);
   assert((bool)DefaultInitStorage != (bool)ParamInitStorage);
 
   // Substitute the storage type into the conforming context.
-  auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
-
-  auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
   auto SubstStorageInterfaceTy = StorageTy.subst(interfaceMap);
   assert(SubstStorageInterfaceTy && "storage type substitution failed?!");
 
-  auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
   auto SubstStorageContextTy = StorageTy.subst(contextMap);
   assert(SubstStorageContextTy && "storage type substitution failed?!");
 
@@ -1189,8 +1185,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   // Initialize the storage immediately, if we can.
   Expr *InitStorageExpr = nullptr;
   auto Method = DefaultInitStorage ? DefaultInitStorage : ParamInitStorage;
-  auto SpecializeInitStorage = ConcreteDeclRef(Context, Method,
-                                               SelfContextSubs);
+  auto SpecializeInitStorage = ConcreteDeclRef(Method, contextMap);
 
   if (DefaultInitStorage ||
       (ParamInitStorage && VD->getParentInitializer())) {
@@ -1231,8 +1226,11 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
       InitValue->walk(RecontextualizeClosures(DC));
       
       // Coerce to the property type.
+      auto PropertyType =
+        Type(contextMap.getGenericSignature()->getGenericParams()[1])
+          .subst(contextMap);
       InitValue = new (Context) CoerceExpr(InitValue, SourceLoc(),
-                      TypeLoc::withoutLoc(SelfContextSubs[1].getReplacement()));
+                      TypeLoc::withoutLoc(PropertyType));
       // Type-check the expression.
       typeCheckExpression(InitValue, DC);
 
@@ -1289,8 +1287,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                  FuncDecl *BehaviorParameter,
                                  NormalProtocolConformance *BehaviorConformance,
-                                 SubstitutionList SelfInterfaceSubs,
-                                 SubstitutionList SelfContextSubs) {
+                                 SubstitutionMap interfaceMap,
+                                 SubstitutionMap contextMap) {
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
@@ -1298,7 +1296,6 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   auto ParameterBaseName = Context.getIdentifier(NameBuf);
 
   // Substitute the requirement type into the conforming context.
-  auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
   auto ParameterTy = BehaviorParameter->getInterfaceType()
     ->castTo<AnyFunctionType>()
     ->getResult();
@@ -1306,12 +1303,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   GenericSignature *genericSig = nullptr;
   GenericEnvironment *genericEnv = nullptr;
 
-  auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
   auto SubstInterfaceTy = ParameterTy.subst(interfaceMap);
   assert(SubstInterfaceTy && "storage type substitution failed?!");
   
-  auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
-
   auto SubstBodyResultTy = SubstInterfaceTy->castTo<AnyFunctionType>()
     ->getResult();
   
@@ -1423,10 +1417,11 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
                                        Type valueTy,
-                                       SubstitutionList SelfInterfaceSubs,
-                                       SubstitutionList SelfContextSubs) {
-  auto selfTy = SelfContextSubs[0].getReplacement();
-  auto selfIfaceTy = SelfInterfaceSubs[0].getReplacement();
+                                       SubstitutionMap SelfInterfaceSubs,
+                                       SubstitutionMap SelfContextSubs) {
+  auto selfGenericParamTy = Type(GenericTypeParamType::get(0, 0, Context));
+  auto selfTy = selfGenericParamTy.subst(SelfContextSubs);
+  auto selfIfaceTy = selfGenericParamTy.subst(SelfInterfaceSubs);
 
   SmallVector<ASTNode, 3> bodyStmts;
   
@@ -1492,7 +1487,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
 
     Expr *selfExpr = makeSelfExpr(getter, ValueImpl->getGetter());
     
-    auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
+    auto implRef = ConcreteDeclRef(ValueImpl, SelfContextSubs);
     auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
                                                       SourceLoc(),
                                                       implRef,
@@ -1523,7 +1518,7 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
   
   if (auto setter = VD->getSetter()) {
     Expr *selfExpr = makeSelfExpr(setter, ValueImpl->getSetter());
-    auto implRef = ConcreteDeclRef(Context, ValueImpl, SelfContextSubs);
+    auto implRef = ConcreteDeclRef(ValueImpl, SelfContextSubs);
     auto implMemberExpr = new (Context) MemberRefExpr(selfExpr,
                                                       SourceLoc(),
                                                       implRef,

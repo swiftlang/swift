@@ -673,17 +673,8 @@ public:
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
-  ///
-  /// \param substitutions Will be populated with the set of substitutions
-  /// to be applied to the generic function type.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocator *locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
-
-  /// Same as above but with a lazily-constructed locator.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocatorBuilder locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
+  SubstitutionMap computeSubstitutions(GenericSignature *sig,
+                                       ConstraintLocatorBuilder locator) const;
 
   /// Return the disjunction choice for the given constraint location.
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {

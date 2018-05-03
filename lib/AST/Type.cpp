@@ -3061,23 +3061,12 @@ static Type substType(Type derivedType,
     // Special-case handle SILBoxTypes; we want to structurally substitute the
     // substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
-      if (boxTy->getGenericArgs().empty())
-        return Type(boxTy);
-      
-      auto subMap = boxTy->getLayout()->getGenericSignature()
-        ->getSubstitutionMap(boxTy->getGenericArgs());
-      subMap = subMap.subst(substitutions, lookupConformances);
+      auto subMap = boxTy->getSubstitutions();
+      auto newSubMap = subMap.subst(substitutions, lookupConformances);
 
-      SmallVector<Substitution, 4> newSubs;
-      boxTy->getLayout()->getGenericSignature()
-        ->getSubstitutions(subMap, newSubs);
-      for (auto &arg : newSubs) {
-        arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                           arg.getConformances());
-      }
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
-                             newSubs);
+                             newSubMap);
     }
     
     // We only substitute for substitutable types and dependent member types.
@@ -3544,9 +3533,10 @@ case TypeKind::Id:
     // This interface isn't suitable for updating the substitution map in a
     // generic SILBox.
     auto boxTy = cast<SILBoxType>(base);
-    for (auto &arg : boxTy->getGenericArgs())
-      assert(arg.getReplacement()->isEqual(arg.getReplacement().transformRec(fn))
+    for (Type type : boxTy->getSubstitutions().getReplacementTypes()) {
+      assert(type->isEqual(type.transformRec(fn))
              && "SILBoxType can't be transformed");
+    }
 #endif
     return base;
   }
@@ -4132,35 +4122,25 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 //
 
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
-                         SubstitutionList Args) {
+                         SubstitutionMap Substitutions) {
   id.AddPointer(Layout);
-  profileSubstitutionList(id, Args);
+  Substitutions.profile(id);
+}
+
+static RecursiveTypeProperties getRecursivePropertiesOfMap(
+                                                      SubstitutionMap subMap) {
+  RecursiveTypeProperties props;
+  for (auto replacementType : subMap.getReplacementTypes()) {
+    if (replacementType) props |= replacementType->getRecursiveProperties();
+  }
+  return props;
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, SubstitutionList Args)
-: TypeBase(TypeKind::SILBox, &C,
-           getRecursivePropertiesFromSubstitutions(Args)), Layout(Layout) {
-  Bits.SILBoxType.NumGenericArgs = Args.size();
-#ifndef NDEBUG
-  // Check that the generic args are reasonable for the box's signature.
-  if (Layout->getGenericSignature())
-    (void)Layout->getGenericSignature()->getSubstitutionMap(Args);
-  for (auto &arg : Args)
-    assert(arg.getReplacement()->isCanonical() &&
-           "box arguments must be canonical types!");
-#endif
-  std::uninitialized_copy(Args.begin(), Args.end(),
-                          getTrailingObjects<Substitution>());
-}
-
-RecursiveTypeProperties SILBoxType::
-getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
-  RecursiveTypeProperties props;
-  for (auto &param : Params) {
-    props |= param.getReplacement()->getRecursiveProperties();
-  }
-  return props;
+                       SILLayout *Layout, SubstitutionMap Substitutions)
+  : TypeBase(TypeKind::SILBox, &C, getRecursivePropertiesOfMap(Substitutions)),
+    Layout(Layout), Substitutions(Substitutions) {
+  assert(Substitutions.isCanonical());
 }
 
 Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {

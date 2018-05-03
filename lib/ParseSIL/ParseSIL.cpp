@@ -5785,8 +5785,10 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
                                         subs))
       return nullptr;
 
+    auto subMap =
+      genericConform->getGenericSignature()->getSubstitutionMap(subs);
     auto result = P.Context.getSpecializedConformance(
-      ConformingTy, genericConform, subs);
+      ConformingTy, genericConform, subMap);
     return result;
   }
 

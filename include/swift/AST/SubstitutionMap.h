@@ -155,7 +155,16 @@ private:
   /// signature nor any replacement types/conformances.
   Storage *storage = nullptr;
 
-  MutableArrayRef<Type> getReplacementTypes() {
+  /// Retrieve the array of replacement types, which line up with the
+  /// generic parameters.
+  ///
+  /// Note that the types may be null, for cases where the generic parameter
+  /// is concrete but hasn't been queried yet.
+  ArrayRef<Type> getReplacementTypesBuffer() const {
+    return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
+  }
+
+  MutableArrayRef<Type> getReplacementTypesBuffer() {
     return storage ? storage->getReplacementTypes() : MutableArrayRef<Type>();
   }
 
@@ -223,12 +232,7 @@ public:
 
   /// Retrieve the array of replacement types, which line up with the
   /// generic parameters.
-  ///
-  /// Note that the types may be null, for cases where the generic parameter
-  /// is concrete but hasn't been queried yet.
-  ArrayRef<Type> getReplacementTypes() const {
-    return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
-  }
+  ArrayRef<Type> getReplacementTypes() const;
 
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;
@@ -239,6 +243,12 @@ public:
 
   /// Query whether any replacement type sin the map contain dynamic Self.
   bool hasDynamicSelf() const;
+
+  /// Whether the replacement types are all canonical.
+  bool isCanonical() const;
+
+  /// Return the canonical form of this substitution map.
+  SubstitutionMap getCanonical() const;
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
@@ -272,6 +282,14 @@ public:
                            GenericSignature *baseSig,
                            GenericSignature *derivedSig,
                            Optional<SubstitutionMap> derivedSubs);
+
+  /// Produce a substitution list for the given substitution map.
+  ///
+  /// Note: we are moving away from using Substitutions, so this should only
+  /// be used at the edges where part of the compiler is still working
+  /// directly with Substitution/SubstitutionList and hasn't been converted
+  /// to SubstitutionMap.
+  SmallVector<Substitution, 4> toList() const;
 
   /// Combine two substitution maps as follows.
   ///
@@ -322,6 +340,14 @@ public:
   static SubstitutionMap getTombstoneKey() {
     return SubstitutionMap(
                (Storage *)llvm::DenseMapInfo<void*>::getTombstoneKey());
+  }
+
+  friend bool operator ==(SubstitutionMap lhs, SubstitutionMap rhs) {
+    return lhs.storage == rhs.storage;
+  }
+
+  friend bool operator !=(SubstitutionMap lhs, SubstitutionMap rhs) {
+    return lhs.storage != rhs.storage;
   }
 
 private:

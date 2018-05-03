@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 412; // Last change: @usableFromInline import
+const uint16_t VERSION_MINOR = 414; // Last change: SIL box type substitutions
 
 using DeclIDField = BCFixed<31>;
 
@@ -800,8 +800,8 @@ namespace decls_block {
 
   using SILBoxTypeLayout = BCRecordLayout<
     SIL_BOX_TYPE,
-    SILLayoutIDField     // layout
-                         // trailing substitutions
+    SILLayoutIDField,     // layout
+    SubstitutionMapIDField // substitutions
   >;
 
   template <unsigned Code>
@@ -1287,9 +1287,9 @@ namespace decls_block {
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
     SPECIALIZED_PROTOCOL_CONFORMANCE,
-    TypeIDField,         // conforming type
-    BCVBR<5>             // # of substitutions for the conformance
-    // followed by substitution records for the conformance
+    TypeIDField,           // conforming type
+    SubstitutionMapIDField // substitution map
+    // trailed by the underlying conformance
   >;
 
   using InheritedProtocolConformanceLayout = BCRecordLayout<

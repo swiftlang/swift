@@ -3315,7 +3315,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
   
   // First, satisfy any associated type requirements.
-  Substitution valueSub;
   AssociatedTypeDecl *valueReqt = nullptr;
   for (auto assocTy : behaviorProto->getAssociatedTypeMembers()) {
   
@@ -3331,7 +3330,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     // TODO: Handle secondary 'where' constraints on the associated types.
     // TODO: Handle non-protocol constraints ('class', base class)
     auto propTy = decl->getType();
-    SmallVector<ProtocolConformanceRef, 4> valueConformances;
     for (auto proto : assocTy->getConformingProtocols()) {
       auto valueConformance = TC.conformsToProtocol(propTy, proto, dc,
                                                     ConformanceCheckFlags::Used,
@@ -3344,12 +3342,9 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                     behaviorProto->getName());
         goto next_requirement;
       }
-      valueConformances.push_back(*valueConformance);
     }
     
     {
-      auto conformancesCopy = TC.Context.AllocateCopy(valueConformances);
-      valueSub = Substitution(propTy, conformancesCopy);
       // FIXME: Maybe we should synthesize an implicit TypeAliasDecl? We
       // really don't want the behavior conformances to show up in the
       // enclosing namespace though.
@@ -3364,27 +3359,18 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     return;
   }
 
-  // Build a Substitution vector from the conformance.
-  auto conformanceMem =
-    TC.Context.AllocateUninitialized<ProtocolConformanceRef>(1);
-  auto selfConformance = new ((void*)conformanceMem.data())
-    ProtocolConformanceRef(conformance);
-  Substitution allInterfaceSubs[] = {
-    Substitution(behaviorInterfaceSelf, *selfConformance),
-    Substitution(decl->getInterfaceType(), valueSub.getConformances()),
-  };
-  Substitution allContextSubs[] = {
-    Substitution(behaviorSelf, *selfConformance),
-    Substitution(decl->getType(), valueSub.getConformances()),
-  };
+  // Build interface and context substitution maps.
+  auto interfaceSubsMap =
+    SubstitutionMap::getProtocolSubstitutions(
+                                behaviorProto,
+                                behaviorInterfaceSelf,
+                                ProtocolConformanceRef(conformance));
 
-  SubstitutionList interfaceSubs = allInterfaceSubs;
-  if (interfaceSubs.back().getConformances().empty())
-    interfaceSubs = interfaceSubs.drop_back();
-
-  SubstitutionList contextSubs = allContextSubs;
-  if (contextSubs.back().getConformances().empty())
-    contextSubs = contextSubs.drop_back();
+  auto contextSubsMap =
+    SubstitutionMap::getProtocolSubstitutions(
+                                  behaviorProto,
+                                  behaviorSelf,
+                                  ProtocolConformanceRef(conformance));
 
   // Now that type witnesses are done, satisfy property and method requirements.
   conformance->setState(ProtocolConformanceState::Checking);
@@ -3493,8 +3479,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                                            behaviorSelf,
                                            storageTy,
                                            conformance,
-                                           interfaceSubs,
-                                           contextSubs);
+                                           interfaceSubsMap,
+                                           contextSubsMap);
         continue;
       }
     } else if (auto func = dyn_cast<FuncDecl>(requirement)) {
@@ -3543,8 +3529,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         // Build the parameter witness method.
         TC.completePropertyBehaviorParameter(decl, func,
                                              conformance,
-                                             interfaceSubs,
-                                             contextSubs);
+                                             interfaceSubsMap,
+                                             contextSubsMap);
         continue;
       }
     }
@@ -3580,9 +3566,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
 
   // Check that the 'value' property from the protocol matches the
   // declared property type in context.
-  auto sig = behaviorProto->getGenericSignatureOfContext();
-  auto map = sig->getSubstitutionMap(interfaceSubs);
-  auto substValueTy = behavior->ValueDecl->getInterfaceType().subst(map);
+  auto substValueTy =
+    behavior->ValueDecl->getInterfaceType().subst(interfaceSubsMap);
   
   if (!substValueTy->isEqual(decl->getInterfaceType())) {
     TC.diagnose(behavior->getLoc(),
@@ -3601,7 +3586,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // 'value' implementation.
   TC.completePropertyBehaviorAccessors(decl, behavior->ValueDecl,
                                        decl->getType(),
-                                       interfaceSubs, contextSubs);
+                                       interfaceSubsMap, contextSubsMap);
   
   return;
 }

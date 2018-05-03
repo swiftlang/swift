@@ -986,8 +986,8 @@ void ASTMangler::appendType(Type type) {
 
       if (auto sig = layout->getGenericSignature()) {
         fieldsList.clear();
-        for (auto &arg : box->getGenericArgs()) {
-          fieldsList.push_back(TupleTypeElt(arg.getReplacement()));
+        for (Type type : box->getSubstitutions().getReplacementTypes()) {
+          fieldsList.push_back(TupleTypeElt(type));
         }
         appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
                          ->getCanonicalType());
