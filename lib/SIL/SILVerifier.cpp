@@ -1866,6 +1866,16 @@ public:
     require(I->getOperand()->getType() == I->getType(),
             "result of copy_block should be same type as operand");
   }
+  void checkCopyBlockInst(CopyBlockWithoutEscapingInst *I) {
+    require(I->getBlock()->getType().isBlockPointerCompatible(),
+            "operand of copy_block should be a block");
+    require(I->getBlock()->getType() == I->getType(),
+            "result of copy_block should be same type as operand");
+    auto FnTy = requireObjectType(SILFunctionType, I->getClosure(),
+                                  "copy_block_without_escaping operand");
+    require(!FnTy->isNoEscape(),
+            "closure parameter must not be a @noescape closure");
+  }
 
   void checkAllocValueBufferInst(AllocValueBufferInst *I) {
     require(I->getOperand()->getType().isAddress(),
@@ -4172,13 +4182,22 @@ public:
   }
 
   void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
-    auto fnType = IEC->getOperand()->getType().getAs<SILFunctionType>();
+    // The closure operand is allowed to be an optional closure.
+    auto operandType = IEC->getOperand()->getType();
+    if (operandType.getOptionalObjectType())
+      operandType = operandType.getOptionalObjectType();
+
+    auto fnType = operandType.getAs<SILFunctionType>();
     require(fnType && fnType->getExtInfo().hasContext() &&
                 !fnType->isNoEscape() &&
                 fnType->getExtInfo().getRepresentation() ==
                     SILFunctionTypeRepresentation::Thick,
             "is_escaping_closure must have a thick "
             "function operand");
+    require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
+                IEC->getVerificationType() ==
+                    IsEscapingClosureInst::WithoutActuallyEscaping,
+            "unknown verfication type");
   }
 
   // This verifies that the entry block of a SIL function doesn't have

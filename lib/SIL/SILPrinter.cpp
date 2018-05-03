@@ -1781,6 +1781,10 @@ public:
   void visitCopyBlockInst(CopyBlockInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
+  void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *RI) {
+    *this << getIDAndType(RI->getBlock()) << " withoutEscaping "
+          << getIDAndType(RI->getClosure());
+  }
   void visitRefCountingInst(RefCountingInst *I) {
     if (I->isNonAtomic())
       *this << "[nonatomic] ";
@@ -1798,6 +1802,8 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+    if (CUI->getVerificationType())
+      *this << "[objc] ";
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {

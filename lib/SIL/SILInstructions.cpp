@@ -178,6 +178,21 @@ VarDecl *AllocStackInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
+DeallocStackInst *AllocStackInst::getSingleDeallocStack() const {
+  DeallocStackInst *Dealloc = nullptr;
+  for (auto *U : getUses()) {
+    if (auto DS = dyn_cast<DeallocStackInst>(U->getUser())) {
+      if (Dealloc == nullptr) {
+        Dealloc = DS;
+        continue;
+      }
+      // Already saw a dealloc_stack.
+      return nullptr;
+    }
+  }
+  return Dealloc;
+}
+
 AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    SILDebugLocation Loc,
                                    SILType ObjectType,
