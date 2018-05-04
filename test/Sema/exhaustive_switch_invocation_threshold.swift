@@ -1,13 +1,20 @@
-// Ensure that -switch-checking-invocation-threshold= frontend option works.
+// Ensure that -switch-checking-invocation-threshold= frontend option works,
+// stopping the check, producing the correct diagnostic, and not producing the
+// diagnostic for a completed check.
 //
-// RUN: not %target-swift-frontend -typecheck %s -switch-checking-invocation-threshold=1 2>&1 | %FileCheck %s --check-prefix LIMIT
-// RUN: not %target-swift-frontend -typecheck %s  2>&1 | %FileCheck %s --check-prefix NO_LIMIT
-// LIMIT: error: the compiler is unable to check that this switch is exhaustive in reasonable time
-// LIMIT-NOT: error: switch must be exhaustive
-// NO_LIMIT: error: switch must be exhaustive
-// NO_LIMIT-NOT: error: the compiler is unable to check that this switch is exhaustive in reasonable time
+// RUN: %empty-directory(%t)
+//
+// RUN: not %target-swift-frontend -typecheck %s -switch-checking-invocation-threshold=1 2>%t/unproven.txt
+// RUN: %FileCheck %s --check-prefix UNABLE-TO-CHECK <%t/unproven.txt
+// RUN: not %FileCheck %s --check-prefix MUST-BE-EXHAUSTIVE <%t/unproven.txt
+//
+// RUN: not %target-swift-frontend -typecheck %s  2>%t/disproved.txt
+// RUN: %FileCheck %s --check-prefix MUST-BE-EXHAUSTIVE <%t/disproved.txt
+// RUN: not %FileCheck %s --check-prefix UNABLE-TO-CHECK <%t/disproved.txt
+//
+// UNABLE-TO-CHECK: error: the compiler is unable to check that this switch is exhaustive in reasonable time
+// MUST-BE-EXHAUSTIVE: error: switch must be exhaustive
 
-import Foundation
 
 enum A {
   case a1, a2, a3, a4, a5
