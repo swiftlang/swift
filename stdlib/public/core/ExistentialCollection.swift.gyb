@@ -24,8 +24,8 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
 @inline(never)
+@usableFromInline
 internal func _abstract(
   file: StaticString = #file,
   line: UInt = #line
