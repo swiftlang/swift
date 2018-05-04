@@ -187,7 +187,9 @@ public:
 
   /// Returns true if this derivation is trying to use a context that isn't
   /// appropriate for deriving.
-  bool checkAndDiagnoseDisallowedContext() const;
+  ///
+  /// \param synthesizing The decl that is being synthesized.
+  bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
 };
 }
 

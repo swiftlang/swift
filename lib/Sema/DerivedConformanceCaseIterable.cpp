@@ -79,7 +79,7 @@ static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
 
 ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   // Conformance can't be synthesized in an extension.
-  if (checkAndDiagnoseDisallowedContext())
+  if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
   // Check that we can actually derive CaseIterable for this type.
@@ -114,7 +114,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
-  if (checkAndDiagnoseDisallowedContext())
+  if (checkAndDiagnoseDisallowedContext(assocType))
     return nullptr;
 
   // Check that we can actually derive CaseIterable for this type.

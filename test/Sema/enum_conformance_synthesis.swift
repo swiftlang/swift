@@ -190,11 +190,10 @@ public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 3 {{non-
   return true
 }
 
-// No explicit conformance; it could be derived, but we don't support extensions
-// yet.
-extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension}}
+// No explicit conformance; but it can be derived, for the same-file cases.
+extension Complex : Hashable {}
 extension Complex : CaseIterable {}  // expected-error {{type 'Complex' does not conform to protocol 'CaseIterable'}}
-extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension}} expected-error {{does not conform to protocol 'CaseIterable'}}
+extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}} expected-error {{does not conform to protocol 'CaseIterable'}}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
@@ -212,7 +211,7 @@ extension OtherFileNonconforming: Hashable {
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
 extension YetOtherFileNonconforming: CaseIterable {} // expected-error {{does not conform}}
 
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"

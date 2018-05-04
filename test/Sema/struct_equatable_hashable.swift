@@ -147,13 +147,13 @@ let _: Int = gnh.hashValue // No error. hashValue is always synthesized, even if
 gnh.hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hash'}}
 
 
-// Conformance cannot be synthesized in an extension.
+// Synthesis can be from an extension...
 struct StructConformsInExtension {
   let v: Int
 }
-extension StructConformsInExtension : Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension StructConformsInExtension : Equatable {}
 
-// But explicit conformance in an extension should work.
+// and explicit conformance in an extension should also work.
 public struct StructConformsAndImplementsInExtension {
   let v: Int
 }
@@ -181,7 +181,7 @@ extension OtherFileNonconforming: Hashable {
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
 
 // Verify that we can add Hashable conformance in an extension by only
 // implementing hash(into:)

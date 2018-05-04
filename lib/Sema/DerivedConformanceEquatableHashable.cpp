@@ -682,7 +682,7 @@ bool DerivedConformance::canDeriveEquatable(TypeChecker &tc,
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
-  if (checkAndDiagnoseDisallowedContext())
+  if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
   // Build the necessary decl.
@@ -1197,7 +1197,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         return nullptr;
       }
 
-      if (checkAndDiagnoseDisallowedContext())
+      if (checkAndDiagnoseDisallowedContext(requirement))
         return nullptr;
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
