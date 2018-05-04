@@ -363,21 +363,38 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   return {propDecl, pbDecl};
 }
 
-bool DerivedConformance::checkAndDiagnoseDisallowedContext() const {
-  // In general, conformances can't be synthesized in an extension; but we have
-  // to allow it as a special case for Equatable and Hashable on enums with no
-  // associated values to preserve source compatibility.
-  bool allowExtensions = false;
+bool DerivedConformance::checkAndDiagnoseDisallowedContext(
+    ValueDecl *synthesizing) const {
+  // In general, conformances can't be synthesized in extensions across files;
+  // but we have to allow it as a special case for Equatable and Hashable on
+  // enums with no associated values to preserve source compatibility.
+  bool allowCrossfileExtensions = false;
   if (Protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
       Protocol->isSpecificProtocol(KnownProtocolKind::Hashable)) {
     auto ED = dyn_cast<EnumDecl>(Nominal);
-    allowExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
+    allowCrossfileExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
   }
 
-  if (!allowExtensions && Nominal != ConformanceDecl) {
-    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
+  if (!allowCrossfileExtensions &&
+      Nominal->getModuleScopeContext() !=
+          getConformanceContext()->getModuleScopeContext()) {
+    TC.diagnose(ConformanceDecl->getLoc(),
+                diag::cannot_synthesize_in_crossfile_extension,
                 getProtocolType());
+    TC.diagnose(Nominal->getLoc(), diag::type_declared_here);
     return true;
+  }
+
+  // A non-final class can't have an protocol-witnesss initializer in an
+  // extension.
+  if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
+    if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&
+        isa<ExtensionDecl>(ConformanceDecl)) {
+      TC.diagnose(ConformanceDecl->getLoc(),
+                  diag::cannot_synthesize_init_in_extension_of_nonfinal,
+                  getProtocolType(), synthesizing->getFullName());
+      return true;
+    }
   }
 
   return false;

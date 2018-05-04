@@ -521,7 +521,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // }
 
   // The enclosing type decl.
-  auto *targetDecl = cast<NominalTypeDecl>(encodeDecl->getDeclContext());
+  auto *targetDecl = encodeDecl->getDeclContext()
+                         ->getAsNominalTypeOrNominalTypeExtensionContext();
 
   auto *funcDC = cast<DeclContext>(encodeDecl);
   auto &C = funcDC->getASTContext();
@@ -786,7 +787,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
   // }
 
   // The enclosing type decl.
-  auto *targetDecl = cast<NominalTypeDecl>(initDecl->getDeclContext());
+  auto *targetDecl = initDecl->getDeclContext()
+                         ->getAsNominalTypeOrNominalTypeExtensionContext();
 
   auto *funcDC = cast<DeclContext>(initDecl);
   auto &C = funcDC->getASTContext();
@@ -1012,7 +1014,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
 static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
 
-  auto target = derived.Nominal;
+  auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
+  auto conformanceDC = derived.getConformanceContext();
 
   // Expected type: (Self) -> (Decoder) throws -> (Self)
   // Constructed as: func type
@@ -1033,20 +1036,19 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
                                        /*Throws=*/true);
 
   // (Self)
-  auto returnType = target->getDeclaredInterfaceType();
+  auto returnType = derived.Nominal->getDeclaredInterfaceType();
 
   // (from: Decoder) throws -> (Self)
   Type innerType = FunctionType::get(inputType, returnType, extInfo);
 
   // Params: (self [implicit], Decoder)
   // self should be inout if the type is a value type; not inout otherwise.
-  auto inOut = !isa<ClassDecl>(target);
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target,
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), conformanceDC,
                                          /*isStatic=*/false,
-                                         /*isInOut=*/inOut);
-  auto *decoderParamDecl = new (C)
-      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                C.Id_from, SourceLoc(), C.Id_decoder, decoderType, target);
+                                         /*isInOut=*/!classDecl);
+  auto *decoderParamDecl = new (C) ParamDecl(
+      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
+      SourceLoc(), C.Id_decoder, decoderType, conformanceDC);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
 
@@ -1055,16 +1057,16 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // Func name: init(from: Decoder)
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
-  auto *initDecl = new (C) ConstructorDecl(name, SourceLoc(), OTK_None,
-                                           SourceLoc(), /*Throws=*/true,
-                                           SourceLoc(), selfDecl, paramList,
-                                           /*GenericParams=*/nullptr, target);
+  auto *initDecl =
+      new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
+                              /*Throws=*/true, SourceLoc(), selfDecl, paramList,
+                              /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.
-  if (isa<ClassDecl>(target) && !target->getAttrs().hasAttribute<FinalAttr>()) {
+  if (classDecl && !classDecl->getAttrs().hasAttribute<FinalAttr>()) {
     auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
     initDecl->getAttrs().add(reqAttr);
   }
@@ -1073,9 +1075,10 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   auto initSelfParam = computeSelfParam(initDecl, /*init=*/true);
   Type interfaceType;
   Type initializerType;
-  if (auto sig = target->getGenericSignatureOfContext()) {
+  if (auto sig = conformanceDC->getGenericSignatureOfContext()) {
     // Evaluate the below, but in a generic environment (if Self is generic).
-    initDecl->setGenericEnvironment(target->getGenericEnvironmentOfContext());
+    initDecl->setGenericEnvironment(
+        conformanceDC->getGenericEnvironmentOfContext());
     interfaceType = GenericFunctionType::get(sig, {selfParam}, innerType,
                                              FunctionType::ExtInfo());
     initializerType = GenericFunctionType::get(sig, {initSelfParam}, innerType,
@@ -1091,7 +1094,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   initDecl->setInterfaceType(interfaceType);
   initDecl->setValidationStarted();
   initDecl->setInitializerInterfaceType(initializerType);
-  initDecl->copyFormalAccessFrom(target, /*sourceIsParentContext*/true);
+  initDecl->copyFormalAccessFrom(derived.Nominal,
+                                 /*sourceIsParentContext*/ true);
 
   C.addSynthesizedDecl(initDecl);
 
@@ -1204,7 +1208,7 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
     return nullptr;
   }
 
-  if (checkAndDiagnoseDisallowedContext())
+  if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
   // We're about to try to synthesize Encodable. If something goes wrong,
@@ -1250,7 +1254,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
     return nullptr;
   }
 
-  if (checkAndDiagnoseDisallowedContext())
+  if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
   // We're about to try to synthesize Decodable. If something goes wrong,
