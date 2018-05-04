@@ -620,7 +620,8 @@ void CompilerInstance::parseAndCheckTypes(
                         TypeCheckOptions, /*curElem*/ 0,
                         options.WarnLongFunctionBodies,
                         options.WarnLongExpressionTypeChecking,
-                        options.SolverExpressionTimeThreshold);
+                        options.SolverExpressionTimeThreshold,
+                        options.SwitchCheckingInvocationThreshold);
   });
 
   // Even if there were no source files, we should still record known
@@ -743,7 +744,8 @@ void CompilerInstance::parseAndTypeCheckMainFile(
                           TypeCheckOptions, CurTUElem,
                           options.WarnLongFunctionBodies,
                           options.WarnLongExpressionTypeChecking,
-                          options.SolverExpressionTimeThreshold);
+                          options.SolverExpressionTimeThreshold,
+                          options.SwitchCheckingInvocationThreshold);
     }
     CurTUElem = MainFile.Decls.size();
   } while (!Done);
