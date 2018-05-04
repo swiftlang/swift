@@ -154,6 +154,8 @@ def main():
                 serialized_pre_edit_filename,
                 '-input-source-filename',
                 post_edit_file.name,
+                '--old-source-filename',
+                pre_edit_file.name,
                 '-output-filename',
                 serialized_incr_filename
             ] + incremental_edit_args)

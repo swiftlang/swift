@@ -108,6 +108,12 @@ OldSyntaxTreeFilename("old-syntax-tree-filename",
                       llvm::cl::desc("Path to the serialized syntax tree of "
                                      "the pre-edit file"));
 
+static llvm::cl::opt<std::string>
+OldSourceFilename("old-source-filename",
+                  llvm::cl::desc("Path to the pre-edit source file to "
+                                 "translate line:column edits into the "
+                                 "file's byte offsets"));
+
 static llvm::cl::list<std::string>
 IncrementalEdits("incremental-edit",
                  llvm::cl::desc("An edit that was applied to reach the input "
@@ -197,8 +203,17 @@ getTokensFromFile(const StringRef InputFilename,
 void anchorForGetMainExecutable() {}
 
 bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
-                                   SourceManager &SourceMgr,
-                                   unsigned BufferID) {
+                                   StringRef OldFileName) {
+  // Get a source manager for the old file
+  InputFile OldFile = InputFile(OldFileName, true);
+  auto OldFileBufferOrErrror = llvm::MemoryBuffer::getFileOrSTDIN(OldFileName);
+  if (!OldFileBufferOrErrror) {
+    llvm::errs() << "Unable to open old source file";
+    return false;
+  }
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(OldFileBufferOrErrror.get()));
+
   // Parse the source edits
   for (auto EditPattern : options::IncrementalEdits) {
     llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
@@ -330,6 +345,16 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
     SyntaxCache = new SyntaxParsingCache(OldSyntaxTree.getValue());
 
     SyntaxCache->recordReuseInformation();
+
+    if (options::OldSourceFilename.empty()) {
+      llvm::errs() << "The old syntax file must be provided to translate "
+                      "line:column edits to byte offsets";
+      return EXIT_FAILURE;
+    }
+    if (!parseIncrementalEditArguments(SyntaxCache,
+                                       options::OldSourceFilename)) {
+      return EXIT_FAILURE;
+    }
   }
 
   // Set up the compiler invocation
@@ -355,13 +380,6 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
   auto BufferIDs = Instance.getInputBufferIDs();
   assert(BufferIDs.size() == 1 && "Only expecting to process one source file");
   unsigned BufferID = BufferIDs.front();
-
-  if (SyntaxCache) {
-    if (!parseIncrementalEditArguments(SyntaxCache, Instance.getSourceMgr(),
-                                       BufferID)) {
-      return EXIT_FAILURE;
-    }
-  }
 
   // Parse the actual source file
   Instance.performParseOnly();
