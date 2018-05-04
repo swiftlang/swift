@@ -372,7 +372,7 @@ class TaskMonitor {
   const unsigned MaxNumberOfParallelTasks;
 
 public:
-  struct CallBacks {
+  struct Callbacks {
     const TaskQueue::TaskBeganCallback TaskBegan;
     const TaskQueue::TaskFinishedCallback TaskFinished;
     const TaskQueue::TaskSignalledCallback TaskSignalled;
@@ -380,15 +380,15 @@ public:
   };
 
 private:
-  CallBacks callBacks;
+  Callbacks callbacks;
 
 public:
   TaskMonitor(std::queue<std::unique_ptr<Task>> &TasksToBeExecuted,
-              const unsigned NumberOfParallelTasks, const CallBacks &callBacks)
+              const unsigned NumberOfParallelTasks, const Callbacks &callbacks)
       : TasksToBeExecuted(TasksToBeExecuted),
         MaxNumberOfParallelTasks(
             NumberOfParallelTasks == 0 ? 1 : NumberOfParallelTasks),
-        callBacks(callBacks) {}
+        callbacks(callbacks) {}
 
   /// Run the tasks to be executed.
   /// \return true on error.
@@ -434,8 +434,8 @@ class TaskHospice {
 public:
   /// \return true on error.
   static bool waitForThenDealWithDeath(
-      Task &T, const TaskQueue::TaskFinishedCallback FinishedCallBack,
-      const TaskQueue::TaskSignalledCallback SignalledCallBack);
+      Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback,
+      const TaskQueue::TaskSignalledCallback SignalledCallback);
 
 private:
   /// Block until process \p pid exits then return the exit status.
@@ -444,12 +444,12 @@ private:
   /// \return true on error.
   static bool
   cleanUpAfterExit(int Status, const Task &T,
-                   const TaskQueue::TaskFinishedCallback FinishedCallBack);
+                   const TaskQueue::TaskFinishedCallback FinishedCallback);
 
   /// \return true on error.
   static bool
   cleanUpAfterSignal(int Status, const Task &T,
-                     const TaskQueue::TaskSignalledCallback SignalledCallBack);
+                     const TaskQueue::TaskSignalledCallback SignalledCallback);
 };
 
 bool TaskMonitor::executeTasks() {
@@ -498,7 +498,7 @@ TaskMonitor::PollResult TaskMonitor::pollTheFds() {
   assert(!FdsBeingPolled.empty() &&
          "We should only call poll() if we have fds to watch!");
   int ReadyFdCount = poll(FdsBeingPolled.data(), FdsBeingPolled.size(), -1);
-  callBacks.PolledAnFd();
+  callbacks.PolledAnFd();
   if (ReadyFdCount != -1)
     return PollResult::NoError;
   return errno == EAGAIN || errno == EINTR ? PollResult::SoftError
@@ -508,7 +508,7 @@ TaskMonitor::PollResult TaskMonitor::pollTheFds() {
 bool TaskMonitor::beginExecutingATask(Task &T) {
   if (T.execute())
     return true;
-  callBacks.TaskBegan(T.getPid(), T.getContext());
+  callbacks.TaskBegan(T.getPid(), T.getContext());
   return false;
 }
 
@@ -526,7 +526,7 @@ TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
       continue;
     finishedFds.push_back(fileDes);
     const bool hadError = TaskHospice::waitForThenDealWithDeath(
-        T, callBacks.TaskFinished, callBacks.TaskSignalled);
+        T, callbacks.TaskFinished, callbacks.TaskSignalled);
     TasksBeingExecuted.destroyTask(T);
     if (hadError)
       return None;
@@ -565,8 +565,8 @@ bool TaskMonitor::didTaskHangup(const short events) const {
 }
 
 bool TaskHospice::waitForThenDealWithDeath(
-    Task &T, const TaskQueue::TaskFinishedCallback FinishedCallBack,
-    const TaskQueue::TaskSignalledCallback SignalledCallBack) {
+    Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback,
+    const TaskQueue::TaskSignalledCallback SignalledCallback) {
   const Optional<int> StatusIfOK = waitForPid(T.getPid());
   if (!StatusIfOK)
     return true;
@@ -574,9 +574,9 @@ bool TaskHospice::waitForThenDealWithDeath(
   T.finishExecution();
   int Status = *StatusIfOK;
   return WIFEXITED(Status)
-             ? cleanUpAfterExit(Status, T, FinishedCallBack)
+             ? cleanUpAfterExit(Status, T, FinishedCallback)
              : WIFSIGNALED(Status)
-                   ? cleanUpAfterSignal(Status, T, SignalledCallBack)
+                   ? cleanUpAfterSignal(Status, T, SignalledCallback)
                    : false /* Can this case ever happen? */;
 }
 
@@ -599,9 +599,9 @@ Optional<int> TaskHospice::waitForPid(const pid_t pidToWaitFor) {
 
 bool TaskHospice::cleanUpAfterExit(
     int Status, const Task &T,
-    const TaskQueue::TaskFinishedCallback FinishedCallBack) {
+    const TaskQueue::TaskFinishedCallback FinishedCallback) {
   const int Result = WEXITSTATUS(Status);
-  if (!FinishedCallBack) {
+  if (!FinishedCallback) {
     // Since we don't have a TaskFinishedCallback, treat a subtask
     // which returned a nonzero exit code as having failed.
     return Result != 0;
@@ -609,18 +609,18 @@ bool TaskHospice::cleanUpAfterExit(
   // If we have a TaskFinishedCallback, only have an error if the callback
   // returns StopExecution.
   return TaskFinishedResponse::StopExecution ==
-         FinishedCallBack(T.getPid(), Result, T.getOutput(), T.getErrors(),
+         FinishedCallback(T.getPid(), Result, T.getOutput(), T.getErrors(),
                           T.getContext());
 }
 
 bool TaskHospice::cleanUpAfterSignal(
     int Status, const Task &T,
-    const TaskQueue::TaskSignalledCallback SignalledCallBack) {
+    const TaskQueue::TaskSignalledCallback SignalledCallback) {
   // The process exited due to a signal.
   const int Signal = WTERMSIG(Status);
   StringRef ErrorMsg = strsignal(Signal);
 
-  if (!SignalledCallBack) {
+  if (!SignalledCallback) {
     // Since we don't have a TaskCrashedCallback, treat a crashing
     // subtask as having failed.
     return true;
@@ -628,7 +628,7 @@ bool TaskHospice::cleanUpAfterSignal(
   // If we have a TaskCrashedCallback, only return an error if the callback
   // returns StopExecution.
   return TaskFinishedResponse::StopExecution ==
-         SignalledCallBack(T.getPid(), ErrorMsg, T.getOutput(), T.getErrors(),
+         SignalledCallback(T.getPid(), ErrorMsg, T.getOutput(), T.getErrors(),
                            T.getContext(), Signal);
 }
 
@@ -644,15 +644,15 @@ void TaskMonitor::stopPolling(ArrayRef<int> FinishedFds) {
   }
 }
 
-bool TaskQueue::execute(TaskBeganCallback BeganCallBack,
-                        TaskFinishedCallback FinishedCallBack,
-                        TaskSignalledCallback SignalledCallBack) {
-  TaskMonitor::CallBacks callBacks{
-      BeganCallBack, FinishedCallBack, SignalledCallBack, [&] {
+bool TaskQueue::execute(TaskBeganCallback BeganCallback,
+                        TaskFinishedCallback FinishedCallback,
+                        TaskSignalledCallback SignalledCallback) {
+  TaskMonitor::Callbacks callbacks{
+      BeganCallback, FinishedCallback, SignalledCallback, [&] {
         if (Stats)
           ++Stats->getDriverCounters().NumDriverPipePolls;
       }};
 
-  TaskMonitor TE(QueuedTasks, getNumberOfParallelTasks(), callBacks);
+  TaskMonitor TE(QueuedTasks, getNumberOfParallelTasks(), callbacks);
   return TE.executeTasks();
 }
