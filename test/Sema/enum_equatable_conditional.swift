@@ -20,7 +20,6 @@ enum WithArrayOfEquatables2<T> {
 case only([T])
 }
 
-// No: T is Equatable here, but cannot synthesize via an extension.
-// expected-error@+1{{type 'WithArrayOfEquatables2<T>' does not conform to protocol 'Equatable'}}
+// Okay: T is Equatable here too
 extension WithArrayOfEquatables2: Equatable where T: Equatable { }
 
