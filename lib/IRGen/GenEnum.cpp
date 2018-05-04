@@ -527,6 +527,7 @@ namespace {
         return;
       getSingleton()->collectMetadataForOutlining(collector,
                                         getSingletonType(collector.IGF.IGM, T));
+      collector.collectTypeMetadataForLayout(T);
     }
 
     void reexplode(IRGenFunction &IGF, Explosion &src, Explosion &dest)
