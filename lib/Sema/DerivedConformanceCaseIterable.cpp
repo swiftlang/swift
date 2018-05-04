@@ -79,14 +79,8 @@ static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
 
 ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   // Conformance can't be synthesized in an extension.
-  auto caseIterableProto =
-      TC.Context.getProtocol(KnownProtocolKind::CaseIterable);
-  auto caseIterableType = caseIterableProto->getDeclaredType();
-  if (Nominal != ConformanceDecl) {
-    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                caseIterableType);
+  if (checkAndDiagnoseDisallowedContext())
     return nullptr;
-  }
 
   // Check that we can actually derive CaseIterable for this type.
   if (!canDeriveConformance(Nominal))
@@ -120,15 +114,8 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 }
 
 Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
-  // Conformance can't be synthesized in an extension.
-  auto caseIterableProto =
-      TC.Context.getProtocol(KnownProtocolKind::CaseIterable);
-  auto caseIterableType = caseIterableProto->getDeclaredType();
-  if (Nominal != ConformanceDecl) {
-    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                caseIterableType);
+  if (checkAndDiagnoseDisallowedContext())
     return nullptr;
-  }
 
   // Check that we can actually derive CaseIterable for this type.
   if (!canDeriveConformance(Nominal))
