@@ -574,6 +574,13 @@ namespace {
       if (D->isImplicit())
         PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
 
+      auto R = D->getSourceRange();
+      if (R.isValid()) {
+        PrintWithColorRAII(OS, RangeColor) << " range=";
+        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
+                D->getASTContext().SourceMgr, /*PrintText=*/false);
+      }
+
       if (D->TrailingSemiLoc.isValid())
         PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
     }
