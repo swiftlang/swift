@@ -168,21 +168,17 @@ protected:
 
   ProtocolConformanceRef getOpConformance(Type ty,
                                           ProtocolConformanceRef conformance) {
-    auto newConformance =
-      conformance.subst(ty,
-                        [&](SubstitutableType *t) -> Type {
-                          if (t->isOpenedExistential()) {
-                            auto found = OpenedExistentialSubs.find(
-                              t->castTo<ArchetypeType>());
-                            if (found != OpenedExistentialSubs.end())
-                              return found->second;
-                            return t;
-                          }
-                          return t;
-                        },
-                        MakeAbstractConformanceForGenericType());
+    // If we have open existentials to substitute, do so now.
+    if (ty->hasOpenedExistential() && !OpenedExistentialSubs.empty()) {
+      conformance =
+        conformance.subst(ty,
+                          QueryTypeSubstitutionMapOrIdentity{
+                                                        OpenedExistentialSubs},
+                          MakeAbstractConformanceForGenericType());
+    }
+
     return asImpl().remapConformance(getASTTypeInClonedContext(ty),
-                                     newConformance);
+                                     conformance);
   }
 
   ArrayRef<ProtocolConformanceRef>
