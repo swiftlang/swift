@@ -80,10 +80,7 @@ deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived) {
       derived.TC, propDecl, stringTy);
   getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
 
-  auto dc = cast<IterableDeclContext>(derived.ConformanceDecl);
-  dc->addMember(getterDecl);
-  dc->addMember(propDecl);
-  dc->addMember(pbDecl);
+  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
   return propDecl;
 }
