@@ -18,3 +18,8 @@ enum YetOtherFileNonconforming {
 // expected-note@-1 {{type declared here}}
   case A(Int)
 }
+
+enum GenericOtherFileNonconforming<T> {
+// expected-note@-1 {{type declared here}}
+    case A(T)
+}

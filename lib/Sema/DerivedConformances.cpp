@@ -16,6 +16,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
@@ -48,6 +49,7 @@ Type DerivedConformance::getProtocolType() const {
 }
 
 bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
+                                                    DeclContext *DC,
                                                     NominalTypeDecl *Nominal,
                                                     ProtocolDecl *Protocol) {
   // Only known protocols can be derived.
@@ -72,7 +74,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
         // Enums without associated values can implicitly derive Equatable
         // conformance.
       case KnownProtocolKind::Equatable:
-        return canDeriveEquatable(TC, Nominal);
+        return canDeriveEquatable(TC, DC, Nominal);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -128,7 +130,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     if (auto structDecl = dyn_cast<StructDecl>(Nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
-          return canDeriveEquatable(TC, Nominal);
+          return canDeriveEquatable(TC, DC, Nominal);
         default:
           return false;
       }
@@ -152,9 +154,15 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    // Check whether this nominal type derives conformances to the protocol.
-    if (!DerivedConformance::derivesProtocolConformance(tc, nominal, proto))
-      return nullptr;
+    if (auto conformance = tc.conformsToProtocol(
+            nominal->getDeclaredInterfaceType(), proto, nominal,
+            ConformanceCheckFlags::SkipConditionalRequirements)) {
+      auto DC = conformance->getConcrete()->getDeclContext();
+      // Check whether this nominal type derives conformances to the protocol.
+      if (!DerivedConformance::derivesProtocolConformance(tc, DC, nominal,
+                                                          proto))
+        return nullptr;
+    }
 
     // Retrieve the requirement.
     auto results = proto->lookupDirect(name);
@@ -330,7 +338,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
   auto &C = TC.Context;
-  auto parentDC = cast<DeclContext>(ConformanceDecl);
+  auto parentDC = getConformanceContext();
 
   VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,

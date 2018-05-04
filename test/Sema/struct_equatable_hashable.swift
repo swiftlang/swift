@@ -48,7 +48,7 @@ struct CustomHashValue: Hashable {
 
   var hashValue: Int { return 0 }
 
-  static func ==(x: CustomHashValue, y: CustomHashValue) -> Bool { return true } // expected-note 2 {{non-matching type}}
+  static func ==(x: CustomHashValue, y: CustomHashValue) -> Bool { return true } // expected-note 3 {{non-matching type}}
 }
 
 if CustomHashValue(x: 1, y: 2) == CustomHashValue(x: 2, y: 3) { }
@@ -68,7 +68,7 @@ struct CustomHashInto: Hashable {
     hasher.combine(y)
   }
 
-  static func ==(x: CustomHashInto, y: CustomHashInto) -> Bool { return true } // expected-note 2 {{non-matching type}}
+  static func ==(x: CustomHashInto, y: CustomHashInto) -> Bool { return true } // expected-note 3 {{non-matching type}}
 }
 
 if CustomHashInto(x: 1, y: 2) == CustomHashInto(x: 2, y: 3) { }
@@ -158,7 +158,7 @@ public struct StructConformsAndImplementsInExtension {
   let v: Int
 }
 extension StructConformsAndImplementsInExtension : Equatable {
-  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note {{non-matching type}}
+  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note 2 {{non-matching type}}
     return true
   }  
 }
@@ -175,7 +175,7 @@ struct NoStoredProperties: Hashable {}
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 2 {{non-matching type}}
     return true
   }
   var hashValue: Int { return 0 }
@@ -206,6 +206,34 @@ extension GenericHashIntoInExtension: Hashable {
 }
 let _: Int = GenericHashIntoInExtension<String>(value: "a").hashValue
 GenericHashIntoInExtension(value: "b").hash(into: &hasher)
+
+// Conditional conformances should be able to be synthesized
+struct GenericDeriveExtension<T> {
+    let value: T
+}
+extension GenericDeriveExtension: Equatable where T: Equatable {}
+extension GenericDeriveExtension: Hashable where T: Hashable {}
+
+// Incorrectly/insufficiently conditional shouldn't work
+struct BadGenericDeriveExtension<T> {
+    let value: T
+}
+extension BadGenericDeriveExtension: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
+extension BadGenericDeriveExtension: Hashable where T: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
+
+// But some cases don't need to be conditional, even if they look similar to the
+// above
+struct AlwaysHashable<T>: Hashable {}
+struct UnusedGenericDeriveExtension<T> {
+    let value: AlwaysHashable<T>
+}
+extension UnusedGenericDeriveExtension: Hashable {}
+
+// Cross-file synthesis is still disallowed for conditional cases
+extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
+// expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
