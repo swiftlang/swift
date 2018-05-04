@@ -14,5 +14,6 @@ struct OtherFileNonconforming {
   let v: String
 }
 struct YetOtherFileNonconforming {
+// expected-note@-1{{type declared here}}
   let v: String
 }

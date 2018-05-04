@@ -1,7 +1,10 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 // Simple structs where Codable conformance is added in extensions should derive
-// conformance.
+// conformance, no matter which order the extension and type occur in.
+
+extension SimpleStruct : Codable {}
+
 struct SimpleStruct {
   var x: Int
   var y: Double
@@ -17,9 +20,6 @@ struct SimpleStruct {
     // Static vars should not be part of the CodingKeys enum.
     let _ = SimpleStruct.CodingKeys.z // expected-error {{type 'SimpleStruct.CodingKeys' has no member 'z'}}
   }
-}
-
-extension SimpleStruct : Codable {
 }
 
 // They should receive synthesized init(from:) and an encode(to:).
