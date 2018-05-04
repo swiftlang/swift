@@ -50,7 +50,7 @@ enum TrailingSemi {
     // CHECK-LABEL: (sequence_expr {{.*}} trailing_semi
     y += 1;
 
-    // CHECK-LABEL: (return_stmt trailing_semi
+    // CHECK-LABEL: (return_stmt{{.*}}trailing_semi
     return y;
   };
 };
