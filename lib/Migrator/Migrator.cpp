@@ -37,14 +37,15 @@ bool migrator::updateCodeAndEmitRemapIfNeeded(
   llvm::sys::fs::remove(Invocation.getMigratorOptions().EmitRemapFilePath);
 
   Migrator M { Instance, Invocation }; // Provide inputs and configuration
+  auto EffectiveVersion = Invocation.getLangOptions().EffectiveLanguageVersion;
+  auto CurrentVersion = version::Version::getCurrentLanguageVersion();
 
   // Phase 1: Pre Fix-it passes
   // These uses the initial frontend invocation to apply any obvious fix-its
   // to see if we can get an error-free AST to get to Phase 2.
   std::unique_ptr<swift::CompilerInstance> PreFixItInstance;
   if (Instance->getASTContext().hadError()) {
-    PreFixItInstance = M.repeatFixitMigrations(2,
-      Invocation.getLangOptions().EffectiveLanguageVersion);
+    PreFixItInstance = M.repeatFixitMigrations(2, EffectiveVersion);
 
     // If we still couldn't fix all of the errors, give up.
     if (PreFixItInstance == nullptr ||
@@ -56,10 +57,8 @@ bool migrator::updateCodeAndEmitRemapIfNeeded(
   }
 
   // Phase 2: Syntactic Transformations
-  // Don't run these passes if we're already in Swift 4.2
-  auto Opts = Invocation.getLangOptions().EffectiveLanguageVersion;
-  bool isFourTwo = Opts.size() == 2 && Opts[0] == 4 && Opts[1] == 2;
-  if (!isFourTwo) {
+  // Don't run these passes if we're already in newest Swift version.
+  if (EffectiveVersion != CurrentVersion) {
     auto FailedSyntacticPasses = M.performSyntacticPasses();
     if (FailedSyntacticPasses) {
       return true;
@@ -75,7 +74,7 @@ bool migrator::updateCodeAndEmitRemapIfNeeded(
 
   if (M.getMigratorOptions().EnableMigratorFixits) {
     M.repeatFixitMigrations(Migrator::MaxCompilerFixitPassIterations,
-                            {4, 0, 0});
+                            CurrentVersion);
   }
 
   // OK, we have a final resulting text. Now we compare against the input
