@@ -95,9 +95,9 @@ extension FixedWidthInteger {
   // _parseASCII function thunk that prevents inlining used as an implementation
   // detail for FixedWidthInteger.init(_: radix:) on the slow path to save code
   // size.
-  @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(never)
+  @usableFromInline
   internal static func _parseASCIISlowPath<
     CodeUnits : IteratorProtocol, Result: FixedWidthInteger
   >(
