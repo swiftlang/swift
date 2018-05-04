@@ -184,6 +184,10 @@ public:
 
   /// Build a reference to the 'self' decl of a derived function.
   static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);
+
+  /// Returns true if this derivation is trying to use a context that isn't
+  /// appropriate for deriving.
+  bool checkAndDiagnoseDisallowedContext() const;
 };
 }
 

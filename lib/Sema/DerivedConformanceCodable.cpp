@@ -1204,14 +1204,8 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
     return nullptr;
   }
 
-  // Conformance can't be synthesized in an extension.
-  auto encodableProto = TC.Context.getProtocol(KnownProtocolKind::Encodable);
-  auto encodableType = encodableProto->getDeclaredType();
-  if (Nominal != ConformanceDecl) {
-    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                encodableType);
+  if (checkAndDiagnoseDisallowedContext())
     return nullptr;
-  }
 
   // We're about to try to synthesize Encodable. If something goes wrong,
   // we'll have to output at least one error diagnostic because we returned
@@ -1230,9 +1224,10 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   // fake failures.
   auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
   TC.diagnose(Nominal, diag::type_does_not_conform, Nominal->getDeclaredType(),
-              encodableType);
+              getProtocolType());
   TC.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
-              requirement->getFullName(), encodableType, /*AddFixIt=*/false);
+              requirement->getFullName(), getProtocolType(),
+              /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
@@ -1255,14 +1250,8 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
     return nullptr;
   }
 
-  // Conformance can't be synthesized in an extension.
-  auto decodableProto = TC.Context.getProtocol(KnownProtocolKind::Decodable);
-  auto decodableType = decodableProto->getDeclaredType();
-  if (Nominal != ConformanceDecl) {
-    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                decodableType);
+  if (checkAndDiagnoseDisallowedContext())
     return nullptr;
-  }
 
   // We're about to try to synthesize Decodable. If something goes wrong,
   // we'll have to output at least one error diagnostic. We need to collate
@@ -1271,10 +1260,10 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   // background on this transaction.
   auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
   TC.diagnose(Nominal, diag::type_does_not_conform, Nominal->getDeclaredType(),
-              decodableType);
+              getProtocolType());
   TC.diagnose(requirement, diag::no_witnesses,
               diag::RequirementKind::Constructor, requirement->getFullName(),
-              decodableType, /*AddFixIt=*/false);
+              getProtocolType(), /*AddFixIt=*/false);
 
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.

@@ -682,23 +682,14 @@ bool DerivedConformance::canDeriveEquatable(TypeChecker &tc,
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
-  // Conformance can't be synthesized in an extension; we allow it as a special
-  // case for enums with no associated values to preserve source compatibility.
-  auto theEnum = dyn_cast<EnumDecl>(Nominal);
-  if (!(theEnum && theEnum->hasOnlyCasesWithoutAssociatedValues()) &&
-      Nominal != ConformanceDecl) {
-    auto equatableProto = TC.Context.getProtocol(KnownProtocolKind::Equatable);
-    auto equatableType = equatableProto->getDeclaredType();
-    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                equatableType);
+  if (checkAndDiagnoseDisallowedContext())
     return nullptr;
-  }
 
   // Build the necessary decl.
   if (requirement->getBaseName() == "==") {
-    if (theEnum) {
+    if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
       auto bodySynthesizer =
-          theEnum->hasOnlyCasesWithoutAssociatedValues()
+          ED->hasOnlyCasesWithoutAssociatedValues()
               ? &deriveBodyEquatable_enum_noAssociatedValues_eq
               : &deriveBodyEquatable_enum_hasAssociatedValues_eq;
       return deriveEquatable_eq(*this, TC.Context.Id_derived_enum_equals,
@@ -1205,22 +1196,15 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
                     hashableProto->getDeclaredType());
         return nullptr;
       }
-      // Hashable can't be fully synthesized in an extension; we allow it as a
-      // special case for enums with no associated values to preserve source
-      // compatibility.
-      auto theEnum = dyn_cast<EnumDecl>(Nominal);
-      auto hasAssociatedValues =
-        theEnum && !theEnum->hasOnlyCasesWithoutAssociatedValues();
-      if ((!theEnum || hasAssociatedValues) && Nominal != ConformanceDecl) {
-        TC.diagnose(ConformanceDecl->getLoc(),
-                    diag::cannot_synthesize_in_extension,
-                    hashableProto->getDeclaredType());
+
+      if (checkAndDiagnoseDisallowedContext())
         return nullptr;
-      }
-      if (theEnum) {
-        auto bodySynthesizer = hasAssociatedValues
-          ? &deriveBodyHashable_enum_hasAssociatedValues_hashInto
-          : &deriveBodyHashable_enum_noAssociatedValues_hashInto;
+
+      if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
+        auto bodySynthesizer =
+            !ED->hasOnlyCasesWithoutAssociatedValues()
+                ? &deriveBodyHashable_enum_hasAssociatedValues_hashInto
+                : &deriveBodyHashable_enum_noAssociatedValues_hashInto;
         return deriveHashable_hashInto(*this, bodySynthesizer);
       } else if (isa<StructDecl>(Nominal))
         return deriveHashable_hashInto(*this,
