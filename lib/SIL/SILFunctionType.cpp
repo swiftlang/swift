@@ -359,7 +359,7 @@ public:
       }
     }
 
-    SILResultInfo result(substResultTL.getLoweredType().getSwiftRValueType(),
+    SILResultInfo result(substResultTL.getLoweredType().getASTType(),
                          convention);
     Results.push_back(result);
   }
@@ -706,7 +706,7 @@ private:
                                    substTL);
       assert(!isIndirectFormalParameter(convention));
     }
-    auto loweredType = substTL.getLoweredType().getSwiftRValueType();
+    auto loweredType = substTL.getLoweredType().getASTType();
 
     Inputs.push_back(SILParameterInfo(loweredType, convention));
 
@@ -731,7 +731,7 @@ private:
       M.Types.getLoweredType(Foreign.Error->getErrorParameterType());
 
     // Assume the error parameter doesn't have interesting lowering.
-    Inputs.push_back(SILParameterInfo(foreignErrorTy.getSwiftRValueType(),
+    Inputs.push_back(SILParameterInfo(foreignErrorTy.getASTType(),
                                       ParameterConvention::Direct_Unowned));
     NextOrigParamIndex++;
     return true;
@@ -864,14 +864,14 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       } else {
         convention = ParameterConvention::Direct_Guaranteed;
       }
-      SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
+      SILParameterInfo param(loweredTy.getASTType(), convention);
       inputs.push_back(param);
       break;
     }
     case CaptureKind::Box: {
       // Lvalues are captured as a box that owns the captured value.
       auto boxTy = Types.getInterfaceBoxTypeForCapture(
-          VD, loweredTy.getSwiftRValueType(),
+          VD, loweredTy.getASTType(),
           /*mutable*/ true);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention);
@@ -882,7 +882,7 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       // Non-escaping lvalues are captured as the address of the value.
       SILType ty = loweredTy.getAddressType();
       auto param =
-          SILParameterInfo(ty.getSwiftRValueType(),
+          SILParameterInfo(ty.getASTType(),
                            ParameterConvention::Indirect_InoutAliasable);
       inputs.push_back(param);
       break;
@@ -960,7 +960,7 @@ static CanSILFunctionType getSILFunctionType(
            "using native Swift error convention for foreign type!");
     SILType exnType = SILType::getExceptionType(M.getASTContext());
     assert(exnType.isObject());
-    errorResult = SILResultInfo(exnType.getSwiftRValueType(),
+    errorResult = SILResultInfo(exnType.getASTType(),
                                 ResultConvention::Owned);
   }
 
@@ -1839,7 +1839,7 @@ public:
       break;
     }
 
-    auto type = tl.getLoweredType().getSwiftRValueType();
+    auto type = tl.getLoweredType().getASTType();
     if (type->hasRetainablePointerRepresentation()
         || (type->getSwiftNewtypeUnderlyingType() && !tl.isTrivial()))
       return ResultConvention::Autoreleased;
@@ -2360,7 +2360,7 @@ public:
   }
 
   SILType subst(SILType type) {
-    return SILType::getPrimitiveType(visit(type.getSwiftRValueType()),
+    return SILType::getPrimitiveType(visit(type.getASTType()),
                                      type.getCategory());
   }
 
@@ -2425,7 +2425,7 @@ public:
 
     AbstractionPattern abstraction(Sig, origType);
     return TheSILModule.Types.getLoweredType(abstraction, substType)
-             .getSwiftRValueType();
+             .getASTType();
   }
 };
 
@@ -2744,13 +2744,13 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
     auto types = tup.getElementTypes();
     aElements.append(types.begin(), types.end());
   } else {
-    aElements.push_back(a.getSwiftRValueType());
+    aElements.push_back(a.getASTType());
   }
   if (auto tup = b.getAs<TupleType>()) {
     auto types = tup.getElementTypes();
     bElements.append(types.begin(), types.end());
   } else {
-    bElements.push_back(b.getSwiftRValueType());
+    bElements.push_back(b.getASTType());
   }
 
   if (aElements.size() != bElements.size())

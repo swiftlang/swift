@@ -103,7 +103,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
   // the type hasn't been mucked with by an optimization pass.
   DeclContext *DC = nullptr;
   GenericEnvironment *GE = nullptr;
-  auto LowTy = GV->getLoweredType().getSwiftRValueType();
+  auto LowTy = GV->getLoweredType().getASTType();
   auto *Type = LowTy.getPointer();
   if (auto *Decl = GV->getDecl()) {
     DC = Decl->getDeclContext();

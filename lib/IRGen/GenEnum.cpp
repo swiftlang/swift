@@ -3292,7 +3292,7 @@ namespace {
     llvm::Value *
     loadDynamicTag(IRGenFunction &IGF, Address addr, SILType T) const {
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy);
-      auto metadata = IGF.emitTypeMetadataRef(T.getSwiftRValueType());
+      auto metadata = IGF.emitTypeMetadataRef(T.getASTType());
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetEnumCaseMultiPayloadFn(),
                                          {addr.getAddress(), metadata});
       call->setDoesNotThrow();
@@ -4489,7 +4489,7 @@ namespace {
 
       // Invoke the runtime to store the tag.
       enumAddr = IGF.Builder.CreateBitCast(enumAddr, IGF.IGM.OpaquePtrTy);
-      auto metadata = IGF.emitTypeMetadataRef(T.getSwiftRValueType());
+      auto metadata = IGF.emitTypeMetadataRef(T.getASTType());
       
       auto call = IGF.Builder.CreateCall(
                                      IGF.IGM.getStoreEnumTagMultiPayloadFn(),
@@ -5108,8 +5108,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     origArgType = theEnum->mapTypeIntoContext(origArgType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
-    const TypeInfo *origArgTI
-      = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
+    auto origArgTI = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getASTType());
     assert(origArgTI && "didn't complete type info?!");
 
     // If the unsubstituted argument contains a generic parameter type, or
@@ -5456,8 +5455,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   if (ElementsWithPayload.empty()) {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
     Alignment alignment(1);
-    applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                          alignment);
+    applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
     return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this, enumTy,
                                                          Size(0), {},
                                                          alignment,
@@ -5476,7 +5474,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
     if (TIK <= Opaque) {
       auto alignment = eltTI.getBestKnownAlignment();
-      applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+      applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
                             alignment);
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
@@ -5485,7 +5483,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
-      applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
+      applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true,
                             alignment);
 
       return getFixedEnumTypeInfo(enumTy,
@@ -5522,8 +5520,7 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   spareBits.extendWithSetBits(tagSize.getValueInBits());
 
   Alignment alignment(tagSize.getValue());
-  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                        alignment);
+  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
 
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                                    enumTy, tagSize, std::move(spareBits),
@@ -5563,8 +5560,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
   enumTy->setBody(body, /*isPacked*/ false);
 
   auto alignment = rawFixedTI.getFixedAlignment();
-  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                        alignment);
+  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
 
   assert(!TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal) &&
          "C-compatible enums cannot be resilient");
@@ -5635,8 +5631,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   }
   
   auto alignment = payloadTI.getFixedAlignment();
-  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/true,
-                        alignment);
+  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/true, alignment);
 
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), std::move(spareBits), alignment,
@@ -5664,7 +5659,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   auto &payloadTI = getPayloadTypeInfo();
   auto alignment = payloadTI.getBestKnownAlignment();
   
-  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
                         alignment);
   
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
@@ -5826,7 +5821,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     assert(PayloadTagBits.count() == numTagBits);
   }
   
-  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/ true,
+  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/ true,
                         worstAlignment);
 
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
@@ -5863,7 +5858,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
     bt &= payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   }
   
-  applyLayoutAttributes(TC.IGM, Type.getSwiftRValueType(), /*fixed*/false,
+  applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
                         alignment);
   
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,

@@ -324,14 +324,14 @@ static bool usesGenerics(SILFunction *F,
         if (&BB != &*F->begin()) {
           // Scan types of all BB arguments. Ignore the entry BB, because
           // it is handled in a special way.
-           Arg->getType().getSwiftRValueType().visit(FindArchetypesAndGenericTypes);
+           Arg->getType().getASTType().visit(FindArchetypesAndGenericTypes);
            if (UsesGenerics)
              return UsesGenerics;
         }
       }
       // Scan types of all operands.
       for (auto &Op : I.getAllOperands()) {
-        Op.get()->getType().getSwiftRValueType().visit(FindArchetypesAndGenericTypes);
+        Op.get()->getType().getASTType().visit(FindArchetypesAndGenericTypes);
       }
       // Scan all substitutions of apply instructions.
       if (auto AI = ApplySite::isa(&I)) {
@@ -350,7 +350,7 @@ static bool usesGenerics(SILFunction *F,
 
       // Scan the result type of the instruction.
       for (auto V : I.getResults()) {
-        V->getType().getSwiftRValueType().visit(FindArchetypesAndGenericTypes);
+        V->getType().getASTType().visit(FindArchetypesAndGenericTypes);
       }
 
       if (UsesGenerics)
@@ -521,7 +521,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
       DEBUG(llvm::dbgs() << "                " << Ty << "\n");
       // If Ty is trivial, just pass it directly.
       if (Ty.isTrivial(AD.Arg->getModule())) {
-        SILParameterInfo NewInfo(Ty.getSwiftRValueType(),
+        SILParameterInfo NewInfo(Ty.getASTType(),
                                  ParameterConvention::Direct_Unowned);
         Out.push_back(NewInfo);
         continue;
@@ -538,7 +538,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
           llvm_unreachable("Unknown parameter convention transformation");
         }
       }
-      SILParameterInfo NewInfo(Ty.getSwiftRValueType(), ParameterConvention);
+      SILParameterInfo NewInfo(Ty.getASTType(), ParameterConvention);
       Out.push_back(NewInfo);
     }
     return;
@@ -936,7 +936,7 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
     bool HasNonTypeDeadArguments = false;
     for (auto &AD : TransformDescriptor.ArgumentDescList) {
       if (AD.IsEntirelyDead &&
-          !isa<AnyMetatypeType>(AD.Arg->getType().getSwiftRValueType())) {
+          !isa<AnyMetatypeType>(AD.Arg->getType().getASTType())) {
         HasNonTypeDeadArguments = true;
         break;
       }
@@ -1228,7 +1228,7 @@ bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
     }
 
     // Explosion of generic parameters is not supported yet.
-    if (A.Arg->getType().getSwiftRValueType()->hasArchetype())
+    if (A.Arg->getType().hasArchetype())
       continue;
 
     A.ProjTree.computeUsesAndLiveness(A.Arg);

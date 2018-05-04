@@ -124,7 +124,7 @@ protected:
   }
 
   SILType getTypeInClonedContext(SILType Ty) {
-    auto objectTy = Ty.getSwiftRValueType();
+    auto objectTy = Ty.getASTType();
     // Do not substitute opened existential types, if we do not have any.
     if (!objectTy->hasOpenedExistential())
       return Ty;
@@ -614,9 +614,7 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
                     getOpLocation(Inst->getLoc()),
                     getOpValue(Inst->getCallee()),
                     getOpSubstitutions(Inst->getSubstitutions()), Args,
-                    Inst->getType()
-                        .getSwiftRValueType()
-                        ->getAs<SILFunctionType>()
+                    Inst->getType().getAs<SILFunctionType>()
                       ->getCalleeConvention(),
                     GenericSpecializationInformation::create(Inst,
                                                              getBuilder())));
@@ -1678,8 +1676,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy
-    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
   registerOpenedExistentialRemapping(
       archetypeTy,
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
@@ -1696,8 +1693,7 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitOpenExistentialValueInst(
     OpenExistentialValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy =
-      Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
   registerOpenedExistentialRemapping(
       archetypeTy,
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
@@ -1714,8 +1710,8 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   // Create a new archetype for this opened existential type.
-  CanType openedType = Inst->getType().getSwiftRValueType();
-  CanType exType = Inst->getOperand()->getType().getSwiftRValueType();
+  auto openedType = Inst->getType().getASTType();
+  auto exType = Inst->getOperand()->getType().getASTType();
   while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
     exType = exMetatype.getInstanceType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
@@ -1747,8 +1743,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy
-    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
   registerOpenedExistentialRemapping(
       archetypeTy,
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
@@ -1765,8 +1760,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy
-    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
   registerOpenedExistentialRemapping(
       archetypeTy,
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
@@ -1783,8 +1777,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy
-    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
   registerOpenedExistentialRemapping(
       archetypeTy,
       ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));

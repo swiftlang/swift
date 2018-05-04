@@ -1451,7 +1451,7 @@ emitReabstractedSubobject(SILGenFunction &SGF, SILLocation loc,
                           CanType substFormalType) {
   // Return if there's no abstraction.  (The first condition is just
   // a fast path.)
-  if (value.getType().getSwiftRValueType() == substFormalType ||
+  if (value.getType().getASTType() == substFormalType ||
       value.getType() == SGF.getLoweredType(substFormalType))
     return value;
 
@@ -1865,7 +1865,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getSwiftRValueType()->isVoid();
+      hasElt = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
@@ -2026,7 +2026,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getSwiftRValueType()->isVoid();
+      hasElt = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
@@ -2573,7 +2573,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   assert(value.getType().isTrivial(SGF.getModule()));
 
   // Get the enum type as an Any.Type value.
-  CanType switchedValueSwiftType = value.getType().getSwiftRValueType();
+  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
       CanMetatypeType::get(switchedValueSwiftType,
                            MetatypeRepresentation::Thick));
@@ -2610,7 +2610,7 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   }
 
   // Get the switched-upon value's type.
-  CanType switchedValueSwiftType = value.getType().getSwiftRValueType();
+  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
       CanMetatypeType::get(switchedValueSwiftType,
                            MetatypeRepresentation::Thick));

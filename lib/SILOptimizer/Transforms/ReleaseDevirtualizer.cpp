@@ -144,8 +144,8 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
     return false;
 
   CanSILFunctionType DeallocType = Dealloc->getLoweredFunctionType();
-  auto *NTD = AllocType.getSwiftRValueType()->getAnyNominal();
-  auto AllocSubMap = AllocType.getSwiftRValueType()
+  auto *NTD = AllocType.getASTType()->getAnyNominal();
+  auto AllocSubMap = AllocType.getASTType()
     ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
 
   DeallocType = DeallocType->substGenericArgs(M, AllocSubMap);

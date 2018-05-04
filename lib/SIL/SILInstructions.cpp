@@ -79,7 +79,7 @@ static void buildTypeDependentOperands(
   for (auto archetype : OpenedArchetypes) {
     auto Def = OpenedArchetypesState.getOpenedArchetypeDef(archetype);
     assert(Def);
-    assert(getOpenedArchetypeOf(Def->getType().getSwiftRValueType()) &&
+    assert(getOpenedArchetypeOf(Def->getType().getASTType()) &&
            "Opened archetype operands should be of an opened existential type");
     TypeDependentOperands.push_back(Def);
   }
@@ -169,7 +169,7 @@ AllocStackInst::create(SILDebugLocation Loc,
                        Optional<SILDebugVariable> Var) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               elementType.getSwiftRValueType());
+                               elementType.getASTType());
   void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
       F.getModule(), Var, TypeDependentOperands);
   return ::new (Buffer)
@@ -221,10 +221,10 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                        ElementCountOperands.end());
   for (SILType ElemType : ElementTypes) {
     collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
-                                 ElemType.getSwiftRValueType());
+                                 ElemType.getASTType());
   }
   collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
-                               ObjectType.getSwiftRValueType());
+                               ObjectType.getASTType());
   auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefInst));
@@ -242,10 +242,10 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                                        ElementCountOperands.end());
   AllOperands.push_back(metatypeOperand);
   collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
-                               ty.getSwiftRValueType());
+                               ty.getASTType());
   for (SILType ElemType : ElementTypes) {
     collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
-                                 ElemType.getSwiftRValueType());
+                                 ElemType.getASTType());
   }
   auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
                                                         ElementTypes.size());
@@ -356,7 +356,7 @@ AllocValueBufferInst::create(SILDebugLocation DebugLoc, SILType valueType,
                              SILOpenedArchetypesState &OpenedArchetypes) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               valueType.getSwiftRValueType());
+                               valueType.getASTType());
   void *Buffer = F.getModule().allocateInst(
       sizeof(AllocValueBufferInst) +
           sizeof(Operand) * (TypeDependentOperands.size() + 1),
@@ -426,7 +426,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionList Subs,
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               SubstCalleeSILTy.getSwiftRValueType(), Subs);
+                               SubstCalleeSILTy.getASTType(), Subs);
   void *Buffer =
     allocateTrailingInst<ApplyInst, Operand>(
       F, getNumAllOperands(Args, TypeDependentOperands));
@@ -530,7 +530,7 @@ PartialApplyInst *PartialApplyInst::create(
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               SubstCalleeTy.getSwiftRValueType(), Subs);
+                               SubstCalleeTy.getASTType(), Subs);
   void *Buffer =
     allocateTrailingInst<PartialApplyInst, Operand>(
       F, getNumAllOperands(Args, TypeDependentOperands));
@@ -566,7 +566,7 @@ TryApplyInst *TryApplyInst::create(
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
-                               substCalleeTy.getSwiftRValueType(), subs);
+                               substCalleeTy.getASTType(), subs);
   void *buffer =
     allocateTrailingInst<TryApplyInst, Operand>(
       F, getNumAllOperands(args, typeDependentOperands));
@@ -830,7 +830,7 @@ MarkFunctionEscapeInst::create(SILDebugLocation Loc,
 
 static SILType getPinResultType(SILType operandType) {
   return SILType::getPrimitiveObjectType(
-    OptionalType::get(operandType.getSwiftRValueType())->getCanonicalType());
+    OptionalType::get(operandType.getASTType())->getCanonicalType());
 }
 
 StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand,
@@ -854,7 +854,7 @@ BindMemoryInst::create(SILDebugLocation Loc, SILValue Base, SILValue Index,
                        SILOpenedArchetypesState &OpenedArchetypes) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               BoundType.getSwiftRValueType());
+                               BoundType.getASTType());
   auto Size = totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size() +
                                                NumFixedOpers);
   auto Buffer = F.getModule().allocateInst(Size, alignof(BindMemoryInst));
@@ -1596,7 +1596,7 @@ ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
 
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
@@ -1691,7 +1691,7 @@ InitExistentialMetatypeInst *InitExistentialMetatypeInst::create(
   SILModule &M = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
-                               existentialMetatypeType.getSwiftRValueType());
+                               existentialMetatypeType.getASTType());
 
   unsigned size = totalSizeToAlloc<swift::Operand, ProtocolConformanceRef>(
       1 + TypeDependentOperands.size(), conformances.size());
@@ -1796,7 +1796,7 @@ UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UncheckedRefCastInst));
@@ -1811,7 +1811,7 @@ UncheckedAddrCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UncheckedAddrCastInst));
@@ -1826,7 +1826,7 @@ UncheckedTrivialBitCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UncheckedTrivialBitCastInst));
@@ -1842,7 +1842,7 @@ UncheckedBitwiseCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UncheckedBitwiseCastInst));
@@ -1856,7 +1856,7 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getSwiftRValueType());
+                               DestTy.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
@@ -1870,7 +1870,7 @@ UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getSwiftRValueType());
+                               DestTy.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer =
@@ -1887,7 +1887,7 @@ CheckedCastBranchInst *CheckedCastBranchInst::create(
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getSwiftRValueType());
+                               DestTy.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastBranchInst));
@@ -1904,7 +1904,7 @@ CheckedCastValueBranchInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getSwiftRValueType());
+                               DestTy.getASTType());
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastValueBranchInst));
@@ -1930,7 +1930,7 @@ UpcastInst *UpcastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UpcastInst));
@@ -1945,7 +1945,7 @@ ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ThinToThickFunctionInst));
@@ -1960,7 +1960,7 @@ PointerToThinFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(PointerToThinFunctionInst));
@@ -1975,7 +1975,7 @@ ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
@@ -2006,7 +2006,7 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getSwiftRValueType());
+                               Ty.getASTType());
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertEscapeToNoEscapeInst));
@@ -2389,7 +2389,7 @@ DestructureStructInst *DestructureStructInst::create(SILModule &M,
 DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
                                                    SILDebugLocation Loc,
                                                    SILValue Operand) {
-  assert(Operand->getType().getSwiftRValueType()->is<TupleType>() &&
+  assert(Operand->getType().is<TupleType>() &&
          "Expected a tuple typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;

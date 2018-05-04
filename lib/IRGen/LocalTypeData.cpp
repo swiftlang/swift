@@ -150,7 +150,7 @@ bool LocalTypeDataCache::AbstractCacheEntry::immediatelySatisfies(
 MetadataResponse
 IRGenFunction::tryGetLocalTypeMetadataForLayout(SILType layoutType,
                                                 DynamicMetadataRequest request){
-  auto type = layoutType.getSwiftRValueType();
+  auto type = layoutType.getASTType();
 
   // Check under the formal type first.
   if (type->isLegalFormalType()) {
@@ -192,7 +192,7 @@ IRGenFunction::tryGetConcreteLocalTypeData(LocalTypeDataKey key,
 
 llvm::Value *IRGenFunction::tryGetLocalTypeDataForLayout(SILType type,
                                                        LocalTypeDataKind kind) {
-  return tryGetLocalTypeData(LocalTypeDataKey(type.getSwiftRValueType(), kind));
+  return tryGetLocalTypeData(LocalTypeDataKey(type.getASTType(), kind));
 }
 
 llvm::Value *IRGenFunction::tryGetLocalTypeData(CanType type,
@@ -346,7 +346,7 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
 void
 IRGenFunction::setScopedLocalTypeMetadataForLayout(SILType type,
                                                    MetadataResponse response) {
-  auto key = LocalTypeDataKey(type.getSwiftRValueType(),
+  auto key = LocalTypeDataKey(type.getASTType(),
                          LocalTypeDataKind::forRepresentationTypeMetadata());
   setScopedLocalTypeData(key, response);
 }
@@ -369,7 +369,7 @@ void IRGenFunction::setScopedLocalTypeDataForLayout(SILType type,
                                                     LocalTypeDataKind kind,
                                                     llvm::Value *data) {
   assert(!kind.isAnyTypeMetadata());
-  setScopedLocalTypeData(LocalTypeDataKey(type.getSwiftRValueType(), kind),
+  setScopedLocalTypeData(LocalTypeDataKey(type.getASTType(), kind),
                          MetadataResponse::forComplete(data));
 }
 

@@ -741,7 +741,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
 
       // Check if the result type depends on this specific opened existential.
       auto ResultDependsOnOldOpenedArchetype =
-          CandidateResult->getType().getSwiftRValueType().findIf(
+          CandidateResult->getType().getASTType().findIf(
               [&OldOpenedArchetype](Type t) -> bool {
                 return (CanType(t) == OldOpenedArchetype);
               });
