@@ -1580,9 +1580,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cacheEntry.setInt(true);
-      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {
-          return true;
-        });
+      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {});
     }
   } else {
     // Build the representation of the Clang module in Swift.
@@ -1602,9 +1600,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // Force load adapter modules for all imported modules.
     // FIXME: This forces the creation of wrapper modules for all imports as
     // well, and may do unnecessary work.
-    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {
-        return true;
-      });
+    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
   }
 
   if (clangModule->isSubModule()) {
@@ -3055,7 +3051,6 @@ void ClangModuleUnit::getImportedModules(
     imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
     break;
   case ModuleDecl::ImportFilter::Public:
-  case ModuleDecl::ImportFilter::ForLinking:
     break;
   }
 
@@ -3065,7 +3060,6 @@ void ClangModuleUnit::getImportedModules(
     switch (filter) {
     case ModuleDecl::ImportFilter::All:
     case ModuleDecl::ImportFilter::Public:
-    case ModuleDecl::ImportFilter::ForLinking:
       imported.append(owner.ImportedHeaderExports.begin(),
                       owner.ImportedHeaderExports.end());
       break;
@@ -3114,7 +3108,6 @@ void ClangModuleUnit::getImportedModules(
     }
 
     case ModuleDecl::ImportFilter::Public:
-    case ModuleDecl::ImportFilter::ForLinking:
       break;
     }
   }

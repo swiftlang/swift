@@ -387,7 +387,6 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
   CurrDC->getParentSourceFile()->forAllVisibleModules(
       [&](ModuleDecl::ImportedModule Import) {
         Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
-        return true;
       });
 }
 
