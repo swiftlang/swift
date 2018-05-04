@@ -389,7 +389,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
       // Emit the retain that matches the captured argument by the
       // partial_apply
       // in the callee that is consumed by the partial_apply.
-      Builder.setInsertionPoint(AI.getInstruction());
+      Builder.setInsertionPointAndScope(AI.getInstruction());
       Builder.createRetainValue(Closure->getLoc(), Arg,
                                 Builder.getDefaultAtomicity());
     } else {
@@ -401,7 +401,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     ++ClosureArgIdx;
   }
 
-  Builder.setInsertionPoint(AI.getInstruction());
+  Builder.setInsertionPointAndScope(AI.getInstruction());
   FullApplySite NewAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     NewAI = Builder.createTryApply(AI.getLoc(), FRI,
@@ -477,7 +477,7 @@ void CallSiteDescriptor::extendArgumentLifetime(
     Builder.createRetainValue(getClosure()->getLoc(), Arg,
                               Builder.getDefaultAtomicity());
     for (auto *I : CInfo->LifetimeFrontier) {
-      Builder.setInsertionPoint(I);
+      Builder.setInsertionPointAndScope(I);
       Builder.createReleaseValue(getClosure()->getLoc(), Arg,
                                  Builder.getDefaultAtomicity());
     }

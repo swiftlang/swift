@@ -192,18 +192,18 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
     auto *ErrorBB = TAI->getFunction()->createBasicBlock();
     ErrorBB->createPHIArgument(TAI->getErrorBB()->getArgument(0)->getType(),
                                ValueOwnershipKind::Owned);
-    Builder.setInsertionPoint(ErrorBB);
+    Builder.setInsertionPointAndScope(ErrorBB, TAI);
     Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
                          {ErrorBB->getArgument(0)});
 
     auto *NormalBB = TAI->getFunction()->createBasicBlock();
     NormalBB->createPHIArgument(TAI->getNormalBB()->getArgument(0)->getType(),
                                 ValueOwnershipKind::Owned);
-    Builder.setInsertionPoint(NormalBB);
+    Builder.setInsertionPointAndScope(NormalBB, TAI);
     Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(),
                          {NormalBB->getArgument(0)});
 
-    Builder.setInsertionPoint(VirtAI.getInstruction());
+    Builder.setInsertionPointAndScope(VirtAI.getInstruction());
     SmallVector<SILValue, 4> Args;
     for (auto Arg : VirtAI.getArguments()) {
       Args.push_back(Arg);

@@ -117,10 +117,9 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   // We need a new fail BB in order to add a dealloc_stack to it
   SILBasicBlock *ConvFailBB = nullptr;
   if (isConditional) {
-    auto CurrInsPoint = Builder.getInsertionPoint();
-    ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
-                                          nullptr, nullptr);
-    Builder.setInsertionPoint(CurrInsPoint);
+    SILBuilderForCodeExpansion convFailBuilder(Builder.getInsertionPoint());
+    ConvFailBB = splitBasicBlockAndBranch(
+        convFailBuilder, &(*FailureBB->begin()), nullptr, nullptr);
   }
 
   if (SILBridgedTy != Src->getType()) {
@@ -150,7 +149,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
         CastSuccessBB->createPHIArgument(SILBridgedTy,
                                          ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
-        Builder.setInsertionPoint(CastSuccessBB);
+        Builder.setInsertionPointAndScope(CastSuccessBB, Load);
         SrcOp = CastSuccessBB->getArgument(0);
       } else {
         SrcOp = Load;
@@ -162,7 +161,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
                                       SILBridgedTy, CastSuccessBB, ConvFailBB);
       NewI = CCBI;
       splitEdge(CCBI, /* EdgeIdx to ConvFailBB */ 1);
-      Builder.setInsertionPoint(CastSuccessBB);
+      Builder.setInsertionPointAndScope(CastSuccessBB, Load);
       SrcOp = CastSuccessBB->getArgument(0);
     } else {
       auto cast =
@@ -257,7 +256,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     } else if (CCABI->getConsumptionKind() ==
                CastConsumptionKind::TakeOnSuccess) {
       // Insert a release in the success BB.
-      Builder.setInsertionPoint(SuccessBB->begin());
+      Builder.setInsertionPointAndScope(SuccessBB->begin(), Inst);
       Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
     }
   }
@@ -276,18 +275,18 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
     Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB,
                                  CaseBBs);
 
-    Builder.setInsertionPoint(FailureBB->begin());
-    Builder.createDeallocStack(Loc, Tmp);
+    SILBuilderForCodeExpansion deallocB(FailureBB->begin(), Inst);
+    deallocB.createDeallocStack(Loc, Tmp);
 
-    Builder.setInsertionPoint(ConvSuccessBB);
-    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
-                                                        SomeDecl);
+    SILBuilderForCodeExpansion successB(ConvSuccessBB, Inst);
+    auto Addr = successB.createUncheckedTakeEnumDataAddr(
+        Loc, InOutOptionalParam, SomeDecl);
 
-    Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);
+    successB.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);
 
-    Builder.createDeallocStack(Loc, Tmp);
+    successB.createDeallocStack(Loc, Tmp);
     SmallVector<SILValue, 1> SuccessBBArgs;
-    Builder.createBranch(Loc, SuccessBB, SuccessBBArgs);
+    successB.createBranch(Loc, SuccessBB, SuccessBBArgs);
   }
 
   EraseInstAction(Inst);
@@ -582,7 +581,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
                                            nullptr);
         Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
                                         CondBrSuccessBB, FailureBB);
-        Builder.setInsertionPoint(CondBrSuccessBB, CondBrSuccessBB->begin());
+        Builder.setInsertionPointAndScope(CondBrSuccessBB,
+                                          CondBrSuccessBB->begin(), NewI);
         CastedValue = CondBrSuccessBB->getArgument(0);
       } else {
         CastedValue = SILValue(
@@ -775,8 +775,8 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
         srcTL.emitDestroyAddress(Builder, Loc, Src);
       }
       EraseInstAction(Inst);
-      Builder.setInsertionPoint(BB);
-      auto *NewI = Builder.createBranch(Loc, SuccessBB);
+      SILBuilderForCodeExpansion branchBuilder(BB, Inst);
+      auto *NewI = branchBuilder.createBranch(Loc, SuccessBB);
       WillSucceedAction();
       return NewI;
     }
@@ -802,8 +802,8 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   }
   SILInstruction *NewI = &BB->back();
   if (!isa<TermInst>(NewI)) {
-    Builder.setInsertionPoint(BB);
-    NewI = Builder.createBranch(Loc, SuccessBB);
+    SILBuilderForCodeExpansion branchBuilder(BB, Inst);
+    NewI = branchBuilder.createBranch(Loc, SuccessBB);
   }
   WillSucceedAction();
   return NewI;
@@ -1073,7 +1073,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
               Inst->getFalseBBCount());
           SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
                                        ValueOwnershipKind::Owned);
-          B.setInsertionPoint(SuccessBB->begin());
+          B.setInsertionPointAndScope(SuccessBB->begin(), Inst);
           // Store the result
           B.createStore(Loc, SuccessBB->getArgument(0), Dest,
                         StoreOwnershipQualifier::Unqualified);
@@ -1276,9 +1276,11 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
     auto *Trap = Builder.createBuiltinTrap(Loc);
     Inst->replaceAllUsesWithUndef();
     EraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(Trap)));
+
+    SILBuilderForCodeExpansion unreachableBuilder(
+        std::next(SILBasicBlock::iterator(Trap)));
     auto *UnreachableInst =
-        Builder.createUnreachable(ArtificialUnreachableLocation());
+        unreachableBuilder.createUnreachable(ArtificialUnreachableLocation());
 
     // Delete everything after the unreachable except for dealloc_stack which we
     // move before the trap.
@@ -1496,9 +1498,11 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     }
     auto *TrapI = Builder.createBuiltinTrap(Loc);
     EraseInstAction(Inst);
-    Builder.setInsertionPoint(std::next(SILBasicBlock::iterator(TrapI)));
+
+    SILBuilderForCodeExpansion unreachableBuilder(
+        std::next(SILBasicBlock::iterator(TrapI)));
     auto *UnreachableInst =
-        Builder.createUnreachable(ArtificialUnreachableLocation());
+        unreachableBuilder.createUnreachable(ArtificialUnreachableLocation());
 
     // Delete everything after the unreachable except for dealloc_stack which we
     // move before the trap.

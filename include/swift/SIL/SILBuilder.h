@@ -2063,9 +2063,11 @@ private:
 /// from the instruction being expanded, and constructors of convenience which
 /// infer the correct debug scope based on the insertion point.
 class SILBuilderForCodeExpansion : public SILBuilder {
-  void inheritScopeFrom(SILInstruction *I) {
-    assert(I->getDebugScope() && "instruction has no debug scope");
-    setCurrentDebugScope(I->getDebugScope());
+  using super = SILBuilder;
+
+  void inheritScopeFrom(SILInstruction &I) {
+    assert(I.getDebugScope() && "instruction has no debug scope");
+    setCurrentDebugScope(I.getDebugScope());
   }
 
 public:
@@ -2076,8 +2078,7 @@ public:
       SILInstruction *I,
       SmallVectorImpl<SILInstruction *> *InsertedInstrs = nullptr)
       : SILBuilder(I, InsertedInstrs) {
-    assert(I->getDebugScope() && "instruction has no debug scope");
-    setCurrentDebugScope(I->getDebugScope());
+    inheritScopeFrom(*I);
   }
 
   explicit SILBuilderForCodeExpansion(SILBasicBlock::iterator I)
@@ -2086,20 +2087,20 @@ public:
   explicit SILBuilderForCodeExpansion(SILInstruction *I,
                                       SILInstruction *InheritScopeFrom)
       : SILBuilderForCodeExpansion(I) {
-    inheritScopeFrom(InheritScopeFrom);
+    inheritScopeFrom(*InheritScopeFrom);
   }
 
   explicit SILBuilderForCodeExpansion(SILBasicBlock::iterator I,
                                       SILInstruction *InheritScopeFrom)
-      : SILBuilderForCodeExpansion(&*I) {
-    inheritScopeFrom(InheritScopeFrom);
+      : SILBuilder(I) {
+    inheritScopeFrom(*InheritScopeFrom);
   }
 
   /// Creates a new SILBuilder with an insertion point at the end of BB.
   explicit SILBuilderForCodeExpansion(SILBasicBlock *BB,
                                       SILInstruction *InheritScopeFrom)
       : SILBuilder(BB) {
-    inheritScopeFrom(InheritScopeFrom);
+    inheritScopeFrom(*InheritScopeFrom);
   }
 
   /// Creates a new SILBuilder with an insertion point at the beginning of BB.
@@ -2107,6 +2108,65 @@ public:
   atBeginning(SILBasicBlock *BB, SILInstruction *InheritScopeFrom) {
     return SILBuilderForCodeExpansion(BB->begin(), InheritScopeFrom);
   }
+
+  /// @name Safer setInsertionPoint() alternatives
+  ///
+  /// Use setInsertionPointAndScope() to change the insertion point (IP) of this
+  /// builder and to specify the correct debug scope at the new IP. For your
+  /// convenience, there are overloads of setInsertionPointAndScope() which
+  /// infer the correct debug scope based on the new IP, in the exact same way
+  /// as the constructors of SILBuilderForCodeExpansion.
+  ///
+  /// Note that instead of changing the IP, it may be simpler to create a fresh
+  /// builder instance instead.
+  ///
+  /// @{
+
+  void setInsertionPoint(SILInstruction *I) = delete;
+
+  void setInsertionPointAndScope(SILInstruction *I,
+                                 SILInstruction *InheritScopeFrom) {
+    super::setInsertionPoint(I);
+    inheritScopeFrom(*InheritScopeFrom);
+  }
+
+  void setInsertionPointAndScope(SILInstruction *I) {
+    setInsertionPointAndScope(I, I);
+  }
+
+  void setInsertionPoint(SILBasicBlock::iterator IIIter) = delete;
+
+  void setInsertionPointAndScope(SILBasicBlock::iterator IIIter,
+                                 SILInstruction *InheritScopeFrom) {
+    super::setInsertionPoint(IIIter);
+    inheritScopeFrom(*InheritScopeFrom);
+  }
+
+  void setInsertionPointAndScope(SILBasicBlock::iterator IIIter) {
+    setInsertionPointAndScope(IIIter, &*IIIter);
+  }
+
+  void setInsertionPoint(SILBasicBlock *BB) = delete;
+
+  void setInsertionPointAndScope(SILBasicBlock *BB,
+                                 SILInstruction *InheritScopeFrom) {
+    super::setInsertionPoint(BB);
+    inheritScopeFrom(*InheritScopeFrom);
+  }
+
+  void setInsertionPoint(SILBasicBlock *BB,
+                         SILBasicBlock::iterator InsertPt) = delete;
+
+  void setInsertionPointAndScope(SILBasicBlock *BB,
+                                 SILBasicBlock::iterator InsertPt,
+                                 SILInstruction *InheritScopeFrom) {
+    super::setInsertionPoint(BB, InsertPt);
+    inheritScopeFrom(*InheritScopeFrom);
+  }
+
+  void setInsertionPoint(SILFunction::iterator BBIter) = delete;
+
+  /// @}
 };
 
 class SavedInsertionPointRAII {

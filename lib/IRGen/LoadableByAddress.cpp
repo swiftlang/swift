@@ -1467,10 +1467,10 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
     if (auto *tryApply = dyn_cast<TryApplyInst>(applyInst)) {
       auto *tgtBB = tryApply->getNormalBB();
       assert(tgtBB && "Could not find try apply's target BB");
-      loadBuilder.setInsertionPoint(tgtBB->begin());
+      loadBuilder.setInsertionPointAndScope(tgtBB->begin(), applyInst);
     } else {
       ++II;
-      loadBuilder.setInsertionPoint(II);
+      loadBuilder.setInsertionPointAndScope(II, applyInst);
     }
     if (!pass.F->hasQualifiedOwnership()) {
       load = loadBuilder.createLoad(applyInst->getLoc(), value,

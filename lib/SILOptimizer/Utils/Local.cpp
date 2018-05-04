@@ -1051,13 +1051,12 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   // Emit a destroy for each captured closure argument at each final release
   // point.
   for (auto *FinalRelease : Tracker.getFinalReleases()) {
-    Builder.setInsertionPoint(FinalRelease);
-    Builder.setCurrentDebugScope(FinalRelease->getDebugScope());
+    SILBuilderForCodeExpansion B{FinalRelease};
     for (unsigned i : indices(Args)) {
       SILValue Arg = Args[i];
       SILParameterInfo Param = Params[i];
 
-      releasePartialApplyCapturedArg(Builder, Loc, Arg, Param, Callbacks);
+      releasePartialApplyCapturedArg(B, Loc, Arg, Param, Callbacks);
     }
   }
 

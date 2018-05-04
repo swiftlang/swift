@@ -1945,8 +1945,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
   if (TheMemory.isClassInitSelf()) {
     auto Loc = Release->getLoc();
 
-    SILBuilderForCodeExpansion B(Release);
-    B.setInsertionPoint(InsertPt);
+    SILBuilderForCodeExpansion B(InsertPt, Release);
 
     SILValue Pointer = Release->getOperand(0);
 
@@ -2327,7 +2326,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
 /// to emit branching logic when an element may or may not be initialized.
 void LifetimeChecker::
 handleConditionalDestroys(SILValue ControlVariableAddr) {
-  SILBuilderForCodeExpansion B(TheMemory.MemoryInst);
+  auto *Inst = TheMemory.MemoryInst;
+  SILBuilderForCodeExpansion B(Inst);
   Identifier ShiftRightFn, TruncateFn;
 
   unsigned NumMemoryElements = TheMemory.NumElements;
@@ -2398,10 +2398,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
                        ReleaseBlock, DeallocBlock, ContBlock);
 
       // Set up the initialized release block.
-      B.setInsertionPoint(ReleaseBlock->begin());
+      B.setInsertionPointAndScope(ReleaseBlock->begin(), Inst);
       destroyMemoryElement(Loc, Elt);
 
-      B.setInsertionPoint(ContBlock->begin());
+      B.setInsertionPointAndScope(ContBlock->begin(), Inst);
     }
   };
 
@@ -2423,11 +2423,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
                      ReleaseBlock, ConsumedBlock, ContBlock);
 
     // If true, self is fully initialized; just release it as usual.
-    B.setInsertionPoint(ReleaseBlock->begin());
+    B.setInsertionPointAndScope(ReleaseBlock->begin(), Inst);
     Release->moveBefore(&*B.getInsertionPoint());
 
     // If false, self is consumed.
-    B.setInsertionPoint(ConsumedBlock->begin());
+    B.setInsertionPointAndScope(ConsumedBlock->begin(), Inst);
     processUninitializedRelease(Release, true, B.getInsertionPoint());
   };
 
@@ -2440,8 +2440,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     auto Loc = Release->getLoc();
     auto &Availability = CDElt.Availability;
 
-    B.setInsertionPoint(Release);
-    B.setCurrentDebugScope(Release->getDebugScope());
+    B.setInsertionPointAndScope(Release);
 
     // Value types and root classes don't require any fancy handling.
     // Just conditionally destroy each memory element, and for classes,
@@ -2512,13 +2511,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
                          ConsumedBlock, DeallocBlock, ContBlock);
 
         // If true, self.init or super.init was called and self was consumed.
-        B.setInsertionPoint(ConsumedBlock->begin());
-        B.setCurrentDebugScope(ConsumedBlock->begin()->getDebugScope());
+        B.setInsertionPointAndScope(ConsumedBlock->begin());
         processUninitializedRelease(Release, true, B.getInsertionPoint());
 
         // If false, self is uninitialized and must be freed.
-        B.setInsertionPoint(DeallocBlock->begin());
-        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
+        B.setInsertionPointAndScope(DeallocBlock->begin());
         destroyMemoryElements(Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 
@@ -2548,14 +2545,12 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
                          LiveBlock, DeallocBlock, ContBlock);
 
         // If true, self was consumed or is fully initialized.
-        B.setInsertionPoint(LiveBlock->begin());
-        B.setCurrentDebugScope(LiveBlock->begin()->getDebugScope());
+        B.setInsertionPointAndScope(LiveBlock->begin());
         emitReleaseOfSelfWhenNotConsumed(Loc, Release);
         isDeadRelease = false;
 
         // If false, self is uninitialized and must be freed.
-        B.setInsertionPoint(DeallocBlock->begin());
-        B.setCurrentDebugScope(DeallocBlock->begin()->getDebugScope());
+        B.setInsertionPointAndScope(DeallocBlock->begin());
         destroyMemoryElements(Loc, Availability);
         processUninitializedRelease(Release, false, B.getInsertionPoint());
 

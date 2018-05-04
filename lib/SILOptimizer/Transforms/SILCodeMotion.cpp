@@ -1511,12 +1511,11 @@ static bool tryToSinkRefCountAcrossSwitch(SwitchEnumInst *Switch,
     return false;
 
   // Ok, we have a ref count instruction, sink it!
-  SILBuilderForCodeExpansion Builder(Switch, &*RV);
   for (unsigned i = 0, e = Switch->getNumCases(); i != e; ++i) {
     auto Case = Switch->getCase(i);
     EnumElementDecl *Enum = Case.first;
     SILBasicBlock *Succ = Case.second;
-    Builder.setInsertionPoint(&*Succ->begin());
+    SILBuilderForCodeExpansion Builder(&*Succ->begin(), &*RV);
     if (Enum->hasAssociatedValues())
       createRefCountOpForPayload(Builder, &*RV, Enum, Switch->getOperand());
   }
@@ -1596,13 +1595,12 @@ static bool tryToSinkRefCountAcrossSelectEnum(CondBranchInst *CondBr,
 
   Elts[1] = OtherElt;
 
-  SILBuilderForCodeExpansion Builder(SEI, &*I);
 
   // Ok, we have a ref count instruction, sink it!
   for (unsigned i = 0; i != 2; ++i) {
     EnumElementDecl *Enum = Elts[i];
     SILBasicBlock *Succ = i == 0 ? CondBr->getTrueBB() : CondBr->getFalseBB();
-    Builder.setInsertionPoint(&*Succ->begin());
+    SILBuilderForCodeExpansion Builder(&*Succ->begin(), &*I);
     if (Enum->hasAssociatedValues())
       createRefCountOpForPayload(Builder, &*I, Enum, SEI->getEnumOperand());
   }

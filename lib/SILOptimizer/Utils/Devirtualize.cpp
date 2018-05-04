@@ -652,7 +652,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
     NewAI = B.createTryApply(AI.getLoc(), FRI, Subs, NewArgs, ResultBB, ErrorBB);
     if (ErrorBB != TAI->getErrorBB()) {
-      B.setInsertionPoint(ErrorBB);
+      B.setInsertionPointAndScope(ErrorBB, TAI);
       B.createBranch(TAI->getLoc(), TAI->getErrorBB(),
                      {ErrorBB->getArgument(0)});
     }
@@ -661,9 +661,9 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
     ResultCastRequired = ResultTy != NormalBB->getArgument(0)->getType();
 
     if (ResultBB != NormalBB)
-      B.setInsertionPoint(ResultBB);
+      B.setInsertionPointAndScope(ResultBB, TAI);
     else if (ResultCastRequired) {
-      B.setInsertionPoint(NormalBB->begin());
+      B.setInsertionPointAndScope(NormalBB->begin(), TAI);
       // Collect all uses, before casting.
       for (auto *Use : NormalBB->getArgument(0)->getUses()) {
         OriginalResultUses.push_back(Use);
