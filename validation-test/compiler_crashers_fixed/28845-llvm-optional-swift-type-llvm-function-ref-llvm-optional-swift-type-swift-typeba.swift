@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: not %target-swift-frontend %s -emit-ir
 class a<a{extension{class a
 let d=r protocol
 protocol P{}func a{class a<a:A A
