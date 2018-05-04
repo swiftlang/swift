@@ -160,7 +160,6 @@ extension StringProtocol {
 }
 
 extension String {
-  @inlinable // FIXME(sil-serialize-all)
   public func hasPrefix(_ prefix: String) -> Bool {
     let prefixCount = prefix._guts.count
     if prefixCount == 0 { return true }
@@ -208,7 +207,6 @@ extension String {
     return self.starts(with: prefix)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
     let suffixCount = suffix._guts.count
     if suffixCount == 0 { return true }

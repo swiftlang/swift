@@ -49,7 +49,6 @@ extension String.Index {
   ///     `sourcePosition` must be a valid index of at least one of the views
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(
     _ sourcePosition: String.Index,
     within target: String
