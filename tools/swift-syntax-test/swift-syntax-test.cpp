@@ -20,22 +20,23 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/Syntax/Serialization/SyntaxDeserialization.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/Serialization/SyntaxDeserialization.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Regex.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -50,7 +51,6 @@ enum class ActionType {
   ParseOnly,
   ParserGen,
   EOFPos,
-  IncrementalParse,
   None
 };
 
@@ -87,10 +87,6 @@ Action(llvm::cl::desc("Action (required):"),
                    "deserialize-raw-tree",
                    "Parse the JSON file from the serialized raw tree "
                    "to the original"),
-        clEnumValN(ActionType::IncrementalParse,
-                   "incremental-parse",
-                   "Incrementally syntax parse the input file. Requires "
-                   "-old-syntax-tree-filename"),
         clEnumValN(ActionType::EOFPos,
                    "eof",
                    "Parse the source file, calculate the absolute position"
@@ -132,6 +128,14 @@ IncrementalReuseLog("incremental-reuse-log",
 static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
+
+static llvm::cl::opt<bool>
+PrintVisualReuseInfo("print-visual-reuse-info",
+                     llvm::cl::desc("Print a coloured output of which parts of "
+                                    "the source file have been reused from the "
+                                    "old syntax tree."),
+                     llvm::cl::cat(Category),
+                     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 PrintNodeKind("print-node-kind",
@@ -192,9 +196,143 @@ getTokensFromFile(const StringRef InputFilename,
 
 void anchorForGetMainExecutable() {}
 
-bool setUpCompilerInstance(CompilerInstance &Instance, StringRef InputFileName,
-                           const char *MainExecutablePath,
-                           SyntaxParsingCache *SyntaxParsingCache) {
+bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
+                                   SourceManager &SourceMgr,
+                                   unsigned BufferID) {
+  // Parse the source edits
+  for (auto EditPattern : options::IncrementalEdits) {
+    llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
+    SmallVector<StringRef, 4> Matches;
+    if (!MatchRegex.match(EditPattern, &Matches)) {
+      llvm::errs() << "Invalid edit pattern: " << EditPattern << '\n';
+      return false;
+    }
+    int EditStartLine, EditStartColumn, EditEndLine, EditEndColumn;
+    if (Matches[1].getAsInteger(10, EditStartLine)) {
+      llvm::errs() << "Could not parse edit start as integer: " << EditStartLine
+                   << '\n';
+      return false;
+    }
+    if (Matches[2].getAsInteger(10, EditStartColumn)) {
+      llvm::errs() << "Could not parse edit start as integer: "
+                   << EditStartColumn << '\n';
+      return false;
+    }
+    if (Matches[3].getAsInteger(10, EditEndLine)) {
+      llvm::errs() << "Could not parse edit start as integer: " << EditEndLine
+                   << '\n';
+      return false;
+    }
+    if (Matches[4].getAsInteger(10, EditEndColumn)) {
+      llvm::errs() << "Could not parse edit end as integer: " << EditEndColumn
+                   << '\n';
+      return false;
+    }
+
+    auto EditStartLoc =
+        SourceMgr.getLocForLineCol(BufferID, EditStartLine, EditStartColumn);
+    auto EditEndLoc =
+        SourceMgr.getLocForLineCol(BufferID, EditEndLine, EditEndColumn);
+    auto EditStartOffset =
+        SourceMgr.getLocOffsetInBuffer(EditStartLoc, BufferID);
+    auto EditEndOffset = SourceMgr.getLocOffsetInBuffer(EditEndLoc, BufferID);
+    Cache->addEdit(EditStartOffset, EditEndOffset,
+                   /*ReplacmentLength=*/Matches[5].size());
+  }
+  return true;
+}
+
+void printVisualNodeReuseInformation(SourceManager &SourceMgr,
+                                     unsigned BufferID,
+                                     SyntaxParsingCache *Cache) {
+  unsigned CurrentOffset = 0;
+  auto SourceText = SourceMgr.getEntireTextForBuffer(BufferID);
+  if (llvm::outs().has_colors()) {
+    llvm::outs().changeColor(llvm::buffer_ostream::Colors::GREEN);
+  }
+  auto PrintReparsedRegion = [](StringRef SourceText, unsigned ReparseStart,
+                                unsigned ReparseEnd) {
+    if (ReparseEnd != ReparseStart) {
+      if (llvm::outs().has_colors()) {
+        llvm::outs().changeColor(llvm::buffer_ostream::Colors::RED);
+      } else {
+        llvm::outs() << "<reparse>";
+      }
+
+      llvm::outs() << SourceText.substr(ReparseStart,
+                                        ReparseEnd - ReparseStart);
+
+      if (llvm::outs().has_colors()) {
+        llvm::outs().changeColor(llvm::buffer_ostream::Colors::GREEN);
+      } else {
+        llvm::outs() << "</reparse>";
+      }
+    }
+  };
+
+  for (auto ReuseRange : Cache->getReusedRanges()) {
+    // Print region that was not reused
+    PrintReparsedRegion(SourceText, CurrentOffset, ReuseRange.first);
+
+    llvm::outs() << SourceText.substr(ReuseRange.first,
+                                      ReuseRange.second - ReuseRange.first);
+    CurrentOffset = ReuseRange.second;
+  }
+  PrintReparsedRegion(SourceText, CurrentOffset, SourceText.size());
+  if (llvm::outs().has_colors())
+    llvm::outs().resetColor();
+
+  llvm::outs() << '\n';
+}
+
+void saveReuseLog(SourceManager &SourceMgr, unsigned BufferID,
+                  SyntaxParsingCache *Cache) {
+  std::error_code ErrorCode;
+  llvm::raw_fd_ostream ReuseLog(options::IncrementalReuseLog, ErrorCode,
+                                llvm::sys::fs::OpenFlags::F_RW);
+  assert(!ErrorCode && "Unable to open incremental usage log");
+
+  for (auto ReuseRange : Cache->getReusedRanges()) {
+    SourceLoc Start = SourceMgr.getLocForOffset(BufferID, ReuseRange.first);
+    SourceLoc End = SourceMgr.getLocForOffset(BufferID, ReuseRange.second);
+
+    ReuseLog << "Reused ";
+    Start.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
+    ReuseLog << " to ";
+    End.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
+    ReuseLog << '\n';
+  }
+}
+
+/// Parse the given input file (incrementally if an old syntax tree was
+/// provided) and call the action specific callback with the new syntax tree
+int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
+              llvm::function_ref<int(SourceFile *)> ActionSpecificCallback) {
+  // The cache needs to be a heap allocated pointer since we construct it inside
+  // an if block but need to keep it alive until the end of the function.
+  SyntaxParsingCache *SyntaxCache = nullptr;
+  SWIFT_DEFER { delete SyntaxCache; };
+  // We also need to hold on to the Deserializer and buffer since they keep
+  // ownership of strings that are referenced from the old syntax tree
+  swift::json::SyntaxDeserializer *Deserializer = nullptr;
+  SWIFT_DEFER { delete Deserializer; };
+
+  auto Buffer = llvm::MemoryBuffer::getFile(options::OldSyntaxTreeFilename);
+  // Deserialise the old syntax tree
+  if (!options::OldSyntaxTreeFilename.empty()) {
+    Deserializer = new swift::json::SyntaxDeserializer(
+        llvm::MemoryBufferRef(*(Buffer.get())));
+    auto OldSyntaxTree = Deserializer->getSourceFileSyntax();
+    if (!OldSyntaxTree.hasValue()) {
+      llvm::errs() << "Could not deserialise old syntax tree.";
+      return EXIT_FAILURE;
+    }
+    SyntaxCache = new SyntaxParsingCache(OldSyntaxTree.getValue());
+
+    SyntaxCache->recordReuseInformation();
+  }
+
+  // Set up the compiler invocation
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
@@ -202,19 +340,30 @@ bool setUpCompilerInstance(CompilerInstance &Instance, StringRef InputFileName,
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
       reinterpret_cast<void *>(&anchorForGetMainExecutable)));
-  Invocation.setMainFileSyntaxParsingCache(SyntaxParsingCache);
-
+  Invocation.setMainFileSyntaxParsingCache(SyntaxCache);
   Invocation.setModuleName("Test");
-  PrintingDiagnosticConsumer DiagPrinter;
-  Instance.addDiagnosticConsumer(&DiagPrinter);
-  if (Instance.setup(Invocation)) {
-    return false;
-  }
-  return true;
-}
 
-SourceFile *parseSourceFile(CompilerInstance &Instance) {
-  // First, parse the file normally and get the regular old AST.
+  PrintingDiagnosticConsumer DiagConsumer;
+  CompilerInstance Instance;
+  Instance.addDiagnosticConsumer(&DiagConsumer);
+  if (Instance.setup(Invocation)) {
+    llvm::errs() << "Unable to set up compiler instance";
+    return EXIT_FAILURE;
+  }
+
+  // Parse incremental edit arguments
+  auto BufferIDs = Instance.getInputBufferIDs();
+  assert(BufferIDs.size() == 1 && "Only expecting to process one source file");
+  unsigned BufferID = BufferIDs.front();
+
+  if (SyntaxCache) {
+    if (!parseIncrementalEditArguments(SyntaxCache, Instance.getSourceMgr(),
+                                       BufferID)) {
+      return EXIT_FAILURE;
+    }
+  }
+
+  // Parse the actual source file
   Instance.performParseOnly();
 
   SourceFile *SF = nullptr;
@@ -225,17 +374,19 @@ SourceFile *parseSourceFile(CompilerInstance &Instance) {
     }
   }
   assert(SF && "No source file");
-  return SF;
-}
 
-SourceFile *getSourceFile(CompilerInstance &Instance, StringRef InputFileName,
-                          const char *MainExecutablePath) {
-  if (!setUpCompilerInstance(Instance, InputFileName, MainExecutablePath,
-                             /*SyntaxParsingCache*/ nullptr)) {
-    return nullptr;
+  // If we have a syntax cache, output reuse information if requested
+  if (SyntaxCache) {
+    if (options::PrintVisualReuseInfo) {
+      printVisualNodeReuseInformation(Instance.getSourceMgr(), BufferID,
+                                      SyntaxCache);
+    }
+    if (!options::IncrementalReuseLog.empty()) {
+      saveReuseLog(Instance.getSourceMgr(), BufferID, SyntaxCache);
+    }
   }
 
-  return parseSourceFile(Instance);
+  return ActionSpecificCallback(SF);
 }
 
 int doFullLexRoundTrip(const StringRef InputFilename) {
@@ -259,7 +410,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   return EXIT_SUCCESS;
 }
 
-int doDumpRawTokenSyntax(const StringRef InputFilename) {
+int doDumpRawTokenSyntax(const StringRef InputFile) {
   LangOptions LangOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags(SourceMgr);
@@ -268,8 +419,8 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
 
   std::vector<std::pair<RC<syntax::RawSyntax>,
                         syntax::AbsolutePosition>> Tokens;
-  if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
-                        Diags, Tokens) == EXIT_FAILURE) {
+  if (getTokensFromFile(InputFile, LangOpts, SourceMgr, Diags, Tokens) ==
+      EXIT_FAILURE) {
     return EXIT_FAILURE;
   }
 
@@ -284,189 +435,87 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
 }
 
 int doFullParseRoundTrip(const char *MainExecutablePath,
-                         const StringRef InputFileName) {
-  CompilerInstance Instance;
-  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  SF->getSyntaxRoot().print(llvm::outs(), {});
-  return EXIT_SUCCESS;
+                         const StringRef InputFile) {
+  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
+    SF->getSyntaxRoot().print(llvm::outs(), {});
+    return EXIT_SUCCESS;
+  });
 }
 
 int doSerializeRawTree(const char *MainExecutablePath,
-                       const StringRef InputFileName) {
-  CompilerInstance Instance;
-  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
+                       const StringRef InputFile) {
+  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
+    auto Root = SF->getSyntaxRoot().getRaw();
 
-  auto Root = SF->getSyntaxRoot().getRaw();
-  swift::json::Output out(llvm::outs());
-  out << *Root;
-  llvm::outs() << "\n";
+    if (!options::OutputFilename.empty()) {
+      std::error_code errorCode;
+      llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
+                              llvm::sys::fs::F_None);
+      assert(!errorCode && "Couldn't open output file");
 
-  return EXIT_SUCCESS;
+      swift::json::Output out(os);
+      out << *Root;
+      os << "\n";
+    } else {
+      swift::json::Output out(llvm::outs());
+      out << *Root;
+      llvm::outs() << "\n";
+    }
+    return EXIT_SUCCESS;
+  });
 }
 
 int doDeserializeRawTree(const char *MainExecutablePath,
-                         const StringRef InputFileName,
+                         const StringRef InputFile,
                          const StringRef OutputFileName) {
 
-  auto Buffer = llvm::MemoryBuffer::getFile(InputFileName);
+  auto Buffer = llvm::MemoryBuffer::getFile(InputFile);
   std::error_code errorCode;
   auto os = llvm::make_unique<llvm::raw_fd_ostream>(
               OutputFileName, errorCode, llvm::sys::fs::F_None);
   swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
   deserializer.getSourceFileSyntax()->print(*os);
-  return EXIT_SUCCESS;
-}
-
-int doParseOnly(const char *MainExecutablePath,
-                  const StringRef InputFileName) {
-  CompilerInstance Instance;
-  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  return SF ? EXIT_SUCCESS : EXIT_FAILURE;
-}
-
-int dumpParserGen(const char *MainExecutablePath,
-                  const StringRef InputFileName) {
-  CompilerInstance Instance;
-  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  SyntaxPrintOptions Opts;
-  Opts.PrintSyntaxKind = options::PrintNodeKind;
-  Opts.Visual = options::Visual;
-  Opts.PrintTrivialNodeKind = options::PrintTrivialNodeKind;
-  SF->getSyntaxRoot().print(llvm::outs(), Opts);
-  return 0;
-}
-
-int doIncrementalParse(const char *MainExecutablePath,
-                       const StringRef InputFileName,
-                       const StringRef OldSyntaxTreeFileName) {
-  // Deserialise the old syntax tree
-  auto Buffer = llvm::MemoryBuffer::getFile(OldSyntaxTreeFileName);
-  swift::json::SyntaxDeserializer Deserializer(
-      llvm::MemoryBufferRef(*(Buffer.get())));
-  auto OldSyntaxTree = Deserializer.getSourceFileSyntax();
-  if (!OldSyntaxTree.hasValue()) {
-    llvm::errs() << "Could not deserialise old syntax tree.";
-    return EXIT_FAILURE;
-  }
-  SyntaxParsingCache Cache = SyntaxParsingCache(OldSyntaxTree.getValue());
-
-  if (!options::IncrementalReuseLog.empty()) {
-    Cache.recordeReuseInformation();
-  }
-
-  // Parse the new libSyntax tree incrementally
-  CompilerInstance Instance;
-  setUpCompilerInstance(Instance, InputFileName, MainExecutablePath, &Cache);
-
-  auto &SourceMgr = Instance.getSourceMgr();
-  auto BufferIDs = Instance.getInputBufferIDs();
-  assert(BufferIDs.size() == 1 && "Only expecting to process one source file");
-  unsigned BufferID = BufferIDs.front();
-
-  // Parse the source edits
-  for (auto EditPattern : options::IncrementalEdits) {
-    llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
-    SmallVector<StringRef, 4> Matches;
-    if (!MatchRegex.match(EditPattern, &Matches)) {
-      llvm::errs() << "Invalid edit pattern: " << EditPattern << '\n';
-      return EXIT_FAILURE;
-    }
-    int EditStartLine, EditStartColumn, EditEndLine, EditEndColumn;
-    if (Matches[1].getAsInteger(10, EditStartLine)) {
-      llvm::errs() << "Could not parse edit start as integer: " << EditStartLine
-                   << '\n';
-      return EXIT_FAILURE;
-    }
-    if (Matches[2].getAsInteger(10, EditStartColumn)) {
-      llvm::errs() << "Could not parse edit start as integer: "
-                   << EditStartColumn << '\n';
-      return EXIT_FAILURE;
-    }
-    if (Matches[3].getAsInteger(10, EditEndLine)) {
-      llvm::errs() << "Could not parse edit start as integer: " << EditEndLine
-                   << '\n';
-      return EXIT_FAILURE;
-    }
-    if (Matches[4].getAsInteger(10, EditEndColumn)) {
-      llvm::errs() << "Could not parse edit end as integer: " << EditEndColumn
-                   << '\n';
-      return EXIT_FAILURE;
-    }
-
-    auto EditStartLoc =
-        SourceMgr.getLocForLineCol(BufferID, EditStartLine, EditStartColumn);
-    auto EditEndLoc =
-        SourceMgr.getLocForLineCol(BufferID, EditEndLine, EditEndColumn);
-    auto EditStartOffset =
-        SourceMgr.getLocOffsetInBuffer(EditStartLoc, BufferID);
-    auto EditEndOffset = SourceMgr.getLocOffsetInBuffer(EditEndLoc, BufferID);
-    Cache.addEdit(EditStartOffset, EditEndOffset,
-                  /*ReplacmentLength=*/Matches[5].size());
-  }
-
-  SourceFile *SF = parseSourceFile(Instance);
-
-  if (!options::IncrementalReuseLog.empty()) {
-    std::error_code ErrorCode;
-    llvm::raw_fd_ostream ReuseLog(options::IncrementalReuseLog, ErrorCode,
-                                  llvm::sys::fs::OpenFlags::F_RW);
-    assert(!ErrorCode && "Unable to open incremental usage log");
-
-    for (auto ReuseRange : Cache.getReusedRanges()) {
-      SourceLoc Start = SourceMgr.getLocForOffset(BufferID, ReuseRange.first);
-      SourceLoc End = SourceMgr.getLocForOffset(BufferID, ReuseRange.second);
-
-      ReuseLog << "Reused ";
-      Start.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
-      ReuseLog << " to ";
-      End.printLineAndColumn(ReuseLog, SourceMgr, BufferID);
-      ReuseLog << '\n';
-    }
-  }
-
-  // Serialize and print the newly generated libSyntax tree
-  auto Root = SF->getSyntaxRoot().getRaw();
-  swift::json::Output out(llvm::outs());
-  out << *Root;
-  llvm::outs() << "\n";
-
-  auto CurrentOffset = 0;
-  auto SourceText = SourceMgr.getEntireTextForBuffer(BufferID);
-
-  llvm::outs() << "\n\n";
-
-  for (auto ReuseRange : Cache.getReusedRanges()) {
-    llvm::outs().changeColor(llvm::buffer_ostream::Colors::RED);
-    llvm::outs() << SourceText.substr(CurrentOffset,
-                                      ReuseRange.first - CurrentOffset);
-    llvm::outs().changeColor(llvm::buffer_ostream::Colors::GREEN);
-    llvm::outs() << SourceText.substr(ReuseRange.first,
-                                      ReuseRange.second - ReuseRange.first);
-    CurrentOffset = ReuseRange.second;
-  }
 
   return EXIT_SUCCESS;
+}
+
+int doParseOnly(const char *MainExecutablePath, const StringRef InputFile) {
+  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) {
+    return SF ? EXIT_SUCCESS : EXIT_FAILURE;
+  });
+}
+
+int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
+  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) {
+    SyntaxPrintOptions Opts;
+    Opts.PrintSyntaxKind = options::PrintNodeKind;
+    Opts.Visual = options::Visual;
+    Opts.PrintTrivialNodeKind = options::PrintTrivialNodeKind;
+    SF->getSyntaxRoot().print(llvm::outs(), Opts);
+    return EXIT_SUCCESS;
+  });
 }
 
 int dumpEOFSourceLoc(const char *MainExecutablePath,
-                     const StringRef InputFileName) {
-  CompilerInstance Instance;
-  SourceFile *SF = getSourceFile(Instance, InputFileName, MainExecutablePath);
-  auto BufferId = *SF->getBufferID();
-  auto Root = SF->getSyntaxRoot();
-  auto AbPos = Root.getEOFToken().getAbsolutePosition();
+                     const StringRef InputFile) {
+  return parseFile(MainExecutablePath, InputFile, [](SourceFile *SF) -> int {
+    auto BufferId = *SF->getBufferID();
+    auto Root = SF->getSyntaxRoot();
+    auto AbPos = Root.getEOFToken().getAbsolutePosition();
 
-  SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
-  auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);
-  auto EndLoc = SourceMgr.getLocForOffset(BufferId, AbPos.getOffset());
+    SourceManager &SourceMgr = SF->getASTContext().SourceMgr;
+    auto StartLoc = SourceMgr.getLocForBufferStart(BufferId);
+    auto EndLoc = SourceMgr.getLocForOffset(BufferId, AbPos.getOffset());
 
-  // To ensure the correctness of position when translated to line & column pair.
-  if (SourceMgr.getLineAndColumn(EndLoc) != AbPos.getLineAndColumn()) {
-    llvm::outs() << "locations should be identical";
-    return EXIT_FAILURE;
-  }
-  llvm::outs() << CharSourceRange(SourceMgr, StartLoc, EndLoc).str();
-  return 0;
+    // To ensure the correctness of position when translated to line & column
+    // pair.
+    if (SourceMgr.getLineAndColumn(EndLoc) != AbPos.getLineAndColumn()) {
+      llvm::outs() << "locations should be identical";
+      return EXIT_FAILURE;
+    }
+    llvm::outs() << CharSourceRange(SourceMgr, StartLoc, EndLoc).str();
+    return EXIT_SUCCESS;
+  });
 }
 }// end of anonymous namespace
 
@@ -496,10 +545,6 @@ int invokeCommand(const char *MainExecutablePath,
       break;
     case ActionType::ParserGen:
       ExitCode = dumpParserGen(MainExecutablePath, InputSourceFilename);
-      break;
-    case ActionType::IncrementalParse:
-      ExitCode = doIncrementalParse(MainExecutablePath, InputSourceFilename,
-                                    options::OldSyntaxTreeFilename);
       break;
     case ActionType::EOFPos:
       ExitCode = dumpEOFSourceLoc(MainExecutablePath, InputSourceFilename);
