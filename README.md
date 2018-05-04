@@ -68,6 +68,7 @@ repositories and will update them instead.
 
     git clone https://github.com/google/swift.git -b tensorflow
     ./swift/utils/update-checkout --clone --config swift/utils/update-checkout-config-tensorflow.json
+    cd swift
 
 **Via SSH**  For those who plan on regularly making direct commits,
 cloning over SSH may provide a better experience (which requires
