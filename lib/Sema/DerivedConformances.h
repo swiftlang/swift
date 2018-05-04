@@ -41,6 +41,16 @@ public:
   DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
                      NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
+  /// Retrieve the context in which the conformance is declared (either the
+  /// nominal type, or an extension of it) as a \c DeclContext.
+  DeclContext *getConformanceContext() const;
+
+  /// Add \c children as members of the context that declares the conformance.
+  void addMembersToConformanceContext(ArrayRef<Decl *> children);
+
+  /// Get the declared type of the protocol that this is conformance is for.
+  Type getProtocolType() const;
+
   /// True if the type can implicitly derive a conformance for the given
   /// protocol.
   ///

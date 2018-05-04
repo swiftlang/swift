@@ -68,14 +68,13 @@ static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumType) {
   return ArraySliceType::get(metaTy->getRValueInstanceType());
 }
 
-static Type deriveCaseIterable_AllCases(TypeChecker &tc, Decl *parentDecl,
-                                        EnumDecl *enumDecl) {
+static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
   // enum SomeEnum : CaseIterable {
   //   @derived
   //   typealias AllCases = [SomeEnum]
   // }
-  auto *rawInterfaceType = computeAllCasesType(enumDecl);
-  return cast<DeclContext>(parentDecl)->mapTypeIntoContext(rawInterfaceType);
+  auto *rawInterfaceType = computeAllCasesType(cast<EnumDecl>(derived.Nominal));
+  return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
 }
 
 ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
@@ -115,10 +114,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 
   getterDecl->setBodySynthesizer(&deriveCaseIterable_enum_getter);
 
-  auto dc = cast<IterableDeclContext>(ConformanceDecl);
-  dc->addMember(getterDecl);
-  dc->addMember(propDecl);
-  dc->addMember(pbDecl);
+  addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
   return propDecl;
 }
@@ -144,7 +140,7 @@ Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
     return nullptr;
 
   if (assocType->getName() == TC.Context.Id_AllCases) {
-    return deriveCaseIterable_AllCases(TC, ConformanceDecl, enumDecl);
+    return deriveCaseIterable_AllCases(*this);
   }
 
   TC.diagnose(assocType->getLoc(), diag::broken_case_iterable_requirement);

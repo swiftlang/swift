@@ -27,8 +27,24 @@ DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
                                        ProtocolDecl *protocol)
     : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
-  assert(cast<DeclContext>(conformanceDecl)
+  assert(getConformanceContext()
              ->getAsNominalTypeOrNominalTypeExtensionContext() == nominal);
+}
+
+DeclContext *DerivedConformance::getConformanceContext() const {
+  return cast<DeclContext>(ConformanceDecl);
+}
+
+void DerivedConformance::addMembersToConformanceContext(
+    ArrayRef<Decl *> children) {
+  auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  for (auto child : children) {
+    IDC->addMember(child);
+  }
+}
+
+Type DerivedConformance::getProtocolType() const {
+  return Protocol->getDeclaredType();
 }
 
 bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,

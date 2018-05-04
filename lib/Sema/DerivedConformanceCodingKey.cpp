@@ -102,24 +102,17 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
 /// Synthesizes a constructor declaration with the given parameter name and
 /// type.
 ///
-/// \param tc The type checker to use in synthesizing the constructor.
-///
-/// \param parentDecl The parent declaration of the enum.
-///
-/// \param enumDecl The enum on which to synthesize the constructor.
-///
 /// \param paramType The type of the parameter.
 ///
 /// \param paramName The name of the parameter.
 ///
 /// \param synthesizer A lambda to call to set the constructor's body.
 template <typename Synthesizer>
-static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
-                                 EnumDecl *enumDecl, Type paramType,
+static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
                                  Identifier paramName,
                                  const Synthesizer &synthesizer) {
-  auto &C = tc.Context;
-  auto *parentDC = cast<DeclContext>(parentDecl);
+  auto &C = derived.TC.Context;
+  auto *parentDC = derived.getConformanceContext();
 
   // rawValue
   auto *rawDecl =
@@ -179,12 +172,12 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   }
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
-  initDecl->setAccess(enumDecl->getFormalAccess());
+  initDecl->setAccess(derived.Nominal->getFormalAccess());
   initDecl->setValidationStarted();
 
-  tc.Context.addSynthesizedDecl(initDecl);
+  C.addSynthesizedDecl(initDecl);
 
-  cast<IterableDeclContext>(parentDecl)->addMember(initDecl);
+  derived.addMembersToConformanceContext({initDecl});
   return initDecl;
 }
 
@@ -366,24 +359,18 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
 }
 
 /// Returns whether the given enum is eligible for CodingKey synthesis.
-///
-/// \param tc The type checker to use in checking eligibility.
-///
-/// \param parentDecl The parent declaration of the enum.
-///
-/// \param enumDecl The enum to check.
-static bool canSynthesizeCodingKey(TypeChecker &tc, Decl *parentDecl,
-                                   EnumDecl *enumDecl) {
+static bool canSynthesizeCodingKey(DerivedConformance &derived) {
+  auto enumDecl = cast<EnumDecl>(derived.Nominal);
   // Validate the enum and its raw type.
-  tc.validateDecl(enumDecl);
+  derived.TC.validateDecl(enumDecl);
 
   // If the enum has a raw type (optional), it must be String or Int.
   Type rawType = enumDecl->getRawType();
   if (rawType) {
-    auto *parentDC = cast<DeclContext>(parentDecl);
+    auto *parentDC = derived.getConformanceContext();
     rawType = parentDC->mapTypeIntoContext(rawType);
 
-    auto &C = tc.Context;
+    auto &C = derived.TC.Context;
     auto *nominal = rawType->getCanonicalType()->getAnyNominal();
     if (nominal != C.getStringDecl() && nominal != C.getIntDecl())
       return false;
@@ -407,7 +394,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
     return nullptr;
 
   // Check other preconditions for synthesized conformance.
-  if (!canSynthesizeCodingKey(TC, Nominal, enumDecl))
+  if (!canSynthesizeCodingKey(*this))
     return nullptr;
 
   auto &C = TC.Context;
@@ -505,8 +492,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
           }
         };
 
-        return deriveInitDecl(TC, ConformanceDecl, enumDecl, stringType,
-                              C.Id_stringValue, synth);
+        return deriveInitDecl(*this, stringType, C.Id_stringValue, synth);
       } else if (argumentNames[0] == C.Id_intValue) {
         // Synthesize `init?(intValue:)`
         auto intType = C.getIntDecl()->getDeclaredType();
@@ -530,8 +516,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
           }
         };
 
-        return deriveInitDecl(TC, ConformanceDecl, enumDecl, intType,
-                              C.Id_intValue, synthesizer);
+        return deriveInitDecl(*this, intType, C.Id_intValue, synthesizer);
       }
     }
   }
