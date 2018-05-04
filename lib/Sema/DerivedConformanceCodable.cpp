@@ -83,6 +83,7 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
                                                     DeclContext *context,
                                                     Type target, bool isIUO,
                                                     ProtocolDecl *proto) {
+  target = context->mapTypeIntoContext(target->mapTypeOutOfContext());
   // Some generic types need to be introspected to get at their "true" Codable
   // conformance.
   if (auto referenceType = target->getAs<ReferenceStorageType>()) {
@@ -105,7 +106,7 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
 ///
 /// \param tc The typechecker to use in validating {En,De}codable conformance.
 ///
-/// \param context The \c DeclContext the var declarations belong to.
+/// \param context The \c DeclContext in which to check conformance.
 ///
 /// \param varDecl The \c VarDecl to validate.
 ///
@@ -148,6 +149,7 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
 static bool validateCodingKeysEnum(DerivedConformance &derived,
                                    EnumDecl *codingKeysDecl) {
   auto &tc = derived.TC;
+  auto conformanceDC = derived.getConformanceContext();
 
   // Look through all var decls in the given type.
   // * Filter out lazy/computed vars.
@@ -182,8 +184,8 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     }
 
     // We have a property to map to. Ensure it's {En,De}codable.
-    auto conformance = varConformsToCodable(
-        tc, derived.Nominal->getDeclContext(), it->second, derived.Protocol);
+    auto conformance =
+        varConformsToCodable(tc, conformanceDC, it->second, derived.Protocol);
     switch (conformance) {
       case Conforms:
         // The property was valid. Remove it from the list.
@@ -285,7 +287,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!tc.conformsToProtocol(codingKeysType, codingKeyProto,
-                             derived.Nominal->getDeclContext(),
+                             derived.getConformanceContext(),
                              ConformanceCheckFlags::Used)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
@@ -321,6 +323,11 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
 static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   auto &tc = derived.TC;
   auto &C = tc.Context;
+  // Create CodingKeys in the parent type always, because both
+  // Encodable and Decodable might want to use it, and they may have
+  // different conditional bounds. CodingKeys is simple and can't
+  // depend on those bounds.
+  auto target = derived.Nominal;
 
   // We want to look through all the var declarations of this type to create
   // enum cases based on those var names.
@@ -329,7 +336,6 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
   MutableArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
 
-  auto target = derived.Nominal;
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);
   enumDecl->setImplicit();
@@ -356,7 +362,11 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 
-    auto conformance = varConformsToCodable(tc, target->getDeclContext(),
+    // Despite creating the enum in the context of the type, we're
+    // concurrently checking the variables for the current protocol
+    // conformance being synthesized, for which we use the conformance
+    // context, not the type.
+    auto conformance = varConformsToCodable(tc, derived.getConformanceContext(),
                                             varDecl, derived.Protocol);
     switch (conformance) {
       case Conforms:
@@ -686,8 +696,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
 /// Adds the function declaration to the given type before returning it.
 static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
-
-  auto target = derived.Nominal;
+  auto conformanceDC = derived.getConformanceContext();
 
   // Expected type: (Self) -> (Encoder) throws -> ()
   // Constructed as: func type
@@ -713,10 +722,10 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   auto innerType = FunctionType::get(inputType, returnType, extInfo);
 
   // Params: (self [implicit], Encoder)
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target);
+  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), conformanceDC);
   auto *encoderParam = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
-                SourceLoc(), C.Id_encoder, encoderType, target);
+                SourceLoc(), C.Id_encoder, encoderType, conformanceDC);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
@@ -724,30 +733,29 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 
   // Func name: encode(to: Encoder)
   DeclName name(C, C.Id_encode, params[1]);
-  auto *encodeDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                      SourceLoc(), name, SourceLoc(),
-                                      /*Throws=*/true, SourceLoc(),
-                                      nullptr, params,
-                                      TypeLoc::withoutLoc(returnType),
-                                      target);
+  auto *encodeDecl = FuncDecl::create(
+      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
+      /*Throws=*/true, SourceLoc(), nullptr, params,
+      TypeLoc::withoutLoc(returnType), conformanceDC);
   encodeDecl->setImplicit();
   encodeDecl->setSynthesized();
   encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
 
   // This method should be marked as 'override' for classes inheriting Encodable
   // conformance from a parent class.
-  auto *classDecl = dyn_cast<ClassDecl>(target);
+  auto *classDecl = dyn_cast<ClassDecl>(derived.Nominal);
   if (classDecl && superclassIsEncodable(classDecl)) {
     auto *attr = new (C) OverrideAttr(/*IsImplicit=*/true);
     encodeDecl->getAttrs().add(attr);
   }
 
   // Evaluate the type of Self in (Self) -> (Encoder) throws -> ().
-  Type selfType = target->getDeclaredInterfaceType();
+  Type selfType = conformanceDC->getDeclaredInterfaceType();
   Type interfaceType;
-  if (auto sig = target->getGenericSignatureOfContext()) {
+  if (auto sig = conformanceDC->getGenericSignatureOfContext()) {
     // Evaluate the below, but in a generic environment (if Self is generic).
-    encodeDecl->setGenericEnvironment(target->getGenericEnvironmentOfContext());
+    encodeDecl->setGenericEnvironment(
+        conformanceDC->getGenericEnvironmentOfContext());
     interfaceType = GenericFunctionType::get(sig, selfType, innerType,
                                              FunctionType::ExtInfo());
   } else {
@@ -757,11 +765,12 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 
   encodeDecl->setInterfaceType(interfaceType);
   encodeDecl->setValidationStarted();
-  encodeDecl->copyFormalAccessFrom(target, /*sourceIsParentContext*/true);
+  encodeDecl->copyFormalAccessFrom(derived.Nominal,
+                                   /*sourceIsParentContext*/ true);
 
   C.addSynthesizedDecl(encodeDecl);
 
-  target->addMember(encodeDecl);
+  derived.addMembersToConformanceContext({encodeDecl});
   return encodeDecl;
 }
 
@@ -787,8 +796,9 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
   // }
 
   // The enclosing type decl.
-  auto *targetDecl = initDecl->getDeclContext()
-                         ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto conformanceDC = initDecl->getDeclContext();
+  auto *targetDecl =
+      conformanceDC->getAsNominalTypeOrNominalTypeExtensionContext();
 
   auto *funcDC = cast<DeclContext>(initDecl);
   auto &C = funcDC->getASTContext();
@@ -865,7 +875,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
       // is Optional<T>, we want to decodeIfPresent(T.self, forKey: ...);
       // otherwise, we can just decode(T.self, forKey: ...).
       // This is also true if the type is an ImplicitlyUnwrappedOptional.
-      auto varType = varDecl->getType();
+      auto varType = conformanceDC->mapTypeIntoContext(
+          varDecl->getType()->mapTypeOutOfContext());
       auto methodName = C.Id_decode;
       if (auto referenceType = varType->getAs<ReferenceStorageType>()) {
         // This is a weak/unowned/unmanaged var. Get the inner type before
