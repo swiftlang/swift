@@ -1077,21 +1077,15 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   // FIXME: Having to deal with private imports as a superset of public imports
   // is inefficient.
   SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
-  SmallVector<ModuleDecl::ImportedModule, 8> linkImports;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
   for (auto file : M->getFiles()) {
     file->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
-    file->getImportedModules(linkImports, ModuleDecl::ImportFilter::ForLinking);
     file->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
   }
 
   llvm::SmallSet<ModuleDecl::ImportedModule, 8, ModuleDecl::OrderImportedModules>
     publicImportSet;
   publicImportSet.insert(publicImports.begin(), publicImports.end());
-
-  llvm::SmallSet<ModuleDecl::ImportedModule, 8, ModuleDecl::OrderImportedModules>
-    linkImportSet;
-  linkImportSet.insert(linkImports.begin(), linkImports.end());
 
   removeDuplicateImports(allImports);
   auto clangImporter =
@@ -1121,10 +1115,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
     ImportPathBlob importPath;
     flattenImportPath(import, importPath);
-    ImportedModule.emit(ScratchRecord,
-                        publicImportSet.count(import),
-                        (linkImportSet.count(import) &&
-                         !publicImportSet.count(import)),
+    ImportedModule.emit(ScratchRecord, publicImportSet.count(import),
                         !import.first.empty(), importPath);
   }
 

@@ -1,8 +1,11 @@
 // Same test as clang_inline.swift, but with the order swapped.
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -enable-objc-interop -emit-ir -module-name clang_inline | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -enable-objc-interop -emit-ir -module-name clang_inline -I %t | %FileCheck %s
 
 // REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: objc_interop
 
 import gizmo
 
