@@ -42,7 +42,7 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
 void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *parentEnum = parentDC->getAsEnumOrEnumExtensionContext();
-  auto enumTy = parentEnum->getDeclaredTypeInContext();
+  auto enumTy = parentDC->getDeclaredTypeInContext();
   auto &C = parentDC->getASTContext();
 
   SmallVector<Expr *, 8> elExprs;

@@ -178,6 +178,13 @@ enum Instrument {
 
 extension Instrument : Equatable {}
 
+extension Instrument : CaseIterable {}
+
+enum UnusedGeneric<T> {
+    case a, b, c
+}
+extension UnusedGeneric : CaseIterable {}
+
 // Explicit conformance should work too
 public enum Medicine {
   case Antibiotic
