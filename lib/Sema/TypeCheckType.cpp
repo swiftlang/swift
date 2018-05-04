@@ -710,6 +710,15 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     }
   }
 
+  // Sometimes code completion would request type check of the
+  // individual generic type parameters, because of the cursor
+  // position. Let's just return ErrorType in this case, if such
+  // type hasn't been validated yet.
+  if (auto *GTPD = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    if (GTPD->getDepth() == GenericTypeParamDecl::InvalidDepth)
+      return ErrorType::get(TC.Context);
+  }
+
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
   Type type =
