@@ -550,7 +550,7 @@ public:
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
                            SILDeclRef witness,
-                           SubstitutionList witnessSubs,
+                           SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree);
   
   /// Convert a block to a native function with a thunk.
@@ -1099,7 +1099,7 @@ public:
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
                                 CanType expectedType,
-                                SubstitutionList subs);
+                                SubstitutionMap subs);
   
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
@@ -1343,7 +1343,7 @@ public:
 
   SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                 SILType substFnType,
-                                SubstitutionList subs,
+                                SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
   /// Emit a literal that applies the various initializers.

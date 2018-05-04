@@ -4943,14 +4943,16 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     return true;
   }
 
-  SmallVector<Substitution, 4> subs;
+  SubstitutionMap subs;
   if (!parsedSubs.empty()) {
     if (!GenericEnv) {
       P.diagnose(TypeLoc, diag::sil_substitutions_on_non_polymorphic_type);
       return true;
     }
-    if (getApplySubstitutionsFromParsed(*this, GenericEnv, parsedSubs, subs))
+    SmallVector<Substitution, 4> subsVec;
+    if (getApplySubstitutionsFromParsed(*this, GenericEnv, parsedSubs, subsVec))
       return true;
+    subs = GenericEnv->getGenericSignature()->getSubstitutionMap(subsVec);
   }
 
   SILValue FnVal = getLocalValue(FnName, Ty, InstLoc, B);

@@ -705,7 +705,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, witnessRef,
-                          witnessSubs.toList(), isFree);
+                          witnessSubs, isFree);
 
   return f;
 }

@@ -82,23 +82,17 @@ class ReabstractionInfo {
   // any transformations performed by the generic specializer.
   //
   // Maps callee's generic parameters to caller's archetypes.
-  SubstitutionList CalleeParamSubs;
+  SubstitutionMap CalleeParamSubMap;
 
   // Set of substitutions to be used to invoke a specialized function.
   //
   // Maps generic parameters of the specialized callee function to caller's
   // archetypes.
-  SubstitutionList CallerParamSubs;
+  SubstitutionMap CallerParamSubMap;
 
   // Replaces archetypes of the original callee with archetypes
   // or concrete types, if they were made concrete) of the specialized
   // callee.
-  //
-  // Maps original callee's generic parameters to specialized
-  // callee archetypes.
-  SubstitutionList ClonerParamSubs;
-
-  /// Substitution map form of ClonerParamSubs.
   SubstitutionMap ClonerParamSubMap;
 
   // Reference to the original generic non-specialized callee function.
@@ -213,11 +207,15 @@ public:
   }
 
   SubstitutionList getCallerParamSubstitutions() const {
-    return CallerParamSubs;
+    return CallerParamSubMap.toList();
+  }
+
+  SubstitutionMap getCallerParamSubstitutionMap() const {
+    return CallerParamSubMap;
   }
 
   SubstitutionList getClonerParamSubstitutions() const {
-    return ClonerParamSubs;
+    return ClonerParamSubMap.toList();
   }
 
   SubstitutionMap getClonerParamSubstitutionMap() const {
@@ -225,7 +223,11 @@ public:
   }
 
   SubstitutionList getCalleeParamSubstitutions() const {
-    return CalleeParamSubs;
+    return CalleeParamSubMap.toList();
+  }
+
+  SubstitutionMap getCalleeParamSubstitutionMap() const {
+    return CalleeParamSubMap;
   }
 
   /// Create a specialized function type for a specific substituted type \p

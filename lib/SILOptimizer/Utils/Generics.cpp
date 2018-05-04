@@ -369,29 +369,25 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   SpecializedGenericEnv = nullptr;
   SpecializedGenericSig = nullptr;
-  CalleeParamSubs = ParamSubs;
   auto CalleeGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto CalleeGenericEnv = Callee->getGenericEnvironment();
 
   this->Callee = Callee;
   this->Apply = Apply;
 
-  SubstitutionMap InterfaceSubs;
-
   // Get the original substitution map.
-  if (CalleeGenericSig)
-    InterfaceSubs = CalleeGenericSig->getSubstitutionMap(ParamSubs);
+  CalleeParamSubMap = CalleeGenericSig->getSubstitutionMap(ParamSubs);
 
   using namespace OptRemark;
   // We do not support partial specialization.
-  if (!EnablePartialSpecialization && InterfaceSubs.hasArchetypes()) {
+  if (!EnablePartialSpecialization && CalleeParamSubMap.hasArchetypes()) {
     DEBUG(llvm::dbgs() << "    Partial specialization is not supported.\n");
     DEBUG(for (auto Sub : ParamSubs) { Sub.dump(); });
     return false;
   }
 
   // Perform some checks to see if we need to bail.
-  if (InterfaceSubs.hasDynamicSelf()) {
+  if (CalleeParamSubMap.hasDynamicSelf()) {
     REMARK_OR_DEBUG(ORE, [&]() {
       return RemarkMissed("DynamicSelf", *Apply.getInstruction())
              << IndentDebug(4) << "Cannot specialize with dynamic self";
@@ -423,7 +419,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   for (auto GP : CalleeGenericSig->getSubstitutableParams()) {
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
-    auto Replacement = Type(GP).subst(InterfaceSubs);
+    auto Replacement = Type(GP).subst(CalleeParamSubMap);
     if (!Replacement->is<ArchetypeType>())
       HasNonArchetypeGenericParams = true;
 
@@ -546,7 +542,7 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
     auto CalleeFnTy = Callee->getLoweredFunctionType();
     assert(CalleeFnTy->isPolymorphic());
     auto CalleeSubstFnTy = CalleeFnTy->substGenericArgs(
-        Callee->getModule(), getCalleeParamSubstitutions());
+        Callee->getModule(), getCalleeParamSubstitutionMap());
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -629,11 +625,11 @@ bool ReabstractionInfo::canBeSpecialized() const {
 }
 
 bool ReabstractionInfo::isFullSpecialization() const {
-  return !hasArchetypes(getCalleeParamSubstitutions());
+  return !getCalleeParamSubstitutionMap().hasArchetypes();
 }
 
 bool ReabstractionInfo::isPartialSpecialization() const {
-  return hasArchetypes(getCalleeParamSubstitutions());
+  return getCalleeParamSubstitutionMap().hasArchetypes();
 }
 
 void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
@@ -841,20 +837,6 @@ getGenericEnvironmentAndSignatureWithRequirements(
   return { NewGenEnv, NewGenSig };
 }
 
-/// Perform some sanity checks on the newly formed substitution lists.
-static void verifySubstitutionList(SubstitutionList Subs, StringRef Name) {
-  DEBUG(llvm::dbgs() << "\nSubstitutions for " << Name << "\n";
-        for (auto Sub : Subs) {
-          Sub.getReplacement()->dump();
-        });
-#ifndef NDEBUG
-  for (auto Sub : Subs) {
-    assert(!Sub.getReplacement()->hasError() &&
-           "There should be no error types in substitutions");
-  }
-#endif
-}
-
 /// This is a fast path for full specializations.
 /// There is no need to form a new generic signature in such cases,
 /// because the specialized function will be non-generic.
@@ -871,18 +853,12 @@ void ReabstractionInfo::performFullSpecializationPreparation(
       Callee->getLoweredFunctionType()->getGenericSignature();
 
   // Get the original substitution map.
-  auto CalleeInterfaceToCallerArchetypeMap =
+  ClonerParamSubMap = 
       CalleeGenericSig->getSubstitutionMap(ParamSubs);
 
   SubstitutedType = Callee->getLoweredFunctionType()->substGenericArgs(
-      M, CalleeInterfaceToCallerArchetypeMap);
-  ClonerParamSubs = CalleeParamSubs;
-  if (auto genericSig =
-        Callee->getLoweredFunctionType()->getGenericSignature())
-    ClonerParamSubMap = genericSig->getSubstitutionMap(CalleeParamSubs);
-  else
-    ClonerParamSubMap = SubstitutionMap();
-  CallerParamSubs = {};
+      M, ClonerParamSubMap);
+  CallerParamSubMap = {};
   createSubstitutedAndSpecializedTypes();
 }
 
@@ -1244,10 +1220,9 @@ public:
 
   void createSpecializedGenericSignatureWithNonGenericSubs();
 
-  SubstitutionMap computeClonerParamSubs(SubstitutionList &ClonerParamSubs);
+  SubstitutionMap computeClonerParamSubs();
 
-  void computeCallerParamSubs(GenericSignature *SpecializedGenericSig,
-                              SubstitutionList &CallerParamSubs);
+  SubstitutionMap getCallerParamSubs();
 
   void computeCallerInterfaceSubs(SubstitutionMap &CallerInterfaceSubs);
 };
@@ -1533,9 +1508,8 @@ FunctionSignaturePartialSpecializer::
   return { GenEnv, GenSig };
 }
 
-SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs(
-                                         SubstitutionList &ClonerParamSubs) {
-  auto SubMap = CalleeGenericSig->getSubstitutionMap(
+SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs() {
+  return CalleeGenericSig->getSubstitutionMap(
       [&](SubstitutableType *type) -> Type {
         DEBUG(llvm::dbgs() << "\ngetSubstitution for ClonerParamSubs:\n"
                            << Type(type) << "\n"
@@ -1547,25 +1521,10 @@ SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs(
             SpecializedInterfaceTy);
       },
       LookUpConformanceInSignature(*SpecializedGenericSig));
-
-  SmallVector<Substitution, 4> List;
-  CalleeGenericSig->getSubstitutions(SubMap, List);
-  ClonerParamSubs = Ctx.AllocateCopy(List);
-  verifySubstitutionList(ClonerParamSubs, "ClonerParamSubs");
-
-  return SubMap;
 }
 
-void FunctionSignaturePartialSpecializer::computeCallerParamSubs(
-    GenericSignature *SpecializedGenericSig,
-    SubstitutionList &CallerParamSubs) {
-  SmallVector<Substitution, 4> List;
-
-  SpecializedGenericSig->getSubstitutions(
-      SpecializedInterfaceToCallerArchetypeMap, List);
-
-  CallerParamSubs = Ctx.AllocateCopy(List);
-  verifySubstitutionList(CallerParamSubs, "CallerParamSubs");
+SubstitutionMap FunctionSignaturePartialSpecializer::getCallerParamSubs() {
+  return SpecializedInterfaceToCallerArchetypeMap;
 }
 
 void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
@@ -1733,14 +1692,15 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
   }
 
   // Create substitution lists for the caller and cloner.
-  ClonerParamSubMap = FSPS.computeClonerParamSubs(ClonerParamSubs);
-  FSPS.computeCallerParamSubs(SpecializedGenericSig, CallerParamSubs);
+  ClonerParamSubMap = FSPS.computeClonerParamSubs();
+  CallerParamSubMap = FSPS.getCallerParamSubs();
+
   // Create a substitution map for the caller interface substitutions.
   FSPS.computeCallerInterfaceSubs(CallerInterfaceSubs);
 
-  if (CalleeParamSubs.empty()) {
+  if (CalleeParamSubMap.empty()) {
     // It can happen if there is no caller or it is an eager specialization.
-    CalleeParamSubs = CallerParamSubs;
+    CalleeParamSubMap = CallerParamSubMap;
   }
 
   HasUnboundGenericParams =
@@ -1968,7 +1928,7 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 
 /// Return a substituted callee function type.
 static CanSILFunctionType
-getCalleeSubstFunctionType(SILValue Callee, SubstitutionList Subs) {
+getCalleeSubstFunctionType(SILValue Callee, SubstitutionMap Subs) {
   // Create a substituted callee type.
   auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
   return CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
@@ -1987,16 +1947,9 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   prepareCallArguments(AI, Builder, ReInfo, Arguments, StoreResultTo);
 
   // Create a substituted callee type.
-  ArrayRef<Substitution> Subs;
+  SubstitutionMap Subs;
   if (ReInfo.getSpecializedType()->isPolymorphic()) {
-    Subs = ReInfo.getCallerParamSubstitutions();
-    if (auto FRI = dyn_cast<FunctionRefInst>(Callee)) {
-      assert(Subs.size() ==
-             FRI->getReferencedFunction()
-                 ->getLoweredFunctionType()
-                 ->getGenericSignature()
-                 ->getSubstitutionListSize());
-    }
+    Subs = ReInfo.getCallerParamSubstitutionMap();
   }
 
   auto CalleeSubstFnTy = getCalleeSubstFunctionType(Callee, Subs);
@@ -2184,7 +2137,7 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
     SILBuilder &Builder) {
   SILFunction *Thunk = &Builder.getFunction();
   auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
-  auto Subs = Thunk->getForwardingSubstitutions();
+  auto Subs = Thunk->getForwardingSubstitutionMap();
   auto specConv = SpecializedFunc->getConventions();
   if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
     return Builder.createApply(Loc, FRI, Subs, Arguments, false);
@@ -2419,7 +2372,7 @@ void swift::trySpecializeApplyOfGeneric(
     for (auto &Op : PAI->getArgumentOperands()) {
       Arguments.push_back(Op.get());
     }
-    auto Subs = ReInfo.getCallerParamSubstitutions();
+    auto Subs = ReInfo.getCallerParamSubstitutionMap();
     auto *NewPAI = Builder.createPartialApply(
         PAI->getLoc(), FRI, Subs, Arguments,
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());

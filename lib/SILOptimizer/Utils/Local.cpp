@@ -854,7 +854,7 @@ SingleValueInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin,
-                             SubstitutionList(), Arguments,
+                             SubstitutionMap(), Arguments,
                              false);
 }
 
