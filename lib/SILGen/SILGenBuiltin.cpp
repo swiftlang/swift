@@ -364,7 +364,7 @@ static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &SGF,
                                          SubstitutionMap substitutions,
                                          ArrayRef<ManagedValue> args,
                                          SGFContext C) {
-  CanType ty = args[0].getType().getSwiftRValueType();
+  auto ty = args[0].getType().getASTType();
   (void)ty;
   assert(ty->usesNativeReferenceCounting(ResilienceExpansion::Maximal) &&
          "Can only cast types that use native reference counting to native "

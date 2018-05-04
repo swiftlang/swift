@@ -287,8 +287,7 @@ static bool isLetAccess(const AccessedStorage &storage, SILFunction *F) {
 
 static bool isScratchBuffer(SILValue value) {
   // Special case unsafe value buffer access.
-  return isa<BuiltinUnsafeValueBufferType>(
-    value->getType().getSwiftRValueType());
+  return value->getType().is<BuiltinUnsafeValueBufferType>();
 }
 
 bool swift::memInstMustInitialize(Operand *memOper) {

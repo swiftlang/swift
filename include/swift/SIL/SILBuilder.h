@@ -457,14 +457,13 @@ public:
     assert(Args[0]->getType() == Args[1]->getType() &&
            "Binary operands must match");
     assert(Args[2]->getType().is<BuiltinIntegerType>() &&
-           Args[2]->getType().getSwiftRValueType()->isBuiltinIntegerType(1) &&
+           Args[2]->getType().getASTType()->isBuiltinIntegerType(1) &&
            "Must have a third Int1 operand");
 
     SILType OpdTy = Args[0]->getType();
     SILType Int1Ty = Args[2]->getType();
 
-    TupleTypeElt ResultElts[] = {OpdTy.getSwiftRValueType(),
-                                 Int1Ty.getSwiftRValueType()};
+    TupleTypeElt ResultElts[] = {OpdTy.getASTType(), Int1Ty.getASTType()};
     Type ResultTy = TupleType::get(ResultElts, getASTContext());
     SILType SILResultTy =
         SILType::getPrimitiveObjectType(ResultTy->getCanonicalType());
@@ -2044,7 +2043,7 @@ private:
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
     if (auto BuiltinIntTy =
-            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
+            dyn_cast<BuiltinIntegerType>(OpdTy.getASTType())) {
       if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
         Name += "_Word";
       } else {
@@ -2052,7 +2051,7 @@ private:
         Name += "_Int" + llvm::utostr(NumBits);
       }
     } else {
-      assert(OpdTy.getSwiftRValueType() == getASTContext().TheRawPointerType);
+      assert(OpdTy.getASTType() == getASTContext().TheRawPointerType);
       Name += "_RawPointer";
     }
   }

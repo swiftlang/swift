@@ -95,7 +95,7 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
     return false;
   }
 
-  CanType canType = t.getSwiftRValueType();
+  auto canType = t.getASTType();
   if (canType->hasTypeParameter()) {
     assert(GenericEnv && "Expected a GenericEnv");
     canType = GenericEnv->mapTypeIntoContext(canType)->getCanonicalType();
@@ -221,12 +221,11 @@ LargeSILTypeMapper::getNewResults(GenericEnvironment *GenericEnv,
     // We (currently) only care about function signatures
     if (containsFunctionSignature(GenericEnv, Mod, currResultTy, newSILType)) {
       // Case (1) Above
-      SILResultInfo newResult(newSILType.getSwiftRValueType(),
-                              result.getConvention());
+      SILResultInfo newResult(newSILType.getASTType(), result.getConvention());
       newResults.push_back(newResult);
     } else if (modNonFuncTypeResultType(GenericEnv, fnType, Mod)) {
       // Case (2) Above
-      SILResultInfo newSILResultInfo(newSILType.getSwiftRValueType(),
+      SILResultInfo newSILResultInfo(newSILType.getASTType(),
                                      ResultConvention::Indirect);
       newResults.push_back(newSILResultInfo);
     } else {
@@ -349,7 +348,7 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
   SILType newOptFuncType =
       getNewOptionalFunctionType(env, storageType, IGM);
   if (newOptFuncType != storageType) {
-    return param.getWithType(newOptFuncType.getSwiftRValueType());
+    return param.getWithType(newOptFuncType.getASTType());
   }
 
   if (auto paramFnType = storageType.getAs<SILFunctionType>()) {
@@ -361,14 +360,14 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
     }
   } else if (isLargeLoadableType(env, storageType, IGM)) {
     if (param.getConvention() == ParameterConvention::Direct_Guaranteed)
-      return  SILParameterInfo(storageType.getSwiftRValueType(),
+      return SILParameterInfo(storageType.getASTType(),
                                ParameterConvention::Indirect_In_Guaranteed);
     else
-      return  SILParameterInfo(storageType.getSwiftRValueType(),
+      return SILParameterInfo(storageType.getASTType(),
                                ParameterConvention::Indirect_In_Constant);
   } else {
     auto newType = getNewSILType(env, storageType, IGM);
-    return SILParameterInfo(newType.getSwiftRValueType(),
+    return SILParameterInfo(newType.getASTType(),
                             param.getConvention());
   }
 }
@@ -410,7 +409,7 @@ SILType LargeSILTypeMapper::getNewTupleType(GenericEnvironment *GenericEnv,
     auto elem = SILType::getPrimitiveObjectType(origCanType);
     auto newElem = getNewSILType(GenericEnv, elem, Mod);
     auto newTupleType =
-        TupleTypeElt(newElem.getSwiftRValueType(), canElem.getName(),
+        TupleTypeElt(newElem.getASTType(), canElem.getName(),
                      canElem.getParameterFlags());
     newElems.push_back(newTupleType);
   }
@@ -787,7 +786,7 @@ bool LargeSILTypeMapper::shouldConvertBBArg(SILArgument *arg,
   auto *F = arg->getFunction();
   SILType storageType = arg->getType();
   GenericEnvironment *genEnv = F->getGenericEnvironment();
-  CanType currCanType = storageType.getSwiftRValueType();
+  auto currCanType = storageType.getASTType();
   if (auto funcType = dyn_cast<SILFunctionType>(currCanType)) {
     if (funcType->isPolymorphic()) {
       genEnv = getGenericEnvironment(funcType);
@@ -1288,7 +1287,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
   auto loweredTy = pass.F->getLoweredFunctionType();
   auto singleResult = loweredTy->getSingleResult();
   SILType resultStorageType = singleResult.getSILStorageType();
-  auto canType = resultStorageType.getSwiftRValueType();
+  auto canType = resultStorageType.getASTType();
   if (canType->hasTypeParameter()) {
     assert(genEnv && "Expected a GenericEnv");
     canType = genEnv->mapTypeIntoContext(canType)->getCanonicalType();
@@ -1300,7 +1299,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
       VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
       ctx.getIdentifier("$return_value"), SourceLoc(),
       ctx.getIdentifier("$return_value"),
-      resultStorageType.getSwiftRValueType(), pass.F->getDeclContext());
+      resultStorageType.getASTType(), pass.F->getDeclContext());
   pass.F->begin()->insertFunctionArgument(0, resultStorageType.getAddressType(),
                                           ValueOwnershipKind::Trivial, var);
 }
@@ -2211,7 +2210,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
              (resultTy != newSILType)) {
     assert(loweredTy->getNumResults() == 1 && "Expected a single result");
     SILResultInfo origResultInfo = loweredTy->getSingleResult();
-    SILResultInfo newSILResultInfo(newSILType.getSwiftRValueType(),
+    SILResultInfo newSILResultInfo(newSILType.getASTType(),
                                    origResultInfo.getConvention());
     auto NewTy = SILFunctionType::get(
         loweredTy->getGenericSignature(), loweredTy->getExtInfo(),
