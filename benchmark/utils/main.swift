@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -111,6 +111,8 @@ import ProtocolDispatch2
 import Queue
 import RC4
 import RGBHistogram
+import RandomShuffle
+import RandomValues
 import RangeAssignment
 import RangeIteration
 import RangeReplaceableCollectionPlusDefault
@@ -266,6 +268,8 @@ registerBenchmark(QueueGeneric)
 registerBenchmark(QueueConcrete)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
+registerBenchmark(RandomShuffle)
+registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
