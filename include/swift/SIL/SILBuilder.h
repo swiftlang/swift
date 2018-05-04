@@ -729,10 +729,10 @@ public:
   MarkUninitializedBehaviorInst *
   createMarkUninitializedBehavior(SILLocation Loc,
                                   SILValue initStorageFunc,
-                                  SubstitutionList initStorageSubs,
+                                  SubstitutionMap initStorageSubs,
                                   SILValue storage,
                                   SILValue setterFunc,
-                                  SubstitutionList setterSubs,
+                                  SubstitutionMap setterSubs,
                                   SILValue self,
                                   SILType ty) {
     return insert(MarkUninitializedBehaviorInst::create(getModule(),

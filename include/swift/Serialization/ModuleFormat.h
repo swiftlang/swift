@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 414; // Last change: SIL box type substitutions
+const uint16_t VERSION_MINOR = 416; // Last change: remove substitutions
 
 using DeclIDField = BCFixed<31>;
 
@@ -750,13 +750,6 @@ namespace decls_block {
     DeclIDField, // generic decl
     TypeIDField, // parent
     BCArray<TypeIDField> // generic arguments
-  >;
-
-  using BoundGenericSubstitutionLayout = BCRecordLayout<
-    BOUND_GENERIC_SUBSTITUTION,
-    TypeIDField,  // replacement
-    BCVBR<5>
-    // Trailed by protocol conformance info (if any)
   >;
 
   using GenericFunctionTypeLayout = BCRecordLayout<

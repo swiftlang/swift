@@ -2322,6 +2322,12 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
     if (recursiveConcreteType)
       return ErrorType::get(anchor);
 
+    // Prevent recursive substitution.
+    this->recursiveConcreteType = true;
+    SWIFT_DEFER {
+      this->recursiveConcreteType = false;
+    };
+
     return genericEnv->mapTypeIntoContext(concreteType,
                                           builder.getLookupConformanceFn());
   }
@@ -2381,6 +2387,12 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
   // Substitute into the superclass.
   Type superclass = this->recursiveSuperclassType ? Type() : this->superclass;
   if (superclass && superclass->hasTypeParameter()) {
+    // Prevent recursive substitution.
+    this->recursiveSuperclassType = true;
+    SWIFT_DEFER {
+      this->recursiveSuperclassType = false;
+    };
+
     superclass = genericEnv->mapTypeIntoContext(
                                             superclass,
                                             builder.getLookupConformanceFn());

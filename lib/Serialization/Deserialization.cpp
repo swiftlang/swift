@@ -650,42 +650,6 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   return conformance;
 }
 
-Optional<Substitution>
-ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
-                                  GenericEnvironment *genericEnv) {
-  BCOffsetRAII lastRecordOffset(cursor);
-
-  auto entry = cursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    return None;
-
-  StringRef blobData;
-  SmallVector<uint64_t, 2> scratch;
-  unsigned recordID = cursor.readRecord(entry.ID, scratch, &blobData);
-  if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
-    return None;
-
-  TypeID replacementID;
-  unsigned numConformances;
-  decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
-                                                          replacementID,
-                                                          numConformances);
-
-  auto replacementTy = getType(replacementID);
-  if (genericEnv) {
-    replacementTy = genericEnv->mapTypeIntoContext(replacementTy);
-  }
-
-  SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
-  while (numConformances--) {
-    conformanceBuf.push_back(readConformance(cursor));
-  }
-
-  lastRecordOffset.reset();
-  return Substitution{replacementTy,
-                      getContext().AllocateCopy(conformanceBuf)};
-}
-
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
                                                GenericParamList *outerParams) {
   using namespace decls_block;

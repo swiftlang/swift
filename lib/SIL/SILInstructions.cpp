@@ -428,8 +428,8 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionList Subs,
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                SubstCalleeSILTy.getSwiftRValueType(), Subs);
   void *Buffer =
-    allocateTrailingInst<ApplyInst, Operand, Substitution>(
-      F, getNumAllOperands(Args, TypeDependentOperands), Subs.size());
+    allocateTrailingInst<ApplyInst, Operand>(
+      F, getNumAllOperands(Args, TypeDependentOperands));
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
                                  TypeDependentOperands, isNonThrowing,
@@ -488,9 +488,9 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
                                substCalleeType, subs);
   void *buffer =
-    allocateTrailingInst<BeginApplyInst, Operand, Substitution,
+    allocateTrailingInst<BeginApplyInst, Operand,
                          MultipleValueInstruction*, BeginApplyResult>(
-      F, getNumAllOperands(args, typeDependentOperands), subs.size(),
+      F, getNumAllOperands(args, typeDependentOperands),
       1, resultTypes.size());
   return ::new(buffer) BeginApplyInst(loc, callee, substCalleeSILType,
                                       resultTypes, resultOwnerships, subs,
@@ -532,8 +532,8 @@ PartialApplyInst *PartialApplyInst::create(
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                SubstCalleeTy.getSwiftRValueType(), Subs);
   void *Buffer =
-    allocateTrailingInst<PartialApplyInst, Operand, Substitution>(
-      F, getNumAllOperands(Args, TypeDependentOperands), Subs.size());
+    allocateTrailingInst<PartialApplyInst, Operand>(
+      F, getNumAllOperands(Args, TypeDependentOperands));
   return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
                                         Subs, Args,
                                         TypeDependentOperands, ClosureType,
@@ -568,8 +568,8 @@ TryApplyInst *TryApplyInst::create(
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
                                substCalleeTy.getSwiftRValueType(), subs);
   void *buffer =
-    allocateTrailingInst<TryApplyInst, Operand, Substitution>(
-      F, getNumAllOperands(args, typeDependentOperands), subs.size());
+    allocateTrailingInst<TryApplyInst, Operand>(
+      F, getNumAllOperands(args, typeDependentOperands));
   return ::new (buffer) TryApplyInst(loc, callee, substCalleeTy, subs, args,
                                      typeDependentOperands,
                                      normalBB, errorBB, specializationInfo);
@@ -1714,15 +1714,13 @@ MarkUninitializedBehaviorInst *
 MarkUninitializedBehaviorInst::create(SILModule &M,
                                       SILDebugLocation DebugLoc,
                                       SILValue InitStorage,
-                                      SubstitutionList InitStorageSubs,
+                                      SubstitutionMap InitStorageSubs,
                                       SILValue Storage,
                                       SILValue Setter,
-                                      SubstitutionList SetterSubs,
+                                      SubstitutionMap SetterSubs,
                                       SILValue Self,
                                       SILType Ty) {
-  auto totalSubs = InitStorageSubs.size() + SetterSubs.size();
-  auto mem = M.allocateInst(sizeof(MarkUninitializedBehaviorInst)
-                              + additionalSizeToAlloc<Substitution>(totalSubs),
+  auto mem = M.allocateInst(sizeof(MarkUninitializedBehaviorInst),
                             alignof(MarkUninitializedBehaviorInst));
   return ::new (mem) MarkUninitializedBehaviorInst(DebugLoc,
                                                    InitStorage, InitStorageSubs,
@@ -1735,24 +1733,17 @@ MarkUninitializedBehaviorInst::create(SILModule &M,
 MarkUninitializedBehaviorInst::MarkUninitializedBehaviorInst(
                                         SILDebugLocation DebugLoc,
                                         SILValue InitStorage,
-                                        SubstitutionList InitStorageSubs,
+                                        SubstitutionMap InitStorageSubs,
                                         SILValue Storage,
                                         SILValue Setter,
-                                        SubstitutionList SetterSubs,
+                                        SubstitutionMap SetterSubs,
                                         SILValue Self,
                                         SILType Ty)
   : InstructionBase(DebugLoc, Ty),
     Operands(this, InitStorage, Storage, Setter, Self),
-    NumInitStorageSubstitutions(InitStorageSubs.size()),
-    NumSetterSubstitutions(SetterSubs.size())
+    InitStorageSubstitutions(InitStorageSubs),
+    SetterSubstitutions(SetterSubs)
 {
-  auto *trailing = getTrailingObjects<Substitution>();
-  for (unsigned i = 0; i < InitStorageSubs.size(); ++i) {
-    ::new ((void*)trailing++) Substitution(InitStorageSubs[i]);
-  }
-  for (unsigned i = 0; i < SetterSubs.size(); ++i) {
-    ::new ((void*)trailing++) Substitution(SetterSubs[i]);
-  }
 }
 
 OpenedExistentialAccess swift::getOpenedExistentialAccessFor(AccessKind access) {
