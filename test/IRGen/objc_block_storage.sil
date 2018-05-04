@@ -11,7 +11,7 @@ import Builtin
 import Swift
 import gizmo
 
-// CHECK: [[BLOCK_ISA:@_NSConcreteStackBlock]] = external global %objc_class
+// CHECK: [[BLOCK_ISA:@_NSConcreteStackBlock]] = external global {{(dllimport )?}}%objc_class
 // CHECK: [[VOID_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"v8@?0\00"
 // CHECK: [[TRIVIAL_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
 // CHECK:   i64 0,
