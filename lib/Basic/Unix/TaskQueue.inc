@@ -360,8 +360,8 @@ public:
 /// A task is executing iff it is in TasksBeingExecuted,
 /// A task is executing iff any of its fds being polled are in FdsBeingPolled
 /// (These should be all of its output fds, but today is only stdout.)
-/// When a task has finished executing, TaskHospice waits for it to die, takes
-/// action appropriate to the cause of death, then TaskMonitor reclaims its
+/// When a task has finished executing, wait for it to die, takes
+/// action appropriate to the cause of death, then reclaim its
 /// storage.
 class TaskMonitor {
   std::queue<std::unique_ptr<Task>> &TasksToBeExecuted;
@@ -427,31 +427,6 @@ private:
   bool didTaskHangup(short events) const;
 };
 
-/// Do everything required to clean up a task when its output has hung up.
-/// Encapsulates the knowledge of how to wait, and then how to clean up.
-class TaskHospice {
-
-public:
-  /// \return true on error.
-  static bool waitForThenDealWithDeath(
-      Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback,
-      const TaskQueue::TaskSignalledCallback SignalledCallback);
-
-private:
-  /// Block until process \p pid exits then return the exit status.
-  static Optional<int> waitForPid(pid_t pid);
-
-  /// \return true on error.
-  static bool
-  cleanUpAfterExit(int Status, const Task &T,
-                   const TaskQueue::TaskFinishedCallback FinishedCallback);
-
-  /// \return true on error.
-  static bool
-  cleanUpAfterSignal(int Status, const Task &T,
-                     const TaskQueue::TaskSignalledCallback SignalledCallback);
-};
-
 bool TaskMonitor::executeTasks() {
   while (!isFinishedExecutingTasks()) {
     if (startUpSomeTasks())
@@ -512,6 +487,11 @@ bool TaskMonitor::beginExecutingATask(Task &T) {
   return false;
 }
 
+static bool cleanUpAHungUpTask( Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback,  TaskQueue::TaskSignalledCallback SignalledCallback);
+static Optional<int> waitForPid(const pid_t pidToWaitFor);
+static bool cleanUpAfterSignal( int Status, const Task &T, const TaskQueue::TaskSignalledCallback SignalledCallback);
+static bool cleanUpAfterExit( int Status, const Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback);
+
 Optional<std::vector<int>>
 TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
   std::vector<int> finishedFds;
@@ -525,7 +505,7 @@ TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
     if (!didTaskHangup(receivedEvents))
       continue;
     finishedFds.push_back(fileDes);
-    const bool hadError = TaskHospice::waitForThenDealWithDeath(
+    const bool hadError = cleanUpAHungUpTask(
         T, callbacks.TaskFinished, callbacks.TaskSignalled);
     TasksBeingExecuted.destroyTask(T);
     if (hadError)
@@ -564,7 +544,7 @@ bool TaskMonitor::didTaskHangup(const short events) const {
   return (events & (POLLHUP | POLLERR)) != 0;
 }
 
-bool TaskHospice::waitForThenDealWithDeath(
+static bool cleanUpAHungUpTask(
     Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback,
     const TaskQueue::TaskSignalledCallback SignalledCallback) {
   const Optional<int> StatusIfOK = waitForPid(T.getPid());
@@ -580,7 +560,7 @@ bool TaskHospice::waitForThenDealWithDeath(
                    : false /* Can this case ever happen? */;
 }
 
-Optional<int> TaskHospice::waitForPid(const pid_t pidToWaitFor) {
+static Optional<int> waitForPid(const pid_t pidToWaitFor) {
   for (;;) {
     int Status = 0;
     const pid_t pidFromWait = waitpid(pidToWaitFor, &Status, 0);
@@ -597,7 +577,7 @@ Optional<int> TaskHospice::waitForPid(const pid_t pidToWaitFor) {
   }
 }
 
-bool TaskHospice::cleanUpAfterExit(
+static bool cleanUpAfterExit(
     int Status, const Task &T,
     const TaskQueue::TaskFinishedCallback FinishedCallback) {
   const int Result = WEXITSTATUS(Status);
@@ -613,7 +593,7 @@ bool TaskHospice::cleanUpAfterExit(
                           T.getContext());
 }
 
-bool TaskHospice::cleanUpAfterSignal(
+static bool cleanUpAfterSignal(
     int Status, const Task &T,
     const TaskQueue::TaskSignalledCallback SignalledCallback) {
   // The process exited due to a signal.
