@@ -990,7 +990,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void printParameterList(const ParameterList *params) {
+    void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter_list";
@@ -999,6 +999,19 @@ namespace {
         OS << '\n';
         printParameter(P);
       }
+
+      if (!ctx && params->size() != 0 && params->get(0))
+        ctx = &params->get(0)->getASTContext();
+
+      if (ctx) {
+        auto R = params->getSourceRange();
+        if (R.isValid()) {
+          PrintWithColorRAII(OS, RangeColor) << " range=";
+          R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
+                  ctx->SourceMgr, /*PrintText=*/false);
+        }
+      }
+
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
       Indent -= 2;
     }
@@ -1007,7 +1020,7 @@ namespace {
       for (auto pl : D->getParameterLists()) {
         OS << '\n';
         Indent += 2;
-        printParameterList(pl);
+        printParameterList(pl, &D->getASTContext());
         Indent -= 2;
      }
       if (auto FD = dyn_cast<FuncDecl>(D)) {
@@ -2280,7 +2293,7 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
+      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
     }
 
     OS << '\n';
@@ -2296,7 +2309,7 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
+      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
     }
 
     OS << '\n';
