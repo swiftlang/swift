@@ -929,12 +929,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code],
         AI->isNonThrowing() ? SIL_NON_THROWING_APPLY : SIL_APPLY,
-        AI->getSubstitutions().size(),
+        S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getSwiftRValueType()),
         S.addTypeRef(AI->getSubstCalleeType()),
         addValueRef(AI->getCallee()),
         Args);
-    S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -951,12 +950,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code],
         AI->isNonThrowing() ? SIL_NON_THROWING_BEGIN_APPLY : SIL_BEGIN_APPLY,
-        AI->getSubstitutions().size(),
+        S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getSwiftRValueType()),
         S.addTypeRef(AI->getSubstCalleeType()),
         addValueRef(AI->getCallee()),
         Args);
-    S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case SILInstructionKind::TryApplyInst: {
@@ -975,12 +973,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_TRY_APPLY,
-        AI->getSubstitutions().size(),
+        S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getSwiftRValueType()),
         S.addTypeRef(AI->getSubstCalleeType()),
         addValueRef(AI->getCallee()),
         Args);
-    S.writeSubstitutions(AI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -991,12 +988,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_PARTIAL_APPLY,
-        PAI->getSubstitutions().size(),
+        S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
         S.addTypeRef(PAI->getCallee()->getType().getSwiftRValueType()),
         S.addTypeRef(PAI->getType().getSwiftRValueType()),
         addValueRef(PAI->getCallee()),
         Args);
-    S.writeSubstitutions(PAI->getSubstitutions(), SILAbbrCodes);
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {
@@ -2406,9 +2402,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.
-  // We have to make sure BOUND_GENERIC_SUBSTITUTION does not overlap with
-  // SIL-specific records.
-  registerSILAbbr<decls_block::BoundGenericSubstitutionLayout>();
   registerSILAbbr<decls_block::AbstractProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();

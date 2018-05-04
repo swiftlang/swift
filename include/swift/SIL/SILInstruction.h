@@ -1681,27 +1681,21 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   /// points to the specialization info of the inlined function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// The number of tail-allocated substitutions, allocated after the operand
-  /// list's tail allocation.
-  unsigned NumSubstitutions: 31;
-
   /// Used for apply_inst instructions: true if the called function has an
   /// error result but is not actually throwing.
   unsigned NonThrowing: 1;
 
   /// The number of call arguments as required by the callee.
-  unsigned NumCallArguments;
+  unsigned NumCallArguments : 31;
 
   /// The total number of type-dependent operands.
   unsigned NumTypeDependentOperands;
 
+  /// The substitutions being applied to the callee.
+  SubstitutionMap Substitutions;
+
   Impl &asImpl() { return static_cast<Impl &>(*this); }
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
-
-  MutableArrayRef<Substitution> getSubstitutionsBuffer() {
-    return { asImpl().template getTrailingObjects<Substitution>(),
-             NumSubstitutions };
-  }
 
 protected:
   template <class... As>
@@ -1713,8 +1707,7 @@ protected:
                 As... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo),
-        NumSubstitutions(subs.size()), NonThrowing(false),
-        NumCallArguments(args.size()),
+        NonThrowing(false), NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()) {
 
     // Initialize the operands.
@@ -1729,8 +1722,11 @@ protected:
     }
 
     // Initialize the substitutions.
-    memcpy(getSubstitutionsBuffer().data(), subs.begin(),
-           sizeof(subs[0]) * subs.size());
+    if (!subs.empty()) {
+      if (auto genericSig = getOrigCalleeType()->getGenericSignature()) {
+        Substitutions = genericSig->getSubstitutionMap(subs);
+      }
+    }
   }
 
   ~ApplyInstBase() {
@@ -1740,10 +1736,6 @@ protected:
 
   template <class, class...>
   friend class llvm::TrailingObjects;
-
-  unsigned numTrailingObjects(OverloadToken<Substitution>) const {
-    return NumSubstitutions;
-  }
 
   unsigned numTrailingObjects(OverloadToken<Operand>) const {
     return getNumAllOperands();
@@ -1814,13 +1806,13 @@ public:
   }
 
   /// True if this application has generic substitutions.
-  bool hasSubstitutions() const { return NumSubstitutions != 0; }
+  bool hasSubstitutions() const { return !Substitutions.empty(); }
 
   /// The substitutions used to bind the generic arguments of this function.
-  SubstitutionList getSubstitutions() const {
-    return { asImpl().template getTrailingObjects<Substitution>(),
-             NumSubstitutions };
-  }
+  SubstitutionList getSubstitutions() const { return Substitutions.toList(); }
+
+  /// The substitutions used to bind the generic arguments of this function.
+  SubstitutionMap getSubstitutionMap() const { return Substitutions; }
 
   /// Return the total number of operands of this instruction.
   unsigned getNumAllOperands() const {
@@ -2011,7 +2003,7 @@ public:
 class ApplyInst final
     : public InstructionBase<SILInstructionKind::ApplyInst,
                              ApplyInstBase<ApplyInst, SingleValueInstruction>>,
-      public llvm::TrailingObjects<ApplyInst, Operand, Substitution> {
+      public llvm::TrailingObjects<ApplyInst, Operand> {
   friend SILBuilder;
 
   ApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
@@ -2043,7 +2035,7 @@ class PartialApplyInst final
     : public InstructionBase<SILInstructionKind::PartialApplyInst,
                              ApplyInstBase<PartialApplyInst,
                                            SingleValueInstruction>>,
-      public llvm::TrailingObjects<PartialApplyInst, Operand, Substitution> {
+      public llvm::TrailingObjects<PartialApplyInst, Operand> {
   friend SILBuilder;
 
   PartialApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
@@ -2102,7 +2094,7 @@ class BeginApplyInst final
           BeginApplyInst, BeginApplyResult,
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
-          InitialTrailingObjects<Operand, Substitution>> {
+          InitialTrailingObjects<Operand>> {
   friend SILBuilder;
 
   template <class, class...>
@@ -3593,15 +3585,14 @@ public:
 /// This is only valid in Raw SIL.
 class MarkUninitializedBehaviorInst final
     : public InstructionBase<SILInstructionKind::MarkUninitializedBehaviorInst,
-                             SingleValueInstruction>,
-      private llvm::TrailingObjects<MarkUninitializedBehaviorInst, Substitution>
+                             SingleValueInstruction>
 {
   friend SILBuilder;
-  friend TrailingObjects;
 
   FixedOperandList<4> Operands;
-  unsigned NumInitStorageSubstitutions, NumSetterSubstitutions;
-  
+  SubstitutionMap InitStorageSubstitutions;
+  SubstitutionMap SetterSubstitutions;
+
   enum {
     // The initialization function for the storage.
     InitStorageFunc,
@@ -3613,26 +3604,22 @@ class MarkUninitializedBehaviorInst final
     Self,
   };
   
-  size_t numTrailingObjects(OverloadToken<Substitution>) {
-    return NumInitStorageSubstitutions + NumSetterSubstitutions;
-  }
-  
   MarkUninitializedBehaviorInst(SILDebugLocation DebugLoc,
                                 SILValue InitStorage,
-                                SubstitutionList InitStorageSubs,
+                                SubstitutionMap InitStorageSubs,
                                 SILValue Storage,
                                 SILValue Setter,
-                                SubstitutionList SetterSubs,
+                                SubstitutionMap SetterSubs,
                                 SILValue Self,
                                 SILType Ty);
   
   static MarkUninitializedBehaviorInst *create(SILModule &M,
                                          SILDebugLocation DebugLoc,
                                          SILValue InitStorage,
-                                         SubstitutionList InitStorageSubs,
+                                         SubstitutionMap InitStorageSubs,
                                          SILValue Storage,
                                          SILValue Setter,
-                                         SubstitutionList SetterSubs,
+                                         SubstitutionMap SetterSubs,
                                          SILValue Self,
                                          SILType Ty);
 
@@ -3640,8 +3627,8 @@ public:
   SILValue getInitStorageFunc() const {
     return Operands[InitStorageFunc].get();
   }
-  SubstitutionList getInitStorageSubstitutions() const {
-    return {getTrailingObjects<Substitution>(), NumInitStorageSubstitutions};
+  SubstitutionMap getInitStorageSubstitutions() const {
+    return InitStorageSubstitutions;
   }
   SILValue getStorage() const {
     return Operands[Storage].get();
@@ -3650,9 +3637,8 @@ public:
   SILValue getSetterFunc() const {
     return Operands[SetterFunc].get();
   }
-  SubstitutionList getSetterSubstitutions() const {
-    return {getTrailingObjects<Substitution>() + NumInitStorageSubstitutions,
-            NumSetterSubstitutions};
+  SubstitutionMap getSetterSubstitutions() const {
+    return SetterSubstitutions;
   }
   SILValue getSelf() const {
     return Operands[Self].get();
@@ -7541,7 +7527,7 @@ public:
 class TryApplyInst final
     : public InstructionBase<SILInstructionKind::TryApplyInst,
                              ApplyInstBase<TryApplyInst, TryApplyInstBase>>,
-      public llvm::TrailingObjects<TryApplyInst, Operand, Substitution> {
+      public llvm::TrailingObjects<TryApplyInst, Operand> {
   friend SILBuilder;
 
   TryApplyInst(SILDebugLocation DebugLoc, SILValue callee,
@@ -7700,10 +7686,7 @@ public:
 
   /// The substitutions used to bind the generic arguments of this function.
   SubstitutionMap getSubstitutionMap() const {
-    if (auto genericSig = getOrigCalleeType()->getGenericSignature())
-      return genericSig->getSubstitutionMap(getSubstitutions());
-
-    return SubstitutionMap();
+    FOREACH_IMPL_RETURN(getSubstitutionMap());
   }
 
   /// Return a begin iterator for the substitution array.
