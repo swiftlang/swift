@@ -120,6 +120,21 @@ protected:
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
+    // If we have open existentials to substitute, check whether that's
+    // relevant to this this particular substitution.
+    if (!OpenedExistentialSubs.empty()) {
+      for (auto ty : Subs.getReplacementTypes()) {
+        // If we found a type containing an opened existential, substitute
+        // open existentials throughout the substitution map.
+        if (ty->hasOpenedExistential()) {
+          Subs = Subs.subst(QueryTypeSubstitutionMapOrIdentity{
+                              OpenedExistentialSubs},
+                            MakeAbstractConformanceForGenericType());
+          break;
+        }
+      }
+    }
+
     return asImpl().remapSubstitutionMap(Subs).getCanonical();
   }
 
