@@ -718,7 +718,7 @@ bool Parser::loadCurrentSyntaxNodeFromCache() {
   unsigned LexerOffset =
       SourceMgr.getLocOffsetInBuffer(Tok.getLoc(), L->getBufferID());
   unsigned LeadingTriviaOffset = LexerOffset - LeadingTrivia.getTextLength();
-  if (auto TextLength = SyntaxContext->loadFromCache(LexerOffset)) {
+  if (auto TextLength = SyntaxContext->loadFromCache(LeadingTriviaOffset)) {
     L->resetToOffset(LeadingTriviaOffset + TextLength);
     L->lex(Tok, LeadingTrivia, TrailingTrivia);
     return true;

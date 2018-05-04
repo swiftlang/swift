@@ -17,13 +17,13 @@ using namespace swift::syntax;
 
 bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
                                          SyntaxKind Kind) const {
-  if (Node.getAbsolutePosition().getOffset() != Position)
+  auto NodeStart = Node.getAbsolutePositionWithLeadingTrivia().getOffset();
+  if (NodeStart != Position)
     return false;
   if (Node.getKind() != Kind)
     return false;
 
   // Check if this node has been edited. If it has, we cannot reuse it.
-  auto NodeStart = Node.getAbsolutePosition().getOffset();
   auto NodeEnd = NodeStart + Node.getTextLength();
   for (auto Edit : Edits) {
     if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd)) {
@@ -49,7 +49,7 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
     if (!Child.hasValue()) {
       continue;
     }
-    auto ChildStart = Child->getAbsolutePosition().getOffset();
+    auto ChildStart = Child->getAbsolutePositionWithLeadingTrivia().getOffset();
     auto ChildEnd = ChildStart + Child->getTextLength();
     if (ChildStart <= Position && Position < ChildEnd) {
       return lookUpFrom(Child.getValue(), Position, Kind);
@@ -73,12 +73,8 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
   auto Node = lookUpFrom(OldSyntaxTree, OldPosition, Kind);
   if (Node.hasValue()) {
     if (RecordReuseInformation) {
-      auto LeadingTrivia =
-          Node->getAbsolutePosition().getOffset() -
-          Node->getAbsolutePositionWithLeadingTrivia().getOffset();
-      auto Start = NewPosition - LeadingTrivia;
-      auto End = Start + Node->getTextLength();
-      ReusedRanges.push_back({Start, End});
+      ReusedRanges.push_back(
+          {NewPosition, NewPosition + Node->getTextLength()});
     }
   }
   return Node;
