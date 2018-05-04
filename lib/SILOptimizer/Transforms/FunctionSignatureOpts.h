@@ -108,7 +108,7 @@ struct ArgumentDescriptor {
     if (Arg->getType().isObject())
       return true;
     // @in arguments of generic types can be processed.
-    if (Arg->getType().getSwiftRValueType()->hasArchetype() &&
+    if (Arg->getType().hasArchetype() &&
         Arg->getType().isAddress() &&
         (Arg->hasConvention(SILArgumentConvention::Indirect_In) ||
          Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)))

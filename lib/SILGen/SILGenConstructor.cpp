@@ -886,10 +886,10 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
     
     auto initConstantTy = initFn->getLoweredType().castTo<SILFunctionType>();
     
-    auto param = SILParameterInfo(initTy.getSwiftRValueType(),
+    auto param = SILParameterInfo(initTy.getASTType(),
                         initTy.isAddress() ? ParameterConvention::Indirect_In
                                            : ParameterConvention::Direct_Owned);
-    auto result = SILResultInfo(storageTy.getSwiftRValueType(),
+    auto result = SILResultInfo(storageTy.getASTType(),
                               storageTy.isAddress() ? ResultConvention::Indirect
                                                     : ResultConvention::Owned);
     

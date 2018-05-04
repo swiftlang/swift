@@ -98,8 +98,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
           // convention for parameters. E.g. some of former indirect parameters
           // may become direct. Some of indirect return values may become
           // direct. Do not replace the callee in that case.
-          if (SubstCalleeSILType.getSwiftRValueType() ==
-              RecursiveSubstCalleeSILType) {
+          if (SubstCalleeSILType.getASTType() == RecursiveSubstCalleeSILType) {
             Subs = RecursiveSubsList;
             Callee = Builder.createFunctionRef(
                 Cloner.getOpLocation(AI.getLoc()), &Builder.getFunction());

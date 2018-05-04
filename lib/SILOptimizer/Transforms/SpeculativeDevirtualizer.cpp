@@ -93,7 +93,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (!canDevirtualizeClassMethod(AI, SubType))
     return FullApplySite();
 
-  if (SubType.getSwiftRValueType()->hasDynamicSelfType())
+  if (SubType.getASTType()->hasDynamicSelfType())
     return FullApplySite();
 
   // Create a diamond shaped control flow and a checked_cast_branch
@@ -467,7 +467,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
 
     auto ClassOrMetatypeType = ClassType;
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
-      auto InstTy = ClassType.getSwiftRValueType();
+      auto InstTy = ClassType.getASTType();
       auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
       auto CanMetaTy = CanMetatypeType(MetaTy);
       ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);

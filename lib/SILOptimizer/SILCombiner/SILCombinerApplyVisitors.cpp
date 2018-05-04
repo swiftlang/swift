@@ -489,7 +489,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
-    } else if (OldOpType.getSwiftRValueType() != NewOpType.getSwiftRValueType()) {
+    } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
       auto URC = Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
@@ -768,7 +768,7 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
     if (auto *IE =
           dyn_cast<InitExistentialMetatypeInst>(Open->getOperand())) {
-      auto Ty = Open->getType().getSwiftRValueType();
+      auto Ty = Open->getType().getASTType();
       while (auto Metatype = dyn_cast<MetatypeType>(Ty))
         Ty = Metatype.getInstanceType();
       OpenedArchetype = cast<ArchetypeType>(Ty);
@@ -903,17 +903,17 @@ ConformanceAndConcreteType::ConformanceAndConcreteType(
     Conformances = IE->getConformances();
     ConcreteType = IE->getFormalConcreteType();
     NewSelf = IE;
-    ExistentialType = IE->getOperand()->getType().getSwiftRValueType();
+    ExistentialType = IE->getOperand()->getType().getASTType();
   } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
     Conformances = IER->getConformances();
     ConcreteType = IER->getFormalConcreteType();
     NewSelf = IER->getOperand();
-    ExistentialType = IER->getType().getSwiftRValueType();
+    ExistentialType = IER->getType().getASTType();
   } else if (auto IEM = dyn_cast<InitExistentialMetatypeInst>(InitExistential)){
     Conformances = IEM->getConformances();
     NewSelf = IEM->getOperand();
-    ConcreteType = NewSelf->getType().getSwiftRValueType();
-    ExistentialType = IEM->getType().getSwiftRValueType();
+    ConcreteType = NewSelf->getType().getASTType();
+    ExistentialType = IEM->getType().getASTType();
     while (auto InstanceType = dyn_cast<ExistentialMetatypeType>(ExistentialType)) {
       ExistentialType = InstanceType.getInstanceType();
       ConcreteType = cast<MetatypeType>(ConcreteType).getInstanceType();
@@ -1105,14 +1105,14 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   // Notice that it is sufficient to compare the return type to the
   // substituted type because types that depend on the Self type are
   // not allowed (for example [Self] is not allowed).
-  if (AI.getType().getSwiftRValueType() == WMI->getLookupType())
+  if (AI.getType().getASTType() == WMI->getLookupType())
     return nullptr;
 
   // We need to handle the Self return type.
   // In we find arguments that are not the 'self' argument and if
   // they are of the Self type then we abort the optimization.
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg->getType().getSwiftRValueType() == WMI->getLookupType())
+    if (Arg->getType().getASTType() == WMI->getLookupType())
       return nullptr;
   }
 
@@ -1187,8 +1187,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   // In we find arguments that are not the 'self' argument and if
   // they are of the Self type then we abort the optimization.
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg->getType().getSwiftRValueType() ==
-        AI.getArguments().back()->getType().getSwiftRValueType())
+    if (Arg->getType().getASTType() ==
+        AI.getArguments().back()->getType().getASTType())
       return nullptr;
   }
 

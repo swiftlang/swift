@@ -261,7 +261,7 @@ static SILFunction *getGlobalGetterFunction(SILModule &M,
   auto refType = M.Types.getLoweredType(varDecl->getInterfaceType());
 
   // Function takes no arguments and returns refType
-  SILResultInfo Results[] = { SILResultInfo(refType.getSwiftRValueType(),
+  SILResultInfo Results[] = { SILResultInfo(refType.getASTType(),
                                             ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);

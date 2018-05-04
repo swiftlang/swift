@@ -91,7 +91,7 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
   }
   case SILInstructionKind::RefTailAddrInst: {
     auto *RTAI = cast<RefTailAddrInst>(I);
-    auto *Ty = RTAI->getTailType().getSwiftRValueType().getPointer();
+    auto *Ty = RTAI->getTailType().getASTType().getPointer();
     Value = ValueTy(ProjectionKind::TailElems, Ty);
     assert(getKind() == ProjectionKind::TailElems);
     break;
@@ -148,14 +148,14 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     break;
   }
   case SILInstructionKind::UpcastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::Upcast, Ty);
     assert(getKind() == ProjectionKind::Upcast);
     break;
   }
   case SILInstructionKind::UncheckedRefCastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::RefCast, Ty);
     assert(getKind() == ProjectionKind::RefCast);
@@ -163,7 +163,7 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
   }
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedAddrCastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::BitwiseCast, Ty);
     assert(getKind() == ProjectionKind::BitwiseCast);

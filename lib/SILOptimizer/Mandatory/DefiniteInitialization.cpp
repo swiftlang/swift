@@ -105,7 +105,7 @@ static void LowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
     B.createStore(Loc, Src, Inst->getDest(), StoreOwnershipQualifier::Init);
 
     auto MetatypeTy = CanMetatypeType::get(
-        Inst->getDest()->getType().getSwiftRValueType(),
+        Inst->getDest()->getType().getASTType(),
         MetatypeRepresentation::Thick);
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
@@ -1962,7 +1962,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
         Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
 
       auto MetatypeTy = CanMetatypeType::get(
-          TheMemory.MemorySILType.getSwiftRValueType(),
+          TheMemory.MemorySILType.getASTType(),
           MetatypeRepresentation::Thick);
       auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
       SILValue Metatype;

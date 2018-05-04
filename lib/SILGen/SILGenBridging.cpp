@@ -1120,7 +1120,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
 ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
                                                   ManagedValue bridgedError) {
   // If the incoming error is non-optional, just do an existential erasure.
-  CanType bridgedErrorTy = bridgedError.getType().getSwiftRValueType();
+  auto bridgedErrorTy = bridgedError.getType().getASTType();
   if (!bridgedErrorTy.getOptionalObjectType()) {
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 

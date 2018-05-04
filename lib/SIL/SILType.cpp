@@ -66,9 +66,9 @@ SILType SILType::getBuiltinWordType(const ASTContext &C) {
 }
 
 SILType SILType::getOptionalType(SILType type) {
-  auto &ctx = type.getSwiftRValueType()->getASTContext();
+  auto &ctx = type.getASTContext();
   auto optType = BoundGenericEnumType::get(ctx.getOptionalDecl(), Type(),
-                                           { type.getSwiftRValueType() });
+                                           { type.getASTType() });
   return getPrimitiveType(CanType(optType), type.getCategory());
 }
 
@@ -85,7 +85,7 @@ bool SILType::isReferenceCounted(SILModule &M) const {
 }
 
 bool SILType::isNoReturnFunction() const {
-  if (auto funcTy = dyn_cast<SILFunctionType>(getSwiftRValueType()))
+  if (auto funcTy = dyn_cast<SILFunctionType>(getASTType()))
     return funcTy->isNoReturnFunction();
 
   return false;
@@ -101,10 +101,10 @@ std::string SILType::getAsString() const {
 bool SILType::isPointerSizeAndAligned() {
   auto &C = getASTContext();
   if (isHeapObjectReferenceType()
-      || getSwiftRValueType()->isEqual(C.TheRawPointerType)) {
+      || getASTType()->isEqual(C.TheRawPointerType)) {
     return true;
   }
-  if (auto intTy = dyn_cast<BuiltinIntegerType>(getSwiftRValueType()))
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(getASTType()))
     return intTy->getWidth().isPointerWidth();
 
   return false;
@@ -169,7 +169,7 @@ static bool canUnsafeCastTuple(SILType fromType, CanTupleType fromTupleTy,
     return true;
   }
   // Otherwise, flatten one level of tuple elements on each side.
-  auto toTupleTy = dyn_cast<TupleType>(toType.getSwiftRValueType());
+  auto toTupleTy = dyn_cast<TupleType>(toType.getASTType());
   if (!toTupleTy)
     return false;
 
@@ -233,7 +233,7 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
 
 static bool canUnsafeCastScalars(SILType fromType, SILType toType,
                                  SILModule &M) {
-  CanType fromCanTy = fromType.getSwiftRValueType();
+  CanType fromCanTy = fromType.getASTType();
   bool isToPointer = toType.isPointerSizeAndAligned();
 
   unsigned LeastFromWidth = 0;
@@ -260,7 +260,7 @@ static bool canUnsafeCastScalars(SILType fromType, SILType toType,
     GreatestToWidth = BuiltinIntegerWidth::pointer().getGreatestWidth();
 
   } else if (auto toIntTy = dyn_cast<BuiltinIntegerType>(
-               toType.getSwiftRValueType())) {
+               toType.getASTType())) {
     if (toIntTy->isFixedWidth())
       GreatestToWidth = toIntTy->getFixedWidth();
   }
@@ -288,7 +288,7 @@ bool SILType::canPerformABICompatibleUnsafeCastValue(SILType fromType,
     return canUnsafeCastStruct(fromType, fromStruct, toType, M);
 
   if (CanTupleType fromTupleTy =
-      dyn_cast<TupleType>(fromType.getSwiftRValueType())) {
+      dyn_cast<TupleType>(fromType.getASTType())) {
     return canUnsafeCastTuple(fromType, fromTupleTy, toType, M);
   }
   if (EnumDecl *fromEnum = fromType.getEnumOrBoundGenericEnum())
@@ -310,7 +310,7 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
 }
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
-  auto baseTy = getSwiftRValueType();
+  auto baseTy = getASTType();
 
   AbstractionPattern origFieldTy = M.Types.getAbstractionPattern(field);
   CanType substFieldTy;
@@ -333,7 +333,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
   assert(elt->hasAssociatedValues());
 
-  if (auto objectType = getSwiftRValueType().getOptionalObjectType()) {
+  if (auto objectType = getASTType().getOptionalObjectType()) {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
     return SILType(objectType, getCategory());
   }
@@ -341,17 +341,17 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   // If the case is indirect, then the payload is boxed.
   if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
     auto box = M.Types.getBoxTypeForEnumElement(*this, elt);
-    return SILType(SILType::getPrimitiveObjectType(box).getSwiftRValueType(),
+    return SILType(SILType::getPrimitiveObjectType(box).getASTType(),
                    getCategory());
   }
 
   auto substEltTy =
-    getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(), elt,
+    getASTType()->getTypeOfMember(M.getSwiftModule(), elt,
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
 
-  return SILType(loweredTy.getSwiftRValueType(), getCategory());
+  return SILType(loweredTy.getASTType(), getCategory());
 }
 
 bool SILType::isLoadableOrOpaque(SILModule &M) const {
@@ -381,13 +381,14 @@ SILType SILType::substGenericArgs(SILModule &M,
 
 bool SILType::isHeapObjectReferenceType() const {
   auto &C = getASTContext();
-  if (getSwiftRValueType()->isBridgeableObjectType())
+  auto Ty = getASTType();
+  if (Ty->isBridgeableObjectType())
     return true;
-  if (getSwiftRValueType()->isEqual(C.TheNativeObjectType))
+  if (Ty->isEqual(C.TheNativeObjectType))
     return true;
-  if (getSwiftRValueType()->isEqual(C.TheBridgeObjectType))
+  if (Ty->isEqual(C.TheBridgeObjectType))
     return true;
-  if (getSwiftRValueType()->isEqual(C.TheUnknownObjectType))
+  if (Ty->isEqual(C.TheUnknownObjectType))
     return true;
   if (is<SILBoxType>())
     return true;
@@ -395,7 +396,7 @@ bool SILType::isHeapObjectReferenceType() const {
 }
 
 SILType SILType::getMetatypeInstanceType(SILModule &M) const {
-  CanType MetatypeType = getSwiftRValueType();
+  CanType MetatypeType = getASTType();
   assert(MetatypeType->is<AnyMetatypeType>() &&
          "This method should only be called on SILTypes with an underlying "
          "metatype type.");
@@ -462,7 +463,7 @@ bool SILType::aggregateHasUnreferenceableStorage() const {
 }
 
 SILType SILType::getOptionalObjectType() const {
-  if (auto objectTy = getSwiftRValueType().getOptionalObjectType()) {
+  if (auto objectTy = getASTType().getOptionalObjectType()) {
     return SILType(objectTy, getCategory());
   }
 
@@ -512,7 +513,7 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
   if (!isExistentialType())
     return ExistentialRepresentation::None;
 
-  auto layout = getSwiftRValueType().getExistentialLayout();
+  auto layout = getASTType().getExistentialLayout();
 
   if (layout.isErrorExistential()) {
     // NSError or CFError references can be adopted directly as Error
@@ -544,10 +545,10 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   case ExistentialRepresentation::Class:
   case ExistentialRepresentation::Boxed: {
     // Look at the protocols to see what representation is appropriate.
-    if (!getSwiftRValueType().isExistentialType())
+    if (!isExistentialType())
       return false;
 
-    auto layout = getSwiftRValueType().getExistentialLayout();
+    auto layout = getASTType().getExistentialLayout();
 
     // The (uncomposed) Error existential uses a special boxed
     // representation. It can also adopt class references of bridged error types
@@ -572,8 +573,7 @@ SILType::canUseExistentialRepresentation(SILModule &M,
 }
 
 SILType SILType::getReferentType(SILModule &M) const {
-  ReferenceStorageType *Ty =
-      getSwiftRValueType()->castTo<ReferenceStorageType>();
+  auto Ty = castTo<ReferenceStorageType>();
   return M.Types.getLoweredType(Ty->getReferentType()->getCanonicalType());
 }
 
@@ -589,7 +589,7 @@ SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
              QuerySubstitutionMap{subMap},
              LookUpConformanceInSubstitutionMap(subMap),
              sig)
-      .getSwiftRValueType();
+      .getASTType();
   }
   return fieldTy;
 }
@@ -637,7 +637,7 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 }
 
 bool SILFunctionType::isNoReturnFunction() {
-  return getDirectFormalResultsType().getSwiftRValueType()->isUninhabited();
+  return getDirectFormalResultsType().getASTType()->isUninhabited();
 }
 
 #ifndef NDEBUG
@@ -706,8 +706,8 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
 /// check whether they have an abstraction difference.
 bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
                                        SILType type2) {
-  CanType ct1 = getSwiftRValueType();
-  CanType ct2 = type2.getSwiftRValueType();
+  CanType ct1 = getASTType();
+  CanType ct2 = type2.getASTType();
   assert(getSILFunctionLanguage(rep) == SILFunctionLanguage::C ||
          areOnlyAbstractionDifferent(ct1, ct2));
   (void)ct1;
@@ -772,5 +772,5 @@ bool SILType::isLoweringOf(SILModule &Mod, CanType formalType) {
     formalType = dynamicSelf.getSelfType();
 
   // Other types are preserved through lowering.
-  return loweredType.getSwiftRValueType() == formalType;
+  return loweredType.getASTType() == formalType;
 }

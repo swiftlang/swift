@@ -187,7 +187,7 @@ public:
   /// return on a variable of this type.
   SILType getSemanticType() const {
     // If you change this, change getSemanticTypeLowering() too.
-    auto storageType = getLoweredType().getSwiftRValueType();
+    auto storageType = getLoweredType().getASTType();
     if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
       return SILType::getPrimitiveType(refType.getReferentType(),
                                        SILValueCategory::Object);
@@ -639,7 +639,7 @@ public:
   }
   
   static bool isIndirectPlusZeroSelfParameter(SILType T) {
-    return isIndirectPlusZeroSelfParameter(T.getSwiftRValueType());
+    return isIndirectPlusZeroSelfParameter(T.getASTType());
   }
   
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
@@ -907,7 +907,7 @@ private:
 inline const TypeLowering &
 TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
   // If you change this, change getSemanticType() too.
-  auto storageType = getLoweredType().getSwiftRValueType();
+  auto storageType = getLoweredType().getASTType();
   if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
     return TC.getTypeLowering(refType.getReferentType());
   return *this;
