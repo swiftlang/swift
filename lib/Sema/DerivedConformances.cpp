@@ -362,3 +362,23 @@ DerivedConformance::declareDerivedProperty(Identifier name,
 
   return {propDecl, pbDecl};
 }
+
+bool DerivedConformance::checkAndDiagnoseDisallowedContext() const {
+  // In general, conformances can't be synthesized in an extension; but we have
+  // to allow it as a special case for Equatable and Hashable on enums with no
+  // associated values to preserve source compatibility.
+  bool allowExtensions = false;
+  if (Protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+      Protocol->isSpecificProtocol(KnownProtocolKind::Hashable)) {
+    auto ED = dyn_cast<EnumDecl>(Nominal);
+    allowExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
+  }
+
+  if (!allowExtensions && Nominal != ConformanceDecl) {
+    TC.diagnose(ConformanceDecl->getLoc(), diag::cannot_synthesize_in_extension,
+                getProtocolType());
+    return true;
+  }
+
+  return false;
+}
