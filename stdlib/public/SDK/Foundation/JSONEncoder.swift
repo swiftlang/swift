@@ -10,11 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-fileprivate protocol _JSONStringDictionaryMarker {
+
+fileprivate protocol _JSONStringDictionaryEncodableMarker { }
+
+extension Dictionary : _JSONStringDictionaryEncodableMarker where Key == String, Value: Encodable { }
+
+fileprivate protocol _JSONStringDictionaryDecodableMarker {
     static var elementType: Decodable.Type { get }
 }
 
-extension Dictionary : _JSONStringDictionaryMarker where Key == String, Value: Decodable {
+extension Dictionary : _JSONStringDictionaryDecodableMarker where Key == String, Value: Decodable {
     static var elementType: Decodable.Type { return Value.self }
 }
 
@@ -852,7 +857,7 @@ extension _JSONEncoder {
         } else if type == Decimal.self || type == NSDecimalNumber.self {
             // JSONSerialization can natively handle NSDecimalNumber.
             return (value as! NSDecimalNumber)
-        } else if type is Dictionary<String, Encodable> {
+        } else if type is _JSONStringDictionaryEncodableMarker {
             return self.box(value as! Dictionary<String, Encodable>)
         }
 
@@ -2380,7 +2385,7 @@ extension _JSONDecoder {
         }
     }
 
-    fileprivate func unbox<T>(_ value: Any, as type: _JSONStringDictionaryMarker.Type) throws -> T? {
+    fileprivate func unbox<T>(_ value: Any, as type: _JSONStringDictionaryDecodableMarker.Type) throws -> T? {
         var result = [String : Any]()
         guard let dict = value as? NSDictionary else {
             throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
@@ -2420,7 +2425,7 @@ extension _JSONDecoder {
             return url
         } else if type == Decimal.self || type == NSDecimalNumber.self {
             return try self.unbox(value, as: Decimal.self)
-        } else if let stringKeyedDictType = type as? _JSONStringDictionaryMarker.Type {
+        } else if let stringKeyedDictType = type as? _JSONStringDictionaryDecodableMarker.Type {
             return try self.unbox(value, as: stringKeyedDictType)
         } else {
             self.storage.push(container: value)
