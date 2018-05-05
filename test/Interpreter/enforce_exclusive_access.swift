@@ -212,7 +212,7 @@ ExclusiveAccessTestSuite.test("InoutReadNoescapeWrite")
   doOne { readAndPerform(&x, closure: c) }
 }
 
-ExclusiveAccessTestSuite.test("InoutWriteEscapeRead")
+ExclusiveAccessTestSuite.test("InoutWriteEscapeReadClosure")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -226,7 +226,7 @@ ExclusiveAccessTestSuite.test("InoutWriteEscapeRead")
   doOne { modifyAndPerform(&x, closure: c) }
 }
 
-ExclusiveAccessTestSuite.test("InoutWriteEscapeWrite")
+ExclusiveAccessTestSuite.test("InoutWriteEscapeWriteClosure")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
