@@ -318,6 +318,20 @@ void SyntaxParsingContext::finalizeRoot() {
   getRootData().Storage.clear();
 }
 
+void SyntaxParsingContext::synthesize(tok Kind, StringRef Text) {
+  if (!Enabled)
+    return;
+  if (Text.empty())
+    Text = getTokenText(Kind);
+  Storage.push_back(RawSyntax::missing(Kind, Text));
+}
+
+void SyntaxParsingContext::synthesize(SyntaxKind Kind) {
+  if (!Enabled)
+    return;
+  Storage.push_back(RawSyntax::missing(Kind));
+}
+
 SyntaxParsingContext::~SyntaxParsingContext() {
   assert(isTopOfContextStack() && "destructed in wrong order");
 

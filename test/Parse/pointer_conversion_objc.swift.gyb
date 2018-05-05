@@ -52,7 +52,7 @@ func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
                                    ap: AutoreleasingUnsafeMutablePointer<C>) {
   takesAutoreleasingPointer(nil)
 % if not suffix:
-  // expected-error@-2 {{nil is not compatible with expected argument type}}
+  // expected-error@-2 {{'nil' is not compatible with expected argument type}}
 % end
 
   takesAutoreleasingPointer(p) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'AutoreleasingUnsafeMutablePointer<C>${diag_suffix}'}}

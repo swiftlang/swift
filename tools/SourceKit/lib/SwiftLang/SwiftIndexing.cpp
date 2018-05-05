@@ -184,6 +184,8 @@ static void indexModule(llvm::MemoryBuffer *Input,
       IdxConsumer.failed("failed to load module");
       return;
     }
+
+    Mod->setHasResolvedImports();
   }
 
   // Setup a typechecker for protocol conformance resolving.

@@ -144,4 +144,16 @@ PositionTests.test("Implicit") {
   })
 }
 
+PositionTests.test("WithoutSourceFileRoot") {
+  expectDoesNotThrow({
+    let item = SyntaxFactory.makeCodeBlockItem(
+      item: SyntaxFactory.makeReturnStmt(
+        returnKeyword: SyntaxFactory.makeToken(.returnKeyword, presence: .present)
+          .withLeadingTrivia(.newlines(1)).withTrailingTrivia(.newlines(1)),
+            expression: nil), semicolon: nil)
+     expectEqual(0, item.position.utf8Offset)
+     expectEqual(1, item.positionAfterSkippingLeadingTrivia.utf8Offset)
+  })
+}
+
 runAllTests()

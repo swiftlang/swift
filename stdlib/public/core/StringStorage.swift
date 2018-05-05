@@ -13,14 +13,14 @@
 import SwiftShims
 
 @_fixed_layout
-public
+@usableFromInline
 class _SwiftRawStringStorage : _SwiftNativeNSString {
   @nonobjc
-  public // @testable
+  @usableFromInline
   final var capacity: Int
 
   @nonobjc
-  public // @testable
+  @usableFromInline
   final var count: Int
 
   @nonobjc
@@ -36,7 +36,6 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
 
   @inlinable
   @nonobjc
-  public // @testable
   final var unusedCapacity: Int {
     _sanityCheck(capacity >= count)
     return capacity - count
@@ -47,13 +46,16 @@ internal typealias _ASCIIStringStorage = _SwiftStringStorage<UInt8>
 internal typealias _UTF16StringStorage = _SwiftStringStorage<UTF16.CodeUnit>
 
 @_fixed_layout
-public final class _SwiftStringStorage<CodeUnit>
+@usableFromInline
+final class _SwiftStringStorage<CodeUnit>
   : _SwiftRawStringStorage, _NSStringCore
 where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
   /// Create uninitialized storage of at least the specified capacity.
-  @inlinable
+  @usableFromInline
   @nonobjc
+  @_specialize(where CodeUnit == UInt8)
+  @_specialize(where CodeUnit == UInt16)
   internal static func create(
     capacity: Int,
     count: Int = 0
@@ -62,8 +64,10 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
 #if arch(i386) || arch(arm)
 #else
-    _sanityCheck((CodeUnit.self != UInt8.self || capacity > 15),
-      "Should prefer a small representation")
+    // TODO(SR-7594): Restore below invariant
+    // _sanityCheck(
+    //   CodeUnit.self != UInt8.self || capacity > _SmallUTF8String.capacity,
+    //   "Should prefer a small representation")
 #endif // 64-bit
 
     let storage = Builtin.allocWithTailElems_1(
@@ -91,24 +95,28 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
   // NSString API
 
   @objc(initWithCoder:)
-  public convenience init(coder aDecoder: AnyObject) {
+  @usableFromInline
+  convenience init(coder aDecoder: AnyObject) {
     _sanityCheckFailure("init(coder:) not implemented for _SwiftStringStorage")
   }
 
   @objc(length)
-  public var length: Int {
+  @usableFromInline
+  var length: Int {
     return count
   }
 
   @objc(characterAtIndex:)
-  public func character(at index: Int) -> UInt16 {
+  @usableFromInline
+  func character(at index: Int) -> UInt16 {
     defer { _fixLifetime(self) }
     precondition(index >= 0 && index < count, "Index out of bounds")
     return UInt16(start[index])
   }
 
   @objc(getCharacters:range:)
-  public func getCharacters(
+  @usableFromInline
+  func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange
   ) {
@@ -126,13 +134,15 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
   }
 
   @objc(_fastCharacterContents)
-  public func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+  @usableFromInline
+  func _fastCharacterContents() -> UnsafePointer<UInt16>? {
     guard CodeUnit.self == UInt16.self else { return nil }
     return UnsafePointer(rawStart.assumingMemoryBound(to: UInt16.self))
   }
 
   @objc(copyWithZone:)
-  public func copy(with zone: _SwiftNSZone?) -> AnyObject {
+  @usableFromInline
+  func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While _SwiftStringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
@@ -185,7 +195,7 @@ extension _SwiftStringStorage {
 extension _SwiftStringStorage {
   // Append operations
 
-  @inlinable
+  @inlinable // TODO(inlinability): @usableFromInline - P3
   @nonobjc
   internal final func _appendInPlace<OtherCodeUnit>(
     _ other: _UnmanagedString<OtherCodeUnit>
@@ -197,7 +207,7 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @inlinable
+  @inlinable // TODO(inlinability): @usableFromInline - P3
   @nonobjc
   internal final func _appendInPlace(_ other: _UnmanagedOpaqueString) {
     let otherCount = Int(other.count)
@@ -206,7 +216,7 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @inlinable
+  @inlinable // TODO(inlinability): @usableFromInline - P3
   @nonobjc
   internal final func _appendInPlace<C: Collection>(contentsOf other: C)
   where C.Element == CodeUnit {
@@ -219,7 +229,7 @@ extension _SwiftStringStorage {
     count += otherCount
   }
 
-  @inlinable
+  @inlinable // TODO(inlinability): @usableFromInline - P3
   @_specialize(where C == Character._SmallUTF16, CodeUnit == UInt8)
   @nonobjc
   internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)

@@ -1585,8 +1585,8 @@ ERROR(availability_query_repeated_platform, none,
 //------------------------------------------------------------------------------
 // syntax parsing diagnostics
 //------------------------------------------------------------------------------
-WARNING(unknown_syntax_entity, PointsToFirstBadToken,
-        "unknown %0 syntax exists in the source", (StringRef))
+ERROR(unknown_syntax_entity, PointsToFirstBadToken,
+      "unknown %0 syntax exists in the source", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

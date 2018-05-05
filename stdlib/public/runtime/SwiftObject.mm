@@ -603,12 +603,13 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_retain(static_cast<HeapObject *>(objectRef));
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
-  return objc_retain(static_cast<id>(objectRef));
+  objc_retain(static_cast<id>(objectRef));
+  return object;
 #else
   swift_retain(static_cast<HeapObject *>(objectRef));
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -624,12 +625,13 @@ void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_nonatomic_retain(static_cast<HeapObject *>(objectRef));
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
-  return objc_retain(static_cast<id>(objectRef));
+  objc_retain(static_cast<id>(objectRef));
+  return object;
 #else
   swift_nonatomic_retain(static_cast<HeapObject *>(objectRef));
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -680,14 +682,14 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
   void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_retain_n(static_cast<HeapObject *>(objectRef), n);
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
   for (int i = 0;i < n; ++i)
     objc_ret = objc_retain(static_cast<id>(objectRef));
-  return objc_ret;
+  return object;
 #else
   swift_retain_n(static_cast<HeapObject *>(objectRef), n);
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -721,14 +723,14 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
   void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
   for (int i = 0;i < n; ++i)
     objc_ret = objc_retain(static_cast<id>(objectRef));
-  return objc_ret;
+  return object;
 #else
   swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -1417,22 +1419,39 @@ bool swift::swift_isUniquelyReferencedOrPinned_native(const HeapObject *object){
 bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
-                                                  int32_t line) {
+                                                  int32_t line, int32_t column,
+                                                  unsigned verifcationType) {
+  assert((verifcationType == 0 || verifcationType == 1) &&
+         "Unknown verifcation type");
+
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
 
   // Print a message if the closure escaped.
   if (isEscaping) {
-    auto *message = "Fatal error: closure argument was escaped in "
-                              "withoutActuallyEscaping block";
+    auto *message = (verifcationType == 0)
+                        ? "closure argument was escaped in "
+                          "withoutActuallyEscaping block"
+                        : "closure argument passed as @noescape "
+                          "to Objective-C has escaped";
     auto messageLength = strlen(message);
 
-    if (_swift_shouldReportFatalErrorsToDebugger())
-      _swift_reportToDebugger(RuntimeErrorFlagFatal, message);
-
     char *log;
-    swift_asprintf(&log, "%.*s: file %.*s, line %" PRIu32 "\n", messageLength,
-                   message, filenameLength, filename, line);
+    swift_asprintf(
+        &log, "%.*s: file %.*s, line %" PRIu32 ", column %" PRIu32 " \n",
+        messageLength, message, filenameLength, filename, line, column);
+
+    printCurrentBacktrace(2/*framesToSkip*/);
+
+    if (_swift_shouldReportFatalErrorsToDebugger()) {
+      RuntimeErrorDetails details = {
+          .version = RuntimeErrorDetails::currentVersion,
+          .errorType = "escaping-closure-violation",
+          .currentStackDescription = "Closure has escaped",
+          .framesToSkip = 1,
+      };
+      _swift_reportToDebugger(RuntimeErrorFlagFatal, log, &details);
+    }
 
     swift_reportError(RuntimeErrorFlagFatal, log);
     free(log);

@@ -18,6 +18,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -500,6 +501,10 @@ Parser::~Parser() {
   delete SyntaxContext;
 }
 
+bool Parser::allowTopLevelCode() const {
+  return SF.isScriptMode();
+}
+
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
@@ -879,7 +884,7 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
-                  std::function<ParserStatus()> callback) {
+                  llvm::function_ref<ParserStatus()> callback) {
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
   if (Kind == SyntaxKind::Unknown)

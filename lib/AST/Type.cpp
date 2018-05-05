@@ -66,6 +66,11 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
   return subMap.lookupSubstitution(key);
 }
 
+void TypeLoc::setType(Type Ty, bool validated) {
+  assert(!Ty || !Ty->hasTypeVariable());
+  TAndValidBit.setPointerAndInt(Ty, validated);
+}
+
 bool TypeLoc::isError() const {
   assert(wasValidated() && "Type not yet validated");
   return getType()->hasError();
@@ -799,8 +804,9 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   return result;
 }
 
-void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
-                              unsigned level, SmallVectorImpl<bool> &outDefaultMap) {
+void swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
+                              const ValueDecl *paramOwner, unsigned level,
+                              SmallVectorImpl<bool> &outDefaultMap) {
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (paramOwner) {
@@ -815,34 +821,28 @@ void swift::computeDefaultMap(Type type, const ValueDecl *paramOwner,
         paramList = enumElement->getParameterList();
     }
   }
-  
-  switch (type->getKind()) {
-  case TypeKind::Tuple: {
-    auto tupleTy = cast<TupleType>(type.getPointer());
 
+  switch (params.size()) {
+  case 0:
+    break;
+
+  case 1:
+    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
+                            paramList->get(0)->isDefaultArgument());
+    break;
+
+  default:
     // Arguments and parameters are not guaranteed to always line-up
     // perfectly, e.g. failure diagnostics tries to match argument type
     // to different "candidate" parameters.
-    if (paramList && tupleTy->getNumElements() != paramList->size())
+    if (paramList && params.size() != paramList->size())
       paramList = nullptr;
 
-    for (auto i : range(0, tupleTy->getNumElements())) {
+    for (auto i : range(0, params.size())) {
       outDefaultMap.push_back(paramList &&
                               paramList->get(i)->isDefaultArgument());
     }
     break;
-  }
-      
-  case TypeKind::Paren: {
-    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
-                            paramList->get(0)->isDefaultArgument());
-    break;
-  }
-      
-  default: {
-    outDefaultMap.push_back(false);
-    break;
-  }
   }
 }
 
@@ -1340,33 +1340,24 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   return UnderlyingType;
 }
 
-SubstitutionMap NameAliasType::getSubstitutionMap() const {
-  if (auto genericSig = getGenericSignature())
-    return genericSig->getSubstitutionMap(getSubstitutionList());
-
-  return SubstitutionMap();
-}
-
 SmallVector<Type, 2> NameAliasType::getInnermostGenericArgs() const {
   SmallVector<Type, 2> result;
 
   // If the typealias is not generic, there are no generic arguments
   if (!typealias->isGeneric()) return result;
 
-  auto genericSig = typealias->getGenericSignature();
-  if (!genericSig) return result;
-
-  // If the substitution list was empty, bail out.
-  if (getSubstitutionList().empty()) return result;
+  // If the substitution map is empty, bail out.
+  auto subMap = getSubstitutionMap();
+  if (subMap.empty()) return result;
 
   // Retrieve the substitutions for the generic parameters (only).
+  auto genericSig = subMap.getGenericSignature();
   unsigned numAllGenericParams = genericSig->getGenericParams().size();
-  auto genericArgSubs = getSubstitutionList().slice(0, numAllGenericParams);
-
-  // Copy the replacement types for the innermost generic arguments.
   unsigned numMyGenericParams = typealias->getGenericParams()->size();
-  for (const auto &sub : genericArgSubs.take_back(numMyGenericParams)) {
-    result.push_back(sub.getReplacement());
+  result.reserve(numMyGenericParams);
+  unsigned startIndex = numAllGenericParams - numMyGenericParams;
+  for (auto gp : genericSig->getGenericParams().slice(startIndex)) {
+    result.push_back(Type(gp).subst(subMap, SubstFlags::UseErrorType));
   }
   return result;
 }
@@ -2226,7 +2217,7 @@ namespace {
 static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
                                 TypeMatchOptions matchMode,
                                 OptionalUnwrapping insideOptional,
-                                std::function<bool()> paramsAndResultMatch) {
+                                llvm::function_ref<bool()> paramsAndResultMatch) {
   // FIXME: Handle generic functions in non-ABI matches.
   if (!matchMode.contains(TypeMatchFlags::AllowABICompatible)) {
     if (!isa<FunctionType>(fn1) || !isa<FunctionType>(fn2))
@@ -2335,7 +2326,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
     if (!fn1)
       return false;
 
-    std::function<bool()> paramsAndResultMatch = [=]() {
+    auto paramsAndResultMatch = [&]() {
       // Inputs are contravariant, results are covariant.
       return (matches(fn2.getInput(), fn1.getInput(), matchMode,
                       ParameterPosition::Parameter, OptionalUnwrapping::None) &&
@@ -2371,7 +2362,7 @@ bool TypeBase::matchesParameter(Type other, TypeMatchOptions matchMode) {
 }
 
 bool TypeBase::matchesFunctionType(Type other, TypeMatchOptions matchMode,
-                                   std::function<bool()> paramsAndResultMatch) {
+                                   llvm::function_ref<bool()> paramsAndResultMatch) {
   auto thisFnTy = dyn_cast<AnyFunctionType>(getCanonicalType());
   auto otherFnTy = dyn_cast<AnyFunctionType>(other->getCanonicalType());
 
@@ -3070,23 +3061,12 @@ static Type substType(Type derivedType,
     // Special-case handle SILBoxTypes; we want to structurally substitute the
     // substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
-      if (boxTy->getGenericArgs().empty())
-        return Type(boxTy);
-      
-      auto subMap = boxTy->getLayout()->getGenericSignature()
-        ->getSubstitutionMap(boxTy->getGenericArgs());
-      subMap = subMap.subst(substitutions, lookupConformances);
+      auto subMap = boxTy->getSubstitutions();
+      auto newSubMap = subMap.subst(substitutions, lookupConformances);
 
-      SmallVector<Substitution, 4> newSubs;
-      boxTy->getLayout()->getGenericSignature()
-        ->getSubstitutions(subMap, newSubs);
-      for (auto &arg : newSubs) {
-        arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                           arg.getConformances());
-      }
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
-                             newSubs);
+                             newSubMap);
     }
     
     // We only substitute for substitutable types and dependent member types.
@@ -3553,9 +3533,10 @@ case TypeKind::Id:
     // This interface isn't suitable for updating the substitution map in a
     // generic SILBox.
     auto boxTy = cast<SILBoxType>(base);
-    for (auto &arg : boxTy->getGenericArgs())
-      assert(arg.getReplacement()->isEqual(arg.getReplacement().transformRec(fn))
+    for (Type type : boxTy->getSubstitutions().getReplacementTypes()) {
+      assert(type->isEqual(type.transformRec(fn))
              && "SILBoxType can't be transformed");
+    }
 #endif
     return base;
   }
@@ -4141,35 +4122,25 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 //
 
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
-                         SubstitutionList Args) {
+                         SubstitutionMap Substitutions) {
   id.AddPointer(Layout);
-  profileSubstitutionList(id, Args);
+  Substitutions.profile(id);
+}
+
+static RecursiveTypeProperties getRecursivePropertiesOfMap(
+                                                      SubstitutionMap subMap) {
+  RecursiveTypeProperties props;
+  for (auto replacementType : subMap.getReplacementTypes()) {
+    if (replacementType) props |= replacementType->getRecursiveProperties();
+  }
+  return props;
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, SubstitutionList Args)
-: TypeBase(TypeKind::SILBox, &C,
-           getRecursivePropertiesFromSubstitutions(Args)), Layout(Layout) {
-  Bits.SILBoxType.NumGenericArgs = Args.size();
-#ifndef NDEBUG
-  // Check that the generic args are reasonable for the box's signature.
-  if (Layout->getGenericSignature())
-    (void)Layout->getGenericSignature()->getSubstitutionMap(Args);
-  for (auto &arg : Args)
-    assert(arg.getReplacement()->isCanonical() &&
-           "box arguments must be canonical types!");
-#endif
-  std::uninitialized_copy(Args.begin(), Args.end(),
-                          getTrailingObjects<Substitution>());
-}
-
-RecursiveTypeProperties SILBoxType::
-getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
-  RecursiveTypeProperties props;
-  for (auto &param : Params) {
-    props |= param.getReplacement()->getRecursiveProperties();
-  }
-  return props;
+                       SILLayout *Layout, SubstitutionMap Substitutions)
+  : TypeBase(TypeKind::SILBox, &C, getRecursivePropertiesOfMap(Substitutions)),
+    Layout(Layout), Substitutions(Substitutions) {
+  assert(Substitutions.isCanonical());
 }
 
 Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {

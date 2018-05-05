@@ -20,6 +20,7 @@
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -272,7 +273,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // in-place.
         // TODO: Use immutable box for immutable captures.
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
-                                       vl.value->getType().getSwiftRValueType(),
+                                       vl.value->getType().getASTType(),
                                        F.getGenericEnvironment(),
                                        /*mutable*/ true);
         
@@ -505,7 +506,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto argvTy = fnConv.getSILArgumentType(1);
 
     SILType unwrappedTy = argvTy;
-    if (Type innerTy = argvTy.getSwiftRValueType()->getOptionalObjectType()) {
+    if (Type innerTy = argvTy.getASTType()->getOptionalObjectType()) {
       auto canInnerTy = innerTy->getCanonicalType();
       unwrappedTy = SILType::getPrimitiveObjectType(canInnerTy);
     }
@@ -515,8 +516,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     if (unwrappedTy != argv->getType()) {
       auto converted =
           emitPointerToPointer(mainClass, managedArgv,
-                               argv->getType().getSwiftRValueType(),
-                               unwrappedTy.getSwiftRValueType());
+                               argv->getType().getASTType(),
+                               unwrappedTy.getASTType());
       managedArgv = std::move(converted).getAsSingleValue(*this, mainClass);
     }
 
@@ -549,9 +550,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // return NSApplicationMain(C_ARGC, C_ARGV);
 
     SILParameterInfo argTypes[] = {
-      SILParameterInfo(argc->getType().getSwiftRValueType(),
+      SILParameterInfo(argc->getType().getASTType(),
                        ParameterConvention::Direct_Unowned),
-      SILParameterInfo(argv->getType().getSwiftRValueType(),
+      SILParameterInfo(argv->getType().getASTType(),
                        ParameterConvention::Direct_Unowned),
     };
     auto NSApplicationMainType = SILFunctionType::get(nullptr,
@@ -563,7 +564,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   ParameterConvention::Direct_Unowned,
                   argTypes,
                   /*yields*/ {},
-                  SILResultInfo(argc->getType().getSwiftRValueType(),
+                  SILResultInfo(argc->getType().getASTType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
                   getASTContext());

@@ -1849,51 +1849,41 @@ static void checkGenericParamAccess(TypeChecker &TC,
     return;
 
   // This must stay in sync with diag::generic_param_access.
-  enum {
-    ACEK_Parameter = 0,
-    ACEK_Requirement
+  enum class ACEK {
+    Parameter = 0,
+    Requirement
   } accessControlErrorKind;
   auto minAccessScope = AccessScope::getPublic();
   const TypeRepr *complainRepr = nullptr;
   auto downgradeToWarning = DowngradeToWarning::Yes;
 
+  auto callbackACEK = ACEK::Parameter;
+
+  auto callback = [&](AccessScope typeAccessScope,
+                      const TypeRepr *thisComplainRepr,
+                      DowngradeToWarning thisDowngrade) {
+    if (typeAccessScope.isChildOf(minAccessScope) ||
+        (thisDowngrade == DowngradeToWarning::No &&
+         downgradeToWarning == DowngradeToWarning::Yes) ||
+        (!complainRepr &&
+         typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+      minAccessScope = typeAccessScope;
+      complainRepr = thisComplainRepr;
+      accessControlErrorKind = callbackACEK;
+      downgradeToWarning = thisDowngrade;
+    }
+  };
   for (auto param : *params) {
     if (param->getInherited().empty())
       continue;
     assert(param->getInherited().size() == 1);
     checkTypeAccessImpl(TC, param->getInherited().front(), accessScope,
                         owner->getDeclContext(),
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *thisComplainRepr,
-                            DowngradeToWarning thisDowngrade) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (thisDowngrade == DowngradeToWarning::No &&
-           downgradeToWarning == DowngradeToWarning::Yes) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        accessControlErrorKind = ACEK_Parameter;
-        downgradeToWarning = thisDowngrade;
-      }
-    });
+                        callback);
   }
+  callbackACEK = ACEK::Requirement;
 
   for (auto &requirement : params->getRequirements()) {
-    auto callback = [&](AccessScope typeAccessScope,
-                        const TypeRepr *thisComplainRepr,
-                        DowngradeToWarning thisDowngrade) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (thisDowngrade == DowngradeToWarning::No &&
-           downgradeToWarning == DowngradeToWarning::Yes) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        accessControlErrorKind = ACEK_Requirement;
-        downgradeToWarning = thisDowngrade;
-      }
-    };
     switch (requirement.getKind()) {
     case RequirementReprKind::TypeConstraint:
       checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
@@ -1944,7 +1934,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
                           owner->getDescriptiveKind(), isExplicit,
                           contextAccess, minAccess,
                           isa<FileUnit>(owner->getDeclContext()),
-                          accessControlErrorKind);
+                          accessControlErrorKind == ACEK::Requirement);
   highlightOffendingType(TC, diag, complainRepr);
 }
 
@@ -2232,12 +2222,13 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         bool isExplicit = CD->getAttrs().hasAttribute<AccessControlAttr>();
         auto diagID = diag::class_super_access;
         if (downgradeToWarning == DowngradeToWarning::Yes ||
-            outerDowngradeToWarning == DowngradeToWarning::Yes) {
+            outerDowngradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::class_super_access_warn;
-        }
+
         auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
                                 typeAccess,
-                                isa<FileUnit>(CD->getDeclContext()));
+                                isa<FileUnit>(CD->getDeclContext()),
+                                superclassLocIter->getTypeRepr() != complainRepr);
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
@@ -3322,7 +3313,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
   
   // First, satisfy any associated type requirements.
-  Substitution valueSub;
   AssociatedTypeDecl *valueReqt = nullptr;
   for (auto assocTy : behaviorProto->getAssociatedTypeMembers()) {
   
@@ -3338,7 +3328,6 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     // TODO: Handle secondary 'where' constraints on the associated types.
     // TODO: Handle non-protocol constraints ('class', base class)
     auto propTy = decl->getType();
-    SmallVector<ProtocolConformanceRef, 4> valueConformances;
     for (auto proto : assocTy->getConformingProtocols()) {
       auto valueConformance = TC.conformsToProtocol(propTy, proto, dc,
                                                     ConformanceCheckFlags::Used,
@@ -3351,12 +3340,9 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                     behaviorProto->getName());
         goto next_requirement;
       }
-      valueConformances.push_back(*valueConformance);
     }
     
     {
-      auto conformancesCopy = TC.Context.AllocateCopy(valueConformances);
-      valueSub = Substitution(propTy, conformancesCopy);
       // FIXME: Maybe we should synthesize an implicit TypeAliasDecl? We
       // really don't want the behavior conformances to show up in the
       // enclosing namespace though.
@@ -3371,27 +3357,18 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     return;
   }
 
-  // Build a Substitution vector from the conformance.
-  auto conformanceMem =
-    TC.Context.AllocateUninitialized<ProtocolConformanceRef>(1);
-  auto selfConformance = new ((void*)conformanceMem.data())
-    ProtocolConformanceRef(conformance);
-  Substitution allInterfaceSubs[] = {
-    Substitution(behaviorInterfaceSelf, *selfConformance),
-    Substitution(decl->getInterfaceType(), valueSub.getConformances()),
-  };
-  Substitution allContextSubs[] = {
-    Substitution(behaviorSelf, *selfConformance),
-    Substitution(decl->getType(), valueSub.getConformances()),
-  };
+  // Build interface and context substitution maps.
+  auto interfaceSubsMap =
+    SubstitutionMap::getProtocolSubstitutions(
+                                behaviorProto,
+                                behaviorInterfaceSelf,
+                                ProtocolConformanceRef(conformance));
 
-  SubstitutionList interfaceSubs = allInterfaceSubs;
-  if (interfaceSubs.back().getConformances().empty())
-    interfaceSubs = interfaceSubs.drop_back();
-
-  SubstitutionList contextSubs = allContextSubs;
-  if (contextSubs.back().getConformances().empty())
-    contextSubs = contextSubs.drop_back();
+  auto contextSubsMap =
+    SubstitutionMap::getProtocolSubstitutions(
+                                  behaviorProto,
+                                  behaviorSelf,
+                                  ProtocolConformanceRef(conformance));
 
   // Now that type witnesses are done, satisfy property and method requirements.
   conformance->setState(ProtocolConformanceState::Checking);
@@ -3500,8 +3477,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                                            behaviorSelf,
                                            storageTy,
                                            conformance,
-                                           interfaceSubs,
-                                           contextSubs);
+                                           interfaceSubsMap,
+                                           contextSubsMap);
         continue;
       }
     } else if (auto func = dyn_cast<FuncDecl>(requirement)) {
@@ -3550,8 +3527,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         // Build the parameter witness method.
         TC.completePropertyBehaviorParameter(decl, func,
                                              conformance,
-                                             interfaceSubs,
-                                             contextSubs);
+                                             interfaceSubsMap,
+                                             contextSubsMap);
         continue;
       }
     }
@@ -3587,9 +3564,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
 
   // Check that the 'value' property from the protocol matches the
   // declared property type in context.
-  auto sig = behaviorProto->getGenericSignatureOfContext();
-  auto map = sig->getSubstitutionMap(interfaceSubs);
-  auto substValueTy = behavior->ValueDecl->getInterfaceType().subst(map);
+  auto substValueTy =
+    behavior->ValueDecl->getInterfaceType().subst(interfaceSubsMap);
   
   if (!substValueTy->isEqual(decl->getInterfaceType())) {
     TC.diagnose(behavior->getLoc(),
@@ -3608,7 +3584,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   // 'value' implementation.
   TC.completePropertyBehaviorAccessors(decl, behavior->ValueDecl,
                                        decl->getType(),
-                                       interfaceSubs, contextSubs);
+                                       interfaceSubsMap, contextSubsMap);
   
   return;
 }
@@ -3994,6 +3970,123 @@ static void finalizeAbstractStorageDecl(TypeChecker &TC,
     if (auto addressor = storage->getMutableAddressor())
       TC.validateDecl(addressor);
   }
+}
+
+static void adjustFunctionTypeForOverride(Type &type) {
+  // Drop 'throws'.
+  // FIXME: Do we want to allow overriding a function returning a value
+  // with one returning Never?
+  auto fnType = type->castTo<AnyFunctionType>();
+  auto extInfo = fnType->getExtInfo();
+  extInfo = extInfo.withThrows(false);
+  if (fnType->getExtInfo() != extInfo)
+    type = fnType->withExtInfo(extInfo);
+}
+
+/// Drop the optionality of the result type of the given function type.
+static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
+  // We've hit the result type.
+  if (uncurryLevel == 0) {
+    if (auto objectTy = type->getOptionalObjectType())
+      return objectTy;
+
+    return type;
+  }
+
+  // Determine the input and result types of this function.
+  auto fnType = type->castTo<AnyFunctionType>();
+  auto parameters = fnType->getParams();
+  Type resultType =
+      dropResultOptionality(fnType->getResult(), uncurryLevel - 1);
+
+  // Produce the resulting function type.
+  if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+    return GenericFunctionType::get(genericFn->getGenericSignature(),
+                                    parameters, resultType,
+                                    fnType->getExtInfo());
+  }
+
+  return FunctionType::get(parameters, resultType, fnType->getExtInfo());
+}
+
+static Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
+                                       ValueDecl *derivedDecl = nullptr,
+                                       bool stripLabels = true) {
+  auto *method = dyn_cast<AbstractFunctionDecl>(member);
+  ConstructorDecl *ctor = nullptr;
+  if (method)
+    ctor = dyn_cast<ConstructorDecl>(method);
+
+  auto abstractStorage = dyn_cast<AbstractStorageDecl>(member);
+  assert((method || abstractStorage) && "Not a method or abstractStorage?");
+  SubscriptDecl *subscript = nullptr;
+  if (abstractStorage)
+    subscript = dyn_cast<SubscriptDecl>(abstractStorage);
+
+  auto memberType = member->getInterfaceType();
+  if (derivedDecl) {
+    auto *dc = derivedDecl->getDeclContext();
+    auto owningType = dc->getDeclaredInterfaceType();
+    assert(owningType);
+
+    memberType = owningType->adjustSuperclassMemberDeclType(member, derivedDecl,
+                                                            memberType);
+    if (memberType->hasError())
+      return memberType;
+  }
+
+  if (stripLabels)
+    memberType = memberType->getUnlabeledType(ctx);
+
+  if (method) {
+    // For methods, strip off the 'Self' type.
+    memberType = memberType->castTo<AnyFunctionType>()->getResult();
+    adjustFunctionTypeForOverride(memberType);
+  } else if (subscript) {
+    // For subscripts, we don't have a 'Self' type, but turn it
+    // into a monomorphic function type.
+    auto funcTy = memberType->castTo<AnyFunctionType>();
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult(),
+                                   FunctionType::ExtInfo());
+  } else {
+    // For properties, strip off ownership.
+    memberType = memberType->getReferenceStorageReferent();
+  }
+
+  // Ignore the optionality of initializers when comparing types;
+  // we'll enforce this separately
+  if (ctor) {
+    memberType = dropResultOptionality(memberType, 1);
+  }
+
+  return memberType;
+}
+
+static bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
+                                  ValueDecl *parentDecl, Type parentDeclTy) {
+  auto *genericSig =
+      decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+
+  auto canDeclTy = declTy->getCanonicalType(genericSig);
+  auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
+
+  auto declIUOAttr =
+      decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  auto parentDeclIUOAttr =
+      parentDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
+  if (declIUOAttr != parentDeclIUOAttr)
+    return false;
+
+  // If this is a constructor, let's compare only parameter types.
+  if (isa<ConstructorDecl>(decl)) {
+    auto fnType1 = declTy->castTo<AnyFunctionType>();
+    auto fnType2 = parentDeclTy->castTo<AnyFunctionType>();
+    return AnyFunctionType::equalParams(fnType1->getParams(),
+                                        fnType2->getParams());
+  }
+
+  return canDeclTy == canParentDeclTy;
 }
 
 namespace {
@@ -4810,32 +4903,6 @@ public:
     return true;
   }
 
-  /// Drop the optionality of the result type of the given function type.
-  static Type dropResultOptionality(Type type, unsigned uncurryLevel) {
-    // We've hit the result type.
-    if (uncurryLevel == 0) {
-      if (auto objectTy = type->getOptionalObjectType())
-        return objectTy;
-
-      return type;
-    }
-
-    // Determine the input and result types of this function.
-    auto fnType = type->castTo<AnyFunctionType>();
-    Type inputType = fnType->getInput();
-    Type resultType = dropResultOptionality(fnType->getResult(),
-                                            uncurryLevel - 1);
-
-    // Produce the resulting function type.
-    if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
-      return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                      inputType, resultType,
-                                      fnType->getExtInfo());
-    }
-
-    return FunctionType::get(inputType, resultType, fnType->getExtInfo());
-  }
-
   static bool
   diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
                               const ParameterList *params, TypeLoc resultTL,
@@ -5002,17 +5069,6 @@ public:
     }
   }
 
-  static void adjustFunctionTypeForOverride(Type &type) {
-    // Drop 'throws'.
-    // FIXME: Do we want to allow overriding a function returning a value
-    // with one returning Never?
-    auto fnType = type->castTo<AnyFunctionType>();
-    auto extInfo = fnType->getExtInfo();
-    extInfo = extInfo.withThrows(false);
-    if (fnType->getExtInfo() != extInfo)
-      type = fnType->withExtInfo(extInfo);
-  }
-
   /// If the difference between the types of \p decl and \p base is something
   /// we feel confident about fixing (even partially), emit a note with fix-its
   /// attached. Otherwise, no note will be emitted.
@@ -5031,8 +5087,12 @@ public:
       if (auto *baseInit = dyn_cast<ConstructorDecl>(base)) {
         // Special-case initializers, whose "type" isn't useful besides the
         // input arguments.
-        baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
-        Type argTy = baseTy->getAs<AnyFunctionType>()->getInput();
+        auto *fnType = baseTy->getAs<AnyFunctionType>();
+        baseTy = fnType->getResult();
+        Type argTy = FunctionType::composeInput(TC.Context,
+                                                baseTy->getAs<AnyFunctionType>()
+                                                      ->getParams(),
+                                                false);
         auto diagKind = diag::override_type_mismatch_with_fixits_init;
         unsigned numArgs = baseInit->getParameters()->size();
         activeDiag.emplace(TC.diagnose(decl, diagKind,
@@ -5203,7 +5263,7 @@ public:
     // when their storage decl is processed.
     if (isa<AccessorDecl>(decl))
       return false;
-    
+
     auto method = dyn_cast<AbstractFunctionDecl>(decl);
     ConstructorDecl *ctor = nullptr;
     if (method)
@@ -5216,27 +5276,7 @@ public:
       subscript = dyn_cast<SubscriptDecl>(abstractStorage);
 
     // Figure out the type of the declaration that we're using for comparisons.
-    auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
-    if (method) {
-      // For methods, strip off the 'Self' type.
-      declTy = declTy->castTo<AnyFunctionType>()->getResult();
-      adjustFunctionTypeForOverride(declTy);
-    } if (subscript) {
-      // For subscripts, we don't have a 'Self' type, but turn it
-      // into a monomorphic function type.
-      auto funcTy = declTy->castTo<AnyFunctionType>();
-      declTy = FunctionType::get(funcTy->getInput(),
-                                 funcTy->getResult());
-    } else {
-      // For properties, strip off ownership.
-      declTy = declTy->getReferenceStorageReferent();
-    }
-
-    // Ignore the optionality of initializers when comparing types;
-    // we'll enforce this separately
-    if (ctor) {
-      declTy = dropResultOptionality(declTy, 1);
-    }
+    auto declTy = getMemberTypeForComparison(TC.Context, decl);
 
     // Look for members with the same name and matching types as this
     // one.
@@ -5331,45 +5371,20 @@ public:
           // checked by name.
         }
 
-        // Check whether the types are identical.
-        auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
-            parentDecl, decl, parentDecl->getInterfaceType());
-        if (parentDeclTy->hasError()) continue;
-        parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
-        if (method) {
-          // For methods, strip off the 'Self' type.
-          parentDeclTy = parentDeclTy->castTo<FunctionType>()->getResult();
-          adjustFunctionTypeForOverride(parentDeclTy);
-        } else {
-          // For properties, strip off ownership.
-          parentDeclTy = parentDeclTy->getReferenceStorageReferent();
-        }
-
-        // Ignore the optionality of initializers when comparing types;
-        // we'll enforce this separately
         if (ctor) {
-          parentDeclTy = dropResultOptionality(parentDeclTy, 1);
-
           // Factory methods cannot be overridden.
           auto parentCtor = cast<ConstructorDecl>(parentDecl);
           if (parentCtor->isFactoryInit())
             continue;
         }
 
-        // Canonicalize with respect to the override's generic signature, if any.
-        auto *genericSig = decl->getInnermostDeclContext()
-          ->getGenericSignatureOfContext();
+        // Check whether the types are identical.
+        auto parentDeclTy =
+            getMemberTypeForComparison(TC.Context, parentDecl, decl);
+        if (parentDeclTy->hasError())
+          continue;
 
-        auto canDeclTy = declTy->getCanonicalType(genericSig);
-        auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
-
-        auto declIUOAttr =
-            decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-        auto parentDeclIUOAttr =
-            parentDecl->getAttrs()
-                .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-
-        if (declIUOAttr == parentDeclIUOAttr && canDeclTy == canParentDeclTy) {
+        if (isOverrideBasedOnType(decl, declTy, parentDecl, parentDeclTy)) {
           matches.push_back({parentDecl, true, parentDeclTy});
           hadExactMatch = true;
           continue;
@@ -6938,29 +6953,26 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         if (!aliasDecl->isGeneric()) {
           aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
 
-          // If the underlying alias declaration has a type parameter,
-          // we have unresolved dependent member types we will need to deal
-          // with. Wipe out the types and validate them again.
-          // FIXME: We never should have recorded such a type in the first
-          // place.
-          if (!aliasDecl->getUnderlyingTypeLoc().getType() ||
-              aliasDecl->getUnderlyingTypeLoc().getType()
-                ->findUnresolvedDependentMemberType()) {
-            aliasDecl->getUnderlyingTypeLoc().setType(Type(),
-                                                      /*validated=*/false);
-            validateAccessControl(aliasDecl);
+          // The generic environment didn't exist until now, we may have
+          // unresolved types we will need to deal with, and need to record the
+          // appropriate substitutions for that environment. Wipe out the types
+          // and validate them again.
+          aliasDecl->getUnderlyingTypeLoc().setType(Type(),
+                                                    /*validated=*/false);
+          aliasDecl->setInterfaceType(Type());
 
-            // Check generic parameters, if needed.
-            bool validated = aliasDecl->hasValidationStarted();
+          validateAccessControl(aliasDecl);
+
+          // Check generic parameters, if needed.
+          bool validated = aliasDecl->hasValidationStarted();
+          if (!validated)
+            aliasDecl->setIsBeingValidated();
+          SWIFT_DEFER {
             if (!validated)
-              aliasDecl->setIsBeingValidated();
-            SWIFT_DEFER {
-              if (!validated)
-                aliasDecl->setIsBeingValidated(false);
-            };
+              aliasDecl->setIsBeingValidated(false);
+          };
 
-            validateTypealiasType(*this, aliasDecl);
-          }
+          validateTypealiasType(*this, aliasDecl);
         }
       }
     }
@@ -7000,41 +7012,58 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     break;
   }
 
-  case DeclKind::Var:
   case DeclKind::Param: {
-    auto VD = cast<VarDecl>(D);
+    // FIXME: This case is hit when code completion occurs in a function
+    // parameter list. Previous parameters are definitely in scope, but
+    // we don't really know how to type-check them.
+    // We can also hit this when code-completing in a closure body.
+    //
+    // FIXME: Also, note that we don't call setValidationStarted() here,
+    // because the ExprCleanser clears the type of ParamDecls, so we
+    // can end up here multiple times for the same ParamDecl.
+    auto *PD = cast<ParamDecl>(D);
+    if (!PD->hasInterfaceType())
+      PD->markInvalid();
 
-    if (PatternBindingDecl *PBD = VD->getParentPatternBinding())
-      if (PBD->isBeingValidated())
-        return;
+    break;
+  }
+
+  case DeclKind::Var: {
+    auto *VD = cast<VarDecl>(D);
+    auto *PBD = VD->getParentPatternBinding();
+
+    // Note that we need to handle the fact that some VarDecls don't
+    // have a PatternBindingDecl, for example the iterator in a
+    // 'for ... in ...' loop.
+    if (PBD == nullptr) {
+      if (!VD->hasInterfaceType()) {
+        VD->setValidationStarted();
+        VD->markInvalid();
+      }
+
+      break;
+    }
+
+    // If we're already checking our PatternBindingDecl, bail out
+    // without setting our own 'is being validated' flag, since we
+    // will attempt validation again later.
+    if (PBD->isBeingValidated())
+      return;
 
     D->setIsBeingValidated();
 
     if (!VD->hasInterfaceType()) {
-      if (VD->isSelfParameter()) {
-        if (!VD->hasInterfaceType()) {
-          VD->setInterfaceType(ErrorType::get(Context));
-          VD->setInvalid();
-        }
-        recordSelfContextType(cast<AbstractFunctionDecl>(VD->getDeclContext()));
-      } else if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        validatePatternBindingEntries(*this, PBD);
+      // Attempt to infer the type using initializer expressions.
+      validatePatternBindingEntries(*this, PBD);
 
-        auto parentPattern = VD->getParentPattern();
-        if (PBD->isInvalid() || !parentPattern->hasType()) {
-          parentPattern->setType(ErrorType::get(Context));
-          setBoundVarsTypeError(parentPattern, Context);
-        }
-      } else {
-        // FIXME: This case is hit when code completion occurs in a function
-        // parameter list. Previous parameters are definitely in scope, but
-        // we don't really know how to type-check them.
-        // We can also hit this when code-completing in a closure body.
-        assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
-               isa<AbstractClosureExpr>(D->getDeclContext()) ||
-               isa<TopLevelCodeDecl>(D->getDeclContext()));
-        VD->markInvalid();
+      auto parentPattern = VD->getParentPattern();
+      if (PBD->isInvalid() || !parentPattern->hasType()) {
+        parentPattern->setType(ErrorType::get(Context));
+        setBoundVarsTypeError(parentPattern, Context);
       }
+
+      // Should have set a type above.
+      assert(VD->hasInterfaceType());
     }
 
     // We're not really done with processing the signature yet, but
@@ -8716,21 +8745,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (decl->isInvalid())
     return;
 
-  // Local function that produces the canonical parameter type of the given
-  // initializer.
-  // FIXME: Doesn't work properly for generics.
-  auto getInitializerParamType = [](ConstructorDecl *ctor) -> CanType {
-    auto interfaceTy = ctor->getInterfaceType();
-
-    // Skip the 'self' parameter.
-    auto uncurriedInitTy = interfaceTy->castTo<AnyFunctionType>()->getResult();
-
-    // Grab the parameter type;
-    auto paramTy = uncurriedInitTy->castTo<AnyFunctionType>()->getInput();
-
-    return paramTy->getCanonicalType();
-  };
-
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.
   if (isa<ClassDecl>(decl)) {
@@ -8752,7 +8766,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   bool SuppressMemberwiseInitializer = false;
   bool FoundDesignatedInit = false;
 
-  SmallPtrSet<CanType, 4> initializerParamTypes;
+  SmallVector<std::pair<ValueDecl *, Type>, 4> declaredInitializers;
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   if (decl->hasClangNode() && isa<ClassDecl>(decl)) {
     // Objective-C classes may have interesting initializers in extensions.
@@ -8781,8 +8795,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         if (isa<StructDecl>(decl))
           continue;
 
-        if (!ctor->isInvalid())
-          initializerParamTypes.insert(getInitializerParamType(ctor));
+        if (!ctor->isInvalid()) {
+          auto type = getMemberTypeForComparison(Context, ctor, nullptr,
+                                                 /*stripLabels*/ false);
+          declaredInitializers.push_back({ctor, type});
+        }
 
         if (auto overridden = ctor->getOverriddenDecl())
           overriddenInits.insert(overridden);
@@ -8937,10 +8954,22 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
       // A designated or required initializer has not been overridden.
 
+      bool alreadyDeclared = false;
+      for (const auto &ctorAndType : declaredInitializers) {
+        auto *ctor = ctorAndType.first;
+        auto type = ctorAndType.second;
+        auto parentType = getMemberTypeForComparison(
+            Context, superclassCtor, ctor, /*stripLabels*/ false);
+
+        if (isOverrideBasedOnType(ctor, type, superclassCtor, parentType)) {
+          alreadyDeclared = true;
+          break;
+        }
+      }
+
       // If we have already introduced an initializer with this parameter type,
       // don't add one now.
-      if (!initializerParamTypes.insert(
-             getInitializerParamType(superclassCtor)).second)
+      if (alreadyDeclared)
         continue;
 
       // If we're inheriting initializers, create an override delegating

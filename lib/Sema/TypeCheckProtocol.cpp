@@ -91,15 +91,10 @@ struct swift::RequirementCheck {
 };
 
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
-  SmallVector<Substitution, 2> syntheticSubs;
   auto syntheticEnv = ReqEnv->getSyntheticEnvironment();
-  ReqEnv->getRequirementSignature()->getSubstitutions(
-      ReqEnv->getRequirementToSyntheticMap(),
-      syntheticSubs);
   return swift::Witness(this->Witness, WitnessSubstitutions,
-                        syntheticEnv, syntheticSubs);
+                        syntheticEnv, ReqEnv->getRequirementToSyntheticMap());
 }
-
 
 AssociatedTypeDecl *
 swift::getReferencedAssocTypeOfProtocol(Type type, ProtocolDecl *proto) {
@@ -351,14 +346,14 @@ RequirementMatch
 swift::matchWitness(
              TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             const std::function<
+             llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)> 
-               &setup,
-             const std::function<Optional<RequirementMatch>(Type, Type)> 
-               &matchTypes,
-             const std::function<
+               setup,
+             llvm::function_ref<Optional<RequirementMatch>(Type, Type)>
+               matchTypes,
+             llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > &finalize) {
+                   > finalize) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -719,7 +714,7 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
-      if (!replacedInReq)
+      if (!replacedInReq || replacedInReq->hasError())
         continue;
 
       if (reqGenericEnv) {
@@ -787,10 +782,10 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
                             optionalAdjustments);
 
     // Compute the set of substitutions we'll need for the witness.
-    solution->computeSubstitutions(
-      witness->getInnermostDeclContext()->getGenericSignatureOfContext(),
-      witnessLocator,
-      result.WitnessSubstitutions);
+    auto witnessSig =
+      witness->getInnermostDeclContext()->getGenericSignatureOfContext();
+    result.WitnessSubstitutions =
+      solution->computeSubstitutions(witnessSig, witnessLocator);
     
     return result;
   };
@@ -1660,7 +1655,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
       auto sigWithoutReqts
         = GenericSignature::get(genericFn->getGenericParams(), {});
       return GenericFunctionType::get(sigWithoutReqts,
-                                      resultFn->getInput(),
+                                      resultFn->getParams(),
                                       resultFn->getResult(),
                                       resultFn->getExtInfo());
     }
@@ -4603,6 +4598,12 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     // Complain about the redundant conformance.
 
+    auto currentSig = dc->getGenericSignatureOfContext();
+    auto existingSig = diag.ExistingDC->getGenericSignatureOfContext();
+    auto differentlyConditional = currentSig && existingSig &&
+                                  currentSig->getCanonicalSignature() !=
+                                      existingSig->getCanonicalSignature();
+
     // If we've redundantly stated a conformance for which the original
     // conformance came from the module of the type or the module of the
     // protocol, just warn; we'll pick up the original conformance.
@@ -4614,11 +4615,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
            extendedNominal->getParentModule()->getName() ||
          existingModule == diag.Protocol->getParentModule())) {
       // Warn about the conformance.
-      diagnose(diag.Loc, diag::redundant_conformance_adhoc,
-               dc->getDeclaredInterfaceType(),
+      auto diagID = differentlyConditional
+                        ? diag::redundant_conformance_adhoc_conditional
+                        : diag::redundant_conformance_adhoc;
+      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
                diag.Protocol->getName(),
                existingModule->getName() ==
-                 extendedNominal->getParentModule()->getName(),
+                   extendedNominal->getParentModule()->getName(),
                existingModule->getName());
 
       // Complain about any declarations in this extension whose names match
@@ -4649,8 +4652,10 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         }
       }
     } else {
-      diagnose(diag.Loc, diag::redundant_conformance,
-               dc->getDeclaredInterfaceType(),
+      auto diagID = differentlyConditional
+                        ? diag::redundant_conformance_conditional
+                        : diag::redundant_conformance;
+      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
                diag.Protocol->getName());
     }
 

@@ -673,17 +673,8 @@ public:
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
-  ///
-  /// \param substitutions Will be populated with the set of substitutions
-  /// to be applied to the generic function type.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocator *locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
-
-  /// Same as above but with a lazily-constructed locator.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocatorBuilder locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
+  SubstitutionMap computeSubstitutions(GenericSignature *sig,
+                                       ConstraintLocatorBuilder locator) const;
 
   /// Return the disjunction choice for the given constraint location.
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
@@ -1183,7 +1174,7 @@ private:
     ///
     /// \param processor The processor function to be applied to each of
     /// the constraints retrieved.
-    void forEachRetired(std::function<void(Constraint &)> processor) {
+    void forEachRetired(llvm::function_ref<void(Constraint &)> processor) {
       for (auto &constraint : retiredConstraints)
         processor(constraint);
     }
@@ -2347,11 +2338,10 @@ public:
 
   /// \brief Subroutine of \c matchTypes(), used to bind a type to a
   /// type variable.
-  TypeMatchResult
-  matchTypesBindTypeVar(TypeVariableType *typeVar, Type type,
-                        ConstraintKind kind, TypeMatchOptions flags,
-                        ConstraintLocatorBuilder locator,
-                        std::function<TypeMatchResult()> formUnsolvedResult);
+  TypeMatchResult matchTypesBindTypeVar(
+      TypeVariableType *typeVar, Type type, ConstraintKind kind,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator,
+      llvm::function_ref<TypeMatchResult()> formUnsolvedResult);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
@@ -3398,9 +3388,6 @@ void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
 /// their type variables, and we don't want pointers into the original AST to
 /// dereference these now-dangling types.
 class ExprCleaner {
-  llvm::SmallVector<Expr*,4> Exprs;
-  llvm::SmallVector<TypeLoc*, 4> TypeLocs;
-  llvm::SmallVector<Pattern*, 4> Patterns;
   llvm::SmallVector<VarDecl*, 4> Vars;
 public:
 
@@ -3408,21 +3395,6 @@ public:
     struct ExprCleanerImpl : public ASTWalker {
       ExprCleaner *TS;
       ExprCleanerImpl(ExprCleaner *TS) : TS(TS) {}
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-        TS->Exprs.push_back(expr);
-        return { true, expr };
-      }
-
-      bool walkToTypeLocPre(TypeLoc &TL) override {
-        TS->TypeLocs.push_back(&TL);
-        return true;
-      }
-
-      std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.push_back(P);
-        return { true, P };
-      }
 
       bool walkToDeclPre(Decl *D) override {
         if (auto VD = dyn_cast<VarDecl>(D))
@@ -3444,22 +3416,6 @@ public:
   ~ExprCleaner() {
     // Check each of the expression nodes to verify that there are no type
     // variables hanging out.  If so, just nuke the type.
-    for (auto E : Exprs) {
-      if (E->getType() && E->getType()->hasTypeVariable())
-        E->setType(Type());
-    }
-
-    for (auto TL : TypeLocs) {
-      if (TL->getTypeRepr() && TL->getType() &&
-          TL->getType()->hasTypeVariable())
-        TL->setType(Type(), false);
-    }
-
-    for (auto P : Patterns) {
-      if (P->hasType() && P->getType()->hasTypeVariable())
-        P->setType(Type());
-    }
-
     for (auto VD : Vars) {
       if (VD->hasType() && VD->getType()->hasTypeVariable()) {
         VD->setType(Type());

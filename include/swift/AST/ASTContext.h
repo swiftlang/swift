@@ -740,30 +740,11 @@ public:
   /// \param generic The generic conformance.
   ///
   /// \param substitutions The set of substitutions required to produce the
-  /// specialized conformance from the generic conformance. This list is
-  /// copied so passing a temporary is permitted.
+  /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            SubstitutionList substitutions,
-                            bool alreadyCheckedCollapsed = false);
-
-  /// \brief Produce a specialized conformance, which takes a generic
-  /// conformance and substitutions written in terms of the generic
-  /// conformance's signature.
-  ///
-  /// \param type The type for which we are retrieving the conformance.
-  ///
-  /// \param generic The generic conformance.
-  ///
-  /// \param substitutions The set of substitutions required to produce the
-  /// specialized conformance from the generic conformance. The keys must
-  /// be generic parameters, not archetypes, so for example passing in
-  /// TypeBase::getContextSubstitutionMap() is OK.
-  ProtocolConformance *
-  getSpecializedConformance(Type type,
-                            ProtocolConformance *generic,
-                            const SubstitutionMap &substitutions);
+                            SubstitutionMap substitutions);
 
   /// \brief Produce an inherited conformance, for subclasses of a type
   /// that already conforms to a protocol.

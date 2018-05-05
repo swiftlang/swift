@@ -101,7 +101,7 @@ public:
   }
 
   BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
-                             SubstitutionList subs, ArrayRef<SILValue> args);
+                             SubstitutionMap subs, ArrayRef<SILValue> args);
 
   // Existential containers use the conformances needed by the existential
   // box.
@@ -236,9 +236,8 @@ public:
   ///
   /// \return an empty value if the buffer was taken from the context.
   ManagedValue bufferForExpr(SILLocation loc, SILType ty,
-                             const TypeLowering &lowering,
-                             SGFContext context,
-                             std::function<void(SILValue)> rvalueEmitter);
+                             const TypeLowering &lowering, SGFContext context,
+                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUncheckedEnumData;
   ManagedValue createUncheckedEnumData(SILLocation loc, ManagedValue operand,
@@ -276,9 +275,10 @@ public:
 
   ManagedValue createSemanticLoadBorrow(SILLocation loc, ManagedValue addr);
 
-  ManagedValue formalAccessBufferForExpr(
-      SILLocation loc, SILType ty, const TypeLowering &lowering,
-      SGFContext context, std::function<void(SILValue)> rvalueEmitter);
+  ManagedValue
+  formalAccessBufferForExpr(SILLocation loc, SILType ty,
+                            const TypeLowering &lowering, SGFContext context,
+                            llvm::function_ref<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUnconditionalCheckedCastValue;
   ManagedValue

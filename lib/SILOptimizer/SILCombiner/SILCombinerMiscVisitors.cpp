@@ -1496,7 +1496,7 @@ visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI) {
   if (!URC)
     return nullptr;
 
-  auto type = URC->getOperand()->getType().getSwiftRValueType();
+  auto type = URC->getOperand()->getType().getASTType();
   if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
     if (!cd->isObjC()) {
       auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());

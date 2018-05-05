@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-frontend -module-name enum_resilience -I %t -enable-sil-ownership -emit-silgen -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name enum_resilience -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
 
 import resilient_enum
 

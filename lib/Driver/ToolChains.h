@@ -33,10 +33,8 @@ protected:
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Darwin() = default;
-  bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                 StringRef sanitizerLibName,
-                                 bool shared)
-      const override;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {
@@ -47,10 +45,8 @@ protected:
 public:
   Windows(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Windows() = default;
-  bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                 StringRef sanitizerLibName,
-                                 bool shared)
-      const override;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY GenericUnix : public ToolChain {
@@ -85,12 +81,11 @@ protected:
                                      const JobContext &context) const override;
 
 public:
-  GenericUnix(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
+  GenericUnix(const Driver &D, const llvm::Triple &Triple)
+      : ToolChain(D, Triple) {}
   ~GenericUnix() = default;
-  bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                 StringRef sanitizerLibName,
-                                 bool shared)
-      const override;
+  std::string sanitizerRuntimeLibName(StringRef Sanitizer,
+                                      bool shared = true) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {
@@ -98,8 +93,10 @@ protected:
   std::string getTargetForLinker() const override;
 
   bool shouldProvideRPathToLinker() const override;
+
 public:
-  Android(const Driver &D, const llvm::Triple &Triple) : GenericUnix(D, Triple) {}
+  Android(const Driver &D, const llvm::Triple &Triple)
+      : GenericUnix(D, Triple) {}
   ~Android() = default;
 };
 
@@ -110,7 +107,8 @@ protected:
   std::string getTargetForLinker() const override;
 
 public:
-  Cygwin(const Driver &D, const llvm::Triple &Triple) : GenericUnix(D, Triple) {}
+  Cygwin(const Driver &D, const llvm::Triple &Triple)
+      : GenericUnix(D, Triple) {}
   ~Cygwin() = default;
 };
 
@@ -119,4 +117,3 @@ public:
 } // end namespace swift
 
 #endif
-

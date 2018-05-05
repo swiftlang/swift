@@ -809,13 +809,6 @@ rdar32526620_3(a: 42, b: .bar, c: "question")
 // expected-error@-1 {{'rdar32526620_3(a:b:c:)' has been replaced by instance method 'E_32526620.set(a:c:)'}} {{1-15=E_32526620.bar.set}} {{23-32=}}
 
 
-@available(*, unavailable) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-28=}}
-extension DummyType {}
-
-@available(*, deprecated) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-27=}}
-extension DummyType {}
-
-
 var deprecatedGetter: Int {
   @available(*, deprecated) get { return 0 }
   set {}

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-sil-ownership -enable-source-import -emit-silgen -verify | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-sil-ownership -enable-source-import -verify | %FileCheck %s
 
 import Foundation
 

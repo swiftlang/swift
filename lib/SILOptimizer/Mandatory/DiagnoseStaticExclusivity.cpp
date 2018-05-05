@@ -826,6 +826,13 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
     if (isIncidentalUse(user) || onlyAffectsRefCount(user))
       continue;
 
+    if (auto *MD = dyn_cast<MarkDependenceInst>(user)) {
+      if (oper->getOperandNumber() == MarkDependenceInst::Base)
+        continue;
+      uses.append(MD->getUses().begin(), MD->getUses().end());
+      continue;
+    }
+
     if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
       uses.append(copy->getUses().begin(), copy->getUses().end());
       continue;
@@ -889,6 +896,11 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
     abort();
   };
 
+  // If the memory instruction is only used for initialization, it doesn't need
+  // an access marker.
+  if (memInstMustInitialize(memOper))
+    return;
+
   if (auto apply = ApplySite::isa(memInst)) {
     SILArgumentConvention conv =
         apply.getArgumentConvention(apply.getCalleeArgIndex(*memOper));
@@ -922,8 +934,9 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   if (!storage || !isPossibleFormalAccessBase(storage, memInst->getFunction()))
     return;
 
-  // Skip local non-lvalue accesses. There are many local initialization
-  // patterns that don't require access markers.
+  // A box or stack variable may represent lvalues, but they can only conflict
+  // with call sites in the same scope. Some initialization patters (stores to
+  // the local value) aren't protected by markers, so we need this check.
   if (!isa<ApplySite>(memInst)
       && (storage.getKind() == AccessedStorage::Box
           || storage.getKind() == AccessedStorage::Stack)) {

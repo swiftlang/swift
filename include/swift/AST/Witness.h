@@ -93,7 +93,7 @@ class Witness {
     /// the witness declaration from the synthetic environment.
     ConcreteDeclRef declRef;
     GenericEnvironment *syntheticEnvironment;
-    SubstitutionList reqToSyntheticEnvSubs;
+    SubstitutionMap reqToSyntheticEnvSubs;
   };
 
   llvm::PointerUnion<ValueDecl *, StoredWitness *> storage;
@@ -130,9 +130,9 @@ public:
   /// \param reqToSyntheticEnvSubs The mapping from the interface types of the
   /// requirement into the interface types of the synthetic environment.
   Witness(ValueDecl *decl,
-          SubstitutionList substitutions,
+          SubstitutionMap substitutions,
           GenericEnvironment *syntheticEnv,
-          SubstitutionList reqToSyntheticEnvSubs);
+          SubstitutionMap reqToSyntheticEnvSubs);
 
   /// Retrieve the witness declaration reference, which includes the
   /// substitutions needed to use the witness from the synthetic environment
@@ -155,7 +155,7 @@ public:
   ///
   /// The substitutions are substitutions for the witness, providing interface
   /// types from the synthetic environment.
-  SubstitutionList getSubstitutions() const {
+  SubstitutionMap getSubstitutions() const {
     return getDeclRef().getSubstitutions();
   }
 
@@ -168,7 +168,7 @@ public:
 
   /// Retrieve the substitution map that maps the interface types of the
   /// requirement to the interface types of the synthetic environment.
-  SubstitutionList getRequirementToSyntheticSubs() const {
+  SubstitutionMap getRequirementToSyntheticSubs() const {
     if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
       return storedWitness->reqToSyntheticEnvSubs;
     return {};

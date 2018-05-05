@@ -1094,6 +1094,11 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   public var hashValue: Int {
     return self.rawValue.hashValue
   }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.rawValue)
+  }
 }
 
 //===----------------------------------------------------------------------===//

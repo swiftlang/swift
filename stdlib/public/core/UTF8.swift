@@ -177,7 +177,7 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   /// Returns the length of the invalid sequence that ends with the LSB of
   /// buffer.
   @inline(never)
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func _invalidLength() -> UInt8 {
     if _buffer._storage                 & 0b0__1111_0000__1100_0000
                                        == 0b0__1110_0000__1000_0000 {
@@ -254,7 +254,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
   /// Returns the length of the invalid sequence that starts with the LSB of
   /// buffer.
   @inline(never)
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func _invalidLength() -> UInt8 {
     if _buffer._storage               & 0b0__1100_0000__1111_0000
                                      == 0b0__1000_0000__1110_0000 {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership -primary-file %s | %FileCheck %s
 
 struct B {
   var i : Int, j : Float

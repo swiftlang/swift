@@ -396,7 +396,7 @@ static void printGenericSpecializationInfo(
     OS << "// Caller: " << SpecializationInfo->getCaller()->getName() << '\n';
     OS << "// Parent: " << SpecializationInfo->getParent()->getName() << '\n';
     OS << "// Substitutions: ";
-    PrintSubstitutions(SpecializationInfo->getSubstitutions());
+    PrintSubstitutions(SpecializationInfo->getSubstitutions().toList());
     OS << '\n';
     OS << "//\n";
     if (!SpecializationInfo->getCaller()->isSpecialization())
@@ -436,7 +436,7 @@ void SILType::print(raw_ostream &OS) const {
   
   // Print other types as their Swift representation.
   PrintOptions SubPrinter = PrintOptions::printSIL();
-  getSwiftRValueType().print(OS, SubPrinter);
+  getASTType().print(OS, SubPrinter);
 }
 
 void SILType::dump() const {
@@ -496,7 +496,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   
   SILPrinter &operator<<(SILType t) {
     printSILTypeColorAndSigil(PrintState.OS, t);
-    t.getSwiftRValueType().print(PrintState.OS, PrintState.ASTOptions);
+    t.getASTType().print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
   
@@ -1063,6 +1063,10 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo());
+  }
+
+  void printSubstitutions(SubstitutionMap Subs) {
+    printSubstitutions(Subs.toList());
   }
 
   void printSubstitutions(SubstitutionList Subs) {
@@ -1781,6 +1785,10 @@ public:
   void visitCopyBlockInst(CopyBlockInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
+  void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *RI) {
+    *this << getIDAndType(RI->getBlock()) << " withoutEscaping "
+          << getIDAndType(RI->getClosure());
+  }
   void visitRefCountingInst(RefCountingInst *I) {
     if (I->isNonAtomic())
       *this << "[nonatomic] ";
@@ -1798,6 +1806,8 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+    if (CUI->getVerificationType())
+      *this << "[objc] ";
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {

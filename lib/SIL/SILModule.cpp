@@ -113,6 +113,17 @@ SILModule::~SILModule() {
     F.dropAllReferences();
 }
 
+std::unique_ptr<SILModule>
+SILModule::createEmptyModule(ModuleDecl *M, SILOptions &Options,
+                             bool WholeModule) {
+  return std::unique_ptr<SILModule>(
+      new SILModule(M, Options, M, WholeModule));
+}
+
+ASTContext &SILModule::getASTContext() const {
+  return TheSwiftModule->getASTContext();
+}
+
 void *SILModule::allocate(unsigned Size, unsigned Align) const {
   if (getASTContext().LangOpts.UseMalloc)
     return AlignedAlloc(Size, Align);

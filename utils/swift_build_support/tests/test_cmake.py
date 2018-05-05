@@ -35,6 +35,7 @@ class CMakeTestCase(unittest.TestCase):
                          enable_ubsan=False,
                          enable_tsan=False,
                          enable_lsan=False,
+                         enable_sanitize_coverage=False,
                          export_compile_commands=False,
                          distcc=False,
                          cmake_generator="Ninja",
@@ -166,6 +167,19 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Leaks",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
+    def test_common_options_coverage_sanitizer(self):
+        args = self.default_args()
+        args.enable_sanitize_coverage = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DLLVM_USE_SANITIZE_COVERAGE=ON",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",

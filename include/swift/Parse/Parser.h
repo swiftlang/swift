@@ -19,10 +19,9 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
@@ -42,17 +41,18 @@ namespace llvm {
 }
 
 namespace swift {
-  class DefaultArgumentInitializer;
-  class DiagnosticEngine;
-  class Lexer;
-  class ScopeInfo;
-  struct TypeLoc;
-  class TupleType;
-  class SILParserTUStateBase;
-  class SourceManager;
-  class PersistentParserState;
   class CodeCompletionCallbacks;
+  class DefaultArgumentInitializer;
   class DelayedParsingCallbacks;
+  class DiagnosticEngine;
+  class Expr;
+  class Lexer;
+  class PersistentParserState;
+  class SILParserTUStateBase;
+  class ScopeInfo;
+  class SourceManager;
+  class TupleType;
+  struct TypeLoc;
   
   struct EnumElementInfo;
   
@@ -181,9 +181,7 @@ public:
     return L->isCodeCompletion() && !CodeCompletion;
   }
 
-  bool allowTopLevelCode() const {
-    return SF.isScriptMode();
-  }
+  bool allowTopLevelCode() const;
 
   const std::vector<Token> &getSplitTokens() { return SplitTokens; }
 
@@ -677,7 +675,7 @@ public:
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          syntax::SyntaxKind Kind,
-                         std::function<ParserStatus()> callback);
+                         llvm::function_ref<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
                            TopLevelCodeDecl *TLCD);

@@ -515,7 +515,14 @@ TYPED_TEST(BlotMapVectorTest, AssignmentTest) {
   EXPECT_EQ(this->getValue(), copyMap[this->getKey()]);
 
   // test self-assignment.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wself-assign-overloaded"
   copyMap = copyMap;
+#pragma clang diagnostic pop
+#else
+  copyMap = copyMap;
+#endif
   EXPECT_EQ(1u, copyMap.size());
   EXPECT_EQ(this->getValue(), copyMap[this->getKey()]);
   this->NumExpectedLiveTesters = 2;

@@ -1,8 +1,8 @@
-//===--- FunctionSignatureOptUtils.h ----------------------------*- C++ -*-===//
+//===--- FunctionSignatureOpts.h --------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,22 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_FUNCTIONSIGOPTUTILS_H
-#define SWIFT_SIL_FUNCTIONSIGOPTUTILS_H
+#ifndef SWIFT_SILOPTIMIZER_TRANSFORMS_FUNCTIONSIGNATUREOPTS_H
+#define SWIFT_SILOPTIMIZER_TRANSFORMS_FUNCTIONSIGNATUREOPTS_H
 
+#include "swift/SIL/Projection.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/Projection.h"
-#include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 namespace swift {
 
@@ -47,9 +47,15 @@ struct ArgumentDescriptor {
   /// Was this parameter originally dead?
   bool IsEntirelyDead;
 
+  /// Was this argument completely removed already?
+  ///
+  /// TODO: Could we make ArgumentDescriptors just optional and once they have
+  /// been consumed no longer process them?
+  bool WasErased;
+
   /// Should the argument be exploded ?
   bool Explode;
-  
+
   /// This parameter is owned to guaranteed.
   bool OwnedToGuaranteed;
 
@@ -78,16 +84,14 @@ struct ArgumentDescriptor {
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
   ArgumentDescriptor(SILFunctionArgument *A)
-      : Arg(A),
-        PInfo(A->getKnownParameterInfo()),
-        Index(A->getIndex()),
-        Decl(A->getDecl()), IsEntirelyDead(false), Explode(false),
-        OwnedToGuaranteed(false), IsIndirectResult(A->isIndirectResult()),
-        CalleeRelease(), CalleeReleaseInThrowBlock(),
-        ProjTree(A->getModule(), A->getType()) {
-        if (!A->isIndirectResult()) {
-           PInfo = Arg->getKnownParameterInfo();
-        }
+      : Arg(A), PInfo(A->getKnownParameterInfo()), Index(A->getIndex()),
+        Decl(A->getDecl()), IsEntirelyDead(false), WasErased(false),
+        Explode(false), OwnedToGuaranteed(false),
+        IsIndirectResult(A->isIndirectResult()), CalleeRelease(),
+        CalleeReleaseInThrowBlock(), ProjTree(A->getModule(), A->getType()) {
+    if (!A->isIndirectResult()) {
+      PInfo = Arg->getKnownParameterInfo();
+    }
   }
 
   ArgumentDescriptor(const ArgumentDescriptor &) = delete;
@@ -104,7 +108,7 @@ struct ArgumentDescriptor {
     if (Arg->getType().isObject())
       return true;
     // @in arguments of generic types can be processed.
-    if (Arg->getType().getSwiftRValueType()->hasArchetype() &&
+    if (Arg->getType().hasArchetype() &&
         Arg->getType().isAddress() &&
         (Arg->hasConvention(SILArgumentConvention::Indirect_In) ||
          Arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)))
@@ -138,7 +142,7 @@ struct ArgumentDescriptor {
     //
     // This is a potentially a very profitable optimization. Ignore other
     // heuristics.
-    if (hasConvention(SILArgumentConvention::Direct_Owned) && 
+    if (hasConvention(SILArgumentConvention::Direct_Owned) &&
         ERM.hasSomeReleasesForArgument(Arg))
       return true;
 
@@ -180,8 +184,8 @@ struct ResultDescriptor {
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
   ResultDescriptor() {}
-  ResultDescriptor(SILResultInfo RI) 
-    : ResultInfo(RI), CalleeRetain(), OwnedToGuaranteed(false) {}
+  ResultDescriptor(SILResultInfo RI)
+      : ResultInfo(RI), CalleeRetain(), OwnedToGuaranteed(false) {}
 
   ResultDescriptor(const ResultDescriptor &) = delete;
   ResultDescriptor(ResultDescriptor &&) = default;
@@ -193,13 +197,6 @@ struct ResultDescriptor {
     return ResultInfo.getConvention() == R;
   }
 };
-
-/// Returns true if F is a function which the pass know show to specialize
-/// function signatures for.
-bool canSpecializeFunction(SILFunction *F,
-                           const CallerAnalysis::FunctionInfo *FuncInfo,
-                           bool OptForPartialApply);
-
-} // end namespace swift
+} // namespace swift
 
 #endif

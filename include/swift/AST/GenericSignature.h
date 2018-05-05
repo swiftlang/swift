@@ -20,7 +20,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionList.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -223,6 +223,17 @@ public:
       });
   }
 
+  /// Compute the number of conformance requirements in this signature.
+  unsigned getNumConformanceRequirements() const {
+    unsigned result = 0;
+    for (const auto &req : getRequirements()) {
+      if (req.getKind() == RequirementKind::Conformance)
+        ++result;
+    }
+
+    return result;
+  }
+
   /// Return the size of a SubstitutionList built from this signature.
   ///
   /// Don't add new calls of this -- the representation of SubstitutionList
@@ -349,14 +360,6 @@ CanGenericSignature::CanGenericSignature(GenericSignature *Signature)
   : Signature(Signature)
 {
   assert(!Signature || Signature->isCanonical());
-}
-  
-inline ArrayRef<CanTypeWrapper<GenericTypeParamType>>
-CanGenericSignature::getGenericParams() const{
-  auto params = Signature->getGenericParams().getOriginalArray();
-  auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
-                                                                 params.data());
-  return {base, params.size()};
 }
 
 } // end namespace swift

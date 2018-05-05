@@ -154,7 +154,7 @@ public:
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit,
+                                     bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         StringRef Name);
@@ -468,7 +468,7 @@ private:
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType type, DeclContext *DeclCtx,
                            GenericEnvironment *GE) {
-    auto RealType = type.getSwiftRValueType();
+    auto RealType = type.getASTType();
     if (type.isAddress())
       RealType = CanInOutType::get(RealType);
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, GE, RealType,
@@ -1182,7 +1182,7 @@ private:
       SmallVector<llvm::Metadata *, 4> Protocols;
       for (auto *ProtocolDecl : Archetype->getConformsTo()) {
         auto PTy = IGM.getLoweredType(ProtocolDecl->getInterfaceType())
-                       .getSwiftRValueType();
+                       .getASTType();
         auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
             DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(),
             ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy));
@@ -1989,7 +1989,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DbgTy, bool IsLocalToUnit, Optional<SILLocation> Loc) {
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, bool InFixedBuffer,
+    Optional<SILLocation> Loc) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
@@ -2005,7 +2006,16 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   auto File = getOrCreateFile(L.Filename);
 
   // Emit it as global variable of the current module.
-  auto *Expr = Var ? nullptr : DBuilder.createConstantValueExpression(0);
+  llvm::DIExpression *Expr = nullptr;
+  if (!Var)
+    Expr = DBuilder.createConstantValueExpression(0);
+  else if (InFixedBuffer)
+    // FIXME: This is *not* generally correct, but LLDB at the moment cannot
+    // poke to runtime to figure out whether a resilient value has inline
+    // storage, so this is assuming that it doesn't to get the majority of
+    // resilient Foundation types.
+    Expr =
+        DBuilder.createExpression(ArrayRef<uint64_t>(llvm::dwarf::DW_OP_deref));
   auto *GV = DBuilder.createGlobalVariableExpression(
       MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
   if (Var)
@@ -2129,9 +2139,10 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DebugType, bool IsLocalToUnit, Optional<SILLocation> Loc) {
+    DebugTypeInfo DebugType, bool IsLocalToUnit, bool InFixedBuffer,
+    Optional<SILLocation> Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitGlobalVariableDeclaration(
-      Storage, Name, LinkageName, DebugType, IsLocalToUnit, Loc);
+      Storage, Name, LinkageName, DebugType, IsLocalToUnit, InFixedBuffer, Loc);
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,

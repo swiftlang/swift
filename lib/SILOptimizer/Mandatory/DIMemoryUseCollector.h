@@ -73,7 +73,7 @@ public:
   SILInstruction *getFunctionEntryPoint() const;
 
   CanType getType() const {
-    return MemorySILType.getSwiftRValueType();
+    return MemorySILType.getASTType();
   }
 
   SingleValueInstruction *getAddress() const {
