@@ -197,18 +197,6 @@ private:
   /// Please do not use this outside of this class. It is only meant to speedup
   /// MultipleValueInstruction::getIndexOfResult(SILValue).
   const ValueBase *back() const;
-
-  /// Return the offset 1 past the end of the array or None if we are not
-  /// actually storing anything.
-  Optional<unsigned> getStartOffset() const {
-    return empty() ? None : Optional<unsigned>(0);
-  }
-
-  /// Return the offset 1 past the end of the array or None if we are not
-  /// actually storing anything.
-  Optional<unsigned> getEndOffset() const {
-    return empty() ? None : Optional<unsigned>(size());
-  }
 };
 
 class SILInstructionResultArray::iterator {
@@ -220,7 +208,7 @@ class SILInstructionResultArray::iterator {
   SILInstructionResultArray Parent;
 
   /// The index into the parent array.
-  Optional<unsigned> Index;
+  unsigned Index;
 
 public:
   using difference_type = int;
@@ -230,34 +218,31 @@ public:
   using iterator_category = std::bidirectional_iterator_tag;
 
   iterator() = default;
-  iterator(const SILInstructionResultArray &Parent,
-           Optional<unsigned> Index = 0)
+  iterator(const SILInstructionResultArray &Parent, unsigned Index = 0)
       : Parent(Parent), Index(Index) {}
 
-  SILValue operator*() const { return Parent[Index.getValue()]; }
-  SILValue operator*() { return Parent[Index.getValue()]; }
+  SILValue operator*() const { return Parent[Index]; }
   SILValue operator->() const { return operator*(); }
-  SILValue operator->() { return operator*(); }
 
   iterator &operator++() {
-    ++Index.getValue();
+    ++Index;
     return *this;
   }
 
   iterator operator++(int) {
     iterator copy = *this;
-    ++Index.getValue();
+    ++Index;
     return copy;
   }
 
   iterator &operator--() {
-    --Index.getValue();
+    --Index;
     return *this;
   }
 
   iterator operator--(int) {
     iterator copy = *this;
-    --Index.getValue();
+    --Index;
     return copy;
   }
 

@@ -1361,11 +1361,11 @@ SILInstructionResultArray::getTypes() const {
 }
 
 SILInstructionResultArray::iterator SILInstructionResultArray::begin() const {
-  return iterator(*this, getStartOffset());
+  return iterator(*this, 0);
 }
 
 SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
-  return iterator(*this, getEndOffset());
+  return iterator(*this, size());
 }
 
 SILInstructionResultArray::reverse_iterator
