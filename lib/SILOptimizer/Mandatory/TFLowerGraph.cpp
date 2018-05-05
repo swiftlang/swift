@@ -62,6 +62,7 @@ struct GraphGlobalConfiguration {
 
 static const char DEVICE_TPU_REPLICATED_CORE[] = "TPU_REPLICATED_CORE";
 static const char DEVICE_TPU_SYSTEM[] = "TPU_SYSTEM";
+static const char TPU_CLUSTER_ATTR_VALUE[] = "TPUReplicate/cluster";
 // Set a small number to exercise the bounded queue capacity more, increasing
 // test coverage.
 // FIXME: Tune the default value for performance, and/or make it configurable.
@@ -72,7 +73,6 @@ static const int NAMED_TENSOR_QUEUE_CAPACITY = 1;
 /// Dataset/Iterator nodes are not eligible for TPU.
 static void markNodeAsTPUReplicated(TF_OperationDescription *desc) {
   static const char *const TPU_CLUSTER_ATTR_NAME = "_tpu_replicate";
-  static const char *const TPU_CLUSTER_ATTR_VALUE = "TPUReplicate/cluster";
   TF_SetAttrString(desc, TPU_CLUSTER_ATTR_NAME, TPU_CLUSTER_ATTR_VALUE,
                    strlen(TPU_CLUSTER_ATTR_VALUE));
 }
@@ -2041,6 +2041,18 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
                                  "ConfigureDistributedTPU");
     TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
     TF_SetAttrBool(desc, "is_global_init", true);
+    TF_FinishOperation(desc, status);
+    if (checkStatus(SILFn.getLocation()))
+      return true;
+  }
+
+  {
+    auto *desc = TF_NewOperation(resultGraph, "TPUCompilationResult",
+                                 "TPUCompilationResult");
+    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetAttrString(desc, "_tpu_compilation_status", TPU_CLUSTER_ATTR_VALUE,
+                     strlen(TPU_CLUSTER_ATTR_VALUE));
+    TF_AddControlInput(desc, *metadataNode);
     TF_FinishOperation(desc, status);
     if (checkStatus(SILFn.getLocation()))
       return true;
