@@ -82,34 +82,33 @@ func warnNestedOptionalToOptionalAnyCoercion(_ a: Int?, _ b: Any??, _ c: Int???,
   takesOptionalAny(c as Any?, d as Any?)
 }
 
-func warnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
-  _ = takeAny(a, b) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
-  // expected-note@-1 {{provide a default value to avoid this warning}}{{16-16= ?? <#default value#>}}
-  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{16-16=!}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{16-16= as Any}}
-  // expected-warning@-4 {{expression implicitly coerced from 'Any??' to 'Any'}}
-  // expected-note@-5 {{force-unwrap the value to avoid this warning}}{{19-19=!!}}
-  // expected-note@-6 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{19-19= as Any}}
+class C {
+  var a: Int!
+  var b: Any?!
+  func returningIUO() -> Int! { return a }
+  func returningAny() -> Any { return a }
+}
+
+func returningIUO() -> Int! { return 1 }
+
+// No warnings in Swift 3/4 for IUO-to-Any coercion.
+func nowarnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
+  _ = takeAny(a, b)
+  _ = takeAny(returningIUO(), C().returningIUO())
+  _ = takeAny(C().a, C().b)
 
   _ = takeAny(a as Any, b as Any)
 }
 
-func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
-  takesOptionalAny(a, b) // expected-warning {{expression implicitly coerced from 'Any??' to 'Any?'}}
-  // expected-note@-1 {{provide a default value to avoid this warning}}{{24-24= ?? <#default value#>}}
-  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{24-24=!}}
-  // expected-note@-3 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
+// No warnings in Swift 3/4 for IUO-to-Any coercion.
+func nowarnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
+  takesOptionalAny(a, b)
 
   takesOptionalAny(a, b ?? "")
   takesOptionalAny(a, b!)
   takesOptionalAny(a, b as Any?)
 
-  takesOptionalAny(c, d) // expected-warning {{expression implicitly coerced from 'Int???' to 'Any?'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}{{21-21=!!}}
-  // expected-note@-2 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{21-21= as Any?}}
-  // expected-warning@-3 {{expression implicitly coerced from 'Any????' to 'Any?'}}
-  // expected-note@-4 {{force-unwrap the value to avoid this warning}}{{24-24=!!!}}
-  // expected-note@-5 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
+  takesOptionalAny(c, d)
 
   takesOptionalAny(c!!, d!!!)
   takesOptionalAny(c as Any?, d as Any?)

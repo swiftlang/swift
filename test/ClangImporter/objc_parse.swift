@@ -407,22 +407,10 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   type(of: rev).classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: Any
-  value = obj.protoProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-  value = obj.protoPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-  value = type(of: obj).protoClassProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-  value = type(of: obj).protoClassPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = obj.protoProp()
+  value = obj.protoPropRO()
+  value = type(of: obj).protoClassProp()
+  value = type(of: obj).protoClassPropRO()
   _ = value
 }
 
