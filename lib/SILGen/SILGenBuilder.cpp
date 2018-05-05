@@ -118,7 +118,7 @@ SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
                                           SILType resultTy,
-                                          SubstitutionList subs,
+                                          SubstitutionMap subs,
                                           ArrayRef<SILValue> args) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createBuiltin(loc, name, resultTy, subs, args);
@@ -431,9 +431,10 @@ ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
   return SGF.emitFormalAccessManagedBufferWithCleanup(loc, newAddr);
 }
 
-ManagedValue SILGenBuilder::bufferForExpr(
-    SILLocation loc, SILType ty, const TypeLowering &lowering,
-    SGFContext context, std::function<void (SILValue)> rvalueEmitter) {
+ManagedValue
+SILGenBuilder::bufferForExpr(SILLocation loc, SILType ty,
+                             const TypeLowering &lowering, SGFContext context,
+                             llvm::function_ref<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
   SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
@@ -459,10 +460,9 @@ ManagedValue SILGenBuilder::bufferForExpr(
   return SGF.emitManagedBufferWithCleanup(address);
 }
 
-
 ManagedValue SILGenBuilder::formalAccessBufferForExpr(
     SILLocation loc, SILType ty, const TypeLowering &lowering,
-    SGFContext context, std::function<void(SILValue)> rvalueEmitter) {
+    SGFContext context, llvm::function_ref<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
   SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
@@ -668,7 +668,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
   }
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, optionalType);
-  RValue rvalue(SGF, loc, arg.getType().getSwiftRValueType(), arg);
+  RValue rvalue(SGF, loc, arg.getType().getASTType(), arg);
   ArgumentSource argValue(loc, std::move(rvalue));
   SGF.emitInjectOptionalValueInto(
       loc, std::move(argValue), tempResult,

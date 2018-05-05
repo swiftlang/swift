@@ -98,6 +98,9 @@ class ReabstractionInfo {
   // callee archetypes.
   SubstitutionList ClonerParamSubs;
 
+  /// Substitution map form of ClonerParamSubs.
+  SubstitutionMap ClonerParamSubMap;
+
   // Reference to the original generic non-specialized callee function.
   SILFunction *Callee;
 
@@ -215,6 +218,10 @@ public:
 
   SubstitutionList getClonerParamSubstitutions() const {
     return ClonerParamSubs;
+  }
+
+  SubstitutionMap getClonerParamSubstitutionMap() const {
+    return ClonerParamSubMap;
   }
 
   SubstitutionList getCalleeParamSubstitutions() const {

@@ -193,6 +193,16 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // base type into it.
   auto concrete = ref->getBoundDecl();
   tc.validateDeclForNameLookup(concrete);
+
+  if (auto typeAlias = dyn_cast<TypeAliasDecl>(concrete)) {
+    if (auto protocol = dyn_cast<ProtocolDecl>(typeAlias->getDeclContext())) {
+      // We need to make sure the generic environment of a surrounding protocol
+      // propagates to the typealias, since the former may not have existed when
+      // the typealiases type was first computed.
+      // FIXME: See the comment in the ProtocolDecl case of validateDecl().
+      tc.validateDecl(protocol);
+    }
+  }
   if (!concrete->hasInterfaceType())
     return ErrorType::get(tc.Context);
   if (baseTy->isTypeParameter()) {
@@ -667,7 +677,8 @@ static void checkReferencedGenericParams(GenericContext *dc,
   // return type.
   ReferencedGenericTypeWalker paramsAndResultWalker;
   auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
-  funcTy->getInput().walk(paramsAndResultWalker);
+  for (const auto &param : funcTy->getParams())
+    param.getType().walk(paramsAndResultWalker);
   funcTy->getResult().walk(paramsAndResultWalker);
 
   // Set of generic params referenced in parameter types,

@@ -1908,8 +1908,13 @@ bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
     return false; // Skip presumed whitespace.
   } else if (Codepoint == 0x000000A0) {
       // Non-breaking whitespace (U+00A0)
+      while (Tmp[0] == '\xC2' && Tmp[1] == '\xA0')
+        Tmp += 2;
+      SmallString<8> Spaces;
+      Spaces.assign((Tmp - CurPtr + 1) / 2, ' ');
       diagnose(CurPtr - 1, diag::lex_nonbreaking_space)
-          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
+          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp),
+                             Spaces);
       CurPtr = Tmp;
       return false;
   } else if (Codepoint == 0x0000201D) {

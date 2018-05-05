@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s -check-prefix=MAIN
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s -check-prefix=LIBRARY
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s -check-prefix=MAIN
+// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s -check-prefix=LIBRARY
 
 // The following code is valid as a library or as a main source file. Script
 // variables should be accessed directly, whereas library global variables

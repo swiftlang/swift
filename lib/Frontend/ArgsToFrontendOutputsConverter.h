@@ -53,7 +53,6 @@ public:
 };
 
 class OutputFilesComputer {
-  const llvm::opt::ArgList &Args;
   DiagnosticEngine &Diags;
   const FrontendInputsAndOutputs &InputsAndOutputs;
   const std::vector<std::string> OutputFileArguments;
@@ -64,7 +63,7 @@ class OutputFilesComputer {
   const StringRef Suffix;
   const bool HasTextualOutput;
 
-  OutputFilesComputer(const llvm::opt::ArgList &args, DiagnosticEngine &diags,
+  OutputFilesComputer(DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
                       std::vector<std::string> outputFileArguments,
                       StringRef outputDirectoryArgument, StringRef firstInput,

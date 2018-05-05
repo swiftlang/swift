@@ -467,68 +467,15 @@ bool GenericSignature::enumeratePairedRequirements(
 
 SubstitutionMap
 GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result(const_cast<GenericSignature *>(this));
-
-  enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
-      auto sub = subs.front();
-      subs = subs.slice(1);
-
-      auto canTy = depTy->getCanonicalType();
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
-        result.addSubstitution(paramTy,
-                               sub.getReplacement());
-
-      auto conformances = sub.getConformances();
-      assert(reqts.size() == conformances.size());
-
-      for (unsigned i = 0, e = conformances.size(); i < e; i++) {
-        assert(reqts[i].getSecondType()->getAnyNominal() ==
-               conformances[i].getRequirement());
-        result.addConformance(canTy, conformances[i]);
-      }
-
-      return false;
-    });
-
-  assert(subs.empty() && "did not use all substitutions?!");
-  result.verify();
-  return result;
+  return SubstitutionMap::get(const_cast<GenericSignature *>(this), subs);
 }
 
 SubstitutionMap
 GenericSignature::
 getSubstitutionMap(TypeSubstitutionFn subs,
                    LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap(const_cast<GenericSignature *>(this));
-
-  // Enumerate all of the requirements that require substitution.
-  enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {
-    auto canTy = depTy->getCanonicalType();
-
-    // Compute the replacement type.
-    Type currentReplacement = depTy.subst(subs, lookupConformance,
-                                          SubstFlags::UseErrorType);
-    if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy))
-      if (!currentReplacement->hasError())
-        subMap.addSubstitution(paramTy, currentReplacement);
-
-    // Collect the conformances.
-    for (auto req: reqs) {
-      assert(req.getKind() == RequirementKind::Conformance);
-      auto protoType = req.getSecondType()->castTo<ProtocolType>();
-      if (auto conformance = lookupConformance(canTy,
-                                               currentReplacement,
-                                               protoType)) {
-        subMap.addConformance(canTy, *conformance);
-      }
-    }
-
-    return false;
-  });
-
-  subMap.verify();
-  return subMap;
+  return SubstitutionMap::get(const_cast<GenericSignature *>(this),
+                              subs, lookupConformance);
 }
 
 void GenericSignature::
@@ -900,6 +847,14 @@ GenericEnvironment *CanGenericSignature::getGenericEnvironment() const {
   return ctx.getOrCreateCanonicalGenericEnvironment(
            ctx.getOrCreateGenericSignatureBuilder(*this),
            *this);
+}
+
+ArrayRef<CanTypeWrapper<GenericTypeParamType>>
+CanGenericSignature::getGenericParams() const{
+  auto params = Signature->getGenericParams().getOriginalArray();
+  auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
+                                                              params.data());
+  return {base, params.size()};
 }
 
 /// Remove all of the associated type declarations from the given type

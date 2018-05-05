@@ -29,6 +29,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILProfiler.h"
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
@@ -1388,6 +1389,12 @@ SILGenModule::useConformancesFromSubstitutions(SubstitutionList subs) {
     for (auto conformance : sub.getConformances())
       useConformance(conformance);
   }
+}
+
+void SILGenModule::useConformancesFromSubstitutions(
+                                                const SubstitutionMap subs) {
+  for (auto conf : subs.getConformances())
+    useConformance(conf);
 }
 
 namespace {

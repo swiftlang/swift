@@ -604,8 +604,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Mapping from the requirement's generic signature to the witness
   // thunk's generic signature.
-  auto reqtSubs = witness.getRequirementToSyntheticSubs();
-  auto reqtSubMap = reqtOrigTy->getGenericSignature()->getSubstitutionMap(reqtSubs);
+  auto reqtSubMap = witness.getRequirementToSyntheticSubs();
 
   // The generic environment for the witness thunk.
   auto *genericEnv = witness.getSyntheticEnvironment();
@@ -683,7 +682,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       if (SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
                                               selfInterfaceType, selfType,
                                               genericEnv, reqFn, witnessFn,
-                                              witnessSubs))
+                                              witnessSubs.toList()))
         return f;
 
       // Proceed down the normal path.
@@ -692,7 +691,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, witnessRef,
-                          witnessSubs, isFree);
+                          witnessSubs.toList(), isFree);
 
   return f;
 }

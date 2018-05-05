@@ -717,8 +717,7 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 unsigned paramIdx) {
   auto param = substType->getParameters()[paramIdx];
   SILType argType = IGM.silConv.getSILType(param);
-  auto argLoweringTy =
-    getArgumentLoweringType(argType.getSwiftRValueType(), param);
+  auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
   auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
   // Empty values don't matter.
   return ti.getSchema().empty() && !param.isFormalIndirect();
@@ -1369,8 +1368,7 @@ void irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param);
 
-    auto argLoweringTy =
-        getArgumentLoweringType(argType.getSwiftRValueType(), param);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 

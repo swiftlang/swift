@@ -651,7 +651,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
-  SubstitutionList GenericSubstitutions;
+  SubstitutionMap GenericSubstitutions;
 
   /// The mapping from associated type requirements to their substitutions.
   ///
@@ -667,7 +667,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 SubstitutionList substitutions);
+                                 SubstitutionMap substitutions);
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -676,15 +676,9 @@ public:
     return GenericConformance;
   }
 
-  /// Get the substitutions used to produce this specialized conformance from
-  /// the generic conformance.
-  SubstitutionList getGenericSubstitutions() const {
-    return GenericSubstitutions;
-  }
-
   /// Get the substitution map representing the substitutions used to produce
   /// this specialized conformance.
-  SubstitutionMap getSubstitutionMap() const;
+  SubstitutionMap getSubstitutionMap() const { return GenericSubstitutions; }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
   ArrayRef<Requirement> getConditionalRequirements() const {
@@ -744,16 +738,15 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getType(), getGenericConformance(),
-            getGenericSubstitutions());
+    Profile(ID, getType(), getGenericConformance(), getSubstitutionMap());
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
                       ProtocolConformance *genericConformance,
-                      SubstitutionList subs) {
+                      SubstitutionMap subs) {
     ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);
-    profileSubstitutionList(ID, subs);
+    subs.profile(ID);
   }
 
   static bool classof(const ProtocolConformance *conformance) {

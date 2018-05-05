@@ -852,6 +852,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         GenericEnvironments.assign(scratch.begin(), scratch.end());
         break;
+      case index_block::SUBSTITUTION_MAP_OFFSETS:
+        assert(blobData.empty());
+        SubstitutionMaps.assign(scratch.begin(), scratch.end());
+        break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
         NormalConformances.assign(scratch.begin(), scratch.end());
@@ -1128,7 +1132,6 @@ ModuleFile::ModuleFile(
       }
 
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
-      bool seenFlags = false;
 
       auto next = cursor.advance();
       while (next.Kind == llvm::BitstreamEntry::Record) {
@@ -1167,15 +1170,6 @@ ModuleFile::ModuleFile(
           assert(importedHeaderInfo.contents.empty() &&
                  "contents seen already");
           importedHeaderInfo.contents = blobData;
-          break;
-        }
-        case input_block::MODULE_FLAGS: {
-          assert(!seenFlags && "only one flags record allowed");
-          seenFlags = true;
-          bool hasUnderlyingModule;
-          input_block::ModuleFlagsLayout::readRecord(scratch,
-                                                     hasUnderlyingModule);
-          Bits.HasUnderlyingModule = hasUnderlyingModule;
           break;
         }
         case input_block::SEARCH_PATH: {
@@ -1433,11 +1427,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
-    // This is for backwards-compatibility with modules that still rely on the
-    // "HasUnderlyingModule" flag.
-    if (Bits.HasUnderlyingModule && module == ShadowedModule)
-      dependency.forceExported();
-
     if (scopePath.empty()) {
       dependency.Import = { {}, module };
     } else {
@@ -1447,6 +1436,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       std::pair<Identifier, SourceLoc> accessPathElem(scopeID, SourceLoc());
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    if (!module->hasResolvedImports()) {
+      // Notice that we check this condition /after/ recording the module that
+      // caused the problem. Clients need to be able to track down what the
+      // cycle was.
+      return error(Status::CircularDependency);
     }
   }
 
@@ -1591,9 +1587,26 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (filter != ModuleDecl::ImportFilter::All &&
-        (filter == ModuleDecl::ImportFilter::Public) ^ dep.isExported())
-      continue;
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+      // We're including all imports.
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      // Skip @_exported imports.
+      if (dep.isExported())
+        continue;
+
+      break;
+
+    case ModuleDecl::ImportFilter::Public:
+      // Only include @_exported imports.
+      if (!dep.isExported())
+        continue;
+
+      break;
+    }
+
     assert(dep.isLoaded());
     results.push_back(dep.Import);
   }

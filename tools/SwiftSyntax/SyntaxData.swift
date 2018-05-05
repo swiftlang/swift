@@ -43,7 +43,6 @@ final class SyntaxData: Equatable {
   fileprivate func calculatePosition(_ initPos: AbsolutePosition) ->
       AbsolutePosition {
     guard let parent = parent else {
-      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
       // If this node is SourceFileSyntax, its location is the start of the file.
       return initPos
     }
@@ -78,7 +77,6 @@ final class SyntaxData: Equatable {
     // If this node is root, the position of the next sibling is the end of
     // this node.
     guard let parent = parent else {
-      assert(raw.isSourceFile, "cannot find SourceFileSyntax as root")
       let result = self.position.copy()
       raw.accumulateAbsolutePosition(result)
       return result

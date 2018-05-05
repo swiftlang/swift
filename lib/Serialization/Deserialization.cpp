@@ -489,9 +489,9 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
-    unsigned numSubstitutions;
+    SubstitutionMapID substitutionMapID;
     SpecializedProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                     numSubstitutions);
+                                                     substitutionMapID);
 
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
@@ -503,13 +503,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
                                "reading specialized conformance for",
                                conformingType);
 
-    // Read the substitutions.
-    SmallVector<Substitution, 4> substitutions;
-    while (numSubstitutions--) {
-      auto sub = maybeReadSubstitution(Cursor, genericEnv);
-      assert(sub.hasValue() && "Missing substitution?");
-      substitutions.push_back(*sub);
-    }
+    auto subMap = getSubstitutionMap(substitutionMapID);
 
     ProtocolConformanceRef genericConformance =
       readConformance(Cursor, genericEnv);
@@ -519,7 +513,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto conformance =
            ctx.getSpecializedConformance(conformingType,
                                          genericConformance.getConcrete(),
-                                         substitutions);
+                                         subMap);
     return ProtocolConformanceRef(conformance);
   }
 
@@ -654,42 +648,6 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   conformance->setState(ProtocolConformanceState::Complete);
   conformance->setLazyLoader(this, offset);
   return conformance;
-}
-
-Optional<Substitution>
-ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
-                                  GenericEnvironment *genericEnv) {
-  BCOffsetRAII lastRecordOffset(cursor);
-
-  auto entry = cursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    return None;
-
-  StringRef blobData;
-  SmallVector<uint64_t, 2> scratch;
-  unsigned recordID = cursor.readRecord(entry.ID, scratch, &blobData);
-  if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
-    return None;
-
-  TypeID replacementID;
-  unsigned numConformances;
-  decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
-                                                          replacementID,
-                                                          numConformances);
-
-  auto replacementTy = getType(replacementID);
-  if (genericEnv) {
-    replacementTy = genericEnv->mapTypeIntoContext(replacementTy);
-  }
-
-  SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
-  while (numConformances--) {
-    conformanceBuf.push_back(readConformance(cursor));
-  }
-
-  lastRecordOffset.reset();
-  return Substitution{replacementTy,
-                      getContext().AllocateCopy(conformanceBuf)};
 }
 
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
@@ -1097,7 +1055,77 @@ GenericEnvironment *ModuleFile::getGenericEnvironment(
                                        serialization::GenericEnvironmentID ID) {
   return getGenericSignatureOrEnvironment(ID, /*wantEnvironment=*/true)
            .get<GenericEnvironment *>();
-;
+}
+
+SubstitutionMap ModuleFile::getSubstitutionMap(
+                                        serialization::SubstitutionMapID id) {
+  using namespace decls_block;
+
+  // Zero is a sentinel for having an empty substitution map.
+  if (id == 0) return SubstitutionMap();
+
+  assert(id <= SubstitutionMaps.size() && "invalid SubstitutionMap ID");
+  auto &substitutionsOrOffset = SubstitutionMaps[id-1];
+
+  // If we've already deserialized this substitution map, return it.
+  if (substitutionsOrOffset.isComplete()) {
+    return substitutionsOrOffset.get();
+  }
+
+  // Read the substitution map.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(substitutionsOrOffset);
+  DeserializingEntityRAII deserializingEntity(*this);
+
+  // Read the substitution map.
+  auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    error();
+    return SubstitutionMap();
+  }
+
+  StringRef blobData;
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  if (recordID != SUBSTITUTION_MAP) {
+    error();
+    return SubstitutionMap();
+  }
+
+  GenericSignatureID genericSigID;
+  uint64_t numConformances;
+  ArrayRef<uint64_t> replacementTypeIDs;
+  SubstitutionMapLayout::readRecord(scratch, genericSigID, numConformances,
+                                    replacementTypeIDs);
+
+  // Generic signature.
+  auto genericSig = getGenericSignature(genericSigID);
+  if (!genericSig) {
+    error();
+    return SubstitutionMap();
+  }
+
+  // Load the replacement types.
+  SmallVector<Type, 4> replacementTypes;
+  replacementTypes.reserve(replacementTypeIDs.size());
+  for (auto typeID : replacementTypeIDs) {
+    replacementTypes.push_back(getType(typeID));
+  }
+
+  // Read the conformances.
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  conformances.reserve(numConformances);
+  for (unsigned i : range(numConformances)) {
+    (void)i;
+    conformances.push_back(readConformance(DeclTypeCursor));
+  }
+
+  // Form the substitution map and record it.
+  auto substitutions =
+    SubstitutionMap::get(genericSig, ArrayRef<Type>(replacementTypes),
+                         ArrayRef<ProtocolConformanceRef>(conformances));
+  substitutionsOrOffset = substitutions;
+  return substitutions;
 }
 
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
@@ -4218,9 +4246,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     DeclID typealiasID;
     TypeID parentTypeID;
     TypeID underlyingTypeID;
+    SubstitutionMapID substitutionsID;
     decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
-                                                      parentTypeID,
-                                                      underlyingTypeID);
+                                                 parentTypeID,
+                                                 underlyingTypeID,
+                                                 substitutionsID);
     auto aliasOrError = getDeclChecked(typealiasID);
     if (!aliasOrError)
       return aliasOrError.takeError();
@@ -4248,16 +4278,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     Type parentType = getType(parentTypeID);
 
     // Read the substitutions.
-    SubstitutionMap subMap;
-    if (auto genericSig = alias->getGenericSignature()) {
-      SmallVector<Substitution, 4> substitutions;
-      for (unsigned i : range(genericSig->getSubstitutionListSize())) {
-        (void)i;
-        substitutions.push_back(*maybeReadSubstitution(DeclTypeCursor));
-      }
-
-      subMap = genericSig->getSubstitutionMap(substitutions);
-    }
+    SubstitutionMap subMap = getSubstitutionMap(substitutionsID);
 
     // Look through compatibility aliases that are now unavailable.
     if (alias->getAttrs().isUnavailable(ctx) &&
@@ -4267,7 +4288,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
 
     typeOrOffset = NameAliasType::get(alias, parentType, subMap,
-                                           underlyingType);
+                                      underlyingType);
     break;
   }
   case decls_block::NOMINAL_TYPE: {
@@ -4677,8 +4698,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::SIL_BOX_TYPE: {
     SILLayoutID layoutID;
-
-    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID);
+    SubstitutionMapID subMapID;
+    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
     
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
@@ -4704,24 +4725,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto layout = getLayout();
     if (!layout)
       return nullptr;
-    
-    SmallVector<Substitution, 4> genericArgs;
-    if (auto sig = layout->getGenericSignature()) {
-      for (unsigned i : range(sig->getSubstitutionListSize())) {
-        (void)i;
-        auto sub = maybeReadSubstitution(DeclTypeCursor);
-        if (!sub) {
-          error();
-          return nullptr;
-        }
 
-        genericArgs.push_back(
-          Substitution(sub->getReplacement()->getCanonicalType(),
-                       sub->getConformances()));
-      }
-    }
-
-    typeOrOffset = SILBoxType::get(getContext(), layout, genericArgs);
+    auto subMap = getSubstitutionMap(subMapID);
+    typeOrOffset = SILBoxType::get(getContext(), layout, subMap);
     break;
   }
       
@@ -5305,28 +5311,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     };
 
     // Requirement -> synthetic map.
-    SmallVector<Substitution, 4> reqToSyntheticSubs;
     if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
       // Create the synthetic environment.
       syntheticEnv = syntheticSig->createGenericEnvironment();
     }
 
     // Requirement -> synthetic substitutions.
-    if (unsigned numReqSubstitutions = *rawIDIter++) {
-      while (numReqSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
-        reqToSyntheticSubs.push_back(*sub);
-      }
-    }
+    SubstitutionMap reqToSyntheticSubs = getSubstitutionMap(*rawIDIter++);
 
     // Witness substitutions.
-    SmallVector<Substitution, 4> witnessSubstitutions;
-    if (unsigned numWitnessSubstitutions = *rawIDIter++) {
-      while (numWitnessSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, syntheticEnv);
-        witnessSubstitutions.push_back(*sub);
-      }
-    }
+    SubstitutionMap witnessSubstitutions = getSubstitutionMap(*rawIDIter++);
 
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {

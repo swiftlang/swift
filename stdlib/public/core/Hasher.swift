@@ -20,6 +20,17 @@ internal protocol _HasherCore {
   init(seed: (UInt64, UInt64))
   mutating func compress(_ value: UInt64)
   mutating func finalize(tailAndByteCount: UInt64) -> UInt64
+
+  // FIXME(hasher): Remove once one-shot hashing has a hasher parameter.
+  /// Generate a seed value from the current state of this hasher.
+  ///
+  /// Note that the returned value is not same as the seed that was used to
+  /// initialize the hasher.
+  ///
+  /// This comes handy when type's _hash(into:) implementation needs to perform
+  /// one-shot hashing for some of its components. (E.g., for commutative
+  /// hashing.)
+  func _generateSeed() -> (UInt64, UInt64)
 }
 
 @inline(__always)
@@ -81,6 +92,11 @@ internal struct _HasherTailBuffer {
     // lower three bits specify the count of bytes stored in this buffer.)
     _sanityCheck(tail & ~(1 << ((byteCount & 7) << 3) - 1) == 0)
     self.value = (byteCount &<< 56 | tail)
+  }
+
+  @inline(__always)
+  internal init(tail: UInt64, byteCount: Int) {
+    self.init(tail: tail, byteCount: UInt64(truncatingIfNeeded: byteCount))
   }
 
   internal var tail: UInt64 {
@@ -176,7 +192,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 
   @inline(__always)
   internal mutating func combine(bytes: UInt64, count: Int) {
-    _sanityCheck(count <= 8)
+    _sanityCheck(count >= 0 && count < 8)
     let count = UInt64(truncatingIfNeeded: count)
     if let chunk = _buffer.append(bytes, count: count) {
       _core.compress(chunk)
@@ -220,6 +236,13 @@ internal struct _BufferingHasher<Core: _HasherCore> {
     }
   }
 
+  // Generate a seed value from the current state of this hasher.
+  // FIXME(hasher): Remove
+  @inline(__always)
+  internal func _generateSeed() -> (UInt64, UInt64) {
+    return _core._generateSeed()
+  }
+
   @inline(__always)
   internal mutating func finalize() -> UInt64 {
     return _core.finalize(tailAndByteCount: _buffer.value)
@@ -251,7 +274,8 @@ internal struct _BufferingHasher<Core: _HasherCore> {
 ///   versions of the standard library.
 @_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
 public struct Hasher {
-  internal typealias Core = _BufferingHasher<_SipHash13Core>
+  internal typealias RawCore = _SipHash13Core
+  internal typealias Core = _BufferingHasher<RawCore>
 
   internal var _core: Core
 
@@ -364,9 +388,67 @@ public struct Hasher {
   /// Finalizing consumes the hasher: it is illegal to finalize a hasher you
   /// don't own, or to perform operations on a finalized hasher. (These may
   /// become compile-time errors in the future.)
+  ///
+  /// Hash values are not guaranteed to be equal across different executions of
+  /// your program. Do not save hash values to use during a future execution.
   @effects(releasenone)
   public __consuming func finalize() -> Int {
     var core = _core
+    return Int(truncatingIfNeeded: core.finalize())
+  }
+
+  // Generate a seed value from the current state of this hasher.
+  // FIXME(hasher): Remove
+  @effects(readnone)
+  @usableFromInline
+  internal func _generateSeed() -> (UInt64, UInt64) {
+    return _core._generateSeed()
+  }
+
+  @effects(readnone)
+  @usableFromInline
+  internal static func _hash(seed: (UInt64, UInt64), _ value: UInt64) -> Int {
+    var core = RawCore(seed: seed)
+    core.compress(value)
+    let tbc = _HasherTailBuffer(tail: 0, byteCount: 8)
+    return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
+  }
+
+  @effects(readnone)
+  @usableFromInline
+  internal static func _hash(seed: (UInt64, UInt64), _ value: UInt) -> Int {
+    var core = RawCore(seed: seed)
+#if arch(i386) || arch(arm)
+    _sanityCheck(UInt.bitWidth < UInt64.bitWidth)
+    let tbc = _HasherTailBuffer(
+      tail: UInt64(truncatingIfNeeded: value),
+      byteCount: UInt.bitWidth &>> 3)
+#else
+    _sanityCheck(UInt.bitWidth == UInt64.bitWidth)
+    core.compress(UInt64(truncatingIfNeeded: value))
+    let tbc = _HasherTailBuffer(tail: 0, byteCount: 8)
+#endif
+    return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
+  }
+
+  @effects(readnone)
+  @usableFromInline
+  internal static func _hash(
+    seed: (UInt64, UInt64),
+    bytes value: UInt64,
+    count: Int) -> Int {
+    var core = RawCore(seed: seed)
+    let tbc = _HasherTailBuffer(tail: value, byteCount: count)
+    return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
+  }
+
+  @effects(readnone)
+  @usableFromInline
+  internal static func _hash(
+    seed: (UInt64, UInt64),
+    bytes: UnsafeRawBufferPointer) -> Int {
+    var core = Core(seed: seed)
+    core.combine(bytes: bytes)
     return Int(truncatingIfNeeded: core.finalize())
   }
 }

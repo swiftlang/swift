@@ -1092,7 +1092,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
-                                         declRef.getSubstitutions());
+                                         declRef.getSubstitutions().toList());
   return RValue(*this, loc, refType, result);
 }
 
@@ -1252,7 +1252,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
   // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
   // decl member, and when the base is a (non-lvalue) struct.
   assert(baseFormalType->getAnyNominal() &&
-         base.getType().getSwiftRValueType()->getAnyNominal() &&
+         base.getType().getASTType()->getAnyNominal() &&
          "The base of an rvalue MemberRefExpr should be an rvalue value");
 
   // If the accessed field is stored, emit a StructExtract on the base.
@@ -1760,7 +1760,8 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = subs[0].getReplacement();
+  auto nativeType =
+    Type(GenericTypeParamType::get(0, 0, SGF.getASTContext())).subst(subs);
 
   auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
   auto metatype =
@@ -2497,7 +2498,8 @@ private:
       SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                    Expr->isSuper(),
                                    Field, {},
-                                   Expr->getMember().getSubstitutions(),
+                                   Expr->getMember().getSubstitutions()
+                                     .toList(),
                                    Expr->getAccessSemantics(),
                                    Expr->getType(), Context);
     return result;
@@ -2539,7 +2541,8 @@ private:
         SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                      Expr->isSuper(),
                                      Field, {},
-                                     Expr->getMember().getSubstitutions(),
+                                     Expr->getMember().getSubstitutions()
+                                       .toList(),
                                      Expr->getAccessSemantics(),
                                      Expr->getType(), Context,
                                      base.isPlusZeroRValueOrTrivial());
@@ -2637,7 +2640,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc,generator));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
 
-  SubstitutionList subs;
+  SubstitutionMap subs;
   if (fnType->isPolymorphic())
     subs = defaultArgsOwner.getSubstitutions();
 
@@ -2647,8 +2650,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C);
+  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
+                   subs.toList(), {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -3128,7 +3131,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     paramConvention = ParameterConvention::Indirect_In;
 
   SmallVector<SILParameterInfo, 2> params;
-  params.push_back({loweredBaseTy.getSwiftRValueType(),
+  params.push_back({loweredBaseTy.getASTType(),
                     paramConvention});
   auto &C = SGM.getASTContext();
   if (!indexes.empty())
@@ -3136,7 +3139,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                                                  ->getCanonicalType(),
                       ParameterConvention::Direct_Unowned});
   
-  SILResultInfo result(loweredPropTy.getSwiftRValueType(),
+  SILResultInfo result(loweredPropTy.getASTType(),
                        ResultConvention::Indirect);
   
   auto signature = SILFunctionType::get(genericSig,
@@ -3252,10 +3255,10 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   SmallVector<SILParameterInfo, 3> params;
   // property value
-  params.push_back({loweredPropTy.getSwiftRValueType(),
+  params.push_back({loweredPropTy.getASTType(),
                     paramConvention});
   // base
-  params.push_back({loweredBaseTy.getSwiftRValueType(),
+  params.push_back({loweredBaseTy.getASTType(),
                     property->isSetterMutating()
                       ? ParameterConvention::Indirect_Inout
                       : paramConvention});
@@ -3760,7 +3763,7 @@ lowerKeyPathSubscriptIndexTypes(
                                                 AbstractionPattern::getOpaque(),
                                                 indexTy);
     indexLoweredTy = SILType::getPrimitiveType(
-                     indexLoweredTy.getSwiftRValueType()->mapTypeOutOfContext()
+                     indexLoweredTy.getASTType()->mapTypeOutOfContext()
                                                         ->getCanonicalType(),
                      indexLoweredTy.getCategory());
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
@@ -3983,26 +3986,17 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   auto makeExternalKeyPathComponent =
     [&](const KeyPathExpr::Component &component) -> KeyPathPatternComponent {
       SmallVector<KeyPathPatternComponent::Index, 4> indices;
-      SubstitutionList subs = component.getDeclRef().getSubstitutions();
+      SubstitutionMap subMap = component.getDeclRef().getSubstitutions();
       auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
       auto ty = decl->getStorageInterfaceType();
       // Map the substitutions out of context.
-      if (!subs.empty()) {
-        auto sig = decl->getInnermostDeclContext()
-                       ->getGenericSignatureOfContext();
-        auto subMap = sig->getSubstitutionMap(subs);
+      if (!subMap.empty()) {
         // If any of the substitutions involve local archetypes, then the
         // key path pattern needs to capture the generic context, and we need
         // to map the pattern substitutions out of this context.
-        if (std::any_of(subs.begin(), subs.end(),
-                        [](const Substitution &s) -> bool {
-                          return s.getReplacement()->hasArchetype();
-                        })) {
+        if (subMap.hasArchetypes()) {
           needsGenericContext = true;
           subMap = subMap.mapReplacementTypesOutOfContext();
-          SmallVector<Substitution, 4> subsBuf;
-          sig->getSubstitutions(subMap, subsBuf);
-          subs = SGF.getASTContext().AllocateCopy(subsBuf);
         }
         ty = ty.subst(subMap);
       }
@@ -4012,9 +4006,10 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         unsigned numOperands = operands.size();
         SmallVector<IndexTypePair, 4> indexTypes;
         auto sub = cast<SubscriptDecl>(component.getDeclRef().getDecl());
-        lowerKeyPathSubscriptIndexTypes(SGF.SGM, indexTypes,
-                                sub, component.getDeclRef().getSubstitutions(),
-                                needsGenericContext);
+        lowerKeyPathSubscriptIndexTypes(
+                          SGF.SGM, indexTypes, sub,
+                          component.getDeclRef().getSubstitutions().toList(),
+                          needsGenericContext);
         lowerKeyPathSubscriptIndexPatterns(indices, indexTypes,
              component.getSubscriptIndexHashableConformances(),
              numOperands);
@@ -4029,7 +4024,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                  indexEquals, indexHash);
       }
       return KeyPathPatternComponent::forExternal(
-        decl, subs, SGF.getASTContext().AllocateCopy(indices),
+        decl, subMap, SGF.getASTContext().AllocateCopy(indices),
         indexEquals, indexHash,
         ty->getCanonicalType());
     };
@@ -4049,7 +4044,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                               SGF.F.getGenericEnvironment(),
                               numOperands,
                               needsGenericContext,
-                              component.getDeclRef().getSubstitutions(),
+                    component.getDeclRef().getSubstitutions().toList(),
                               decl,
                               component.getSubscriptIndexHashableConformances(),
                               baseTy,
@@ -4111,8 +4106,8 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                                      objcString);
   auto keyPath = SGF.B.createKeyPath(SILLocation(E), pattern,
                                      needsGenericContext
-                                       ? SGF.F.getForwardingSubstitutions()
-                                       : SubstitutionList(),
+                                       ? SGF.F.getForwardingSubstitutionMap()
+                                       : SubstitutionMap(),
                                      operands,
                                      loweredTy);
   auto value = SGF.emitManagedRValueWithCleanup(keyPath);
@@ -4241,7 +4236,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   SILType resultTy = optVal.getType().getOptionalObjectType();
   auto &resultTL = SGF.getTypeLowering(resultTy);
-  assert(resultTy.getSwiftRValueType().getOptionalObjectType() &&
+  assert(resultTy.getASTType().getOptionalObjectType() &&
          "input was not a nested optional value");
 
   SILValue contBBArg;
@@ -4986,7 +4981,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
     // Emit the operand into the temporary.
     SGF.emitExprInto(E->getSubExpr(), temp.get());
 
-    // And then greab the managed address.
+    // And then grab the managed address.
     optValue = temp->getManagedAddress();
   }
 
@@ -5499,8 +5494,9 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   // Now create the verification of the withoutActuallyEscaping operand.
   // Either we fail the uniquenes check (which means the closure has escaped)
   // and abort or we continue and destroy the ultimate reference.
-  auto isEscaping =
-      SGF.B.createIsEscapingClosure(loc, borrowedClosure.getValue());
+  auto isEscaping = SGF.B.createIsEscapingClosure(
+      loc, borrowedClosure.getValue(),
+      IsEscapingClosureInst::WithoutActuallyEscaping);
   SGF.B.createCondFail(loc, isEscaping);
   return rvalue;
 }
@@ -5565,7 +5561,7 @@ public:
     ManagedValue loadedBase = SGF.B.createLoadBorrow(loc, base);
 
     // Convert it to unowned.
-    auto refType = loadedBase.getType().getSwiftRValueType();
+    auto refType = loadedBase.getType().getASTType();
     auto unownedType = SILType::getPrimitiveObjectType(
                                         CanUnmanagedStorageType::get(refType));
     SILValue unowned = SGF.B.createRefToUnmanaged(
@@ -5627,8 +5623,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   // Unsafe*Pointer<T>. Reabstract it if necessary.
   auto opaqueTy = AbstractionPattern::getOpaque();
   auto loweredTy = getLoweredType(opaqueTy, lv.getSubstFormalType());
-  if (lv.getTypeOfRValue().getSwiftRValueType()
-        != loweredTy.getSwiftRValueType()) {
+  if (lv.getTypeOfRValue().getASTType() != loweredTy.getASTType()) {
     lv.addSubstToOrigComponent(opaqueTy, loweredTy);
   }
   switch (pointerInfo.PointerKind) {
@@ -5643,7 +5638,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
     // Set up a writeback through a +0 buffer.
     LValueTypeData typeData = lv.getTypeData();
     SILType rvalueType = SILType::getPrimitiveObjectType(
-      CanUnmanagedStorageType::get(typeData.TypeOfRValue.getSwiftRValueType()));
+      CanUnmanagedStorageType::get(typeData.TypeOfRValue.getASTType()));
 
     LValueTypeData unownedTypeData(
       AbstractionPattern(

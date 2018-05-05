@@ -891,15 +891,7 @@ bool CopyForwarding::markStoredValueUsers(SILValue storedValue) {
 ///   dealloc_stack %1
 /// }
 static DeallocStackInst *getSingleDealloc(AllocStackInst *ASI) {
-  DeallocStackInst *SingleDSI = nullptr;
-  for (Operand *Use : ASI->getUses()) {
-    if (auto *DSI = dyn_cast<DeallocStackInst>(Use->getUser())) {
-      if (SingleDSI)
-        return nullptr;
-      SingleDSI = DSI;
-    }
-  }
-  return SingleDSI;
+  return ASI->getSingleDeallocStack();
 }
 
 /// Perform forward copy-propagation. Find a set of uses that the given copy can

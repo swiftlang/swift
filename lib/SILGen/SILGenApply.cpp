@@ -178,7 +178,7 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
 
   // If we have a metatype, then we just return the original self value since
   // metatypes are trivial, so we can avoid ownership concerns.
-  if (originalSelfType.getSwiftRValueType()->is<AnyMetatypeType>()) {
+  if (originalSelfType.is<AnyMetatypeType>()) {
     assert(originalSelfType.isTrivial(SGF.getModule()) &&
            "Metatypes should always be trivial");
     return ManagedValue::forUnmanaged(originalSelf);
@@ -289,7 +289,7 @@ private:
 
   /// The substitutions applied to OrigFormalInterfaceType to produce
   /// SubstFormalInterfaceType.
-  SubstitutionList Substitutions;
+  SubstitutionMap Substitutions;
 
   /// The list of values captured by our callee.
   Optional<SmallVector<ManagedValue, 2>> Captures;
@@ -299,7 +299,7 @@ private:
 
   static CanFunctionType
   getSubstFormalInterfaceType(CanAnyFunctionType substFormalType,
-                              SubstitutionList subs) {
+                              SubstitutionMap subs) {
     if (auto *gft = substFormalType->getAs<GenericFunctionType>()) {
       return cast<FunctionType>(
         gft->substGenericArgs(subs)
@@ -325,7 +325,7 @@ private:
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
          AbstractionPattern origFormalType,
          CanAnyFunctionType substFormalType,
-         SubstitutionList subs, SILLocation l)
+         SubstitutionMap subs, SILLocation l)
     : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
       OrigFormalInterfaceType(origFormalType),
       SubstFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
@@ -339,7 +339,7 @@ private:
   /// forIndirect.
   Callee(Kind methodKind, SILGenFunction &SGF, SILDeclRef methodName,
          AbstractionPattern origFormalType, CanAnyFunctionType substFormalType,
-         SubstitutionList subs, SILLocation l)
+         SubstitutionMap subs, SILLocation l)
       : kind(methodKind), Constant(methodName),
         OrigFormalInterfaceType(origFormalType),
         SubstFormalInterfaceType(
@@ -355,13 +355,13 @@ public:
     return Callee(indirectValue, origFormalType, substFormalType, l);
   }
   static Callee forDirect(SILGenFunction &SGF, SILDeclRef c,
-                          SubstitutionList subs,
+                          SubstitutionMap subs,
                           SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
     return Callee(SGF, c, ci.FormalPattern, ci.FormalType, subs, l);
   }
   static Callee forEnumElement(SILGenFunction &SGF, SILDeclRef c,
-                               SubstitutionList subs,
+                               SubstitutionMap subs,
                                SILLocation l) {
     assert(isa<EnumElementDecl>(c.getDecl()));
     auto &ci = SGF.getConstantInfo(c);
@@ -369,7 +369,7 @@ public:
                   ci.FormalType, subs, l);
   }
   static Callee forClassMethod(SILGenFunction &SGF,
-                               SILDeclRef c, SubstitutionList subs,
+                               SILDeclRef c, SubstitutionMap subs,
                                SILLocation l) {
     auto base = c.getOverriddenVTableEntry();
     auto &baseCI = SGF.getConstantInfo(base);
@@ -378,7 +378,7 @@ public:
                   baseCI.FormalPattern, derivedCI.FormalType, subs, l);
   }
   static Callee forSuperMethod(SILGenFunction &SGF,
-                               SILDeclRef c, SubstitutionList subs,
+                               SILDeclRef c, SubstitutionMap subs,
                                SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
     return Callee(Kind::SuperMethod, SGF, c,
@@ -387,16 +387,16 @@ public:
   static Callee forWitnessMethod(SILGenFunction &SGF,
                                  CanType protocolSelfType,
                                  SILDeclRef c,
-                                 SubstitutionList subs,
+                                 SubstitutionMap subs,
                                  SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
     return Callee(Kind::WitnessMethod, SGF, c, ci.FormalPattern,
                   ci.FormalType, subs, l);
   }
   static Callee forDynamic(SILGenFunction &SGF,
-                           SILDeclRef c, const SubstitutionList &constantSubs,
+                           SILDeclRef c, SubstitutionMap constantSubs,
                            CanAnyFunctionType substFormalType,
-                           SubstitutionList subs, SILLocation l) {
+                           SubstitutionMap subs, SILLocation l) {
     auto &ci = SGF.getConstantInfo(c);
     AbstractionPattern origFormalType = ci.FormalPattern;
 
@@ -593,12 +593,9 @@ public:
       auto constantInfo = SGF.getConstantInfo(*constant);
 
       auto proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
-      auto genericSig = cast<AbstractFunctionDecl>(Constant.getDecl())
-        ->getGenericSignature();
-      auto subMap = genericSig->getSubstitutionMap(Substitutions);
       auto selfType = proto->getSelfInterfaceType()->getCanonicalType();
-      auto lookupType = selfType.subst(subMap)->getCanonicalType();
-      auto conformance = *subMap.lookupConformance(selfType, proto);
+      auto lookupType = selfType.subst(Substitutions)->getCanonicalType();
+      auto conformance = *Substitutions.lookupConformance(selfType, proto);
 
       SILValue fn;
 
@@ -675,7 +672,7 @@ public:
     }
   }
 
-  SubstitutionList getSubstitutions() const {
+  SubstitutionMap getSubstitutions() const {
     return Substitutions;
   }
 
@@ -859,7 +856,7 @@ public:
 
     ArgumentSource selfValue = thisCallSite->getArg();
 
-    SubstitutionList subs = e->getDeclRef().getSubstitutions();
+    auto subs = e->getDeclRef().getSubstitutions();
 
     SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
     if (isa<ConstructorDecl>(afd)) {
@@ -872,7 +869,7 @@ public:
 
         auto metatype = std::move(selfValue).getAsSingleValue(SGF);
         auto allocated = allocateObjCObject(metatype, loc);
-        auto allocatedType = allocated.getType().getSwiftRValueType();
+        auto allocatedType = allocated.getType().getASTType();
         selfValue =
             ArgumentSource(loc, RValue(SGF, loc, allocatedType, allocated));
       } else {
@@ -945,7 +942,7 @@ public:
       RValue selfMetatype = SGF.emitRValue(thisCallSite->getArg());
       auto selfValue =
           allocateObjCObject(std::move(selfMetatype).getAsSingleValue(SGF, loc), loc);
-      RValue self = RValue(SGF, loc, selfValue.getType().getSwiftRValueType(),
+      RValue self = RValue(SGF, loc, selfValue.getType().getASTType(),
                            selfValue);
       ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
       setSelfParam(std::move(selfArgSource), thisCallSite);
@@ -965,7 +962,7 @@ public:
   // Known callees.
   //
   void visitDeclRefExpr(DeclRefExpr *e) {
-    SubstitutionList subs = e->getDeclRef().getSubstitutions();
+    auto subs = e->getDeclRef().getSubstitutions();
 
     // If this is a direct reference to a vardecl, just emit its value directly.
     // Recursive references to callable declarations are allowed.
@@ -1003,7 +1000,7 @@ public:
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(afd);
     if (afd->getDeclContext()->isLocalContext() &&
         !captureInfo.hasGenericParamCaptures())
-      subs = SubstitutionList();
+      subs = SubstitutionMap();
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
     
@@ -1031,9 +1028,9 @@ public:
     // really producing a closure object.
     SILDeclRef constant(e);
 
-    SubstitutionList subs;
+    SubstitutionMap subs;
     if (e->getCaptureInfo().hasGenericParamCaptures())
-      subs = SGF.getForwardingSubstitutions();
+      subs = SGF.getForwardingSubstitutionMap();
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
     
@@ -1054,7 +1051,8 @@ public:
     // constructors imported from Clang (which won't have a direct entry point)
     // or to delegate to a designated initializer.
     setCallee(Callee::forDirect(SGF,
-                SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer), subs, e));
+                SILDeclRef(e->getDecl(), SILDeclRef::Kind::Initializer),
+                           subs, e));
   }
 
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e) {
@@ -1094,7 +1092,7 @@ public:
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
-    SubstitutionList substitutions;
+    SubstitutionMap substitutions;
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer)
@@ -1308,7 +1306,7 @@ public:
     if (isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
       setCallee(Callee::forWitnessMethod(
-          SGF, self.getType().getSwiftRValueType(),
+          SGF, self.getType().getASTType(),
           constant, subs, expr));
     } else if (getMethodDispatch(ctorRef->getDecl())
                  == MethodDispatch::Class) {
@@ -1318,8 +1316,7 @@ public:
           SGF, constant, subs, fn));
     } else {
       // Directly call the peer constructor.
-      setCallee(
-        Callee::forDirect(SGF, constant, subs, fn));
+      setCallee(Callee::forDirect(SGF, constant, subs, fn));
     }
 
     setSelfParam(std::move(selfArgSource), expr);
@@ -1414,7 +1411,8 @@ public:
         dynamicMemberRef->getBase()->getType()->getCanonicalType(),
         substFormalType, AnyFunctionType::ExtInfo());
 
-      setCallee(Callee::forDynamic(SGF, member, memberRef.getSubstitutions(),
+      setCallee(Callee::forDynamic(SGF, member,
+                                   memberRef.getSubstitutions(),
                                    substFormalType, {}, e));
       setSelfParam(std::move(baseArgSource), dynamicMemberRef);
     };
@@ -1473,7 +1471,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
     SILValue UnicodeScalarValue =
         SGF.B.createIntegerLiteral(E, Int32Ty,
                                    unicode::extractFirstUnicodeScalar(Str));
-    return RValue(SGF, E, Int32Ty.getSwiftRValueType(),
+    return RValue(SGF, E, Int32Ty.getASTType(),
                   ManagedValue::forUnmanaged(UnicodeScalarValue));
   }
   }
@@ -1482,7 +1480,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   if (useConstantStringBuiltin) {
     auto *string = SGF.B.createConstStringLiteral(E, Str, constInstEncoding);
     ManagedValue Elts[] = {ManagedValue::forUnmanaged(string)};
-    TupleTypeElt TypeElts[] = {Elts[0].getType().getSwiftRValueType()};
+    TupleTypeElt TypeElts[] = {Elts[0].getType().getASTType()};
     CanType ty =
         TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
     return RValue(SGF, Elts, ty);
@@ -1506,9 +1504,9 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   };
 
   TupleTypeElt TypeEltsArray[] = {
-    EltsArray[0].getType().getSwiftRValueType(),
-    EltsArray[1].getType().getSwiftRValueType(),
-    EltsArray[2].getType().getSwiftRValueType()
+    EltsArray[0].getType().getASTType(),
+    EltsArray[1].getType().getASTType(),
+    EltsArray[2].getType().getASTType()
   };
 
   ArrayRef<ManagedValue> Elts;
@@ -1538,7 +1536,7 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
 static SILValue emitRawApply(SILGenFunction &SGF,
                              SILLocation loc,
                              ManagedValue fn,
-                             SubstitutionList subs,
+                             SubstitutionMap subs,
                              ArrayRef<ManagedValue> args,
                              CanSILFunctionType substFnType,
                              ApplyOptions options,
@@ -1594,7 +1592,7 @@ static SILValue emitRawApply(SILGenFunction &SGF,
   SILValue result;
   if (!substFnType->hasErrorResult()) {
     result = SGF.B.createApply(loc, fnValue, calleeType,
-                               resultType, subs, argValues);
+                               resultType, subs.toList(), argValues);
 
   // Otherwise, we need to create a try_apply.
   } else {
@@ -1605,7 +1603,7 @@ static SILValue emitRawApply(SILGenFunction &SGF,
       SGF.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
                                options & ApplyOptions::DoesNotThrow);
 
-    SGF.B.createTryApply(loc, fnValue, calleeType, subs, argValues,
+    SGF.B.createTryApply(loc, fnValue, calleeType, subs.toList(), argValues,
                          normalBB, errorBB);
     SGF.B.emitBlock(normalBB);
   }
@@ -2818,7 +2816,7 @@ private:
   static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
                                                     SILParameterInfo param) {
     bool requiresReabstraction =
-        loweredArgType.getSwiftRValueType() != param.getType();
+        loweredArgType.getASTType() != param.getType();
     // If the parameter is consumed, we have to emit at +1.
     if (param.isConsumed()) {
       return {SGFContext(), requiresReabstraction};
@@ -3011,7 +3009,7 @@ void TupleShuffleArgEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
         // tuple.
         variadicParamInfo =
           SILParameterInfo(varargsInfo->getBaseTypeLowering()
-                           .getLoweredType().getSwiftRValueType(),
+                           .getLoweredType().getASTType(),
                            ParameterConvention::Indirect_In);
 
         unsigned i = 0;
@@ -3709,7 +3707,7 @@ CallEmission::applyNormalCall(SGFContext C) {
   // Emit the uncurried call.
   firstLevelResult.value = SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
-      callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
+      callee.getSubstitutions().toList(), uncurriedArgs, calleeTypeInfo, options,
       uncurriedContext);
   firstLevelResult.foreignSelf = calleeTypeInfo.foreignSelf;
   return firstLevelResult;
@@ -3818,7 +3816,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   }
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
-      constantInfo.getSILType(), 1, SGF.B.getModule(), subs, calleeConvention);
+      constantInfo.getSILType(), 1, SGF.B.getModule(), subs.toList(), calleeConvention);
 
   auto &module = SGF.getFunction().getModule();
 
@@ -3827,7 +3825,8 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
     partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
 
   ManagedValue pa = SGF.B.createPartialApply(loc, superMethod, partialApplyTy,
-                                             subs, {upcastedSelf}, closureTy);
+                                             subs.toList(), {upcastedSelf},
+                                             closureTy);
   assert(!closureTy.castTo<SILFunctionType>()->isNoEscape());
   firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
   return firstLevelResult;
@@ -3870,8 +3869,8 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     // always still expressions.
     Expr *argument = std::move(uncurriedSites[0]).forward().asKnownExpr();
     ManagedValue resultMV =
-        emitter(SGF, uncurriedLoc, callee.getSubstitutions(), argument,
-                uncurriedContext);
+        emitter(SGF, uncurriedLoc, callee.getSubstitutions(),
+                argument, uncurriedContext);
     firstLevelResult.value =
         RValue(SGF, uncurriedLoc, formalResultType, resultMV);
     return firstLevelResult;
@@ -3889,7 +3888,8 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   // If we have a late emitter, just delegate to that emitter and return.
   if (specializedEmitter.isLateEmitter()) {
     auto emitter = specializedEmitter.getLateEmitter();
-    ManagedValue mv = emitter(SGF, *uncurriedLoc, callee.getSubstitutions(),
+    ManagedValue mv = emitter(SGF, *uncurriedLoc,
+                              callee.getSubstitutions(),
                               uncurriedArgs, uncurriedContext);
     firstLevelResult.value =
         RValue(SGF, *uncurriedLoc, formalApplyType.getResult(), mv);
@@ -3908,7 +3908,8 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   SILFunctionConventions substConv(substFnType, SGF.SGM.M);
   auto resultVal = SGF.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
                                        substConv.getSILResultType(),
-                                       callee.getSubstitutions(), consumedArgs);
+                                       callee.getSubstitutions(),
+                                       consumedArgs);
   firstLevelResult.value =
       RValue(SGF, *uncurriedLoc, formalApplyType.getResult(),
              SGF.emitManagedRValueWithCleanup(resultVal));
@@ -4159,8 +4160,11 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // Emit the raw application.
   loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
+  auto genericSig =
+    fn.getType().castTo<SILFunctionType>()->getGenericSignature();
+  auto subMap = genericSig->getSubstitutionMap(subs);
   SILValue rawDirectResult = emitRawApply(
-      *this, loc, fn, subs, args, substFnType, options, indirectResultAddrs);
+      *this, loc, fn, subMap, args, substFnType, options, indirectResultAddrs);
 
   // Pop the argument scope.
   argScope.pop();
@@ -4429,20 +4433,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             const SubstitutionMap &subMap,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = fn->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
-
-  return emitApplyOfLibraryIntrinsic(loc, fn, subs, args, ctx);
-}
-
-RValue
-SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
-                                            FuncDecl *fn,
-                                            const SubstitutionList &subs,
-                                            ArrayRef<ManagedValue> args,
-                                            SGFContext ctx) {
-  auto callee = Callee::forDirect(*this, SILDeclRef(fn), subs, loc);
+  auto callee = Callee::forDirect(*this, SILDeclRef(fn), subMap, loc);
 
   auto origFormalType = callee.getOrigFormalType();
   auto substFormalType = callee.getSubstFormalType();
@@ -4467,11 +4458,27 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   llvm::SmallVector<ManagedValue, 8> finalArgs;
   convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(), args, loc, finalArgs);
 
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = fn->getGenericSignature())
+    genericSig->getSubstitutions(subMap, subs);
+
   ResultPlanPtr resultPlan =
-      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
+  ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subs,
                    finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
+}
+
+RValue
+SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
+                                            FuncDecl *fn,
+                                            const SubstitutionList &subs,
+                                            ArrayRef<ManagedValue> args,
+                                            SGFContext ctx) {
+  SubstitutionMap subMap;
+  if (auto genericSig = fn->getGenericSignature())
+    subMap = genericSig->getSubstitutionMap(subs);
+  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, ctx);
 }
 
 static StringRef
@@ -4539,8 +4546,10 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   Optional<Callee> callee;
   if (isa<ProtocolDecl>(ctor->getDeclContext())) {
     callee.emplace(Callee::forWitnessMethod(
-        SGF, selfMetaVal.getType().getSwiftRValueType(),
+        SGF, selfMetaVal.getType().getASTType(),
         initRef, subs, loc));
+  } else if (getMethodDispatch(ctor) == MethodDispatch::Class) {
+    callee.emplace(Callee::forClassMethod(SGF, initRef, subs, loc));
   } else {
     callee.emplace(Callee::forDirect(SGF, initRef, subs, loc));
   }
@@ -4550,7 +4559,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
   // For an inheritable initializer, determine whether we'll need to adjust the
   // result type.
   bool requiresDowncast = false;
-  if (ctor->isInheritable() && overriddenSelfType) {
+  if (ctor->isRequired() && overriddenSelfType) {
     CanType substResultType = substFormalType;
     for (unsigned i : range(ctor->getNumParameterLists())) {
       (void)i;
@@ -4569,7 +4578,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
                        ArgumentSource(loc,
                                       RValue(SGF, loc,
                                              selfMetaVal.getType()
-                                               .getSwiftRValueType(),
+                                               .getASTType(),
                                              std::move(selfMetaVal))),
                        substFormalType);
 
@@ -4701,7 +4710,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   auto &Ctx = getASTContext();
   auto deallocate = Ctx.getDeallocateUninitializedArray(nullptr);
 
-  CanType arrayTy = array->getType().getSwiftRValueType();
+  CanType arrayTy = array->getType().getASTType();
 
   // Invoke the intrinsic.
   auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
@@ -4745,7 +4754,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
                                          ArgumentSource &selfValue,
                                          bool isSuper,
                                          bool isDirectUse,
-                                         SubstitutionList subs) {
+                                         SubstitutionMap subs) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   // The accessor might be a local function that does not capture any
@@ -4754,7 +4763,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(decl);
   if (decl->getDeclContext()->isLocalContext() &&
       !captureInfo.hasGenericParamCaptures()) {
-    subs = SubstitutionList();
+    subs = SubstitutionMap();
   }
 
   // If this is a method in a protocol, generate it as a protocol call.
@@ -4805,11 +4814,19 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                    bool isSuper,
                                    bool isDirectUse)
 {
+  // Convert the substitution list into a substitution map.
+  auto origAccessType = SGF.SGM.Types.getConstantInfo(constant).FormalType;
+  SubstitutionMap subMap;
+  if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType)) {
+    auto genericSig = genericFnType.getGenericSignature();
+    subMap = genericSig->getSubstitutionMap(substitutions);;
+  }
+
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
                                              isSuper, isDirectUse,
-                                             substitutions);
+                                             subMap);
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
@@ -5073,7 +5090,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   if (!subscripts.isNull()) {
     // If we have a value and index list, create a new rvalue to represent the
     // both of them together.
-    auto inputTupleType = cast<TupleType>(accessType.getInput());
+    auto inputTupleType = dyn_cast<TupleType>(accessType.getInput());
 
     SmallVector<ArgumentSource, 4> eltSources;
 
@@ -5086,18 +5103,25 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     // TODO: we should really take an array of RValues.
     if (accessType->getNumParams() != 2) {
       auto subscriptsTupleType = cast<TupleType>(subscripts.getType());
-      assert(inputTupleType->getNumElements()
+      assert(accessType.getParams().size()
               == 1 + subscriptsTupleType->getNumElements());
       SmallVector<RValue, 8> eltRVs;
       std::move(subscripts).extractElements(eltRVs);
       for (auto &elt : eltRVs)
         eltSources.emplace_back(loc, std::move(elt));
     } else {
+      assert(inputTupleType && "Must have an input tuple here");
       subscripts.rewriteType(inputTupleType.getElementType(1));
       eltSources.emplace_back(loc, std::move(subscripts));
     }
 
-    setValue = ArgumentSource(loc, inputTupleType, eltSources);
+    if (eltSources.size() == 1) {
+      setValue = std::move(eltSources.front());
+    } else {
+      assert(inputTupleType);
+      setValue = ArgumentSource(loc, inputTupleType, eltSources);
+    }
+
   } else {
     setValue.rewriteType(accessType.getInput());
   }
@@ -5314,7 +5338,7 @@ static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
   auto nativeTy =
     SGF.getLoweredLoadableType(nativeFormalType).castTo<SILFunctionType>();
 
-  if (nativeTy != partialApplyTy.getSwiftRValueType()) {
+  if (nativeTy != partialApplyTy.getASTType()) {
     result = SGF.emitBlockToFunc(loc, result, foreignFormalType,
                                  nativeFormalType, nativeTy);
   }
@@ -5391,7 +5415,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
       getPartialApplyOfDynamicMethodFormalType(SGM, member, e->getMember());
 
     auto memberFnTy = CanFunctionType::get(
-                                       operand->getType().getSwiftRValueType(),
+                                       operand->getType().getASTType(),
                                        memberMethodTy->getCanonicalType());
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
@@ -5488,7 +5512,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto foreignMethodTy =
       getPartialApplyOfDynamicMethodFormalType(SGM, member, e->getMember());
     
-    auto functionTy = CanFunctionType::get(base->getType().getSwiftRValueType(),
+    auto functionTy = CanFunctionType::get(base->getType().getASTType(),
                                            methodTy);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);

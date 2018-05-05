@@ -20,6 +20,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
@@ -162,7 +163,9 @@ public:
         }
       });
 
-      gft->getInput().walk(walker);
+      for (const auto &param : gft->getParams())
+        param.getType().walk(walker);
+
       gft->getResult().walk(walker);
     }
   }
@@ -232,8 +235,13 @@ public:
     // parameter references transitively.
     if (!D->getDeclContext()->isLocalContext()) {
       if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
-        for (auto sub : DRE->getDeclRef().getSubstitutions()) {
-          checkType(sub.getReplacement(), DRE->getLoc());
+        if (auto subMap = DRE->getDeclRef().getSubstitutions()) {
+          auto genericSig = subMap.getGenericSignature();
+          for (auto gp : genericSig->getGenericParams()) {
+            if (auto type = Type(gp).subst(subMap)) {
+              checkType(type, DRE->getLoc());
+            }
+          }
         }
       }
     }

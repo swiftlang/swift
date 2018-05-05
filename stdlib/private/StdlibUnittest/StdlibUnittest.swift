@@ -2445,7 +2445,7 @@ public func checkHashable<Instances: Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Hashable {
+  Instances.Iterator.Element: Hashable {
   checkEquatable(
     instances,
     oracle: equalityOracle,
@@ -2489,6 +2489,14 @@ public func checkHashable<Instances: Collection>(
           rhs (at index \(j)): \(y)
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        expectEqual(
+          x._rawHashValue(seed: (0, 0)), y._rawHashValue(seed: (0, 0)),
+          """
+          _rawHashValue expected to match, found to differ
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
       } else {
         // Try a few different seeds; at least one of them should discriminate
         // between the hashes. It is extremely unlikely this check will fail
@@ -2498,6 +2506,16 @@ public func checkHashable<Instances: Collection>(
           (0..<10).contains { hash(x, seed: $0) != hash(y, seed: $0) },
           """
           hash(into:) expected to differ, found to match
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        expectTrue(
+          (0..<10 as Range<UInt64>).contains { i in
+            x._rawHashValue(seed: (0, i)) != y._rawHashValue(seed: (0, i))
+          },
+          """
+          _rawHashValue(seed:) expected to differ, found to match
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,

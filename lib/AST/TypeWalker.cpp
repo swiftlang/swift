@@ -180,8 +180,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILBoxType(SILBoxType *ty) {
-    for (auto &arg : ty->getGenericArgs()) {
-      if (doIt(arg.getReplacement()))
+    for (Type type : ty->getSubstitutions().getReplacementTypes()) {
+      if (type && doIt(type))
         return true;
     }
     return false;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -verify %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s
 
 protocol AP {
   associatedtype B: BP

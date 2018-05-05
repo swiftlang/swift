@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name multi_file -emit-silgen -enable-sil-ownership -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name multi_file -enable-sil-ownership -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

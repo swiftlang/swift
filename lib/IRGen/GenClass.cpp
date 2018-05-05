@@ -421,7 +421,7 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
   builder.setAsBodyOfStruct(classTy);
   
   // Record the layout.
-  Layout = new StructLayout(builder, classType.getSwiftRValueType(), classTy,
+  Layout = new StructLayout(builder, classType.getASTType(), classTy,
                             builder.getElements());
   FieldLayout = builder.getClassLayout();
 }
@@ -453,7 +453,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
 
   // Create the StructLayout, which is transfered to the caller (the caller is
   // responsible for deleting it).
-  return new StructLayout(builder, classType.getSwiftRValueType(), ResultTy,
+  return new StructLayout(builder, classType.getASTType(), ResultTy,
                           builder.getElements());
 }
 
@@ -771,7 +771,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                         bool objc, int &StackAllocSize,
                                         TailArraysRef TailArrays) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto classType = selfType.getSwiftRValueType();
+  auto classType = selfType.getASTType();
 
   // If we need to use Objective-C allocation, do so.
   // If the root class isn't known to use the Swift allocator, we need
@@ -920,7 +920,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                         llvm::Value *&alignMask) {
   // Use the magic __getInstanceSizeAndAlignMask method if we can
   // see a declaration of it
-  if (getInstanceSizeByMethod(IGF, selfType.getSwiftRValueType(),
+  if (getInstanceSizeByMethod(IGF, selfType.getASTType(),
                               selfClass, selfValue, size, alignMask))
     return;
 
@@ -1337,7 +1337,7 @@ namespace {
       if (getClass()->hasClangNode())
         fields.add(IGM.getAddrOfObjCClass(getClass(), NotForDefinition));
       else {
-        auto type = getSelfType(getClass()).getSwiftRValueType();
+        auto type = getSelfType(getClass()).getASTType();
         llvm::Constant *metadata =
           tryEmitConstantHeapMetadataRef(IGM, type, /*allowUninit*/ true);
         assert(metadata &&
@@ -2455,7 +2455,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   llvm::Value *metadata;
   if (useSuperVTable) {
     auto instanceTy = baseType;
-    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getSwiftRValueType()))
+    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getASTType()))
       instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
     if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
@@ -2465,7 +2465,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // resilience domain. So, we need to load the superclass metadata
       // dynamically.
 
-      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getSwiftRValueType(),
+      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getASTType(),
                                           MetadataValueType::TypeMetadata,
                                           MetadataState::Complete);
       auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
@@ -2474,7 +2474,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // Otherwise, we can directly load the statically known superclass's
       // metadata.
       auto superTy = instanceTy.getSuperclass();
-      metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
+      metadata = emitClassHeapMetadataRef(IGF, superTy.getASTType(),
                                           MetadataValueType::TypeMetadata,
                                           MetadataState::Complete);
     }

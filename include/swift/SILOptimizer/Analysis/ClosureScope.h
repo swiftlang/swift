@@ -177,7 +177,7 @@ public:
   // Visit all functions in a module, visiting each closure scope function
   // before
   // the closure function itself.
-  void visitFunctions(std::function<void(SILFunction *)> visitor);
+  void visitFunctions(llvm::function_ref<void(SILFunction *)> visitor);
 };
 
 } // end namespace swift

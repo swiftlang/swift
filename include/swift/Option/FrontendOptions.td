@@ -81,6 +81,9 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
 
+def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
+  HelpText<"Verify that no unknown nodes exist in the libSyntax tree">;
+
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
 
@@ -341,6 +344,9 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
   Alias<warn_long_expression_type_checking>;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+
+def switch_checking_invocation_threshold_EQ : Joined<["-"],
+    "switch-checking-invocation-threshold=">;
 
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;

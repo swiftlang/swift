@@ -102,12 +102,12 @@ TypeInfo::~TypeInfo() {
 
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
   assert(ptr->getType()->getPointerElementType() == StorageType);
-  return Address(ptr, StorageAlignment);
+  return Address(ptr, getBestKnownAlignment());
 }
 
 Address TypeInfo::getUndefAddress() const {
   return Address(llvm::UndefValue::get(getStorageType()->getPointerTo(0)),
-                 StorageAlignment);
+                 getBestKnownAlignment());
 }
 
 /// Whether this type is known to be empty.
@@ -239,12 +239,12 @@ unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
     return 0;
   // The runtime supports a max of 0x7FFFFFFF extra inhabitants, which ought
   // to be enough for anybody.
-  if (StorageSize.getValue() >= 4)
+  if (getFixedSize().getValue() >= 4)
     return 0x7FFFFFFF;
   unsigned spareBitCount = SpareBits.count();
-  assert(spareBitCount <= StorageSize.getValueInBits()
+  assert(spareBitCount <= getFixedSize().getValueInBits()
          && "more spare bits than storage bits?!");
-  unsigned inhabitedBitCount = StorageSize.getValueInBits() - spareBitCount;
+  unsigned inhabitedBitCount = getFixedSize().getValueInBits() - spareBitCount;
   return ((1U << spareBitCount) - 1U) << inhabitedBitCount;
 }
 
@@ -304,7 +304,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   auto &C = IGF.IGM.getLLVMContext();
   
   // Load the value.
-  auto payloadTy = llvm::IntegerType::get(C, StorageSize.getValueInBits());
+  auto payloadTy = llvm::IntegerType::get(C, getFixedSize().getValueInBits());
   src = IGF.Builder.CreateBitCast(src, payloadTy->getPointerTo());
   auto val = IGF.Builder.CreateLoad(src);
   
@@ -331,7 +331,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   
   // See if spare bits fit into the 31 bits of the index.
   unsigned numSpareBits = SpareBits.count();
-  unsigned numOccupiedBits = StorageSize.getValueInBits() - numSpareBits;
+  unsigned numOccupiedBits = getFixedSize().getValueInBits() - numSpareBits;
   if (numOccupiedBits < 31) {
     // Gather the spare bits.
     llvm::Value *spareIdx
@@ -756,7 +756,7 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
   
   auto &C = IGF.IGM.getLLVMContext();
 
-  auto payloadTy = llvm::IntegerType::get(C, StorageSize.getValueInBits());
+  auto payloadTy = llvm::IntegerType::get(C, getFixedSize().getValueInBits());
 
   unsigned spareBitCount = SpareBits.count();
   unsigned occupiedBitCount = SpareBits.size() - spareBitCount;
@@ -1298,7 +1298,7 @@ SILType IRGenModule::getLoweredType(Type subst) {
 /// unlike fetching the type info and asking it for the storage type,
 /// this operation will succeed for forward-declarations.
 llvm::PointerType *IRGenModule::getStoragePointerType(SILType T) {
-  return getStoragePointerTypeForLowered(T.getSwiftRValueType());
+  return getStoragePointerTypeForLowered(T.getASTType());
 }
 llvm::PointerType *IRGenModule::getStoragePointerTypeForUnlowered(Type T) {
   return getStorageTypeForUnlowered(T)->getPointerTo();
@@ -1312,7 +1312,7 @@ llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
 }
 
 llvm::Type *IRGenModule::getStorageType(SILType T) {
-  return getStorageTypeForLowered(T.getSwiftRValueType());
+  return getStorageTypeForLowered(T.getASTType());
 }
 
 /// Get the storage type for the given type.  Note that, unlike
@@ -1353,7 +1353,7 @@ IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
 /// to have undergone SIL type lowering (or be one of the types for
 /// which that lowering is the identity function).
 const TypeInfo &IRGenModule::getTypeInfo(SILType T) {
-  return getTypeInfoForLowered(T.getSwiftRValueType());
+  return getTypeInfoForLowered(T.getASTType());
 }
 
 /// Get the fragile type information for the given type.
@@ -1449,8 +1449,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
     // The type we got should be lowered, so lower it like a SILType.
     contextTy = getGenericEnvironment()->mapTypeIntoContext(
                   IGM.getSILModule(),
-                  SILType::getPrimitiveAddressType(contextTy))
-      .getSwiftRValueType();
+                  SILType::getPrimitiveAddressType(contextTy)).getASTType();
   }
   
   // Fold archetypes to unique exemplars. Any archetype with the same

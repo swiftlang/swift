@@ -614,6 +614,20 @@ SequenceTypeTests.test("contains/Predicate") {
   }
 }
 
+SequenceTypeTests.test("allSatisfy/Predicate") {
+  for test in findTests {
+    let s = MinimalSequence<OpaqueValue<Int>>(
+      elements: test.sequence.map { OpaqueValue($0.value) })
+    expectEqual(
+      test.expected == nil,
+      s.allSatisfy { $0.value != test.element.value },
+      stackTrace: SourceLocStack().with(test.loc))
+    expectEqual(
+      test.expectedLeftoverSequence.map { $0.value }, s.map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//

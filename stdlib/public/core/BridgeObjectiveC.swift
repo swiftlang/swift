@@ -170,7 +170,7 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 }
 
 @_silgen_name("")
-public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: T) -> AnyObject
+public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
 
 /// Convert a purportedly-nonnull `id` value from Objective-C into an Any.
 ///

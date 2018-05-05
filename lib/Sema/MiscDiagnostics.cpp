@@ -554,14 +554,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // We care about whether the parameter list of the callee syntactically
       // has more than one argument.  It has to *syntactically* have a tuple
       // type as its argument.  A ParenType wrapping a TupleType is a single
-      // parameter. 
-      if (isa<TupleType>(FT->getInput().getPointer())) {
-        auto TT = FT->getInput()->getAs<TupleType>();
-        if (TT->getNumElements() > 1) {
-          TC.diagnose(Call->getLoc(), diag::tuple_splat_use,
-                      TT->getNumElements())
-            .highlight(Call->getArg()->getSourceRange());
-        }
+      // parameter.
+      auto params = FT->getParams();
+      if (params.size() > 1) {
+        TC.diagnose(Call->getLoc(), diag::tuple_splat_use, params.size())
+          .highlight(Call->getArg()->getSourceRange());
       }
     }
 
@@ -968,16 +965,19 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (DRE->getDecl() != TC.Context.getUnsafeBitCast(&TC))
         return;
       
-      if (DRE->getDeclRef().getSubstitutions().size() != 2)
+      if (DRE->getDeclRef().getSubstitutions().empty())
         return;
       
       // Don't check the same use of unsafeBitCast twice.
       if (!AlreadyDiagnosedBitCasts.insert(DRE).second)
         return;
-      
-      auto fromTy = DRE->getDeclRef().getSubstitutions()[0].getReplacement();
-      auto toTy = DRE->getDeclRef().getSubstitutions()[1].getReplacement();
-    
+
+      auto subMap = DRE->getDeclRef().getSubstitutions();
+      auto fromTy =
+        Type(GenericTypeParamType::get(0, 0, TC.Context)).subst(subMap);
+      auto toTy =
+        Type(GenericTypeParamType::get(0, 1, TC.Context)).subst(subMap);
+
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.
       

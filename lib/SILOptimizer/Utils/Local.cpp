@@ -169,7 +169,7 @@ bool swift::isIntermediateRelease(SILInstruction *I,
 }
 
 namespace {
-  using CallbackTy = std::function<void(SILInstruction *)>;
+  using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
 } // end anonymous namespace
 
 void swift::
@@ -552,7 +552,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 
   // Src is not optional, but dest is optional.
   if (!OptionalSrcTy && OptionalDestTy) {
-    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getSwiftRValueType())
+    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getASTType())
       ->getCanonicalType();
     auto LoweredOptionalSrcType = SILType::getPrimitiveObjectType(
       OptionalSrcCanTy);

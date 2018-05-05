@@ -942,7 +942,7 @@ StringTests.test("stringGutsReserve")
     expectEqual(isSwiftNative(base), startedNative)
     
     let originalBuffer = base.bufferID
-    let isUnique = base._guts.isUniqueNative()
+    let isUnique = base._guts._isUniqueNative()
     let startedUnique =
       startedNative &&
       base._guts._objectIdentifier != nil &&

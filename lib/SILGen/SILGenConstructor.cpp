@@ -886,10 +886,10 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
     
     auto initConstantTy = initFn->getLoweredType().castTo<SILFunctionType>();
     
-    auto param = SILParameterInfo(initTy.getSwiftRValueType(),
+    auto param = SILParameterInfo(initTy.getASTType(),
                         initTy.isAddress() ? ParameterConvention::Indirect_In
                                            : ParameterConvention::Direct_Owned);
-    auto result = SILResultInfo(storageTy.getSwiftRValueType(),
+    auto result = SILResultInfo(storageTy.getASTType(),
                               storageTy.isAddress() ? ResultConvention::Indirect
                                                     : ResultConvention::Owned);
     
@@ -1021,8 +1021,9 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
       auto self = emitSelfForMemberInit(*this, var, selfDecl);
       
       auto mark = B.createMarkUninitializedBehavior(var,
-               initFn, init.getSubstitutions(), storageAddr.getValue(),
-               setterFn, getForwardingSubstitutions(), self.getValue(),
+               initFn, init.getSubstitutions(),
+               storageAddr.getValue(),
+               setterFn, getForwardingSubstitutionMap(), self.getValue(),
                getLoweredType(var->getType()).getAddressType());
       
       // The mark instruction stands in for the behavior property.

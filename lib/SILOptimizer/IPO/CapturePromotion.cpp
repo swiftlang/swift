@@ -371,7 +371,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
       convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
                                         : ParameterConvention::Direct_Owned;
     }
-    OutTys.push_back(SILParameterInfo(paramBoxedTy.getSwiftRValueType(),
+    OutTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(),
                                       convention));
   }
 }

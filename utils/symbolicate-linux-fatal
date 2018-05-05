@@ -55,8 +55,7 @@ def process_ldd(lddoutput):
 
 def create_lldb_target(binary, memmap):
     lldb_debugger = lldb.SBDebugger.Create()
-    lldb_target = lldb_debugger.CreateTargetWithFileAndArch(
-        binary, lldb.LLDB_ARCH_DEFAULT)
+    lldb_target = lldb_debugger.CreateTarget(binary)
     module = lldb_target.GetModuleAtIndex(0)
     for dynlib_path in memmap:
         module = lldb_target.AddModule(

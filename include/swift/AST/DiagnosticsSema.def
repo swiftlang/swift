@@ -310,7 +310,7 @@ ERROR(cannot_convert_initializer_value,none,
 ERROR(cannot_convert_initializer_value_protocol,none,
       "value of type %0 does not conform to specified type %1", (Type,Type))
 ERROR(cannot_convert_initializer_value_nil,none,
-      "nil cannot initialize specified type %0", (Type))
+      "'nil' cannot initialize specified type %0", (Type))
 
 ERROR(cannot_convert_to_return_type,none,
       "cannot convert return expression of type %0 to return type %1",
@@ -318,7 +318,7 @@ ERROR(cannot_convert_to_return_type,none,
 ERROR(cannot_convert_to_return_type_protocol,none,
       "return expression of type %0 does not conform to %1", (Type,Type))
 ERROR(cannot_convert_to_return_type_nil,none,
-      "nil is incompatible with return type %0", (Type))
+      "'nil' is incompatible with return type %0", (Type))
 
 ERROR(cannot_convert_thrown_type,none,
       "thrown expression type %0 does not conform to 'Error'", (Type))
@@ -333,7 +333,7 @@ ERROR(cannot_throw_nil,none,
 ERROR(cannot_convert_raw_initializer_value,none,
       "cannot convert value of type %0 to raw type %1", (Type,Type))
 ERROR(cannot_convert_raw_initializer_value_nil,none,
-      "cannot convert nil to raw type %0", (Type))
+      "cannot convert 'nil' to raw type %0", (Type))
 
 ERROR(cannot_convert_default_arg_value,none,
       "default argument value of type %0 cannot be converted to type %1",
@@ -356,7 +356,7 @@ ERROR(cannot_convert_partial_argument_value_protocol,none,
       "in argument type %0, %1 does not conform to expected type %2", (Type, Type, Type))
 
 ERROR(cannot_convert_argument_value_nil,none,
-      "nil is not compatible with expected argument type %0", (Type))
+      "'nil' is not compatible with expected argument type %0", (Type))
 
 ERROR(cannot_convert_closure_result,none,
       "cannot convert value of type %0 to closure result type %1",
@@ -365,7 +365,7 @@ ERROR(cannot_convert_closure_result_protocol,none,
       "result value of type %0 does not conform to closure result type %1",
       (Type, Type))
 ERROR(cannot_convert_closure_result_nil,none,
-      "nil is not compatible with closure result type %0", (Type))
+      "'nil' is not compatible with closure result type %0", (Type))
 
 ERROR(destructor_not_accessible,none,
       "deinitializers cannot be accessed", ())
@@ -378,7 +378,7 @@ ERROR(cannot_convert_array_element_protocol,none,
       "value of type %0 does not conform to expected element type %1",
       (Type, Type))
 ERROR(cannot_convert_array_element_nil,none,
-      "nil is not compatible with expected element type %0", (Type))
+      "'nil' is not compatible with expected element type %0", (Type))
 
 // Dictionary Key
 ERROR(cannot_convert_dict_key,none,
@@ -388,7 +388,7 @@ ERROR(cannot_convert_dict_key_protocol,none,
       "value of type %0 does not conform to expected dictionary key type %1",
       (Type, Type))
 ERROR(cannot_convert_dict_key_nil,none,
-      "nil is not compatible with expected dictionary key type %0", (Type))
+      "'nil' is not compatible with expected dictionary key type %0", (Type))
 
 // Dictionary Value
 ERROR(cannot_convert_dict_value,none,
@@ -398,7 +398,7 @@ ERROR(cannot_convert_dict_value_protocol,none,
       "value of type %0 does not conform to expected dictionary value type %1",
       (Type, Type))
 ERROR(cannot_convert_dict_value_nil,none,
-      "nil is not compatible with expected dictionary value type %0", (Type))
+      "'nil' is not compatible with expected dictionary value type %0", (Type))
 
 // Coerce Expr
 ERROR(cannot_convert_coerce,none,
@@ -408,7 +408,7 @@ ERROR(cannot_convert_coerce_protocol,none,
       "value of type %0 does not conform to %1 in coercion",
       (Type, Type))
 ERROR(cannot_convert_coerce_nil,none,
-      "nil is not compatible with type %0 in coercion", (Type))
+      "'nil' is not compatible with type %0 in coercion", (Type))
 
 // Assign Expr
 ERROR(cannot_convert_assign,none,
@@ -418,7 +418,7 @@ ERROR(cannot_convert_assign_protocol,none,
       "value of type %0 does not conform to %1 in assignment",
       (Type, Type))
 ERROR(cannot_convert_assign_nil,none,
-      "nil cannot be assigned to type %0", (Type))
+      "'nil' cannot be assigned to type %0", (Type))
 
 
 ERROR(throws_functiontype_mismatch,none,
@@ -585,6 +585,9 @@ ERROR(serialization_missing_single_dependency,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,Fatal,
       "missing required modules: %0", (StringRef))
+ERROR(serialization_circular_dependency,Fatal,
+      "circular dependency between modules '%0' and %1",
+      (StringRef, Identifier))
 ERROR(serialization_missing_shadowed_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
 ERROR(serialization_name_mismatch,Fatal,
@@ -847,7 +850,7 @@ WARNING(conditional_downcast_same_type,none,
         (Type, Type, unsigned))
 WARNING(is_expr_same_type,none,
         "checking a value with optional type %0 against dynamic type %1 "
-        "succeeds whenever the value is non-'nil'; did you mean to use "
+        "succeeds whenever the value is non-nil; did you mean to use "
         "'!= nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
@@ -1396,7 +1399,7 @@ NOTE(objc_generic_extension_using_type_parameter_try_objc,none,
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
 ERROR(cannot_use_nil_with_this_type,none,
-      "nil cannot be used in context expecting type %0", (Type))
+      "'nil' cannot be used in context expecting type %0", (Type))
 
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
@@ -1697,9 +1700,18 @@ ERROR(witness_unavailable,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
+ERROR(redundant_conformance_conditional,none,
+      "conflicting conformance of %0 to protocol %1; there cannot be more "
+      "than one conformance, even with different conditional bounds",
+      (Type, DeclName))
 WARNING(redundant_conformance_adhoc,none,
         "conformance of %0 to protocol %1 was already stated in "
         "%select{the protocol's|the type's}2 module %3",
+        (Type, DeclName, bool, Identifier))
+WARNING(redundant_conformance_adhoc_conditional,none,
+        "conformance of %0 to protocol %1 conflicts with that stated in "
+        "%select{the protocol's|the type's}2 module %3 and will be ignored; "
+        "there cannot be more than one conformance, even with different conditional bounds",
         (Type, DeclName, bool, Identifier))
 NOTE(redundant_conformance_witness_ignored,none,
      "%0 %1 will not be used to satisfy the conformance to %2",
@@ -2584,7 +2596,7 @@ ERROR(missing_protocol,none,
 ERROR(nil_literal_broken_proto,none,
       "protocol 'ExpressibleByNilLiteral' is broken", ())
 ERROR(array_protocol_broken,none,
-      "ExpressibleByArrayLiteral protocol definition is broken", ())
+      "protocol 'ExpressibleByArrayLiteral' is broken", ())
 ERROR(builtin_integer_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinIntegerLiteral' is broken", ())
 ERROR(integer_literal_broken_proto,none,
@@ -2812,7 +2824,7 @@ WARNING(use_of_qq_on_non_optional_value,none,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
         "so the right side is never used", (Type))
 WARNING(nonoptional_compare_to_nil,none,
-        "comparing non-optional value of type %0 to nil always returns"
+        "comparing non-optional value of type %0 to 'nil' always returns"
         " %select{false|true}1", (Type, bool))
 WARNING(optional_check_nonoptional,none,
         "non-optional expression of type %0 used in a check for optionals",
@@ -2925,6 +2937,8 @@ WARNING(expression_unused_literal,none,
 
 ERROR(assignment_lhs_not_lvalue,none,
       "cannot assign to immutable expression of type %0", (Type))
+ERROR(assignment_lhs_is_apply_expression,none,
+      "expression is not assignable: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_variable,none,
       "cannot assign to value: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_property,none,
@@ -3209,18 +3223,21 @@ ERROR(bool_intrinsics_not_found,none,
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
-      "|cannot be declared "
-      "%select{in this context|fileprivate|internal|public|open}1}0 "
-      "because its superclass is "
-      "%select{private|fileprivate|internal|%error|%error}2",
-      (bool, AccessLevel, AccessLevel, bool))
+      "|cannot be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its superclass "
+      "%select{is %select{private|fileprivate|internal|%error|%error}2"
+      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "type as a generic parameter}4",
+      (bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(class_super_access_warn,none,
-        "class %select{should be declared "
-        "%select{private|fileprivate|internal|%error|%error}2"
-        "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
-        "because its superclass is "
-        "%select{private|fileprivate|internal|%error|%error}2",
-        (bool, AccessLevel, AccessLevel, bool))
+      "class %select{should be declared "
+      "%select{private|fileprivate|internal|%error|%error}2"
+      "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
+      "because its superclass "
+      "%select{is %select{private|fileprivate|internal|%error|%error}2"
+      "|uses %select{a private|a fileprivate|an internal|%error|%error}2 "
+      "type as a generic parameter}4",
+      (bool, AccessLevel, AccessLevel, bool, bool))
 ERROR(dot_protocol_on_non_existential,none,
       "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,none,
@@ -3744,10 +3761,6 @@ WARNING(availability_query_useless_enclosing_scope, none,
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
 
-WARNING(availability_extension_platform_agnostic, none,
-        "'@available' without an OS is ignored on extensions; "
-        "apply the attribute to each member instead", ())
-
 ERROR(availability_global_script_no_potential,
       none, "global variable cannot be marked potentially "
       "unavailable with '@available' in script mode", ())
@@ -3948,6 +3961,10 @@ ERROR(empty_switch_stmt,none,
       "'switch' statement body must have at least one 'case' or 'default' "
       "block; do you want to add a default case?",())
 ERROR(non_exhaustive_switch,none, "switch must be exhaustive", ())
+ERROR(possibly_non_exhaustive_switch,none,
+      "the compiler is unable to check that this switch is exhaustive in reasonable time",
+      ())
+
 NOTE(missing_several_cases,none,
      "do you want to add "
      "%select{missing cases|a default clause}0"

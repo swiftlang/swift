@@ -50,10 +50,10 @@ let _ = wrapped // expected-error {{use of unresolved identifier 'wrapped'}}
 let _ = unwrapped // okay
 
 _ = usesWrapped(nil) // expected-error {{use of unresolved identifier 'usesWrapped'}}
-_ = usesUnwrapped(nil) // expected-error {{nil is not compatible with expected argument type 'Int32'}}
+_ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
 
 let _: WrappedAlias = nil // expected-error {{use of undeclared type 'WrappedAlias'}}
-let _: UnwrappedAlias = nil // expected-error {{nil cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
+let _: UnwrappedAlias = nil // expected-error {{'nil' cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
 
 let _: ConstrainedWrapped<Int> = nil // expected-error {{use of undeclared type 'ConstrainedWrapped'}}
 let _: ConstrainedUnwrapped<Int> = nil // expected-error {{type 'Int' does not conform to protocol 'HasAssoc'}}
