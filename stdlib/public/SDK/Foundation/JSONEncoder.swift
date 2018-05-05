@@ -827,14 +827,14 @@ extension _JSONEncoder {
         return try self.box_(value) ?? NSDictionary()
     }
 
-    fileprivate func box(_ dict: [String : Encodable]) throws {
-        let result = self.storage.pushKeyedContainer()
+    fileprivate func box(_ dict: [String : Encodable]) throws -> NSObject {
+        let result = NSMutableDictionary()
         for (k, v) in dict {
             self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
             defer { self.codingPath.removeLast() }
             result[k] = try box(v)
         }
-        // Container will be popped by caller
+        return result
     }
 
     // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
@@ -852,16 +852,14 @@ extension _JSONEncoder {
         } else if type == Decimal.self || type == NSDecimalNumber.self {
             // JSONSerialization can natively handle NSDecimalNumber.
             return (value as! NSDecimalNumber)
+        } else if type is Dictionary<String, Encodable> {
+            return self.box(value as! Dictionary<String, Encodable>)
         }
 
         // The value should request a container from the _JSONEncoder.
         let depth = self.storage.count
         do {
-            if let stringKeyedDict = value as? Dictionary<String, Encodable> {
-                try box(stringKeyedDict)
-            } else {
-                try value.encode(to: self)
-            }
+            try value.encode(to: self)
         } catch {
             // If the value pushed a container before throwing, pop it back off to restore state.
             if self.storage.count > depth {
@@ -2383,8 +2381,10 @@ extension _JSONDecoder {
     }
 
     fileprivate func unbox<T>(_ value: Any, as type: _JSONStringDictionaryMarker.Type) throws -> T? {
-        var result: Dictionary<String, Any> = [:]
-        let dict = value as! Dictionary<String, NSObject>
+        var result = [String : Any]()
+        guard let dict = value as? NSDictionary else {
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        }
         let elementType = type.elementType
         for (k, v) in dict {
             self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
