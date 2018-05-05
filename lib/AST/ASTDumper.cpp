@@ -1906,7 +1906,7 @@ public:
       OS << '\n';
       printRec(E->getArgument());
     }
-    OS << "')";
+    OS << ")";
   }
   void visitDotSelfExpr(DotSelfExpr *E) {
     printCommon(E, "dot_self_expr");
@@ -1960,6 +1960,7 @@ public:
     if (auto semaE = E->getSemanticExpr()) {
       OS << '\n';
       printRec(semaE);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
       return;
     }
     for (auto elt : E->getElements()) {
