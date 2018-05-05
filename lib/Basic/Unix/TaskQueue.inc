@@ -376,7 +376,7 @@ public:
     const TaskQueue::TaskBeganCallback TaskBegan;
     const TaskQueue::TaskFinishedCallback TaskFinished;
     const TaskQueue::TaskSignalledCallback TaskSignalled;
-    const llvm::function_ref<void()> PolledAnFd;
+    const std::function<void()> PolledAnFd;
   };
 
 private:
@@ -473,7 +473,8 @@ TaskMonitor::PollResult TaskMonitor::pollTheFds() {
   assert(!FdsBeingPolled.empty() &&
          "We should only call poll() if we have fds to watch!");
   int ReadyFdCount = poll(FdsBeingPolled.data(), FdsBeingPolled.size(), -1);
-  callbacks.PolledAnFd();
+  if (callbacks.PolledAnFd)
+    callbacks.PolledAnFd();
   if (ReadyFdCount != -1)
     return PollResult::NoError;
   return errno == EAGAIN || errno == EINTR ? PollResult::SoftError
@@ -483,7 +484,8 @@ TaskMonitor::PollResult TaskMonitor::pollTheFds() {
 bool TaskMonitor::beginExecutingATask(Task &T) {
   if (T.execute())
     return true;
-  callbacks.TaskBegan(T.getPid(), T.getContext());
+  if (callbacks.TaskBegan)
+    callbacks.TaskBegan(T.getPid(), T.getContext());
   return false;
 }
 
