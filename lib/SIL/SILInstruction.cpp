@@ -1354,7 +1354,7 @@ operator==(const SILInstructionResultArray &other) {
 
 SILInstructionResultArray::type_range
 SILInstructionResultArray::getTypes() const {
-  std::function<SILType(SILValue)> F = [](SILValue V) -> SILType {
+  SILType (*F)(SILValue) = [](SILValue V) -> SILType {
     return V->getType();
   };
   return {llvm::map_iterator(begin(), F), llvm::map_iterator(end(), F)};
