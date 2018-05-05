@@ -286,7 +286,7 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 
   // expected-note @+1 {{value used here}}
   let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
-  let y = x.scalar! + 2.0 // expected-note {{value used here}}  expected-error {{GraphGen cannot lower a 'receive' from the host yet}}
+  let y = x.scalar! + 2.0 // expected-note {{value used here}}
   // expected-warning @-1 {{value implicitly copied to the accelerator}}
 
   let z = Tensor<Float>(y)

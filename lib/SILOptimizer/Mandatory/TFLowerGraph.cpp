@@ -219,9 +219,10 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   // a value corresponds to, along with the scope ID of the value.
   ValueMappingScopedHashTable valueMapping;
 
-  // Track those tensor ids that have been lowered to graph ops for TF->Swift
-  // tensor sends.
+  // Track those tensor ids that have been lowered to graph ops respectively for
+  // TF->Swift tensor sends and receives.
   llvm::SmallSet<int, 4> processedTensorIdsForSend;
+  llvm::SmallSet<int, 4> processedTensorIdsForReceive;
 
   /// This flag gets set if lowering code to the graph produces a TensorFlow
   /// error and emits a diagnostic.  This tells us to stop lowering and give up
@@ -488,11 +489,8 @@ private:  // Helpers to create TensorFlow graph nodes.
 
   void visitBuiltinInst(BuiltinInst *inst);
   void visitBuiltinTFSendInst(BuiltinInst *inst);
+  void visitBuiltinTFReceiveInst(BuiltinInst *inst);
 
-  void visitBuiltinTFReceiveInst(BuiltinInst *inst) {
-    internalError(inst->getLoc(),
-                  "GraphGen cannot lower a 'receive' from the host yet");
-  }
   /// Create a stack of TF dataset and iterator nodes up to IteratorGetNext.
   ///
   /// FIXME: Dissolve this builtin into a set of finer-grained, composer
@@ -880,6 +878,111 @@ void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     TF_FinishOperation(desc, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
+  }
+}
+
+void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
+  auto &graphFn = getCurrentGraphFunction();
+  // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
+  // the while cond function.
+  if (!graphFn.shouldLowerEffectfulOps) return;
+
+  // Decode the tensor id from the builtin name.
+  // Example: builtin "tensorflowReceive_0"<TensorHandle<Float>>(...) : $()
+  int tensorId = -1;
+  {
+    auto name = inst->getName().str();
+    auto tensorIdStr = name.substr(strlen("tensorflowReceive_"));
+    bool isInt = llvm::to_integer(tensorIdStr, tensorId, 10);
+    assert(isInt);
+  }
+
+  // Type check and process the result.
+  TF_DataType outputType;
+  {
+    assert(inst->getNumOperands() == 0);
+    assert(inst->getNumResults() == 1);
+    outputType =
+        getTensorFlowDataType(inst->getResults()[0]->getType(), inst->getLoc());
+  }
+
+  // Add dequeue to the local graph function, and the corresponding enqueue to
+  // the top level function, so that caller can enqueue tensors via SessionRun.
+  TF_Operation *queueOp;
+  {
+    auto opName = "fifo_queue_" + llvm::itostr(tensorId);
+    auto *desc =
+        TF_NewOperation(graphFn.getGraph(), "FIFOQueueV2", opName.c_str());
+    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
+    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
+    TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
+    queueOp = graphFn.finishOp(desc, /*hasSideEffects*/ false,
+                               /*isEligibleForTPU*/ false, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return;
+  }
+
+  {
+    auto opName = "fifo_queue_dequeue_" + llvm::itostr(tensorId);
+    auto *desc =
+        TF_NewOperation(graphFn.getGraph(), "QueueDequeueV2", opName.c_str());
+    TF_AddInput(desc, {queueOp, 0});
+    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
+
+    auto dequeueOp = graphFn.finishOp(desc, /*hasSideEffects*/ true,
+                                      /*isEligibleForTPU*/ false, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return;
+    addValueMapping({inst, 0}, {dequeueOp, 0});
+  }
+
+  // Now add enqueue to the top level graph function. Multiple graph functions
+  // can have their own dequeue ops over the same tensorId.
+  // One example is to dequeue tensors both within the while op's body
+  // function, and also right after the while op is executed.
+  // In that case, we only generate a single enqueue op at the top level.
+  if (!processedTensorIdsForReceive.insert(tensorId).second) return;
+
+  // The code here is different enough from the above that it's not worth
+  // extracting common code into functions.
+  TF_Operation *globalQueueOp;
+  {
+    auto opName = "fifo_queue_" + llvm::itostr(tensorId);
+    auto *desc = TF_NewOperation(resultGraph, "FIFOQueueV2", opName.c_str());
+    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
+    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
+    // FIXME: Revisit whether to populate "shared_name".
+    TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
+    globalQueueOp = TF_FinishOperation(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return;
+  }
+
+  TF_Operation *inputTensorPlaceholder;
+  {
+    auto opName = "arg_tensor_enqueue_" + llvm::itostr(tensorId);
+    auto *desc = TF_NewOperation(resultGraph, "Placeholder", opName.c_str());
+    TF_SetAttrType(desc, "dtype", outputType);
+
+    inputTensorPlaceholder = TF_FinishOperation(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return;
+  }
+
+  {
+    auto opName = "fifo_queue_enqueue_" + llvm::itostr(tensorId);
+    auto *desc = TF_NewOperation(resultGraph, "QueueEnqueueV2", opName.c_str());
+    TF_AddInput(desc, {globalQueueOp, 0});
+    TF_Output inputTensor{inputTensorPlaceholder, 0};
+    TF_AddInputList(desc, &inputTensor, 1);
+    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetAttrTypeList(desc, "Tcomponents", &outputType, 1);
+    TF_FinishOperation(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return;
   }
 }
 

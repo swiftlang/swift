@@ -21,7 +21,7 @@ public func iftest(z: Tensor<Int32>, y: Tensor<Int32>, c: Bool, d: Bool) -> Tens
     if d { fatalError() }
 
     // expected-warning @+1 {{value implicitly copied to the accelerator}}
-    a = someGlobal  // expected-error {{GraphGen cannot lower a 'receive' from the host yet}}
+    a = someGlobal
   }
 
   a = a * a  // expected-note {{value used here}}
@@ -68,7 +68,6 @@ public func lowerGraphCrash(x: Tensor<Int32>) {
   _ = x*x  // expected-note {{value used here}}
   for _ in 0..<1000 {
     _ = x+someGlobal // expected-warning {{value implicitly copied to the accelerator}}
-    // expected-error @-1 {{GraphGen cannot lower a 'receive' from the host yet}}
   }
 }
 
@@ -131,23 +130,7 @@ public func testStraightLineXORTraining() {
   }
 }
 
-
-// This testcase exposed bb argument and source location manipulation problems.
-public func testEagerLoop() -> Int32 {
-  var a = Tensor<Int32>(6)
-
-  // expected-error @+2 {{GraphGen cannot lower a 'receive' from the host yet}}
-  var count = Tensor<Int32>(0)  // expected-warning {{value implicitly copied to the host}}
-  while a.elementsEqual(1).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
-    if (a % 2).elementsEqual(0).scalar! { // expected-warning 2 {{implicitly copied}} expected-note {{value used here}}
-      a = a / 2
-    } else {
-      a = 3 * a + 1
-    }
-    count += 1
-  }
-  return count.scalar!  // expected-note {{value used here}}
-}
+// FIXME: Add back testEagerLoop() https://github.com/google/swift/issues/28
 
 // This crashed sinking a "tensor to scalar" operation in mean out the bottom
 // of the loop.
