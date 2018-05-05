@@ -66,4 +66,70 @@ func testSendsInALoop() {
 }
 SendsRecvsTests.testCPU("testSendsInALoop", testSendsInALoop)
 
+func test1RecvFloatScalar() {
+#if !CUDA
+  _RuntimeConfig.usesTFEagerAPI = false
+  let x = Tensor<Float>(1.0)
+  let y = x.scalar! + 2.0
+
+  let z = Tensor<Float>(y)
+  let result = z + z
+  expectEqual(6, result.scalar)
+#endif //!CUDA
+}
+SendsRecvsTests.testCPU("test1RecvFloatScalar", test1RecvFloatScalar)
+
+func test1RecvIntScalar() {
+#if !CUDA
+  _RuntimeConfig.usesTFEagerAPI = false
+  let x = Tensor<Int32>(1)
+  let y = x.scalar! + 2
+
+  let z = Tensor<Int32>(y)
+  let result = z + z
+  expectEqual(6, result.scalar)
+#endif //!CUDA
+}
+SendsRecvsTests.testCPU("test1RecvIntScalar", test1RecvIntScalar)
+
+@inline(never)
+func atariSimFloat(_ a: Tensor<Float>) -> Tensor<Float> {
+  return a
+}
+
+func test1RecvFloatTensor() {
+#if !CUDA
+  _RuntimeConfig.usesTFEagerAPI = false
+  let a = Tensor<Float>(1.0)
+  // One send.
+  print(a.toHost())
+  // One recv.
+  var b = atariSimFloat(a).toDevice()
+  b += a
+  print("final b = \(b.toHost())")
+  expectEqual(2, b.scalar)
+#endif //!CUDA
+}
+SendsRecvsTests.testCPU("test1RecvFloatTensor", test1RecvFloatTensor)
+
+@inline(never)
+func atariSimInt(_ a: Tensor<Int64>) -> Tensor<Int64> {
+  return a
+}
+
+func test1RecvIntTensor() {
+#if !CUDA
+  _RuntimeConfig.usesTFEagerAPI = false
+  let a = Tensor<Int64>(1)
+  // One send.
+  print(a.toHost())
+  // One recv.
+  var b = atariSimInt(a).toDevice()
+  b += a
+  print("final b = \(b.toHost())")
+  expectEqual(2, b.scalar)
+#endif //!CUDA
+}
+SendsRecvsTests.testCPU("test1RecvIntTensor", test1RecvIntTensor)
+
 runAllTests()
