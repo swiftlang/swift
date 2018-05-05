@@ -14,4 +14,4 @@ extension NSString {
 var str: String = "hello world"
 
 // Crash when NSString member is accessed on a String with an lvalue base
-_ = str.x
+_ = (str as NSString).x

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3118,7 +3118,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
-  if (baseObjTy->getAnyNominal() == TC.Context.getStringDecl()) {
+  if (false && baseObjTy->getAnyNominal() == TC.Context.getStringDecl()) {
     if (Type classType = TC.Context.getBridgedToObjC(DC, instanceTy)) {
       bridgedType = classType;
     }

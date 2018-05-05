@@ -56,4 +56,4 @@ o.blackHoleWithHawkingRadiation = NSObject()
 // Use of extensions via bridging 
 let str = "Hello, world"
 // CHECK: I've been frobbed!
-str.frob()
+(str as NSString).frob()

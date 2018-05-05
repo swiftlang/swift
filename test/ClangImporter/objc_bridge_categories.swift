@@ -8,9 +8,9 @@ import Foundation
 import AppKit
 
 func testStringBridge(_ str: String) {
-  var str2 = str.nsStringMethod()!
+  var str2 = (str as NSString).nsStringMethod()!
   var int = NSString.nsStringClassMethod()
-  var str3 = str.nsStringProperty!
+  var str3 = (str as NSString).nsStringProperty!
 
   // Make sure the types worked out as expected
   var str: String = str2
