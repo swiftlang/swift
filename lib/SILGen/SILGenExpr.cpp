@@ -4981,7 +4981,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
     // Emit the operand into the temporary.
     SGF.emitExprInto(E->getSubExpr(), temp.get());
 
-    // And then greab the managed address.
+    // And then grab the managed address.
     optValue = temp->getManagedAddress();
   }
 
