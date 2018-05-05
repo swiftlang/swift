@@ -132,6 +132,29 @@ bool FunctionAccessedStorage::mergeFrom(const FunctionAccessedStorage &RHS) {
   return mergeAccesses(RHS, [](const AccessedStorage &s) { return s; });
 }
 
+/// Returns the argument of the full apply or partial apply corresponding to the
+/// callee's parameter index, or returns an invalid SILValue if the applied
+/// closure cannot be found. This walks up the apply chain starting at the given
+/// `fullApply` to find the applied argument.
+static SILValue getCallerArg(FullApplySite fullApply, unsigned paramIndex) {
+  if (paramIndex < fullApply.getNumArguments())
+    return fullApply.getArgument(paramIndex);
+
+  SILValue callee = fullApply.getCalleeOrigin();
+  auto *PAI = dyn_cast<PartialApplyInst>(callee);
+  if (!PAI)
+    return SILValue();
+
+  unsigned appliedIndex =
+    paramIndex - ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
+  if (appliedIndex < PAI->getNumArguments())
+    return PAI->getArgument(appliedIndex);
+
+  // This must be a chain of partial_applies. We don't expect this in practice,
+  // so handle it conservatively.
+  return SILValue();
+}
+
 /// Transform AccessedStorage from a callee into the caller context. If this is
 /// uniquely identified local storage, then return an invalid storage object.
 static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
@@ -149,16 +172,21 @@ static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
     // caller side.
     SILValue obj = storage.getObjectProjection().getObject();
     if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
-      return AccessedStorage(fullApply.getArgument(arg->getIndex()),
-                             storage.getObjectProjection().getProjection());
+      SILValue argVal = getCallerArg(fullApply, arg->getIndex());
+      if (argVal)
+        return AccessedStorage(argVal,
+                               storage.getObjectProjection().getProjection());
     }
     // Otherwise, continue to reference the value in the callee because we don't
     // have any better placeholder for a callee-defined object.
     return storage;
   }
-  case AccessedStorage::Argument:
+  case AccessedStorage::Argument: {
     // Transitively search for the storage base in the caller.
-    return findAccessedStorageOrigin(fullApply.getArgument(storage.getParamIndex()));
+    SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
+    if (argVal)
+      return findAccessedStorageOrigin(argVal);
+  }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
   case AccessedStorage::Unidentified:
