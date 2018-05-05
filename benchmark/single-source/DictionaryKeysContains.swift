@@ -1,4 +1,4 @@
-//===--- DictionaryKeysContains.swift -------------------------------------------===//
+//===--- DictionaryKeysContains.swift -------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -44,27 +44,33 @@ public let DictionaryKeysContains = [
 private var dictionary: [NSString: NSString]!
 
 private func setup_DictionaryKeysContainsNative() {
-    let keyValuePairs = (1...1_000_000).map { ("\($0)" as NSString, "\($0)" as NSString) }
-    dictionary = [NSString: NSString](uniqueKeysWithValues: keyValuePairs)
+  let keyValuePairs = (1...1_000_000).map {
+    ("\($0)" as NSString, "\($0)" as NSString)
+  }
+  dictionary = [NSString: NSString](uniqueKeysWithValues: keyValuePairs)
 }
 
 #if _runtime(_ObjC)
 private func setup_DictionaryKeysContainsCocoa() {
-    let keyValuePairs = (1...1_000_000).map { ("\($0)" as NSString, "\($0)" as NSString) }
-    let nativeDictionary = [NSString: NSString](uniqueKeysWithValues: keyValuePairs)
-    dictionary = (NSDictionary(dictionary: nativeDictionary) as! [NSString: NSString])
+  let keyValuePairs = (1...1_000_000).map {
+    ("\($0)" as NSString, "\($0)" as NSString)
+  }
+  let nativeDictionary = [NSString: NSString](
+    uniqueKeysWithValues: keyValuePairs)
+  dictionary = (NSDictionary(dictionary: nativeDictionary)
+    as! [NSString: NSString])
 }
 #endif
 
 private func teardown_DictionaryKeysContains() {
-    dictionary = nil
+  dictionary = nil
 }
 
 @inline(never)
 public func run_DictionaryKeysContains(_ N: Int) {
-    for _ in 0..<(N * 100) {
-        CheckResults(dictionary.keys.contains("42"))
-        CheckResults(!dictionary.keys.contains("-1"))
-    }
+  for _ in 0..<(N * 100) {
+    CheckResults(dictionary.keys.contains("42"))
+    CheckResults(!dictionary.keys.contains("-1"))
+  }
 }
 
