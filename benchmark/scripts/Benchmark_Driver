@@ -203,7 +203,7 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     output = []
     headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
                 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
-    line_format = '{:>3} {:<57} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
+    line_format = '{:>3} {:<57} {:>7} {:>8} {:>8} {:>8} {:>6} {:>10} {:>10}'
     if verbose and log_directory:
         print(line_format.format(*headings))
     for test in benchmarks:
