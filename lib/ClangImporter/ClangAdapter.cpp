@@ -299,6 +299,9 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::Double:
       return "Double";
 
+    case clang::BuiltinType::Char8:
+      return "UInt8";
+
     case clang::BuiltinType::Char16:
       return "UInt16";
 
