@@ -357,7 +357,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
-  associatedtype Index : Comparable
+  associatedtype Index : Comparable = DefaultIndex<Self>
 
   /// The position of the first element in a nonempty collection.
   ///
@@ -1797,6 +1797,108 @@ extension Collection {
   ) rethrows -> R? {
     return try preprocess()
   }
+}
+
+/// A default `Index` type for `Collection`s defined using `makeIterator`
+public enum DefaultIndex<Base: Swift.Sequence> : Comparable {
+
+  init() { self = .end }
+
+  init(_ s: Base) {
+    var i = s.makeIterator()
+    if let e = i.next() {
+      self = .element(0, e, i)
+    }
+    else {
+      self = .end
+    }
+  }
+
+  /// An index of an element in the collection.
+  ///
+  /// The associated values are:
+  /// - The zero-based position in the collection, for `Comparable` purposes.
+  /// - The element itself, so that it only needs to be computed once.
+  /// - The state, immediately after generating the element at this index.
+  case element(Int, Base.Element, Base.Iterator)
+  
+  /// An index representing the end of the collection.
+  case end
+  
+  public static func ==(lhs: DefaultIndex, rhs: DefaultIndex) -> Bool {
+    switch (lhs, rhs) {
+      case let (.element(l, _, _), .element(r, _, _)): return l == r
+      case (.end, .end): return true
+      default: return false
+    }
+  }
+  
+  public static func < (lhs: DefaultIndex, rhs: DefaultIndex) -> Bool {
+    switch (lhs, rhs) {
+      case let (.element(l, _, _), .element(r, _, _)): return l < r
+      case (.element, .end): return true
+      default: return false
+    }
+  }
+
+  fileprivate mutating func stepForward() {
+    switch self {
+      case .element(let pos, _, var iterator):
+        if let e = iterator.next() {
+          self = .element(pos + 1, e, iterator)
+        } else {
+          self = .end
+        }
+      case .end:
+        fatalError("Can't advance past end")
+    }
+  }
+
+  public func distance(to other: DefaultIndex) -> Int {
+    switch (self, other) {
+      case (.end, .end): return 0
+      case (.element(let l, _, _), .element(let r, _, _)): return r - l
+      default: break
+    }
+    var i = self
+    var n = 0
+    while i != .end { i.stepForward(); n += 1 }
+    return n
+  }
+
+  fileprivate var element: Base.Element {
+    guard case .element(_, let e, _) = self else {
+      fatalError("Can't subscript at end")
+    }
+    return e
+  }
+}
+
+extension Collection where Self.Index == DefaultIndex<Self> {
+  public var startIndex: DefaultIndex<Self> {
+    return DefaultIndex(self)
+  }
+  
+  public var endIndex: DefaultIndex<Self> {
+    return DefaultIndex()
+  }
+  
+  public subscript(i: DefaultIndex<Self>) -> Iterator.Element {
+    return i.element
+  }
+  
+  public func index(after i: DefaultIndex<Self>) -> DefaultIndex<Self> {
+    var j = i
+    j.stepForward()
+    return j
+  }
+
+  // DWA WORKAROUND: for https://bugs.swift.org/browse/SR-7605 from Nate Cook
+#if false
+  public func formIndex(after i: inout DefaultIndex<Self>) {
+    i.stepForward()
+  }
+#endif
 }
 
 extension Collection {
