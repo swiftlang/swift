@@ -39,6 +39,11 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
     TF_DeleteStatus(status)
   }
 
+  @_versioned
+  init(owning cTensorHandle: CTensorHandle) {
+    self.cTensorHandle = cTensorHandle
+  }
+  
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///
@@ -103,6 +108,31 @@ extension TensorHandle : TensorSendableReceivable {
       dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
     }
     return tensorHandle
+  }
+
+  @_inlineable @_versioned
+  func sendToDevice(_ computation: _TensorComputation,
+                    _ tensorId: Int) {
+    if _RuntimeConfig.printsDebugLog {
+      debugLog("Sending tensor of id \(tensorId) and type \(Scalar.self) with:")
+      dumpTensorContent(self.cTensorHandle, Scalar.self)
+    }
+    let status = TF_NewStatus()
+    let cTensor = TFE_TensorHandleResolve(self.cTensorHandle, status)
+    checkOk(status)
+    TF_EnqueueNamedTensor(
+      computation.cSession, Int32(tensorId), cTensor, status)
+    debugLog("Tensor is sent.")
+    checkOk(status)
+    TF_DeleteStatus(status)
+    TF_DeleteTensor(cTensor)
+  }
+
+  @_inlineable @_versioned
+  static func scalar(_ scalar: Scalar) -> TensorHandle<Scalar> {
+    debugLog("Creating a tensor from scalar \(scalar).")
+    let cTensorHandle = _TFCCreateCTensorHandle(scalar, Scalar.cDataType)
+    return TensorHandle<Scalar>(owning: cTensorHandle)
   }
 }
 

@@ -92,10 +92,23 @@ public protocol ParameterAggregate {
 /// it. So changing the protocol design requires changing the compiler
 /// accordingly too.
 protocol TensorSendableReceivable {
+  associatedtype Scalar
+
   /// Receive a tensor based on a tensor computation handle (equivalent to a TF
   /// session handle), and a tensor ID.
   static func receiveFromDevice(_ computation: _TensorComputation,
                                 _ tensorId: Int) -> Self
 
-  // FIXME: add sendToTensorFlow()
+  /// Send a tensor of `this` instance based on a tensor computation handle
+  /// (equivalent to a TF session handle), and a tensor ID.
+  func sendToDevice(_ computation: _TensorComputation,
+                    _ tensorId: Int)
+
+  /// Create a scalar tensor. It can be used by host program to send a scalar
+  /// value to device.
+  ///
+  /// - Note: This is different from protocol method
+  /// AccelerableByTensorFlow._makeScalarTensor(), a mark function to assist
+  /// compiler in generating Accelerator code, and has no runtime effects.
+  static func scalar(_ scalar: Scalar) -> Self
 }
