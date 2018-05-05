@@ -144,16 +144,12 @@ Type DerivedConformance::deriveCaseIterable(TypeChecker &tc, Decl *parentDecl,
     return nullptr;
   }
 
-  // We can only synthesize CaseIterable for enums.
-  auto enumDecl = dyn_cast<EnumDecl>(targetDecl);
-  if (!enumDecl)
-    return nullptr;
-
   // Check that we can actually derive CaseIterable for this type.
   if (!canDeriveConformance(targetDecl))
     return nullptr;
 
   if (assocType->getName() == tc.Context.Id_AllCases) {
+    auto enumDecl = cast<EnumDecl>(targetDecl);
     return deriveCaseIterable_AllCases(tc, parentDecl, enumDecl);
   }
 
