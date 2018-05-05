@@ -2387,10 +2387,13 @@ extension _JSONDecoder {
         }
         let elementType = type.elementType
         for (k, v) in dict {
+            guard let key = k as? String else {
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: String.self, reality: k)
+            }
             self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
             defer { self.codingPath.removeLast() }
 
-            result[k] = try unbox_(v, as: elementType)
+            result[key] = try unbox_(v, as: elementType)
         }
 
         return result as? T
