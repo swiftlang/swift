@@ -115,7 +115,7 @@ static StringRef maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
   // Hack: check to see if the name came from a macro in <os/object.h>.
   clang::SourceManager &sourceMgr = decl->getASTContext().getSourceManager();
   clang::SourceLocation expansionLoc =
-      sourceMgr.getImmediateExpansionRange(loc).first;
+      sourceMgr.getImmediateExpansionRange(loc).getBegin();
   clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
 
   if (!sourceMgr.getFilename(spellingLoc).endswith("/os/object.h"))
