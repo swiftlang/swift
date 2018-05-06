@@ -3037,7 +3037,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 
 /// SWIFT_ENABLE_TENSORFLOW
 void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
-  OS << "wrt ";
+  OS << "source " << getSourceIndex() << " wrt ";
   interleave(getParamIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
