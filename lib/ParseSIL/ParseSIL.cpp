@@ -890,6 +890,13 @@ static bool parseReverseDifferentiableAttr(
   SmallVectorImpl<SILReverseDifferentiableAttr *> &DAs, SILParser &SP) {
   auto &P = SP.P;
   SourceLoc LastLoc = P.getEndOfPreviousLoc();
+  // Parse 'source'.
+  unsigned SourceIndex;
+  if (P.parseSpecificIdentifier(
+        "source", diag::sil_attr_differentiable_expected_keyword, "source") ||
+      P.parseUnsignedInteger(SourceIndex, LastLoc,
+                             diag::sil_gradient_expected_source_index))
+    return true;
   // Parse 'wrt'.
   if (P.parseSpecificIdentifier(
         "wrt", diag::sil_attr_differentiable_expected_keyword, "wrt"))
@@ -937,7 +944,7 @@ static bool parseReverseDifferentiableAttr(
     return true;
   // Create an AdjointAttr and we are done.
   auto *Attr =
-    SILReverseDifferentiableAttr::create(SP.SILMod, ParamIndices,
+    SILReverseDifferentiableAttr::create(SP.SILMod, SourceIndex, ParamIndices,
                                          PrimName.str(), AdjName.str());
   DAs.push_back(Attr);
   return false;
