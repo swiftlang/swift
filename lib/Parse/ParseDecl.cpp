@@ -5669,6 +5669,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     bool isParenStyleInheritance = false;
     {
       BacktrackingScope backtrack(*this);
+      consumeToken(tok::l_paren);
       isParenStyleInheritance = canParseType() &&
         Tok.isAny(tok::r_paren, tok::kw_where, tok::l_brace, tok::eof);
     }
@@ -5682,8 +5683,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
       SourceLoc RParenLoc;
       consumeIf(tok::r_paren, RParenLoc);
       diagnose(LParenLoc, diag::expected_colon_class)
-      .fixItReplace(LParenLoc, ": ")
-      .fixItRemove(RParenLoc);
+        .fixItReplace(LParenLoc, ": ")
+        .fixItRemove(RParenLoc);
     }
   } 
 
