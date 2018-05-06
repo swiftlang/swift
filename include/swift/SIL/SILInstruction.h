@@ -7988,7 +7988,7 @@ public:
   bool isPreservingResult() const { return PreservingResult; }
 
   SILReverseAutoDiffConfiguration getConfiguration() const {
-    return { getParameterIndices(), Seedable, PreservingResult };
+    return { SourceIndex, getParameterIndices(), Seedable, PreservingResult };
   }
 
   ArrayRef<Operand> getAllOperands() const {

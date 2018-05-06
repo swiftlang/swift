@@ -109,19 +109,22 @@ class SILReverseDifferentiableAttr final {
   friend SILFunction;
 
 private:
-  /// The primal and adjoint function names.
-  StringRef PrimalName, AdjointName;
+  /// The index of the original result to differentiate from.
+  unsigned SourceIndex;
   /// The number of parameters of the original function to differentiate with
   /// respect to.
   unsigned NumParamIndices;
+  /// The primal and adjoint function names.
+  StringRef PrimalName, AdjointName;
   /// Constructor, copying parameter indices to the trailing buffer.
-  SILReverseDifferentiableAttr(ArrayRef<unsigned> paramIndices,
+  SILReverseDifferentiableAttr(unsigned sourceIndex,
+                               ArrayRef<unsigned> paramIndices,
                                StringRef primalName,
                                StringRef adjointName);
 
 public:
   static SILReverseDifferentiableAttr *create(
-    SILModule &M, ArrayRef<unsigned> paramIndices,
+    SILModule &M, unsigned sourceIndex, ArrayRef<unsigned> paramIndices,
     StringRef primalName = StringRef(),
     StringRef adjointName = StringRef());
 
@@ -130,6 +133,10 @@ public:
   StringRef getAdjointName() const { return AdjointName; }
   void setAdjointName(StringRef name) { AdjointName = name; }
 
+  unsigned getSourceIndex() const {
+    return SourceIndex;
+  }
+  
   ArrayRef<unsigned> getParamIndices() const;
   unsigned *getParamIndicesData() {
     return reinterpret_cast<unsigned *>(this+1);

@@ -1501,6 +1501,9 @@ ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
       "expected ']' to end 'differentiable' attribute", ())
 
 // SIL autodiff
+ERROR(sil_reverse_autodiff_expected_source_index,PointsToFirstBadToken,
+      "expected the index of an original result to differentiate from", ())
+
 ERROR(sil_reverse_autodiff_expected_parameter_index,PointsToFirstBadToken,
       "expected the index of a parameter to differentiate with respect to", ())
 

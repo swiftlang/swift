@@ -607,7 +607,7 @@ SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
     return SILType::getPrimitiveObjectType(CanType(invalidTy));
   }
   SILReverseAutoDiffConfiguration config =
-    { paramIndices, seedable, preservingResult };
+    { sourceIndex, paramIndices, seedable, preservingResult };
   auto origFnTy = original->getType().getAs<SILFunctionType>();
   auto gradFnTy = origFnTy->getGradientType(config, module);
   return SILType::getPrimitiveObjectType(gradFnTy->getCanonicalType());

@@ -1241,8 +1241,9 @@ public:
   void checkGradientInst(GradientInst *GI) {
     CanSILFunctionType origFnTy = GI->getOriginalType();
     require(origFnTy, "Original function value must have function type");
-    SILFunction *F = GI->getFunction();
     auto config = GI->getConfiguration();
+    require(config.sourceIndex < origFnTy->getNumResults(),
+            "Differentiation source index out of bounds");
     SmallVector<unsigned, 8> allParamIndices;
     ArrayRef<unsigned> paramIndices = config.parameterIndices;
     require(!config.parameterIndices.empty(),

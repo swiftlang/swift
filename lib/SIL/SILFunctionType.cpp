@@ -104,8 +104,8 @@ CanSILFunctionType
 SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
                                  SILModule &M) {
   auto originalParams = getParameters();
-  auto originalResult = getSingleResult();
-  auto originalSingleResultTy = originalResult.getType();
+  auto originalResult = getResults()[config.sourceIndex];
+  auto originalSourceResultTy = originalResult.getType();
   SmallVector<unsigned, 4> allParamIndices;
   ArrayRef<unsigned> paramIndices = config.parameterIndices;
   SmallVector<SILParameterInfo, 4> gradParams;
@@ -129,7 +129,7 @@ SILFunctionType::getGradientType(SILReverseAutoDiffConfiguration config,
     case ResultConvention::UnownedInnerPointer:
       seedConv = ParameterConvention::Indirect_In_Guaranteed; break;
     }
-    gradParams.push_back({ originalSingleResultTy, seedConv });
+    gradParams.push_back({ originalSourceResultTy, seedConv });
   }
   // If no differentiation parameters are specified, differentiation is done
   // with respect to all of original's parameters. For simplicity, we add all
