@@ -827,7 +827,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       getLoweredDifferentiationIndices(*this, AFD, silOriginalFn, diffAttr,
                                        indices);
       silOriginalFn->addReverseDifferentiableAttr(
-        SILReverseDifferentiableAttr::create(M, indices, primName, adjName));
+        SILReverseDifferentiableAttr::create(M, /*sourceIndex*/ 0,
+                                             indices, primName, adjName));
       break;
     }
     }

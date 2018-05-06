@@ -74,6 +74,7 @@ public:
 
 /// SIL-level automatic differentiation configuration.
 struct SILReverseAutoDiffConfiguration {
+  unsigned sourceIndex;
   ArrayRef<unsigned> parameterIndices;
   bool seedable;
   bool preservingResult;
@@ -81,12 +82,15 @@ struct SILReverseAutoDiffConfiguration {
   /// Returns the "master" configuration, which all variants with the same
   /// parameter indices can derive from.
   static
-  SILReverseAutoDiffConfiguration getMaster(ArrayRef<unsigned> paramIndices) {
-    return { paramIndices, /*seedable*/ true, /*preservingResult*/ true };
+  SILReverseAutoDiffConfiguration getMaster(unsigned sourceIndex,
+                                            ArrayRef<unsigned> paramIndices) {
+    return { sourceIndex, paramIndices,
+             /*seedable*/ true, /*preservingResult*/ true };
   }
 
   bool isEqual(const SILReverseAutoDiffConfiguration &other) const {
-    return parameterIndices.equals(other.parameterIndices) &&
+    return sourceIndex == other.sourceIndex &&
+           parameterIndices.equals(other.parameterIndices) &&
            seedable == other.seedable &&
            preservingResult == other.preservingResult;
   }
@@ -106,11 +110,17 @@ template<typename T> struct DenseMapInfo;
 
 template<> struct DenseMapInfo<SILReverseAutoDiffConfiguration> {
   static SILReverseAutoDiffConfiguration getEmptyKey() {
-    return { {}, false, false };
+    return { DenseMapInfo<unsigned>::getEmptyKey(),
+             DenseMapInfo<ArrayRef<unsigned>>::getEmptyKey(),
+             static_cast<bool>(DenseMapInfo<unsigned>::getEmptyKey()),
+             static_cast<bool>(DenseMapInfo<unsigned>::getEmptyKey()) };
   }
 
   static SILReverseAutoDiffConfiguration getTombstoneKey() {
-    return { {}, true, true };
+    return { DenseMapInfo<unsigned>::getTombstoneKey(),
+             DenseMapInfo<ArrayRef<unsigned>>::getTombstoneKey(),
+             static_cast<bool>(DenseMapInfo<unsigned>::getTombstoneKey()),
+             static_cast<bool>(DenseMapInfo<unsigned>::getTombstoneKey()) };
   }
 
   static unsigned getHashValue(const SILReverseAutoDiffConfiguration &Val) {

@@ -78,7 +78,8 @@ struct DifferentiationTask {
   }
 
   SILReverseAutoDiffConfiguration getMasterConfig() const {
-    return SILReverseAutoDiffConfiguration::getMaster(attr->getParamIndices());
+    return SILReverseAutoDiffConfiguration::getMaster(attr->getSourceIndex(),
+                                                      attr->getParamIndices());
   }
 };
 } // end anonymous namespace
@@ -209,28 +210,32 @@ public:
   /// Determines whether the given type conforms to Differentiable.
   bool conformsToDifferentiable(Type type) const;
 
-  void insertPrimal(SILFunction *original, ArrayRef<unsigned> paramIndices,
-                    SILFunction *primal) {
-    auto *attr = getOrCreateReverseDifferentiableAttr(original, paramIndices);
+  void insertPrimal(SILFunction *original, unsigned sourceIndex,
+                    ArrayRef<unsigned> paramIndices, SILFunction *primal) {
+    auto *attr =
+      getOrCreateReverseDifferentiableAttr(original, sourceIndex, paramIndices);
     attr->setPrimalName(primal->getName());
   }
 
-  void insertAdjoint(SILFunction *original, ArrayRef<unsigned> paramIndices,
-                     SILFunction *adjoint) {
-    auto *attr = getOrCreateReverseDifferentiableAttr(original, paramIndices);
+  void insertAdjoint(SILFunction *original, unsigned sourceIndex,
+                     ArrayRef<unsigned> paramIndices, SILFunction *adjoint) {
+    auto *attr =
+      getOrCreateReverseDifferentiableAttr(original, sourceIndex, paramIndices);
     attr->setAdjointName(adjoint->getName());
   }
 
-  SILFunction *lookupPrimal(SILFunction *original,
+  SILFunction *lookupPrimal(SILFunction *original, unsigned sourceIndex,
                             ArrayRef<unsigned> paramIndices) {
-    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices))
+    if (auto *attr =
+        lookupReverseDifferentiableAttr(original, sourceIndex, paramIndices))
       return lookupPrimal(attr);
     return nullptr;
   }
 
-  SILFunction *lookupAdjoint(SILFunction *original,
+  SILFunction *lookupAdjoint(SILFunction *original, unsigned sourceIndex,
                              ArrayRef<unsigned> paramIndices) {
-    if (auto *attr = lookupReverseDifferentiableAttr(original, paramIndices))
+    if (auto *attr =
+        lookupReverseDifferentiableAttr(original, sourceIndex, paramIndices))
       return lookupPrimal(attr);
     return nullptr;
   }
@@ -263,11 +268,12 @@ public:
   /// hashing on SILFunction's side or maintaining a dictionary in ADContext.
   /// In any case, this is not performance-critical.
   SILReverseDifferentiableAttr *
-  lookupReverseDifferentiableAttr(SILFunction *original,
+  lookupReverseDifferentiableAttr(SILFunction *original, unsigned sourceIndex,
                                   ArrayRef<unsigned> paramIndices) const {
     for (auto *attr : original->getReverseDifferentiableAttrs())
-      if (attr->getParamIndices().data() == paramIndices.data() ||
-          attr->getParamIndices().equals(paramIndices))
+      if (attr->getSourceIndex() == sourceIndex &&
+          (attr->getParamIndices().data() == paramIndices.data() ||
+           attr->getParamIndices().equals(paramIndices)))
         return attr;
     return nullptr;
   }
@@ -276,11 +282,14 @@ public:
   /// original function corresponding to the specified parameter indices.
   SILReverseDifferentiableAttr *
   getOrCreateReverseDifferentiableAttr(SILFunction *function,
+                                       unsigned sourceIndex,
                                        ArrayRef<unsigned> paramIndices) {
-    if (auto *attr = lookupReverseDifferentiableAttr(function, paramIndices))
+    if (auto *attr =
+        lookupReverseDifferentiableAttr(function, sourceIndex, paramIndices))
       return attr;
-    auto *attr =
-      SILReverseDifferentiableAttr::create(getModule(), paramIndices);
+    auto *attr = SILReverseDifferentiableAttr::create(getModule(),
+                                                      sourceIndex,
+                                                      paramIndices);
     function->addReverseDifferentiableAttr(attr);
     return attr;
   }
@@ -987,7 +996,7 @@ static SILFunction *getOrCreateGradient(
   // Step 1: Make sure the `[differentiable]` attribute exists. Based on this
   // attribute, create a differentiation task.
   SILReverseDifferentiableAttr *attr =
-    context.getOrCreateReverseDifferentiableAttr(original,
+    context.getOrCreateReverseDifferentiableAttr(original, config.sourceIndex,
                                                  config.parameterIndices);
   DifferentiationTask newTask { original, attr };
   // Update config's parameter indices to not depend on GradientInst's storage
@@ -999,7 +1008,8 @@ static SILFunction *getOrCreateGradient(
   SILFunction *canonicalGrad = nullptr;
   // The master AD config corresponds to the canonical gradient.
   auto masterConfig =
-    SILReverseAutoDiffConfiguration::getMaster(config.parameterIndices);
+    SILReverseAutoDiffConfiguration::getMaster(config.sourceIndex,
+                                               config.parameterIndices);
   // If it already exists, we'll simply use the existing one.
   if (auto *existingGrad = context.lookupGradient({original, masterConfig}))
     canonicalGrad = existingGrad;
