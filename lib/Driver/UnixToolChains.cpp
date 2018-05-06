@@ -283,6 +283,34 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   } else {
     Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
     Arguments.push_back("-lswiftCore");
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // On Linux, the REPL fails with "Couldn't lookup symbols" errors when:
+    // - Linking an external Swift shared library (produced by `swift build`)
+    //   and importing the corresponding Swift module.
+    // - Importing the `TensorFlow` and `Python` modules, without manually
+    //   linking `libswiftPython.so` and `libswiftTensorFlow.so`.
+    //
+    // A manual workaround involves specifying the `-lswiftPython` and
+    // `-lswiftTensorFlow` flags (in that specific order) when invoking the
+    // REPL. Also, `Python` and `TensorFlow` must be imported before the
+    // external Swift module to avoid the error.
+    //
+    // Conditionally adding the linker flags here seems to solve the issue.
+    // This is robust assuming that toolchain artifacts are not manipulated
+    // (so that somehow Python.swiftmodule exists while libswiftPython.so
+    // doesn't).
+    //
+    // https://github.com/google/swift/issues/4
+    SmallString<128> swiftPythonLibPath = SharedRuntimeLibPath;
+    llvm::sys::path::append(swiftPythonLibPath, "libswiftPython.so");
+    if (llvm::sys::fs::exists(swiftPythonLibPath))
+      Arguments.push_back("-lswiftPython");
+
+    SmallString<128> swiftTensorFlowLibPath = SharedRuntimeLibPath;
+    llvm::sys::path::append(swiftTensorFlowLibPath, "libswiftTensorFlow.so");
+    if (llvm::sys::fs::exists(swiftTensorFlowLibPath))
+      Arguments.push_back("-lswiftTensorFlow");
   }
 
   // Explicitly pass the target to the linker
