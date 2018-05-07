@@ -16,6 +16,7 @@ internal typealias _UnmanagedASCIIString = _UnmanagedString<UInt8>
 internal typealias _UnmanagedUTF16String = _UnmanagedString<UTF16.CodeUnit>
 
 @inlinable
+@inline(__always)
 internal
 func memcpy_zext<
   Target: FixedWidthInteger & UnsignedInteger,
@@ -24,12 +25,18 @@ func memcpy_zext<
   dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
 ) {
   _sanityCheck(Source.bitWidth < Target.bitWidth)
-  for i in 0..<count {
+  _sanityCheck(count >= 0)
+  // Don't use the for-in-range syntax to avoid precondition checking in Range.
+  // This enables vectorization of the memcpy loop.
+  var i = 0
+  while i < count {
     dst[i] = Target(src[i])
+    i = i &+ 1
   }
 }
 
 @inlinable
+@inline(__always)
 internal
 func memcpy_trunc<
   Target: FixedWidthInteger & UnsignedInteger,
@@ -38,8 +45,13 @@ func memcpy_trunc<
   dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
 ) {
   _sanityCheck(Source.bitWidth > Target.bitWidth)
-  for i in 0..<count {
+  _sanityCheck(count >= 0)
+  // Don't use the for-in-range syntax to avoid precondition checking in Range.
+  // This enables vectorization of the memcpy loop.
+  var i = 0
+  while i < count {
     dst[i] = Target(truncatingIfNeeded: src[i])
+    i = i &+ 1
   }
 }
 
@@ -194,6 +206,7 @@ extension _UnmanagedString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
   internal func _copy<TargetCodeUnit>(
     into target: UnsafeMutableBufferPointer<TargetCodeUnit>
   ) where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
