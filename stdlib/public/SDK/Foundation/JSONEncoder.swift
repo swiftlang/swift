@@ -832,14 +832,30 @@ extension _JSONEncoder {
         return try self.box_(value) ?? NSDictionary()
     }
 
-    fileprivate func box(_ dict: [String : Encodable]) throws -> NSObject {
-        let result = NSMutableDictionary()
-        for (k, v) in dict {
-            self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
-            defer { self.codingPath.removeLast() }
-            result[k] = try box(v)
+    fileprivate func box(_ dict: [String : Encodable]) throws -> NSObject? {
+        let depth = self.storage.count
+        let result = self.storage.pushKeyedContainer()
+        do {
+            for (k, v) in dict {
+                self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
+                defer { self.codingPath.removeLast() }
+                result[k] = try box(v)
+            }
+        } catch {
+            // If the value pushed a container before throwing, pop it back off to restore state.
+            if self.storage.count > depth {
+                let _ = self.storage.popContainer()
+            }
+
+            throw error
         }
-        return result
+
+        // The top container should be a new container.
+        guard self.storage.count > depth else {
+            return nil
+        }
+
+        return self.storage.popContainer()
     }
 
     // This method is called "box_" instead of "box" to disambiguate it from the overloads. Because the return type here is different from all of the "box" overloads (and is more general), any "box" calls in here would call back into "box" recursively instead of calling the appropriate overload, which is not what we want.
@@ -857,8 +873,8 @@ extension _JSONEncoder {
         } else if type == Decimal.self || type == NSDecimalNumber.self {
             // JSONSerialization can natively handle NSDecimalNumber.
             return (value as! NSDecimalNumber)
-        } else if type is _JSONStringDictionaryEncodableMarker {
-            return self.box(value as! Dictionary<String, Encodable>)
+        } else if value is _JSONStringDictionaryEncodableMarker {
+            return try self.box(value as! Dictionary<String, Encodable>)
         }
 
         // The value should request a container from the _JSONEncoder.
@@ -2395,7 +2411,7 @@ extension _JSONDecoder {
             guard let key = k as? String else {
                 throw DecodingError._typeMismatch(at: self.codingPath, expectation: String.self, reality: k)
             }
-            self.codingPath.append(_JSONKey(stringValue: k, intValue: nil))
+            self.codingPath.append(_JSONKey(stringValue: key, intValue: nil))
             defer { self.codingPath.removeLast() }
 
             result[key] = try unbox_(v, as: elementType)
