@@ -48,6 +48,11 @@ def main():
         '--test-case', default='',
         help='The test case to execute. If no test case is specified all \
               unnamed substitutions are applied')
+    parser.add_argument(
+        '--print-visual-reuse-info', default=False, action='store_true',
+        help='Print visual reuse information about the incremental parse \
+              instead of diffing the syntax trees. This option is intended \
+              for debug purposes only.')
 
     # Parse the arguments
     args = parser.parse_args(sys.argv[1:])
@@ -56,6 +61,7 @@ def main():
     temp_dir = args.temp_dir
     swift_syntax_test = args.swift_syntax_test
     test_case = args.test_case
+    print_visual_reuse_info = args.print_visual_reuse_info
 
     # Generate pre-edit and post-edit files
     pre_edit_file = open(temp_dir + '/' + test_file_name + '.' + test_case + 
@@ -144,9 +150,17 @@ def main():
                 serialized_post_edit_filename
             ])
 
+        if print_visual_reuse_info:
+            print_visual_reuse_info_args = [
+                '-print-visual-reuse-info', 
+                '-force-colored-output'
+            ]
+        else:
+            print_visual_reuse_info_args = []
+
         # Serialise the post-edit syntax tree incrementally based on the 
         # pre-edit syntax tree
-        run_command(
+        incr_parse_output = run_command(
             [
                 swift_syntax_test,
                 '-serialize-raw-tree',
@@ -158,7 +172,11 @@ def main():
                 pre_edit_file.name,
                 '-output-filename',
                 serialized_incr_filename
-            ] + incremental_edit_args)
+            ] + incremental_edit_args + print_visual_reuse_info_args)
+
+        if print_visual_reuse_info:
+            print(incr_parse_output)
+            exit(0)
 
     except subprocess.CalledProcessError as e:
         print("FAILED", file=sys.stderr)
