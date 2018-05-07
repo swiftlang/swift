@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-objc-interop
 
 // An @objc protocol can have 'unavailable'
 // methods.  They are treated as if they
