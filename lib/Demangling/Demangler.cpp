@@ -925,6 +925,7 @@ NodePointer Demangler::popTypeAndGetAnyGeneric() {
 
 NodePointer Demangler::demangleBuiltinType() {
   NodePointer Ty = nullptr;
+  const int maxTypeSize = 4096; // a very conservative upper bound
   switch (nextChar()) {
     case 'b':
       Ty = createNode(Node::Kind::BuiltinTypeName,
@@ -936,7 +937,7 @@ NodePointer Demangler::demangleBuiltinType() {
       break;
     case 'f': {
       int size = demangleIndex() - 1;
-      if (size <= 0)
+      if (size <= 0 || size > maxTypeSize)
         return nullptr;
       CharVector name;
       name.append(BUILTIN_TYPE_NAME_FLOAT, *this);
@@ -946,7 +947,7 @@ NodePointer Demangler::demangleBuiltinType() {
     }
     case 'i': {
       int size = demangleIndex() - 1;
-      if (size <= 0)
+      if (size <= 0 || size > maxTypeSize)
         return nullptr;
       CharVector name;
       name.append(BUILTIN_TYPE_NAME_INT, *this);
@@ -956,7 +957,7 @@ NodePointer Demangler::demangleBuiltinType() {
     }
     case 'v': {
       int elts = demangleIndex() - 1;
-      if (elts <= 0)
+      if (elts <= 0 || elts > maxTypeSize)
         return nullptr;
       NodePointer EltType = popTypeAndGetChild();
       if (!EltType || EltType->getKind() != Node::Kind::BuiltinTypeName ||
