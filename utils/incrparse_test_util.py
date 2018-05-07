@@ -9,8 +9,15 @@ import subprocess
 import sys
 
 
+def escapeCmdArg(arg):
+    if '"' in arg or ' ' in arg:
+        return '"%s"' % arg.replace('"', '\\"')
+    else:
+        return arg
+
+
 def run_command(cmd):
-    print(' '.join(cmd))
+    print(' '.join([escapeCmdArg(arg) for arg in cmd]))
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
 
