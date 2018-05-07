@@ -7,6 +7,7 @@
 // RUN: %incparse-test %s --test-case ATTACH_TO_PREV_NODE
 // RUN: %incparse-test %s --test-case CLASS_SURROUNDING
 // RUN: %incparse-test %s --test-case MULTI_EDIT
+// RUN: %incparse-test %s --test-case MULTI_EDIT_SAME_LINE
 
 func foo() {
 }
@@ -27,3 +28,4 @@ _ = 1
   func method1() {}
 <<MULTI_EDIT<|||}>>>
 
+<<MULTI_EDIT_SAME_LINE<_|||let x>>> = <<MULTI_EDIT_SAME_LINE<1|||"hi">>>

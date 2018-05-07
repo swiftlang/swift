@@ -21,6 +21,52 @@ def run_command(cmd):
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
 
+def parseLine(line, line_no, test_case, incremental_edit_args):
+    column_offset = 1
+    pre_edit_line = ""
+    post_edit_line = ""
+
+    # We parse one tag at a time in the line while eating away a prefix of the 
+    # line
+    while line:
+        # The regular expression to match the template markers
+        subst_re = re.compile(r'^(.*?)<<(.*?)<(.*?)\|\|\|(.*?)>>>(.*\n?)')
+        match = subst_re.match(line)
+        if match:
+            prefix = match.group(1)
+            match_test_case = match.group(2)
+            pre_edit = match.group(3)
+            post_edit = match.group(4)
+            suffix = match.group(5)
+
+            if match_test_case == test_case:
+                pre_edit_line += prefix + pre_edit
+                post_edit_line += prefix + post_edit
+
+                # Compute the -incremental-edit argument for swift-syntax-test
+                column = len(prefix) + column_offset
+                edit_arg = '%d:%d-%d:%d=%s' % \
+                    (line_no, column, line_no, column + len(pre_edit), 
+                     post_edit)
+                incremental_edit_args.append('-incremental-edit')
+                incremental_edit_args.append(edit_arg)
+            else:
+                # For different test cases just take the pre-edit text
+                pre_edit_line += prefix + pre_edit
+                post_edit_line += prefix + pre_edit
+
+            line = suffix
+            column_offset += len(prefix) + len(pre_edit)
+        else:
+            pre_edit_line += line
+            post_edit_line += line
+            # Nothing more to do
+            line = ''
+
+    # print(pre_edit_line, end='')
+    return (pre_edit_line, post_edit_line)
+
+
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -80,46 +126,10 @@ def main():
     # performed edits in this list
     incremental_edit_args = []
 
-    # The regular expression to match the template markers
-    subst_re = re.compile(r'^(.*)<<(.*)<(.*)\|\|\|(.*)>>>(.*)')
-
     line_no = 1
     for line in args.file.readlines():
-        match = subst_re.match(line)
-        if match:
-
-            prefix = match.group(1)
-            match_test_case = match.group(2)
-            pre_edit = match.group(3)
-            post_edit = match.group(4)
-#            suffix = match.group(5)
-
-            if match_test_case == test_case:
-                pre_edit_line = subst_re.sub('\\1\\3\\5', line)
-                post_edit_line = subst_re.sub('\\1\\4\\5', line)
-
-                if subst_re.match(pre_edit_line):
-                    # It probably won't be hard to support multiple edits per
-                    # line, we would just need to figure out the column offsets
-                    print('Error: Multiple substitutions per line are not '
-                          'supported yet by incrparse_test_util.py',
-                          file=sys.stderr)
-                    sys.exit(1)
-
-                # Compute the -incremental-edit argument for swift-syntax-test
-                column = len(prefix) + 1
-                edit_arg = '%d:%d-%d:%d=%s' % \
-                    (line_no, column, line_no, column + len(pre_edit), 
-                     post_edit)
-                incremental_edit_args.append('-incremental-edit')
-                incremental_edit_args.append(edit_arg)
-            else:
-                # For different test cases just take the pre-edit text
-                pre_edit_line = subst_re.sub('\\1\\3\\5', line)
-                post_edit_line = subst_re.sub('\\1\\3\\5', line)
-        else:
-            pre_edit_line = line
-            post_edit_line = line            
+        (pre_edit_line, post_edit_line) = parseLine(line, line_no, test_case, 
+                                                    incremental_edit_args)
 
         pre_edit_file.write(pre_edit_line)
         post_edit_file.write(post_edit_line)
