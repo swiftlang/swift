@@ -145,6 +145,13 @@ PrintVisualReuseInfo("print-visual-reuse-info",
                      llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+ForceColoredOutput("force-colored-output",
+                   llvm::cl::desc("Print colored output even if the shell "
+                                  "does not support it."),
+                   llvm::cl::cat(Category),
+                   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 PrintNodeKind("print-node-kind",
               llvm::cl::desc("To print syntax node kind"),
               llvm::cl::cat(Category),
@@ -258,18 +265,22 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
   return true;
 }
 
+bool useColoredOutput() {
+  return llvm::outs().has_colors() || options::ForceColoredOutput;
+}
+
 void printVisualNodeReuseInformation(SourceManager &SourceMgr,
                                      unsigned BufferID,
                                      SyntaxParsingCache *Cache) {
   unsigned CurrentOffset = 0;
   auto SourceText = SourceMgr.getEntireTextForBuffer(BufferID);
-  if (llvm::outs().has_colors()) {
+  if (useColoredOutput()) {
     llvm::outs().changeColor(llvm::buffer_ostream::Colors::GREEN);
   }
   auto PrintReparsedRegion = [](StringRef SourceText, unsigned ReparseStart,
                                 unsigned ReparseEnd) {
     if (ReparseEnd != ReparseStart) {
-      if (llvm::outs().has_colors()) {
+      if (useColoredOutput()) {
         llvm::outs().changeColor(llvm::buffer_ostream::Colors::RED);
       } else {
         llvm::outs() << "<reparse>";
@@ -278,7 +289,7 @@ void printVisualNodeReuseInformation(SourceManager &SourceMgr,
       llvm::outs() << SourceText.substr(ReparseStart,
                                         ReparseEnd - ReparseStart);
 
-      if (llvm::outs().has_colors()) {
+      if (useColoredOutput()) {
         llvm::outs().changeColor(llvm::buffer_ostream::Colors::GREEN);
       } else {
         llvm::outs() << "</reparse>";
@@ -295,7 +306,7 @@ void printVisualNodeReuseInformation(SourceManager &SourceMgr,
     CurrentOffset = ReuseRange.second;
   }
   PrintReparsedRegion(SourceText, CurrentOffset, SourceText.size());
-  if (llvm::outs().has_colors())
+  if (useColoredOutput())
     llvm::outs().resetColor();
 
   llvm::outs() << '\n';
