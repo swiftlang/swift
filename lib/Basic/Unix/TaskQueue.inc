@@ -489,10 +489,17 @@ bool TaskMonitor::beginExecutingATask(Task &T) {
   return false;
 }
 
-static bool cleanUpAHungUpTask( Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback,  TaskQueue::TaskSignalledCallback SignalledCallback);
+static bool
+cleanUpAHungUpTask(Task &T,
+                   const TaskQueue::TaskFinishedCallback FinishedCallback,
+                   TaskQueue::TaskSignalledCallback SignalledCallback);
 static Optional<int> waitForPid(const pid_t pidToWaitFor);
-static bool cleanUpAfterSignal( int Status, const Task &T, const TaskQueue::TaskSignalledCallback SignalledCallback);
-static bool cleanUpAfterExit( int Status, const Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback);
+static bool
+cleanUpAfterSignal(int Status, const Task &T,
+                   const TaskQueue::TaskSignalledCallback SignalledCallback);
+static bool
+cleanUpAfterExit(int Status, const Task &T,
+                 const TaskQueue::TaskFinishedCallback FinishedCallback);
 
 Optional<std::vector<int>>
 TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
@@ -507,8 +514,8 @@ TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
     if (!didTaskHangup(receivedEvents))
       continue;
     finishedFds.push_back(fileDes);
-    const bool hadError = cleanUpAHungUpTask(
-        T, callbacks.TaskFinished, callbacks.TaskSignalled);
+    const bool hadError =
+        cleanUpAHungUpTask(T, callbacks.TaskFinished, callbacks.TaskSignalled);
     TasksBeingExecuted.destroyTask(T);
     if (hadError)
       return None;
@@ -517,12 +524,10 @@ TaskMonitor::readFromReadyFdsReturningFinishedOnes() {
 }
 
 void TaskMonitor::verifyEvents(const short events) const {
-  if (events & POLLNVAL) {
-    // We passed an invalid fd; this should never happen,
-    // since we always mark fds as finished after calling
-    // Task::finishExecution() (which closes the Task's fd).
-    llvm_unreachable("Asked poll() to watch a closed fd");
-  }
+  // We passed an invalid fd; this should never happen,
+  // since we always mark fds as finished after calling
+  // Task::finishExecution() (which closes the Task's fd).
+  assert((events & POLLNVAL) == 0 && "Asked poll() to watch a closed fd");
   const short expectedEvents = POLLIN | POLLPRI | POLLHUP | POLLERR;
   assert((events & ~expectedEvents) == 0 && "Received unexpected event");
 }
@@ -546,9 +551,10 @@ bool TaskMonitor::didTaskHangup(const short events) const {
   return (events & (POLLHUP | POLLERR)) != 0;
 }
 
-static bool cleanUpAHungUpTask(
-    Task &T, const TaskQueue::TaskFinishedCallback FinishedCallback,
-    const TaskQueue::TaskSignalledCallback SignalledCallback) {
+static bool
+cleanUpAHungUpTask(Task &T,
+                   const TaskQueue::TaskFinishedCallback FinishedCallback,
+                   const TaskQueue::TaskSignalledCallback SignalledCallback) {
   const Optional<int> StatusIfOK = waitForPid(T.getPid());
   if (!StatusIfOK)
     return true;
@@ -568,20 +574,16 @@ static Optional<int> waitForPid(const pid_t pidToWaitFor) {
     const pid_t pidFromWait = waitpid(pidToWaitFor, &Status, 0);
     if (pidFromWait == pidToWaitFor)
       return Status;
-    if (pidFromWait > 0)
-      llvm_unreachable(
-          "We asked to wait for this Task, but we got another process ID!");
-    if (pidFromWait == 0)
-      llvm_unreachable(
-          "We do not pass WNOHANG, so we should always get a process ID");
+    assert(pidFromWait == -1 &&
+           "Did not pass WNOHANG, should only get pidToWaitFor or -1");
     if (errno == ECHILD || errno == EINVAL)
       return None;
   }
 }
 
-static bool cleanUpAfterExit(
-    int Status, const Task &T,
-    const TaskQueue::TaskFinishedCallback FinishedCallback) {
+static bool
+cleanUpAfterExit(int Status, const Task &T,
+                 const TaskQueue::TaskFinishedCallback FinishedCallback) {
   const int Result = WEXITSTATUS(Status);
   if (!FinishedCallback) {
     // Since we don't have a TaskFinishedCallback, treat a subtask
@@ -595,9 +597,9 @@ static bool cleanUpAfterExit(
                           T.getContext());
 }
 
-static bool cleanUpAfterSignal(
-    int Status, const Task &T,
-    const TaskQueue::TaskSignalledCallback SignalledCallback) {
+static bool
+cleanUpAfterSignal(int Status, const Task &T,
+                   const TaskQueue::TaskSignalledCallback SignalledCallback) {
   // The process exited due to a signal.
   const int Signal = WTERMSIG(Status);
   StringRef ErrorMsg = strsignal(Signal);
