@@ -145,8 +145,20 @@ func warnCollectionOfOptionalToAnyCoercion(_ a: [Int?], _ d: [String : Int?]) {
   // expected-note@-1 {{explicitly cast to '[Any]' with 'as [Any]' to silence this warning}}{{25-25= as [Any]}}
   // expected-warning@-2 {{expression implicitly coerced from '[String : Int?]' to '[String : Any]'}}
   // expected-note@-3 {{explicitly cast to '[String : Any]' with 'as [String : Any]' to silence this warning}}{{28-28= as [String : Any]}}
+  takesCollectionOfAny([a[0]], ["test" : a[0]]) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{29-29= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{29-29=!}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{29-29= as Any}}
+  // expected-warning@-4 {{expression implicitly coerced from 'Int?' to 'Any'}}
+  // expected-note@-5 {{provide a default value to avoid this warning}}{{46-46= ?? <#default value#>}}
+  // expected-note@-6 {{force-unwrap the value to avoid this warning}}{{46-46=!}}
+  // expected-note@-7 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{46-46= as Any}}
 
   takesCollectionOfAny(a as [Any], d as [String : Any])
+}
+
+func nowarnCollectionOfIUOToAnyCoercion(_ a: Int!) {
+  takesCollectionOfAny([a], ["test" : a])
 }
 
 func warnCollectionOfTripleOptionalToAnyCoercion(_ a: [Any???], _ d: [String: Any???]) {
