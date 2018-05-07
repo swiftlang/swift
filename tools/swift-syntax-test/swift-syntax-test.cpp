@@ -118,10 +118,11 @@ static llvm::cl::list<std::string>
 IncrementalEdits("incremental-edit",
                  llvm::cl::desc("An edit that was applied to reach the input "
                                 "file from the source file that generated the "
-                                "old syntax tree in the format "
-                                "<start>:<end>=<replacement> where <start> and "
-                                "<end> are byte offsets in the original file "
-                                "and <replacement> is the string that shall "
+                                "old syntax tree in the format <start-line>:"
+                                "<start-column>-<end-line>:<end-column>="
+                                "<replacement> where start and end are defined "
+                                "in terms of the pre-edit file and "
+                                "<replacement> is the string that shall "
                                 "replace the selected range. "
                                 "Can be passed multiple times."));
 
@@ -224,23 +225,23 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
     }
     int EditStartLine, EditStartColumn, EditEndLine, EditEndColumn;
     if (Matches[1].getAsInteger(10, EditStartLine)) {
-      llvm::errs() << "Could not parse edit start as integer: " << EditStartLine
-                   << '\n';
+      llvm::errs() << "Could not parse edit start line as integer: "
+                   << EditStartLine << '\n';
       return false;
     }
     if (Matches[2].getAsInteger(10, EditStartColumn)) {
-      llvm::errs() << "Could not parse edit start as integer: "
+      llvm::errs() << "Could not parse edit start column as integer: "
                    << EditStartColumn << '\n';
       return false;
     }
     if (Matches[3].getAsInteger(10, EditEndLine)) {
-      llvm::errs() << "Could not parse edit start as integer: " << EditEndLine
-                   << '\n';
+      llvm::errs() << "Could not parse edit end line as integer: "
+                   << EditEndLine << '\n';
       return false;
     }
     if (Matches[4].getAsInteger(10, EditEndColumn)) {
-      llvm::errs() << "Could not parse edit end as integer: " << EditEndColumn
-                   << '\n';
+      llvm::errs() << "Could not parse edit end column as integer: "
+                   << EditEndColumn << '\n';
       return false;
     }
 
