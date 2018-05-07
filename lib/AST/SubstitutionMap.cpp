@@ -91,6 +91,17 @@ GenericSignature *SubstitutionMap::getGenericSignature() const {
   return storage ? storage->getGenericSignature() : nullptr;
 }
 
+bool SubstitutionMap::empty() const {
+  return getGenericSignature() == nullptr;
+}
+
+bool SubstitutionMap::hasAnySubstitutableParams() const {
+  auto genericSig = getGenericSignature();
+  if (!genericSig) return false;
+
+  return !genericSig->areAllParamsConcrete();
+}
+
 bool SubstitutionMap::hasArchetypes() const {
   for (Type replacementTy : getReplacementTypes()) {
     if (replacementTy && replacementTy->hasArchetype())
