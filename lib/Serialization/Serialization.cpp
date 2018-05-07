@@ -3447,6 +3447,8 @@ static uint8_t getRawStableFunctionTypeRepresentation(
   SIMPLE_CASE(FunctionTypeRepresentation, Block)
   SIMPLE_CASE(FunctionTypeRepresentation, Thin)
   SIMPLE_CASE(FunctionTypeRepresentation, CFunctionPointer)
+  // SWIFT_ENABLE_TENSORFLOW
+  SIMPLE_CASE(FunctionTypeRepresentation, TensorFlow)
   }
   llvm_unreachable("bad calling convention");
 }
@@ -3464,6 +3466,9 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   SIMPLE_CASE(SILFunctionTypeRepresentation, ObjCMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, WitnessMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, Closure)
+
+  // SWIFT_ENABLE_TENSORFLOW
+  SIMPLE_CASE(SILFunctionTypeRepresentation, TensorFlow)
   }
   llvm_unreachable("bad calling convention");
 }

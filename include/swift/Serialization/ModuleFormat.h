@@ -131,6 +131,8 @@ enum class FunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
+  // SWIFT_ENABLE_TENSORFLOW
+  TensorFlow,
 };
 using FunctionTypeRepresentationField = BCFixed<4>;
 
@@ -151,7 +153,9 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
-  
+  // SWIFT_ENABLE_TENSORFLOW
+  TensorFlow,
+
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
