@@ -119,13 +119,13 @@ class ReabstractionInfo {
 
   void createSubstitutedAndSpecializedTypes();
   bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
-                       SubstitutionList ParamSubs,
+                       SubstitutionMap ParamSubs,
                        OptRemark::Emitter *ORE = nullptr);
   void performFullSpecializationPreparation(SILFunction *Callee,
-                                            SubstitutionList ParamSubs);
+                                            SubstitutionMap ParamSubs);
   void performPartialSpecializationPreparation(SILFunction *Caller,
                                                SILFunction *Callee,
-                                               SubstitutionList ParamSubs);
+                                               SubstitutionMap ParamSubs);
   void finishPartialSpecializationPreparation(
       FunctionSignaturePartialSpecializer &FSPS);
 
@@ -136,7 +136,7 @@ public:
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
   ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
-                    SubstitutionList ParamSubs,
+                    SubstitutionMap ParamSubs,
                     bool ConvertIndirectToDirect = true,
                     OptRemark::Emitter *ORE = nullptr);
 
@@ -256,7 +256,7 @@ public:
 
   /// Returns true if a given apply can be specialized.
   static bool canBeSpecialized(ApplySite Apply, SILFunction *Callee,
-                               SubstitutionList ParamSubs);
+                               SubstitutionMap ParamSubs);
 
   /// Returns the apply site for the current generic specialization.
   ApplySite getApply() const {
@@ -271,7 +271,7 @@ public:
 class GenericFuncSpecializer {
   SILModule &M;
   SILFunction *GenericFunc;
-  SubstitutionList ParamSubs;
+  SubstitutionMap ParamSubs;
   IsSerialized_t Serialized;
   const ReabstractionInfo &ReInfo;
 
@@ -280,7 +280,7 @@ class GenericFuncSpecializer {
 
 public:
   GenericFuncSpecializer(SILFunction *GenericFunc,
-                         SubstitutionList ParamSubs,
+                         SubstitutionMap ParamSubs,
                          IsSerialized_t Serialized,
                          const ReabstractionInfo &ReInfo);
 

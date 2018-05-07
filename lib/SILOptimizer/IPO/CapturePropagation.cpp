@@ -101,7 +101,7 @@ class CapturePropagationCloner
   bool IsCloningConstant;
 public:
   CapturePropagationCloner(SILFunction *OrigF, SILFunction *NewF,
-                           SubstitutionList Subs)
+                           SubstitutionMap Subs)
       : SuperTy(*NewF, *OrigF, Subs), OrigF(OrigF), IsCloningConstant(false) {}
 
   void cloneBlocks(OperandValueArrayRef Args);
@@ -271,7 +271,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
     llvm::dbgs() << "CapturePropagation of generic partial_apply:\n";
     PAI->dumpInContext();
   });
-  CapturePropagationCloner cloner(OrigF, NewF, PAI->getSubstitutions());
+  CapturePropagationCloner cloner(OrigF, NewF, PAI->getSubstitutionMap());
   cloner.cloneBlocks(PAI->getArguments());
   assert(OrigF->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
   return NewF;
@@ -410,11 +410,13 @@ static SILFunction *getSpecializedWithDeadParams(
       return nullptr;
 
     // Perform a generic specialization of the Specialized function.
-    ReabstractionInfo ReInfo(ApplySite(), Specialized, PAI->getSubstitutions(),
+    ReabstractionInfo ReInfo(ApplySite(), Specialized,
+                             PAI->getSubstitutionMap(),
                              /* ConvertIndirectToDirect */ false);
-    GenericFuncSpecializer FuncSpecializer(Specialized,
-                                           ReInfo.getClonerParamSubstitutions(),
-                                           Specialized->isSerialized(), ReInfo);
+    GenericFuncSpecializer FuncSpecializer(
+                                         Specialized,
+                                         ReInfo.getClonerParamSubstitutionMap(),
+                                         Specialized->isSerialized(), ReInfo);
 
     SILFunction *GenericSpecializedFunc = FuncSpecializer.trySpecialization();
     if (!GenericSpecializedFunc)

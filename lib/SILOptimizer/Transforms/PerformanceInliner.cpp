@@ -178,7 +178,7 @@ public:
 // Returns true if it is possible to perform a generic
 // specialization for a given call.
 static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
-                                 SubstitutionList Subs) {
+                                 SubstitutionMap Subs) {
   return ReabstractionInfo::canBeSpecialized(AI, F, Subs);
 }
 
@@ -279,7 +279,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
   // to inlining of generics.
-  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions())) {
+  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutionMap())) {
     return false;
   }
 
@@ -350,9 +350,6 @@ bool SILPerformanceInliner::isProfitableToInline(
         auto SubMap = Sig->getSubstitutionMap(Subs);
         SubMap = SubMap.subst(CalleeSubstMap);
 
-        SmallVector<Substitution, 4> NewSubs;
-        Sig->getSubstitutions(SubMap, NewSubs);
-
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||
             isa<SuperMethodInst>(def)) {
@@ -368,7 +365,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         // Check if a generic specialization would be possible.
         if (isa<FunctionRefInst>(def)) {
           auto CalleeF = FAI.getCalleeFunction();
-          if (!canSpecializeGeneric(FAI, CalleeF, NewSubs))
+          if (!canSpecializeGeneric(FAI, CalleeF, SubMap))
             continue;
           DEBUG(llvm::dbgs() << "Generic specialization will be possible after "
                                 "inlining for the call:\n";
@@ -847,7 +844,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline,
-                       AI.getSubstitutions(),
+                       AI.getSubstitutionMap(),
                        OpenedArchetypesTracker);
 
     // We've already determined we should be able to inline this, so

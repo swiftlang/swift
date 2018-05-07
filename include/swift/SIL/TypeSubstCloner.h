@@ -40,13 +40,6 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
     llvm_unreachable("Clients need to explicitly call a base class impl!");
   }
 
-  void computeSubsMap() {
-    if (auto genericSig = Original.getLoweredFunctionType()
-          ->getGenericSignature()) {
-      SubsMap = genericSig->getSubstitutionMap(ApplySubs);
-    }
-  }
-
   // A helper class for cloning different kinds of apply instructions.
   // Supports cloning of self-recursive functions.
   class ApplySiteCloningHelper {
@@ -141,27 +134,25 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  SubstitutionList ApplySubs,
+                  SubstitutionMap ApplySubs,
                   SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
+      SubsMap(ApplySubs),
       Original(From),
-      ApplySubs(ApplySubs),
       Inlining(Inlining) {
-    computeSubsMap();
   }
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  SubstitutionList ApplySubs,
+                  SubstitutionMap ApplySubs,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
+      SubsMap(ApplySubs),
       Original(From),
-      ApplySubs(ApplySubs),
       Inlining(Inlining) {
-    computeSubsMap();
   }
 
 
@@ -295,8 +286,6 @@ protected:
   llvm::DenseMap<SILType, SILType> TypeCache;
   /// The original function to specialize.
   SILFunction &Original;
-  /// The substitutions used at the call site.
-  SubstitutionList ApplySubs;
   /// True, if used for inlining.
   bool Inlining;
 };

@@ -623,7 +623,7 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
   auto CalleeSubstFnTy = CanSILFuncTy;
   if (CanSILFuncTy->isPolymorphic()) {
     CalleeSubstFnTy = CanSILFuncTy->substGenericArgs(
-        Builder.getModule(), ReInfo.getCallerParamSubstitutions());
+        Builder.getModule(), ReInfo.getCallerParamSubstitutionMap());
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -718,7 +718,7 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
     Serialized = IsSerializable;
 
   GenericFuncSpecializer
-        FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutions(),
+        FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutionMap(),
                         Serialized, ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();

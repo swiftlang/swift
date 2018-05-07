@@ -1788,7 +1788,9 @@ public:
   }
 
   /// True if this application has generic substitutions.
-  bool hasSubstitutions() const { return !Substitutions.empty(); }
+  bool hasSubstitutions() const {
+    return Substitutions.hasAnySubstitutableParams();
+  }
 
   /// The substitutions used to bind the generic arguments of this function.
   SubstitutionList getSubstitutions() const { return Substitutions.toList(); }
@@ -2769,7 +2771,7 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return !Substitutions.empty();
+    return Substitutions.hasAnySubstitutableParams();
   }
 
   /// Return the type parameters to the builtin.

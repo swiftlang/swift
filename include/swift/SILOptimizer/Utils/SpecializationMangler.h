@@ -65,17 +65,17 @@ protected:
 // The mangler for specialized generic functions.
 class GenericSpecializationMangler : public SpecializationMangler {
 
-  SubstitutionList Subs;
+  SubstitutionMap SubMap;
   bool isReAbstracted;
 
 public:
 
   GenericSpecializationMangler(SILFunction *F,
-                               SubstitutionList Subs,
+                               SubstitutionMap SubMap,
                                IsSerialized_t Serialized,
                                bool isReAbstracted)
     : SpecializationMangler(SpecializationPass::GenericSpecializer, Serialized, F),
-      Subs(Subs), isReAbstracted(isReAbstracted) {}
+      SubMap(SubMap), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
 };
