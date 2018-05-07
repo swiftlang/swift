@@ -171,7 +171,7 @@ public:
   reverse_range getReversedValues() const;
 
   using type_range = llvm::iterator_range<
-    llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>, SILType>>;
+    llvm::mapped_iterator<iterator, SILType(*)(SILValue), SILType>>;
   type_range getTypes() const;
 
   bool operator==(const SILInstructionResultArray &rhs);
@@ -197,18 +197,6 @@ private:
   /// Please do not use this outside of this class. It is only meant to speedup
   /// MultipleValueInstruction::getIndexOfResult(SILValue).
   const ValueBase *back() const;
-
-  /// Return the offset 1 past the end of the array or None if we are not
-  /// actually storing anything.
-  Optional<unsigned> getStartOffset() const {
-    return empty() ? None : Optional<unsigned>(0);
-  }
-
-  /// Return the offset 1 past the end of the array or None if we are not
-  /// actually storing anything.
-  Optional<unsigned> getEndOffset() const {
-    return empty() ? None : Optional<unsigned>(size());
-  }
 };
 
 class SILInstructionResultArray::iterator {
@@ -220,7 +208,7 @@ class SILInstructionResultArray::iterator {
   SILInstructionResultArray Parent;
 
   /// The index into the parent array.
-  Optional<unsigned> Index;
+  unsigned Index;
 
 public:
   using difference_type = int;
@@ -230,34 +218,31 @@ public:
   using iterator_category = std::bidirectional_iterator_tag;
 
   iterator() = default;
-  iterator(const SILInstructionResultArray &Parent,
-           Optional<unsigned> Index = 0)
+  iterator(const SILInstructionResultArray &Parent, unsigned Index = 0)
       : Parent(Parent), Index(Index) {}
 
-  SILValue operator*() const { return Parent[Index.getValue()]; }
-  SILValue operator*() { return Parent[Index.getValue()]; }
+  SILValue operator*() const { return Parent[Index]; }
   SILValue operator->() const { return operator*(); }
-  SILValue operator->() { return operator*(); }
 
   iterator &operator++() {
-    ++Index.getValue();
+    ++Index;
     return *this;
   }
 
   iterator operator++(int) {
     iterator copy = *this;
-    ++Index.getValue();
+    ++Index;
     return copy;
   }
 
   iterator &operator--() {
-    --Index.getValue();
+    --Index;
     return *this;
   }
 
   iterator operator--(int) {
     iterator copy = *this;
-    --Index.getValue();
+    --Index;
     return copy;
   }
 
@@ -6646,29 +6631,35 @@ public:
 
   using succblock_iterator =
       TransformIterator<SILSuccessor *,
-                        std::function<SILBasicBlock *(const SILSuccessor &)>>;
+                        SILBasicBlock *(*)(const SILSuccessor &)>;
   using const_succblock_iterator = TransformIterator<
       const SILSuccessor *,
-      std::function<const SILBasicBlock *(const SILSuccessor &)>>;
+      const SILBasicBlock *(*)(const SILSuccessor &)>;
   succblock_iterator succblock_begin() {
-    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().begin(), F);
+    return succblock_iterator(getSuccessors().begin(),
+                              [](const SILSuccessor &succ) -> SILBasicBlock * {
+      return succ.getBB();
+    });
   }
   succblock_iterator succblock_end() {
-    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().end(), F);
+    return succblock_iterator(getSuccessors().end(),
+                              [](const SILSuccessor &succ) -> SILBasicBlock * {
+      return succ.getBB();
+    });
   }
   const_succblock_iterator succblock_begin() const {
-    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().begin(), F);
+    return const_succblock_iterator(
+        getSuccessors().begin(),
+        [](const SILSuccessor &succ) -> const SILBasicBlock * {
+      return succ.getBB();
+    });
   }
   const_succblock_iterator succblock_end() const {
-    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().end(), F);
+    return const_succblock_iterator(
+        getSuccessors().end(),
+        [](const SILSuccessor &succ) -> const SILBasicBlock * {
+      return succ.getBB();
+    });
   }
 
   SILBasicBlock *getSingleSuccessorBlock() {
@@ -6691,23 +6682,26 @@ public:
 
   using SuccessorBlockListTy =
       TransformRange<SuccessorListTy,
-                     std::function<SILBasicBlock *(const SILSuccessor &)>>;
+                     SILBasicBlock *(*)(const SILSuccessor &)>;
   using ConstSuccessorBlockListTy =
-      TransformRange<ConstSuccessorListTy, std::function<const SILBasicBlock *(
-                                               const SILSuccessor &)>>;
+      TransformRange<ConstSuccessorListTy,
+                     const SILBasicBlock *(*)(const SILSuccessor &)>;
 
   /// Return the range of SILBasicBlocks that are successors of this block.
   SuccessorBlockListTy getSuccessorBlocks() {
-    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformRange(getSuccessors(), F);
+    return SuccessorBlockListTy(getSuccessors(),
+                                [](const SILSuccessor &succ) -> SILBasicBlock* {
+      return succ.getBB();
+    });
   }
 
   /// Return the range of SILBasicBlocks that are successors of this block.
   ConstSuccessorBlockListTy getSuccessorBlocks() const {
-    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformRange(getSuccessors(), F);
+    return ConstSuccessorBlockListTy(
+        getSuccessors(),
+        [](const SILSuccessor &succ) -> const SILBasicBlock * {
+      return succ.getBB();
+    });
   }
 
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(TermInst)
