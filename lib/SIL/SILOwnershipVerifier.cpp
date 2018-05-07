@@ -24,6 +24,7 @@
 #include "swift/Basic/TransformArrayRef.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OwnershipChecker.h"
@@ -67,110 +68,6 @@ llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
 /// is useful for temporarily turning off verification on tests.
 static llvm::cl::opt<bool>
     DisableOwnershipVerification("disable-sil-ownership-verification");
-
-//===----------------------------------------------------------------------===//
-//                              Generalized User
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// This is a class that models normal users and also cond_br users that are
-/// associated with the block in the target block. This is safe to do since in
-/// Semantic SIL, cond_br with non-trivial arguments are not allowed to have
-/// critical edges.
-class GeneralizedUser {
-  using InnerTy = llvm::PointerIntPair<SILInstruction *, 1>;
-  InnerTy User;
-
-public:
-  GeneralizedUser(SILInstruction *I) : User(I) {
-    assert(!isa<CondBranchInst>(I));
-  }
-
-  GeneralizedUser(CondBranchInst *I) : User(I) {}
-
-  GeneralizedUser(CondBranchInst *I, unsigned SuccessorIndex)
-      : User(I, SuccessorIndex) {
-    assert(SuccessorIndex == CondBranchInst::TrueIdx ||
-           SuccessorIndex == CondBranchInst::FalseIdx);
-  }
-
-  GeneralizedUser(const GeneralizedUser &Other) : User(Other.User) {}
-  GeneralizedUser &operator=(const GeneralizedUser &Other) {
-    User = Other.User;
-    return *this;
-  }
-
-  operator SILInstruction *() { return User.getPointer(); }
-  operator const SILInstruction *() const { return User.getPointer(); }
-
-  SILInstruction *getInst() const { return User.getPointer(); }
-
-  SILBasicBlock *getParent() const;
-
-  bool isCondBranchUser() const {
-    return isa<CondBranchInst>(User.getPointer());
-  }
-
-  unsigned getCondBranchSuccessorID() const {
-    assert(isCondBranchUser());
-    return User.getInt();
-  }
-
-  SILBasicBlock::iterator getIterator() const {
-    return User.getPointer()->getIterator();
-  }
-
-  void *getAsOpaqueValue() const {
-    return llvm::PointerLikeTypeTraits<InnerTy>::getAsVoidPointer(User);
-  }
-
-  static GeneralizedUser getFromOpaqueValue(void *p) {
-    InnerTy TmpUser =
-        llvm::PointerLikeTypeTraits<InnerTy>::getFromVoidPointer(p);
-    if (auto *CBI = dyn_cast<CondBranchInst>(TmpUser.getPointer())) {
-      return GeneralizedUser(CBI, TmpUser.getInt());
-    }
-    return GeneralizedUser(TmpUser.getPointer());
-  }
-
-  enum {
-    NumLowBitsAvailable =
-        llvm::PointerLikeTypeTraits<InnerTy>::NumLowBitsAvailable
-  };
-};
-
-} // end anonymous namespace
-
-SILBasicBlock *GeneralizedUser::getParent() const {
-  if (!isCondBranchUser()) {
-    return getInst()->getParent();
-  }
-
-  auto *CBI = cast<CondBranchInst>(getInst());
-  unsigned Number = getCondBranchSuccessorID();
-  if (Number == CondBranchInst::TrueIdx)
-    return CBI->getTrueBB();
-  return CBI->getFalseBB();
-}
-
-namespace llvm {
-
-template <> struct PointerLikeTypeTraits<GeneralizedUser> {
-
-public:
-  static void *getAsVoidPointer(GeneralizedUser v) {
-    return v.getAsOpaqueValue();
-  }
-
-  static GeneralizedUser getFromVoidPointer(void *p) {
-    return GeneralizedUser::getFromOpaqueValue(p);
-  }
-
-  enum { NumLowBitsAvailable = GeneralizedUser::NumLowBitsAvailable };
-};
-
-} // namespace llvm
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -1499,7 +1396,7 @@ class SILValueOwnershipChecker {
 
   /// The set of blocks with non-lifetime ending uses and the associated
   /// non-lifetime ending use SILInstruction.
-  llvm::SmallDenseMap<SILBasicBlock *, GeneralizedUser, 8>
+  llvm::SmallDenseMap<SILBasicBlock *, BranchPropagatedUser, 8>
       BlocksWithNonLifetimeEndingUses;
 
   /// The blocks that we have already visited.
@@ -1511,11 +1408,11 @@ class SILValueOwnershipChecker {
 
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
-  llvm::SmallVector<GeneralizedUser, 16> LifetimeEndingUsers;
+  llvm::SmallVector<BranchPropagatedUser, 16> LifetimeEndingUsers;
 
   /// The list of non lifetime ending users that we found. Only valid if check
   /// is successful.
-  llvm::SmallVector<GeneralizedUser, 16> RegularUsers;
+  llvm::SmallVector<BranchPropagatedUser, 16> RegularUsers;
 
 public:
   SILValueOwnershipChecker(
@@ -1541,7 +1438,8 @@ public:
     return Result.getValue();
   }
 
-  using user_array_transform = std::function<SILInstruction *(GeneralizedUser)>;
+  using user_array_transform =
+      std::function<SILInstruction *(BranchPropagatedUser)>;
   using user_array = TransformArrayRef<user_array_transform>;
 
   /// A function that returns a range of lifetime ending users found for the
@@ -1551,10 +1449,10 @@ public:
     assert(Result.getValue() && "Can not call if check() returned false");
 
     user_array_transform Transform(
-        [](GeneralizedUser User) -> SILInstruction * {
+        [](BranchPropagatedUser User) -> SILInstruction * {
           return User.getInst();
         });
-    return user_array(ArrayRef<GeneralizedUser>(LifetimeEndingUsers),
+    return user_array(ArrayRef<BranchPropagatedUser>(LifetimeEndingUsers),
                       Transform);
   }
 
@@ -1565,28 +1463,28 @@ public:
     assert(Result.getValue() && "Can not call if check() returned false");
 
     user_array_transform Transform(
-        [](GeneralizedUser User) -> SILInstruction * {
+        [](BranchPropagatedUser User) -> SILInstruction * {
           return User.getInst();
         });
-    return user_array(ArrayRef<GeneralizedUser>(RegularUsers), Transform);
+    return user_array(ArrayRef<BranchPropagatedUser>(RegularUsers), Transform);
   }
 
 private:
   bool checkUses();
   bool checkDataflow();
   void checkDataflowEndConditions();
-  void
-  gatherUsers(llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers,
-              llvm::SmallVectorImpl<GeneralizedUser> &NonLifetimeEndingUsers);
+  void gatherUsers(
+      llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
+      llvm::SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers);
   void uniqueNonLifetimeEndingUsers(
-      ArrayRef<GeneralizedUser> NonLifetimeEndingUsers);
+      ArrayRef<BranchPropagatedUser> NonLifetimeEndingUsers);
 
   /// Returns true if the given block is in the BlocksWithLifetimeEndingUses
   /// set. This is a helper to extract out large logging messages so that the
   /// main logic is easy to read.
   bool doesBlockDoubleConsume(
       SILBasicBlock *UserBlock,
-      llvm::Optional<GeneralizedUser> LifetimeEndingUser = None,
+      llvm::Optional<BranchPropagatedUser> LifetimeEndingUser = None,
       bool ShouldInsert = false);
 
   /// Returns true if the given block contains a non-lifetime ending use that is
@@ -1594,7 +1492,7 @@ private:
   /// non-lifetime ending uses are before the lifetime ending use, the block is
   /// removed from the BlocksWithNonLifetimeEndingUses map to show that the uses
   /// were found to properly be post-dominated by a lifetime ending use.
-  bool doesBlockContainUseAfterFree(GeneralizedUser LifetimeEndingUser,
+  bool doesBlockContainUseAfterFree(BranchPropagatedUser LifetimeEndingUser,
                                     SILBasicBlock *UserBlock);
 
   bool checkValueWithoutLifetimeEndingUses();
@@ -1603,10 +1501,12 @@ private:
 
   bool isGuaranteedFunctionArgWithLifetimeEndingUses(
       SILFunctionArgument *Arg,
-      const llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers) const;
+      const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
+      const;
   bool isSubobjectProjectionWithLifetimeEndingUses(
       SILValue Value,
-      const llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers) const;
+      const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
+      const;
 
   /// Depending on our initialization, either return false or call Func and
   /// throw an error.
@@ -1627,12 +1527,12 @@ private:
 } // end anonymous namespace
 
 bool SILValueOwnershipChecker::doesBlockContainUseAfterFree(
-    GeneralizedUser LifetimeEndingUser, SILBasicBlock *UserBlock) {
+    BranchPropagatedUser LifetimeEndingUser, SILBasicBlock *UserBlock) {
   auto Iter = BlocksWithNonLifetimeEndingUses.find(UserBlock);
   if (Iter == BlocksWithNonLifetimeEndingUses.end())
     return false;
 
-  GeneralizedUser NonLifetimeEndingUser = Iter->second;
+  BranchPropagatedUser NonLifetimeEndingUser = Iter->second;
 
   // Make sure that the non-lifetime ending use is before the lifetime ending
   // use. Otherwise, we have a use after free.
@@ -1683,7 +1583,8 @@ bool SILValueOwnershipChecker::doesBlockContainUseAfterFree(
 
 bool SILValueOwnershipChecker::doesBlockDoubleConsume(
     SILBasicBlock *UserBlock,
-    llvm::Optional<GeneralizedUser> LifetimeEndingUser, bool ShouldInsert) {
+    llvm::Optional<BranchPropagatedUser> LifetimeEndingUser,
+    bool ShouldInsert) {
   if ((ShouldInsert && BlocksWithLifetimeEndingUses.insert(UserBlock).second) ||
       !BlocksWithLifetimeEndingUses.count(UserBlock))
     return false;
@@ -1699,8 +1600,8 @@ bool SILValueOwnershipChecker::doesBlockDoubleConsume(
 }
 
 void SILValueOwnershipChecker::gatherUsers(
-    llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers,
-    llvm::SmallVectorImpl<GeneralizedUser> &NonLifetimeEndingUsers) {
+    llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
+    llvm::SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers) {
 
   // See if Value is guaranteed. If we are guaranteed and not forwarding, then
   // we need to look through subobject uses for more uses. Otherwise, if we are
@@ -1716,17 +1617,18 @@ void SILValueOwnershipChecker::gatherUsers(
   llvm::SmallVector<Operand *, 8> Users;
   std::copy(Value->use_begin(), Value->use_end(), std::back_inserter(Users));
 
-  auto addCondBranchToList = [](llvm::SmallVectorImpl<GeneralizedUser> &List,
-                                CondBranchInst *CBI, unsigned OperandIndex) {
-    if (CBI->isConditionOperandIndex(OperandIndex)) {
-      List.emplace_back(CBI);
-      return;
-    }
+  auto addCondBranchToList =
+      [](llvm::SmallVectorImpl<BranchPropagatedUser> &List, CondBranchInst *CBI,
+         unsigned OperandIndex) {
+        if (CBI->isConditionOperandIndex(OperandIndex)) {
+          List.emplace_back(CBI);
+          return;
+        }
 
-    bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
-    List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
-                                         : CondBranchInst::FalseIdx);
-  };
+        bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
+        List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
+                                             : CondBranchInst::FalseIdx);
+      };
 
   while (!Users.empty()) {
     Operand *Op = Users.pop_back_val();
@@ -1835,8 +1737,8 @@ void SILValueOwnershipChecker::gatherUsers(
 // Unique our non lifetime ending user list by only selecting the last user in
 // each block.
 void SILValueOwnershipChecker::uniqueNonLifetimeEndingUsers(
-    ArrayRef<GeneralizedUser> NonLifetimeEndingUsers) {
-  for (GeneralizedUser User : NonLifetimeEndingUsers) {
+    ArrayRef<BranchPropagatedUser> NonLifetimeEndingUsers) {
+  for (BranchPropagatedUser User : NonLifetimeEndingUsers) {
     auto *UserBlock = User.getParent();
     // First try to associate User with User->getParent().
     auto Result =
@@ -1949,7 +1851,8 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 
 bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
     SILFunctionArgument *Arg,
-    const llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers) const {
+    const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
+    const {
   if (Arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
     return true;
 
@@ -1966,7 +1869,8 @@ bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
 
 bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
     SILValue Value,
-    const llvm::SmallVectorImpl<GeneralizedUser> &LifetimeEndingUsers) const {
+    const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
+    const {
   return handleError([&] {
     llvm::errs() << "    Function: '" << Value->getFunction()->getName()
                  << "'\n"
@@ -2046,9 +1950,9 @@ bool SILValueOwnershipChecker::checkUses() {
   // reason why this is necessary is because we wish to not add elements to the
   // worklist twice. Thus we want to check if we have already visited a
   // predecessor.
-  llvm::SmallVector<std::pair<GeneralizedUser, SILBasicBlock *>, 32>
+  llvm::SmallVector<std::pair<BranchPropagatedUser, SILBasicBlock *>, 32>
       PredsToAddToWorklist;
-  for (GeneralizedUser User : LifetimeEndingUsers) {
+  for (BranchPropagatedUser User : LifetimeEndingUsers) {
     SILBasicBlock *UserBlock = User.getParent();
     // If the block does over consume, we either assert or return false. We only
     // return false when debugging.
@@ -2092,7 +1996,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // PredsToAddToWorklist list and add our preds, making sure that none of these
   // preds are in BlocksWithLifetimeEndingUses.
   for (auto Pair : PredsToAddToWorklist) {
-    GeneralizedUser User = Pair.first;
+    BranchPropagatedUser User = Pair.first;
     SILBasicBlock *PredBlock = Pair.second;
 
     // Make sure that the predecessor is not in our
