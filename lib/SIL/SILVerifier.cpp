@@ -4300,9 +4300,8 @@ public:
     }
   }
 
-  bool
-  isUnreachableAlongAllPathsStartingAt(SILBasicBlock *StartBlock,
-                                       SmallPtrSet<SILBasicBlock *, 16> &Visited) {
+  bool isUnreachableAlongAllPathsStartingAt(
+      SILBasicBlock *StartBlock, SmallPtrSetImpl<SILBasicBlock *> &Visited) {
     if (isa<UnreachableInst>(StartBlock->getTerminator()))
       return true;
     else if (isa<ReturnInst>(StartBlock->getTerminator()))

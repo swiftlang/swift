@@ -1503,7 +1503,7 @@ class SILValueOwnershipChecker {
       BlocksWithNonLifetimeEndingUses;
 
   /// The blocks that we have already visited.
-  llvm::SmallPtrSet<SILBasicBlock *, 32> &VisitedBlocks;
+  llvm::SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
 
   /// A list of successor blocks that we must visit by the time the algorithm
   /// terminates.
@@ -1521,10 +1521,9 @@ public:
   SILValueOwnershipChecker(
       SILModule &M, DeadEndBlocks &DEBlocks, SILValue V,
       ErrorBehaviorKind ErrorBehavior,
-      llvm::SmallPtrSet<SILBasicBlock *, 32> &VisitedBlocks)
+      llvm::SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks)
       : Result(), Mod(M), DEBlocks(DEBlocks), Value(V),
-        ErrorBehavior(ErrorBehavior),
-        VisitedBlocks(VisitedBlocks) {
+        ErrorBehavior(ErrorBehavior), VisitedBlocks(VisitedBlocks) {
     assert(Value && "Can not initialize a checker with an empty SILValue");
   }
 

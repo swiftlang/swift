@@ -668,7 +668,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
       return Action::Continue;
     }
 
-    SmallPtrSet<CanType, 4> &getReferencedGenericParams() {
+    SmallPtrSetImpl<CanType> &getReferencedGenericParams() {
       return ReferencedGenericParams;
     }
   };
