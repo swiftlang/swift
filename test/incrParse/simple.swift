@@ -5,6 +5,8 @@
 // RUN: %incparse-test %s --test-case INSERT
 // RUN: %incparse-test %s --test-case REMOVE
 // RUN: %incparse-test %s --test-case ATTACH_TO_PREV_NODE
+// RUN: %incparse-test %s --test-case CLASS_SURROUNDING
+// RUN: %incparse-test %s --test-case MULTI_EDIT
 
 func foo() {
 }
@@ -17,3 +19,11 @@ _ = <<REPLACE_BY_SHORTER<"Hello again"|||"a">>>
 foo()
 <<ATTACH_TO_PREV_NODE<|||{}>>>
 _ = 1
+
+<<CLASS_SURROUNDING<|||class C {>>>
+  func method1() {}
+
+<<MULTI_EDIT<|||class C {>>>
+  func method1() {}
+<<MULTI_EDIT<|||}>>>
+
