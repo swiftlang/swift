@@ -352,6 +352,17 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             checkNoEscapeParameterUse(DRE, Call, OperandKind::Argument);
         });
       }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      // Handle special rules for the #tfop syntax.
+      if (auto *OLE = dyn_cast<ObjectLiteralExpr>(E))
+        if (OLE->isTFOp()) {
+          argExprVisitArguments(OLE->getArg(),
+                                [&](unsigned argIndex, Expr *arg) {
+            if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
+              checkNoEscapeParameterUse(DRE, OLE, OperandKind::Argument);
+          });
+        }
       
       // If we have an assignment expression, scout ahead for acceptable _'s.
       if (auto *AE = dyn_cast<AssignExpr>(E))
@@ -713,9 +724,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           return;
         } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
           return;
+          // SWIFT_ENABLE_TENSORFLOW
+        } else if (auto *ole = dyn_cast<ObjectLiteralExpr>(parent)) {
+          if (ole->isTFOp()) return;
         } else if (isa<DynamicTypeExpr>(parent)) {
           return;
         }
+
       }
 
       TC.diagnose(DRE->getStartLoc(), diag::invalid_noescape_use,

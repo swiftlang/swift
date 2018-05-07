@@ -1956,6 +1956,8 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::Block:
       return SGF.emitBlockToFunc(loc, source, sourceFormalTy, resultFormalTy,
                                  resultTy);
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionType::Representation::TensorFlow:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
@@ -1985,6 +1987,8 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
                                  resultTy);
     case SILFunctionType::Representation::Block:
       llvm_unreachable("should not try block-to-block repr change");
+      // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionType::Representation::TensorFlow:
     case SILFunctionType::Representation::Method:
     case SILFunctionType::Representation::Closure:
     case SILFunctionType::Representation::ObjCMethod:
@@ -1998,6 +2002,9 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     llvm_unreachable("should not do function conversion to thin");
   case AnyFunctionType::Representation::CFunctionPointer:
     llvm_unreachable("should not do C function pointer conversion here");
+  // SWIFT_ENABLE_TENSORFLOW
+  case AnyFunctionType::Representation::TensorFlow:
+    llvm_unreachable("should not do function conversion to TensorFlow");
   }
   llvm_unreachable("bad representation");
 }
@@ -2075,6 +2082,8 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   switch(srcRepTy->getRepresentation()) {
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
+  // SWIFT_ENABLE_TENSORFLOW
+  case AnyFunctionType::Representation::TensorFlow:
     // Source is native, so we can convert signature first.
     destTy = adjustFunctionType(destRepTy,
                                 srcTy->getRepresentation());
@@ -4532,6 +4541,8 @@ static bool isVerbatimNullableTypeInC(SILModule &M, Type ty) {
       // Was already bridged.
       case FunctionTypeRepresentation::Swift:
       case FunctionTypeRepresentation::Thin:
+      // SWIFT_ENABLE_TENSORFLOW
+      case FunctionType::Representation::TensorFlow:
         return false;
       }
     }
@@ -4654,6 +4665,8 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
       return true;
     case FunctionTypeRepresentation::Swift:
     case FunctionTypeRepresentation::Thin:
+    // SWIFT_ENABLE_TENSORFLOW
+    case FunctionTypeRepresentation::TensorFlow:
       return false;
     }
   }
