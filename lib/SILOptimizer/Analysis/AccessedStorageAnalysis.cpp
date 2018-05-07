@@ -184,8 +184,8 @@ static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
   case AccessedStorage::Argument: {
     // Transitively search for the storage base in the caller.
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
-    if (argVal)
-      return findAccessedStorageOrigin(argVal);
+    assert(argVal && "AccessedStorage argument missing?");
+    return findAccessedStorageOrigin(argVal);
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");

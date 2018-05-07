@@ -2898,7 +2898,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
   auto *nominal = Adoptee->getAnyNominal();
-  if (DerivedConformance::derivesProtocolConformance(TC, nominal, Proto))
+  if (DerivedConformance::derivesProtocolConformance(TC, DC, nominal, Proto))
     derivingTypeDecl = nominal;
 
   if (!derivingTypeDecl) {
@@ -3574,7 +3574,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-        DerivedConformance::derivesProtocolConformance(TC, enumDecl, Proto) &&
+        DerivedConformance::derivesProtocolConformance(TC, DC, enumDecl,
+                                                       Proto) &&
         enumDecl->hasRawType()) {
 
       auto rawType = enumDecl->getRawType();
@@ -4662,11 +4663,12 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     // Special case: explain that 'RawRepresentable' conformance
     // is implied for enums which already declare a raw type.
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
-      if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable)
-          && DerivedConformance::derivesProtocolConformance(*this, enumDecl,
-                                                            diag.Protocol)
-          && enumDecl->hasRawType()
-          && enumDecl->getInherited()[0].getSourceRange().isValid()) {
+      if (diag.Protocol->isSpecificProtocol(
+              KnownProtocolKind::RawRepresentable) &&
+          DerivedConformance::derivesProtocolConformance(*this, dc, enumDecl,
+                                                         diag.Protocol) &&
+          enumDecl->hasRawType() &&
+          enumDecl->getInherited()[0].getSourceRange().isValid()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                  diag::enum_declares_rawrep_with_raw_type,
                  dc->getDeclaredInterfaceType(), enumDecl->getRawType());
@@ -4973,35 +4975,32 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   if (Decl->isInvalid())
     return nullptr;
 
+  DerivedConformance derived(*this, Decl, TypeDecl, protocol);
+
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return DerivedConformance::deriveRawRepresentable(*this, Decl,
-                                                      TypeDecl, Requirement);
+    return derived.deriveRawRepresentable(Requirement);
 
   case KnownProtocolKind::CaseIterable:
-    return DerivedConformance::deriveCaseIterable(*this, Decl,
-                                                  TypeDecl, Requirement);
+    return derived.deriveCaseIterable(Requirement);
 
   case KnownProtocolKind::Equatable:
-    return DerivedConformance::deriveEquatable(*this, Decl, TypeDecl,
-                                               Requirement);
-  
+    return derived.deriveEquatable(Requirement);
+
   case KnownProtocolKind::Hashable:
-    return DerivedConformance::deriveHashable(*this, Decl, TypeDecl,
-                                              Requirement);
-    
+    return derived.deriveHashable(Requirement);
+
   case KnownProtocolKind::BridgedNSError:
-    return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,
-                                                    Requirement);
+    return derived.deriveBridgedNSError(Requirement);
 
   case KnownProtocolKind::CodingKey:
-    return DerivedConformance::deriveCodingKey(*this, Decl, TypeDecl, Requirement);
+    return derived.deriveCodingKey(Requirement);
 
   case KnownProtocolKind::Encodable:
-    return DerivedConformance::deriveEncodable(*this, Decl, TypeDecl, Requirement);
+    return derived.deriveEncodable(Requirement);
 
   case KnownProtocolKind::Decodable:
-    return DerivedConformance::deriveDecodable(*this, Decl, TypeDecl, Requirement);
+    return derived.deriveDecodable(Requirement);
 
   default:
     return nullptr;
@@ -5020,13 +5019,12 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
 
+  DerivedConformance derived(*this, Decl, TypeDecl, protocol);
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return DerivedConformance::deriveRawRepresentable(*this, Decl,
-                                                      TypeDecl, AssocType);
+    return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
-    return DerivedConformance::deriveCaseIterable(*this, Decl,
-                                                  TypeDecl, AssocType);
+    return derived.deriveCaseIterable(AssocType);
   default:
     return nullptr;
   }
