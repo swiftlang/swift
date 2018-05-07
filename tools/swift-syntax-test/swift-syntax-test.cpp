@@ -126,6 +126,17 @@ IncrementalEdits("incremental-edit",
                                 "replace the selected range. "
                                 "Can be passed multiple times."));
 
+static llvm::cl::list<std::string>
+ReparseRegions("reparse-region",
+               llvm::cl::desc("If specified, an error will be emitted if any "
+                              "part of the file outside of the reparse region "
+                              "gets parsed again. "
+                              "Can be passed multiple times to specify "
+                              "multiple reparse regions. "
+                              "Reparse regions are specified in the form "
+                              "<start-column>-<end-line>:<end-column> in terms "
+                              "of the post-edit file"));
+
 static llvm::cl::opt<std::string>
 IncrementalReuseLog("incremental-reuse-log",
                     llvm::cl::desc("Path to which a log should be written that "
@@ -177,6 +188,87 @@ Visual("v",
 } // end namespace options
 
 namespace {
+
+// A utility class to wrap a source range consisting of a byte start and end
+// offset
+struct ByteBasedSourceRange {
+  unsigned Start;
+  unsigned End;
+
+  ByteBasedSourceRange(unsigned Start, unsigned End) : Start(Start), End(End) {
+    assert(Start <= End);
+  }
+  ByteBasedSourceRange(std::pair<unsigned, unsigned> Pair)
+      : ByteBasedSourceRange(Pair.first, Pair.second) {}
+  ByteBasedSourceRange() : ByteBasedSourceRange(0, 0) {}
+
+  ByteBasedSourceRange intersect(const ByteBasedSourceRange &Other) {
+    auto Start = std::max(this->Start, Other.Start);
+    auto End = std::min(this->End, Other.End);
+    if (Start > End) {
+      return {0, 0};
+    } else {
+      return {Start, End};
+    }
+  }
+
+  bool empty() { return Start == End; }
+
+  SourceRange toSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
+    auto StartLoc = SourceMgr.getLocForOffset(BufferID, Start);
+    // SourceRange includes the last offset, we don't. So subtract 1
+    auto EndLoc = SourceMgr.getLocForOffset(BufferID, End - 1);
+    return SourceRange(StartLoc, EndLoc);
+  }
+};
+
+// The union of multiple offset-based source ranges
+struct ByteBasedSourceRangeSet {
+  std::vector<ByteBasedSourceRange> Ranges;
+
+  ByteBasedSourceRangeSet() {}
+
+  ByteBasedSourceRangeSet(
+      std::vector<std::pair<unsigned, unsigned>> PairVector) {
+    for (auto Pair : PairVector) {
+      addRange(Pair);
+    }
+  }
+
+  void addRange(ByteBasedSourceRange Range) { Ranges.push_back(Range); }
+
+  ByteBasedSourceRangeSet invert(unsigned FileLength) {
+    ByteBasedSourceRangeSet Result;
+    unsigned CurrentOffset = 0;
+    for (auto Range : Ranges) {
+      assert(CurrentOffset <= Range.Start &&
+             "Ranges must be sorted in ascending order and not be overlapping");
+      if (CurrentOffset < Range.Start) {
+        Result.addRange({CurrentOffset, Range.Start});
+      }
+      CurrentOffset = Range.End;
+    }
+    if (CurrentOffset < FileLength) {
+      Result.addRange({CurrentOffset, FileLength});
+    }
+
+    return Result;
+  }
+
+  ByteBasedSourceRangeSet intersect(ByteBasedSourceRangeSet Other) {
+    ByteBasedSourceRangeSet Intersection;
+    for (auto A : Ranges) {
+      for (auto B : Other.Ranges) {
+        auto PartialIntersection = A.intersect(B);
+        if (!PartialIntersection.empty()) {
+          Intersection.addRange(PartialIntersection);
+        }
+      }
+    }
+    return Intersection;
+  }
+};
+
 int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
@@ -210,6 +302,54 @@ getTokensFromFile(const StringRef InputFilename,
 
 void anchorForGetMainExecutable() {}
 
+/// Populates the \c ParsedRegions parameter with the regions that are expected
+/// to get reparsed
+bool parseReparseRegionArguments(ByteBasedSourceRangeSet &ParsedRegions,
+                                 SourceManager &SourceMgr, unsigned BufferID) {
+  llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)");
+  // Parse the source edits
+  for (auto ReparsePattern : options::ReparseRegions) {
+    SmallVector<StringRef, 4> Matches;
+    if (!MatchRegex.match(ReparsePattern, &Matches)) {
+      llvm::errs() << "Invalid reparse region pattern: " << ReparsePattern
+                   << '\n';
+      return false;
+    }
+    int ReparseStartLine, ReparseStartColumn, ReparseEndLine, ReparseEndColumn;
+    if (Matches[1].getAsInteger(10, ReparseStartLine)) {
+      llvm::errs() << "Could not parse reparse region start line as integer: "
+                   << ReparseStartLine << '\n';
+      return false;
+    }
+    if (Matches[2].getAsInteger(10, ReparseStartColumn)) {
+      llvm::errs() << "Could not parse reparse region start column as integer: "
+                   << ReparseStartColumn << '\n';
+      return false;
+    }
+    if (Matches[3].getAsInteger(10, ReparseEndLine)) {
+      llvm::errs() << "Could not parse reparse region  end line as integer: "
+                   << ReparseEndLine << '\n';
+      return false;
+    }
+    if (Matches[4].getAsInteger(10, ReparseEndColumn)) {
+      llvm::errs() << "Could not parse reparse region  end column as integer: "
+                   << ReparseEndColumn << '\n';
+      return false;
+    }
+
+    auto ReparseStartLoc = SourceMgr.getLocForLineCol(
+        BufferID, ReparseStartLine, ReparseStartColumn);
+    auto ReparseEndLoc =
+        SourceMgr.getLocForLineCol(BufferID, ReparseEndLine, ReparseEndColumn);
+    auto ReparseStartOffset =
+        SourceMgr.getLocOffsetInBuffer(ReparseStartLoc, BufferID);
+    auto ReparseEndOffset =
+        SourceMgr.getLocOffsetInBuffer(ReparseEndLoc, BufferID);
+    ParsedRegions.addRange({ReparseStartOffset, ReparseEndOffset});
+  }
+  return true;
+}
+
 bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
                                    StringRef OldFileName) {
   // Get a source manager for the old file
@@ -222,9 +362,9 @@ bool parseIncrementalEditArguments(SyntaxParsingCache *Cache,
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(OldFileBufferOrErrror.get()));
 
+  llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
   // Parse the source edits
   for (auto EditPattern : options::IncrementalEdits) {
-    llvm::Regex MatchRegex("([0-9]+):([0-9]+)-([0-9]+):([0-9]+)=(.*)");
     SmallVector<StringRef, 4> Matches;
     if (!MatchRegex.match(EditPattern, &Matches)) {
       llvm::errs() << "Invalid edit pattern: " << EditPattern << '\n';
@@ -331,6 +471,53 @@ void saveReuseLog(SourceManager &SourceMgr, unsigned BufferID,
   }
 }
 
+bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
+                         SyntaxParsingCache *SyntaxCache,
+                         SourceManager &SourceMgr, unsigned BufferID,
+                         SourceFile *SF) {
+  // We always expect the EOF token to be reparsed. Don't complain about it.
+  auto Eof = SF->getSyntaxRoot().getChild(SourceFileSyntax::Cursor::EOFToken);
+  auto EofNodeStart = Eof->getAbsolutePositionWithLeadingTrivia().getOffset();
+  if (ExpectedReparseRegions.Ranges.back().End >= EofNodeStart) {
+    // If the last expected reparse region already covers part of the eof
+    // leading trivia, extended it
+    auto LastRange = ExpectedReparseRegions.Ranges.back();
+    ExpectedReparseRegions.Ranges.pop_back();
+    ByteBasedSourceRange ExtendedRange(LastRange.Start,
+                                       EofNodeStart + Eof->getTextLength());
+    ExpectedReparseRegions.addRange(ExtendedRange);
+  } else {
+    ByteBasedSourceRange EofRange(EofNodeStart,
+                                  EofNodeStart + Eof->getTextLength());
+    ExpectedReparseRegions.addRange(EofRange);
+  }
+
+  auto FileLength = SourceMgr.getRangeForBuffer(BufferID).getByteLength();
+
+  // Compute the repared regions by inverting the reused regions
+  auto ReusedRanges = ByteBasedSourceRangeSet(SyntaxCache->getReusedRanges());
+  auto ReparsedRegions = ReusedRanges.invert(FileLength);
+
+  // Same for expected reuse regions
+  auto ExpectedReuseRegions = ExpectedReparseRegions.invert(FileLength);
+
+  // Intersect the reparsed regions with the expected reuse regions to get
+  // regions that should not have been reparsed
+  auto UnexpectedReparseRegions =
+      ReparsedRegions.intersect(ExpectedReuseRegions);
+
+  bool NoUnexpectedParse = true;
+
+  for (auto ReparseRegion : UnexpectedReparseRegions.Ranges) {
+    NoUnexpectedParse = false;
+    auto ReparseRange = ReparseRegion.toSourceRange(SourceMgr, BufferID);
+
+    llvm::errs() << "\nERROR: Unexpectedly reparsed following region:\n";
+    ReparseRange.print(llvm::errs(), SourceMgr);
+  }
+  return NoUnexpectedParse;
+}
+
 /// Parse the given input file (incrementally if an old syntax tree was
 /// provided) and call the action specific callback with the new syntax tree
 int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
@@ -405,6 +592,9 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
   }
   assert(SF && "No source file");
 
+  // In case the action specific callback succeeds, we output this error code
+  int InternalExitCode = EXIT_SUCCESS;
+
   // If we have a syntax cache, output reuse information if requested
   if (SyntaxCache) {
     if (options::PrintVisualReuseInfo) {
@@ -414,9 +604,25 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
     if (!options::IncrementalReuseLog.empty()) {
       saveReuseLog(Instance.getSourceMgr(), BufferID, SyntaxCache);
     }
+    ByteBasedSourceRangeSet ExpectedReparseRegions;
+
+    if (parseReparseRegionArguments(ExpectedReparseRegions,
+                                    Instance.getSourceMgr(), BufferID)) {
+      if (!ExpectedReparseRegions.Ranges.empty()) {
+        if (!verifyReusedRegions(ExpectedReparseRegions, SyntaxCache,
+                                 Instance.getSourceMgr(), BufferID, SF)) {
+          InternalExitCode = EXIT_FAILURE;
+        }
+      }
+    }
   }
 
-  return ActionSpecificCallback(SF);
+  int ActionSpecificExitCode = ActionSpecificCallback(SF);
+  if (ActionSpecificExitCode != EXIT_SUCCESS) {
+    return ActionSpecificExitCode;
+  } else {
+    return InternalExitCode;
+  }
 }
 
 int doFullLexRoundTrip(const StringRef InputFilename) {
