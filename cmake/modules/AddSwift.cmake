@@ -2316,37 +2316,18 @@ function(add_swift_host_tool executable)
   endif()
 endfunction()
 
-macro(add_swift_fuzz_tool executable)
-  cmake_parse_arguments(
-      ADDSWIFTHOSTTOOL # prefix
-      "" # options
-      "" # single-value args
-      "SWIFT_COMPONENT" # multi-value args
-      ${ARGN})
+# This declares a swift host tool that links with libfuzzer.
+function(add_swift_fuzzer_host_tool executable)
+  # First create our target. We do not actually parse the argument since we do
+  # not care about the arguments, we just pass them all through to
+  # add_swift_host_tool.
+  add_swift_host_tool(${executable} ${ARGN})
 
-  # Create the executable rule.
-  add_swift_executable(${executable} ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS})
-
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=fuzzer")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer")
-  set(LINK_FLAGS "${LINK_FLAGS} -fsanitize=fuzzer")
-
-  # And then create the install rule if we are asked to.
-  if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)
-    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      TARGETS ${executable}
-      RUNTIME DESTINATION bin)
-
-    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      is_installing)
-
-    if(NOT is_installing)
-      set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
-    else()
-      set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
-    endif()
-  endif()
-endmacro()
+  # Then make sure that we pass the -fsanitize=fuzzer flag both on the cflags
+  # and cxx flags line.
+  target_compile_options(${executable} PRIVATE "-fsanitize=fuzzer")
+  target_link_libraries(${executable} PRIVATE "-fsanitize=fuzzer")
+endfunction()
 
 macro(add_swift_tool_symlink name dest component)
   add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
