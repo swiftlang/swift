@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown -swift-version 4
 
 var hasher = Hasher()
 
