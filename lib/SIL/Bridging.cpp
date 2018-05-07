@@ -107,6 +107,8 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
                                           SILFunctionTypeRepresentation rep,
                                           BridgedTypePurpose purpose) {
   switch (rep) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
@@ -188,6 +190,8 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Closure:
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionTypeRepresentation::TensorFlow:
       return t;
     case SILFunctionType::Representation::Thick: {
       // Thick functions (TODO: conditionally) get bridged to blocks.

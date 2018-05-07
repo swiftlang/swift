@@ -1192,6 +1192,8 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   switch (fn->getRepresentation()) {
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionTypeRepresentation::TensorFlow:
       break;
     case SILFunctionTypeRepresentation::Block:
       OpArgs.push_back('B');
@@ -1666,6 +1668,9 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
+  // SWIFT_ENABLE_TENSORFLOW
+  case AnyFunctionType::Representation::TensorFlow:
+
     if (fn->isAutoClosure()) {
       if (fn->isNoEscape())
         return appendOperator("XK");

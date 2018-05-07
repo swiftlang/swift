@@ -398,7 +398,9 @@ static SILFunction *getCalleeFunction(
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::WitnessMethod:
     break;
-    
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:

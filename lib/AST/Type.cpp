@@ -1938,6 +1938,8 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     // Check the representation of the function type.
     bool isBlock = false;
     switch (functionType->getRepresentation()) {
+    // SWIFT_ENABLE_TENSORFLOW
+    case AnyFunctionType::Representation::TensorFlow:
     case AnyFunctionType::Representation::Thin:
       return failure();
 

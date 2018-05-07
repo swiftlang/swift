@@ -6341,7 +6341,17 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   auto &tc = cs.getTypeChecker();
   Type fromType = cs.getType(expr);
   auto fromFnType = fromType->getAs<AnyFunctionType>();
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (toType->getRepresentation()
+        == AnyFunctionType::Representation::TensorFlow ||
+      fromFnType->getRepresentation()
+        == AnyFunctionType::Representation::TensorFlow) {
+    tc.diagnose(expr->getLoc(),
+                diag::invalid_tensorflow_fn_conversion);
+    return;
+  }
+
   // Conversions to C function pointer type are limited. Since a C function
   // pointer captures no context, we can only do the necessary thunking or
   // codegen if the original function is a direct reference to a global function
