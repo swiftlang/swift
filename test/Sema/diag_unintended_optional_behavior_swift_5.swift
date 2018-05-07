@@ -67,3 +67,16 @@ func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any??
   takesOptionalAny(c!!, d!!!)
   takesOptionalAny(c as Any?, d as Any?)
 }
+
+func takesCollectionOfAny(_ a: [Any], _ d: [String : Any]) {}
+
+func warnCollectionOfIUOToAnyCoercion(_ a: Int!) {
+  takesCollectionOfAny([a], ["test" : a]) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}{{26-26= ?? <#default value#>}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}{{26-26=!}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{26-26= as Any}}
+  // expected-warning@-4 {{expression implicitly coerced from 'Int?' to 'Any'}}
+  // expected-note@-5 {{provide a default value to avoid this warning}}{{40-40= ?? <#default value#>}}
+  // expected-note@-6 {{force-unwrap the value to avoid this warning}}{{40-40=!}}
+  // expected-note@-7 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{40-40= as Any}}
+}
