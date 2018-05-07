@@ -941,12 +941,11 @@ static void addProtocols(Type T,
 /// \brief Add the protocol (or protocols) in the type T to the stack of
 /// protocols, checking whether any of the protocols had already been seen and
 /// zapping those in the original list that we find again.
-static void addMinimumProtocols(Type T,
-                                SmallVectorImpl<ProtocolDecl *> &Protocols,
-                           llvm::SmallDenseMap<ProtocolDecl *, unsigned> &Known,
-                                llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
-                                SmallVector<ProtocolDecl *, 16> &Stack,
-                                bool &ZappedAny) {
+static void
+addMinimumProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
+                    llvm::SmallDenseMap<ProtocolDecl *, unsigned> &Known,
+                    llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited,
+                    SmallVector<ProtocolDecl *, 16> &Stack, bool &ZappedAny) {
   if (auto Proto = T->getAs<ProtocolType>()) {
     auto KnownPos = Known.find(Proto->getDecl());
     if (KnownPos != Known.end()) {

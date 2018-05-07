@@ -1566,7 +1566,7 @@ AttributeChecker::visitSetterAccessAttr(SetterAccessAttr *attr) {
 
 /// Collect all used generic parameter types from a given type.
 static void collectUsedGenericParameters(
-    Type Ty, SmallPtrSet<TypeBase *, 4> &ConstrainedGenericParams) {
+    Type Ty, SmallPtrSetImpl<TypeBase *> &ConstrainedGenericParams) {
   if (!Ty)
     return;
 

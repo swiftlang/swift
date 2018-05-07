@@ -4279,7 +4279,7 @@ namespace {
     /// given vector, guarded by the known set of protocols.
     void addProtocols(ProtocolDecl *protocol,
                       SmallVectorImpl<ProtocolDecl *> &protocols,
-                      llvm::SmallPtrSet<ProtocolDecl *, 4> &known);
+                      llvm::SmallPtrSetImpl<ProtocolDecl *> &known);
 
     // Import the given Objective-C protocol list, along with any
     // implicitly-provided protocols, and attach them to the given
@@ -6782,7 +6782,7 @@ SwiftDeclConverter::importAccessor(clang::ObjCMethodDecl *clangAccessor,
 
 void SwiftDeclConverter::addProtocols(
     ProtocolDecl *protocol, SmallVectorImpl<ProtocolDecl *> &protocols,
-    llvm::SmallPtrSet<ProtocolDecl *, 4> &known) {
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &known) {
   if (!known.insert(protocol).second)
     return;
 
