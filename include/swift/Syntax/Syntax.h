@@ -132,7 +132,7 @@ public:
 
   /// Returns the child index of this node in its parent,
   /// if it has one, otherwise 0.
-  CursorIndex getIndexInParent() const;
+  CursorIndex getIndexInParent() const { return getData().getIndexInParent(); }
 
   /// Return the number of bytes this node takes when spelled out in the source
   size_t getTextLength() const { return getRaw()->getTextLength(); }

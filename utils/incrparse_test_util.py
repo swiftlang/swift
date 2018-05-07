@@ -174,7 +174,8 @@ def main():
                 serialized_incr_filename
             ])
     except subprocess.CalledProcessError as e:
-        print('Syntax tree of incremental compilation does not match '
+        print('Test case %s failed' % (test_case), file=sys.stderr)
+        print('Syntax tree of incremental parsing does not match '
               'from-scratch parsing of post-edit file:\n\n', file=sys.stderr)
         print(e.output, file=sys.stderr)
         sys.exit(1)

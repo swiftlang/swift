@@ -15,6 +15,49 @@
 using namespace swift;
 using namespace swift::syntax;
 
+ArrayRef<TriviaPiece> getNextChildsLeadingTrivia(const Syntax *Node) {
+  // Find the next parent with a successor child
+  while (true) {
+    auto Parent = Node->getParent();
+    if (!Parent.hasValue()) {
+      return {};
+    }
+
+    bool FoundSuccessor = false;
+    for (size_t I = Node->getIndexInParent() + 1; I < Parent->getNumChildren();
+         ++I) {
+      if (Parent->getChild(I)) {
+        Node = Parent->getChild(I).getPointer();
+        FoundSuccessor = true;
+        break;
+      }
+    }
+    if (FoundSuccessor)
+      break;
+
+    // Continue traversing up the tree
+    Node = Parent.getPointer();
+  }
+  // Find the first token of the successor node
+  while (true) {
+    bool LeafReached = true;
+    for (size_t I = 0; I < Node->getNumChildren(); ++I) {
+      if (Node->getChild(I)) {
+        Node = Node->getChild(I).getPointer();
+        LeafReached = false;
+        break;
+      }
+    }
+    if (LeafReached) {
+      if (Node->isToken()) {
+        return Node->getRaw()->getLeadingTrivia();
+      } else {
+        return {};
+      }
+    }
+  }
+}
+
 bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
                                          SyntaxKind Kind) const {
   auto NodeStart = Node.getAbsolutePositionWithLeadingTrivia().getOffset();
@@ -23,10 +66,19 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
   if (Node.getKind() != Kind)
     return false;
 
-  // Check if this node has been edited. If it has, we cannot reuse it.
+  // Calculate the leading trivia of the next node. Node can also not be reused
+  // if an edit has been made in the next token's leading trivia
+  auto NextNodeTrivia = getNextChildsLeadingTrivia(&Node);
+  size_t TriviaLength = 0;
+  for (auto TriviaPiece : NextNodeTrivia) {
+    TriviaLength += TriviaPiece.getTextLength();
+  }
+
   auto NodeEnd = NodeStart + Node.getTextLength();
   for (auto Edit : Edits) {
-    if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd)) {
+    // Check if this node or the trivia of the next node has been edited. If it
+    // has, we cannot reuse it.
+    if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd + TriviaLength)) {
       return false;
     }
   }
