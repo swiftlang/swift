@@ -89,9 +89,3 @@ struct S5 : Codable {
     case c
   }
 }
-
-// Structs cannot yet synthesize Encodable or Decodable in extensions.
-struct S6 {}
-extension S6 : Codable {}
-// expected-error@-1 {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
-// expected-error@-2 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}

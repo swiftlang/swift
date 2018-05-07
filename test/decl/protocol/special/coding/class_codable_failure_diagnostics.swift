@@ -109,8 +109,7 @@ class C6 : Codable {
   }
 }
 
-// Classes cannot yet synthesize Encodable or Decodable in extensions.
+// Non-final classes cannot synthesize Decodable in an extension.
 class C7 {}
-extension C7 : Codable {}
-// expected-error@-1 {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
-// expected-error@-2 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
+extension C7 : Decodable {}
+// expected-error@-1 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be be satisfied by a 'required' initializer in the class definition}}

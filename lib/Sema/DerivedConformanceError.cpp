@@ -24,7 +24,6 @@
 #include "swift/AST/Types.h"
 
 using namespace swift;
-using namespace DerivedConformance;
 
 static void deriveBodyBridgedNSError_enum_nsErrorDomain(
               AbstractFunctionDecl *domainDecl) {
@@ -53,9 +52,8 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
   domainDecl->setBody(body);
 }
 
-static ValueDecl *deriveBridgedNSError_enum_nsErrorDomain(TypeChecker &tc,
-                                                          Decl *parentDecl,
-                                                          EnumDecl *enumDecl) {
+static ValueDecl *
+deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
@@ -65,45 +63,35 @@ static ValueDecl *deriveBridgedNSError_enum_nsErrorDomain(TypeChecker &tc,
 
   // Note that for @objc enums the format is assumed to be "MyModule.SomeEnum".
   // If this changes, please change PrintAsObjC as well.
-  
-  ASTContext &C = tc.Context;
-  
+
+  ASTContext &C = derived.TC.Context;
+
   auto stringTy = C.getStringDecl()->getDeclaredType();
 
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl)
-    = declareDerivedProperty(tc, parentDecl, enumDecl, C.Id_nsErrorDomain,
-                             stringTy, stringTy, /*isStatic=*/true,
-                             /*isFinal=*/true);
+  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_nsErrorDomain, stringTy, stringTy, /*isStatic=*/true,
+      /*isFinal=*/true);
 
   // Define the getter.
-  auto getterDecl =
-    addGetterToReadOnlyDerivedProperty(tc, propDecl, stringTy);
+  auto getterDecl = derived.addGetterToReadOnlyDerivedProperty(
+      derived.TC, propDecl, stringTy);
   getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_nsErrorDomain);
 
-  auto dc = cast<IterableDeclContext>(parentDecl);
-  dc->addMember(getterDecl);
-  dc->addMember(propDecl);
-  dc->addMember(pbDecl);
+  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
   return propDecl;
 }
 
-ValueDecl *DerivedConformance::deriveBridgedNSError(TypeChecker &tc,
-                                                    Decl *parentDecl,
-                                                    NominalTypeDecl *type,
-                                                    ValueDecl *requirement) {
-  if (!isa<EnumDecl>(type))
+ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
+  if (!isa<EnumDecl>(Nominal))
     return nullptr;
 
-  auto enumType = cast<EnumDecl>(type);
+  if (requirement->getBaseName() == TC.Context.Id_nsErrorDomain)
+    return deriveBridgedNSError_enum_nsErrorDomain(*this);
 
-  if (requirement->getBaseName() == tc.Context.Id_nsErrorDomain)
-    return deriveBridgedNSError_enum_nsErrorDomain(tc, parentDecl, enumType);
-
-  tc.diagnose(requirement->getLoc(),
-              diag::broken_errortype_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_errortype_requirement);
   return nullptr;
 }
