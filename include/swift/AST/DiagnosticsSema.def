@@ -75,6 +75,12 @@ ERROR(could_not_find_type_member_corrected,none,
       "type %0 has no member %1; did you mean %2?",
       (Type, DeclName, DeclName))
 
+ERROR(could_not_find_subscript_member,none,
+      "type %0 has no member property or method named 'subscript'",
+      (Type))
+NOTE(did_you_mean_subscript_operator,none,
+      "did you mean to use the subscript operator?", ())
+
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2", (Type, DeclName, DeclName))
 

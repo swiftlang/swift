@@ -253,11 +253,20 @@ struct SubscriptTest1 {
 
 func testSubscript1(_ s1 : SubscriptTest1) {
   let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
-  
+
   if s1["hello"] {}
-  
-  
-  let _ = s1["hello"]  // expected-error {{ambiguous use of 'subscript'}}
+
+  _ = s1.subscript("hello")
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+  _ = s1.subscript("hello"
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-27=]}}
+  // expected-note@-3 {{to match this opening '('}}
+
+  let _ = s1["hello"]
+  // expected-error@-1 {{ambiguous use of 'subscript'}}
+  // expected-error@-2 {{expected ')' in expression list}}
 }
 
 struct SubscriptTest2 {
@@ -268,11 +277,13 @@ struct SubscriptTest2 {
 func testSubscript1(_ s2 : SubscriptTest2) {
   _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type 'String'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
-  
+
   let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(String, Double)'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
-  
-  
+
+  _ = s2.subscript("hello", 6)
+  // expected-error@-1 {{type 'SubscriptTest2' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{30-31=]}}
   let b = s2[1, "foo"] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 
   // rdar://problem/27449208
@@ -318,4 +329,6 @@ struct SR2575 {
   }
 }
 
-SR2575().subscript() // expected-error{{type 'SR2575' has no member 'subscript'}}
+SR2575().subscript()
+// expected-error@-1 {{type 'SR2575' has no member property or method named 'subscript'}}
+// expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{20-21=]}}

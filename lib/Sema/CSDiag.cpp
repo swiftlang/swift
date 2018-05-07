@@ -1422,6 +1422,16 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
           .fixItInsert(baseExpr->getStartLoc(), "(")
           .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
         return;
+      } else if (memberName.getBaseName() == "subscript") {
+        auto res = CS.lookupMember(baseObjTy->getRValueType(),
+                                   DeclName(DeclBaseName::createSubscript()));
+        if (!res.empty()) {
+          diagnose(loc, diag::could_not_find_subscript_member, baseObjTy)
+          .highlight(baseRange).highlight(nameLoc.getSourceRange());
+          return;
+        }
+        emitBasicError();
+        return;
       }
 
       tryTypoCorrection();
@@ -5421,8 +5431,46 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // Type check the function subexpression to resolve a type for it if
     // possible.
     fnExpr = typeCheckChildIndependently(callExpr->getFn());
-    if (!fnExpr)
+    if (!fnExpr) {
+      auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
+
+      if (!UDE)
+        return true;
+
+      auto baseExpr = UDE->getBase();
+
+      if (UDE->getName().getBaseName() == "subscript" && baseExpr) {
+        auto baseType = CS.getType(baseExpr);
+        // Look up subscript declarations and return if there are none.
+        auto SLR = CS.lookupMember(baseType->getRValueType(),
+                                   DeclName(DeclBaseName::createSubscript()));
+        if (SLR.empty())
+          return true;
+
+        auto *locator = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
+        auto memberRange = baseExpr->getSourceRange();
+        if (locator)
+          locator = simplifyLocator(CS, locator, memberRange);
+
+        auto baseLoc = baseExpr->getLoc();
+        auto nameLoc = DeclNameLoc(memberRange.Start);
+        auto argExpr = callExpr->getArg();
+
+        auto endCh = StringRef((const char *)
+                               argExpr->getEndLoc().getOpaquePointerValue(), 1);
+
+        auto diag = diagnose(baseLoc, diag::did_you_mean_subscript_operator);
+        diag.fixItReplace(SourceRange(argExpr->getStartLoc()), "[");
+        diag.fixItRemove(nameLoc.getSourceRange());
+        diag.fixItRemove(SourceRange(UDE->getDotLoc()));
+
+        if (endCh == ")")
+          diag.fixItReplace(SourceRange(argExpr->getEndLoc()), "]");
+        else
+          diag.fixItInsertAfter(argExpr->getEndLoc(), "]");
+      }
       return true;
+    }
   }
 
   SWIFT_DEFER {
