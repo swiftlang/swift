@@ -7697,6 +7697,8 @@ public:
 
   bool isCalleeThin() const {
     switch (getSubstCalleeType()->getRepresentation()) {
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILFunctionTypeRepresentation::TensorFlow:
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:

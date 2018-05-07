@@ -2383,7 +2383,7 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
 
 /// Scan the specified function, looking for logic that configures the current
 /// graph.
-GraphGlobalConfiguration findConfigurationInfo(SILFunction &fn) {
+GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
   GraphGlobalConfiguration result;
 
   SILInstruction *alreadyFound = nullptr;
@@ -2462,7 +2462,7 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   // the file descriptor mapping...
   setenv("TF_CPP_MIN_LOG_LEVEL", "2", 1);
 
-  GraphGlobalConfiguration configuration = findConfigurationInfo(*fn);
+  GraphGlobalConfiguration configuration = findConfiguration(*fn);
 
   TFGraphLowering graphGen(*fn, configuration);
   auto graphFnBody = graphGen.lowerToFunction([&]() {

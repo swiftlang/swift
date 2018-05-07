@@ -222,6 +222,9 @@ namespace {
       case AnyFunctionType::Representation::Swift:
       case AnyFunctionType::Representation::Block:
         return asImpl().handleReference(type);
+
+      // SWIFT_ENABLE_TENSORFLOW
+      case AnyFunctionType::Representation::TensorFlow:
       case AnyFunctionType::Representation::CFunctionPointer:
       case AnyFunctionType::Representation::Thin:
         return asImpl().handleTrivial(type);

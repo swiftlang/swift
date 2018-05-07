@@ -1327,6 +1327,8 @@ static CanSILFunctionType getNativeSILFunctionType(
                                                   substInterfaceType,
                                                   extInfo, constant);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionType::Representation::TensorFlow:
   case SILFunctionType::Representation::Thin:
   case SILFunctionType::Representation::ObjCMethod:
   case SILFunctionType::Representation::Thick:
@@ -2582,6 +2584,8 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   };
 
   switch (auto rep = t->getExtInfo().getSILRepresentation()) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
@@ -2716,6 +2720,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // Bridge input and result types.
   switch (rep) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Method:

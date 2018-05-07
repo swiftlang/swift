@@ -1025,6 +1025,11 @@ NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
      "str.startIndex.advanced(by: n), or a projection like str.utf8", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(invalid_tensorflow_fn_conversion,none,
+      "TensorFlow functions cannot be converted to other function types", ())
+
+
 ERROR(invalid_c_function_pointer_conversion_expr,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
       "a literal closure", ())

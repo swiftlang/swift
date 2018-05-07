@@ -923,6 +923,8 @@ namespace {
         metadataConvention = FunctionMetadataConvention::Swift;
         isEscaping = !type->isNoEscape();
         break;
+      // SWIFT_ENABLE_TENSORFLOW
+      case FunctionTypeRepresentation::TensorFlow:
       case FunctionTypeRepresentation::Thin:
         metadataConvention = FunctionMetadataConvention::Thin;
         break;
@@ -1976,6 +1978,9 @@ namespace {
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
       case SILFunctionType::Representation::Closure:
+      // SWIFT_ENABLE_TENSORFLOW
+      case SILFunctionType::Representation::TensorFlow:
+
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitDirectMetadataRef(C.TheRawPointerType, request);
@@ -2172,6 +2177,9 @@ namespace {
       case SILFunctionType::Representation::ObjCMethod:
       case SILFunctionType::Representation::CFunctionPointer:
       case SILFunctionType::Representation::Closure:
+      // SWIFT_ENABLE_TENSORFLOW
+        case SILFunctionType::Representation::TensorFlow:
+
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitFromValueWitnessTable(C.TheRawPointerType);
