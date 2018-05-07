@@ -592,7 +592,9 @@ PrintTests.test("Printable_Float") {
   expectDescription("-inf", -Float.infinity)
   expectDescription("3.1415925", Float.pi)
   expectDescription("3.4028235e+38", Float.greatestFiniteMagnitude)
+#if !arch(arm)
   expectDescription("1e-45", Float.leastNonzeroMagnitude)
+#endif
   expectDescription("1.1754944e-38", Float.leastNormalMagnitude)
 
   // Special cases for the underlying algorithms:
@@ -623,7 +625,12 @@ PrintTests.test("Printable_Float") {
   expectNaN("snan(0x1fffff)", Float(bitPattern: 0x7fbf_ffff))
 
   // Every power of 10 should print with only a single digit '1'
-  for power in -45 ... 38 {
+#if arch(arm)
+  let lowerBound = -37
+#else
+  let lowerBound = -45
+#endif
+  for power in lowerBound ... 38 {
     let s: String
     if power < -4 || power > 7 { // Exponential form
       s = exponentialPowerOfTen(power)
@@ -709,7 +716,9 @@ PrintTests.test("Printable_Double") {
   // Special values
   expectDescription("3.141592653589793", Double.pi)
   expectDescription("1.7976931348623157e+308", Double.greatestFiniteMagnitude)
+#if !arch(arm)
   expectDescription("5e-324", Double.leastNonzeroMagnitude)
+#endif
   expectDescription("2.2250738585072014e-308", Double.leastNormalMagnitude)
   expectDescription("inf", Double.infinity)
   expectDescription("-inf", -Double.infinity)
@@ -730,7 +739,12 @@ PrintTests.test("Printable_Double") {
   expectNaN("snan(0x3ffffffffffff)", Float64(bitPattern: 0x7ff7_ffff_ffff_ffff))
 
   // We know how every power of 10 should print
-  for power in -323 ... 308 {
+#if arch(arm)
+  let lowerBound = -307
+#else
+  let lowerBound = -323
+#endif
+  for power in lowerBound ... 308 {
     let s: String
     if power < -4 || power > 15 { // Exponential form
       s = exponentialPowerOfTen(power)
