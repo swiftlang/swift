@@ -411,10 +411,12 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
     if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext()) {
-      auto normB = SILBuilderForCodeExpansion::atBeginning(TAI->getNormalBB(), TAI);
-      normB.createReleaseValue(Closure->getLoc(), Closure, Builder.getDefaultAtomicity());
-      auto errB = SILBuilderForCodeExpansion::atBeginning(TAI->getErrorBB(), TAI);
-      errB.createReleaseValue(Closure->getLoc(), Closure, Builder.getDefaultAtomicity());
+      SILBuilderForCodeExpansion normB(TAI->getNormalBB()->begin(), TAI);
+      normB.createReleaseValue(Closure->getLoc(), Closure,
+                               Builder.getDefaultAtomicity());
+      SILBuilderForCodeExpansion errB(TAI->getErrorBB()->begin(), TAI);
+      errB.createReleaseValue(Closure->getLoc(), Closure,
+                              Builder.getDefaultAtomicity());
     }
   } else {
     auto oldApply = cast<ApplyInst>(AI);

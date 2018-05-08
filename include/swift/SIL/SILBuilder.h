@@ -109,6 +109,14 @@ public:
     setInsertionPoint(BB, InsertPt);
   }
 
+  // Instead of copying a SILBuilder, consider creating a fresh instance of
+  // SILBuilderForCodeExpansion, which is stricter about enforcing proper debug
+  // scope handling.
+  SILBuilder(const SILBuilder &) = delete;
+  SILBuilder &operator=(const SILBuilder &) = delete;
+  SILBuilder(SILBuilder &&) = default;
+  SILBuilder &operator=(SILBuilder &&) = default;
+
   // Allow a pass to override the current SIL module conventions. This should
   // only be done by a pass responsible for lowering SIL to a new stage
   // (e.g. AddressLowering).
@@ -2101,12 +2109,6 @@ public:
                                       SILInstruction *InheritScopeFrom)
       : SILBuilder(BB) {
     inheritScopeFrom(*InheritScopeFrom);
-  }
-
-  /// Creates a new SILBuilder with an insertion point at the beginning of BB.
-  static SILBuilderForCodeExpansion
-  atBeginning(SILBasicBlock *BB, SILInstruction *InheritScopeFrom) {
-    return SILBuilderForCodeExpansion(BB->begin(), InheritScopeFrom);
   }
 
   /// @name Safer setInsertionPoint() alternatives

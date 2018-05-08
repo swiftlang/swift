@@ -1005,8 +1005,7 @@ static SILInstruction *createOutlinedCopyCall(SILBuilder &copyBuilder,
 /// Create a SILBuilder for building alloc instructions.
 static SILBuilderForCodeExpansion
 getAllocBuilder(SILFunction *F, SILInstruction *InheritScopeFrom) {
-  return SILBuilderForCodeExpansion::atBeginning(&*F->begin(),
-                                                 InheritScopeFrom);
+  return SILBuilderForCodeExpansion(F->begin()->begin(), InheritScopeFrom);
 }
 
 void LoadableStorageAllocation::replaceLoadWithCopyAddr(
