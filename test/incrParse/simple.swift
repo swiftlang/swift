@@ -8,6 +8,8 @@
 // RUN: %incparse-test %s --test-case CLASS_SURROUNDING
 // RUN: %incparse-test %s --test-case MULTI_EDIT
 // RUN: %incparse-test %s --test-case MULTI_EDIT_SAME_LINE
+// RUN: %incparse-test %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
+// RUN: %incparse-test %s --test-case REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER
 
 func foo() {
 }
@@ -29,3 +31,6 @@ _ = 1
 <<MULTI_EDIT<|||}>>>
 
 <<MULTI_EDIT_SAME_LINE<_|||let x>>> = <<MULTI_EDIT_SAME_LINE<1|||"hi">>>
+
+let x = "<<REPLACE_WITH_MULTI_BYTE_CHAR<a|||👨‍👩‍👧‍👦>>>"
+let x = "<<REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER<👨‍👩‍👧‍👦|||🎉>>>"
