@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-object -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-object -emit-module -o %t %S/Inputs/def_class.swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: llvm-bcanalyzer %t/def_class.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -sil-debug-serialization -I %t %s | %FileCheck %s -check-prefix=SIL
 // RUN: echo "import def_class; struct A : ClassProto {}" | not %target-swift-frontend -typecheck -I %t - 2>&1 | %FileCheck %s -check-prefix=CHECK-STRUCT
