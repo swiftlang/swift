@@ -1759,6 +1759,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       if (node) {
         if (node->getKind() == Node::Kind::DependentGenericSignature) {
           auto decl = popNode();
+          if (!decl)
+            return nullptr;
           result = createWithChildren(nodeKind, decl, /*sig*/ node);
         } else {
           result = createWithChild(nodeKind, /*decl*/ node);
