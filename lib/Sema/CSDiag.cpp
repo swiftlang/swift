@@ -6323,9 +6323,10 @@ bool FailureDiagnosis::diagnoseClosureExpr(
         auto diag =
           diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
                    inferredArgCount);
-        std::string fixText = " _";  // Let's provide fixits for up to 10 args.
+        std::string fixText; // Let's provide fixits for up to 10 args.
 
         if (inferredArgCount <= 10) {
+          fixText += " _";
           for (unsigned i = 0; i < inferredArgCount - 1; i ++) {
             fixText += ",_";
           }
