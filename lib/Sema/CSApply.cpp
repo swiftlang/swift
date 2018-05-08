@@ -3380,9 +3380,17 @@ namespace {
               if (SuppressDiagnostics)
                 return nullptr;
 
+              auto startLoc = static_cast<const char *>(cast->getStartLoc().getOpaquePointerValue());
+              auto asLoc = static_cast<const char *>(cast->getLoc().getOpaquePointerValue());
+              auto fromType = std::string(startLoc).substr(0, asLoc-startLoc);
+              auto toType = resultType->getOptionalObjectType().getString();
+              auto replacement = "(CFGetTypeID(" + fromType + "as AnyObject) == " + toType + "GetTypeID()) ? (" + fromType + "as! " + toType + ") : nil";
+              
               auto &tc = cs.getTypeChecker();
               tc.diagnose(cast->getLoc(), diag::conditional_downcast_foreign,
-                          destValueType);
+                          destValueType)
+              .highlight(cast->getAsLoc())
+              .fixItReplace(cast->getSourceRange(), replacement);
             }
           }
         }
