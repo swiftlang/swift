@@ -2150,6 +2150,7 @@ class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
+  unsigned LocalDiscriminator = 0;
 
 private:
     bool isUsableFromInline() const;

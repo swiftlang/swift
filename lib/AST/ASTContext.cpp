@@ -226,10 +226,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// \brief Map from Swift declarations to brief comments.
   llvm::DenseMap<const Decl *, StringRef> BriefComments;
 
-  /// \brief Map from local declarations to their discriminators.
-  /// Missing entries implicitly have value 0.
-  llvm::DenseMap<const ValueDecl *, unsigned> LocalDiscriminators;
-
   /// \brief Map from declarations to foreign error conventions.
   /// This applies to both actual imported functions and to @objc functions.
   llvm::DenseMap<const AbstractFunctionDecl *,
@@ -1796,24 +1792,6 @@ void ASTContext::setBriefComment(const Decl *D, StringRef Comment) {
   getImpl().BriefComments[D] = Comment;
 }
 
-unsigned ValueDecl::getLocalDiscriminator() const {
-  assert(getDeclContext()->isLocalContext());
-  auto &discriminators = getASTContext().getImpl().LocalDiscriminators;
-  auto it = discriminators.find(this);
-  if (it == discriminators.end())
-    return 0;
-  return it->second;
-}
-
-void ValueDecl::setLocalDiscriminator(unsigned index) {
-  assert(getDeclContext()->isLocalContext());
-  if (!index) {
-    assert(!getASTContext().getImpl().LocalDiscriminators.count(this));
-    return;
-  }
-  getASTContext().getImpl().LocalDiscriminators.insert({this, index});
-}
-
 NormalProtocolConformance *
 ASTContext::getBehaviorConformance(Type conformingType,
                                    ProtocolDecl *protocol,
@@ -2034,7 +2012,6 @@ size_t ASTContext::getTotalMemory() const {
     llvm::capacity_in_bytes(getImpl().ModuleLoaders) +
     llvm::capacity_in_bytes(getImpl().RawComments) +
     llvm::capacity_in_bytes(getImpl().BriefComments) +
-    llvm::capacity_in_bytes(getImpl().LocalDiscriminators) +
     llvm::capacity_in_bytes(getImpl().ModuleTypes) +
     llvm::capacity_in_bytes(getImpl().GenericParamTypes) +
     // getImpl().GenericFunctionTypes ?
