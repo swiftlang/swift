@@ -295,7 +295,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
     // Simple rename.
     if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
-      if (CI->NodeKind == SDKNodeKind::DeclVar && CI->isRename()) {
+      if (CI->isRename() && (CI->NodeKind == SDKNodeKind::DeclVar ||
+                             CI->NodeKind == SDKNodeKind::DeclType)) {
         Text = CI->getNewName();
         return true;
       }
