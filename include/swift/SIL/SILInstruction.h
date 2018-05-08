@@ -7741,8 +7741,15 @@ public:
     case SILInstructionKind::TryApplyInst:
       return 0;
     case SILInstructionKind::PartialApplyInst:
-      // The arguments to partial_apply are a suffix of the arguments to the
-      // the actually-called function.
+      // The arguments to partial_apply are a suffix of the partial_apply's
+      // callee. Note that getSubstCalleeConv is function type of the callee
+      // argument passed to this apply, not necessarilly the function type of
+      // the underlying callee function (i.e. it is based on the `getCallee`
+      // type, not the `getCalleeOrigin` type).
+      //
+      // pa1 = partial_apply f(c) : $(a, b, c)
+      // pa2 = partial_apply pa1(b) : $(a, b)
+      // apply pa2(a)
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
     default:
       llvm_unreachable("not implemented for this instruction!");

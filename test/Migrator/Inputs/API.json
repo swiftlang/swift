@@ -498,5 +498,16 @@
     "NewTypeName": "example",
     "SelfIndex": 0,
     "RemovedIndex": 1
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)BarBaseNested",
+    "LeftComment": "BarBaseNested",
+    "RightUsr": "",
+    "RightComment": "BarBase.Nested",
+    "ModuleName": "bar"
   }
 ]
