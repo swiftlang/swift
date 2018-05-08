@@ -355,12 +355,13 @@ public protocol RangeReplaceableCollection : Collection
 
   /// Removes from the collection all elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows
+  mutating func removeAll(
+    where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
   // FIXME(ABI): Associated type inference requires this.
   subscript(bounds: Index) -> Element { get }
