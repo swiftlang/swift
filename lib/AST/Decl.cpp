@@ -1680,6 +1680,16 @@ bool ValueDecl::needsCapture() const {
   return !isa<TypeDecl>(this);
 }
 
+unsigned ValueDecl::getLocalDiscriminator() const {
+  return LocalDiscriminator;
+}
+
+void ValueDecl::setLocalDiscriminator(unsigned index) {
+  assert(getDeclContext()->isLocalContext());
+  assert(LocalDiscriminator == 0 && "LocalDiscriminator is set multiple times");
+  LocalDiscriminator = index;
+}
+
 ValueDecl *ValueDecl::getOverriddenDecl() const {
   if (auto fd = dyn_cast<FuncDecl>(this))
     return fd->getOverriddenDecl();

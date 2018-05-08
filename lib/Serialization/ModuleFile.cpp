@@ -2018,7 +2018,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   for (auto entry : LocalTypeDecls->data()) {
     auto DeclID = entry.first;
     auto TD = cast<TypeDecl>(getDecl(DeclID));
-    TD->setLocalDiscriminator(entry.second);
+    assert(entry.second == TD->getLocalDiscriminator());
+//    TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
 }
