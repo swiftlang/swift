@@ -6437,10 +6437,13 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
 
     // Only allow ObjC-rooted classes to be @objc.
     // (Leave a hole for test cases.)
-    if (kind == ObjCClassKind::ObjCWithSwiftRoot &&
-        TC.getLangOpts().EnableObjCAttrRequiresFoundation) {
-      TC.diagnose(attr->getLocation(), diag::invalid_objc_swift_rooted_class)
-        .fixItRemove(attr->getRangeWithAt());
+    if (kind == ObjCClassKind::ObjCWithSwiftRoot) {
+      if (TC.getLangOpts().EnableObjCAttrRequiresFoundation)
+        TC.diagnose(attr->getLocation(), diag::invalid_objc_swift_rooted_class)
+          .fixItRemove(attr->getRangeWithAt());
+      if (!TC.getLangOpts().EnableObjCInterop)
+        TC.diagnose(attr->getLocation(), diag::objc_interop_disabled)
+          .fixItRemove(attr->getRangeWithAt());
     }
 
     return ObjCReason::ExplicitlyObjC;

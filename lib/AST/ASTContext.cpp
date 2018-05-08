@@ -2324,9 +2324,12 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
 void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   bool ImportsFoundationModule = false;
 
-  if (SF.Kind == SourceFileKind::SIL ||
-      !LangOpts.EnableObjCAttrRequiresFoundation)
-    return;
+  if (LangOpts.EnableObjCInterop) {
+    if (!LangOpts.EnableObjCAttrRequiresFoundation)
+      return;
+    if (SF.Kind == SourceFileKind::SIL)
+      return;
+  }
 
   SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
     if (import.second->getName() == Id_Foundation)
@@ -2337,6 +2340,9 @@ void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
     return;
 
   for (auto Attr : SF.AttrsRequiringFoundation) {
+    if (!LangOpts.EnableObjCInterop)
+      Diags.diagnose(Attr->getLocation(), diag::objc_interop_disabled)
+        .fixItRemove(Attr->getRangeWithAt());
     Diags.diagnose(Attr->getLocation(),
                    diag::attr_used_without_required_module,
                    Attr, Id_Foundation)

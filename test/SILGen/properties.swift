@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name properties -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name properties -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 var zero: Int = 0
 
