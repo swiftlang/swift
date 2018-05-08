@@ -3710,12 +3710,22 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void emitSilenceOptionalAnyWarningWithCoercion(Expr *E, Type destType) {
+      Diag<Type, StringRef> silenceDiag = diag::silence_optional_to_any;
+
+      if (auto declRefExpr = dyn_cast<DeclRefExpr>(E)) {
+        auto decl = declRefExpr->getDecl();
+        if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          // Use a different diagnostic ID for IUO to differntiate them in the
+          // migrator
+          silenceDiag = diag::silence_implicitly_unwrapped_optional_to_any;
+        }
+      }
+
       SmallString<16> coercionString;
       coercionString += " as ";
       coercionString += destType->getWithoutParens()->getString();
 
-      TC.diagnose(E->getLoc(), diag::silence_optional_to_any,
-                  destType, coercionString.substr(1))
+      TC.diagnose(E->getLoc(), silenceDiag, destType, coercionString.substr(1))
         .highlight(E->getSourceRange())
         .fixItInsertAfter(E->getEndLoc(), coercionString);
     }

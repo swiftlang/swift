@@ -2842,6 +2842,9 @@ NOTE(force_optional_to_any,none,
 NOTE(silence_optional_to_any,none,
      "explicitly cast to %0 with '%1' to silence this warning",
      (Type, StringRef))
+NOTE(silence_implicitly_unwrapped_optional_to_any,none,
+     "explicitly cast to %0 with '%1' to silence this warning",
+     (Type, StringRef))
 WARNING(optional_in_string_interpolation_segment,none,
         "string interpolation produces a debug description for an optional "
         "value; did you mean to make this explicit?",
