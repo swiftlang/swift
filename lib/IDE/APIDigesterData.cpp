@@ -487,6 +487,13 @@ private:
     if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
       if (CI->rightCommentUnderscored())
         return false;
+
+      // Ignore constructor's return value rewritten.
+      if (CI->DiffKind == NodeAnnotation::TypeRewritten &&
+          CI->NodeKind == SDKNodeKind::DeclConstructor &&
+          CI->getChildIndices().front() == 0) {
+        return false;
+      }
     }
     return true;
   }
