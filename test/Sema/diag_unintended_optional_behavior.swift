@@ -87,6 +87,13 @@ class C {
   var b: Any?!
   func returningIUO() -> Int! { return a }
   func returningAny() -> Any { return a }
+
+  subscript(i: Int) -> Int! { return 0 }
+  subscript(i: Float) -> Any! { return 0 }
+}
+
+class D {
+  init!() {}
 }
 
 func returningIUO() -> Int! { return 1 }
@@ -96,6 +103,8 @@ func nowarnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
   _ = takeAny(a, b)
   _ = takeAny(returningIUO(), C().returningIUO())
   _ = takeAny(C().a, C().b)
+  _ = takeAny(C()[0], C()[1.0])
+  _ = takeAny(D(), D())
 
   _ = takeAny(a as Any, b as Any)
 }

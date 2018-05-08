@@ -3728,6 +3728,13 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
         if (auto *call = dyn_cast<CallExpr>(E))
           E = call->getDirectCallee();
 
+        if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
+          if (subscript->hasDecl())
+            return subscript->getDecl().getDecl();
+
+          return nullptr;
+        }
+
         if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
           return memberRef->getMember().getDecl();
         if (auto *declRef = dyn_cast<DeclRefExpr>(E))
