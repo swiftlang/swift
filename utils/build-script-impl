@@ -2802,6 +2802,19 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_DOTEST_CC_OPTS="-C $(build_directory $LOCAL_HOST llvm)"/bin/clang
                 fi
 
+                # Options to find the just-built libddispatch and Foundation.
+                if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
+                    DOTEST_EXTRA=""
+                else
+                    # This assumes that there are no spaces in any on these paths.
+                    FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                    DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/Foundation/usr/lib/swift"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}/Foundation"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
+                fi
                 call mkdir -p "${results_dir}"
                 with_pushd "${results_dir}" \
                            call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
@@ -2811,7 +2824,8 @@ for host in "${ALL_HOSTS[@]}"; do
                            --rerun-all-issues \
                            ${LLDB_TEST_SUBDIR_CLAUSE} \
                            ${LLDB_DOTEST_CC_OPTS} \
-                           ${LLDB_FORMATTER_OPTS}
+                           ${LLDB_FORMATTER_OPTS} \
+                           -E "${DOTEST_EXTRA}"
                 continue
                 ;;
             llbuild)
