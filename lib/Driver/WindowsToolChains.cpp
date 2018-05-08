@@ -168,5 +168,10 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
+  // Run clang++ in verbose mode if "-v" is set
+  if (context.Args.hasArg(options::OPT_v)) {
+    Arguments.push_back("-v");
+  }
+
   return {Clang, Arguments};
 }
