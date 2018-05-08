@@ -1107,6 +1107,7 @@ extension RangeReplaceableCollection where Self: MutableCollection {
       formIndex(after: &j)
     }
     removeSubrange(i...)
+  }
 }
 
 extension RangeReplaceableCollection {
