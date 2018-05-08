@@ -3138,6 +3138,9 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   ParserResult<Decl> Result;
   SyntaxParsingContext DeclContext(SyntaxContext,
                                    SyntaxKind::MemberDeclListItem);
+  if (loadCurrentSyntaxNodeFromCache()) {
+    return ParserStatus();
+  }
   Result = parseDecl(Options, handler);
   if (Result.isParseError())
     skipUntilDeclRBrace(tok::semi, tok::pound_endif);
