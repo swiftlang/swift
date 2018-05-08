@@ -1,6 +1,45 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-check-deabstraction -verify %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-check-deabstraction -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -verify %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -verify %s | %FileCheck %s
 import TensorFlow
+
+public func trivialAdd(a: Tensor<Float>) -> Tensor<Float> {
+  let b = a.toDevice()
+  return b+b
+}
+
+// @constExpr
+func one() -> Int {
+  return 1
+}
+
+// FIXME: We should be able to constant propagate "1" through the constexpr function.
+public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
+  // expected-error @+1 {{attribute 'axis' requires a constant argument}}
+  return Tensor<Float>(oneHotAtIndices: idx.toDevice(), depth: 0, axis: one())
+}
+
+
+
+// FIXME: We should be able to constant propagate 1 through the Wrapper struct.
+struct Wrapper {
+  let v : Int
+}
+
+public func f(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
+  let w = Wrapper(v: 1)
+  // expected-error @+1 {{attribute 'axis' requires a constant argument}}
+  return Tensor<Float>(oneHotAtIndices: idx.toDevice(), depth: 0, axis: w.v)
+}
+
+
+
+
+// FIXME: Constexpr propagation of tensorshape should handle this.
+public func tensorShape() -> Tensor<Float> {
+  let shape : TensorShape = [2]
+  // expected-error @+1 {{attribute 'value' requires a constant argument}}
+  return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: shape))
+}
 
 // b/75407624
 
@@ -29,4 +68,5 @@ CHECK: apply [[TFROM1D]]
 
 CHECK-LABEL: ----
 */
+
 

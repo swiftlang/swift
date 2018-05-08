@@ -43,9 +43,8 @@ TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
            llvm::cl::desc("Dump extra details about TensorFlow deabstraction"));
 
 static llvm::cl::opt<bool>
-TFCheckDeabstraction("tf-check-deabstraction", llvm::cl::init(false),
-           llvm::cl::desc("Check that the output of deabstraction is valid"));
-
+TFStrictDeabstraction("tf-strict-deabstraction", llvm::cl::init(false),
+       llvm::cl::desc("Verify #tfop's are valid without the perf optimizer"));
 
 template<typename...T, typename...U>
 static InFlightDiagnostic
@@ -211,7 +210,8 @@ void TFDeabstraction::inlineCalls() {
         callee.getName().contains("S10TensorFlow0A5ShapeV12arrayLiteral"
                                   "ACs5Int32Vd_tcfC") ||
         callee.getName().contains("_allocateUninitializedArray"))
-      return true;
+      if (!TFStrictDeabstraction)
+        return true;
 
     // If we're forcibly flattening code into the top level function, and if the
     // callee is in the same source file as that top-level function (and thus
@@ -614,6 +614,9 @@ void TFDeabstraction::simplifyTensorOperands() {
 // FIXME: This is only necessary because we don't have a constexpr model.
 // When that is in place and working well, this should be removed.
 static bool isSimpleBuiltinArithmeticOp(BuiltinInst *builtin) {
+  if (TFStrictDeabstraction)
+    return false;
+
   switch (builtin->getBuiltinInfo().ID) {
   default: return false;
   case BuiltinValueKind::Trunc:
@@ -808,9 +811,10 @@ void PromotableMemoryFinder::findPromotableMemoryFromValue(SILValue value) {
   // allocas in the way of them.
   // FIXME: This is only necessary because we don't have a constexpr model.
   // When that is in place and working well, this should be removed.
-  if (auto builtin = dyn_cast<BuiltinInst>(inst))
-    if (isSimpleBuiltinArithmeticOp(builtin))
-      findPromotableMemoryFromValue(builtin->getOperand(0));
+  if (!TFStrictDeabstraction)
+    if (auto builtin = dyn_cast<BuiltinInst>(inst))
+      if (isSimpleBuiltinArithmeticOp(builtin))
+        findPromotableMemoryFromValue(builtin->getOperand(0));
 
   // If this is a load, then we can deabstract it if it is a SRoA'able pointer
   // to a stack allocation.
@@ -1825,7 +1829,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       // ready for that, we gate the validation of tensor operations on a flag.
       // This allows us to write testcases without breaking current use of the
       // compiler.
-      if (!TFCheckDeabstraction)
+      if (!TFStrictDeabstraction)
         continue;
 
 
@@ -1917,7 +1921,8 @@ void TFDeabstraction::doIt() {
   // FIXME: Should be eliminated when partitioning happens as part of
   // deabstraction, because then the optimizer won't be seeing all of our tensor
   // stuff.
-  fn.getModule().getOptions().EnableARCOptimizations = false;
+  if (!TFStrictDeabstraction)
+    fn.getModule().getOptions().EnableARCOptimizations = false;
 }
 
 
