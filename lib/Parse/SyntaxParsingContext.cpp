@@ -297,8 +297,10 @@ void finalizeSourceFile(RootContextData &RootData,
   assert(newRaw);
   SF.setSyntaxRoot(make<SourceFileSyntax>(newRaw));
 
-  if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
-    // Verify the added nodes if specified.
+  // Verify the tree if specified.
+  // Do this only when we see the real EOF token because parseIntoSourceFile()
+  // can get called multiple times for single source file.
+  if (EOFToken->isPresent() && SF.getASTContext().LangOpts.VerifySyntaxTree) {
     SyntaxVerifier Verifier(RootData);
     Verifier.verify(SF.getSyntaxRoot());
   }
