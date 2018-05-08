@@ -599,10 +599,8 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
 
   auto attrs = VD->getAttrs();
   // 'lazy' is not allowed to have reference attributes
-  if (attrs.hasAttribute<ReferenceOwnershipAttr>()) {
-    auto *refAttr = attrs.getAttribute<ReferenceOwnershipAttr>();
+  if (auto *refAttr = attrs.getAttribute<ReferenceOwnershipAttr>())
     diagnoseAndRemoveAttr(attr, diag::lazy_not_strong, refAttr->get());
-  }
 
   // lazy is not allowed on a protocol requirement.
   auto varDC = VD->getDeclContext();
