@@ -68,7 +68,7 @@ CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
     expectEqual(0, c.timesMakeIteratorCalled.value)
     expectEqual(0, c.timesStartIndexCalled.value)
     let copy = c._copyToContiguousArray()
-    expectEqual(0, c.timesMakeIteratorCalled.value)
+    expectEqual(1, c.timesMakeIteratorCalled.value)
     expectNotEqual(0, c.timesStartIndexCalled.value)
     expectEqualSequence(
       Array(10..<27),
@@ -82,7 +82,7 @@ CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
     expectEqual(0, wrapped.timesMakeIteratorCalled.value)
     expectEqual(0, wrapped.timesStartIndexCalled.value)
     let copy = s._copyToContiguousArray()
-    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
     expectNotEqual(0, wrapped.timesStartIndexCalled.value)
 
     expectEqualSequence(
@@ -2419,9 +2419,9 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     : "invalid Collection: count differed in successive traversals"
 
   let constructionMessage =
-    /*_isStdlibInternalChecksEnabled() && !evilBoundsCheck && step <= 0
-      ? "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity"
-      :*/ message
+    _isDebugAssertConfiguration() && evilBoundsCheck && step <= 0
+      ? "invalid Collection: count differed in successive traversals"
+      : message
 
   // The invalid Collection error is a _debugPreconditon that will only fire
   // in a Debug assert configuration.
