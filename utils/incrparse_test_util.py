@@ -16,13 +16,20 @@ def escapeCmdArg(arg):
         return arg
 
 
+def fail(errorMessage):
+    print(errorMessage, file=sys.stderr)
+    sys.exit(1)
+
+
 def run_command(cmd):
     print(' '.join([escapeCmdArg(arg) for arg in cmd]))
     return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
 
-def parseLine(line, line_no, test_case, incremental_edit_args):
-    column_offset = 1
+def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args, 
+              current_reparse_start):
+    pre_column_offset = 1
+    post_column_offset = 1
     pre_edit_line = ""
     post_edit_line = ""
 
@@ -31,20 +38,29 @@ def parseLine(line, line_no, test_case, incremental_edit_args):
     while line:
         # The regular expression to match the template markers
         subst_re = re.compile(r'^(.*?)<<(.*?)<(.*?)\|\|\|(.*?)>>>(.*\n?)')
-        match = subst_re.match(line)
-        if match:
-            prefix = match.group(1)
-            match_test_case = match.group(2)
-            pre_edit = match.group(3)
-            post_edit = match.group(4)
-            suffix = match.group(5)
+        reparse_re = re.compile(r'^(.*?)<(/?)reparse ?(.*?)>(.*\n?)')
+        subst_match = subst_re.match(line)
+        reparse_match = reparse_re.match(line)
+        if subst_match and reparse_match:
+            # If both regex match use the one with the shorter prefix
+            if len(subst_match.group(1)) < len(reparse_match.group(1)):
+                reparse_match = None
+            else:
+                subst_match = None
+
+        if subst_match:
+            prefix = subst_match.group(1)
+            match_test_case = subst_match.group(2)
+            pre_edit = subst_match.group(3)
+            post_edit = subst_match.group(4)
+            suffix = subst_match.group(5)
 
             if match_test_case == test_case:
                 pre_edit_line += prefix + pre_edit
                 post_edit_line += prefix + post_edit
 
                 # Compute the -incremental-edit argument for swift-syntax-test
-                column = len(prefix) + column_offset
+                column = pre_column_offset + len(prefix)
                 edit_arg = '%d:%d-%d:%d=%s' % \
                     (line_no, column, line_no, column + len(pre_edit), 
                      post_edit)
@@ -56,15 +72,41 @@ def parseLine(line, line_no, test_case, incremental_edit_args):
                 post_edit_line += prefix + pre_edit
 
             line = suffix
-            column_offset += len(prefix) + len(pre_edit)
+            pre_column_offset += len(pre_edit_line)
+            post_column_offset += len(post_edit_line)
+        elif reparse_match:
+            prefix = reparse_match.group(1)
+            is_closing = len(reparse_match.group(2)) > 0
+            match_test_case = reparse_match.group(3)
+            suffix = reparse_match.group(4)
+            if match_test_case == test_case:
+                column = post_column_offset + len(prefix)
+                if is_closing:
+                    if not current_reparse_start:
+                        fail('Closing unopened reparse tag in line %d' %
+                             line_no)
+                    reparse_args.append('-reparse-region')
+                    reparse_args.append(
+                        '%d:%d-%d:%d' % (current_reparse_start[0], 
+                                         current_reparse_start[1], 
+                                         line_no, column))
+                    current_reparse_start = None
+                else:
+                    if current_reparse_start:
+                        fail('Opening nested reparse tags for the same test '
+                             'case in line %d' % line_no)
+                    current_reparse_start = [line_no, column]
+
+            pre_edit_line += prefix
+            post_edit_line += prefix
+            line = suffix
         else:
             pre_edit_line += line
             post_edit_line += line
             # Nothing more to do
             line = ''
 
-    # print(pre_edit_line, end='')
-    return (pre_edit_line, post_edit_line)
+    return (pre_edit_line, post_edit_line, current_reparse_start)
 
 
 def main():
@@ -125,16 +167,23 @@ def main():
     # Gather command line arguments for swift-syntax-test specifiying the 
     # performed edits in this list
     incremental_edit_args = []
+    reparse_args = []
+    current_reparse_start = None
 
     line_no = 1
     for line in args.file.readlines():
-        (pre_edit_line, post_edit_line) = parseLine(line, line_no, test_case, 
-                                                    incremental_edit_args)
+        parseLineRes = parseLine(line, line_no, test_case, 
+                                 incremental_edit_args,
+                                 reparse_args, current_reparse_start)
+        (pre_edit_line, post_edit_line, current_reparse_start) = parseLineRes
 
         pre_edit_file.write(pre_edit_line)
         post_edit_file.write(post_edit_line)
 
         line_no += 1
+
+    if current_reparse_start:
+        fail('Unclosed reparse tag for test case %s' % test_case)
 
     pre_edit_file.close()
     post_edit_file.close()
@@ -189,7 +238,10 @@ def main():
                 pre_edit_file.name,
                 '-output-filename',
                 serialized_incr_filename
-            ] + incremental_edit_args + print_visual_reuse_info_args)
+            ] + 
+            incremental_edit_args + 
+            reparse_args + 
+            print_visual_reuse_info_args)
 
         if print_visual_reuse_info:
             print(incr_parse_output)
