@@ -4017,7 +4017,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
       return;
 
     auto &DL = IGM.DataLayout;
-    if (DL.getTypeSizeInBits(AI->getAllocatedType()) < DL.getPointerSize())
+    if (DL.getTypeSizeInBits(AI->getAllocatedType()) < DL.getPointerSizeInBits())
       return;
 
     auto *BC = Builder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
