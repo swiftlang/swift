@@ -240,7 +240,7 @@ bool SILPerformanceInliner::isProfitableToInline(
     int &NumCallerBlocks,
     const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   SILFunction *Callee = AI.getReferencedFunction();
-  bool IsGeneric = !AI.getSubstitutions().empty();
+  bool IsGeneric = AI.hasSubstitutions();
 
   assert(EnableSILInliningOfGenerics || !IsGeneric);
 
@@ -296,12 +296,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   int CalleeCost = 0;
   int Benefit = 0;
 
-  SubstitutionMap CalleeSubstMap;
-  if (IsGeneric) {
-    CalleeSubstMap = Callee->getLoweredFunctionType()
-      ->getGenericSignature()
-      ->getSubstitutionMap(AI.getSubstitutions());
-  }
+  SubstitutionMap CalleeSubstMap = AI.getSubstitutionMap();
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
 
@@ -330,7 +325,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         if (!def)
           continue;
 
-        auto Subs = FAI.getSubstitutions();
+        auto Subs = FAI.getSubstitutionMap();
 
         // Bail if it is not a generic call or inlining of generics is forbidden.
         if (!EnableSILInliningOfGenerics || Subs.empty())
@@ -346,9 +341,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 
         // Create the list of substitutions as they will be after
         // inlining.
-        auto Sig = FAI.getOrigCalleeType()->getGenericSignature();
-        auto SubMap = Sig->getSubstitutionMap(Subs);
-        SubMap = SubMap.subst(CalleeSubstMap);
+        auto SubMap = Subs.subst(CalleeSubstMap);
 
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||
@@ -512,7 +505,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
-  if (!hasArchetypes(AI.getSubstitutions()))
+  if (!AI.getSubstitutionMap().hasArchetypes())
     return false;
 
   // It is not clear yet if this function should be decided or not.

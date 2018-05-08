@@ -580,14 +580,12 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   for (auto &BB : *Callee) {
     for (auto &I : BB) {
       if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
-        auto PAISubs = PAI->getSubstitutions();
-        if (PAISubs.empty())
+        if (!PAI->hasSubstitutions())
           continue;
 
         // Check if any of substitutions would contain open existentials
         // after inlining.
-        auto PAISubMap = PAI->getOrigCalleeType()
-          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        auto PAISubMap = PAI->getSubstitutionMap();
         PAISubMap = PAISubMap.subst(SubsMap);
         if (PAISubMap.hasOpenedExistential())
           return true;
