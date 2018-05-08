@@ -9,7 +9,7 @@ import Bar
 
 class Derived : WillOverrideWithTypeChange {
   func doThing(_ thing: ItemSet.some) -> ItemSet.some {
-    return SomeItemSet()
+    return ItemSet.some()
   }
 }
 
