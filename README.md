@@ -14,8 +14,9 @@
 
 | | **Swift** |
 |---|:---:|
-|**Debian** |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1)|
-|**Fedora** |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27)|
+|**Debian 9.1** |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1)|
+|**Fedora 27** |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27)|
+|**Ubuntu 16.04** |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04)|
 
 **Welcome to Swift!**
 
