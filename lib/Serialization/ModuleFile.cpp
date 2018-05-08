@@ -429,7 +429,7 @@ class ModuleFile::LocalDeclTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = internal_key_type;
-  using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+  using data_type = DeclID;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -447,7 +447,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -456,9 +456,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
-    auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
-    return { declID, discriminator };
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 
@@ -1516,7 +1514,7 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   if (iter == LocalTypeDecls->end())
     return nullptr;
 
-  return cast<TypeDecl>(getDecl((*iter).first));
+  return cast<TypeDecl>(getDecl(*iter));
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
@@ -2021,11 +2019,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   if (!LocalTypeDecls)
     return;
 
-  for (auto entry : LocalTypeDecls->data()) {
-    auto DeclID = entry.first;
+  for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
-    assert(entry.second == TD->getLocalDiscriminator());
-//    TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
 }
