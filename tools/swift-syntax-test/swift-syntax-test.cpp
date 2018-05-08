@@ -509,8 +509,18 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
   bool NoUnexpectedParse = true;
 
   for (auto ReparseRegion : UnexpectedReparseRegions.Ranges) {
-    NoUnexpectedParse = false;
     auto ReparseRange = ReparseRegion.toSourceRange(SourceMgr, BufferID);
+
+    // To improve the ergonomics when writing tests we do not want to complain
+    // about reparsed whitespaces.
+    auto RangeStr =
+        CharSourceRange(SourceMgr, ReparseRange.Start, ReparseRange.End).str();
+    llvm::Regex WhitespaceOnlyRegex("^\\s*$", llvm::Regex::Newline);
+    if (WhitespaceOnlyRegex.match(RangeStr)) {
+      continue;
+    }
+
+    NoUnexpectedParse = false;
 
     llvm::errs() << "\nERROR: Unexpectedly reparsed following region:\n";
     ReparseRange.print(llvm::errs(), SourceMgr);

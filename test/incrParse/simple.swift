@@ -10,9 +10,9 @@
 // RUN: %incparse-test %s --test-case MULTI_EDIT_SAME_LINE
 
 func foo() {
-}<reparse REPLACE>
+}
 
-_ = <<REPLACE<6|||7>>></reparse REPLACE>
+<reparse REPLACE>_ = <<REPLACE<6|||7>>></reparse REPLACE>
 _ = <<REPLACE_BY_LONGER<6|||"Hello World">>>
 _ = <<REPLACE_BY_SHORTER<"Hello again"|||"a">>>
 <<INSERT<|||foo()>>>
