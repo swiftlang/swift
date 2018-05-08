@@ -1,8 +1,8 @@
-//===--- OwnershipChecker.h -------------------------------------*- C++ -*-===//
+//===--- OwnershipUtils.h ------------------------------------*- C++ -*----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_OWNERSHIPCHECKER_H
-#define SWIFT_SIL_OWNERSHIPCHECKER_H
+#ifndef SWIFT_SIL_OWNERSHIPUTILS_H
+#define SWIFT_SIL_OWNERSHIPUTILS_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
@@ -48,6 +48,6 @@ struct OwnershipChecker {
   bool checkValue(SILValue Value);
 };
 
-} // end swift namespace
+} // namespace swift
 
 #endif
