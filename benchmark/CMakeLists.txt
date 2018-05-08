@@ -67,6 +67,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryBridge
     single-source/DictionaryCopy
     single-source/DictionaryGroup
+    single-source/DictionaryKeysContains
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
