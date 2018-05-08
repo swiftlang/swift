@@ -14,7 +14,7 @@ COMMON_NODES = [
     Node('UnknownPattern', kind='Pattern'),
 
     # code-block-item = (decl | stmt | expr) ';'?
-    Node('CodeBlockItem', kind='Syntax',
+    Node('CodeBlockItem', kind='Syntax', omit_when_empty=True,
          description="""
          A CodeBlockItem is any Syntax node that appears on its own line inside
          a CodeBlock.
@@ -27,6 +27,7 @@ COMMON_NODES = [
                        Child('Stmt', kind='Stmt'),
                        Child('Expr', kind='Expr'),
                        Child('TokenList', kind='TokenList'),
+                       Child('NonEmptyTokenList', kind='NonEmptyTokenList'),
                    ]),
              Child('Semicolon', kind='SemicolonToken',
                    description="""

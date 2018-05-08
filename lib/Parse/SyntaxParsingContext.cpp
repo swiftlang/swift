@@ -171,7 +171,8 @@ void SyntaxParsingContext::addSyntax(Syntax Node) {
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N) {
   if (N == 0) {
-    Storage.push_back(createSyntaxAs(Kind, {}));
+    if (!shallBeOmittedWhenNoChildren(Kind))
+      Storage.push_back(createSyntaxAs(Kind, {}));
     return;
   }
 

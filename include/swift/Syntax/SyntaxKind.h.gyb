@@ -71,6 +71,8 @@ bool isTokenKind(SyntaxKind Kind);
 
 bool isUnknownKind(SyntaxKind Kind);
 
+bool shallBeOmittedWhenNoChildren(SyntaxKind Kind);
+
 SyntaxKind getUnknownKind(SyntaxKind Kind);
 } // end namespace syntax
 

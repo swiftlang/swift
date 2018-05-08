@@ -452,7 +452,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SyntaxContext->setTransparent();
 
       SyntaxParsingContext ItemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
-      SyntaxParsingContext StmtCtxt(SyntaxContext, SyntaxContextKind::Stmt);
+      SyntaxParsingContext TokenListCtxt(SyntaxContext,
+                                         SyntaxKind::NonEmptyTokenList);
       // If we had a parse error, skip to the start of the next stmt, decl or
       // '{'.
       //
