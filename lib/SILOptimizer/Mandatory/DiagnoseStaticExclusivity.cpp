@@ -299,13 +299,6 @@ using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
 /// Represents two accesses that conflict and their underlying storage.
 struct ConflictingAccess {
-private:
-
-  /// If true, always diagnose this conflict as a warning. This is useful for
-  /// staging in fixes for false negatives without affecting source
-  /// compatibility.
-  bool AlwaysDiagnoseAsWarning = false;
-public:
   /// Create a conflict for two begin_access instructions in the same function.
   ConflictingAccess(const AccessedStorage &Storage, const RecordedAccess &First,
                     const RecordedAccess &Second)
@@ -314,11 +307,6 @@ public:
   const AccessedStorage Storage;
   const RecordedAccess FirstAccess;
   const RecordedAccess SecondAccess;
-
-  bool getAlwaysDiagnoseAsWarning() const { return AlwaysDiagnoseAsWarning; }
-  void setAlwaysDiagnoseAsWarning(bool AlwaysDiagnoseAsWarning) {
-    this->AlwaysDiagnoseAsWarning = AlwaysDiagnoseAsWarning;
-  }
 };
 
 } // end anonymous namespace
@@ -554,8 +542,7 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
 
   // For now, all exclusivity violations are warning in Swift 3 mode.
   // Also treat some violations as warnings to allow them to be staged in.
-  bool DiagnoseAsWarning = Violation.getAlwaysDiagnoseAsWarning() ||
-      Ctx.LangOpts.isSwiftVersion3();
+  bool DiagnoseAsWarning = Ctx.LangOpts.isSwiftVersion3();
 
   if (const ValueDecl *VD = Storage.getDecl(F)) {
     // We have a declaration, so mention the identifier in the diagnostic.
@@ -755,10 +742,8 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
       continue;
 
     const AccessInfo &Info = AccessIt->getSecond();
-    if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info)) {
-      Conflict->setAlwaysDiagnoseAsWarning(/*DiagnoseAsWarning=*/false);
+    if (auto Conflict = findConflictingArgumentAccess(AS, Storage, Info))
       State.ConflictingAccesses.push_back(*Conflict);
-    }
   }
 }
 
