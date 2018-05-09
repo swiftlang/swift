@@ -515,7 +515,7 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
     // about reparsed whitespaces.
     auto RangeStr =
         CharSourceRange(SourceMgr, ReparseRange.Start, ReparseRange.End).str();
-    llvm::Regex WhitespaceOnlyRegex("^\\s*$", llvm::Regex::Newline);
+    llvm::Regex WhitespaceOnlyRegex("^[ \t\r\n]*$");
     if (WhitespaceOnlyRegex.match(RangeStr)) {
       continue;
     }

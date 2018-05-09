@@ -17,8 +17,8 @@ func start() {}
   let g: Int
 <reparse ADD_PROPERTY>}</reparse ADD_PROPERTY>
 
-
-<reparse WRAP_IN_CLASS><<WRAP_IN_CLASS<|||class Foo {>>></reparse WRAP_IN_CLASS>
+// FIXME: The functions inside the class should not need to get reparsed
+<<WRAP_IN_CLASS<|||class Foo {>>>
   func foo1() {
     print("Hello Foo!")
   }
