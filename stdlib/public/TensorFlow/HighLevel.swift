@@ -167,7 +167,7 @@ public extension DifferentiableModule {
 ///     }
 ///
 public protocol Learnable : DifferentiableModule {
-  associatedtype Loss : FloatingPoint
+  associatedtype Loss : BinaryFloatingPoint
 
   /// Returns the loss of a predicted output from an expected output.
   func loss(of predicted: Output, from expected: Output) -> Loss
@@ -217,9 +217,9 @@ public final class StochasticGradientDescent<Scalar> : Optimizer
     _ parameters: inout P,
     gradient: P
   ) where P.Scalar == Scalar {
-    parameters.update(with: gradient) { param, grad in
-      param -= grad * learningRate
-    }
+    // To properly implement this, tensor ops should be able to apply on
+    // parameter aggregates.
+    fatalError("Unimplemented")
   }
 }
 
@@ -230,7 +230,7 @@ public final class StochasticGradientDescent<Scalar> : Optimizer
 /// A layer with a 4-D kernel that computes 2-D convolutions given 4-D inputs.
 @_fixed_layout
 public struct Convolution2DLayer<Scalar> : DifferentiableModule
-  where Scalar : FloatingPoint & AccelerableByTensorFlow {
+  where Scalar : BinaryFloatingPoint & AccelerableByTensorFlow {
 
   public typealias Input = Tensor<Scalar>
   public typealias Output = Tensor<Scalar>
@@ -295,7 +295,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     public init(differentiationSeed: Scalar) {
       self.filter = Tensor<Scalar>(differentiationSeed)
     }
-    
+
     @_inlineable @inline(__always)
     public func makeAdjoint(_ value: Scalar) -> Parameters {
       return Parameters(filter: Tensor(value).broadcast(to: filter))
@@ -382,7 +382,7 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
 //   etc).
 @_fixed_layout
 public struct FullyConnectedLayer<Scalar> : DifferentiableModule
-  where Scalar : FloatingPoint & AccelerableByTensorFlow {
+  where Scalar : BinaryFloatingPoint & AccelerableByTensorFlow {
 
   public typealias Input = Tensor<Scalar>
   public typealias Output = Tensor<Scalar>
@@ -443,7 +443,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
       self.weight = Tensor<Scalar>(differentiationSeed)
       self.bias = Tensor<Scalar>(differentiationSeed)
     }
-    
+
     @_inlineable @inline(__always)
     public func makeAdjoint(_ value: Scalar) -> Parameters {
       return Parameters(weight: Tensor(value).broadcast(to: weight),
@@ -565,15 +565,15 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   // internal access, not public. Public initializers must be manually declared.
   @_inlineable @inline(__always)
   public init(axis: Int32,
-              momentum: Tensor<Scalar> = Tensor(0.99),
-              offset: Tensor<Scalar> = Tensor(0),
-              scale: Tensor<Scalar> = Tensor(0),
-              epsilon: Tensor<Scalar> = Tensor(0.001)) {
+              momentum: Scalar = 0.99,
+              offset: Scalar = 0,
+              scale: Scalar = 0,
+              epsilon: Scalar = 0.001) {
     self.axis = axis
-    self.momentum = momentum
-    self.offset = offset
-    self.scale = scale
-    self.epsilon = epsilon
+    self.momentum = Tensor(momentum)
+    self.offset = Tensor(offset)
+    self.scale = Tensor(scale)
+    self.epsilon = Tensor(epsilon)
     /// Initialize running mean and variance with dummy values.
     self.runningMean = Tensor(0)
     self.runningVariance = Tensor(1)
@@ -610,7 +610,7 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
       self.offset = Tensor<Scalar>(differentiationSeed)
       self.scale = Tensor<Scalar>(differentiationSeed)
     }
-    
+
     @_inlineable @inline(__always)
     public func makeAdjoint(_ value: Scalar) -> Parameters {
       return Parameters(offset: Tensor(value).broadcast(to: offset),
@@ -666,8 +666,10 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   public func primal(
     for input: Tensor<Scalar>
   ) -> DifferentiationPrimalValues {
-    let result = input.batchNormalized(alongAxis: axis, offset: offset,
-                                       scale: scale, epsilon: epsilon)
+    let result = input.batchNormalized(alongAxis: axis,
+                                       offset: offset.scalarized(),
+                                       scale: scale.scalarized(),
+                                       epsilon: epsilon.scalarized())
     return DifferentiationPrimalValues(result: result)
   }
 
@@ -681,9 +683,13 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     backpropagating adjoint: Tensor<Scalar>
   ) -> (Tensor<Scalar>, Parameters) {
     let (dInput, dOffset, dScale) = input._adjointBatchNormalized(
-      alongAxis: axis, offset: offset, scale: scale, epsilon: epsilon,
-      originalValue: primalValues.result, seed: adjoint
+      alongAxis: axis,
+      offset: offset.scalarized(),
+      scale: scale.scalarized(),
+      epsilon: epsilon.scalarized(),
+      originalValue: primalValues.result,
+      seed: adjoint
     )
-    return (dInput, Parameters(offset: dOffset, scale: dScale))
+    return (dInput, Parameters(offset: Tensor(dOffset), scale: Tensor(dScale)))
   }
 }

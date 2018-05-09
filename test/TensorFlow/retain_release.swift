@@ -132,11 +132,10 @@ public func testBalancedRetainReleases() {
 // CHECK: strong_release [[H]] : $TensorHandle<Float>
 //
 // CHECK: strong_retain [[H]] : $TensorHandle<Float>
-// CHECK: strong_retain [[H]] : $TensorHandle<Float>
 //
-// CHECK: strong_release [[H]] : $TensorHandle<Float>
 // __tf_receive is called here
-// CHECK: apply {{.*}}<Float>([[H]])
+// CHECK: [[RECV:%.*]] = function_ref @__tf_receive
+// CHECK: apply [[RECV]]<Float>([[H]])
 //
 // CHECK: strong_release [[H]] : $TensorHandle<Float>
 // CHECK-LABEL: ---

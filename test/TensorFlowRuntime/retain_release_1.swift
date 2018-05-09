@@ -17,8 +17,8 @@ var RetainReleaseTests = TestSuite("RetainRelease")
 
 RetainReleaseTests.testAllBackends("Basic") {
   let t1 = Tensor<Float>(1.2)
-  let t2 = t1 + t1
-  let array1 = t1.array
+  let _ = t1 + t1
+  let _ = t1.array
 }
 
 runAllTests()
