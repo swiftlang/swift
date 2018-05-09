@@ -355,6 +355,13 @@ void SyntaxParsingContext::synthesize(SyntaxKind Kind) {
   Storage.push_back(RawSyntax::missing(Kind));
 }
 
+void SyntaxParsingContext::dumpStorage() const  {
+  for (auto Node : Storage) {
+    Node->dump();
+    llvm::errs() << "\n--------------\n";
+  }
+}
+
 SyntaxParsingContext::~SyntaxParsingContext() {
   assert(isTopOfContextStack() && "destructed in wrong order");
 

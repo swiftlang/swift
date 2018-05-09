@@ -281,6 +281,10 @@ public:
   /// Make a missing node corresponding to the given node kind, and
   /// push this node into the context.
   void synthesize(SyntaxKind Kind);
+
+  /// Dump the nodes that are in the storage stack of the SyntaxParsingContext
+  LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,
+                            "Only meant for use in the debugger");
 };
 
 } // namespace swift
