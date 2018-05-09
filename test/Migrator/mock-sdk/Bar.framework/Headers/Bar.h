@@ -53,3 +53,8 @@ typedef NS_ENUM(long, FooComparisonResult) {
   FooOrderedSame,
   FooOrderedDescending
 };
+
+@interface BarBase
+@end
+@interface BarBaseNested
+@end
