@@ -2605,7 +2605,7 @@ bool RefactoringActionLocalizeString::performChange() {
 bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
 #warning Implement here
     if (Tok.Kind != CursorInfoKind::ValueRef)
-        return nullptr;
+        return false;
     
     return Tok.ValueD->getKind() == DeclKind::Func;
 }
