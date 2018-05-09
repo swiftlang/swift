@@ -463,6 +463,7 @@ public:
       auto *newStorage = allocate(newCapacity);
       if (storage) {
         std::copy(storage->data(), storage->data() + count, newStorage->data());
+        newStorage->Count.store(count, std::memory_order_relaxed);
         FreeList.push_back(storage);
       }
       
@@ -471,11 +472,10 @@ public:
       Elements.store(storage, std::memory_order_release);
     }
     
-    auto Count = storage->Count.load(std::memory_order_relaxed);
-    new(&storage->data()[Count]) ElemTy(elem);
-    storage->Count.store(Count + 1, std::memory_order_release);
+    new(&storage->data()[count]) ElemTy(elem);
+    storage->Count.store(count + 1, std::memory_order_release);
     
-    if (ReaderCount.load(std::memory_order_relaxed) == 0)
+    if (ReaderCount.load(std::memory_order_acquire) == 0)
       for (Storage *storage : FreeList)
         deallocate(storage);
   }
@@ -485,14 +485,14 @@ public:
   /// count. This represents a snapshot of the contents at the time
   /// `read` was called. The pointer becomes invalid after `f` returns.
   template <class F> auto read(F f) -> decltype(f(nullptr, 0)) {
-    ReaderCount.fetch_add(1, std::memory_order_relaxed);
+    ReaderCount.fetch_add(1, std::memory_order_acquire);
     auto *storage = Elements.load(std::memory_order_consume);
     auto count = storage->Count.load(std::memory_order_acquire);
     auto *ptr = storage->data();
     
     decltype(f(nullptr, 0)) result = f(ptr, count);
     
-    ReaderCount.fetch_sub(1, std::memory_order_relaxed);
+    ReaderCount.fetch_sub(1, std::memory_order_release);
     
     return result;
   }
