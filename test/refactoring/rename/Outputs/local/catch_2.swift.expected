@@ -39,8 +39,8 @@ func test4(arg: () throws -> Void) {
   }
 }
 
-
-
-
-
+func test5(_ x: Int) {
+  let x = x 
+  print(x)
+}
 

@@ -32,15 +32,15 @@ struct Err1 : Error { }
 func test4(arg: () throws -> Void) {
   do {
     try arg()
-  } catch let xRenamed as Err1 {
-    print(xRenamed)
+  } catch let x as Err1 {
+    print(x)
   } catch let x {
     print(x)
   }
 }
 
-func test5(_ x: Int) {
-  let x = x 
+func test5(_ xRenamed: Int) {
+  let x = xRenamed 
   print(x)
 }
 
