@@ -2557,6 +2557,9 @@ NOTE(silence_inject_forced_downcast,none,
 ERROR(conditional_downcast_foreign,none,
       "conditional downcast to CoreFoundation type %0 will always succeed",
       (Type))
+NOTE(note_explicitly_compare_cftypeid,none,
+      "did you mean to explicitly compare the CFTypeIDs of %0 and %1?",
+      (DeclBaseName, Type))
 
 ERROR(optional_used_as_boolean,none,
      "optional type %0 cannot be used as a boolean; "
