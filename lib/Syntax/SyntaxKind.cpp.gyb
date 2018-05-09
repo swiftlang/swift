@@ -44,6 +44,19 @@ StringRef getTokenText(tok kind) {
   return text;
 }
 
+bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind) {
+  switch(Kind) {
+%   for node in SYNTAX_NODES:
+%     if node.shall_be_omitted_when_empty():
+  case syntax::SyntaxKind::${node.syntax_kind}:
+%     end
+%   end
+    return true;
+  default:
+    return false;
+  }
+}
+
 namespace syntax {
 
 void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
@@ -107,19 +120,6 @@ bool isUnknownKind(SyntaxKind Kind) {
          Kind == SyntaxKind::UnknownStmt ||
          Kind == SyntaxKind::UnknownType ||
          Kind == SyntaxKind::UnknownPattern;
-}
-
-bool shallBeOmittedWhenNoChildren(SyntaxKind Kind) {
-  switch(Kind) {
-%   for node in SYNTAX_NODES:
-%     if node.shall_be_omitted_when_empty():
-  case SyntaxKind::${node.syntax_kind}:
-%     end
-%   end
-    return true;
-  default:
-    return false;
-  }
 }
 
 SyntaxKind getUnknownKind(SyntaxKind Kind) {

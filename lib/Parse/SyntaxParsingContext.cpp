@@ -113,6 +113,9 @@ RC<RawSyntax> SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
       break;
     }
     return RawNode;
+  } else if (Parts.empty()) {
+    // Just omit the unknown node if it does not have any children
+    return nullptr;
   } else {
     SyntaxKind UnknownKind;
     switch (Kind) {
@@ -171,7 +174,7 @@ void SyntaxParsingContext::addSyntax(Syntax Node) {
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N) {
   if (N == 0) {
-    if (!shallBeOmittedWhenNoChildren(Kind))
+    if (!parserShallOmitWhenNoChildren(Kind))
       Storage.push_back(createSyntaxAs(Kind, {}));
     return;
   }
@@ -387,7 +390,9 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   case AccumulationMode::CoerceKind: {
     assert(!isRoot());
     if (Storage.size() == Offset) {
-      Storage.push_back(bridgeAs(CtxtKind, {}));
+      if (auto BridgedNode = bridgeAs(CtxtKind, {})) {
+        Storage.push_back(BridgedNode);
+      }
     } else {
       auto I = Storage.begin() + Offset;
       *I = bridgeAs(CtxtKind, getParts());
