@@ -31,8 +31,6 @@ import CTensorFlow
 /// around a `TensorHandle`.
 @_fixed_layout
 public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
-  public typealias BoolTensor = Tensor<Bool>
-
   /// The underlying `TensorHandle`.
   /// - Note: `handle` is public to allow user defined ops, but should not
   /// normally be used otherwise.
@@ -91,8 +89,9 @@ func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
 /// designed to align with the requirements of the `Const` TensorFlow operation.
 @_versioned @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
-func _TFTensorFromScalars<Scalar>(_ scalars: [Scalar], shape: [Int32])
-    -> TensorHandle<Scalar> {
+func _TFTensorFromScalars<Scalar>(
+  _ scalars: [Scalar], shape: [Int32]
+) -> TensorHandle<Scalar> {
   let contiguousSize = shape.map(Int.init).reduce(1, *)
   precondition(scalars.count == contiguousSize,
                "The number of scalars does not match the shape.")
@@ -125,6 +124,25 @@ func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
 }
 
 //===----------------------------------------------------------------------===//
+// Memory transfer markers
+//===----------------------------------------------------------------------===//
+
+/// TODO: Remove when send/receive semantics gets revisited.
+public extension Tensor {
+  /// Mark memory transfer to device.
+  @_inlineable @inline(__always)
+  func toDevice() -> Tensor {
+    return Tensor(handle: _TFSend(handle))
+  }
+
+  /// Mark memory transfer to host.
+  @_inlineable @inline(__always)
+  func toHost() -> Tensor {
+    return Tensor(handle: _TFReceive(handle))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Initialization
 //===----------------------------------------------------------------------===//
 
@@ -146,8 +164,7 @@ public extension Tensor {
   /// Creates a tensor from an array of tensors (which may themselves be
   /// scalars).
   @_inlineable @inline(__always)
-  init<TensorType : TensorProtocol>(_ elements: [TensorType])
-    where TensorType.Scalar == Scalar {
+  init(_ elements: [Tensor]) {
     self.init(handle: #tfop("Pack", elements))
   }
 
@@ -285,44 +302,113 @@ public extension Tensor {
 }
 
 //===----------------------------------------------------------------------===//
-// Initialization Syntax
+// Initialization syntax
 //===----------------------------------------------------------------------===//
 
-extension Tensor : ExpressibleByIntegerLiteral
-  where Scalar : ExpressibleByIntegerLiteral &
-        _ExpressibleByBuiltinIntegerLiteral {
-  public typealias IntegerLiteralType = Scalar
-  @_inlineable @inline(__always)
-  public init(integerLiteral: Scalar) {
-    self.init(integerLiteral)
+// Background story on `TensorElementLiteral` and why it's necessary:
+//
+// Very importantly, we want users to be able to implicitly convert an array
+// literal to a tensor. At a first glance, a straightfoward implementation would
+// be conforming `Tensor` to `ExpressibleByArrayLiteral` with
+// `ExpressibleBy(Float|Int|Bool)Literal` as a base case. However, it is not
+// that simple. We have binary operators that take `(Tensor, Scalar)`, `(Scalar,
+// Tensor)` as well as `(Tensor, Tensor)`. When `Tensor` are convertible from
+// both a scalar and an array literal, a scalar-tensor binary operator like `+`
+// will not type check.
+//
+// One way to word around is to define all tensor-tensor operators on a
+// protocol extension, and all tensor-scalar and scalar-tensor operators on
+// concrete `Tensor`. Protocol extensions are less favorable than concrete
+// implementations, so the compiler will prefer the concrete implementation for
+// a scalar-tensor operation. However, this would cause enormous code bloat and
+// is entirely a hack.
+//
+// To resolve ambiguity, `Tensor` should not be expressible by scalar literal.
+// There's already a lightweight syntax for converting a scalar to a tensor:
+// `Tensor(x)`, so there is no strong need for implicit conversion. But we need
+// to find a way to give `ExpressibleByArrayLiteral` a base case: what would the
+// `ArrayLiteralElement` be if we want to support both `[1,2,3]` and `[[[1,2],
+// [1,2]]]`? In the first case the array literal element is an interger, while
+// in the second case the array literal itself should be a tensor. Based on this
+// observation, we can come up with an intermediate type: `TensorLiteralElement`
+// as the `ArrayLiteralElement` of `Tensor`. By making `TensorLiteralElement`
+// expressible by both array literal and scalar literal, `Tensor` can now be
+// converted from an arbitrary-dimensional array literal.
+//
+// Due to protocol requirements, `TensorElementLiteral` has to be
+// public. It is never supposed to be used directly by any user, so the library
+// convention is to prepend an underscore to its name, making it
+// `_TensorElementLiteral`. However, we chose not to do that because underscored
+// types are ugly in error messages involving literal conversions to tensors.
+//
+// It would be nice to be able to remove this type when we can systematically
+// resolve tensor-scalar/scalar-tensor op ambiguity someday, either through an
+// improved `Expressible` model, or by introducing an attribute to tell the type
+// checker which function to prefer when ambiguity occurs.
+
+/// Represents a literal element for conversion to a `Tensor`.
+///
+/// - NOTE: Do not use this API directly. This is implicitly created during the
+/// conversion from an array literal to a `Tensor`.
+@_fixed_layout
+public struct TensorElementLiteral<Scalar> : TensorProtocol
+  where Scalar : AccelerableByTensorFlow {
+
+  @_versioned let tensor: Tensor<Scalar>
+
+  @_inlineable
+  public var handle: TensorHandle<Scalar> {
+    return tensor.handle
+  }
+
+  @_inlineable
+  public init(handle: TensorHandle<Scalar>) {
+    tensor = Tensor(handle: handle)
   }
 }
 
-extension Tensor : ExpressibleByFloatLiteral
-  where Scalar : BinaryFloatingPoint &
-        _ExpressibleByBuiltinFloatLiteral {
-  public typealias FloatLiteralType = Scalar
+extension TensorElementLiteral : ExpressibleByBooleanLiteral
+  where Scalar : ExpressibleByBooleanLiteral {
+  public typealias BooleanLiteralType = Scalar.BooleanLiteralType
   @_inlineable @inline(__always)
-  public init(floatLiteral: Scalar) {
-    self.init(floatLiteral)
+  public init(booleanLiteral: BooleanLiteralType) {
+    tensor = Tensor(Scalar(booleanLiteral: booleanLiteral))
   }
 }
 
-extension Tensor : ExpressibleByBooleanLiteral where Scalar == Bool {
-  public typealias BooleanLiteralType = Bool
+extension TensorElementLiteral : ExpressibleByIntegerLiteral
+  where Scalar : ExpressibleByIntegerLiteral {
+  public typealias IntegerLiteralType = Scalar.IntegerLiteralType
   @_inlineable @inline(__always)
-  public init(booleanLiteral: Bool) {
-    self.init(booleanLiteral)
+  public init(integerLiteral: IntegerLiteralType) {
+    tensor = Tensor(Scalar(integerLiteral: integerLiteral))
+  }
+}
+
+extension TensorElementLiteral : ExpressibleByFloatLiteral
+  where Scalar : ExpressibleByFloatLiteral {
+  public typealias FloatLiteralType = Scalar.FloatLiteralType
+  @_inlineable @inline(__always)
+  public init(floatLiteral: FloatLiteralType) {
+    tensor = Tensor(Scalar(floatLiteral: floatLiteral))
+  }
+}
+
+extension TensorElementLiteral : ExpressibleByArrayLiteral {
+  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+  @_inlineable @inline(__always)
+  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
+    tensor = #tfop("Pack", elements)
   }
 }
 
 extension Tensor : ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
-  public typealias ArrayLiteralElement = Tensor<Scalar>
+  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
   /// Creates a tensor initialized with the given elements.
   @_inlineable @inline(__always)
-  public init(arrayLiteral elements: Tensor<Scalar>...) {
-    self.init(elements)
+  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
+    self.init(handle: #tfop("Pack", elements))
   }
 }
 
@@ -529,7 +615,7 @@ public extension Tensor where Scalar == Int32 {
   }
 }
 
-public extension Tensor where Scalar : FloatingPoint {
+public extension Tensor where Scalar : BinaryFloatingPoint {
   /// Creates a tensor with the specified shape, randomly sampling scalar values
   /// from a uniform distribution between 0 and 1.
   ///
@@ -692,7 +778,7 @@ public extension AccelerableByTensorFlow {
 // Automatic differentiation
 //===----------------------------------------------------------------------===//
 
-extension Tensor : Differentiable where Scalar : FloatingPoint {
+extension Tensor : Differentiable where Scalar : BinaryFloatingPoint {
   /// The currency type in the mathematical model of differentiation.
   public typealias DifferentiationCurrency = Scalar
 

@@ -43,7 +43,7 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   init(owning cTensorHandle: CTensorHandle) {
     self.cTensorHandle = cTensorHandle
   }
-  
+
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///

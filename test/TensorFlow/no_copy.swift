@@ -144,7 +144,7 @@ public func test75494462() {
 }
 
 public func paddingTuplesHoistable() {
-  let matrix: Tensor<Float> = [[1, 2, 3], [4, 5, 6]] + 1
+  let matrix: Tensor<Float> = Tensor([[1, 2, 3], [4, 5, 6]]) + 1
   let padded = matrix.padded(forSizes: [(before: 1, after: 1), (before: 2, after: 2)]).toDevice()
   _ = padded.array
 }

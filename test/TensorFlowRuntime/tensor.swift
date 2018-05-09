@@ -15,7 +15,7 @@ import StdlibUnittest
 var TensorTests = TestSuite("Tensor")
 
 TensorTests.testAllBackends("Initializers") {
-  let scalar: Tensor<Float> = 1.0
+  let scalar = Tensor<Float>(1)
   let matrix: Tensor<Float> = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
   let broadcastScalar = Tensor<Float>(broadcasting: 10, rank: 3)
   let some4d = Tensor<Float>(shape: [2, 1, 2, 1],
@@ -334,7 +334,7 @@ TensorTests.testAllBackends("SimpleCond") {
 @inline(never)
 func testXORInference() {
   func xor(_ x: Float, _ y: Float) -> Float {
-    let x = Tensor<Float>([[x, y]])
+    let x = Tensor<Float>([x, y]).reshaped(to: [1, 2])
 
     // FIXME: If params are declared outside of `xor`, it would crash.
     // 2 x 4

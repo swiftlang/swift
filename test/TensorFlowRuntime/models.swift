@@ -108,7 +108,7 @@ ModelTests.testAllBackends("XORClassifierTraining") {
     }
 
     func prediction(for x: Bool, _ y: Bool) -> Bool {
-      let input = Tensor<Float>(Tensor([[x, y]]))
+      let input = Tensor<Float>(Tensor([x, y]).reshaped(to: [1, 2]))
       let floatPred = prediction(for: input).scalarized()
       return abs(floatPred - 1) < 0.1
     }
