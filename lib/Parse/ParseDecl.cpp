@@ -3349,6 +3349,8 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
 }
 
 ParserStatus Parser::parseLineDirective(bool isLine) {
+  SyntaxParsingContext PoundSourceLocation(SyntaxContext,
+                                           SyntaxKind::PoundSourceLocation);
   SourceLoc Loc = consumeToken();
   if (isLine) {
     diagnose(Loc, diag::line_directive_style_deprecated)
@@ -3378,40 +3380,47 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       }
       return makeParserSuccess();
     }
-    
-    if (parseSpecificIdentifier("file", diag::sourceLocation_expected,"file:")||
-        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
-      return makeParserError();
 
-    if (Tok.isNot(tok::string_literal)) {
-      diagnose(Tok, diag::expected_line_directive_name);
-      return makeParserError();
+    {
+      SyntaxParsingContext Args(SyntaxContext,
+                                SyntaxKind::PoundSourceLocationArgs);
+
+      if (parseSpecificIdentifier("file", diag::sourceLocation_expected,
+                                  "file:") ||
+          parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+        return makeParserError();
+
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Tok, diag::expected_line_directive_name);
+        return makeParserError();
+      }
+
+      Filename =
+          getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#sourceLocation");
+      if (!Filename.hasValue())
+        return makeParserError();
+      consumeToken(tok::string_literal);
+
+      if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
+          parseSpecificIdentifier("line", diag::sourceLocation_expected,
+                                  "line:") ||
+          parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+        return makeParserError();
+
+      if (Tok.isNot(tok::integer_literal)) {
+        diagnose(Tok, diag::expected_line_directive_number);
+        return makeParserError();
+      }
+      if (Tok.getText().getAsInteger(0, StartLine)) {
+        diagnose(Tok, diag::expected_line_directive_number);
+        return makeParserError();
+      }
+      if (StartLine == 0) {
+        diagnose(Tok, diag::line_directive_line_zero);
+        return makeParserError();
+      }
+      consumeToken(tok::integer_literal);
     }
-    
-    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                 "#sourceLocation");
-    if (!Filename.hasValue())
-      return makeParserError();
-    consumeToken(tok::string_literal);
-    
-    if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
-        parseSpecificIdentifier("line", diag::sourceLocation_expected,"line:")||
-        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
-      return makeParserError();
-  
-    if (Tok.isNot(tok::integer_literal)) {
-      diagnose(Tok, diag::expected_line_directive_number);
-      return makeParserError();
-    }
-    if (Tok.getText().getAsInteger(0, StartLine)) {
-      diagnose(Tok, diag::expected_line_directive_number);
-      return makeParserError();
-    }
-    if (StartLine == 0) {
-      diagnose(Tok, diag::line_directive_line_zero);
-      return makeParserError();
-    }
-    consumeToken(tok::integer_literal);
 
     LastTokTextEnd = Tok.getText().end();
     if (parseToken(tok::r_paren, diag::sourceLocation_expected, ")"))
