@@ -34,6 +34,7 @@ func foo(_ c: Container) -> String {
   c.adding(attributes: convertToSimpleAttributeDictionary(convertFromSimpleAttributeDictionary(c.attrDict)))
   _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray(convertFromSimpleAttributeArray(c.attrArr)))
   c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(convertFromOptionalSimpleAttributeDictionary(c.optionalAttrDict)))
+  _ = convertFromNewAttribute(AttributeWrapper.NewAttribute)
   return convertFromNewAttribute(c.Value)
 }
 
