@@ -2341,6 +2341,14 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   D->setLocalDiscriminator(discriminator);
 }
 
+void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
+  for (auto P : *PL) {
+    if (!P->hasName() || P->isImplicit())
+      continue;
+    setLocalDiscriminator(P);
+  }
+}
+
 void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                            ParseDeclOptions Flags) {
   auto CurLoc = Tok.getLoc();
@@ -4196,6 +4204,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
       // Establish the new context.
       ParseFunctionBody CC(*this, TheDecl);
+      for (auto PL : TheDecl->getParameterLists())
+        setLocalDiscriminatorToParamList(PL);
 
       // Parse the body.
       SmallVector<ASTNode, 16> Entries;
@@ -4287,6 +4297,8 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, AccessorParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   SmallVector<ASTNode, 16> Entries;
   parseBraceItems(Entries);
@@ -5239,6 +5251,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
+    for (auto PL : FD->getParameterLists())
+      setLocalDiscriminatorToParamList(PL);
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -5309,6 +5323,8 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -6148,6 +6164,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the body.
       ParseFunctionBody CC(*this, CD);
+      for (auto PL : CD->getParameterLists())
+        setLocalDiscriminatorToParamList(PL);
 
       if (!isDelayedParsingEnabled()) {
         if (Context.Stats)

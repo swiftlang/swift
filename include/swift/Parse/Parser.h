@@ -763,6 +763,7 @@ public:
   ParserStatus parseLineDirective(bool isLine = false);
 
   void setLocalDiscriminator(ValueDecl *D);
+  void setLocalDiscriminatorToParamList(ParameterList *PL);
 
   /// Parse the optional attributes before a declaration.
   bool parseDeclAttributeList(DeclAttributes &Attributes,
