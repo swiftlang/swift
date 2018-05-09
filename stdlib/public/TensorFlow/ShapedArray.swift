@@ -540,6 +540,16 @@ public extension Tensor where Scalar : AccelerableByTensorFlow {
   }
 }
 
+/// Array literal conversion
+extension ShapedArray : ExpressibleByArrayLiteral
+  where Scalar : AccelerableByTensorFlow {
+  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+  @_inlineable @inline(__always)
+  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
+    self = Tensor<Scalar>(tensorElementLiterals: elements).array
+  }
+}
+
 /// Equatable conformance
 extension ShapedArray : Equatable where Scalar : Equatable {
   public static func == (lhs: ShapedArray, rhs: ShapedArray) -> Bool {
@@ -623,14 +633,15 @@ extension ShapedArray : CustomReflectable {
 @_fixed_layout
 public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   /// The underlying `ShapedArray` of the slice.
-  internal var base: ShapedArray<Scalar>
+  @_versioned internal var base: ShapedArray<Scalar>
   /// The subdimensional indices of a slice.
-  internal var baseIndices: [Int]
+  @_versioned internal var baseIndices: [Int]
   /// The subtensor bounds of a slice.
-  internal var bounds: Range<Int>?
+  @_versioned internal var bounds: Range<Int>?
 
   /// Creates a `ShapedArraySlice` from a base `ShapedArray`, with the specified
   /// subdimensional indices and subarray bounds.
+  @_versioned @_inlineable
   internal init(
     base: ShapedArray<Scalar>,
     baseIndices indices: [Int] = [],
@@ -838,6 +849,16 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
 public extension ShapedArraySlice where Scalar : AccelerableByTensorFlow {
   init(_ tensor: Tensor<Scalar>) {
     self.init(base: tensor.array)
+  }
+}
+
+/// Array literal conversion
+extension ShapedArraySlice : ExpressibleByArrayLiteral
+  where Scalar : AccelerableByTensorFlow {
+  public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+  @_inlineable @inline(__always)
+  public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
+    self.init(base: Tensor(tensorElementLiterals: elements).array)
   }
 }
 
