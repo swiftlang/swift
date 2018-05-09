@@ -6,9 +6,9 @@ import StdlibCollectionUnittest
 
 let RandomTests = TestSuite("Random")
 
-// _stdlib_random
+// _fill(bytes:)
 
-RandomTests.test("_stdlib_random") {
+RandomTests.test("_fill(bytes:)") {
   for count in [100, 1000] {
     var bytes1 = [UInt8](repeating: 0, count: count)
     var bytes2 = [UInt8](repeating: 0, count: count)
@@ -17,11 +17,11 @@ RandomTests.test("_stdlib_random") {
     expectEqual(bytes1, zeros)
     expectEqual(bytes2, zeros)
     
-    bytes1.withUnsafeMutableBytes { _stdlib_random($0) }
+    bytes1.withUnsafeMutableBytes { Random.default._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes1, zeros)
     
-    bytes2.withUnsafeMutableBytes { _stdlib_random($0) }
+    bytes2.withUnsafeMutableBytes { Random.default._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes2, zeros)
   }
