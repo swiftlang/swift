@@ -14,101 +14,115 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// The model provided by this file is completely dynamic, it doesn't require
-// invasive compiler support.  For a description of how to use this and some
-// examples, please see the PythonExample page.
+// The model provided by this file is completely dynamic and does not require
+// invasive compiler support.
 //
 //===----------------------------------------------------------------------===//
 
 import CPython
 
 //===----------------------------------------------------------------------===//
-// MARK: PyReference Implementation
+// `PyReference` definition
 //===----------------------------------------------------------------------===//
 
-/// This is a typealias used when we're passing or returning a PyObject
-/// pointer with ownership implied.
-public typealias OwnedPyObject = UnsafeMutablePointer<PyObject>
+/// Typealias used when passing or returning a `PyObject` pointer with
+/// implied ownership.
+public typealias OwnedPyObjectPointer = UnsafeMutablePointer<PyObject>
 
-/// Primitive reference to a Python object.  This is always non-null and always
-/// owning of the underlying object.
+/// A primitive reference to a Python C API `PyObject`.
 ///
-/// - TODO: It sure would be nice to be able to express this as a Swift struct
-///   with C++ style user-defined copy ctors, move operators, etc.
+/// A `PyReference` instance has ownership of its underlying `PyObject`, which
+/// must be non-null.
+///
+/// - Note: When Swift has ownership, `PyReference` should be removed.
+///   `PythonObject` will be a Swift struct with copy constructors, move
+///   operators, etc.
 @_versioned @_fixed_layout
 final class PyReference {
-  private var state: OwnedPyObject
+  private var pointer: OwnedPyObjectPointer
 
-  public init(owned: OwnedPyObject) {
-    state = owned
+  init(owning pointer: OwnedPyObjectPointer) {
+    self.pointer = pointer
   }
 
-  public init(borrowed: UnsafeMutablePointer<PyObject>) {
-    state = borrowed
-    Py_IncRef(state)
+  init(borrowing pointer: UnsafeMutablePointer<PyObject>) {
+    self.pointer = pointer
+    Py_IncRef(pointer)
   }
 
   deinit {
-    Py_DecRef(state)
+    Py_DecRef(pointer)
   }
 
-  public var borrowedPyObject: UnsafeMutablePointer<PyObject> {
-    return state
+  var borrowedPyObject: UnsafeMutablePointer<PyObject> {
+    return pointer
   }
 
-  public var ownedPyObject: OwnedPyObject {
-    Py_IncRef(state)
-    return state
+  var ownedPyObject: OwnedPyObjectPointer {
+    Py_IncRef(pointer)
+    return pointer
   }
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: PythonObject type
+// `PythonObject` definition
 //===----------------------------------------------------------------------===//
 
-/// This is the currency type for Python object references.  It is passed to and
-/// returned from Python calls and member references, and is overloaded to
-/// support the standard operations that Python supports.
+/// A Python object.
+///
+/// `PythonObject` is a wrapper around a `PyReference`.
+///
+/// `PythonObject` is passed to and returned from all Python function calls and
+/// member references, and is overloaded to support the standard Python
+/// operations.
+///
+/// - Note: `PyReference` is an implementation detail for `PythonObject`.
+///   When Swift has ownership, `PyReference` will be removed and `PythonObject`
+///   will directly wrap a `PyObject` pointer.
 @dynamicMemberLookup
 @_fixed_layout
 public struct PythonObject {
-  /// This is the actual handle to a Python object that we represent.
-  fileprivate var state: PyReference
+  /// The underlying `PyReference`.
+  fileprivate var reference: PyReference
 
   @_versioned
-  init(_ state: PyReference) {
-    self.state = state
+  init(_ pointer: PyReference) {
+    reference = pointer
   }
 
-  public init(owned: OwnedPyObject) {
-    state = PyReference(owned: owned)
+  /// Creates a new instance, taking ownership of the specified `PyObject` pointer.
+  public init(owning pointer: OwnedPyObjectPointer) {
+    reference = PyReference(owning: pointer)
   }
 
-  public init(borrowed: UnsafeMutablePointer<PyObject>) {
-    state = PyReference(borrowed: borrowed)
+  /// Creates a new instance from the specified `PyObject` pointer.
+  public init(borrowing pointer: UnsafeMutablePointer<PyObject>) {
+    reference = PyReference(borrowing: pointer)
   }
 
   fileprivate var borrowedPyObject: UnsafeMutablePointer<PyObject> {
-    return state.borrowedPyObject
+    return reference.borrowedPyObject
   }
 
-  fileprivate var ownedPyObject: OwnedPyObject {
-    return state.ownedPyObject
+  fileprivate var ownedPyObject: OwnedPyObjectPointer {
+    return reference.ownedPyObject
   }
 }
 
-/// Make "print(python)" print a pretty form of the PythonObject.
+/// Make `print(python)` print a pretty form of the `PythonObject`.
 extension PythonObject : CustomStringConvertible {
+  /// A textual description of this Python object, produced by `Python.str`.
   public var description: String {
-    // We describe a Python object to the REPL and Playgrounds with the str(x)
-    // call, just like Python's REPL does.  'str' is designed to be readable,
-    // and using 'repr' takes WAY too long for large objects because it is
-    // designed to faithfully represent the object.
+    // The `str` function is used here because it is designed to return
+    // human-readable descriptions of Python objects. The Python REPL also uses
+    // it for printing descriptions.
+    // `repr` is not used because it is not designed to be readable and takes
+    // too long for large objects.
     return String(Python.str.call(with: self))!
   }
 }
 
-// Make PythonObject's show up nicely in the Xcode Playground results sidebar.
+// Make `PythonObject` show up nicely in the Xcode Playground results sidebar.
 extension PythonObject : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
@@ -123,103 +137,92 @@ extension PythonObject : CustomReflectable {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: PythonConvertible Protocol
+// `PythonConvertible` protocol
 //===----------------------------------------------------------------------===//
 
 public protocol PythonConvertible {
-  /// Python convertible values may be converted from Python, but these
-  /// conversions can fail.
+  /// Creates a new instance from the given `PythonObject`, if possible.
+  /// - Note: Conversion may fail if the given `PythonObject` instance is
+  ///   incompatible (e.g. a Python `string` object cannot be converted into an
+  ///   `Int`).
   init?(_ object: PythonObject)
 
-  /// Python convertible values may always be converted to Python.
+  /// A `PythonObject` instance representing this value.
   var pythonObject: PythonObject { get }
 }
 
-// You can explicitly convert any PythonConvertible to a PythonObject.
-extension PythonObject {
-  public init<T : PythonConvertible>(_ value: T) {
-    self.init(value.pythonObject)
+public extension PythonObject {
+  /// Creates a new instance from a `PythonConvertible` value.
+  init<T : PythonConvertible>(_ object: T) {
+    self.init(object.pythonObject)
   }
 }
 
-// For our use below, provide helpers to convert PythonConvertible values to
-// owned and borrowed references.  These shouldn't be public though.
+/// Internal helpers to convert `PythonConvertible` values to owned and borrowed
+/// `PyObject` instances. These should not be made public.
 fileprivate extension PythonConvertible {
   var borrowedPyObject: UnsafeMutablePointer<PyObject> {
     return pythonObject.borrowedPyObject
   }
 
-  var ownedPyObject: OwnedPyObject {
+  var ownedPyObject: OwnedPyObjectPointer {
     return pythonObject.ownedPyObject
   }
 }
 
-// PyReference and PythonObject are trivially PythonConvertible
-extension PyReference : PythonConvertible {
-  public convenience init(_ object: PythonObject) {
-    self.init(owned: object.ownedPyObject)
-  }
-
-  /// Python convertible values may always be converted to Python.
-  public var pythonObject: PythonObject {
-    return PythonObject(self)
-  }
-}
-
+/// `PythonObject` is trivially `PythonConvertible`.
 extension PythonObject : PythonConvertible {
   public init(_ object: PythonObject) {
-    self.init(object.state)
+    self.init(owning: object.ownedPyObject)
   }
 
-  /// Python convertible values may always be converted to Python.
   public var pythonObject: PythonObject { return self }
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: ThrowingPythonObject Implementation
+// `PythonObject` callable implementation
 //===----------------------------------------------------------------------===//
 
 public extension PythonObject {
-  /// Return a version of this object that may be called.  It throws a Swift
-  /// error if the underlying Python function throws a Python exception.
+  /// Returns a callable version of this `PythonObject`. When called, the result
+  /// throws a Swift error if the underlying Python function throws a Python
+  /// exception.
   var throwing: ThrowingPythonObject {
     return ThrowingPythonObject(self)
   }
 }
 
-/// This represents the result of a failable operation when working with
-/// Python objects.
+/// An error produced by a failable Python operation.
 @_fixed_layout
 public enum PythonError : Error {
-  /// This represents an exception thrown out of a Python API.  This can occur
-  /// on calls.
+  /// A Python runtime exception, produced by calling Python functions.
   case exception(PythonObject)
 
-  /// A call on the specified object failed, e.g. because it wasn't a Python
-  /// callable, because the wrong number of parameters were provided, or because
-  /// a keyword argument was specified multiple times.
+  /// A failed call on a `PythonObject`.
+  /// Reasons for failure include:
+  /// - A non-callable Python object was called.
+  /// - An incorrect number of arguments were provided to the callable Python
+  ///   object.
+  /// - An invalid keyword argument was specified.
   case invalidCall(PythonObject)
 
-  /// A callMember(x, ...) operation failed to look up the 'x' member.
+  /// A member lookup error.
   case invalidMember(String)
 
-  /// Importing the module with the returned name failed.
+  /// A module import error.
   case invalidModule(String)
 }
 
 extension PythonError : Equatable {
   public static func == (lhs: PythonError, rhs: PythonError) -> Bool {
     switch (lhs, rhs) {
-    case let (.invalidCall(leftVal), .invalidCall(rightVal)),
-         let (.exception(leftVal), .exception(rightVal)):
-      return leftVal == rightVal
-    case let (.invalidModule(leftString), .invalidModule(rightString)),
-         let (.invalidMember(leftString), .invalidMember(rightString)):
-      return leftString == rightString
-    case (.exception(_), _),
-         (.invalidCall(_), _),
-         (.invalidMember(_), _),
-         (.invalidModule(_), _):
+    case let (.invalidCall(left), .invalidCall(right)),
+         let (.exception(left), .exception(right)):
+      return left == right
+    case let (.invalidModule(left), .invalidModule(right)),
+         let (.invalidMember(left), .invalidMember(right)):
+      return left == right
+    default:
       return false
     }
   }
@@ -244,76 +247,85 @@ private func throwPythonErrorIfPresent() throws {
   var type: UnsafeMutablePointer<PyObject>?
   var value: UnsafeMutablePointer<PyObject>?
   var traceback: UnsafeMutablePointer<PyObject>?
-  // This takes the exception, clearing the exception state.
+
+  // Fetch the exception and clear the exception state.
   PyErr_Fetch(&type, &value, &traceback)
 
-  // The value for the exception may not be set, but the type always should be.
-  let r = PythonObject(owned: value ?? type!)
+  // The value for the exception may not be set but the type always should be.
+  let r = PythonObject(owning: value ?? type!)
   throw PythonError.exception(r)
 }
 
-/// This type is a PythonObject produced when the user cares about getting an
-/// exception out of a call.  We wrap this up and reflect it back as a thrown
-/// Swift error.
+/// A `PythonObject` wrapper that enables throwing method calls.
+/// Exceptions produced by Python functions are reflected as Swift errors and
+/// thrown.
 @_fixed_layout
 public struct ThrowingPythonObject {
-  private var state: PythonObject
+  private var base: PythonObject
 
-  fileprivate init(_ object: PythonObject) {
-    state = object
+  fileprivate init(_ base: PythonObject) {
+    self.base = base
   }
 
-  /// Call self, which must be a Python Callable.  If the callee throws a Python
-  /// exception, if the callee isn't callable, or if there is some other
-  /// problem, we throw a Swift error.
+  /// Call `self` with the specified arguments.
+  /// If the call fails for some reason, `PythonError.invalidCall` is thrown.
+  /// - Precondition: `self` must be a Python callable.
+  /// - Parameters:
+  ///   - argArray: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   public func call<T : PythonConvertible>(
     argArray args: [T],
     kwargs: [(String, PythonConvertible)] = []
   ) throws -> PythonObject {
-    // Make sure state errors are not around.
+    // Make sure there are no state errors.
     if PyErr_Occurred() != nil {
-      // FIXME: This should be an assert, but the failure mode in playgrounds
+      // FIXME: This should be an assert, but the failure mode in Playgrounds
       // is just awful.
       fatalError("Python error state must be clear")
     }
 
     // Produce a dictionary for keyword arguments if any are present.
-    var kwdictObject: OwnedPyObject? = nil
+    var kwdictObject: OwnedPyObjectPointer? = nil
     if !kwargs.isEmpty {
       kwdictObject = PyDict_New()!
-      for (key, val) in kwargs {
-        // FIXME: What if there are two identical keywords provided?
+      for (key, value) in kwargs {
+        // FIXME: What if two identical keywords are provided?
         let k = PythonObject(key).ownedPyObject
-        let v = val.ownedPyObject
+        let v = value.ownedPyObject
         PyDict_SetItem(kwdictObject, k, v)
         Py_DecRef(k)
         Py_DecRef(v)
       }
     }
-    defer { Py_DecRef(kwdictObject) }  // Py_DecRef is nil safe.
+    defer { Py_DecRef(kwdictObject) } // Py_DecRef is `nil` safe.
 
     // Non-keyword arguments are passed as a tuple of objects.
     let argTuple = pyTuple(args)
     defer { Py_DecRef(argTuple) }
 
-    // Python calls always return a non-null object when successful.  If the
-    // Python function produces the equivalent of C "void", it returns the None
-    // object.  A null result of PyObjectCall happens when there is an error,
-    // like 'self' not being a Python callable.
-    let selfObject = state.ownedPyObject
+    // Python calls always return a non-null object when successful. If the
+    // Python function produces the equivalent of C `void`, it returns the
+    // `None` object. A `null` result of `PyObjectCall` happens when there is an
+    // error, like `self` not being a Python callable.
+    let selfObject = base.ownedPyObject
     defer { Py_DecRef(selfObject) }
 
     guard let result = PyObject_Call(selfObject, argTuple, kwdictObject) else {
-      // Translate a Python exception into a Swift error if one was thrown.
+      // If a Python exception was thrown, throw a corresponding Swift error.
       try throwPythonErrorIfPresent()
-      throw PythonError.invalidCall(state)
+      throw PythonError.invalidCall(base)
     }
-
-    return PythonObject(owned: result)
+    return PythonObject(owning: result)
   }
 
-  /// Call self, which must be a Python Callable.
+  // Call `self` with the specified arguments.
+  /// - Precondition: `self` must be a Python callable.
+  /// - Parameters:
+  ///   - args: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   public func call(
     _ args: PythonConvertible...,
@@ -322,7 +334,13 @@ public struct ThrowingPythonObject {
     return try call(argArray: args.map { $0.pythonObject }, kwargs: kwargs)
   }
 
-  // Call a member, as in self.foo(...)
+  // Call a member with the specified arguments.
+  /// - Precondition: The member must be a Python callable.
+  /// - Parameters:
+  ///   - name: The name of the member.
+  ///   - argArray: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   public func callMember<T : PythonConvertible>(
     _ name: String,
@@ -330,12 +348,18 @@ public struct ThrowingPythonObject {
     kwargs: [(String, PythonConvertible)] = []
   ) throws -> PythonObject {
     // If the member lookup fails, reflect it as a Swift error.
-    guard let callee = state.checking[dynamicMember: name] else {
+    guard let callee = base.checking[dynamicMember: name] else {
       throw PythonError.invalidMember(name)
     }
     return try callee.throwing.call(argArray: args, kwargs: kwargs)
   }
 
+  // Call a member with the specified arguments.
+  /// - Precondition: `self` must be a Python callable.
+  /// - Parameters:
+  ///   - args: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   public func callMember(
     _ name: String,
@@ -347,7 +371,7 @@ public struct ThrowingPythonObject {
   }
 
   public var tuple2: (PythonObject, PythonObject)? {
-    let ct = state.checking
+    let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1] else {
       return nil
     }
@@ -355,7 +379,7 @@ public struct ThrowingPythonObject {
   }
 
   public var tuple3: (PythonObject, PythonObject, PythonObject)? {
-    let ct = state.checking
+    let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1], let elt2 = ct[2] else {
       return nil
     }
@@ -363,7 +387,7 @@ public struct ThrowingPythonObject {
   }
 
   public var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject)? {
-    let ct = state.checking
+    let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1],
           let elt2 = ct[2], let elt3 = ct[3] else {
         return nil
@@ -374,90 +398,93 @@ public struct ThrowingPythonObject {
 
 
 //===----------------------------------------------------------------------===//
-// MARK: CheckingPythonObject Implementation
+// `PythonObject` member access implementation
 //===----------------------------------------------------------------------===//
 
 public extension PythonObject {
-  /// Return a version of this object that may have member access operations
-  /// performed on it.  These operations can fail and return an optional when
-  /// the underlying Python operations fail.
+  /// Returns a `PythonObject` wrapper capable of member accesses.
   var checking: CheckingPythonObject {
     return CheckingPythonObject(self)
   }
 }
 
-/// This type temporarily wraps a PythonObject when the user cares about turning
-/// an operation (like a member lookup or subscript) into a failable operation
-/// that returns an optional.
+/// A `PythonObject` wrapper that enables member accesses.
+/// Member access operations return an `Optional` result. When member access
+/// fails, `nil` is returned.
 @dynamicMemberLookup
 @_fixed_layout
 public struct CheckingPythonObject {
-  private var state: PythonObject
+  /// The underlying `PythonObject`.
+  private var base: PythonObject
 
-  fileprivate init(_ object: PythonObject) {
-    state = object
+  fileprivate init(_ base: PythonObject) {
+    self.base = base
   }
 
   public subscript(dynamicMember name: String) -> PythonObject? {
     get {
-      let selfObject = state.ownedPyObject
+      let selfObject = base.ownedPyObject
       defer { Py_DecRef(selfObject) }
       guard let result = PyObject_GetAttrString(selfObject, name) else {
         PyErr_Clear()
         return nil
       }
-      // PyObject_GetAttrString returns +1 result.
-      return PythonObject(owned: result)
+      // `PyObject_GetAttrString` returns +1 result.
+      return PythonObject(owning: result)
     }
   }
 
-  /// Swift subscripts cannot throw yet, so model this as returning an optional
-  /// reference.
-  public subscript(array index: [PythonConvertible]) -> PythonObject? {
+  /// Access the element corresponding to the specified `PythonConvertible`
+  /// values representing a key.
+  /// - Note: this is equivalent to `object[key]` in Python.
+  public subscript(key: [PythonConvertible]) -> PythonObject? {
     get {
-      let pyIndexObject = flattenedSubscriptIndices(index)
-      let selfObject = state.ownedPyObject
+      let keyObject = flattenedSubscriptIndices(key)
+      let selfObject = base.ownedPyObject
       defer {
-        Py_DecRef(pyIndexObject)
+        Py_DecRef(keyObject)
         Py_DecRef(selfObject)
       }
 
-      // PyObject_GetItem returns +1 reference.
-      if let result = PyObject_GetItem(selfObject, pyIndexObject) {
-        return PythonObject(owned: result)
+      // `PyObject_GetItem` returns +1 reference.
+      if let result = PyObject_GetItem(selfObject, keyObject) {
+        return PythonObject(owning: result)
       }
-
       PyErr_Clear()
       return nil
     }
     nonmutating set {
-      let pyIndexObject = flattenedSubscriptIndices(index)
-      let selfObject = state.ownedPyObject
+      let keyObject = flattenedSubscriptIndices(key)
+      let selfObject = base.ownedPyObject
       defer {
-        Py_DecRef(pyIndexObject)
+        Py_DecRef(keyObject)
         Py_DecRef(selfObject)
       }
 
       if let newValue = newValue {
         let newValueObject = newValue.ownedPyObject
-        PyObject_SetItem(selfObject, pyIndexObject, newValueObject)
+        PyObject_SetItem(selfObject, keyObject, newValueObject)
         Py_DecRef(newValueObject)
       } else {
-        // Assigning nil deletes the key, just like Swift dictionaries.
-        PyObject_DelItem(selfObject, pyIndexObject)
+        // Assigning `nil` deletes the key, just like Swift dictionaries.
+        PyObject_DelItem(selfObject, keyObject)
       }
     }
   }
 
-  public subscript(i: PythonConvertible...) -> PythonObject? {
+  /// Access the element corresponding to the specified `PythonConvertible`
+  /// values representing a key.
+  /// - Note: this is equivalent to `object[key]` in Python.
+  public subscript(key: PythonConvertible...) -> PythonObject? {
     get {
-      return self[array: i]
+      return self[key]
     }
     nonmutating set {
-      self[array: i] = newValue
+      self[key] = newValue
     }
   }
 
+  /// Converts to a 2-tuple, if possible.
   public var tuple2: (PythonObject, PythonObject)? {
     guard let elt0 = self[0], let elt1 = self[1] else {
       return nil
@@ -465,6 +492,7 @@ public struct CheckingPythonObject {
     return (elt0, elt1)
   }
 
+  /// Converts to a 3-tuple, if possible.
   public var tuple3: (PythonObject, PythonObject, PythonObject)? {
     guard let elt0 = self[0], let elt1 = self[1], let elt2 = self[2] else {
       return nil
@@ -472,6 +500,7 @@ public struct CheckingPythonObject {
     return (elt0, elt1, elt2)
   }
 
+  /// Converts to a 4-tuple, if possible.
   public var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject)? {
     guard let elt0 = self[0], let elt1 = self[1],
           let elt2 = self[2], let elt3 = self[3] else {
@@ -482,18 +511,18 @@ public struct CheckingPythonObject {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Core PythonObject API
+// Core `PythonObject` API
 //===----------------------------------------------------------------------===//
 
-/// Turn an array of indices into a flattened index reference as a +1 Python
-/// object.
+/// Converts an array of indices into a `PythonObject` representing a flattened
+/// index.
 private func flattenedSubscriptIndices(
-  _ index: [PythonConvertible]
-) -> OwnedPyObject {
-  if index.count == 1 {
-    return index[0].ownedPyObject
+  _ indices: [PythonConvertible]
+) -> OwnedPyObjectPointer {
+  if indices.count == 1 {
+    return indices[0].ownedPyObject
   }
-  return pyTuple(index.map { $0.pythonObject })
+  return pyTuple(indices.map { $0.pythonObject })
 }
 
 public extension PythonObject {
@@ -501,7 +530,7 @@ public extension PythonObject {
     get {
       return checking[dynamicMember: member]!
     }
-    set {
+    nonmutating set {
       let selfObject = self.ownedPyObject
       defer { Py_DecRef(selfObject) }
       let valueObject = newValue.ownedPyObject
@@ -514,44 +543,39 @@ public extension PythonObject {
     }
   }
 
-  // Dictionary lookups return optionals because they can always fail if the
-  // key is not present.
-  func member(_ dictMember: PythonObject) -> PythonObject? {
-
-    let selfObject = self.ownedPyObject
-    let keyObject = dictMember.ownedPyObject
-    defer {
-      Py_DecRef(selfObject)
-      Py_DecRef(keyObject)
-    }
-
-    // PyDict_GetItem returns +0 result.
-    return PythonObject(borrowed: PyDict_GetItem(selfObject, keyObject))
-  }
-
-  subscript(index: PythonConvertible...) -> PythonObject {
+  /// Access the element corresponding to the specified `PythonConvertible`
+  /// values representing a key.
+  /// - Note: this is equivalent to `object[key]` in Python.
+  subscript(key: PythonConvertible...) -> PythonObject {
     get {
-      return self.checking[array: index]!
+      return self.checking[key]!
     }
     nonmutating set {
-      self.checking[array: index] = newValue
+      self.checking[key] = newValue
     }
   }
 
-  // Helpers for destructuring tuples
+  /// Converts to a 2-tuple.
   var tuple2: (PythonObject, PythonObject) {
     return (self[0], self[1])
   }
 
+  /// Converts to a 3-tuple.
   var tuple3: (PythonObject, PythonObject, PythonObject) {
     return (self[0], self[1], self[2])
   }
 
+  /// Converts to a 4-tuple.
   var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject) {
     return (self[0], self[1], self[2], self[3])
   }
 
-  /// Call self, which must be a Python Callable.
+  /// Call `self` with the specified arguments.
+  /// - Precondition: `self` must be a Python callable.
+  /// - Parameters:
+  ///   - args: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   func call<T : PythonConvertible>(
     with args: [T],
@@ -560,15 +584,26 @@ public extension PythonObject {
     return try! self.throwing.call(argArray: args, kwargs: kwargs)
   }
 
-  /// Call self, which must be a Python Callable.
+  /// Call `self` with the specified arguments.
+  /// - Precondition: `self` must be a Python callable.
+  /// - Parameters:
+  ///   - args: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   func call(with args: PythonConvertible...,
-                   kwargs: [(String, PythonConvertible)] = []) -> PythonObject {
+            kwargs: [(String, PythonConvertible)] = []) -> PythonObject {
     return try! self.throwing.call(argArray: args.map { $0.pythonObject },
                                    kwargs: kwargs)
   }
 
-  /// Call a member.
+  // Call a member with the specified arguments.
+  /// - Precondition: The member must be a Python callable.
+  /// - Parameters:
+  ///   - name: The name of the member.
+  ///   - argArray: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   func callMember<T : PythonConvertible>(
     _ name: String,
@@ -577,6 +612,14 @@ public extension PythonObject {
   ) -> PythonObject {
     return try! self.throwing.callMember(name, argArray: args, kwargs: kwargs)
   }
+
+  // Call a member with the specified arguments.
+  /// - Precondition: The member must be a Python callable.
+  /// - Parameters:
+  ///   - name: The name of the member.
+  ///   - args: Positional arguments for the Python callable.
+  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
+  ///     `kwargs` in Python.
   @discardableResult
   func callMember(
     _ name: String,
@@ -590,29 +633,42 @@ public extension PythonObject {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: `Python` Type Implementation
+// Python interface implementation
 //===----------------------------------------------------------------------===//
 
-// We want the user to iteract with Python at the top level through a
-// Python.import("foo") sort of statement.  The problem with this is that we
-// want to ensure that Python is initialized on all uses of the Python interface
-// and we want to allow this interface to eventually conform to a protocol that
-// allows dynamic lookup of its members (through the Builtin map).  This will
-// require an instance named "Python", which is unconventional, but does what we
-// need.
-/// The Python interface.
+/// The global Python interface.
+///
+/// You can import Python modules and access Python builtin types and functions
+/// via `Python`.
+///
+///     import Python
+///     // Import modules.
+///     let os = Python.import("os")
+///     let np = Python.import("numpy")
+///
+///     // Use builtin types and functions.
+///     let list: PythonObject = [1, 2, 3]
+///     print(Python.len.call(with: list)) // Prints 3.
+///     print(Python.type.call(with: list) == Python.list) // Prints true.
 @_fixed_layout
 public let Python = PythonInterface()
 
+/// An interface for Python.
+///
+/// `PythonInterface` allows interaction with Python. It can be used to import
+/// modules and dynamically access Python builtin types and functions.
+/// - Note: It is not intended for `PythonInterface` to be initialized
+///   directly. Instead, please use the global instance of `PythonInterface`
+///   called `Python`.
 @_fixed_layout
 @dynamicMemberLookup
 public struct PythonInterface {
-  /// A hash table of the builtins provided by the Python language.
+  /// A dictionary of the Python builtins.
   public let builtins: PythonObject
 
   init() {
     Py_Initialize()   // Initialize Python
-    builtins = PythonObject(borrowed: PyEval_GetBuiltins())
+    builtins = PythonObject(borrowing: PyEval_GetBuiltins())
   }
 
   public func attemptImport(_ name: String) throws -> PythonObject {
@@ -620,7 +676,7 @@ public struct PythonInterface {
       try throwPythonErrorIfPresent()
       throw PythonError.invalidModule(name)
     }
-    return PythonObject(owned: module)
+    return PythonObject(owning: module)
   }
 
   public func `import`(_ name: String) -> PythonObject {
@@ -629,8 +685,8 @@ public struct PythonInterface {
 
   public func updatePath(to path: String) {
     var cStr = path.utf8CString
-    cStr.withUnsafeMutableBufferPointer { buf in
-      PySys_SetPath(buf.baseAddress)
+    cStr.withUnsafeMutableBufferPointer { buffPtr in
+      PySys_SetPath(buffPtr.baseAddress)
     }
   }
 
@@ -640,92 +696,92 @@ public struct PythonInterface {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Python List, Dictionary, Slice and Tuple Helpers
+// Helpers for Python slice and tuple types
 //===----------------------------------------------------------------------===//
 
 private func pySlice(_ start: PythonConvertible?,
                      _ stop: PythonConvertible?,
-                     _ step: PythonConvertible? = nil) -> OwnedPyObject {
+                     _ step: PythonConvertible? = nil) -> OwnedPyObjectPointer {
   let startP = start?.ownedPyObject
   let stopP = stop?.ownedPyObject
   let stepP = step?.ownedPyObject
 
-  // PySlice_New takes each operand at +0, and returns +1.
+  // `PySlice_New` takes each operand at +0, and returns +1.
   let result = PySlice_New(startP, stopP, stepP)!
 
   Py_DecRef(startP)
   Py_DecRef(stopP)
-  Py_DecRef(stepP)  // Py_DecRef is nil safe.
+  Py_DecRef(stepP) // `Py_DecRef` is `nil` safe.
   return result
 }
 
 // Create a Python tuple object with the specified elements.
-private func pyTuple<T : Collection>(_ vals: T) -> OwnedPyObject
+private func pyTuple<T : Collection>(_ vals: T) -> OwnedPyObjectPointer
   where T.Element : PythonConvertible {
 
   let tuple = PyTuple_New(vals.count)!
   for (index, element) in vals.enumerated() {
-    // PyTuple_SetItem steals the reference of the object stored.
+    // `PyTuple_SetItem` steals the reference of the object stored.
     PyTuple_SetItem(tuple, index, element.ownedPyObject)
   }
   return tuple
 }
 
 public extension PythonObject {
-  /// - FIXME: This should be subsumed by Swift ranges + strides.  Python has a
-  ///   very extravagant model though, it isn't clear how best to represent this
-  ///   in Swift.
+  /// FIXME: This should be subsumed by Swift ranges and strides. Python has a
+  /// very extravagant model though, it isn't clear how best to represent this
+  /// in Swift.
   ///
   /// Initial thoughts are that we should sugar the obvious cases (so you can
-  /// use 0...100 in a subscript) but then provide this member for the fully
+  /// use 0...100 in a subscript) but then provide this method for the fully
   /// general case.
   ///
-  /// We also need conditional conformances to allow range if PythonObject's to
-  /// be a Slice.  We can probably get away with a bunch of overloads for now
+  /// We also need conditional conformances to allow range if PythonObject is to
+  /// be a Slice. We can probably get away with a bunch of overloads for now
   /// given that slices are typically used with concrete operands.
   init(sliceStart start: PythonConvertible?,
-       stop: PythonConvertible?,
-       step: PythonConvertible? = nil) {
-    self.init(owned: pySlice(start, stop, step))
+                  stop: PythonConvertible?,
+                  step: PythonConvertible? = nil) {
+    self.init(owning: pySlice(start, stop, step))
   }
 
-  // Tuples will require explicit support until Tuples can conform to protocols,
-  // which is probably a long time.
-  init(tuple elts: PythonConvertible...) {
-    self.init(tupleContentsOf: elts)
+  // Tuples require explicit support because tuple types cannot conform to
+  // protocols.
+  init(tupleOf elements: PythonConvertible...) {
+    self.init(tupleContentsOf: elements)
   }
 
-  init<T : Collection>(tupleContentsOf elts: T)
+  init<T : Collection>(tupleContentsOf elements: T)
     where T.Element == PythonConvertible {
-    self.init(owned: pyTuple(elts.map { $0.pythonObject }))
+    self.init(owning: pyTuple(elements.map { $0.pythonObject }))
   }
 
-  init<T : Collection>(tupleContentsOf elts: T)
+  init<T : Collection>(tupleContentsOf elements: T)
     where T.Element : PythonConvertible {
-    self.init(owned: pyTuple(elts))
+    self.init(owning: pyTuple(elements))
   }
 }
 
 
 //===----------------------------------------------------------------------===//
-// MARK: Builtin Swift Types Conformances to PythonObject
+// `PythonConvertible` conformance for basic Swift types
 //===----------------------------------------------------------------------===//
 
-/// Return true if the specified object is an instance of the low-level Python
+/// Return true if the specified objects an instance of the low-level Python
 /// type descriptor passed in as 'type'.
 private func isType(_ object: PythonObject,
                     type: UnsafeMutableRawPointer) -> Bool {
   let typePyRef = PythonObject(
-    borrowed: type.assumingMemoryBound(to: PyObject.self)
+    borrowing: type.assumingMemoryBound(to: PyObject.self)
   )
   let result = Python.isinstance.call(with: object, typePyRef)
 
-  // We can't use the normal failable Bool initializer from PythonObject here,
-  // because that would cause an infinite loop, calling back into isType.
+  // We cannot use the normal failable Bool initializer from `PythonObject`
+  // here because would cause an infinite loop.
   let pyObject = result.ownedPyObject
   defer { Py_DecRef(pyObject) }
 
-  // Anything not zero is truthy.
+  // Anything not equal to `Py_ZeroStruct` is truthy.
   return !(pyObject == &_Py_ZeroStruct)
 }
 
@@ -745,8 +801,8 @@ extension Bool : PythonConvertible {
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
-    return PythonObject(owned: PyBool_FromLong(self ? 1 : 0))
+    _ = Python // Ensure Python is initialized.
+    return PythonObject(owning: PyBool_FromLong(self ? 1 : 0))
   }
 }
 
@@ -755,28 +811,30 @@ extension String : PythonConvertible {
     let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
 
-    guard let cStringVal = PyString_AsString(pyObject) else {
+    guard let cString = PyString_AsString(pyObject) else {
       PyErr_Clear()
       return nil
     }
-
-    self = String(cString: cStringVal)
+    self.init(cString: cString)
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
+    _ = Python // Ensure Python is initialized.
     let v = self.utf8CString.withUnsafeBufferPointer {
-      PyString_FromStringAndSize($0.baseAddress, $0.count-1 /*trim \0*/)!
+      // 1 is subtracted from the C string length to trim the trailing null
+      // character (`\0`).
+      PyString_FromStringAndSize($0.baseAddress, $0.count - 1)!
     }
-    return PythonObject(owned: v)
+    return PythonObject(owning: v)
   }
 }
 
 fileprivate extension PythonObject {
-  // This converts a PythonObject to some given type by applying the appropriate
-  // converter and checking against the error value.
-  func converted<T : Equatable>(withError errorValue: T,
-                                by converter: (OwnedPyObject) -> T) -> T? {
+  // Converts a `PythonObject` to the given type by applying the appropriate
+  // converter function and checking the error value.
+  func converted<T : Equatable>(
+    withError errorValue: T, by converter: (OwnedPyObjectPointer) -> T
+  ) -> T? {
     let pyObject = ownedPyObject
     defer { Py_DecRef(pyObject) }
 
@@ -795,7 +853,7 @@ fileprivate extension PythonObject {
 
 extension Int : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    // PyInt_AsLong return -1 and sets an error if the Python object isn't
+    // `PyInt_AsLong` return -1 and sets an error if the Python object is not
     // integer compatible.
     guard let value = pythonObject.converted(withError: -1,
                                              by: PyInt_AsLong) else {
@@ -805,51 +863,51 @@ extension Int : PythonConvertible {
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
-    return PythonObject(owned: PyInt_FromLong(self))
+    _ = Python // Ensure Python is initialized.
+    return PythonObject(owning: PyInt_FromLong(self))
   }
 }
 
 extension UInt : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    // PyInt_AsUnsignedLongMask isn't documented as such, but in fact it does
-    // return -1 and sets an error if the Python object isn't
-    // integer compatible.
-    guard let value = pythonObject.converted(withError: ~0,
-                                        by: PyInt_AsUnsignedLongMask) else {
+    // `PyInt_AsUnsignedLongMask` isn't documented as such, but in fact it does
+    // return -1 and set an error if the Python object is not integer compatible.
+    guard let value = pythonObject.converted(
+      withError: ~0, by: PyInt_AsUnsignedLongMask) else {
       return nil
     }
     self = value
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
-    return PythonObject(owned: PyInt_FromSize_t(Int(self)))
+    _ = Python // Ensure Python is initialized.
+    return PythonObject(owning: PyInt_FromSize_t(Int(self)))
   }
 }
 
 extension Double : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    // PyFloat_AsDouble return -1 and sets an error
-    // if the Python object isn't float compatible.
+    // `PyFloat_AsDouble` return -1 and sets an error if the Python object is not
+    // float compatible.
     guard let value = pythonObject.converted(withError: -1,
-                                        by: PyFloat_AsDouble) else {
+                                             by: PyFloat_AsDouble) else {
       return nil
     }
     self = value
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
-    return PythonObject(owned: PyFloat_FromDouble(self))
+    _ = Python // Ensure Python is initialized.
+    return PythonObject(owning: PyFloat_FromDouble(self))
   }
 }
 
 //===----------------------------------------------------------------------===//
-// Sized integer and Float conformances.
+// `PythonConvertible` conformances for `FixedWidthInteger` and `Float`
 //===----------------------------------------------------------------------===//
 
-// Any integer can conform to PythonObject by using the Int/UInt implementation.
+/// Any `FixedWidthInteger` type is `PythonConvertible` via the `Int`/`UInt`
+/// implementation.
 public protocol FixedWidthIntegerPythonObject
   : PythonConvertible, FixedWidthInteger {
   associatedtype ParentPythonIntType : PythonConvertible, FixedWidthInteger
@@ -880,57 +938,59 @@ extension Float : PythonConvertible {
     guard let v = Double(pythonObject) else { return nil }
     self = Float(v)
   }
+
   public var pythonObject: PythonObject {
     return Double(self).pythonObject
   }
 }
 
 //===----------------------------------------------------------------------===//
-// Collection Conformances to PythonConvertible
+// `PythonConvertible` conformance for `Array` and `Dictionary`
 //===----------------------------------------------------------------------===//
 
-// Arrays are PythonConvertible if their elements are.
+// `Array` conditionally conforms to `PythonConvertible` if the `Element`
+// associated type does.
 extension Array : PythonConvertible where Element : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
     self = []
-
-    for elt in pythonObject {
-      guard let eltVal = Element(elt) else { return nil }
-      append(eltVal)
+    for elementObject in pythonObject {
+      guard let element = Element(elementObject) else { return nil }
+      append(element)
     }
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
+    _ = Python // Ensure Python is initialized.
     let list = PyList_New(count)!
     for (index, element) in enumerated() {
-      // PyList_SetItem steals the reference of the object stored.
+      // `PyList_SetItem` steals the reference of the object stored.
       PyList_SetItem(list, index, element.ownedPyObject)
     }
-    return PythonObject(owned: list)
+    return PythonObject(owning: list)
   }
 }
 
-// Dictionary is PythonConvertible if its keys and values are.
+// `Dictionary` conditionally conforms to `PythonConvertible` if the `Key` and
+// `Value` associated types do.
 extension Dictionary : PythonConvertible
   where Key : PythonConvertible, Value : PythonConvertible {
   public init?(_ pythonDict: PythonObject) {
     self = [:]
 
-    // Iterate the Python dictionary, converting the key/value's within it to
-    // the specified Swift Key/Value pairs.
+    // Iterate over the Python dictionary, converting its keys and values to
+    // Swift `Key` and `Value` pairs.
     var key, value: UnsafeMutablePointer<PyObject>?
     var position: Py_ssize_t = 0
 
     while PyDict_Next(pythonDict.borrowedPyObject,
                       &position, &key, &value) != 0 {
-      // If either the key or value are not convertible to the expected Swift
-      // type then the entire dictionary fails to convert.
-      if let swiftKey = Key(PythonObject(borrowed: key!)),
-         let swiftValue = Value(PythonObject(borrowed: value!)) {
-        // It is possible that there are duplicate keys after conversion.  We
-        // silently allow duplicate keys and pick a nondeterministic result
-        // if there is a collision.
+      // If any key or value is not convertible to the corresponding Swift
+      // type, then the entire dictionary is not convertible.
+      if let swiftKey = Key(PythonObject(borrowing: key!)),
+         let swiftValue = Value(PythonObject(borrowing: value!)) {
+        // It is possible that there are duplicate keys after conversion. We
+        // silently allow duplicate keys and pick a nondeterministic result if
+        // there is a collision.
         self[swiftKey] = swiftValue
       } else {
         return nil
@@ -939,23 +999,21 @@ extension Dictionary : PythonConvertible
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
-
+    _ = Python // Ensure Python is initialized.
     let dict = PyDict_New()!
-    for (key, val) in self {
+    for (key, value) in self {
       let k = key.ownedPyObject
-      let v = val.ownedPyObject
+      let v = value.ownedPyObject
       PyDict_SetItem(dict, k, v)
       Py_DecRef(k)
       Py_DecRef(v)
     }
-
-    return PythonObject(owned: dict)
+    return PythonObject(owning: dict)
   }
 }
 
 //===----------------------------------------------------------------------===//
-// Range Conformances to PythonConvertible
+// `PythonConvertible` conformance for `Range` types
 //===----------------------------------------------------------------------===//
 
 extension Range : PythonConvertible where Bound : PythonConvertible {
@@ -970,10 +1028,10 @@ extension Range : PythonConvertible where Bound : PythonConvertible {
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
+    _ = Python // Ensure Python is initialized.
     return PythonObject(sliceStart: self.lowerBound,
-                   stop: self.upperBound,
-                   step: nil)
+                        stop: self.upperBound,
+                        step: nil)
   }
 }
 
@@ -989,7 +1047,7 @@ extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
+    _ = Python // Ensure Python is initialized.
     return PythonObject(sliceStart: self.lowerBound, stop: nil, step: nil)
   }
 }
@@ -1006,13 +1064,13 @@ extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
   }
 
   public var pythonObject: PythonObject {
-    _ = Python // ensure Python is initialized.
+    _ = Python // Ensure Python is initialized.
     return PythonObject(sliceStart: nil, stop: self.upperBound, step: nil)
   }
 }
 
 //===----------------------------------------------------------------------===//
-// Standard Operators and Conformances
+// Standard operators and conformances
 //===----------------------------------------------------------------------===//
 
 public extension PythonObject {
@@ -1051,7 +1109,7 @@ public extension PythonObject {
 
 extension PythonObject : SignedNumeric {
   public init<T : BinaryInteger>(exactly value: T) {
-    self = PythonObject(Int(value))
+    self.init(Int(value))
   }
 
   public typealias Magnitude = PythonObject
@@ -1061,13 +1119,9 @@ extension PythonObject : SignedNumeric {
   }
 }
 
-
-// Define conformance to Comparable and Equatable
-extension PythonObject : Hashable, Comparable, Equatable {
-  // Comparable/Equatable are implemented using rich comparison. This tries at
-  // first the dedicated function, e.g. __eq__ for equality and if this does not
-  // work 3 way comparison is used.
-  // This is coherent with how comparison is handled in the Python interpreter.
+extension PythonObject : Equatable, Comparable, Hashable {
+  // `Equatable` and `Comparable` are implemented using rich comparison.
+  // This is consistent with how Python handles comparisons.
   private func compared(to other: PythonObject, byOp: Int32) -> Bool {
     let lhsObject = self.ownedPyObject
     let rhsObject = other.ownedPyObject
@@ -1113,7 +1167,7 @@ extension PythonObject : Hashable, Comparable, Equatable {
 
   public var hashValue: Int {
     guard let hash = Int(self.__hash__.call()) else {
-      fatalError("cannot use __hash__ on \(self)")
+      fatalError("Cannot use '__hash__' on \(self)")
     }
     return hash
   }
@@ -1131,6 +1185,10 @@ extension PythonObject : MutableCollection {
     return Python.len.call(with: self)
   }
 
+  public func index(after i: Index) -> Index {
+    return i + PythonObject(1)
+  }
+
   public subscript(index: PythonObject) -> PythonObject {
     get {
       return self[index as PythonConvertible]
@@ -1139,18 +1197,18 @@ extension PythonObject : MutableCollection {
       self[index as PythonConvertible] = newValue
     }
   }
-
-  // Method that returns the next index when iterating
-  public func index(after i: Index) -> Index {
-    return i + PythonObject(1)
-  }
 }
 
-// Simple Literal Conformances
+
+//===----------------------------------------------------------------------===//
+// `ExpressibleByLiteral` conformances
+//===----------------------------------------------------------------------===//
+
 extension PythonObject : ExpressibleByBooleanLiteral,
                          ExpressibleByIntegerLiteral,
                          ExpressibleByFloatLiteral,
-                         ExpressibleByStringLiteral {
+                         ExpressibleByStringLiteral,
+                         ExpressibleByNilLiteral {
   public init(booleanLiteral value: Bool) {
     self.init(value)
   }
@@ -1163,9 +1221,11 @@ extension PythonObject : ExpressibleByBooleanLiteral,
   public init(stringLiteral value: String) {
     self.init(value)
   }
+  public init(nilLiteral: ()) {
+    self.init(Python.None)
+  }
 }
 
-// Collection Literal Conformances
 extension PythonObject : ExpressibleByArrayLiteral,
                          ExpressibleByDictionaryLiteral {
   public init(arrayLiteral elements: PythonObject...) {
