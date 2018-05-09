@@ -158,6 +158,9 @@ def main():
     test_case = args.test_case
     print_visual_reuse_info = args.print_visual_reuse_info
 
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+
     # Generate pre-edit and post-edit files
     pre_edit_file = open(temp_dir + '/' + test_file_name + '.' + test_case + 
                          '.pre.swift', mode='w+')
@@ -261,7 +264,8 @@ def main():
                 serialized_incr_filename
             ])
     except subprocess.CalledProcessError as e:
-        print('Test case %s failed' % (test_case), file=sys.stderr)
+        print('Test case "%s" of %s failed' % (test_case, test_file.name), 
+              file=sys.stderr)
         print('Syntax tree of incremental parsing does not match '
               'from-scratch parsing of post-edit file:\n\n', file=sys.stderr)
         print(e.output, file=sys.stderr)
