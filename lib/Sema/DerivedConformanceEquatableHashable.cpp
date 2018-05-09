@@ -1043,16 +1043,15 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // ExpressibleByIntegerLiteral.
   if (!tc.conformsToProtocol(intType,
                              C.getProtocol(KnownProtocolKind::Hashable),
-                             derived.Nominal, None)) {
-    tc.diagnose(derived.Nominal->getLoc(),
-                diag::broken_int_hashable_conformance);
+                             parentDC, None)) {
+    tc.diagnose(derived.ConformanceDecl, diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!tc.conformsToProtocol(intType, intLiteralProto, derived.Nominal, None)) {
-    tc.diagnose(derived.Nominal->getLoc(),
+  if (!tc.conformsToProtocol(intType, intLiteralProto, parentDC, None)) {
+    tc.diagnose(derived.ConformanceDecl,
                 diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
   }
