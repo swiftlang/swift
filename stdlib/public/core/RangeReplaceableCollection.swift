@@ -355,12 +355,13 @@ public protocol RangeReplaceableCollection : Collection
 
   /// Removes from the collection all elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows
+  mutating func removeAll(
+    where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
   // FIXME(ABI): Associated type inference requires this.
   subscript(bounds: Index) -> Element { get }
@@ -1088,43 +1089,42 @@ extension RangeReplaceableCollection {
 extension RangeReplaceableCollection where Self: MutableCollection {
   /// Removes from the collection all elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func removeAll(
-    where predicate: (Element) throws -> Bool
+    where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
-    if var i = try firstIndex(where: predicate) {
-      var j = index(after: i)
-      while j != endIndex {
-        if try !predicate(self[j]) {
-          swapAt(i, j)
-          formIndex(after: &i)
-        }
-        formIndex(after: &j)
+    guard var i = try firstIndex(where: shouldBeRemoved) else { return }
+    var j = index(after: i)
+    while j != endIndex {
+      if try !shouldBeRemoved(self[j]) {
+        swapAt(i, j)
+        formIndex(after: &i)
       }
-      removeSubrange(i...)
+      formIndex(after: &j)
     }
+    removeSubrange(i...)
   }
 }
 
 extension RangeReplaceableCollection {
   /// Removes from the collection all elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func removeAll(
-    where predicate: (Element) throws -> Bool
+    where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
     // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
     // self = try filter { try !predicate($0) }
-    self = try Self(self.lazy.filter { try !predicate($0) })
+    self = try Self(self.lazy.filter { try !shouldBeRemoved($0) })
   }
 }
