@@ -32,7 +32,7 @@ ShapedArrayTests.test("Initializers") {
   expectEqual([2, 3], x.shape)
   expectEqual([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], x.scalars)
 
-  let y = ShapedArraySlice(shape: [2, 3], scalars: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+  let y: ShapedArraySlice<Double> = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
   expectEqual([2, 3], y.shape)
   expectEqual([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], y.scalars)
 }
