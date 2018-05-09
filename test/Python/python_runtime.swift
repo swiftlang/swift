@@ -138,18 +138,18 @@ PythonRuntimeTestSuite.test("tuple") {
   let element2: PythonObject = "abc"
   let element3: PythonObject = [0, 0]
   let element4: PythonObject = ["a": 0, "b": "c"]
-  let pair = PythonObject(tuple: element1, element2)
+  let pair = PythonObject(tupleOf: element1, element2)
   let (pair1, pair2) = pair.tuple2
   expectEqual(element1, pair1)
   expectEqual(element2, pair2)
 
-  let triple = PythonObject(tuple: element1, element2, element3)
+  let triple = PythonObject(tupleOf: element1, element2, element3)
   let (triple1, triple2, triple3) = triple.tuple3
   expectEqual(element1, triple1)
   expectEqual(element2, triple2)
   expectEqual(element3, triple3)
 
-  let quadruple = PythonObject(tuple: element1, element2, element3, element4)
+  let quadruple = PythonObject(tupleOf: element1, element2, element3, element4)
   let (quadruple1, quadruple2, quadruple3, quadruple4) = quadruple.tuple4
   expectEqual(element1, quadruple1)
   expectEqual(element2, quadruple2)
@@ -166,19 +166,28 @@ PythonRuntimeTestSuite.test("python-convertible") {
   let zero: PythonObject = 0
   let half: PythonObject = 0.5
   let string: PythonObject = "abc"
+  let none: PythonObject = nil
 
   expectEqual(-1, Int(minusOne))
-  expectEqual(0, Int(zero))
-  expectEqual("abc", String(string))
   expectEqual(-1.0, Double(minusOne))
+
+  expectEqual(0, Int(zero))
   expectEqual(0.0, Double(zero))
+
   expectEqual(0.5, Double(half))
-  // Python rounds down the value in this case.
+  // Python rounds down in this case.
   expectEqual(0, Int(half))
+
+  expectEqual("abc", String(string))
+  expectEqual(Python.None, none)
 
   expectNil(String(zero))
   expectNil(Int(string))
   expectNil(Double(string))
+  expectNil(String(none))
+  expectNil(Bool(none))
+  expectNil(Int(none))
+  expectNil(Float(none))
 }
 
 runAllTests()
