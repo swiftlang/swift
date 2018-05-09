@@ -461,13 +461,13 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   }
         
   // Map the generic parameters to their corresponding type variables.
-  llvm::SmallVector<TypeLoc, 4> arguments;
+  llvm::SmallVector<Type, 2> arguments;
   for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
     auto found = replacements.find(
       cast<GenericTypeParamType>(gp->getCanonicalType()));
     assert(found != replacements.end() &&
            "Missing generic parameter?");
-    arguments.push_back(TypeLoc::withoutLoc(found->second));
+    arguments.push_back(found->second);
   }
 
   // FIXME: For some reason we can end up with unbound->getDecl()
@@ -477,7 +477,6 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   return TC.applyUnboundGenericArguments(
       unbound, unboundDecl,
       SourceLoc(), DC, arguments,
-      /*options*/TypeResolutionOptions(),
       /*resolver*/nullptr,
       /*unsatisfiedDependency*/nullptr);
 }

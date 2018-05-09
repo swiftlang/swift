@@ -1696,7 +1696,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
-                       ExcludedFlagsBitmask);
+                       ExcludedFlagsBitmask, /*ShowAllAliases*/false);
     return finishDiagProcessing(0);
   }
 

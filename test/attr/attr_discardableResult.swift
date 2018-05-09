@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // ---------------------------------------------------------------------------
 // Mark function's return value as discardable and silence warning

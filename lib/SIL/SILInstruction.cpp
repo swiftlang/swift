@@ -1354,18 +1354,18 @@ operator==(const SILInstructionResultArray &other) {
 
 SILInstructionResultArray::type_range
 SILInstructionResultArray::getTypes() const {
-  std::function<SILType(SILValue)> F = [](SILValue V) -> SILType {
+  SILType (*F)(SILValue) = [](SILValue V) -> SILType {
     return V->getType();
   };
   return {llvm::map_iterator(begin(), F), llvm::map_iterator(end(), F)};
 }
 
 SILInstructionResultArray::iterator SILInstructionResultArray::begin() const {
-  return iterator(*this, getStartOffset());
+  return iterator(*this, 0);
 }
 
 SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
-  return iterator(*this, getEndOffset());
+  return iterator(*this, size());
 }
 
 SILInstructionResultArray::reverse_iterator

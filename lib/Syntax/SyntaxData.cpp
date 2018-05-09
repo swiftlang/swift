@@ -50,3 +50,60 @@ bool SyntaxData::isUnknown() const {
 void SyntaxData::dump(llvm::raw_ostream &OS) const {
   Raw->dump(OS, 0);
 }
+
+RC<SyntaxData> SyntaxData::getPreviousNode() const {
+  if (size_t N = getIndexInParent()) {
+    if (hasParent()) {
+      for (size_t I = N - 1; ; I--) {
+        if (auto C = getParent()->getChild(I)) {
+          return C;
+        }
+        if (I == 0)
+          break;
+      }
+    }
+  }
+  return hasParent() ? Parent->getPreviousNode() : nullptr;
+}
+
+RC<SyntaxData> SyntaxData::getNextNode() const {
+  if (hasParent()) {
+    for (size_t I = getIndexInParent() + 1, N = Parent->getNumChildren();
+         I != N; I++) {
+      if (auto C = getParent()->getChild(I))
+        return C;
+    }
+    return Parent->getNextNode();
+  }
+  return nullptr;
+}
+
+AbsolutePosition SyntaxData::getAbsolutePositionWithLeadingTrivia() const {
+  if (PositionCache.hasValue())
+    return *PositionCache;
+  if (auto P = getPreviousNode()) {
+    auto Result = P->getAbsolutePositionWithLeadingTrivia();
+    P->getRaw()->accumulateAbsolutePosition(Result);
+    // FIXME: avoid using const_cast.
+    const_cast<SyntaxData*>(this)->PositionCache = Result;
+  } else {
+    const_cast<SyntaxData*>(this)->PositionCache = AbsolutePosition();
+  }
+  return *PositionCache;
+}
+
+AbsolutePosition SyntaxData::getAbsolutePosition() const {
+  auto Result = getAbsolutePositionWithLeadingTrivia();
+  getRaw()->accumulateLeadingTrivia(Result);
+  return Result;
+}
+
+AbsolutePosition SyntaxData::getAbsoluteEndPosition() const {
+  if (auto N = getNextNode()) {
+    return N->getAbsolutePositionWithLeadingTrivia();
+  } else {
+    auto Result = getAbsolutePositionWithLeadingTrivia();
+    getRaw()->accumulateAbsolutePosition(Result);
+    return Result;
+  }
+}

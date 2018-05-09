@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // Test the use of 'as' for type coercion (which requires no checking).
 @objc protocol P1 {

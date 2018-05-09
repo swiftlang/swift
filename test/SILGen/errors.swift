@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -enable-sil-ownership -emit-silgen -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 // TODO: Turn back on ownership verification. I turned off the verification on
 // this file since it shows an ownership error that does not affect

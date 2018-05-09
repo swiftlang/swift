@@ -169,11 +169,6 @@ extension ClosedRange.Index : Comparable {
 extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
@@ -396,11 +391,6 @@ extension ClosedRange: Equatable {
 
 extension ClosedRange: Hashable where Bound: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(lowerBound)
     hasher.combine(upperBound)
@@ -505,6 +495,5 @@ extension ClosedRange {
 @available(*, deprecated, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
 
-@available(*, deprecated: 4.2, renamed: "ClosedRange")
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger

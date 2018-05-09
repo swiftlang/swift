@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-objc-interop
 
 // ----------------------------------------------------------------------------
 // DynamicSelf is only allowed on the return type of class and

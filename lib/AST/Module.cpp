@@ -354,7 +354,7 @@ void SourceLookupCache::invalidate() {
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : DeclContext(DeclContextKind::Module, nullptr),
     TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
-    Flags({0, 0, 0}) {
+    Flags() {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
@@ -1127,25 +1127,35 @@ bool ModuleDecl::isSystemModule() const {
   return false;
 }
 
-bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                  llvm::function_ref<bool(ImportedModule)> fn) {
+template<bool respectVisibility>
+static bool
+forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
+                      llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
+  using ImportedModule = ModuleDecl::ImportedModule;
+  using AccessPathTy = ModuleDecl::AccessPathTy;
+  
   llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
-  getImportedModules(stack, ModuleDecl::ImportFilter::Public);
+  auto filter = respectVisibility ? ModuleDecl::ImportFilter::Public
+                                  : ModuleDecl::ImportFilter::All;
+  topLevel->getImportedModules(stack, filter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
-  stack.push_back(ImportedModule(thisPath, this));
+  AccessPathTy overridingPath;
+  if (respectVisibility)
+    overridingPath = thisPath;
+  stack.push_back(ImportedModule(overridingPath, topLevel));
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val();
 
     // Filter any whole-module imports, and skip specific-decl imports if the
     // import path doesn't match exactly.
-    if (next.first.empty())
-      next.first = thisPath;
-    else if (!thisPath.empty() &&
-             !ModuleDecl::isSameAccessPath(next.first, thisPath)) {
+    if (next.first.empty() || !respectVisibility)
+      next.first = overridingPath;
+    else if (!overridingPath.empty() &&
+             !ModuleDecl::isSameAccessPath(next.first, overridingPath)) {
       // If we ever allow importing non-top-level decls, it's possible the rule
       // above isn't what we want.
       assert(next.first.size() == 1 && "import of non-top-level decl");
@@ -1158,10 +1168,19 @@ bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
     if (!fn(next))
       return false;
 
-    next.second->getImportedModulesForLookup(stack);
+    if (respectVisibility)
+      next.second->getImportedModulesForLookup(stack);
+    else
+      next.second->getImportedModules(stack, filter);
   }
 
   return true;
+}
+
+bool
+ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
+                                 llvm::function_ref<bool(ImportedModule)> fn) {
+  return forAllImportedModules<true>(this, thisPath, fn);
 }
 
 bool FileUnit::forAllVisibleModules(
@@ -1189,16 +1208,15 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-
-  const_cast<SourceFile *>(this)->forAllVisibleModules(
-    [&](swift::ModuleDecl::ImportedModule import) {
-      swift::ModuleDecl *next = import.second;
-      if (next->getName() == getParentModule()->getName())
-        return true;
-
-      next->collectLinkLibraries(callback);
+  forAllImportedModules<false>(getParentModule(), /*thisPath*/{},
+                               [=](ModuleDecl::ImportedModule import) -> bool {
+    swift::ModuleDecl *next = import.second;
+    if (next->getName() == getParentModule()->getName())
       return true;
-    });
+
+    next->collectLinkLibraries(callback);
+    return true;
+  });
 }
 
 bool ModuleDecl::walk(ASTWalker &Walker) {

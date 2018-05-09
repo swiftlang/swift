@@ -38,7 +38,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(StringRef)> fn) const;
+                         llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -89,6 +89,11 @@ public:
   /// the expression type checker run before we consider an expression
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
+  
+  /// If non-zero, overrides the default threshold for how many times
+  /// the Space::minus function is called before we consider switch statement
+  /// exhaustiveness checking to be too complex.
+  unsigned SwitchCheckingInvocationThreshold = 0;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;

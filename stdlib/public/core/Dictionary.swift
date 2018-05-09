@@ -1254,7 +1254,7 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-      return _variantBuffer.index(forKey: element) != nil
+      return _variantBuffer.containsKey(element)
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -1450,15 +1450,12 @@ extension Dictionary: Equatable where Value: Equatable {
 
 extension Dictionary: Hashable where Value: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
-      var elementHasher = Hasher()
+      // Note that we use a copy of our own hasher here. This makes hash values
+      // dependent on its state, eliminating static collision patterns.
+      var elementHasher = hasher
       elementHasher.combine(k)
       elementHasher.combine(v)
       commutativeHash ^= elementHasher._finalize()
@@ -2442,9 +2439,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher.finalize() & _bucketMask
+    return k._rawHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3299,8 +3294,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaDictionaryBuffer
   ) {
@@ -3425,6 +3420,23 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func containsKey(_ key: Key) -> Bool {
+    if _fastPath(guaranteedNative) {
+      return asNative.index(forKey: key) != nil
+    }
+
+    switch self {
+    case .native:
+      return asNative.index(forKey: key) != nil
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
+      return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key) != nil
+#endif
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
   internal func assertingGet(_ i: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return asNative.assertingGet(i._nativeIndex)
@@ -3464,8 +3476,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Key
   ) -> Value? {
@@ -4333,19 +4345,24 @@ extension Dictionary.Index {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
+  public func hash(into hasher: inout Hasher) {
+  #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
-      return _nativeIndex.offset
+      hasher.combine(0 as UInt8)
+      hasher.combine(_nativeIndex.offset)
+      return
     }
-
     switch _value {
     case ._native(let nativeIndex):
-      return nativeIndex.offset
-  #if _runtime(_ObjC)
+      hasher.combine(0 as UInt8)
+      hasher.combine(nativeIndex.offset)
     case ._cocoa(let cocoaIndex):
-      return cocoaIndex.currentKeyIndex
-  #endif
+      hasher.combine(1 as UInt8)
+      hasher.combine(cocoaIndex.currentKeyIndex)
     }
+  #else
+    hasher.combine(_nativeIndex.offset)
+  #endif
   }
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -module-name=test -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -module-name=test -enable-sil-ownership -primary-file %s | %FileCheck %s
 
 // Check if we mangle the following constructors, functions, and
 // subscripts correctly.

@@ -1433,16 +1433,18 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
   return call;
 }
 
-llvm::Value *IRGenFunction::emitIsEscapingClosureCall(llvm::Value *value,
-                                                      SourceLoc sourceLoc) {
+llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
+    llvm::Value *value, SourceLoc sourceLoc, unsigned verificationType) {
   auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
   auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
+  auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.Column);
   auto filename = IGM.getAddrOfGlobalString(loc.Filename);
   auto filenameLength =
       llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
+  auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
   llvm::CallInst *call =
       Builder.CreateCall(IGM.getIsEscapingClosureAtFileLocationFn(),
-                         {value, filename, filenameLength, line});
+                         {value, filename, filenameLength, line, col, type});
   call->setDoesNotThrow();
   return call;
 }
@@ -1554,13 +1556,13 @@ public:
     auto boxedInterfaceType = boxedType;
     if (env) {
       boxedInterfaceType = SILType::getPrimitiveType(
-        boxedType.getSwiftRValueType()->mapTypeOutOfContext()
+        boxedType.getASTType()->mapTypeOutOfContext()
            ->getCanonicalType(),
          boxedType.getCategory());
     }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
-        boxedInterfaceType.getSwiftRValueType());
+        boxedInterfaceType.getASTType());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);
     Address rawAddr = project(IGF, allocation, boxedType);
@@ -1715,7 +1717,7 @@ Address irgen::emitAllocateExistentialBoxInBuffer(
     IRGenFunction &IGF, SILType boxedType, Address destBuffer,
     GenericEnvironment *env, const llvm::Twine &name, bool isOutlined) {
   // Get a box for the boxed value.
-  auto boxType = SILBoxType::get(boxedType.getSwiftRValueType());
+  auto boxType = SILBoxType::get(boxedType.getASTType());
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   OwnedAddress owned = boxTI.allocate(IGF, boxedType, env, name);
   Explosion box;
@@ -1910,7 +1912,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      SILType objectType,
                                                      bool suppressCast) {
   return emitHeapMetadataRefForHeapObject(IGF, object,
-                                          objectType.getSwiftRValueType(),
+                                          objectType.getASTType(),
                                           suppressCast);
 }
 
@@ -1965,9 +1967,9 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 bool suppressCast) {
   // If it is known to have swift metadata, just load. A swift class is both
   // heap metadata and type metadata.
-  if (hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType())) {
+  if (hasKnownSwiftMetadata(IGF.IGM, objectType.getASTType())) {
     return emitLoadOfHeapMetadataRef(IGF, object,
-                getIsaEncodingForType(IGF.IGM, objectType.getSwiftRValueType()),
+                getIsaEncodingForType(IGF.IGM, objectType.getASTType()),
                 suppressCast);
   }
 

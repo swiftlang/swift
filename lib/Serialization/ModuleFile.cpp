@@ -852,6 +852,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         GenericEnvironments.assign(scratch.begin(), scratch.end());
         break;
+      case index_block::SUBSTITUTION_MAP_OFFSETS:
+        assert(blobData.empty());
+        SubstitutionMaps.assign(scratch.begin(), scratch.end());
+        break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
         NormalConformances.assign(scratch.begin(), scratch.end());
@@ -1432,6 +1436,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       std::pair<Identifier, SourceLoc> accessPathElem(scopeID, SourceLoc());
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    if (!module->hasResolvedImports()) {
+      // Notice that we check this condition /after/ recording the module that
+      // caused the problem. Clients need to be able to track down what the
+      // cycle was.
+      return error(Status::CircularDependency);
     }
   }
 

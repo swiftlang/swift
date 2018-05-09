@@ -1612,7 +1612,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   for (auto &elt : Condition)
     if (auto pattern = elt.getPatternOrNull())
       pattern->collectVariables(Vars);
-
+  Vars.append(DisabledVars.begin(), DisabledVars.end());
   llvm::SaveAndRestore<decltype(DisabledVars)>
   RestoreCurVars(DisabledVars, Vars);
 

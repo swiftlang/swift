@@ -3529,10 +3529,16 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return parseDeclAssociatedType(Flags, Attributes);
   }
   TmpCtxt.reset();
-  
+
+  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
+                                          /*genericParams*/nullptr,
+                                          CurDeclContext);
+
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    ContextChange CC(*this, TAD);
+
     SyntaxParsingContext InitCtx(SyntaxContext,
                                  SyntaxKind::TypeInitializerClause);
     if (Tok.is(tok::colon)) {
@@ -3540,20 +3546,15 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       // Recognize this and produce a fixit.
       diagnose(Tok, diag::expected_equal_in_typealias)
           .fixItReplace(Tok.getLoc(), " = ");
-      consumeToken(tok::colon);
+      EqualLoc = consumeToken(tok::colon);
     } else {
       EqualLoc = consumeToken(tok::equal);
     }
 
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
     Status |= UnderlyingTy;
-    if (UnderlyingTy.isNull())
-      return Status;
   }
 
-  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          /*genericParams*/nullptr,
-                                          CurDeclContext);
   TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
 
@@ -3567,8 +3568,13 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
-    diagnose(Tok, diag::expected_equal_in_typealias);
-    Status.setIsParseError();
+    // If there is an attempt to do code completion
+    // inside of typealias type, let's just return
+    // because we've seen required '=' token.
+    if (EqualLoc.isInvalid()) {
+      diagnose(Tok, diag::expected_equal_in_typealias);
+      Status.setIsParseError();
+    }
     return Status;
   }
 
@@ -3874,6 +3880,8 @@ static unsigned skipUntilMatchingRBrace(Parser &P,
                                         SyntaxParsingContext *&SyntaxContext) {
   SyntaxParsingContext BlockItemListContext(SyntaxContext,
                                             SyntaxKind::CodeBlockItemList);
+  SyntaxParsingContext BlockItemContext(SyntaxContext,
+                                        SyntaxKind::CodeBlockItem);
   SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
   unsigned OpenBraces = 1;
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
@@ -4250,6 +4258,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         return true;
       }
       ExternalAsmName = true;
+      BlockCtx.setTransparent();
     }
 
     // Set up a function declaration.
@@ -5812,7 +5821,30 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
                                /*allowClassRequirement=*/false,
                                /*allowAnyObject=*/false);
     CD->setInherited(Context.AllocateCopy(Inherited));
-  }
+  
+  // Parse python style inheritance clause and replace parentheses with a colon
+  } else if (Tok.is(tok::l_paren)) {
+    bool isParenStyleInheritance = false;
+    {
+      BacktrackingScope backtrack(*this);
+      consumeToken(tok::l_paren);
+      isParenStyleInheritance = canParseType() &&
+        Tok.isAny(tok::r_paren, tok::kw_where, tok::l_brace, tok::eof);
+    }
+    if(isParenStyleInheritance) {
+      SourceLoc LParenLoc = consumeToken(tok::l_paren);
+      auto TypeResult = parseType();
+      if (TypeResult.isNull()) {
+        Status.setIsParseError();
+        return Status;
+      }
+      SourceLoc RParenLoc;
+      consumeIf(tok::r_paren, RParenLoc);
+      diagnose(LParenLoc, diag::expected_colon_class)
+        .fixItReplace(LParenLoc, ": ")
+        .fixItRemove(RParenLoc);
+    }
+  } 
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 

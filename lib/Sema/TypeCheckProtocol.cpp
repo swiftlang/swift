@@ -91,15 +91,10 @@ struct swift::RequirementCheck {
 };
 
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
-  SmallVector<Substitution, 2> syntheticSubs;
   auto syntheticEnv = ReqEnv->getSyntheticEnvironment();
-  ReqEnv->getRequirementSignature()->getSubstitutions(
-      ReqEnv->getRequirementToSyntheticMap(),
-      syntheticSubs);
   return swift::Witness(this->Witness, WitnessSubstitutions,
-                        syntheticEnv, syntheticSubs);
+                        syntheticEnv, ReqEnv->getRequirementToSyntheticMap());
 }
-
 
 AssociatedTypeDecl *
 swift::getReferencedAssocTypeOfProtocol(Type type, ProtocolDecl *proto) {
@@ -351,14 +346,14 @@ RequirementMatch
 swift::matchWitness(
              TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             const std::function<
+             llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)> 
-               &setup,
-             const std::function<Optional<RequirementMatch>(Type, Type)> 
-               &matchTypes,
-             const std::function<
+               setup,
+             llvm::function_ref<Optional<RequirementMatch>(Type, Type)>
+               matchTypes,
+             llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > &finalize) {
+                   > finalize) {
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
@@ -719,7 +714,7 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
-      if (!replacedInReq)
+      if (!replacedInReq || replacedInReq->hasError())
         continue;
 
       if (reqGenericEnv) {
@@ -787,10 +782,10 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
                             optionalAdjustments);
 
     // Compute the set of substitutions we'll need for the witness.
-    solution->computeSubstitutions(
-      witness->getInnermostDeclContext()->getGenericSignatureOfContext(),
-      witnessLocator,
-      result.WitnessSubstitutions);
+    auto witnessSig =
+      witness->getInnermostDeclContext()->getGenericSignatureOfContext();
+    result.WitnessSubstitutions =
+      solution->computeSubstitutions(witnessSig, witnessLocator);
     
     return result;
   };
@@ -2903,7 +2898,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
   auto *nominal = Adoptee->getAnyNominal();
-  if (DerivedConformance::derivesProtocolConformance(TC, nominal, Proto))
+  if (DerivedConformance::derivesProtocolConformance(TC, DC, nominal, Proto))
     derivingTypeDecl = nominal;
 
   if (!derivingTypeDecl) {
@@ -3579,7 +3574,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
   // conformance to RawRepresentable was inferred.
   if (auto enumDecl = T->getEnumOrBoundGenericEnum()) {
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
-        DerivedConformance::derivesProtocolConformance(TC, enumDecl, Proto) &&
+        DerivedConformance::derivesProtocolConformance(TC, DC, enumDecl,
+                                                       Proto) &&
         enumDecl->hasRawType()) {
 
       auto rawType = enumDecl->getRawType();
@@ -4603,6 +4599,12 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
 
     // Complain about the redundant conformance.
 
+    auto currentSig = dc->getGenericSignatureOfContext();
+    auto existingSig = diag.ExistingDC->getGenericSignatureOfContext();
+    auto differentlyConditional = currentSig && existingSig &&
+                                  currentSig->getCanonicalSignature() !=
+                                      existingSig->getCanonicalSignature();
+
     // If we've redundantly stated a conformance for which the original
     // conformance came from the module of the type or the module of the
     // protocol, just warn; we'll pick up the original conformance.
@@ -4614,11 +4616,13 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
            extendedNominal->getParentModule()->getName() ||
          existingModule == diag.Protocol->getParentModule())) {
       // Warn about the conformance.
-      diagnose(diag.Loc, diag::redundant_conformance_adhoc,
-               dc->getDeclaredInterfaceType(),
+      auto diagID = differentlyConditional
+                        ? diag::redundant_conformance_adhoc_conditional
+                        : diag::redundant_conformance_adhoc;
+      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
                diag.Protocol->getName(),
                existingModule->getName() ==
-                 extendedNominal->getParentModule()->getName(),
+                   extendedNominal->getParentModule()->getName(),
                existingModule->getName());
 
       // Complain about any declarations in this extension whose names match
@@ -4649,19 +4653,22 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         }
       }
     } else {
-      diagnose(diag.Loc, diag::redundant_conformance,
-               dc->getDeclaredInterfaceType(),
+      auto diagID = differentlyConditional
+                        ? diag::redundant_conformance_conditional
+                        : diag::redundant_conformance;
+      diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
                diag.Protocol->getName());
     }
 
     // Special case: explain that 'RawRepresentable' conformance
     // is implied for enums which already declare a raw type.
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
-      if (diag.Protocol->isSpecificProtocol(KnownProtocolKind::RawRepresentable)
-          && DerivedConformance::derivesProtocolConformance(*this, enumDecl,
-                                                            diag.Protocol)
-          && enumDecl->hasRawType()
-          && enumDecl->getInherited()[0].getSourceRange().isValid()) {
+      if (diag.Protocol->isSpecificProtocol(
+              KnownProtocolKind::RawRepresentable) &&
+          DerivedConformance::derivesProtocolConformance(*this, dc, enumDecl,
+                                                         diag.Protocol) &&
+          enumDecl->hasRawType() &&
+          enumDecl->getInherited()[0].getSourceRange().isValid()) {
         diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                  diag::enum_declares_rawrep_with_raw_type,
                  dc->getDeclaredInterfaceType(), enumDecl->getRawType());
@@ -4968,35 +4975,32 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   if (Decl->isInvalid())
     return nullptr;
 
+  DerivedConformance derived(*this, Decl, TypeDecl, protocol);
+
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return DerivedConformance::deriveRawRepresentable(*this, Decl,
-                                                      TypeDecl, Requirement);
+    return derived.deriveRawRepresentable(Requirement);
 
   case KnownProtocolKind::CaseIterable:
-    return DerivedConformance::deriveCaseIterable(*this, Decl,
-                                                  TypeDecl, Requirement);
+    return derived.deriveCaseIterable(Requirement);
 
   case KnownProtocolKind::Equatable:
-    return DerivedConformance::deriveEquatable(*this, Decl, TypeDecl,
-                                               Requirement);
-  
+    return derived.deriveEquatable(Requirement);
+
   case KnownProtocolKind::Hashable:
-    return DerivedConformance::deriveHashable(*this, Decl, TypeDecl,
-                                              Requirement);
-    
+    return derived.deriveHashable(Requirement);
+
   case KnownProtocolKind::BridgedNSError:
-    return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,
-                                                    Requirement);
+    return derived.deriveBridgedNSError(Requirement);
 
   case KnownProtocolKind::CodingKey:
-    return DerivedConformance::deriveCodingKey(*this, Decl, TypeDecl, Requirement);
+    return derived.deriveCodingKey(Requirement);
 
   case KnownProtocolKind::Encodable:
-    return DerivedConformance::deriveEncodable(*this, Decl, TypeDecl, Requirement);
+    return derived.deriveEncodable(Requirement);
 
   case KnownProtocolKind::Decodable:
-    return DerivedConformance::deriveDecodable(*this, Decl, TypeDecl, Requirement);
+    return derived.deriveDecodable(Requirement);
 
   default:
     return nullptr;
@@ -5015,13 +5019,12 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
 
   auto Decl = DC->getInnermostDeclarationDeclContext();
 
+  DerivedConformance derived(*this, Decl, TypeDecl, protocol);
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return DerivedConformance::deriveRawRepresentable(*this, Decl,
-                                                      TypeDecl, AssocType);
+    return derived.deriveRawRepresentable(AssocType);
   case KnownProtocolKind::CaseIterable:
-    return DerivedConformance::deriveCaseIterable(*this, Decl,
-                                                  TypeDecl, AssocType);
+    return derived.deriveCaseIterable(AssocType);
   default:
     return nullptr;
   }

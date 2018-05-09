@@ -126,7 +126,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
          "Address-only optionals cannot use this");
   SILType optType = optTL.getLoweredType();
-  CanType formalOptType = optType.getSwiftRValueType();
+  auto formalOptType = optType.getASTType();
   (void)formalOptType;
 
   assert(formalOptType.getOptionalObjectType());
@@ -435,7 +435,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
           return scope.exitAndBranch(loc, some);
         }
 
-        RValue R(*this, loc, noOptResultTy.getSwiftRValueType(), result);
+        RValue R(*this, loc, noOptResultTy.getASTType(), result);
         ArgumentSource resultValueRV(loc, std::move(R));
         emitInjectOptionalValueInto(loc, std::move(resultValueRV),
                                     finalResult.getValue(), resultTL);
@@ -572,7 +572,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
       if (!nsErrorVar) return emitUndef(loc, existentialTL.getLoweredType());
 
-      SubstitutionList nsErrorVarSubstitutions;
+      SubstitutionMap nsErrorVarSubstitutions;
 
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
@@ -592,7 +592,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       ManagedValue nsError =
           emitRValueForStorageLoad(
               loc, nativeError, concreteFormalType,
-              /*super*/ false, nsErrorVar, RValue(), nsErrorVarSubstitutions,
+              /*super*/ false, nsErrorVar, RValue(),
+              nsErrorVarSubstitutions.toList(),
               AccessSemantics::Ordinary, nsErrorType, SGFContext())
               .getAsSingleValue(*this, loc);
 

@@ -218,7 +218,7 @@ class BridgedProperty : public OutlinePattern {
   SingleValueInstruction *FirstInst; // A load or class_method
   SILBasicBlock *StartBB;
   SwitchInfo switchInfo;
-  ObjCMethodInst *ObjCMethod;;
+  ObjCMethodInst *ObjCMethod;
   StrongReleaseInst *Release;
   ApplyInst *PropApply;
 
@@ -278,18 +278,18 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
   SmallVector<SILParameterInfo, 4> Parameters;
   if (auto *Load = dyn_cast<LoadInst>(FirstInst))
     Parameters.push_back(
-      SILParameterInfo(Load->getType().getSwiftRValueType(),
+      SILParameterInfo(Load->getType().getASTType(),
                        ParameterConvention::Indirect_In_Guaranteed));
   else
     Parameters.push_back(SILParameterInfo(cast<ObjCMethodInst>(FirstInst)
                                               ->getOperand()
                                               ->getType()
-                                              .getSwiftRValueType(),
+                                              .getASTType(),
                                           ParameterConvention::Direct_Unowned));
   SmallVector<SILResultInfo, 4> Results;
 
   Results.push_back(SILResultInfo(
-                      switchInfo.Br->getArg(0)->getType().getSwiftRValueType(),
+                      switchInfo.Br->getArg(0)->getType().getASTType(),
                       ResultConvention::Owned));
   auto ExtInfo =
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
@@ -477,7 +477,7 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
     return false;
 
   // Check that we call the _unconditionallyBridgeFromObjectiveC witness.
-  auto NativeType = Apply->getType().getSwiftRValueType();
+  auto NativeType = Apply->getType().getASTType();
   auto *BridgeFun = FunRef->getReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
@@ -763,7 +763,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   }
 
   // Make sure we are calling the actual bridge witness.
-  auto NativeType = BridgedValue->getType().getSwiftRValueType();
+  auto NativeType = BridgedValue->getType().getASTType();
   auto *BridgeFun = FunRef->getReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
@@ -803,7 +803,7 @@ public:
   operator bool() { return switchInfo.SomeBB != nullptr; }
 
   CanType getReturnType() {
-    return switchInfo.Br->getArg(0)->getType().getSwiftRValueType();
+    return switchInfo.Br->getArg(0)->getType().getASTType();
   }
 
   /// Outline the return value bridging blocks.
@@ -1092,7 +1092,7 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
       Parameters.push_back(SILParameterInfo(BridgedArguments[BridgedArgIdx]
                                                 .bridgedValue()
                                                 ->getType()
-                                                .getSwiftRValueType(),
+                                                .getASTType(),
                                             ParameterConvention::Direct_Owned));
       ++BridgedArgIdx;
     } else {

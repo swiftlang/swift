@@ -33,7 +33,7 @@ Swift 5.0
   class Node {
     var children = [Node]()
 
-    var depth: Int {
+    var depth: Int = 0 {
       didSet {
         if depth < 0 {
           // Will not recursively call didSet, as setting depth on self (same
@@ -49,10 +49,6 @@ Swift 5.0
         }
       }
     }
-
-    init(depth: Int) {
-      self.depth = depth
-    }
   }
   ```
 
@@ -60,6 +56,17 @@ Swift 5.0
 
 Swift 4.2
 ---------
+
+* [SE-0054][]
+
+  `ImplicitlyUnwrappedOptional<T>` is now an unavailable typealias of `Optional<T>`.
+  Declarations annotated with `!` have the type `Optional<T>`. If an
+  expression involving one of these values will not compile successfully with the
+  type `Optional<T>`, it is implicitly unwrapped, producing a value of type `T`.
+
+  In some cases this change will cause code that previously compiled to
+  need to be adjusted. Please see [this blog post](https://swift.org/blog/iuo/)
+  for more information.
 
 * [SE-0206][]
 
@@ -200,6 +207,8 @@ Swift 4.2
 
 Swift 4.1
 ---------
+
+### 2018-03-29 (Xcode 9.3)
 
 * [SE-0075][]
 
@@ -7056,7 +7065,19 @@ Swift 1.0
 [SE-0197]: <https://github.com/apple/swift-evolution/blob/master/proposals/0197-remove-where.md>
 [SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
 [SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
+[SE-0200]: <https://github.com/apple/swift-evolution/blob/master/proposals/0200-raw-string-escaping.md>
+[SE-0201]: <https://github.com/apple/swift-evolution/blob/master/proposals/0201-package-manager-local-dependencies.md>
+[SE-0202]: <https://github.com/apple/swift-evolution/blob/master/proposals/0202-random-unification.md>
+[SE-0203]: <https://github.com/apple/swift-evolution/blob/master/proposals/0203-rename-sequence-elements-equal.md>
+[SE-0204]: <https://github.com/apple/swift-evolution/blob/master/proposals/0204-add-last-methods.md>
+[SE-0205]: <https://github.com/apple/swift-evolution/blob/master/proposals/0205-withUnsafePointer-for-lets.md>
 [SE-0206]: <https://github.com/apple/swift-evolution/blob/master/proposals/0206-hashable-enhancements.md>
+[SE-0207]: <https://github.com/apple/swift-evolution/blob/master/proposals/0207-containsOnly.md>
+[SE-0208]: <https://github.com/apple/swift-evolution/blob/master/proposals/0208-package-manager-system-library-targets.md>
+[SE-0209]: <https://github.com/apple/swift-evolution/blob/master/proposals/0209-package-manager-swift-lang-version-update.md>
+[SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
+[SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
+[SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>

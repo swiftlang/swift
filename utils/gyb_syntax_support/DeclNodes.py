@@ -139,7 +139,7 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating', 'indirect',
+                       'mutating', 'nonmutating', 'indirect', '__consuming'
                    ]),
              Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
              Child('Detail', kind='IdentifierToken', is_optional=True),

@@ -398,6 +398,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::CondBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyAddrInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::RetainValueAddrInst:

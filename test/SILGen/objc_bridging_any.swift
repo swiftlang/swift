@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_any -Xllvm -sil-print-debuginfo -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_any -Xllvm -sil-print-debuginfo -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -698,4 +698,5 @@ class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
 // CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP9hashValueSivgTW
 // CHECK-NEXT: method #Hashable.hash!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP4hash4intoys6HasherVz_tFTW
+// CHECK-NEXT: method #Hashable._rawHashValue!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP13_rawHashValue4seedSis6UInt64V_AHt_tFTW
 // CHECK-NEXT: }

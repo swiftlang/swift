@@ -77,7 +77,7 @@ class BugReducerTester : public SILFunctionTransform {
     auto EmptyTupleCanType = getFunction()
                                  ->getModule()
                                  .Types.getEmptyTupleType()
-                                 .getSwiftRValueType();
+                                 .getASTType();
     ResultInfoArray.push_back(
         SILResultInfo(EmptyTupleCanType, ResultConvention::Unowned));
     auto FuncType = SILFunctionType::get(

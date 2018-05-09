@@ -1378,7 +1378,7 @@ TypeConverter::~TypeConverter() {
     // Destroy only the unique entries.
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
-    CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
+    CanType mappedType = ti.second->getLoweredType().getASTType();
     if (srcType == mappedType || isa<InOutType>(srcType))
       ti.second->~TypeLowering();
   }
@@ -1454,7 +1454,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     // the original type of the element --- the actual archetype
     // doesn't matter, just the abstraction pattern.
     SILType silType = tc.getLoweredType(origEltType, substEltType);
-    CanType loweredSubstEltType = silType.getSwiftRValueType();
+    CanType loweredSubstEltType = silType.getASTType();
 
     changed = (changed || substEltType != loweredSubstEltType);
 
@@ -1477,7 +1477,7 @@ static CanType getLoweredOptionalType(TypeConverter &tc,
 
   CanType loweredObjectType =
       tc.getLoweredType(origType.getOptionalObjectType(), substObjectType)
-          .getSwiftRValueType();
+          .getASTType();
 
   // If the object type didn't change, we don't have to rebuild anything.
   if (loweredObjectType == substObjectType) {
@@ -1494,7 +1494,7 @@ static CanType getLoweredReferenceStorageType(TypeConverter &tc,
   CanType loweredReferentType =
     tc.getLoweredType(origType.getReferenceStorageReferentType(),
                       substType.getReferentType())
-      .getSwiftRValueType();
+      .getASTType();
 
   if (loweredReferentType == substType.getReferentType())
     return substType;
@@ -1664,7 +1664,7 @@ CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
 }
 
 const TypeLowering &TypeConverter::getTypeLowering(SILType type) {
-  auto loweredType = type.getSwiftRValueType();
+  auto loweredType = type.getASTType();
   auto key = getTypeKey(AbstractionPattern(getCurGenericContext(), loweredType),
                         loweredType);
 
@@ -2000,7 +2000,7 @@ SILType TypeConverter::getSubstitutedStorageType(AbstractStorageDecl *value,
   }
 
   SILType silSubstType = getLoweredType(origType, substType).getAddressType();
-  substType = silSubstType.getSwiftRValueType();
+  substType = silSubstType.getASTType();
 
   // Type substitution preserves structural type structure, and the
   // type-of-reference is only different in the outermost structural
@@ -2044,7 +2044,7 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
     // Destroy only the unique entries.
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
-    CanType mappedType = ti.second->getLoweredType().getSwiftRValueType();
+    CanType mappedType = ti.second->getLoweredType().getASTType();
     if (srcType == mappedType)
       ti.second->~TypeLowering();
   }
@@ -2085,7 +2085,7 @@ CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
     // selfMetatypeType.
     if (auto metatype = canSelfType->getAs<MetatypeType>()) {
       if (!metatype->hasRepresentation())
-        canSelfType = getLoweredType(metatype).getSwiftRValueType();
+        canSelfType = getLoweredType(metatype).getASTType();
     }
   }
 
@@ -2294,8 +2294,8 @@ TypeConverter::checkForABIDifferences(SILType type1, SILType type2,
   // Classes, class-constrained archetypes, and pure-ObjC existential types
   // all have single retainable pointer representation; optionality change
   // is allowed.
-  if (type1.getSwiftRValueType()->satisfiesClassConstraint() &&
-      type2.getSwiftRValueType()->satisfiesClassConstraint())
+  if (type1.getASTType()->satisfiesClassConstraint() &&
+      type2.getASTType()->satisfiesClassConstraint())
     return ABIDifference::Trivial;
 
   // Function parameters are ABI compatible if their differences are
@@ -2472,10 +2472,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
     -> ProtocolConformanceRef {
       return ProtocolConformanceRef(conformedTy->getDecl());
     });
-  SmallVector<Substitution, 4> genericArgs;
-  signature->getSubstitutions(subMap, genericArgs);
 
-  auto boxTy = SILBoxType::get(C, layout, genericArgs);
+  auto boxTy = SILBoxType::get(C, layout, subMap);
 #ifndef NDEBUG
   // FIXME: Map the box type out of context when asserting the field so
   // we don't need to push a GenericContextScope (which really ought to die).
@@ -2490,7 +2488,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
          ->getCanonicalType());
   }
   assert(contextBoxTy->getLayout()->getFields().size() == 1
-         && contextBoxTy->getFieldType(M, 0).getSwiftRValueType()
+         && contextBoxTy->getFieldType(M, 0).getASTType()
              == loweredContextType
          && "box field type doesn't match capture!");
 #endif
@@ -2536,28 +2534,26 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 
   if (boxSignature == CanGenericSignature()) {
     auto eltIntfTy = elt->getArgumentInterfaceType();
-    auto boxVarTy = getLoweredType(eltIntfTy).getSwiftRValueType();
+    auto boxVarTy = getLoweredType(eltIntfTy).getASTType();
     auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true));
     return SILBoxType::get(C, layout, {});
   }
 
   // Use the enum's signature for the box type.
-  auto boundEnum = enumType.getSwiftRValueType();
+  auto boundEnum = enumType.getASTType();
 
   // Lower the enum element's argument in the box's context.
   auto eltIntfTy = elt->getArgumentInterfaceType();
   GenericContextScope scope(*this, boxSignature);
   auto boxVarTy = getLoweredType(getAbstractionPattern(elt), eltIntfTy)
-                      .getSwiftRValueType();
+                      .getASTType();
   auto layout = SILLayout::get(C, boxSignature, SILField(boxVarTy, true));
 
   // Instantiate the layout with enum's substitution list.
   auto subMap = boundEnum->getContextSubstitutionMap(
       M.getSwiftModule(), enumDecl, enumDecl->getGenericEnvironment());
-  SmallVector<Substitution, 4> genericArgs;
-  boxSignature->getSubstitutions(subMap, genericArgs);
 
-  auto boxTy = SILBoxType::get(C, layout, genericArgs);
+  auto boxTy = SILBoxType::get(C, layout, subMap);
   return boxTy;
 }
 

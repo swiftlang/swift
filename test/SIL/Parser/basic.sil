@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all=true | %FileCheck %s
 
 sil_stage raw // CHECK: sil_stage raw
 
@@ -1480,7 +1480,9 @@ bb0(%0 : $*Builtin.NativeObject):
 sil @is_escaping_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
 bb0(%0 : $@callee_guaranteed () -> ()):
   // CHECK: %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+  // CHECK: %2 = is_escaping_closure [objc] %0 : $@callee_guaranteed () -> ()
   %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
+  %2 = is_escaping_closure [objc] %0: $@callee_guaranteed () -> ()
   return %1 : $Builtin.Int1
 }
 

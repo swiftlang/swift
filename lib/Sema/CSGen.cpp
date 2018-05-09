@@ -562,7 +562,7 @@ namespace {
   /// overloads which inhibit any overload from being favored.
   void favorCallOverloads(ApplyExpr *expr,
                           ConstraintSystem &CS,
-                          std::function<bool(ValueDecl *)> isFavored,
+                          llvm::function_ref<bool(ValueDecl *)> isFavored,
                           std::function<bool(ValueDecl *)>
                               mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.
@@ -1164,13 +1164,16 @@ namespace {
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
-      // If the expression has already been assigned a type; just use that type.
-      return E->getType();
+      if (!E->isActivated())
+        return Type();
+
+      return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                   TVO_CanBindToLValue);
     }
 
     Type visitLiteralExpr(LiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
-      if (expr->getType() && !expr->getType()->hasTypeVariable())
+      if (expr->getType())
         return expr->getType();
 
       auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
@@ -1234,7 +1237,7 @@ namespace {
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
-      if (expr->getType() && !expr->getType()->hasTypeVariable())
+      if (expr->getType())
         return expr->getType();
 
       auto &tc = CS.getTypeChecker();
@@ -3553,7 +3556,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
   ConstraintSystem CS(*TC, &DC, Options);
   Parent = Parent->walk(SanitizeExpr(CS));
-  CleanupIllFormedExpressionRAII cleanup(TC->Context, Parent);
+  CleanupIllFormedExpressionRAII cleanup(Parent);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);

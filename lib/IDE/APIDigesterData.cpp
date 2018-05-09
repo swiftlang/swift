@@ -482,6 +482,22 @@ struct swift::ide::api::APIDiffItemStore::Implementation {
 private:
   llvm::SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> AllBuffer;
   llvm::BumpPtrAllocator Allocator;
+
+  static bool shouldInclude(APIDiffItem *Item) {
+    if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+      if (CI->rightCommentUnderscored())
+        return false;
+
+      // Ignore constructor's return value rewritten.
+      if (CI->DiffKind == NodeAnnotation::TypeRewritten &&
+          CI->NodeKind == SDKNodeKind::DeclConstructor &&
+          CI->getChildIndices().front() == 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
 public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
   bool PrintUsr;
@@ -507,14 +523,13 @@ public:
         APIDiffItem *Item = serializeDiffItem(Allocator,
           cast<llvm::yaml::MappingNode>(&*It));
         auto &Bag = Data[Item->getKey()];
-        if (std::find_if(Bag.begin(), Bag.end(),
+        if (shouldInclude(Item) && std::find_if(Bag.begin(), Bag.end(),
             [&](APIDiffItem* I) { return *Item == *I; }) == Bag.end()) {
           Bag.push_back(Item);
           AllItems.push_back(Item);
         }
       }
     }
-
   }
 };
 

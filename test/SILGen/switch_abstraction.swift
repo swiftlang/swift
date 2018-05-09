@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name switch_abstraction -emit-silgen -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch_abstraction -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
 
 struct A {}
 

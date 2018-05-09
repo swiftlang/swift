@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
 
 public enum E: Int {
   case a, b, c

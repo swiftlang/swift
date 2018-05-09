@@ -578,9 +578,9 @@ public:
       verifyChecked(type, visitedArchetypes);
     }
 
-    void verifyChecked(
-           Type type,
-           llvm::SmallPtrSet<ArchetypeType *, 4> &visitedArchetypes) {
+    void
+    verifyChecked(Type type,
+                  llvm::SmallPtrSetImpl<ArchetypeType *> &visitedArchetypes) {
       if (!type)
         return;
 
@@ -2416,6 +2416,10 @@ public:
       }
     }
 
+    void verifyChecked(SubstitutionMap substitutions){
+      // FIXME: Check replacement types without forcing anything.
+    }
+
     /// Check the given explicit protocol conformance.
     void verifyConformance(Decl *decl, ProtocolConformance *conformance) {
       PrettyStackTraceDecl debugStack("verifying protocol conformance", decl);
@@ -2525,11 +2529,8 @@ public:
           if (auto *genericEnv = witness.getSyntheticEnvironment())
             GenericEnv.push_back({genericEnv});
 
-          for (const auto &sub : witness.getRequirementToSyntheticSubs())
-            verifyChecked(sub.getReplacement());
-
-          for (const auto &sub : witness.getSubstitutions())
-            verifyChecked(sub.getReplacement());
+          verifyChecked(witness.getRequirementToSyntheticSubs());
+          verifyChecked(witness.getSubstitutions());
 
           if (auto *genericEnv = witness.getSyntheticEnvironment()) {
             assert(GenericEnv.back().storage.dyn_cast<GenericEnvironment *>()
@@ -3414,9 +3415,8 @@ public:
 
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
-    void checkSourceRanges(SourceRange Current,
-                           ASTWalker::ParentTy Parent,
-                           std::function<void()> printEntity) {
+    void checkSourceRanges(SourceRange Current, ASTWalker::ParentTy Parent,
+                           llvm::function_ref<void()> printEntity) {
       SourceRange Enclosing;
       if (Parent.isNull())
           return;

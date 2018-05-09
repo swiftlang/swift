@@ -16,12 +16,14 @@
 
 #include "swift/AST/ASTContext.h"
 #include "ForeignRepresentationInfo.h"
+#include "SubstitutionMapStorage.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
@@ -30,6 +32,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Compiler.h"
@@ -309,6 +312,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
+    /// The set of substitution maps (uniqued by their storage).
+    llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
+
     ~Arena() {
       for (auto &conformance : SpecializedConformances)
         conformance.~SpecializedProtocolConformance();
@@ -424,6 +430,7 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
 static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
   auto M = ModuleDecl::create(ctx.getIdentifier(BUILTIN_NAME), ctx);
   M->addFile(*new (ctx) BuiltinUnit(*M));
+  M->setHasResolvedImports();
   return M;
 }
 
@@ -1863,16 +1870,13 @@ static ProtocolConformance *collapseSpecializedConformance(
 ProtocolConformance *
 ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
-                                      SubstitutionList substitutions,
-                                      bool alreadyCheckedCollapsed) {
+                                      SubstitutionMap substitutions) {
   // If we are performing a substitution that would get us back to the
   // a prior conformance (e.g., mapping into and then out of a conformance),
   // return the existing conformance.
-  if (!alreadyCheckedCollapsed) {
-    if (auto existing = collapseSpecializedConformance(type, generic)) {
-      ++NumCollapsedSpecializedProtocolConformances;
-      return existing;
-    }
+  if (auto existing = collapseSpecializedConformance(type, generic)) {
+    ++NumCollapsedSpecializedProtocolConformances;
+    return existing;
   }
 
   llvm::FoldingSetNodeID id;
@@ -1888,32 +1892,11 @@ ASTContext::getSpecializedConformance(Type type,
     return result;
 
   // Build a new specialized conformance.
-  substitutions = AllocateCopy(substitutions, arena);
   auto result
     = new (*this, arena) SpecializedProtocolConformance(type, generic,
                                                         substitutions);
   specializedConformances.InsertNode(result, insertPos);
   return result;
-}
-
-ProtocolConformance *
-ASTContext::getSpecializedConformance(Type type,
-                                      ProtocolConformance *generic,
-                                      const SubstitutionMap &subMap) {
-  // If we are performing a substitution that would get us back to the
-  // a prior conformance (e.g., mapping into and then out of a conformance),
-  // return the existing conformance.
-  if (auto existing = collapseSpecializedConformance(type, generic)) {
-    ++NumCollapsedSpecializedProtocolConformances;
-    return existing;
-  }
-
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = generic->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
-
-  return getSpecializedConformance(type, generic, subs,
-                                   /*alreadyCheckedCollapsed=*/true);
 }
 
 InheritedProtocolConformance *
@@ -2341,20 +2324,25 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
 void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
   bool ImportsFoundationModule = false;
 
-  if (SF.Kind == SourceFileKind::SIL ||
-      !LangOpts.EnableObjCAttrRequiresFoundation)
-    return;
+  if (LangOpts.EnableObjCInterop) {
+    if (!LangOpts.EnableObjCAttrRequiresFoundation)
+      return;
+    if (SF.Kind == SourceFileKind::SIL)
+      return;
+  }
 
   SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
     if (import.second->getName() == Id_Foundation)
       ImportsFoundationModule = true;
-    return true;
   });
 
   if (ImportsFoundationModule)
     return;
 
   for (auto Attr : SF.AttrsRequiringFoundation) {
+    if (!LangOpts.EnableObjCInterop)
+      Diags.diagnose(Attr->getLocation(), diag::objc_interop_disabled)
+        .fixItRemove(Attr->getRangeWithAt());
     Diags.diagnose(Attr->getLocation(),
                    diag::attr_used_without_required_module,
                    Attr, Id_Foundation)
@@ -2881,9 +2869,9 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
 //===----------------------------------------------------------------------===//
 
 NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
-                                       const SubstitutionMap &substitutions,
-                                       Type underlying,
-                                       RecursiveTypeProperties properties)
+                             const SubstitutionMap &substitutions,
+                             Type underlying,
+                             RecursiveTypeProperties properties)
     : SugarType(TypeKind::NameAlias, underlying, properties),
       typealias(typealias) {
   // Record the parent (or absence of a parent).
@@ -2896,23 +2884,16 @@ NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
 
   // Record the substitutions.
   if (auto genericSig = substitutions.getGenericSignature()) {
-    SmallVector<Substitution, 4> flatSubs;
-    genericSig->getSubstitutions(substitutions, flatSubs);
-    Bits.NameAliasType.NumSubstitutions = flatSubs.size();
-    std::copy(flatSubs.begin(), flatSubs.end(),
-              getTrailingObjects<Substitution>());
-
-    *getTrailingObjects<GenericSignature *>() = genericSig;
+    Bits.NameAliasType.HasSubstitutionMap = true;
+    *getTrailingObjects<SubstitutionMap>() = substitutions;
   } else {
-    Bits.NameAliasType.NumSubstitutions = 0;
+    Bits.NameAliasType.HasSubstitutionMap = false;
   }
 }
 
-NameAliasType *NameAliasType::get(
-                                        TypeAliasDecl *typealias,
-                                        Type parent,
-                                        const SubstitutionMap &substitutions,
-                                        Type underlying) {
+NameAliasType *NameAliasType::get(TypeAliasDecl *typealias, Type parent,
+                                  const SubstitutionMap &substitutions,
+                                  Type underlying) {
   // Compute the recursive properties.
   //
   auto properties = underlying->getRecursiveProperties();
@@ -2947,11 +2928,8 @@ NameAliasType *NameAliasType::get(
     return result;
 
   // Build a new type.
-  unsigned numSubstitutions =
-    genericSig ? genericSig->getSubstitutionListSize() : 0;
-  auto size =
-    totalSizeToAlloc<Type, GenericSignature *, Substitution>(
-                        parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
+  auto size = totalSizeToAlloc<Type, SubstitutionMap>(parent ? 1 : 0,
+                                                      genericSig ? 1 : 0);
   auto mem = ctx.Allocate(size, alignof(NameAliasType), arena);
   auto result = new (mem) NameAliasType(typealias, parent, substitutions,
                                         underlying, storedProperties);
@@ -4307,6 +4285,76 @@ CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
   delete Log;
 }
 
+void SubstitutionMap::Storage::Profile(
+                               llvm::FoldingSetNodeID &id,
+                               GenericSignature *genericSig,
+                               ArrayRef<Type> replacementTypes,
+                               ArrayRef<ProtocolConformanceRef> conformances) {
+  id.AddPointer(genericSig);
+  if (!genericSig) return;
+
+  // Profile those replacement types that corresponding to canonical generic
+  // parameters within the generic signature.
+  id.AddInteger(replacementTypes.size());
+  auto genericParams = genericSig->getGenericParams();
+  for (unsigned i : indices(genericParams)) {
+    auto gp = genericParams[i];
+    if (genericSig->isCanonicalTypeInContext(gp->getCanonicalType()))
+      id.AddPointer(replacementTypes[i].getPointer());
+    else
+      id.AddPointer(nullptr);
+  }
+
+  // Conformances.
+  id.AddInteger(conformances.size());
+  for (auto conformance : conformances)
+    id.AddPointer(conformance.getOpaqueValue());
+}
+
+SubstitutionMap::Storage *SubstitutionMap::Storage::get(
+                            GenericSignature *genericSig,
+                            ArrayRef<Type> replacementTypes,
+                            ArrayRef<ProtocolConformanceRef> conformances) {
+  // If there is no generic signature, we need no storage.
+  if (!genericSig) {
+    assert(replacementTypes.empty());
+    assert(conformances.empty());
+    return nullptr;
+  }
+
+  // Figure out which arena this should go in.
+  RecursiveTypeProperties properties;
+  for (auto type : replacementTypes) {
+    if (type)
+      properties |= type->getRecursiveProperties();
+  }
+
+  // Profile the substitution map.
+  llvm::FoldingSetNodeID id;
+  SubstitutionMap::Storage::Profile(id, genericSig, replacementTypes,
+                                    conformances);
+
+  auto arena = getArena(properties);
+
+  // Did we already record this substitution map?
+  auto &ctx = genericSig->getASTContext();
+  void *insertPos;
+  auto &substitutionMaps = ctx.Impl.getArena(arena).SubstitutionMaps;
+  if (auto result = substitutionMaps.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Allocate the appropriate amount of storage for the signature and its
+  // replacement types and conformances.
+  auto size = Storage::totalSizeToAlloc<Type, ProtocolConformanceRef>(
+                                                      replacementTypes.size(),
+                                                      conformances.size());
+  auto mem = ctx.Allocate(size, alignof(Storage), arena);
+
+  auto result = new (mem) Storage(genericSig, replacementTypes, conformances);
+  substitutionMaps.InsertNode(result, insertPos);
+  return result;
+}
+
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
                               TypeArrayView<GenericTypeParamType> genericParams,
                               ArrayRef<Requirement> requirements) {
@@ -4853,25 +4901,20 @@ SILLayout *SILLayout::get(ASTContext &C,
 
 CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
-                              SubstitutionList Args) {
-  llvm::FoldingSetNodeID id;
-
+                              SubstitutionMap Substitutions) {
   // Canonicalize substitutions.
-  SmallVector<Substitution, 4> CanArgs;
-  Args = getCanonicalSubstitutionList(Args, CanArgs);
-
-  Profile(id, Layout, Args);
+  Substitutions = Substitutions.getCanonical();
 
   // Return an existing layout if there is one.
   void *insertPos;
   auto &SILBoxTypes = C.Impl.SILBoxTypes;
-
+  llvm::FoldingSetNodeID id;
+  Profile(id, Layout, Substitutions);
   if (auto existing = SILBoxTypes.FindNodeOrInsertPos(id, insertPos))
     return CanSILBoxType(existing);
 
-  void *memory = C.Allocate(totalSizeToAlloc<Substitution>(Args.size()),
-                            alignof(SILBoxType));
-  auto newBox = ::new (memory) SILBoxType(C, Layout, Args);
+  auto newBox = new (C, AllocationArena::Permanent) SILBoxType(C, Layout,
+                                                               Substitutions);
   SILBoxTypes.InsertNode(newBox, insertPos);
   return CanSILBoxType(newBox);
 }
@@ -4881,12 +4924,20 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
 CanSILBoxType SILBoxType::get(CanType boxedType) {
   auto &ctx = boxedType->getASTContext();
   auto singleGenericParamSignature = ctx.getSingleGenericParameterSignature();
+  auto genericParam = singleGenericParamSignature->getGenericParams()[0];
   auto layout = SILLayout::get(ctx, singleGenericParamSignature,
-                               SILField(CanType(singleGenericParamSignature
-                                  ->getGenericParams()[0]),
-                               /*mutable*/ true));
+                               SILField(CanType(genericParam),
+                                        /*mutable*/ true));
 
-  return get(boxedType->getASTContext(), layout, Substitution(boxedType, {}));
+  SubstitutionMap subMap =
+    singleGenericParamSignature->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        if (type->isEqual(genericParam)) return boxedType;
+
+        return nullptr;
+      },
+      MakeAbstractConformanceForGenericType());
+  return get(boxedType->getASTContext(), layout, subMap);
 }
 
 LayoutConstraint

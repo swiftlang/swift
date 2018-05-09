@@ -2449,8 +2449,6 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
-
-      return true;
     });
   }
 

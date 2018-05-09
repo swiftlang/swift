@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/macros_redef.h -emit-silgen %s | %FileCheck -check-prefix=NEGATIVE %s
-
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -import-objc-header %S/Inputs/macros_redef.h -DCONFLICT -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -enable-objc-interop -import-objc-header %S/Inputs/macros_redef.h -emit-silgen %s | %FileCheck -check-prefix=NEGATIVE %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -enable-objc-interop -import-objc-header %S/Inputs/macros_redef.h -DCONFLICT -typecheck -verify %s
 
 // NEGATIVE-NOT: OLDTAG
 

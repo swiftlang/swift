@@ -484,23 +484,13 @@ extension Set: Equatable {
 }
 
 extension Set: Hashable {
-  /// The hash value for the set.
-  ///
-  /// Two sets that are equal will always have equal hash values.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
-    return _hashValue(for: self)
-  }
-
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var hash = 0
+    let seed = hasher._generateSeed()
     for member in self {
-      hash ^= _hashValue(for: member)
+      hash ^= member._rawHashValue(seed: seed)
     }
     hasher.combine(hash)
   }
@@ -2049,9 +2039,7 @@ extension _NativeSetBuffer where Element: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher._finalize() & _bucketMask
+    return k._rawHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2836,8 +2824,8 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaSetBuffer
   ) {
@@ -2999,8 +2987,8 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Key
   ) -> Value? {
@@ -3661,19 +3649,24 @@ extension Set.Index {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
+  public func hash(into hasher: inout Hasher) {
+  #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
-      return _nativeIndex.offset
+      hasher.combine(0 as UInt8)
+      hasher.combine(_nativeIndex.offset)
+      return
     }
-
     switch _value {
     case ._native(let nativeIndex):
-      return nativeIndex.offset
-  #if _runtime(_ObjC)
+      hasher.combine(0 as UInt8)
+      hasher.combine(nativeIndex.offset)
     case ._cocoa(let cocoaIndex):
-      return cocoaIndex.currentKeyIndex
-  #endif
+      hasher.combine(1 as UInt8)
+      hasher.combine(cocoaIndex.currentKeyIndex)
     }
+  #else
+    hasher.combine(_nativeIndex.offset)
+  #endif
   }
 }
 

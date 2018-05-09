@@ -25,6 +25,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SubstitutionList.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -332,11 +333,6 @@ protected:
     CoroutineKind : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SILBoxType, TypeBase, 32,
-    : NumPadBits,
-    NumGenericArgs : 32
-  );
-
   SWIFT_INLINE_BITFIELD(AnyMetatypeType, TypeBase, 2,
     /// The representation of the metatype.
     ///
@@ -373,14 +369,14 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+16,
+  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+1,
     : NumPadBits,
 
     /// Whether we have a parent type.
     HasParent : 1,
 
-    /// The number of substitutions.
-    NumSubstitutions : 16
+    /// Whether we have a substitution map.
+    HasSubstitutionMap : 1
   );
 
   } Bits;
@@ -835,7 +831,7 @@ public:
   /// paramsAndResultMatch which determines in a client-specific way
   /// whether the parameters and result of the types match.
   bool matchesFunctionType(Type other, TypeMatchOptions matchOptions,
-                           std::function<bool()> paramsAndResultMatch);
+                           llvm::function_ref<bool()> paramsAndResultMatch);
 
   /// \brief Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,
@@ -1592,8 +1588,7 @@ public:
 /// set of substitutions to apply to make the type concrete.
 class NameAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<NameAliasType, Type, GenericSignature *,
-                          Substitution>
+    llvm::TrailingObjects<NameAliasType, Type, SubstitutionMap>
 {
   TypeAliasDecl *typealias;
 
@@ -1601,30 +1596,20 @@ class NameAliasType final
   friend TrailingObjects;
 
   NameAliasType(TypeAliasDecl *typealias, Type parent,
-                     const SubstitutionMap &substitutions, Type underlying,
-                     RecursiveTypeProperties properties);
-
-  unsigned getNumSubstitutions() const {
-    return Bits.NameAliasType.NumSubstitutions;
-  }
+                const SubstitutionMap &substitutions, Type underlying,
+                RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
     return Bits.NameAliasType.HasParent ? 1 : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericSignature *>) const {
-    return getNumSubstitutions() > 0 ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<Substitution>) const {
-    return getNumSubstitutions();
+  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
+    return Bits.NameAliasType.HasSubstitutionMap ? 1 : 0;
   }
 
   /// Retrieve the generic signature used for substitutions.
   GenericSignature *getGenericSignature() const {
-    return getNumSubstitutions() > 0
-             ? *getTrailingObjects<GenericSignature *>()
-             : nullptr;
+    return getSubstitutionMap().getGenericSignature();
   }
 
 public:
@@ -1642,18 +1627,17 @@ public:
   /// written before ".", if provided.
   Type getParent() const {
     return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
-                                             : Type();
-  }
-
-  /// Retrieve the set of substitutions to be applied to the declaration to
-  /// produce the underlying type.
-  SubstitutionList getSubstitutionList() const {
-    return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
+                                        : Type();
   }
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
-  SubstitutionMap getSubstitutionMap() const;
+  SubstitutionMap getSubstitutionMap() const {
+    if (!Bits.NameAliasType.HasSubstitutionMap)
+      return SubstitutionMap();
+
+    return *getTrailingObjects<SubstitutionMap>();
+  }
 
   /// Get the innermost generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration in
@@ -4080,31 +4064,22 @@ typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
 
 /// The SIL-only type for boxes, which represent a reference to a (non-class)
 /// refcounted value referencing an aggregate with a given lowered layout.
-class SILBoxType final : public TypeBase,
-                         public llvm::FoldingSetNode,
-                         private llvm::TrailingObjects<SILBoxType,Substitution>
+class SILBoxType final : public TypeBase, public llvm::FoldingSetNode
 {
-  friend TrailingObjects;
-  
   SILLayout *Layout;
-
-  static RecursiveTypeProperties
-  getRecursivePropertiesFromSubstitutions(SubstitutionList Args);
+  SubstitutionMap Substitutions;
 
   SILBoxType(ASTContext &C,
-             SILLayout *Layout, SubstitutionList Args);
+             SILLayout *Layout, SubstitutionMap Substitutions);
 
 public:
   static CanSILBoxType get(ASTContext &C,
                            SILLayout *Layout,
-                           SubstitutionList Args);
+                           SubstitutionMap Substitutions);
 
   SILLayout *getLayout() const { return Layout; }
-  SubstitutionList getGenericArgs() const {
-    return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
-                              Bits.SILBoxType.NumGenericArgs);
-  }
-  
+  SubstitutionMap getSubstitutions() const { return Substitutions; }
+
   // In SILType.h:
   CanType getFieldLoweredType(SILModule &M, unsigned index) const;
   SILType getFieldType(SILModule &M, unsigned index) const;
@@ -4122,11 +4097,11 @@ public:
   /// Produce a profile of this box, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       SILLayout *Layout,
-                      SubstitutionList Args);
+                      SubstitutionMap Args);
   
   /// \brief Produce a profile of this box, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
-    Profile(id, getLayout(), getGenericArgs());
+    Profile(id, getLayout(), getSubstitutions());
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
@@ -5437,7 +5412,6 @@ struct DenseMapInfo<swift::BuiltinIntegerWidth> {
     return a == b;
   }
 };
-
 
 }
   

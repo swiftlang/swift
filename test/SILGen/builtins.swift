@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -enable-sil-ownership -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 

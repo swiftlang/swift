@@ -91,7 +91,8 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
-                       "Swift Module Wrapper", options::ModuleWrapOption, 0);
+                       "Swift Module Wrapper", options::ModuleWrapOption, 0,
+                       /*ShowAllAliases*/false);
       return 1;
     }
 

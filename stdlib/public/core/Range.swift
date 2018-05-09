@@ -406,11 +406,6 @@ extension Range: Equatable {
 
 extension Range: Hashable where Bound: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(lowerBound)
     hasher.combine(upperBound)
@@ -910,10 +905,8 @@ extension Range {
   }
 }
 
-@available(*, deprecated, renamed: "Range")
 public typealias CountableRange<Bound: Strideable> = Range<Bound>
   where Bound.Stride : SignedInteger
 
-@available(*, deprecated: 4.2, renamed: "PartialRangeFrom")
 public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
   where Bound.Stride : SignedInteger

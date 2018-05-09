@@ -568,6 +568,19 @@ GenericEnvironmentID Serializer::addGenericEnvironmentRef(
   return id;
 }
 
+SubstitutionMapID Serializer::addSubstitutionMapRef(
+                                              SubstitutionMap substitutions) {
+  if (!substitutions) return 0;
+
+  auto &id = SubstitutionMapIDs[substitutions];
+  if (id != 0)
+    return id;
+
+  id = ++LastSubstitutionMapID;
+  SubstitutionMapsToWrite.push(substitutions);
+  return id;
+}
+
 DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   switch (DC->getContextKind()) {
   case DeclContextKind::Module:
@@ -787,6 +800,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, LOCAL_DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_SIGNATURE_OFFSETS);
   BLOCK_RECORD(index_block, GENERIC_ENVIRONMENT_OFFSETS);
+  BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
   BLOCK_RECORD(index_block, DECL_CONTEXT_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
   BLOCK_RECORD(index_block, NORMAL_CONFORMANCE_OFFSETS);
@@ -831,8 +845,6 @@ void Serializer::writeBlockInfoBlock() {
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::BOUND_GENERIC_SUBSTITUTION);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::ABSTRACT_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -1459,6 +1471,34 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
                            DeclTypeAbbrCodes);
 }
 
+void Serializer::writeSubstitutionMap(const SubstitutionMap substitutions) {
+  using namespace decls_block;
+  assert(substitutions);
+
+  // Record the offset of this substitution map.
+  auto id = SubstitutionMapIDs[substitutions];
+  assert(id != 0 && "generic environment not referenced properly");
+  (void)id;
+
+  // Record the current bit.
+  assert((id - 1) == SubstitutionMapOffsets.size());
+  SubstitutionMapOffsets.push_back(Out.GetCurrentBitNo());
+
+  // Collect the replacement types.
+  SmallVector<uint64_t, 4> rawReplacementTypes;
+  for (auto type : substitutions.getReplacementTypes())
+    rawReplacementTypes.push_back(addTypeRef(type));
+
+  auto substitutionsAbbrCode = DeclTypeAbbrCodes[SubstitutionMapLayout::Code];
+  SubstitutionMapLayout::emitRecord(Out, ScratchRecord, substitutionsAbbrCode,
+                                    addGenericSignatureRef(
+                                      substitutions.getGenericSignature()),
+                                    substitutions.getConformances().size(),
+                                    rawReplacementTypes);
+
+  writeConformances(substitutions.getConformances(), DeclTypeAbbrCodes);
+}
+
 void Serializer::writeSILLayout(SILLayout *layout) {
   using namespace decls_block;
   auto foundLayoutID = SILLayouts.find(layout);
@@ -1537,10 +1577,10 @@ void Serializer::writeNormalConformance(
         data.push_back(/*null generic signature*/0);
       }
 
-      auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
-
-      data.push_back(reqToSyntheticSubs.size());
-      data.push_back(witness.getSubstitutions().size());
+      data.push_back(
+        addSubstitutionMapRef(witness.getRequirementToSyntheticSubs()));
+      data.push_back(
+        addSubstitutionMapRef(witness.getSubstitutions()));
   });
 
   unsigned numSignatureConformances =
@@ -1559,21 +1599,6 @@ void Serializer::writeNormalConformance(
   // Write requirement signature conformances.
   for (auto reqConformance : conformance->getSignatureConformances())
     writeConformance(reqConformance, DeclTypeAbbrCodes);
-  
-  conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req, Witness witness) {
-   // Bail out early for simple witnesses.
-   if (!witness.getDecl()) return;
-
-   // Write requirement-to-synthetic substitutions.
-   writeSubstitutions(witness.getRequirementToSyntheticSubs(),
-                      DeclTypeAbbrCodes, nullptr);
-
-   // Write the witness substitutions.
-   writeSubstitutions(witness.getSubstitutions(),
-                      DeclTypeAbbrCodes,
-                      witness.getSyntheticEnvironment());
-  });
 }
 
 void
@@ -1623,16 +1648,15 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
   case ProtocolConformanceKind::Specialized: {
     auto conf = cast<SpecializedProtocolConformance>(conformance);
-    auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
       type = type->mapTypeOutOfContext();
-    SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
-                                                     abbrCode,
-                                                     addTypeRef(type),
-                                                     substitutions.size());
-    writeSubstitutions(substitutions, abbrCodes, genericEnv);
+    SpecializedProtocolConformanceLayout::emitRecord(
+                           Out, ScratchRecord,
+                           abbrCode,
+                           addTypeRef(type),
+                           addSubstitutionMapRef(conf->getSubstitutionMap()));
 
     writeConformance(conf->getGenericConformance(), abbrCodes, genericEnv);
     break;
@@ -1672,30 +1696,6 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
 
   for (auto conformance : conformances)
     writeConformance(conformance, abbrCodes);
-}
-
-void
-Serializer::writeSubstitutions(SubstitutionList substitutions,
-                               const std::array<unsigned, 256> &abbrCodes,
-                               GenericEnvironment *genericEnv) {
-  using namespace decls_block;
-  auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
-
-  for (auto &sub : substitutions) {
-    auto replacementType = sub.getReplacement();
-    if (genericEnv && replacementType->hasArchetype()) {
-      replacementType = replacementType->mapTypeOutOfContext();
-    }
-
-    BoundGenericSubstitutionLayout::emitRecord(
-      Out, ScratchRecord, abbrCode,
-      addTypeRef(replacementType),
-      sub.getConformances().size());
-
-    for (auto conformance : sub.getConformances()) {
-      writeConformance(conformance, abbrCodes, genericEnv);
-    }
-  }
 }
 
 static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
@@ -3623,14 +3623,13 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(
-                             Out, ScratchRecord, abbrCode,
-                             addDeclRef(typeAlias,
-                                        /*forceSerialization*/false,
-                                        /*allowTypeAliasXRef*/true),
-                             addTypeRef(alias->getParent()),
-                             addTypeRef(alias->getSinglyDesugaredType()));
-    // Write the set of substitutions.
-    writeSubstitutions(alias->getSubstitutionList(), DeclTypeAbbrCodes);
+                           Out, ScratchRecord, abbrCode,
+                           addDeclRef(typeAlias,
+                                      /*forceSerialization*/false,
+                                      /*allowTypeAliasXRef*/true),
+                           addTypeRef(alias->getParent()),
+                           addTypeRef(alias->getSinglyDesugaredType()),
+                           addSubstitutionMapRef(alias->getSubstitutionMap()));
     break;
   }
 
@@ -3813,17 +3812,8 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
 
-#ifndef NDEBUG
-    if (auto sig = boxTy->getLayout()->getGenericSignature()) {
-      assert(sig->getSubstitutionListSize()
-               == boxTy->getGenericArgs().size());
-    }
-#endif
-
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef);
-
-    // Write the set of substitutions.
-    writeSubstitutions(boxTy->getGenericArgs(), DeclTypeAbbrCodes);
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef,
+                          addSubstitutionMapRef(boxTy->getSubstitutions()));
     break;
   }
       
@@ -4001,7 +3991,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
-  registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();
@@ -4053,6 +4042,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<LayoutRequirementLayout>();
   registerDeclTypeAbbr<GenericSignatureLayout>();
   registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
+  registerDeclTypeAbbr<SubstitutionMapLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
   registerDeclTypeAbbr<DeclContextLayout>();
@@ -4123,6 +4113,12 @@ void Serializer::writeAllDeclsAndTypes() {
       writeGenericEnvironment(next);
     }
 
+    while (!SubstitutionMapsToWrite.empty()) {
+      auto next = SubstitutionMapsToWrite.front();
+      SubstitutionMapsToWrite.pop();
+      writeSubstitutionMap(next);
+    }
+
     while (!NormalConformancesToWrite.empty()) {
       auto next = NormalConformancesToWrite.front();
       NormalConformancesToWrite.pop();
@@ -4140,6 +4136,7 @@ void Serializer::writeAllDeclsAndTypes() {
            !SILLayoutsToWrite.empty() ||
            !GenericSignaturesToWrite.empty() ||
            !GenericEnvironmentsToWrite.empty() ||
+           !SubstitutionMapsToWrite.empty() ||
            !NormalConformancesToWrite.empty());
 }
 
@@ -4938,6 +4935,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     writeOffsets(Offsets, LocalDeclContextOffsets);
     writeOffsets(Offsets, GenericSignatureOffsets);
     writeOffsets(Offsets, GenericEnvironmentOffsets);
+    writeOffsets(Offsets, SubstitutionMapOffsets);
     writeOffsets(Offsets, NormalConformanceOffsets);
     writeOffsets(Offsets, SILLayoutOffsets);
 

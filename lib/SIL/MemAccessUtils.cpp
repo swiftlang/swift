@@ -105,8 +105,53 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   }
 }
 
-// An address base is a block argument. Verify that it is actually a box
-// projected from a switch_enum.
+const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
+  switch (k) {
+  case Box:
+    return "Box";
+  case Stack:
+    return "Stack";
+  case Nested:
+    return "Nested";
+  case Unidentified:
+    return "Unidentified";
+  case Argument:
+    return "Argument";
+  case Global:
+    return "Global";
+  case Class:
+    return "Class";
+  }
+}
+
+void AccessedStorage::print(raw_ostream &os) const {
+  os << getKindName(kind) << " ";
+  switch (kind) {
+  case Box:
+  case Stack:
+  case Nested:
+  case Unidentified:
+    os << value;
+    break;
+  case Argument:
+    os << "index: " << paramIndex << "\n";
+    break;
+  case Global:
+    os << *global;
+    break;
+  case Class:
+    os << objProj.getObject() << "  ";
+    objProj.getProjection().print(os, objProj.getObject()->getType());
+    os << "\n";
+  }
+}
+
+void AccessedStorage::dump() const { print(llvm::dbgs()); }
+
+// Given an address base is a block argument, verify that it is actually a box
+// projected from a switch_enum. This is a valid pattern at any SIL stage
+// resulting in a block-type phi. In later SIL stages, the optimizer may form
+// address-type phis, causing this assert if called on those cases.
 static void checkSwitchEnumBlockArg(SILPHIArgument *arg) {
   assert(!arg->getType().isAddress());
   SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
@@ -163,6 +208,9 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     // A block argument may be a box value projected out of
     // switch_enum. Address-type block arguments are not allowed.
     case ValueKind::SILPHIArgument:
+      if (address->getType().isAddress())
+        return AccessedStorage();
+
       checkSwitchEnumBlockArg(cast<SILPHIArgument>(address));
       return AccessedStorage(address, AccessedStorage::Unidentified);
 
@@ -239,8 +287,7 @@ static bool isLetAccess(const AccessedStorage &storage, SILFunction *F) {
 
 static bool isScratchBuffer(SILValue value) {
   // Special case unsafe value buffer access.
-  return isa<BuiltinUnsafeValueBufferType>(
-    value->getType().getSwiftRValueType());
+  return value->getType().is<BuiltinUnsafeValueBufferType>();
 }
 
 bool swift::memInstMustInitialize(Operand *memOper) {
@@ -318,7 +365,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     if (isScratchBuffer(storage.getValue()))
       return false;
   }
-  // Additional checks that apply to anything that may fal through.
+  // Additional checks that apply to anything that may fall through.
 
   // Immutable values are only accessed for initialization.
   if (isLetAccess(storage, F))
@@ -331,7 +378,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
 /// including arguments to @noescape functions that are passed as closures to
 /// the current call.
 static void visitApplyAccesses(ApplySite apply,
-                               std::function<void(Operand *)> visitor) {
+                               llvm::function_ref<void(Operand *)> visitor) {
   for (Operand &oper : apply.getArgumentOperands()) {
     // Consider any address-type operand an access. Whether it is read or modify
     // depends on the argument convention.
@@ -355,7 +402,7 @@ static void visitApplyAccesses(ApplySite apply,
 }
 
 static void visitBuiltinAddress(BuiltinInst *builtin,
-                                std::function<void(Operand *)> visitor) {
+                                llvm::function_ref<void(Operand *)> visitor) {
   if (auto kind = builtin->getBuiltinKind()) {
     switch (kind.getValue()) {
     default:
@@ -430,7 +477,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
 }
 
 void swift::visitAccessedAddress(SILInstruction *I,
-                                 std::function<void(Operand *)> visitor) {
+                                 llvm::function_ref<void(Operand *)> visitor) {
   assert(I->mayReadOrWriteMemory());
 
   // Reference counting instructions do not access user visible memory.
@@ -513,6 +560,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::CopyUnownedValueInst:
   case SILInstructionKind::DeinitExistentialAddrInst:

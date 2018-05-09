@@ -45,8 +45,8 @@ bool isRetainInstruction(SILInstruction *II);
 /// Return true if this is a release instruction.
 bool isReleaseInstruction(SILInstruction *II);
 
-using RetainList = llvm::SmallVector<SILInstruction *, 1>;
-using ReleaseList = llvm::SmallVector<SILInstruction *, 1>;
+using RetainList = TinyPtrVector<SILInstruction *>;
+using ReleaseList = TinyPtrVector<SILInstruction *>;
 
 /// \returns True if the user \p User decrements the ref count of \p Ptr.
 bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,

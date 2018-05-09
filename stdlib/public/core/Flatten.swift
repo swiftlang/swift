@@ -230,11 +230,6 @@ extension FlattenCollection.Index : Comparable {
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_outer)
     hasher.combine(_inner)

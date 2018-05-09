@@ -709,7 +709,6 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var isSingleByte: Bool {
     @inline(__always)
     get {
@@ -729,7 +728,6 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var byteWidth: Int {
     @inline(__always)
     get { return isSingleByte ? 1 : 2 }
@@ -742,14 +740,12 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var isContiguousASCII: Bool {
     @inline(__always)
     get { return isContiguous && isSingleByte }
   }
 
   @inlinable
-  public // @testable
   var isContiguousUTF16: Bool {
     @inline(__always)
     get { return isContiguous && !isSingleByte }
@@ -770,7 +766,6 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var nativeRawStorage: _SwiftRawStringStorage {
     @inline(__always) get {
       _sanityCheck(isNative)

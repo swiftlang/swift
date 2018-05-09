@@ -295,7 +295,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
     // Simple rename.
     if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
-      if (CI->NodeKind == SDKNodeKind::DeclVar && CI->isRename()) {
+      if (CI->isRename() && (CI->NodeKind == SDKNodeKind::DeclVar ||
+                             CI->NodeKind == SDKNodeKind::DeclType)) {
         Text = CI->getNewName();
         return true;
       }
@@ -340,7 +341,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                           Type T, ReferenceMetaData Data) override {
-    for (auto *Item: getRelatedDiffItems(D)) {
+    for (auto *Item: getRelatedDiffItems(CtorTyRef ? CtorTyRef: D)) {
       std::string RepText;
       if (isSimpleReplacement(Item, RepText)) {
         Editor.replace(Range, RepText);

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -965,16 +965,19 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (DRE->getDecl() != TC.Context.getUnsafeBitCast(&TC))
         return;
       
-      if (DRE->getDeclRef().getSubstitutions().size() != 2)
+      if (DRE->getDeclRef().getSubstitutions().empty())
         return;
       
       // Don't check the same use of unsafeBitCast twice.
       if (!AlreadyDiagnosedBitCasts.insert(DRE).second)
         return;
-      
-      auto fromTy = DRE->getDeclRef().getSubstitutions()[0].getReplacement();
-      auto toTy = DRE->getDeclRef().getSubstitutions()[1].getReplacement();
-    
+
+      auto subMap = DRE->getDeclRef().getSubstitutions();
+      auto fromTy =
+        Type(GenericTypeParamType::get(0, 0, TC.Context)).subst(subMap);
+      auto toTy =
+        Type(GenericTypeParamType::get(0, 1, TC.Context)).subst(subMap);
+
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.
       
@@ -3720,6 +3723,39 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
         .fixItInsertAfter(E->getEndLoc(), coercionString);
     }
 
+    static bool hasImplicitlyUnwrappedResult(Expr *E) {
+      auto getDeclForExpr = [&](Expr *E) -> ValueDecl * {
+        if (auto *call = dyn_cast<CallExpr>(E))
+          E = call->getDirectCallee();
+
+        if (auto *subscript = dyn_cast<SubscriptExpr>(E)) {
+          if (subscript->hasDecl())
+            return subscript->getDecl().getDecl();
+
+          return nullptr;
+        }
+
+        if (auto *memberRef = dyn_cast<MemberRefExpr>(E))
+          return memberRef->getMember().getDecl();
+        if (auto *declRef = dyn_cast<DeclRefExpr>(E))
+          return declRef->getDecl();
+        if (auto *apply = dyn_cast<ApplyExpr>(E))
+          return apply->getCalledValue();
+
+        return nullptr;
+      };
+
+      // Look through implicit conversions like loads, derived-to-base
+      // conversion, etc.
+      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
+        E = ICE->getSubExpr();
+
+      auto *decl = getDeclForExpr(E);
+
+      return decl
+        && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    }
+
     void visitErasureExpr(ErasureExpr *E, OptionalToAnyCoercion coercion) {
       if (coercion.shouldSuppressDiagnostic())
         return;
@@ -3730,6 +3766,12 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       // from a higher level of optionality.
       while (auto *bindExpr = dyn_cast<BindOptionalExpr>(subExpr))
         subExpr = bindExpr->getSubExpr();
+
+      // Do not warn on coercions from implicitly unwrapped optionals
+      // for Swift versions less than 5.
+      if (!TC.Context.isSwiftVersionAtLeast(5) &&
+          hasImplicitlyUnwrappedResult(subExpr))
+        return;
 
       // We're taking the source type from the child of any BindOptionalExprs,
       // and the destination from the parent of any

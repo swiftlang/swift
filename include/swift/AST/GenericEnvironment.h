@@ -170,6 +170,7 @@ public:
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
 
+  SubstitutionMap getForwardingSubstitutionMap() const;
   SubstitutionList getForwardingSubstitutions() const;
 
   void dump(raw_ostream &os) const;

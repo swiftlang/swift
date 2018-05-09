@@ -12,4 +12,8 @@ func foo() {
   _ = NewFooComparisonResult.NewFooOrderedSame
   let _ : FooComparisonResult = NewFooComparisonResult.NewFooOrderedSame
   _ = NewCityKind.NewTown
+  _ = ToplevelWrapper.internalType()
+  _ = ToplevelWrapper.internalType(recordName: "")
 }
+
+func foo(_: ToplevelWrapper.internalType) {}

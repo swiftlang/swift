@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
 
 import Swift
 

@@ -624,7 +624,7 @@ private:
                          bool Curried, bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, Type paramListTy, bool isCurried,
-                          std::function<bool()> isAPINameByDefault);
+                          llvm::function_ref<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -2310,7 +2310,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
 void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
                                   bool isCurried,
-                                  std::function<bool()> isAPINameByDefault) {
+                                  llvm::function_ref<bool()> isAPINameByDefault) {
   SmallVector<ParameterTypeFlags, 4> paramFlags;
   if (paramListTy && !paramListTy->hasError()) {
     if (auto parenTy = dyn_cast<ParenType>(paramListTy.getPointer())) {
@@ -3714,11 +3714,11 @@ public:
     }
 
     // The arguments to the layout, if any, do come from the outer environment.
-    if (!T->getGenericArgs().empty()) {
+    if (auto subMap = T->getSubstitutions()) {
       Printer << " <";
-      interleave(T->getGenericArgs(),
-                 [&](const Substitution &arg) {
-                   visit(arg.getReplacement());
+      interleave(subMap.getReplacementTypes(),
+                 [&](Type type) {
+                   visit(type);
                  }, [&]{
                    Printer << ", ";
                  });
@@ -4157,9 +4157,10 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
-    interleave(spec->getGenericSubstitutions(),
+    interleave(spec->getSubstitutionMap().toList(),
                [&](const Substitution &s) { s.print(os, PO); },
                [&] { os << ", "; });
+
     os << "> (";
     spec->getGenericConformance()->printName(os, PO);
     os << ")";

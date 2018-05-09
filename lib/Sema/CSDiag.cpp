@@ -657,7 +657,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
                                       Diag<StringRef> diagID,
                                       Diag<Type> unknownDiagID) {
   auto &TC = CS.getTypeChecker();
-  
+
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
   auto immInfo = resolveImmutableBase(destExpr, CS);
@@ -706,18 +706,23 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       .highlight(immInfo.first->getSourceRange());
     return;
   }
-  
+
   // If we're trying to set an unapplied method, say that.
-  if (auto *VD = dyn_cast_or_null<ValueDecl>(immInfo.second)) {
+  if (auto *VD = immInfo.second) {
     std::string message = "'";
     message += VD->getBaseName().getIdentifier().str();
     message += "'";
-    
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-      message += AFD->getImplicitSelfDecl() ? " is a method" : " is a function";
-    else
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      if (AFD->getImplicitSelfDecl()) {
+        message += " is a method";
+        diagID = diag::assignment_lhs_is_immutable_variable;
+      } else {
+        message += " is a function";
+      }
+    } else
       message += " is not settable";
-    
+
     TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
     return;
@@ -730,11 +735,13 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     auto argsTuple =
       dyn_cast<TupleExpr>(AE->getArg()->getSemanticsProvidingExpr());
     if (isa<CallExpr>(AE) && AE->isImplicit() && argsTuple &&
-        argsTuple->getNumElements() == 1 &&
-        isa<LiteralExpr>(argsTuple->getElement(0)->
-                         getSemanticsProvidingExpr())) {
-      TC.diagnose(loc, diagID, "literals are not mutable");
-      return;
+        argsTuple->getNumElements() == 1) {
+      if (auto LE = dyn_cast<LiteralExpr>(argsTuple->getElement(0)->
+                                          getSemanticsProvidingExpr())) {
+        TC.diagnose(loc, diagID, "literals are not mutable")
+          .highlight(LE->getSourceRange());
+        return;
+      }
     }
 
     std::string name = "call";
@@ -755,7 +762,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       .highlight(AE->getSourceRange());
     return;
   }
-  
+
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(immInfo.first))
     if (isa<LoadExpr>(ICE->getSubExpr())) {
       TC.diagnose(loc, diagID,
@@ -986,8 +993,9 @@ private:
 
   bool diagnoseTrailingClosureErrors(ApplyExpr *expr);
 
-  bool diagnoseClosureExpr(ClosureExpr *closureExpr, Type contextualType,
-                           std::function<bool(Type, Type)> resultTypeProcessor);
+  bool
+  diagnoseClosureExpr(ClosureExpr *closureExpr, Type contextualType,
+                      llvm::function_ref<bool(Type, Type)> resultTypeProcessor);
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
@@ -3155,7 +3163,9 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
   }
 
   Diag<StringRef> diagID;
-  if (isa<DeclRefExpr>(dest))
+  if (isa<ApplyExpr>(dest))
+    diagID = diag::assignment_lhs_is_apply_expression;
+  else if (isa<DeclRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_variable;
   else if (isa<ForceValueExpr>(dest))
     diagID = diag::assignment_bang_has_immutable_subcomponent;
@@ -3163,7 +3173,7 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
     diagID = diag::assignment_lhs_is_immutable_property;
   else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
     diagID = diag::assignment_subscript_has_immutable_base;
-    
+
     // If the destination is a subscript with a 'dynamicLookup:' label and if
     // the tuple is implicit, then this was actually a @dynamicMemberLookup
     // access. Emit a more specific diagnostic.
@@ -6274,7 +6284,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
 
 bool FailureDiagnosis::diagnoseClosureExpr(
     ClosureExpr *CE, Type contextualType,
-    std::function<bool(Type, Type)> resultTypeProcessor) {
+    llvm::function_ref<bool(Type, Type)> resultTypeProcessor) {
   // Look through IUO because it doesn't influence
   // neither parameter nor return type diagnostics itself,
   // but if we have function type inside, that might
@@ -6313,23 +6323,25 @@ bool FailureDiagnosis::diagnoseClosureExpr(
         auto diag =
           diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
                    inferredArgCount);
-        StringRef fixText;  // We only handle the most common cases.
-        if (inferredArgCount == 1)
-          fixText = " _ in ";
-        else if (inferredArgCount == 2)
-          fixText = " _,_ in ";
-        else if (inferredArgCount == 3)
-          fixText = " _,_,_ in ";
-        
+        std::string fixText; // Let's provide fixits for up to 10 args.
+
+        if (inferredArgCount <= 10) {
+          fixText += " _";
+          for (unsigned i = 0; i < inferredArgCount - 1; i ++) {
+            fixText += ",_";
+          }
+          fixText += " in ";
+        }
+
         if (!fixText.empty()) {
           // Determine if there is already a space after the { in the closure to
           // make sure we introduce the right whitespace.
           auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
           auto text = CS.TC.Context.SourceMgr.extractText({afterBrace, 1});
           if (text.size() == 1 && text == " ")
-            fixText = fixText.drop_back();
+            fixText = fixText.erase(fixText.size() - 1);
           else
-            fixText = fixText.drop_front();
+            fixText = fixText.erase(0, 1);
           diag.fixItInsertAfter(CE->getStartLoc(), fixText);
         }
         return true;

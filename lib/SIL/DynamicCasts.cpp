@@ -285,10 +285,10 @@ CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
 
 static bool isCFBridgingConversion(ModuleDecl *M, SILType sourceType,
                                    SILType targetType) {
-  return (sourceType.getSwiftRValueType() ==
-            getNSBridgedClassOfCFClass(M, targetType.getSwiftRValueType()) ||
-          targetType.getSwiftRValueType() ==
-            getNSBridgedClassOfCFClass(M, sourceType.getSwiftRValueType()));
+  return (sourceType.getASTType() ==
+            getNSBridgedClassOfCFClass(M, targetType.getASTType()) ||
+          targetType.getASTType() ==
+            getNSBridgedClassOfCFClass(M, sourceType.getASTType()));
 }
 
 /// Try to classify the dynamic-cast relationship between two types.
