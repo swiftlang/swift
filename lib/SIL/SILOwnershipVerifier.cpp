@@ -46,6 +46,7 @@
 #include <algorithm>
 
 using namespace swift;
+using namespace swift::ownership;
 
 // This is an option to put the SILOwnershipVerifier in testing mode. This
 // causes the following:
@@ -137,35 +138,6 @@ static bool isOwnershipForwardingInst(SILInstruction *I) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-struct ErrorBehaviorKind {
-  enum inner_t {
-    Invalid = 0,
-    ReturnFalse = 1,
-    PrintMessage = 2,
-    Assert = 4,
-    PrintMessageAndReturnFalse = PrintMessage | ReturnFalse,
-    PrintMessageAndAssert = PrintMessage | Assert,
-  } Value;
-
-  ErrorBehaviorKind() : Value(Invalid) {}
-  ErrorBehaviorKind(inner_t Inner) : Value(Inner) { assert(Value != Invalid); }
-
-  bool shouldAssert() const {
-    assert(Value != Invalid);
-    return Value & Assert;
-  }
-
-  bool shouldPrintMessage() const {
-    assert(Value != Invalid);
-    return Value & PrintMessage;
-  }
-
-  bool shouldReturnFalse() const {
-    assert(Value != Invalid);
-    return Value & ReturnFalse;
-  }
-};
 
 struct OwnershipUseCheckerResult {
   bool HasCompatibleOwnership;
@@ -1388,24 +1360,6 @@ class SILValueOwnershipChecker {
   /// The action that the checker should perform on detecting an error.
   ErrorBehaviorKind ErrorBehavior;
 
-  /// The worklist that we will use for our iterative reachability query.
-  llvm::SmallVector<SILBasicBlock *, 32> Worklist;
-
-  /// The set of blocks with lifetime ending uses.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> BlocksWithLifetimeEndingUses;
-
-  /// The set of blocks with non-lifetime ending uses and the associated
-  /// non-lifetime ending use SILInstruction.
-  llvm::SmallDenseMap<SILBasicBlock *, BranchPropagatedUser, 8>
-      BlocksWithNonLifetimeEndingUses;
-
-  /// The blocks that we have already visited.
-  llvm::SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
-
-  /// A list of successor blocks that we must visit by the time the algorithm
-  /// terminates.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> SuccessorBlocksThatMustBeVisited;
-
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
   llvm::SmallVector<BranchPropagatedUser, 16> LifetimeEndingUsers;
@@ -1413,6 +1367,9 @@ class SILValueOwnershipChecker {
   /// The list of non lifetime ending users that we found. Only valid if check
   /// is successful.
   llvm::SmallVector<BranchPropagatedUser, 16> RegularUsers;
+
+  /// The set of blocks that we have visited.
+  llvm::SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
 
 public:
   SILValueOwnershipChecker(
@@ -1433,7 +1390,12 @@ public:
       return Result.getValue();
 
     DEBUG(llvm::dbgs() << "Verifying ownership of: " << *Value);
-    Result = checkUses() && checkDataflow();
+    Result = checkUses();
+    if (!Result.getValue())
+      return false;
+
+    Result = valueHasLinearLifetime(Value, LifetimeEndingUsers, RegularUsers,
+                                    VisitedBlocks, DEBlocks, ErrorBehavior);
 
     return Result.getValue();
   }
@@ -1471,29 +1433,9 @@ public:
 
 private:
   bool checkUses();
-  bool checkDataflow();
-  void checkDataflowEndConditions();
   void gatherUsers(
       llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
       llvm::SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers);
-  void uniqueNonLifetimeEndingUsers(
-      ArrayRef<BranchPropagatedUser> NonLifetimeEndingUsers);
-
-  /// Returns true if the given block is in the BlocksWithLifetimeEndingUses
-  /// set. This is a helper to extract out large logging messages so that the
-  /// main logic is easy to read.
-  bool doesBlockDoubleConsume(
-      SILBasicBlock *UserBlock,
-      llvm::Optional<BranchPropagatedUser> LifetimeEndingUser = None,
-      bool ShouldInsert = false);
-
-  /// Returns true if the given block contains a non-lifetime ending use that is
-  /// strictly later in the block than a lifetime ending use. If all
-  /// non-lifetime ending uses are before the lifetime ending use, the block is
-  /// removed from the BlocksWithNonLifetimeEndingUses map to show that the uses
-  /// were found to properly be post-dominated by a lifetime ending use.
-  bool doesBlockContainUseAfterFree(BranchPropagatedUser LifetimeEndingUser,
-                                    SILBasicBlock *UserBlock);
 
   bool checkValueWithoutLifetimeEndingUses();
 
@@ -1525,79 +1467,6 @@ private:
 };
 
 } // end anonymous namespace
-
-bool SILValueOwnershipChecker::doesBlockContainUseAfterFree(
-    BranchPropagatedUser LifetimeEndingUser, SILBasicBlock *UserBlock) {
-  auto Iter = BlocksWithNonLifetimeEndingUses.find(UserBlock);
-  if (Iter == BlocksWithNonLifetimeEndingUses.end())
-    return false;
-
-  BranchPropagatedUser NonLifetimeEndingUser = Iter->second;
-
-  // Make sure that the non-lifetime ending use is before the lifetime ending
-  // use. Otherwise, we have a use after free.
-
-  // First check if our lifetime ending user is a cond_br. In such a case, we
-  // always consider the non-lifetime ending use to be a use after free.
-  if (LifetimeEndingUser.isCondBranchUser()) {
-    return !handleError([&]() {
-      llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
-                   << "Found use after free?!\n"
-                   << "Value: " << *Value
-                   << "Consuming User: " << *LifetimeEndingUser
-                   << "Non Consuming User: " << *Iter->second << "Block: bb"
-                   << UserBlock->getDebugID() << "\n\n";
-    });
-  }
-
-  // Ok. At this point, we know that our lifetime ending user is not a cond
-  // branch user. Check if our non-lifetime ending use is. In such a case, we
-  // know that our non lifetime ending user is properly post-dominated so we can
-  // erase the non lifetime ending use and continue.
-  if (NonLifetimeEndingUser.isCondBranchUser()) {
-    BlocksWithNonLifetimeEndingUses.erase(Iter);
-    return false;
-  }
-
-  // Otherwise, we know that both of our users are non-cond branch users and
-  // thus must be instructions in the given block. Make sure that the non
-  // lifetime ending user is strictly before the lifetime ending user.
-  if (std::find_if(LifetimeEndingUser.getIterator(), UserBlock->end(),
-                   [&NonLifetimeEndingUser](const SILInstruction &I) -> bool {
-                     return NonLifetimeEndingUser == &I;
-                   }) != UserBlock->end()) {
-    return !handleError([&] {
-      llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
-                   << "Found use after free?!\n"
-                   << "Value: " << *Value
-                   << "Consuming User: " << *LifetimeEndingUser
-                   << "Non Consuming User: " << *Iter->second << "Block: bb"
-                   << UserBlock->getDebugID() << "\n\n";
-    });
-  }
-
-  // Erase the use since we know that it is properly joint post-dominated.
-  BlocksWithNonLifetimeEndingUses.erase(Iter);
-  return false;
-}
-
-bool SILValueOwnershipChecker::doesBlockDoubleConsume(
-    SILBasicBlock *UserBlock,
-    llvm::Optional<BranchPropagatedUser> LifetimeEndingUser,
-    bool ShouldInsert) {
-  if ((ShouldInsert && BlocksWithLifetimeEndingUses.insert(UserBlock).second) ||
-      !BlocksWithLifetimeEndingUses.count(UserBlock))
-    return false;
-
-  return !handleError([&] {
-    llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n"
-                 << "Found over consume?!\n"
-                 << "Value: " << *Value;
-    if (LifetimeEndingUser.hasValue())
-      llvm::errs() << "User: " << *LifetimeEndingUser.getValue();
-    llvm::errs() << "Block: bb" << UserBlock->getDebugID() << "\n\n";
-  });
-}
 
 void SILValueOwnershipChecker::gatherUsers(
     llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
@@ -1731,49 +1600,6 @@ void SILValueOwnershipChecker::gatherUsers(
         std::copy(BBArg->use_begin(), BBArg->use_end(), std::back_inserter(Users));
       }
     }
-  }
-}
-
-// Unique our non lifetime ending user list by only selecting the last user in
-// each block.
-void SILValueOwnershipChecker::uniqueNonLifetimeEndingUsers(
-    ArrayRef<BranchPropagatedUser> NonLifetimeEndingUsers) {
-  for (BranchPropagatedUser User : NonLifetimeEndingUsers) {
-    auto *UserBlock = User.getParent();
-    // First try to associate User with User->getParent().
-    auto Result =
-        BlocksWithNonLifetimeEndingUses.insert(std::make_pair(UserBlock, User));
-
-    // If the insertion succeeds, then we know that there is no more work to
-    // be done, so process the next use.
-    if (Result.second)
-      continue;
-
-    // If the insertion fails, then we have at least two non-lifetime ending
-    // uses in the same block. Since we are performing a liveness type of
-    // dataflow, we only need the last non-lifetime ending use to show that all
-    // lifetime ending uses post dominate both.
-    //
-    // We begin by checking if the first use is a cond_br use from the previous
-    // block. In such a case, we always use the already stored value and
-    // continue.
-    if (User.isCondBranchUser()) {
-      continue;
-    }
-
-    // Then, we check if Use is after Result.first->second in the use list. If
-    // Use is not later, then we wish to keep the already mapped value, not use,
-    // so continue.
-    if (std::find_if(Result.first->second.getIterator(), UserBlock->end(),
-                     [&User](const SILInstruction &I) -> bool {
-                       return User == &I;
-                     }) == UserBlock->end()) {
-      continue;
-    }
-
-    // At this point, we know that User is later in the Block than
-    // Result.first->second, so store Use instead.
-    Result.first->second = User;
   }
 }
 
@@ -1930,198 +1756,6 @@ bool SILValueOwnershipChecker::checkUses() {
     if (!isSubobjectProjectionWithLifetimeEndingUses(Value,
                                                      LifetimeEndingUsers)) {
       return false;
-    }
-  }
-
-  // Then add our non lifetime ending users and their blocks to the
-  // BlocksWithNonLifetimeEndingUses map. While we do this, if we have multiple
-  // uses in the same block, we only accept the last use since from a liveness
-  // perspective that is all we care about.
-  uniqueNonLifetimeEndingUsers(RegularUsers);
-
-  // Finally, we go through each one of our lifetime ending users performing the
-  // following operation:
-  //
-  // 1. Verifying that no two lifetime ending users are in the same block. This
-  // is accomplished by adding the user blocks to the
-  // BlocksWithLifetimeEndingUses list. This avoids double consumes.
-  //
-  // 2. Verifying that no predecessor is a block with a lifetime ending use. The
-  // reason why this is necessary is because we wish to not add elements to the
-  // worklist twice. Thus we want to check if we have already visited a
-  // predecessor.
-  llvm::SmallVector<std::pair<BranchPropagatedUser, SILBasicBlock *>, 32>
-      PredsToAddToWorklist;
-  for (BranchPropagatedUser User : LifetimeEndingUsers) {
-    SILBasicBlock *UserBlock = User.getParent();
-    // If the block does over consume, we either assert or return false. We only
-    // return false when debugging.
-    if (doesBlockDoubleConsume(UserBlock, User, true)) {
-      return handleError([] {});
-    }
-
-    // Then check if the given block has a use after free.
-    if (doesBlockContainUseAfterFree(User, UserBlock)) {
-      return handleError([] {});
-    }
-
-    // If this user is in the same block as the value, do not visit
-    // predecessors. We must be extra tolerant here since we allow for
-    // unreachable code.
-    if (UserBlock == Value->getParentBlock())
-      continue;
-
-    // Then for each predecessor of this block...
-    for (auto *Pred : UserBlock->getPredecessorBlocks()) {
-      // If this block is not a block that we have already put on the list, add
-      // it to the worklist.
-      PredsToAddToWorklist.push_back({User, Pred});
-    }
-  }
-
-  for (const auto &I : LifetimeEndingUsers) {
-    // Finally add the user block to the visited list so we do not try to add it
-    // to our must visit successor list.
-    VisitedBlocks.insert(I.getParent());
-  }
-
-  // Make sure not to add predecessors to our worklist if we only have 1
-  // lifetime ending user and it is in the same block as our def.
-  if (LifetimeEndingUsers.size() == 1 &&
-      LifetimeEndingUsers[0].getParent() == Value->getParentBlock()) {
-    return true;
-  }
-
-  // Now that we have marked all of our producing blocks, we go through our
-  // PredsToAddToWorklist list and add our preds, making sure that none of these
-  // preds are in BlocksWithLifetimeEndingUses.
-  for (auto Pair : PredsToAddToWorklist) {
-    BranchPropagatedUser User = Pair.first;
-    SILBasicBlock *PredBlock = Pair.second;
-
-    // Make sure that the predecessor is not in our
-    // BlocksWithLifetimeEndingUses list.
-    if (doesBlockDoubleConsume(PredBlock, User)) {
-      return handleError([] {});
-    }
-
-    if (!VisitedBlocks.insert(PredBlock).second)
-      continue;
-    Worklist.push_back(PredBlock);
-  }
-
-  return true;
-}
-
-bool SILValueOwnershipChecker::checkDataflow() {
-  DEBUG(llvm::dbgs() << "    Beginning to check dataflow constraints\n");
-  // Until the worklist is empty...
-  while (!Worklist.empty()) {
-    // Grab the next block to visit.
-    SILBasicBlock *BB = Worklist.pop_back_val();
-    DEBUG(llvm::dbgs() << "    Visiting Block: bb" << BB->getDebugID() << '\n');
-
-    // Since the block is on our worklist, we know already that it is not a
-    // block with lifetime ending uses, due to the invariants of our loop.
-
-    // First remove BB from the SuccessorBlocksThatMustBeVisited list. This
-    // ensures that when the algorithm terminates, we know that BB was not the
-    // beginning of a non-covered path to the exit.
-    SuccessorBlocksThatMustBeVisited.erase(BB);
-
-    // Then remove BB from BlocksWithNonLifetimeEndingUses so we know that
-    // this block was properly joint post-dominated by our lifetime ending
-    // users.
-    BlocksWithNonLifetimeEndingUses.erase(BB);
-
-    // Ok, now we know that we do not have an overconsume. If this block does
-    // not end in a no return function, we need to update our state for our
-    // successors to make sure by the end of the traversal we visit them.
-    //
-    // We must consider such no-return blocks since we may be running during
-    // SILGen before NoReturn folding has run.
-    for (SILBasicBlock *SuccBlock : BB->getSuccessorBlocks()) {
-      // If we already visited the successor, there is nothing to do since we
-      // already visited the successor.
-      if (VisitedBlocks.count(SuccBlock))
-        continue;
-
-      // Then check if the successor is a transitively unreachable block. In
-      // such a case, we ignore it since we are going to leak along that path.
-      if (DEBlocks.isDeadEnd(SuccBlock))
-        continue;
-
-      // Otherwise, add the successor to our SuccessorBlocksThatMustBeVisited
-      // set to ensure that we assert if we do not visit it by the end of the
-      // algorithm.
-      SuccessorBlocksThatMustBeVisited.insert(SuccBlock);
-    }
-
-    // If we are at the dominating block of our walk, continue. There is nothing
-    // further to do since we do not want to visit the predecessors of our
-    // dominating block. On the other hand, we do want to add its successors to
-    // the SuccessorBlocksThatMustBeVisited set.
-    if (BB == Value->getParentBlock())
-      continue;
-
-    // Then for each predecessor of this block:
-    //
-    // 1. If we have visited the predecessor already, that it is not a block
-    // with lifetime ending uses. If it is a block with uses, then we have a
-    // double release... so assert. If not, we continue.
-    //
-    // 2. We add the predecessor to the worklist if we have not visited it yet.
-    for (auto *PredBlock : BB->getPredecessorBlocks()) {
-      if (doesBlockDoubleConsume(PredBlock)) {
-        return handleError([] {});
-      }
-
-      if (VisitedBlocks.count(PredBlock)) {
-        continue;
-      }
-
-      VisitedBlocks.insert(PredBlock);
-      Worklist.push_back(PredBlock);
-    }
-  }
-
-  // Make sure that we visited all successor blocks that we needed to visit to
-  // make sure we didn't leak.
-  if (!SuccessorBlocksThatMustBeVisited.empty()) {
-    return handleError([&] {
-      llvm::errs()
-          << "Function: '" << Value->getFunction()->getName() << "'\n"
-          << "Error! Found a leak due to a consuming post-dominance failure!\n"
-          << "    Value: " << *Value << "    Post Dominating Failure Blocks:\n";
-      for (auto *BB : SuccessorBlocksThatMustBeVisited) {
-        llvm::errs() << "        bb" << BB->getDebugID();
-      }
-      llvm::errs() << '\n';
-    });
-  }
-
-  // Make sure that we do not have any lifetime ending uses left to visit that
-  // are not transitively unreachable blocks. If we do, then these non lifetime
-  // ending uses must be outside of our "alive" blocks implying a use-after
-  // free.
-  if (!BlocksWithNonLifetimeEndingUses.empty()) {
-    for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
-      if (DEBlocks.isDeadEnd(Pair.first)) {
-        continue;
-      }
-
-      return handleError([&] {
-        llvm::errs() << "Function: '" << Value->getFunction()->getName()
-                     << "'\n"
-                     << "Found use after free due to unvisited non lifetime "
-                        "ending uses?!\n"
-                     << "Value: " << *Value << "    Remaining Users:\n";
-        for (auto &Pair : BlocksWithNonLifetimeEndingUses) {
-          llvm::errs() << "User:" << *Pair.second << "Block: bb"
-                       << Pair.first->getDebugID() << "\n";
-        }
-        llvm::errs() << "\n";
-      });
     }
   }
 

@@ -8,6 +8,7 @@ add_swift_library(swiftSIL STATIC
   InstructionUtils.cpp
   MemAccessUtils.cpp
   Linker.cpp
+  LinearLifetimeChecker.cpp
   LoopInfo.cpp
   OptimizationRemark.cpp
   PrettyStackTrace.cpp
