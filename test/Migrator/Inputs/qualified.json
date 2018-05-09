@@ -30,5 +30,13 @@
     "OldTypeName": "Cities.CityKind",
     "NewPrintedName": "NewTown",
     "NewTypeName": "NewCityKind"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities12ToplevelTypeC",
+    "OldPrintedName": "ToplevelType",
+    "OldTypeName": "",
+    "NewPrintedName": "internalType",
+    "NewTypeName": "ToplevelWrapper"
   }
 ]
