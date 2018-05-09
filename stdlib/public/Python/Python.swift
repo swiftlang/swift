@@ -30,8 +30,8 @@ import CPython
 /// pointer with ownership implied.
 public typealias OwnedPyObject = UnsafeMutablePointer<PyObject>
 
-/// Primitive reference to a Python value.  This is always non-null and always
-/// owning of the underlying value.
+/// Primitive reference to a Python object.  This is always non-null and always
+/// owning of the underlying object.
 ///
 /// - TODO: It sure would be nice to be able to express this as a Swift struct
 ///   with C++ style user-defined copy ctors, move operators, etc.
@@ -63,7 +63,7 @@ final class PyReference {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: PyValue type
+// MARK: PythonObject type
 //===----------------------------------------------------------------------===//
 
 /// This is the currency type for Python object references.  It is passed to and
@@ -71,13 +71,13 @@ final class PyReference {
 /// support the standard operations that Python supports.
 @dynamicMemberLookup
 @_fixed_layout
-public struct PyValue {
-  /// This is the actual handle to a Python value that we represent.
+public struct PythonObject {
+  /// This is the actual handle to a Python object that we represent.
   fileprivate var state: PyReference
 
   @_versioned
-  init(_ value: PyReference) {
-    state = value
+  init(_ state: PyReference) {
+    self.state = state
   }
 
   public init(owned: OwnedPyObject) {
@@ -97,26 +97,26 @@ public struct PyValue {
   }
 }
 
-/// Make "print(python)" print a pretty form of the PyValue.
-extension PyValue : CustomStringConvertible {
+/// Make "print(python)" print a pretty form of the PythonObject.
+extension PythonObject : CustomStringConvertible {
   public var description: String {
-    // We describe a Python value to the REPL and Playgrounds with the str(x)
+    // We describe a Python object to the REPL and Playgrounds with the str(x)
     // call, just like Python's REPL does.  'str' is designed to be readable,
-    // and using 'repr' takes WAY too long for large values because it is
-    // designed to faithfully represent the value.
+    // and using 'repr' takes WAY too long for large objects because it is
+    // designed to faithfully represent the object.
     return String(Python.str.call(with: self))!
   }
 }
 
-// Make PyValue's show up nicely in the Xcode Playground results sidebar.
-extension PyValue : CustomPlaygroundQuickLookable {
+// Make PythonObject's show up nicely in the Xcode Playground results sidebar.
+extension PythonObject : CustomPlaygroundQuickLookable {
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(description)
   }
 }
 
 // Mirror representation, used by debugger/REPL.
-extension PyValue : CustomReflectable {
+extension PythonObject : CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [], displayStyle: .struct)
   }
@@ -129,16 +129,16 @@ extension PyValue : CustomReflectable {
 public protocol PythonConvertible {
   /// Python convertible values may be converted from Python, but these
   /// conversions can fail.
-  init?(_ value: PyValue)
+  init?(_ object: PythonObject)
 
   /// Python convertible values may always be converted to Python.
-  var pythonValue: PyValue { get }
+  var pythonObject: PythonObject { get }
 }
 
-// You can explicitly convert any PythonConvertible to a PyValue.
-extension PyValue {
+// You can explicitly convert any PythonConvertible to a PythonObject.
+extension PythonObject {
   public init<T : PythonConvertible>(_ value: T) {
-    self.init(value.pythonValue)
+    self.init(value.pythonObject)
   }
 }
 
@@ -146,59 +146,59 @@ extension PyValue {
 // owned and borrowed references.  These shouldn't be public though.
 fileprivate extension PythonConvertible {
   var borrowedPyObject: UnsafeMutablePointer<PyObject> {
-    return pythonValue.borrowedPyObject
+    return pythonObject.borrowedPyObject
   }
 
   var ownedPyObject: OwnedPyObject {
-    return pythonValue.ownedPyObject
+    return pythonObject.ownedPyObject
   }
 }
 
-// PyReference and PyValue are trivially PythonConvertible
+// PyReference and PythonObject are trivially PythonConvertible
 extension PyReference : PythonConvertible {
-  public convenience init(_ value: PyValue) {
-    self.init(owned: value.ownedPyObject)
+  public convenience init(_ object: PythonObject) {
+    self.init(owned: object.ownedPyObject)
   }
 
   /// Python convertible values may always be converted to Python.
-  public var pythonValue: PyValue {
-    return PyValue(self)
+  public var pythonObject: PythonObject {
+    return PythonObject(self)
   }
 }
 
-extension PyValue : PythonConvertible {
-  public init(_ value: PyValue) {
-    self.init(value.state)
+extension PythonObject : PythonConvertible {
+  public init(_ object: PythonObject) {
+    self.init(object.state)
   }
 
   /// Python convertible values may always be converted to Python.
-  public var pythonValue: PyValue { return self }
+  public var pythonObject: PythonObject { return self }
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: ThrowingPyValue Implementation
+// MARK: ThrowingPythonObject Implementation
 //===----------------------------------------------------------------------===//
 
-public extension PyValue {
-  /// Return a version of this value that may be called.  It throws a Swift
+public extension PythonObject {
+  /// Return a version of this object that may be called.  It throws a Swift
   /// error if the underlying Python function throws a Python exception.
-  var throwing: ThrowingPyValue {
-    return ThrowingPyValue(self)
+  var throwing: ThrowingPythonObject {
+    return ThrowingPythonObject(self)
   }
 }
 
 /// This represents the result of a failable operation when working with
-/// Python values.
+/// Python objects.
 @_fixed_layout
 public enum PythonError : Error {
   /// This represents an exception thrown out of a Python API.  This can occur
   /// on calls.
-  case exception(PyValue)
+  case exception(PythonObject)
 
-  /// A call on the specified value failed, e.g. because it wasn't a Python
+  /// A call on the specified object failed, e.g. because it wasn't a Python
   /// callable, because the wrong number of parameters were provided, or because
   /// a keyword argument was specified multiple times.
-  case invalidCall(PyValue)
+  case invalidCall(PythonObject)
 
   /// A callMember(x, ...) operation failed to look up the 'x' member.
   case invalidMember(String)
@@ -248,19 +248,19 @@ private func throwPythonErrorIfPresent() throws {
   PyErr_Fetch(&type, &value, &traceback)
 
   // The value for the exception may not be set, but the type always should be.
-  let r = PyValue(owned: value ?? type!)
+  let r = PythonObject(owned: value ?? type!)
   throw PythonError.exception(r)
 }
 
-/// This type is a PyValue produced when the user cares about getting an
+/// This type is a PythonObject produced when the user cares about getting an
 /// exception out of a call.  We wrap this up and reflect it back as a thrown
 /// Swift error.
 @_fixed_layout
-public struct ThrowingPyValue {
-  private var state: PyValue
+public struct ThrowingPythonObject {
+  private var state: PythonObject
 
-  fileprivate init(_ value: PyValue) {
-    state = value
+  fileprivate init(_ object: PythonObject) {
+    state = object
   }
 
   /// Call self, which must be a Python Callable.  If the callee throws a Python
@@ -270,7 +270,7 @@ public struct ThrowingPyValue {
   public func call<T : PythonConvertible>(
     argArray args: [T],
     kwargs: [(String, PythonConvertible)] = []
-  ) throws -> PyValue {
+  ) throws -> PythonObject {
     // Make sure state errors are not around.
     if PyErr_Occurred() != nil {
       // FIXME: This should be an assert, but the failure mode in playgrounds
@@ -284,7 +284,7 @@ public struct ThrowingPyValue {
       kwdictObject = PyDict_New()!
       for (key, val) in kwargs {
         // FIXME: What if there are two identical keywords provided?
-        let k = PyValue(key).ownedPyObject
+        let k = PythonObject(key).ownedPyObject
         let v = val.ownedPyObject
         PyDict_SetItem(kwdictObject, k, v)
         Py_DecRef(k)
@@ -293,13 +293,13 @@ public struct ThrowingPyValue {
     }
     defer { Py_DecRef(kwdictObject) }  // Py_DecRef is nil safe.
 
-    // Non-keyword arguments are passed as a tuple of values.
+    // Non-keyword arguments are passed as a tuple of objects.
     let argTuple = pyTuple(args)
     defer { Py_DecRef(argTuple) }
 
-    // Python calls always return a non-null value when successful.  If the
+    // Python calls always return a non-null object when successful.  If the
     // Python function produces the equivalent of C "void", it returns the None
-    // value.  A null result of PyObjectCall happens when there is an error,
+    // object.  A null result of PyObjectCall happens when there is an error,
     // like 'self' not being a Python callable.
     let selfObject = state.ownedPyObject
     defer { Py_DecRef(selfObject) }
@@ -310,7 +310,7 @@ public struct ThrowingPyValue {
       throw PythonError.invalidCall(state)
     }
 
-    return PyValue(owned: result)
+    return PythonObject(owned: result)
   }
 
   /// Call self, which must be a Python Callable.
@@ -318,8 +318,8 @@ public struct ThrowingPyValue {
   public func call(
     _ args: PythonConvertible...,
     kwargs: [(String, PythonConvertible)] = []
-  ) throws -> PyValue {
-    return try call(argArray: args.map { $0.pythonValue }, kwargs: kwargs)
+  ) throws -> PythonObject {
+    return try call(argArray: args.map { $0.pythonObject }, kwargs: kwargs)
   }
 
   // Call a member, as in self.foo(...)
@@ -328,7 +328,7 @@ public struct ThrowingPyValue {
     _ name: String,
     argArray args: [T],
     kwargs: [(String, PythonConvertible)] = []
-  ) throws -> PyValue {
+  ) throws -> PythonObject {
     // If the member lookup fails, reflect it as a Swift error.
     guard let callee = state.checking[dynamicMember: name] else {
       throw PythonError.invalidMember(name)
@@ -341,12 +341,12 @@ public struct ThrowingPyValue {
     _ name: String,
     with args: PythonConvertible...,
     kwargs: [(String, PythonConvertible)] = []
-  ) throws -> PyValue {
-    return try callMember(name, argArray: args.map { $0.pythonValue },
+  ) throws -> PythonObject {
+    return try callMember(name, argArray: args.map { $0.pythonObject },
                           kwargs: kwargs)
   }
 
-  public var tuple2: (PyValue, PyValue)? {
+  public var tuple2: (PythonObject, PythonObject)? {
     let ct = state.checking
     guard let elt0 = ct[0], let elt1 = ct[1] else {
       return nil
@@ -354,7 +354,7 @@ public struct ThrowingPyValue {
     return (elt0, elt1)
   }
 
-  public var tuple3: (PyValue, PyValue, PyValue)? {
+  public var tuple3: (PythonObject, PythonObject, PythonObject)? {
     let ct = state.checking
     guard let elt0 = ct[0], let elt1 = ct[1], let elt2 = ct[2] else {
       return nil
@@ -362,7 +362,7 @@ public struct ThrowingPyValue {
     return (elt0, elt1, elt2)
   }
 
-  public var tuple4: (PyValue, PyValue, PyValue, PyValue)? {
+  public var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject)? {
     let ct = state.checking
     guard let elt0 = ct[0], let elt1 = ct[1],
           let elt2 = ct[2], let elt3 = ct[3] else {
@@ -374,31 +374,31 @@ public struct ThrowingPyValue {
 
 
 //===----------------------------------------------------------------------===//
-// MARK: CheckingPyValue Implementation
+// MARK: CheckingPythonObject Implementation
 //===----------------------------------------------------------------------===//
 
-public extension PyValue {
-  /// Return a version of this value that may have member access operations
+public extension PythonObject {
+  /// Return a version of this object that may have member access operations
   /// performed on it.  These operations can fail and return an optional when
   /// the underlying Python operations fail.
-  var checking: CheckingPyValue {
-    return CheckingPyValue(self)
+  var checking: CheckingPythonObject {
+    return CheckingPythonObject(self)
   }
 }
 
-/// This type temporarily wraps a PyValue when the user cares about turning an
-/// operation (like a member lookup or subscript) into a failable operation that
-/// returns an optional.
+/// This type temporarily wraps a PythonObject when the user cares about turning
+/// an operation (like a member lookup or subscript) into a failable operation
+/// that returns an optional.
 @dynamicMemberLookup
 @_fixed_layout
-public struct CheckingPyValue {
-  private var state: PyValue
+public struct CheckingPythonObject {
+  private var state: PythonObject
 
-  fileprivate init(_ value: PyValue) {
-    state = value
+  fileprivate init(_ object: PythonObject) {
+    state = object
   }
 
-  public subscript(dynamicMember name: String) -> PyValue? {
+  public subscript(dynamicMember name: String) -> PythonObject? {
     get {
       let selfObject = state.ownedPyObject
       defer { Py_DecRef(selfObject) }
@@ -406,13 +406,14 @@ public struct CheckingPyValue {
         PyErr_Clear()
         return nil
       }
-      return PyValue(owned: result) // PyObject_GetAttrString returns +1 result.
+      // PyObject_GetAttrString returns +1 result.
+      return PythonObject(owned: result)
     }
   }
 
   /// Swift subscripts cannot throw yet, so model this as returning an optional
   /// reference.
-  public subscript(array index: [PythonConvertible]) -> PyValue? {
+  public subscript(array index: [PythonConvertible]) -> PythonObject? {
     get {
       let pyIndexObject = flattenedSubscriptIndices(index)
       let selfObject = state.ownedPyObject
@@ -423,7 +424,7 @@ public struct CheckingPyValue {
 
       // PyObject_GetItem returns +1 reference.
       if let result = PyObject_GetItem(selfObject, pyIndexObject) {
-        return PyValue(owned: result)
+        return PythonObject(owned: result)
       }
 
       PyErr_Clear()
@@ -448,7 +449,7 @@ public struct CheckingPyValue {
     }
   }
 
-  public subscript(i: PythonConvertible...) -> PyValue? {
+  public subscript(i: PythonConvertible...) -> PythonObject? {
     get {
       return self[array: i]
     }
@@ -457,21 +458,21 @@ public struct CheckingPyValue {
     }
   }
 
-  public var tuple2: (PyValue, PyValue)? {
+  public var tuple2: (PythonObject, PythonObject)? {
     guard let elt0 = self[0], let elt1 = self[1] else {
       return nil
     }
     return (elt0, elt1)
   }
 
-  public var tuple3: (PyValue, PyValue, PyValue)? {
+  public var tuple3: (PythonObject, PythonObject, PythonObject)? {
     guard let elt0 = self[0], let elt1 = self[1], let elt2 = self[2] else {
       return nil
     }
     return (elt0, elt1, elt2)
   }
 
-  public var tuple4: (PyValue, PyValue, PyValue, PyValue)? {
+  public var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject)? {
     guard let elt0 = self[0], let elt1 = self[1],
           let elt2 = self[2], let elt3 = self[3] else {
       return nil
@@ -481,7 +482,7 @@ public struct CheckingPyValue {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Core PyValue API
+// MARK: Core PythonObject API
 //===----------------------------------------------------------------------===//
 
 /// Turn an array of indices into a flattened index reference as a +1 Python
@@ -492,11 +493,11 @@ private func flattenedSubscriptIndices(
   if index.count == 1 {
     return index[0].ownedPyObject
   }
-  return pyTuple(index.map { $0.pythonValue })
+  return pyTuple(index.map { $0.pythonObject })
 }
 
-public extension PyValue {
-  subscript(dynamicMember member: String) -> PyValue {
+public extension PythonObject {
+  subscript(dynamicMember member: String) -> PythonObject {
     get {
       return checking[dynamicMember: member]!
     }
@@ -515,7 +516,7 @@ public extension PyValue {
 
   // Dictionary lookups return optionals because they can always fail if the
   // key is not present.
-  func member(_ dictMember: PyValue) -> PyValue? {
+  func member(_ dictMember: PythonObject) -> PythonObject? {
 
     let selfObject = self.ownedPyObject
     let keyObject = dictMember.ownedPyObject
@@ -525,10 +526,10 @@ public extension PyValue {
     }
 
     // PyDict_GetItem returns +0 result.
-    return PyValue(borrowed: PyDict_GetItem(selfObject, keyObject))
+    return PythonObject(borrowed: PyDict_GetItem(selfObject, keyObject))
   }
 
-  subscript(index: PythonConvertible...) -> PyValue {
+  subscript(index: PythonConvertible...) -> PythonObject {
     get {
       return self.checking[array: index]!
     }
@@ -538,15 +539,15 @@ public extension PyValue {
   }
 
   // Helpers for destructuring tuples
-  var tuple2: (PyValue, PyValue) {
+  var tuple2: (PythonObject, PythonObject) {
     return (self[0], self[1])
   }
 
-  var tuple3: (PyValue, PyValue, PyValue) {
+  var tuple3: (PythonObject, PythonObject, PythonObject) {
     return (self[0], self[1], self[2])
   }
 
-  var tuple4: (PyValue, PyValue, PyValue, PyValue) {
+  var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject) {
     return (self[0], self[1], self[2], self[3])
   }
 
@@ -555,15 +556,15 @@ public extension PyValue {
   func call<T : PythonConvertible>(
     with args: [T],
     kwargs: [(String, PythonConvertible)] = []
-  ) -> PyValue {
+  ) -> PythonObject {
     return try! self.throwing.call(argArray: args, kwargs: kwargs)
   }
 
   /// Call self, which must be a Python Callable.
   @discardableResult
   func call(with args: PythonConvertible...,
-                   kwargs: [(String, PythonConvertible)] = []) -> PyValue {
-    return try! self.throwing.call(argArray: args.map { $0.pythonValue },
+                   kwargs: [(String, PythonConvertible)] = []) -> PythonObject {
+    return try! self.throwing.call(argArray: args.map { $0.pythonObject },
                                    kwargs: kwargs)
   }
 
@@ -573,7 +574,7 @@ public extension PyValue {
     _ name: String,
     argArray args: [T],
     kwargs: [(String, PythonConvertible)] = []
-  ) -> PyValue {
+  ) -> PythonObject {
     return try! self.throwing.callMember(name, argArray: args, kwargs: kwargs)
   }
   @discardableResult
@@ -581,9 +582,9 @@ public extension PyValue {
     _ name: String,
     with args: PythonConvertible...,
     kwargs: [(String, PythonConvertible)] = []
-  ) -> PyValue {
+  ) -> PythonObject {
     return try! self.throwing.callMember(name,
-                                         argArray: args.map { $0.pythonValue },
+                                         argArray: args.map { $0.pythonObject },
                                          kwargs: kwargs)
   }
 }
@@ -607,22 +608,22 @@ public let Python = PythonInterface()
 @dynamicMemberLookup
 public struct PythonInterface {
   /// A hash table of the builtins provided by the Python language.
-  public let builtins: PyValue
+  public let builtins: PythonObject
 
   init() {
     Py_Initialize()   // Initialize Python
-    builtins = PyValue(borrowed: PyEval_GetBuiltins())
+    builtins = PythonObject(borrowed: PyEval_GetBuiltins())
   }
 
-  public func attemptImport(_ name: String) throws -> PyValue {
+  public func attemptImport(_ name: String) throws -> PythonObject {
     guard let module = PyImport_ImportModule(name) else {
       try throwPythonErrorIfPresent()
       throw PythonError.invalidModule(name)
     }
-    return PyValue(owned: module)
+    return PythonObject(owned: module)
   }
 
-  public func `import`(_ name: String) -> PyValue {
+  public func `import`(_ name: String) -> PythonObject {
     return try! attemptImport(name)
   }
 
@@ -633,7 +634,7 @@ public struct PythonInterface {
     }
   }
 
-  public subscript(dynamicMember name: String) -> PyValue {
+  public subscript(dynamicMember name: String) -> PythonObject {
     return builtins[name]
   }
 }
@@ -664,13 +665,13 @@ private func pyTuple<T : Collection>(_ vals: T) -> OwnedPyObject
 
   let tuple = PyTuple_New(vals.count)!
   for (index, element) in vals.enumerated() {
-    // PyTuple_SetItem steals the reference of the value stored.
+    // PyTuple_SetItem steals the reference of the object stored.
     PyTuple_SetItem(tuple, index, element.ownedPyObject)
   }
   return tuple
 }
 
-public extension PyValue {
+public extension PythonObject {
   /// - FIXME: This should be subsumed by Swift ranges + strides.  Python has a
   ///   very extravagant model though, it isn't clear how best to represent this
   ///   in Swift.
@@ -679,9 +680,9 @@ public extension PyValue {
   /// use 0...100 in a subscript) but then provide this member for the fully
   /// general case.
   ///
-  /// We also need conditional conformances to allow range if PyValue's to be a
-  /// Slice.  We can probably get away with a bunch of overloads for now given
-  /// that slices are typically used with concrete operands.
+  /// We also need conditional conformances to allow range if PythonObject's to
+  /// be a Slice.  We can probably get away with a bunch of overloads for now
+  /// given that slices are typically used with concrete operands.
   init(sliceStart start: PythonConvertible?,
        stop: PythonConvertible?,
        step: PythonConvertible? = nil) {
@@ -696,7 +697,7 @@ public extension PyValue {
 
   init<T : Collection>(tupleContentsOf elts: T)
     where T.Element == PythonConvertible {
-    self.init(owned: pyTuple(elts.map { $0.pythonValue }))
+    self.init(owned: pyTuple(elts.map { $0.pythonObject }))
   }
 
   init<T : Collection>(tupleContentsOf elts: T)
@@ -707,16 +708,19 @@ public extension PyValue {
 
 
 //===----------------------------------------------------------------------===//
-// MARK: Builtin Swift Types Conformances to PyValue
+// MARK: Builtin Swift Types Conformances to PythonObject
 //===----------------------------------------------------------------------===//
 
-/// Return true if the specified value is an instance of the low-level Python
+/// Return true if the specified object is an instance of the low-level Python
 /// type descriptor passed in as 'type'.
-private func isType(_ val: PyValue, type: UnsafeMutableRawPointer) -> Bool {
-  let typePyRef = PyValue(borrowed: type.assumingMemoryBound(to: PyObject.self))
-  let result = Python.isinstance.call(with: val, typePyRef)
+private func isType(_ object: PythonObject,
+                    type: UnsafeMutableRawPointer) -> Bool {
+  let typePyRef = PythonObject(
+    borrowed: type.assumingMemoryBound(to: PyObject.self)
+  )
+  let result = Python.isinstance.call(with: object, typePyRef)
 
-  // We can't use the normal failable Bool initialization from PyValue here,
+  // We can't use the normal failable Bool initializer from PythonObject here,
   // because that would cause an infinite loop, calling back into isType.
   let pyObject = result.ownedPyObject
   defer { Py_DecRef(pyObject) }
@@ -731,24 +735,24 @@ private func == (_ x: UnsafeMutablePointer<PyObject>,
 }
 
 extension Bool : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
-    guard isType(pyValue, type: &PyBool_Type) else { return nil }
+  public init?(_ pythonObject: PythonObject) {
+    guard isType(pythonObject, type: &PyBool_Type) else { return nil }
 
-    let pyObject = pyValue.ownedPyObject
+    let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
 
     self = pyObject == &_Py_TrueStruct
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
-    return PyValue(owned: PyBool_FromLong(self ? 1 : 0))
+    return PythonObject(owned: PyBool_FromLong(self ? 1 : 0))
   }
 }
 
 extension String : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
-    let pyObject = pyValue.ownedPyObject
+  public init?(_ pythonObject: PythonObject) {
+    let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
 
     guard let cStringVal = PyString_AsString(pyObject) else {
@@ -759,17 +763,17 @@ extension String : PythonConvertible {
     self = String(cString: cStringVal)
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
     let v = self.utf8CString.withUnsafeBufferPointer {
       PyString_FromStringAndSize($0.baseAddress, $0.count-1 /*trim \0*/)!
     }
-    return PyValue(owned: v)
+    return PythonObject(owned: v)
   }
 }
 
-fileprivate extension PyValue {
-  // This converts a PyValue to some given type by applying the appropriate
+fileprivate extension PythonObject {
+  // This converts a PythonObject to some given type by applying the appropriate
   // converter and checking against the error value.
   func converted<T : Equatable>(withError errorValue: T,
                                 by converter: (OwnedPyObject) -> T) -> T? {
@@ -790,53 +794,54 @@ fileprivate extension PyValue {
 }
 
 extension Int : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
-    // PyInt_AsLong return -1 and sets an error if the Python value isn't
+  public init?(_ pythonObject: PythonObject) {
+    // PyInt_AsLong return -1 and sets an error if the Python object isn't
     // integer compatible.
-    guard let value = pyValue.converted(withError: -1, by: PyInt_AsLong) else {
+    guard let value = pythonObject.converted(withError: -1,
+                                             by: PyInt_AsLong) else {
       return nil
     }
     self = value
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
-    return PyValue(owned: PyInt_FromLong(self))
+    return PythonObject(owned: PyInt_FromLong(self))
   }
 }
 
 extension UInt : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
+  public init?(_ pythonObject: PythonObject) {
     // PyInt_AsUnsignedLongMask isn't documented as such, but in fact it does
-    // return -1 and sets an error if the Python value isn't
+    // return -1 and sets an error if the Python object isn't
     // integer compatible.
-    guard let value = pyValue.converted(withError: ~0,
+    guard let value = pythonObject.converted(withError: ~0,
                                         by: PyInt_AsUnsignedLongMask) else {
       return nil
     }
     self = value
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
-    return PyValue(owned: PyInt_FromSize_t(Int(self)))
+    return PythonObject(owned: PyInt_FromSize_t(Int(self)))
   }
 }
 
 extension Double : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
+  public init?(_ pythonObject: PythonObject) {
     // PyFloat_AsDouble return -1 and sets an error
-    // if the Python value isn't float compatible.
-    guard let value = pyValue.converted(withError: -1,
+    // if the Python object isn't float compatible.
+    guard let value = pythonObject.converted(withError: -1,
                                         by: PyFloat_AsDouble) else {
       return nil
     }
     self = value
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
-    return PyValue(owned: PyFloat_FromDouble(self))
+    return PythonObject(owned: PyFloat_FromDouble(self))
   }
 }
 
@@ -844,38 +849,39 @@ extension Double : PythonConvertible {
 // Sized integer and Float conformances.
 //===----------------------------------------------------------------------===//
 
-// Any integer can conform to PyValue by using the Int/UInt implementation.
-public protocol FixedWidthIntegerPyValue : PythonConvertible, FixedWidthInteger {
+// Any integer can conform to PythonObject by using the Int/UInt implementation.
+public protocol FixedWidthIntegerPythonObject
+  : PythonConvertible, FixedWidthInteger {
   associatedtype ParentPythonIntType : PythonConvertible, FixedWidthInteger
 }
 
-public extension FixedWidthIntegerPyValue {
-  init?(_ pyValue: PyValue) {
-    guard let i = ParentPythonIntType(pyValue) else { return nil }
+public extension FixedWidthIntegerPythonObject {
+  init?(_ pythonObject: PythonObject) {
+    guard let i = ParentPythonIntType(pythonObject) else { return nil }
     self = Self(i)
   }
 
-  var pythonValue: PyValue {
-    return ParentPythonIntType(self).pythonValue
+  var pythonObject: PythonObject {
+    return ParentPythonIntType(self).pythonObject
   }
 }
 
-extension Int8  : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = Int }
-extension Int16 : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = Int }
-extension Int32 : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = Int }
-extension Int64 : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = Int }
-extension UInt8  : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = UInt }
-extension UInt16 : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = UInt }
-extension UInt32 : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = UInt }
-extension UInt64 : FixedWidthIntegerPyValue { public typealias ParentPythonIntType = UInt }
+extension Int8  : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
+extension Int16 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
+extension Int32 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
+extension Int64 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
+extension UInt8  : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
+extension UInt16 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
+extension UInt32 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
+extension UInt64 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
 
 extension Float : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
-    guard let v = Double(pyValue) else { return nil }
+  public init?(_ pythonObject: PythonObject) {
+    guard let v = Double(pythonObject) else { return nil }
     self = Float(v)
   }
-  public var pythonValue: PyValue {
-    return Double(self).pythonValue
+  public var pythonObject: PythonObject {
+    return Double(self).pythonObject
   }
 }
 
@@ -885,30 +891,30 @@ extension Float : PythonConvertible {
 
 // Arrays are PythonConvertible if their elements are.
 extension Array : PythonConvertible where Element : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
+  public init?(_ pythonObject: PythonObject) {
     self = []
 
-    for elt in pyValue {
+    for elt in pythonObject {
       guard let eltVal = Element(elt) else { return nil }
       append(eltVal)
     }
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
     let list = PyList_New(count)!
     for (index, element) in enumerated() {
-      // PyList_SetItem steals the reference of the value stored.
+      // PyList_SetItem steals the reference of the object stored.
       PyList_SetItem(list, index, element.ownedPyObject)
     }
-    return PyValue(owned: list)
+    return PythonObject(owned: list)
   }
 }
 
 // Dictionary is PythonConvertible if its keys and values are.
 extension Dictionary : PythonConvertible
   where Key : PythonConvertible, Value : PythonConvertible {
-  public init?(_ pythonDict: PyValue) {
+  public init?(_ pythonDict: PythonObject) {
     self = [:]
 
     // Iterate the Python dictionary, converting the key/value's within it to
@@ -920,8 +926,8 @@ extension Dictionary : PythonConvertible
                       &position, &key, &value) != 0 {
       // If either the key or value are not convertible to the expected Swift
       // type then the entire dictionary fails to convert.
-      if let swiftKey = Key(PyValue(borrowed: key!)),
-         let swiftValue = Value(PyValue(borrowed: value!)) {
+      if let swiftKey = Key(PythonObject(borrowed: key!)),
+         let swiftValue = Value(PythonObject(borrowed: value!)) {
         // It is possible that there are duplicate keys after conversion.  We
         // silently allow duplicate keys and pick a nondeterministic result
         // if there is a collision.
@@ -932,7 +938,7 @@ extension Dictionary : PythonConvertible
     }
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
 
     let dict = PyDict_New()!
@@ -944,7 +950,7 @@ extension Dictionary : PythonConvertible
       Py_DecRef(v)
     }
 
-    return PyValue(owned: dict)
+    return PythonObject(owned: dict)
   }
 }
 
@@ -953,53 +959,55 @@ extension Dictionary : PythonConvertible
 //===----------------------------------------------------------------------===//
 
 extension Range : PythonConvertible where Bound : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
-    guard isType(pyValue, type: &PySlice_Type) else { return nil }
-    guard let lowerBound = Bound(pyValue.start),
-          let upperBound = Bound(pyValue.stop) else {
+  public init?(_ pythonObject: PythonObject) {
+    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard let lowerBound = Bound(pythonObject.start),
+          let upperBound = Bound(pythonObject.stop) else {
        return nil
     }
-    guard pyValue.step == Python.None else { return nil }
+    guard pythonObject.step == Python.None else { return nil }
     self.init(uncheckedBounds: (lowerBound, upperBound))
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
-    return PyValue(sliceStart: self.lowerBound,
+    return PythonObject(sliceStart: self.lowerBound,
                    stop: self.upperBound,
                    step: nil)
   }
 }
 
 extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
-    guard isType(pyValue, type: &PySlice_Type) else { return nil }
-    guard let lowerBound = Bound(pyValue.start) else { return nil }
-    guard pyValue.stop == Python.None, pyValue.step == Python.None else {
+  public init?(_ pythonObject: PythonObject) {
+    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard let lowerBound = Bound(pythonObject.start) else { return nil }
+    guard pythonObject.stop == Python.None,
+          pythonObject.step == Python.None else {
        return nil
     }
     self.init(lowerBound)
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
-    return PyValue(sliceStart: self.lowerBound, stop: nil, step: nil)
+    return PythonObject(sliceStart: self.lowerBound, stop: nil, step: nil)
   }
 }
 
 extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
-  public init?(_ pyValue: PyValue) {
-    guard isType(pyValue, type: &PySlice_Type) else { return nil }
-    guard let upperBound = Bound(pyValue.stop) else { return nil }
-    guard pyValue.start == Python.None, pyValue.step == Python.None else {
+  public init?(_ pythonObject: PythonObject) {
+    guard isType(pythonObject, type: &PySlice_Type) else { return nil }
+    guard let upperBound = Bound(pythonObject.stop) else { return nil }
+    guard pythonObject.start == Python.None,
+          pythonObject.step == Python.None else {
        return nil
     }
     self.init(upperBound)
   }
 
-  public var pythonValue: PyValue {
+  public var pythonObject: PythonObject {
     _ = Python // ensure Python is initialized.
-    return PyValue(sliceStart: nil, stop: self.upperBound, step: nil)
+    return PythonObject(sliceStart: nil, stop: self.upperBound, step: nil)
   }
 }
 
@@ -1007,60 +1015,60 @@ extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
 // Standard Operators and Conformances
 //===----------------------------------------------------------------------===//
 
-public extension PyValue {
-  static func + (lhs: PyValue, rhs: PyValue) -> PyValue {
+public extension PythonObject {
+  static func + (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
     return lhs.__add__.call(with: rhs)
   }
 
-  static func - (lhs: PyValue, rhs: PyValue) -> PyValue {
+  static func - (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
     return lhs.__sub__.call(with: rhs)
   }
 
-  static func * (lhs: PyValue, rhs: PyValue) -> PyValue {
+  static func * (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
     return lhs.__mul__.call(with: rhs)
   }
 
-  static func / (lhs: PyValue, rhs: PyValue) -> PyValue {
+  static func / (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
     return lhs.__truediv__.call(with: rhs)
   }
 
-  static func += (lhs: inout PyValue, rhs: PyValue) {
+  static func += (lhs: inout PythonObject, rhs: PythonObject) {
     lhs = lhs + rhs
   }
 
-  static func -= (lhs: inout PyValue, rhs: PyValue) {
+  static func -= (lhs: inout PythonObject, rhs: PythonObject) {
     lhs = lhs - rhs
   }
 
-  static func *= (lhs: inout PyValue, rhs: PyValue) {
+  static func *= (lhs: inout PythonObject, rhs: PythonObject) {
     lhs = lhs * rhs
   }
 
-  static func /= (lhs: inout PyValue, rhs: PyValue) {
+  static func /= (lhs: inout PythonObject, rhs: PythonObject) {
     lhs = lhs / rhs
   }
 }
 
-extension PyValue : SignedNumeric {
+extension PythonObject : SignedNumeric {
   public init<T : BinaryInteger>(exactly value: T) {
-    self = PyValue(Int(value))
+    self = PythonObject(Int(value))
   }
 
-  public typealias Magnitude = PyValue
+  public typealias Magnitude = PythonObject
 
-  public var magnitude: PyValue {
+  public var magnitude: PythonObject {
     return self < 0 ? -self : self
   }
 }
 
 
 // Define conformance to Comparable and Equatable
-extension PyValue : Hashable, Comparable, Equatable {
+extension PythonObject : Hashable, Comparable, Equatable {
   // Comparable/Equatable are implemented using rich comparison. This tries at
   // first the dedicated function, e.g. __eq__ for equality and if this does not
   // work 3 way comparison is used.
   // This is coherent with how comparison is handled in the Python interpreter.
-  private func compared(to other: PyValue, byOp: Int32) -> Bool {
+  private func compared(to other: PythonObject, byOp: Int32) -> Bool {
     let lhsObject = self.ownedPyObject
     let rhsObject = other.ownedPyObject
     defer {
@@ -1079,27 +1087,27 @@ extension PyValue : Hashable, Comparable, Equatable {
     }
   }
 
-  public static func == (lhs: PyValue, rhs: PyValue) -> Bool {
+  public static func == (lhs: PythonObject, rhs: PythonObject) -> Bool {
     return lhs.compared(to: rhs, byOp: Py_EQ)
   }
 
-  public static func != (lhs: PyValue, rhs: PyValue) -> Bool {
+  public static func != (lhs: PythonObject, rhs: PythonObject) -> Bool {
     return lhs.compared(to: rhs, byOp: Py_NE)
   }
 
-  public static func < (lhs: PyValue, rhs: PyValue) -> Bool {
+  public static func < (lhs: PythonObject, rhs: PythonObject) -> Bool {
     return lhs.compared(to: rhs, byOp: Py_LT)
   }
 
-  public static func <= (lhs: PyValue, rhs: PyValue) -> Bool {
+  public static func <= (lhs: PythonObject, rhs: PythonObject) -> Bool {
     return lhs.compared(to: rhs, byOp: Py_LE)
   }
 
-  public static func > (lhs: PyValue, rhs: PyValue) -> Bool {
+  public static func > (lhs: PythonObject, rhs: PythonObject) -> Bool {
     return lhs.compared(to: rhs, byOp: Py_GT)
   }
 
-  public static func >= (lhs: PyValue, rhs: PyValue) -> Bool {
+  public static func >= (lhs: PythonObject, rhs: PythonObject) -> Bool {
     return lhs.compared(to: rhs, byOp: Py_GE)
   }
 
@@ -1111,9 +1119,9 @@ extension PyValue : Hashable, Comparable, Equatable {
   }
 }
 
-extension PyValue : MutableCollection {
-  public typealias Index = PyValue
-  public typealias Element = PyValue
+extension PythonObject : MutableCollection {
+  public typealias Index = PythonObject
+  public typealias Element = PythonObject
 
   public var startIndex: Index {
     return 0
@@ -1123,7 +1131,7 @@ extension PyValue : MutableCollection {
     return Python.len.call(with: self)
   }
 
-  public subscript(index: PyValue) -> PyValue {
+  public subscript(index: PythonObject) -> PythonObject {
     get {
       return self[index as PythonConvertible]
     }
@@ -1134,38 +1142,38 @@ extension PyValue : MutableCollection {
 
   // Method that returns the next index when iterating
   public func index(after i: Index) -> Index {
-    return i + PyValue(1)
+    return i + PythonObject(1)
   }
 }
 
 // Simple Literal Conformances
-extension PyValue : ExpressibleByBooleanLiteral,
-                  ExpressibleByIntegerLiteral,
-                  ExpressibleByFloatLiteral,
-                  ExpressibleByStringLiteral {
+extension PythonObject : ExpressibleByBooleanLiteral,
+                         ExpressibleByIntegerLiteral,
+                         ExpressibleByFloatLiteral,
+                         ExpressibleByStringLiteral {
   public init(booleanLiteral value: Bool) {
-    self = PyValue(value)
+    self.init(value)
   }
   public init(integerLiteral value: Int) {
-    self = PyValue(value)
+    self.init(value)
   }
   public init(floatLiteral value: Double) {
-    self = PyValue(value)
+    self.init(value)
   }
   public init(stringLiteral value: String) {
-    self = PyValue(value)
+    self.init(value)
   }
 }
 
 // Collection Literal Conformances
-extension PyValue : ExpressibleByArrayLiteral,
-                  ExpressibleByDictionaryLiteral {
-  public init(arrayLiteral elements: PyValue...) {
-    self = elements.pythonValue
+extension PythonObject : ExpressibleByArrayLiteral,
+                         ExpressibleByDictionaryLiteral {
+  public init(arrayLiteral elements: PythonObject...) {
+    self.init(elements)
   }
-  public typealias Key = PyValue
-  public typealias Value = PyValue
-  public init(dictionaryLiteral elements: (PyValue, PyValue)...) {
-    self = Dictionary(elements, uniquingKeysWith: { lhs, _ in lhs }).pythonValue
+  public typealias Key = PythonObject
+  public typealias Value = PythonObject
+  public init(dictionaryLiteral elements: (PythonObject, PythonObject)...) {
+    self.init(Dictionary(elements, uniquingKeysWith: { lhs, _ in lhs }))
   }
 }
