@@ -346,9 +346,6 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         Editor.replace(Range, RepText);
         return true;
       }
-      if (updateStringRepresentableDeclRef(Item, Range)) {
-        return true;
-      }
     }
     return true;
   }
@@ -682,20 +679,30 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto *RD = getReferencedDecl(Reference);
     if (!RD)
       return false;
+    std::string Func;
+    std::string Rename;
     for (auto *Item: getRelatedDiffItems(RD)) {
-      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+      if (isSimpleReplacement(Item, Rename)) {
+      } else if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isStringRepresentableChange() &&
             CI->NodeKind == SDKNodeKind::DeclVar) {
           SmallString<256> Buffer;
-          auto Func = insertHelperFunction(CI->DiffKind, CI->RightComment,
-                                           Buffer, FromString);
-          Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
-          Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
-          return true;
+          Func = insertHelperFunction(CI->DiffKind, CI->RightComment, Buffer,
+            FromString);
         }
       }
     }
-    return false;
+    if (Func.empty())
+      return false;
+
+    Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
+    Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
+    if (!Rename.empty()) {
+      auto Range = CharSourceRange(SM, Reference->getStartLoc(),
+        Lexer::getLocForEndOfToken(SM, Reference->getEndLoc()));
+      Editor.replace(Range, Rename);
+    }
+    return true;
   }
 
   bool handleAssignDestMigration(Expr *E) {
@@ -826,7 +833,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   bool walkToExprPre(Expr *E) override {
     if (handleQualifiedReplacement(E))
       return false;
-    if (handleAssignDestMigration(E) || handleAttributeReference(E))
+    if (handleAssignDestMigration(E))
+      return false;
+    if (handleAttributeReference(E))
       return false;
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
