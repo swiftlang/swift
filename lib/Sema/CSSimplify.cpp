@@ -4036,8 +4036,19 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       // get any special power from being formed in certain contexts, such
       // as the ability to assign to `let`s in initialization contexts, so
       // we pass null for the DC to `isSettable` here.)
-      if (!storage->isSettable(nullptr)
-          || !storage->isSetterAccessibleFrom(DC)) {
+      if (!getASTContext().isSwiftVersionAtLeast(5)) {
+        // As a source-compatibility measure, continue to allow
+        // WritableKeyPaths to be formed in the same conditions we did
+        // in previous releases even if we should not be able to set
+        // the value in this context.
+        if (!storage->isSettable(DC)) {
+          // A non-settable component makes the key path read-only, unless
+          // a reference-writable component shows up later.
+          capability = ReadOnly;
+          continue;
+        }
+      } else if (!storage->isSettable(nullptr)
+                 || !storage->isSetterAccessibleFrom(DC)) {
         // A non-settable component makes the key path read-only, unless
         // a reference-writable component shows up later.
         capability = ReadOnly;
