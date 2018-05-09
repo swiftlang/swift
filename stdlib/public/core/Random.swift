@@ -83,26 +83,7 @@ extension RandomNumberGenerator {
   ///   every value of `T` is equally likely to be returned.
   @inlinable
   public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
-    if T.bitWidth <= UInt64.bitWidth {
-      return T(truncatingIfNeeded: next())
-    }
-
-    let (quotient, remainder) = T.bitWidth.quotientAndRemainder(
-      dividingBy: UInt64.bitWidth
-    )
-    var tmp: T = 0
-
-    for i in 0 ..< quotient {
-      tmp += T(truncatingIfNeeded: next()) &<< (UInt64.bitWidth * i)
-    }
-
-    if remainder != 0 {
-      let random = next()
-      let mask = UInt64.max &>> (UInt64.bitWidth - remainder)
-      tmp += T(truncatingIfNeeded: random & mask) &<< (UInt64.bitWidth * quotient)
-    }
-
-    return tmp
+    return T._random(using: &self)
   }
 
   /// Returns a random value that is less than the given upper bound.
@@ -165,16 +146,6 @@ public struct Random : RandomNumberGenerator {
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
     _stdlib_random(&random, MemoryLayout<UInt64>.size)
-    return random
-  }
-  
-  /// Returns a value from a uniform, independent distribution of binary data.
-  ///
-  /// - Returns: A random value of `T`. Bits are randomly distributed so that
-  ///   every value of `T` is equally likely to be returned.
-  public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
-    var random: T = 0
-    _stdlib_random(&random, MemoryLayout<T>.size)
     return random
   }
 
