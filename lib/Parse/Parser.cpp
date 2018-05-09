@@ -979,7 +979,7 @@ struct ParserUnit::Implementation {
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticEngine Diags;
-  ASTContext Ctx;
+  ASTContext &Ctx;
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
@@ -987,7 +987,7 @@ struct ParserUnit::Implementation {
                  const LangOptions &Opts, StringRef ModuleName)
     : LangOpts(Opts),
       Diags(SM),
-      Ctx(LangOpts, SearchPathOpts, SM, Diags),
+      Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,
