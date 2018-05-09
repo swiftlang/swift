@@ -79,7 +79,7 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   // Compute the text length
   Bits.TextLength = 0;
   for (const auto ChildNode : Layout) {
-    if (ChildNode) {
+    if (ChildNode && !ChildNode->isMissing()) {
       Bits.TextLength += ChildNode->getTextLength();
     }
   }
