@@ -2359,12 +2359,20 @@ namespace {
             PlatformAgnosticAvailabilityKind::UnavailableInSwift);
       } else {
         unsigned majorVersion = getVersion().majorVersionNumber();
+        unsigned minorVersion = getVersion().minorVersionNumber();
         if (getVersion() < getActiveSwiftVersion()) {
           // A Swift 2 name, for example, was obsoleted in Swift 3.
+          // However, a Swift 4 name is obsoleted in Swift 4.2.
+          // FIXME: it would be better to have a unified place
+          // to represent Swift versions for API versioning.
+          clang::VersionTuple obsoletedVersion =
+            (majorVersion == 4 && minorVersion < 2)
+                ? clang::VersionTuple(4, 2)
+                : clang::VersionTuple(majorVersion + 1);
           attr = AvailableAttr::createPlatformAgnostic(
               ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-              clang::VersionTuple(majorVersion + 1));
+              obsoletedVersion);
         } else {
           // Future names are introduced in their future version.
           assert(getVersion() > getActiveSwiftVersion());
