@@ -1911,6 +1911,19 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                            tok::string_interpolation_anchor);
       ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren,
                                            SyntaxKind::Unknown);
+
+      // If we stopped parsing the expression before the expression segment is
+      // over, eat the remaining tokens into a token list
+      if (Segment.getEndLoc() !=
+          L->getLocForEndOfToken(SourceMgr, Tok.getLoc())) {
+        SyntaxParsingContext RemainingTokens(SyntaxContext,
+                                             SyntaxKind::NonEmptyTokenList);
+        do {
+          consumeToken();
+        } while (Segment.getEndLoc() !=
+                 L->getLocForEndOfToken(SourceMgr, Tok.getLoc()));
+      }
+
       Status |= E;
       if (E.isNonNull()) {
         Exprs.push_back(E.get());

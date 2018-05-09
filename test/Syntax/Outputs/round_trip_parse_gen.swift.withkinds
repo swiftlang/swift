@@ -545,3 +545,5 @@ struct S <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Q</Simple
 func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><PoundSourceLocation>
 
 #sourceLocation()</PoundSourceLocation>
+
+"<StringSegment>abc </StringSegment>\( } )<StringSegment> def</StringSegment>"

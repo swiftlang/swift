@@ -545,3 +545,5 @@ struct S : Q, Equatable {
 func foo() {}
 
 #sourceLocation()
+
+"abc \( } ) def"
