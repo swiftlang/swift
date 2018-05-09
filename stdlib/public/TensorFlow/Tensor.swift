@@ -405,10 +405,21 @@ extension TensorElementLiteral : ExpressibleByArrayLiteral {
 extension Tensor : ExpressibleByArrayLiteral {
   /// The type of the elements of an array literal.
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
+
+  /// Creates a tensor initialized with the given elements.
+  /// - Note: This is for conversion from tensor element literals. This is a
+  /// separate method because `ShapedArray` initializers need to call it.
+  @_versioned @_inlineable @inline(__always)
+  internal init(
+    tensorElementLiterals elements: [TensorElementLiteral<Scalar>]
+  ) {
+    self.init(handle: #tfop("Pack", elements))
+  }
+
   /// Creates a tensor initialized with the given elements.
   @_inlineable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    self.init(handle: #tfop("Pack", elements))
+    self.init(tensorElementLiterals: elements)
   }
 }
 
