@@ -2402,6 +2402,9 @@ ${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
+  static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> Self
 }
 
 extension FixedWidthInteger {
@@ -3020,6 +3023,26 @@ ${assignmentOperatorComment('&' + x.operator, True)}
   }
 %   end
 % end
+}
+
+extension FixedWidthInteger {
+  public static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> Self {
+    if bitWidth <= UInt64.bitWidth {
+      return Self(truncatingIfNeeded: generator.next() as UInt64)
+    }
+
+    let (quotient, remainder) = bitWidth.quotientAndRemainder(
+      dividingBy: UInt64.bitWidth
+    )
+    var tmp: Self = 0
+    for i in 0 ..< quotient + remainder.signum() {
+      let next: UInt64 = generator.next()
+      tmp += Self(truncatingIfNeeded: next) &<< (UInt64.bitWidth * i)
+    }
+    return tmp
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -4014,6 +4037,16 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
+
+extension ${Self} {
+  public static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> ${Self} {
+    var result: ${Self} = 0
+    withUnsafeMutableBytes(of: &result) { generator._fill(bytes: $0) }
+    return result
+  }
+}
 
 //===--- end of FIXME(integers) -------------------------------------------===//
 
