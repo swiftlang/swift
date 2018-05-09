@@ -14,33 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The protocol generalizing unranked tensors (`Tensor`) and ranked tensors
-/// (`Tensor1D`, `Tensor2D`, etc). Common tensor properties and operations are
-/// defined on `TensorProtocol`.
-///
-/// - Note: `TensorProtocol` intentionally does not refine `Collection` in order
-/// for predictable and guaranteed acceleration. Methods for indexing/slicing
-/// are defined as standalone subscript methods. Users are encouraged to use
-/// aggregate operations rather than loops when working with `TensorProtocol`
-/// instances.
 public protocol TensorProtocol {
   /// Scalar type.
   associatedtype Scalar : AccelerableByTensorFlow
-  /// Tensor type of the same rank with scalar type `Bool`.
-  associatedtype BoolTensor : TensorProtocol where BoolTensor.Scalar == Bool
-
-  /// The number of dimensions of the tensor.
-  var rank: Int32 { get }
-
-  /// The dimensions of the tensor.
-  var shape: TensorShape { get }
-
-  /// The number of scalars in the tensor.
-  /// Always equal to the product of the elements of `shape`.
-  var scalarCount: Int32 { get }
-
-  /// The scalars of the tensor, in row-major order.
-  var scalars: [Scalar] { get }
 
   /// The underlying `TensorHandle`.
   /// - Note: Do NOT remove this. This is a compiler requirement.
@@ -52,35 +28,12 @@ public protocol TensorProtocol {
 }
 
 //===----------------------------------------------------------------------===//
-// Memory transfer markers
-//===----------------------------------------------------------------------===//
-
-/// TODO: Remove when send/receive semantics gets revisited.
-public extension TensorProtocol {
-  /// Mark memory transfer to device.
-  @_inlineable @inline(__always)
-  func toDevice() -> Self {
-    return Self(handle: _TFSend(handle))
-  }
-
-  /// Mark memory transfer to host.
-  @_inlineable @inline(__always)
-  func toHost() -> Self {
-    return Self(handle: _TFReceive(handle))
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Parameter aggregate
 //===----------------------------------------------------------------------===//
 
 public protocol ParameterAggregate {
-  associatedtype Parameter : TensorProtocol
-    where Parameter.Scalar : FloatingPoint
-  typealias Scalar = Parameter.Scalar
-  /// Update self with the gradient value using the `updateParameter` function.
-  mutating func update(with gradient: Self,
-                       by updateParameter: (inout Parameter, Parameter) -> Void)
+  associatedtype Scalar : FloatingPoint & AccelerableByTensorFlow
+  associatedtype Parameter = Tensor<Scalar>
 }
 
 // FIXME: Consider moving to CompilerProtocols.swift when the interaction
@@ -104,11 +57,11 @@ protocol TensorSendableReceivable {
   func sendToDevice(_ computation: _TensorComputation,
                     _ tensorId: Int)
 
-  /// Create a scalar tensor. It can be used by host program to send a scalar
-  /// value to device.
+  /// Create a scalar tensor. It can be used by the host program to send a
+  /// scalar value to device.
   ///
   /// - Note: This is different from protocol method
-  /// AccelerableByTensorFlow._makeScalarTensor(), a mark function to assist
+  /// `AccelerableByTensorFlow._makeScalarTensor()`, a marker function to assist
   /// compiler in generating Accelerator code, and has no runtime effects.
   static func scalar(_ scalar: Scalar) -> Self
 }
