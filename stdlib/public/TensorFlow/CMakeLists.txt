@@ -44,8 +44,6 @@ add_swift_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   HighLevel.swift
   OpaqueHandles.swift
   Ops.swift
-  RankedArray.swift.gyb
-  RankedTensor.swift.gyb
   ShapedArray.swift
   Tensor.swift
   TensorHandle.swift

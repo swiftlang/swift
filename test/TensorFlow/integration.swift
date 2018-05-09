@@ -162,7 +162,7 @@ public func testExitBranch2(i: Int) {
 
 // This program results in a boolean parameter being passed in.
 public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
-                            x: Tensor1D<Float>, y: Tensor1D<Float>) {
+                            x: Tensor<Float>, y: Tensor<Float>) {
   var a = x.toDevice()
   let b = y.toDevice()
 
@@ -194,7 +194,7 @@ public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly 
 
 
 public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
-                             x: Tensor1D<Float>, y: Tensor1D<Float>) {
+                             x: Tensor<Float>, y: Tensor<Float>) {
   var a = x.toDevice()
   let b = y.toDevice()
 
@@ -217,7 +217,7 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 // CHECK: }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param2{{.*}}
-// CHECK: bb0(%0 : $Bool, %1 : $Tensor1D<Float>, %2 : $Tensor1D<Float>):
+// CHECK: bb0(%0 : $Bool, %1 : $Tensor<Float>, %2 : $Tensor<Float>):
 // CHECK: [[BOOLVAL:%.*]] = struct_extract %0 : $Bool, #Bool._value
 // CHECK: function_ref @_swift_tfc_CreateCTensorHandle
 // CHECK: [[BOOLADDR:%.*]] = alloc_stack $Builtin.Int1
@@ -228,7 +228,7 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 
 
 public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
-                        arg1: Tensor1D<Float>, arg2: Tensor1D<Float>) {
+                        arg1: Tensor<Float>, arg2: Tensor<Float>) {
   var a = arg1.toDevice()
   let b = arg2.toDevice()
 
@@ -356,9 +356,12 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
 
 // This should produce exactly one live out value in the call to
 // _swift_tfc_FinishTensorComputation.
-public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
-                        c : Tensor2D<Float>) -> Tensor2D<Float> {
-  return a+b+c  // expected-warning 3 {{value implicitly copied to the accelerator}}
+public func liveOutTest(
+  a: Tensor<Float>, // expected-warning {{'a' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+  b: Tensor<Float>, // expected-warning {{'b' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+  c: Tensor<Float> // expected-warning {{'c' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+) -> Tensor<Float> {
+  return a+b+c // expected-note 3 {{value used here}}
 }
 
 /*
@@ -372,7 +375,7 @@ public func liveOutTest(a : Tensor2D<Float>, b : Tensor2D<Float>,
 
 /*
  CHECK-LABEL: --- TFPartition Host Result: {{.*}}liveOutTest{{.*}}
- CHECK: sil shared @{{.*}}liveOutTest{{.*}} : $@convention(thin) (@guaranteed Tensor2D<Float>, @guaranteed Tensor2D<Float>, @guaranteed Tensor2D<Float>) -> @owned Tensor2D<Float> {
+ CHECK: @{{.*}}liveOutTest{{.*}} : $@convention(thin) (@owned Tensor<Float>, @owned Tensor<Float>, @owned Tensor<Float>) -> @owned Tensor<Float> {
 
  // [[RESULTBUF:%.*]] = alloc_stack $OpaquePointer
  // [[RESULTACCESS:%.*]] = begin_access [modify] [static] [[RESULTBUF]] : $*OpaquePointer
