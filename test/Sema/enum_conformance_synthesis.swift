@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_conformance_synthesis_other.swift -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_conformance_synthesis_other.swift -verify-ignore-unknown -swift-version 4
 
 var hasher = Hasher()
 
@@ -43,7 +43,7 @@ enum CustomHashable {
 
   var hashValue: Int { return 0 }
 }
-func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 4 {{non-matching type}}
+func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 5 {{non-matching type}}
   return true
 }
 
@@ -59,7 +59,7 @@ enum InvalidCustomHashable {
 
   var hashValue: String { return "" } // expected-note{{previously declared here}}
 }
-func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 4 {{non-matching type}}
+func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 5 {{non-matching type}}
   return ""
 }
 if InvalidCustomHashable.A == .B { }
@@ -178,6 +178,13 @@ enum Instrument {
 
 extension Instrument : Equatable {}
 
+extension Instrument : CaseIterable {}
+
+enum UnusedGeneric<T> {
+    case a, b, c
+}
+extension UnusedGeneric : CaseIterable {}
+
 // Explicit conformance should work too
 public enum Medicine {
   case Antibiotic
@@ -186,15 +193,14 @@ public enum Medicine {
 
 extension Medicine : Equatable {}
 
-public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 3 {{non-matching type}}
+public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 4 {{non-matching type}}
   return true
 }
 
-// No explicit conformance; it could be derived, but we don't support extensions
-// yet.
-extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension}}
+// No explicit conformance; but it can be derived, for the same-file cases.
+extension Complex : Hashable {}
 extension Complex : CaseIterable {}  // expected-error {{type 'Complex' does not conform to protocol 'CaseIterable'}}
-extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension}} expected-error {{does not conform to protocol 'CaseIterable'}}
+extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}} expected-error {{does not conform to protocol 'CaseIterable'}}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
@@ -206,13 +212,13 @@ extension NotExplicitlyHashableAndCannotDerive : CaseIterable {} // expected-err
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 3 {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 4 {{non-matching type}}
     return true
   }
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
 extension YetOtherFileNonconforming: CaseIterable {} // expected-error {{does not conform}}
 
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"
@@ -254,6 +260,35 @@ struct NotEquatable { }
 enum ArrayOfNotEquatables : Equatable { // expected-error{{type 'ArrayOfNotEquatables' does not conform to protocol 'Equatable'}}
 case only([NotEquatable])
 }
+
+// Conditional conformances should be able to be synthesized
+enum GenericDeriveExtension<T> {
+    case A(T)
+}
+extension GenericDeriveExtension: Equatable where T: Equatable {}
+extension GenericDeriveExtension: Hashable where T: Hashable {}
+
+// Incorrectly/insufficiently conditional shouldn't work
+enum BadGenericDeriveExtension<T> {
+    case A(T)
+}
+extension BadGenericDeriveExtension: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
+extension BadGenericDeriveExtension: Hashable where T: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
+
+// But some cases don't need to be conditional, even if they look similar to the
+// above
+struct AlwaysHashable<T>: Hashable {}
+enum UnusedGenericDeriveExtension<T> {
+    case A(AlwaysHashable<T>)
+}
+extension UnusedGenericDeriveExtension: Hashable {}
+
+// Cross-file synthesis is disallowed for conditional cases just as it is for
+// non-conditional ones.
+extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
+// expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
