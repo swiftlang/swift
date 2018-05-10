@@ -948,9 +948,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError = printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError =
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
+        printAsObjCIfNeeded(
+            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+            moduleIsPublic);
 
     const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
 
