@@ -1365,17 +1365,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   auto entry = getTypeEntry(T);
   assert(entry.is<const TypeInfo*>() && "getting TypeInfo recursively!");
-  auto &ti = *entry.get<const TypeInfo*>();
-  assert(ti.isComplete());
-  return ti;
-}
-
-const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
-  auto entry = getTypeEntry(T);
-  if (!entry.is<const TypeInfo*>()) return nullptr;
-  auto &ti = *entry.get<const TypeInfo*>();
-  if (!ti.isComplete()) return nullptr;
-  return &ti;
+  return *entry.get<const TypeInfo*>();
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {

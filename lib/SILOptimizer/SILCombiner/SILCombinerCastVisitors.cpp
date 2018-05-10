@@ -192,7 +192,6 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   Builder.setCurrentDebugScope(UADCI->getDebugScope());
-  SILModule &Mod = UADCI->getModule();
 
   // (unchecked-addr-cast (unchecked-addr-cast x X->Y) Y->Z)
   //   ->

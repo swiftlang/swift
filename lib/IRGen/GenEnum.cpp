@@ -5110,8 +5110,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     origArgType = theEnum->mapTypeIntoContext(origArgType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
-    auto origArgTI = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getASTType());
-    assert(origArgTI && "didn't complete type info?!");
+    auto *origArgTI = &TC.getCompleteTypeInfo(origArgLoweredTy.getASTType());
 
     // If the unsubstituted argument contains a generic parameter type, or
     // is not fixed-size in all resilience domains that have knowledge of
