@@ -18,7 +18,7 @@ extension P {
 
   func hasDefaultTakesT(_: T) {}
 
-  func returnsSelfTakesT(_: T) -> Self { // expected-error {{method 'returnsSelfTakesT' in non-final class 'Class' cannot be implemented in a protocol extension because it returns `Self` and has associated type requirements}}
+  func returnsSelfTakesT(_: T) -> Self { // expected-error {{method 'returnsSelfTakesT' in non-final class 'Class' cannot be implemented in a protocol extension because it returns 'Self' and has associated type requirements}}
     return self
   }
 }

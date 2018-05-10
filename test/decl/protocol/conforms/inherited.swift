@@ -104,7 +104,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   }
 
   // P5
-  func f5() -> A { return self } // expected-error{{method 'f5()' in non-final class 'A' must return `Self` to conform to protocol 'P5'}}
+  func f5() -> A { return self } // expected-error{{method 'f5()' in non-final class 'A' must return 'Self' to conform to protocol 'P5'}}
 
   // P6
   func f6() -> Self { return self }

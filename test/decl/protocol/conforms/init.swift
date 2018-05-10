@@ -26,7 +26,7 @@ final class C1b : P1 {
 }
 
 class C1c : P1 {
-  init() { } // expected-error{{initializer requirement 'init()' can only be satisfied by a `required` initializer in non-final class 'C1c'}}{{3-3=required }}
+  init() { } // expected-error{{initializer requirement 'init()' can only be satisfied by a 'required' initializer in non-final class 'C1c'}}{{3-3=required }}
 }
 
 struct S2 : P1 { } // okay
@@ -35,14 +35,14 @@ enum E2 : P1 { } // expected-error{{type 'E2' does not conform to protocol 'P1'}
 
 final class C2a : P1 { } // okay
 
-class C2b : P1 { } // expected-error{{initializer requirement 'init()' can only be satisfied by a `required` initializer in non-final class 'C2b'}}
+class C2b : P1 { } // expected-error{{initializer requirement 'init()' can only be satisfied by a 'required' initializer in non-final class 'C2b'}}
 
 class C2c { 
   init(x: Int) { }
 }
 
 extension C2c : P1 {
-  convenience init() { self.init(x: 0) } // expected-error{{initializer requirement 'init()' can only be satisfied by a `required` initializer in the definition of non-final class 'C2c'}}
+  convenience init() { self.init(x: 0) } // expected-error{{initializer requirement 'init()' can only be satisfied by a 'required' initializer in the definition of non-final class 'C2c'}}
 }
 
 // rdar://problem/24575507
