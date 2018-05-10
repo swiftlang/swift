@@ -199,25 +199,17 @@ def main():
     try:
         # Serialise the pre-edit syntax tree
         run_command(
-            [
-                swift_syntax_test,
-                '-serialize-raw-tree',
-                '-input-source-filename',
-                pre_edit_file.name,
-                '-output-filename',
-                serialized_pre_edit_filename
-            ])
+            [swift_syntax_test] + 
+            ['-serialize-raw-tree'] +
+            ['-input-source-filename', pre_edit_file.name] +
+            ['-output-filename', serialized_pre_edit_filename])
 
         # Serialise the post-edit syntax tree from scratch
         run_command(
-            [
-                swift_syntax_test,
-                '-serialize-raw-tree',
-                '-input-source-filename',
-                post_edit_file.name,
-                '-output-filename',
-                serialized_post_edit_filename
-            ])
+            [swift_syntax_test] +
+            ['-serialize-raw-tree'] +
+            ['-input-source-filename', post_edit_file.name] +
+            ['-output-filename', serialized_post_edit_filename])
 
         if print_visual_reuse_info:
             print_visual_reuse_info_args = [
@@ -230,20 +222,14 @@ def main():
         # Serialise the post-edit syntax tree incrementally based on the 
         # pre-edit syntax tree
         incr_parse_output = run_command(
-            [
-                swift_syntax_test,
-                '-serialize-raw-tree',
-                '-old-syntax-tree-filename',
-                serialized_pre_edit_filename,
-                '-input-source-filename',
-                post_edit_file.name,
-                '--old-source-filename',
-                pre_edit_file.name,
-                '-output-filename',
-                serialized_incr_filename
-            ] + 
+            [swift_syntax_test] +
+            ['-serialize-raw-tree'] +
+            ['-old-syntax-tree-filename', serialized_pre_edit_filename] +
+            ['-input-source-filename', post_edit_file.name] +
+            ['--old-source-filename', pre_edit_file.name] +
             incremental_edit_args + 
             reparse_args + 
+            ['-output-filename', serialized_incr_filename] +
             print_visual_reuse_info_args)
 
         if print_visual_reuse_info:
@@ -251,7 +237,8 @@ def main():
             exit(0)
 
     except subprocess.CalledProcessError as e:
-        print("FAILED", file=sys.stderr)
+        print('Test case "%s" of %s FAILed' % (test_case, test_file.name), 
+              file=sys.stderr)
         print(e.output, file=sys.stderr)
         sys.exit(1)
 
@@ -259,12 +246,12 @@ def main():
         # Check if the two syntax trees are the same
         run_command(
             [
-                'diff',
+                'diff', '-u',
                 serialized_post_edit_filename,
                 serialized_incr_filename
             ])
     except subprocess.CalledProcessError as e:
-        print('Test case "%s" of %s failed' % (test_case, test_file.name), 
+        print('Test case "%s" of %s FAILed' % (test_case, test_file.name), 
               file=sys.stderr)
         print('Syntax tree of incremental parsing does not match '
               'from-scratch parsing of post-edit file:\n\n', file=sys.stderr)
