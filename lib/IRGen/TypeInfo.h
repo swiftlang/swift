@@ -92,8 +92,6 @@ class TypeInfo {
 
   friend class TypeConverter;
 
-  enum : unsigned { InvalidAlignmentShift = 63 };
-
 protected:
   union {
     uint64_t OpaqueBits;
@@ -144,10 +142,10 @@ protected:
            IsFixedSize_t alwaysFixedSize,
            SpecialTypeInfoKind stik) : StorageType(Type) {
     assert(stik >= SpecialTypeInfoKind::Fixed || !alwaysFixedSize);
+    assert(!A.isZero() && "Invalid alignment");
     Bits.OpaqueBits = 0;
     Bits.TypeInfo.Kind = unsigned(stik);
-    Bits.TypeInfo.AlignmentShift = A.isZero() ? InvalidAlignmentShift
-                                              : llvm::Log2_32(A.getValue());
+    Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
     Bits.TypeInfo.POD = pod;
     Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
@@ -186,11 +184,6 @@ public:
   template <class T> const T &as() const {
     // FIXME: maybe do an assert somehow if we have RTTI enabled.
     return static_cast<const T &>(*this);
-  }
-
-  /// Whether this type info has been completely converted.
-  bool isComplete() const {
-    return Bits.TypeInfo.AlignmentShift != InvalidAlignmentShift;
   }
 
   /// Whether this type is known to be empty.
@@ -263,7 +256,6 @@ public:
 
   Alignment getBestKnownAlignment() const {
     auto Shift = Bits.TypeInfo.AlignmentShift;
-    assert(Shift != InvalidAlignmentShift);
     return Alignment(1ull << Shift);
   }
 
