@@ -187,10 +187,6 @@ private:
   /// Returns nullptr if diagnostic is to be suppressed,
   /// None if diagnostic is to be distributed to every consumer,
   /// a particular consumer if diagnostic goes there.
-  ///
-  /// (If batch mode failed to suppress diagnostics for non-primary files, it
-  /// would end up writing each of those diagnostics in each primary file's
-  /// serialized diagnostic file.)
   Optional<DiagnosticConsumer *> consumerForLocation(SourceManager &SM,
                                                      SourceLoc loc) const;
 };
