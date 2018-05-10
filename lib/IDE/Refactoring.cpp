@@ -2615,6 +2615,14 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
     if(CursorInfo.ValueD->getKind() == DeclKind::Func) {
         swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
         EditConsumer.accept(SM, startLocation, "/**\n  <#Function Summary#>\n */\n");
+        
+//        FuncDecl funcDecl = dynamic_cast<FuncDecl *>(CursorInfo.ValueD);
+        if(isa<FuncDecl>(CursorInfo.ValueD)) {
+            FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
+            for (auto param : funcDecl->getParameterLists()) {
+                llvm::outs()<< param << "\n";
+            }
+        }
         return false;
     }
     
