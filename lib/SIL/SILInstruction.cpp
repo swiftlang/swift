@@ -388,7 +388,8 @@ namespace {
       auto left = cast<BeginAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
           && left->getEnforcement() == right->getEnforcement()
-          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict()
+          && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitEndAccessInst(const EndAccessInst *right) {
@@ -400,13 +401,15 @@ namespace {
       auto left = cast<BeginUnpairedAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
           && left->getEnforcement() == right->getEnforcement()
-          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict()
+          && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
       auto left = cast<EndUnpairedAccessInst>(LHS);
       return left->getEnforcement() == right->getEnforcement()
-          && left->isAborting() == right->isAborting();
+             && left->isAborting() == right->isAborting()
+             && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {

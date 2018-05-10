@@ -792,7 +792,8 @@ void SILCloner<ImplClass>::visitBeginAccessInst(BeginAccessInst *Inst) {
                                            getOpValue(Inst->getOperand()),
                                            Inst->getAccessKind(),
                                            Inst->getEnforcement(),
-                                           Inst->hasNoNestedConflict()));
+                                           Inst->hasNoNestedConflict(),
+                                           Inst->isFromBuiltin()));
 }
 
 template <typename ImplClass>
@@ -814,18 +815,19 @@ void SILCloner<ImplClass>::visitBeginUnpairedAccessInst(
                                            getOpValue(Inst->getBuffer()),
                                            Inst->getAccessKind(),
                                            Inst->getEnforcement(),
-                                           Inst->hasNoNestedConflict()));
+                                           Inst->hasNoNestedConflict(),
+                                           Inst->isFromBuiltin()));
 }
 
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitEndUnpairedAccessInst(
                                              EndUnpairedAccessInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createEndUnpairedAccess(getOpLocation(Inst->getLoc()),
-                                                 getOpValue(Inst->getOperand()),
-                                                 Inst->getEnforcement(),
-                                                 Inst->isAborting()));
+  doPostProcess(Inst,
+                getBuilder().createEndUnpairedAccess(
+                    getOpLocation(Inst->getLoc()),
+                    getOpValue(Inst->getOperand()), Inst->getEnforcement(),
+                    Inst->isAborting(), Inst->isFromBuiltin()));
 }
 
 template <typename ImplClass>
