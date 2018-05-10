@@ -166,7 +166,6 @@ PythonRuntimeTestSuite.test("python-convertible") {
   let zero: PythonObject = 0
   let half: PythonObject = 0.5
   let string: PythonObject = "abc"
-  let none: PythonObject = nil
 
   expectEqual(-1, Int(minusOne))
   expectEqual(-1.0, Double(minusOne))
@@ -179,15 +178,10 @@ PythonRuntimeTestSuite.test("python-convertible") {
   expectEqual(0, Int(half))
 
   expectEqual("abc", String(string))
-  expectEqual(Python.None, none)
 
   expectNil(String(zero))
   expectNil(Int(string))
   expectNil(Double(string))
-  expectNil(String(none))
-  expectNil(Bool(none))
-  expectNil(Int(none))
-  expectNil(Float(none))
 }
 
 runAllTests()
