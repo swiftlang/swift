@@ -677,11 +677,16 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     }
 
   } else if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+    // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually walk
+    // into the body.
     if (auto *FD = DeferS->getTempDecl()) {
       auto *RetS = FD->getBody()->walk(*this);
-      // Already walked children.
-      return { false, RetS };
+      assert(RetS == FD->getBody());
+      (void)RetS;
+      walkToStmtPost(DeferS);
     }
+    // Already walked children.
+    return { false, DeferS };
   }
 
   return { true, S };
