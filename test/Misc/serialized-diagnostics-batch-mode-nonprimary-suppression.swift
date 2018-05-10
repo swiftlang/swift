@@ -18,9 +18,9 @@
 // RUN: %FileCheck -check-prefix=NO-DIAGNOSTICS %s <%t.empty.txt
 // NO-DIAGNOSTICS: Number of diagnostics: 0
 
-// RUN: not %FileCheck -check-prefix=ERROR %s <%t.main.txt
-// RUN: not %FileCheck -check-prefix=ERROR %s <%t.empty.txt
-
+// RUN: %FileCheck -check-prefix=NO-ERROR %s <%t.main.txt
+// RUN: %FileCheck -check-prefix=NO-ERROR %s <%t.empty.txt
+// NO-ERROR-NOT: error:
 
 func test(x: SomeType) {
 }
