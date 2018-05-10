@@ -103,6 +103,10 @@ public:
   bool
   forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
+  /// If \p fn returns true, exit early and return true.
+  bool
+  forEachNonPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+
   unsigned primaryInputCount() const { return PrimaryInputsInOrder.size(); }
 
   // Primary count readers:
