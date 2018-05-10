@@ -123,8 +123,15 @@ extension _StringGuts {
   @inlinable
   public // @testable
   var isASCII: Bool {
-    // FIXME: Currently used to sometimes mean contiguous ASCII
-    return _object.isContiguousASCII
+    @inline(__always) get { return _object.isContiguousASCII }
+  }
+
+  @inlinable
+  internal
+  var _isASCIIOrSmallASCII: Bool {
+    @inline(__always) get {
+      return isASCII || _isSmall && _smallUTF8String.isASCII
+    }
   }
 
   @inlinable
