@@ -112,6 +112,12 @@ bool AccessMarkerElimination::shouldPreserveAccess(
 // updated the SIL, short of erasing the marker itself, and return true.
 bool AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
   if (auto beginAccess = dyn_cast<BeginAccessInst>(inst)) {
+    // Builtins used by the standard library must emit markers regardless of the
+    // current compiler options so that any user code that initiates access via
+    // the standard library is fully enforced.
+    if (beginAccess->isFromBuiltin())
+      return false;
+
     // Leave dynamic accesses in place, but delete all others.
     if (shouldPreserveAccess(beginAccess->getEnforcement()))
       return false;
@@ -126,6 +132,11 @@ bool AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
   // begin_unpaired_access instructions will be directly removed and
   // simply replaced with their operand.
   if (auto BUA = dyn_cast<BeginUnpairedAccessInst>(inst)) {
+    // Builtins used by the standard library must emit markers regardless of the
+    // current compiler options.
+    if (BUA->isFromBuiltin())
+      return false;
+
     if (shouldPreserveAccess(BUA->getEnforcement()))
       return false;
 
@@ -134,6 +145,11 @@ bool AccessMarkerElimination::checkAndEliminateMarker(SILInstruction *inst) {
   // end_unpaired_access instructions will be directly removed and
   // simply replaced with their operand.
   if (auto EUA = dyn_cast<EndUnpairedAccessInst>(inst)) {
+    // Builtins used by the standard library must emit markers regardless of the
+    // current compiler options.
+    if (EUA->isFromBuiltin())
+      return false;
+
     if (shouldPreserveAccess(EUA->getEnforcement()))
       return false;
 

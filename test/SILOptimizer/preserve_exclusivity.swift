@@ -96,11 +96,11 @@ public func f4__testNoOpt(_ k1: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: sil @$S20preserve_exclusivity13f5_beginDoOptyyBp_BpxmtlF : $@convention(thin) <T1> (Builtin.RawPointer, Builtin.RawPointer, @thick T1.Type) -> () {
-// CHECK-NOT: begin_unpaired_access
+// CHECK: begin_unpaired_access
 // CHECK: } // end sil function '$S20preserve_exclusivity13f5_beginDoOptyyBp_BpxmtlF'
 
 // DESERIALIZED-LABEL: sil [serialized] [canonical] @$S20preserve_exclusivity13f5_beginDoOptyyBp_BpxmtlF : $@convention(thin) <T1> (Builtin.RawPointer, Builtin.RawPointer, @thick T1.Type) -> () {
-// DESERIALIZED-NOT: begin_unpaired_access
+// DESERIALIZED: begin_unpaired_access
 // DESERIALIZED: } // end sil function '$S20preserve_exclusivity13f5_beginDoOptyyBp_BpxmtlF'
 
 @inlinable
@@ -110,11 +110,11 @@ public func f5_beginDoOpt<T1>(_ address: Builtin.RawPointer, _ scratch: Builtin.
 }
 
 // CHECK-LABEL: sil @$S20preserve_exclusivity13f6___endDoOptyyBpF : $@convention(thin) (Builtin.RawPointer) -> () {
-// CHECK-NOT: end_unpaired_access
+// CHECK: end_unpaired_access
 // CHECK: } // end sil function '$S20preserve_exclusivity13f6___endDoOptyyBpF'
 
 // DESERIALIZED-LABEL: sil [serialized] [canonical] @$S20preserve_exclusivity13f6___endDoOptyyBpF : $@convention(thin) (Builtin.RawPointer) -> () {
-// DESERIALIZED-NOT: end_unpaired_access
+// DESERIALIZED: end_unpaired_access
 // DESERIALIZED: } // end sil function '$S20preserve_exclusivity13f6___endDoOptyyBpF'
 
 @inlinable
@@ -124,11 +124,11 @@ public func f6___endDoOpt(_ address: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: sil @$S20preserve_exclusivity13f7__readDoOptyyBp_BpmtF : $@convention(thin) (Builtin.RawPointer, @thin Builtin.RawPointer.Type) -> () {
-// CHECK-NOT: begin_unpaired_access
+// CHECK: begin_unpaired_access
 // CHECK: } // end sil function '$S20preserve_exclusivity13f7__readDoOptyyBp_BpmtF'
 
 // DESERIALIZED-LABEL: sil [serialized] [canonical] @$S20preserve_exclusivity13f7__readDoOptyyBp_BpmtF : $@convention(thin) (Builtin.RawPointer, @thin Builtin.RawPointer.Type) -> () {
-// DESERIALIZED-NOT: begin_unpaired_access
+// DESERIALIZED: begin_unpaired_access
 // DESERIALIZED: } // end sil function '$S20preserve_exclusivity13f7__readDoOptyyBp_BpmtF'
 
 @inlinable
