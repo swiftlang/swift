@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -875,8 +876,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SN.Kind = SyntaxStructureKind::EnumElement;
         SN.Range = charSourceRangeFromSourceRange(SM,
                                                   EnumElemD->getSourceRange());
-        SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
-                                       EnumElemD->getName().getLength());
+        if (auto ParamList = EnumElemD->getParameterList()) {
+          SourceRange NameRange = SourceRange(EnumElemD->getNameLoc(),
+                                              ParamList->getSourceRange().End);
+          SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
+        } else {
+          SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
+                                         EnumElemD->getName().getLength());
+        }
+
         if (auto *E = EnumElemD->getRawValueExpr()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
