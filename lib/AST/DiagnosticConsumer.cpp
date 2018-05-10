@@ -197,7 +197,7 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
   // behavior.
   bool hadError = false;
   for (auto &subConsumer : SubConsumers)
-    hadError |= subConsumer.second->finishProcessing();
+    hadError |= subConsumer.second && subConsumer.second->finishProcessing();
   return hadError;
 }
 
