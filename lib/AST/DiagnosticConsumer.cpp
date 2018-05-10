@@ -153,10 +153,7 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
 
   if (possiblyContainingRangeIter != ConsumersOrderedByRange.end() &&
       possiblyContainingRangeIter->first.contains(loc)) {
-    DiagnosticConsumer *consumerIfDiagnosticIsToBeEmitted =
-        possiblyContainingRangeIter->second;
-    return consumerIfDiagnosticIsToBeEmitted ? consumerIfDiagnosticIsToBeEmitted
-                                             : nullptr;
+    return possiblyContainingRangeIter->second;
   }
 
   return None;
