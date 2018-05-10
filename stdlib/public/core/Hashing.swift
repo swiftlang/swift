@@ -14,6 +14,15 @@
 // This file implements helpers for hashing collections.
 //
 
+@usableFromInline
+internal var _smallHashTableLimit: Int {
+  @inline(__always) get {
+    // Note that this must be a power of two, or it will get rounded up,
+    // breaking assumptions made elsewhere in the code.
+    return 1 << 4
+  }
+}
+
 /// This protocol is only used for compile-time checks that
 /// every buffer type implements all required operations.
 internal protocol _HashBuffer {

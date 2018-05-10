@@ -1390,7 +1390,7 @@ extension Dictionary: Equatable where Value: Equatable {
       }
 
       for (k, v) in lhs {
-        let (pos, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
+        let (pos, found) = rhsNative._find(k)
         // FIXME: Can't write the simple code pending
         // <rdar://problem/15484639> Refcounting bug
         /*
@@ -1595,7 +1595,6 @@ public func _dictionaryBridgeToObjectiveC<
 
     result[bridgedKey] = bridgedValue
   }
-
   return result
 }
 #endif
@@ -2035,9 +2034,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (i, found) = buffer._find(nativeKey,
-        startBucket: buffer._bucket(nativeKey))
-
+    let (i, found) = buffer._find(nativeKey)
     if found {
       return buffer.bridgedValue(at: i)
     }
@@ -2176,6 +2173,23 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     return _assumeNonNegative(_storage.bucketCount)
   }
 
+  @usableFromInline
+  internal var capacity: Int {
+    @inline(never) // blacklisted
+    get {
+      if isSmall {
+        return bucketCount
+      }
+      return Int(
+        Double(bucketCount) / _hashContainerDefaultMaxLoadFactorInverse)
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal var isSmall: Bool {
+    return bucketCount <= _smallHashTableLimit
+  }
+
   @inlinable // FIXME(sil-serialize-all)
   internal var count: Int {
     set {
@@ -2282,14 +2296,27 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  internal func moveInitializeEntry(from: Buffer, at: Int, toEntryAt: Int) {
-    _sanityCheck(!isInitializedEntry(at: toEntryAt))
+  internal func moveEntry(from source: Int, to target: Int) {
+    guard source != target else { return }
+    _sanityCheck(isInitializedEntry(at: source))
+    _sanityCheck(!isInitializedEntry(at: target))
+    defer { _fixLifetime(self) }
+    (keys + target).initialize(to: (keys + source).move())
+    (values + target).initialize(to: (values + source).move())
+    _storage.initializedEntries[source] = false
+    _storage.initializedEntries[target] = true
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  internal func moveEntry(from: Buffer, at source: Int, to target: Int) {
+    _sanityCheck(!isInitializedEntry(at: target))
     defer { _fixLifetime(self) }
 
-    (keys + toEntryAt).initialize(to: (from.keys + at).move())
-    (values + toEntryAt).initialize(to: (from.values + at).move())
-    from._storage.initializedEntries[at] = false
-    _storage.initializedEntries[toEntryAt] = true
+    (keys + target).initialize(to: (from.keys + source).move())
+    (values + target).initialize(to: (from.values + source).move())
+    from._storage.initializedEntries[source] = false
+    self._storage.initializedEntries[target] = true
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2299,6 +2326,25 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     defer { _fixLifetime(self) }
 
     return (values + i).pointee
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  internal func destroyEntryReturningValue(at i: Int) -> Value {
+    _sanityCheck(isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
+    _storage.initializedEntries[i] = false
+    (keys + i).deinitialize(count: 1)
+    return (values + i).move()
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  internal func destroyAndReturnEntry(at i: Int) -> (Key, Value) {
+    _sanityCheck(isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
+    _storage.initializedEntries[i] = false
+    return ((keys + i).move(), (values + i).move())
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2347,9 +2393,27 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
       "Attempting to access Dictionary elements using an invalid Index")
     let key = self.key(at: i.offset)
     return (key, self.value(at: i.offset))
-
   }
 }
+
+@_transparent
+@inlinable
+internal func _debugCheckDuplicate(
+  file: StaticString = #file,
+  line: UInt = #line,
+  _ condition: () -> Bool
+) {
+  _debugPrecondition(
+    condition(),
+    """
+    Duplicate key found in Dictionary. \
+    The type Key may not correctly conform to Hashable, or keys may have been \
+    mutated after insertion
+    """,
+    file: file,
+    line: line)
+}
+
 
 extension _NativeDictionaryBuffer where Key: Hashable
 {
@@ -2457,24 +2521,76 @@ extension _NativeDictionaryBuffer where Key: Hashable
   /// Search for a given key starting from the specified bucket.
   ///
   /// If the key is not present, returns the position where it could be
+  /// inserted, or -1 if storage is full.
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func _find(_ key: Key) -> (pos: Index, found: Bool) {
+    guard isSmall else {
+      return _find(key, startBucket: _bucket(key))
+    }
+    // Elements are collected in the last `count` buckets.
+    for bucket in bucketCount - count ..< bucketCount {
+      _sanityCheck(isInitializedEntry(at: bucket))
+      if self.key(at: bucket) == key {
+        return (Index(offset: bucket), true)
+      }
+    }
+    _sanityCheck(
+      bucketCount == count ||
+      !isInitializedEntry(at: bucketCount - count - 1))
+    return (Index(offset: bucketCount - count - 1), false)
+  }
+
+  /// Search for a given key starting from the specified bucket.
+  ///
+  /// If the key is not present, returns the position where it could be
   /// inserted.
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func _find(_ key: Key, startBucket: Int)
-    -> (pos: Index, found: Bool) {
-
+  -> (pos: Index, found: Bool) {
+    _sanityCheck(!isSmall)
     var bucket = startBucket
 
     // The invariant guarantees there's always a hole, so we just loop
     // until we find one
     while true {
-      let isHole = !isInitializedEntry(at: bucket)
-      if isHole {
+      if !isInitializedEntry(at: bucket) {
         return (Index(offset: bucket), false)
       }
       if self.key(at: bucket) == key {
         return (Index(offset: bucket), true)
       }
+      bucket = _bucket(after: bucket)
+    }
+  }
+
+  /// Find an empty bucket for the specified key, which must not already be in
+  /// the Dictionary.
+  @inline(__always)
+  @usableFromInline // blacklisted
+  internal func _findNew(_ key: Key) -> Int {
+    if isSmall {
+      _sanityCheck(count < bucketCount)
+      // Elements are collected in the last `count` buckets.
+      _debugCheckDuplicate {
+        for bucket in bucketCount - count ..< bucketCount {
+          _sanityCheck(self.isInitializedEntry(at: bucket))
+          if self.key(at: bucket) == key { return false }
+        }
+        return true
+      }
+      _sanityCheck(!isInitializedEntry(at: bucketCount - count - 1))
+      return bucketCount - count - 1
+    }
+    // The invariant guarantees there's always a hole, so we just loop
+    // until we find one
+    var bucket = _bucket(key)
+    while true {
+      if !isInitializedEntry(at: bucket) {
+        return bucket
+      }
+      _debugCheckDuplicate { self.key(at: bucket) != key }
       bucket = _bucket(after: bucket)
     }
   }
@@ -2485,20 +2601,12 @@ extension _NativeDictionaryBuffer where Key: Hashable
     forCapacity capacity: Int,
     maxLoadFactorInverse: Double
   ) -> Int {
+    if capacity <= _smallHashTableLimit {
+      return capacity
+    }
     // `capacity + 1` below ensures that we don't fill in the last hole
     return max(Int((Double(capacity) * maxLoadFactorInverse).rounded(.up)),
                capacity + 1)
-  }
-
-  /// Buffer should be uniquely referenced.
-  /// The `key` should not be present in the Dictionary.
-  /// This function does *not* update `count`.
-  @inlinable // FIXME(sil-serialize-all)
-  internal func unsafeAddNew(key newKey: Key, value: Value) {
-    let (i, found) = _find(newKey, startBucket: _bucket(newKey))
-    _precondition(
-      !found, "Duplicate key found in Dictionary. Keys may have been mutated after insertion")
-    initializeKey(newKey, value: value, at: i.offset)
   }
 
   //
@@ -2508,17 +2616,13 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
-      return nil
-    }
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     return found ? i : nil
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal func assertingGet(_ key: Key) -> Value {
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     _precondition(found, "Key not found")
     return self.value(at: i.offset)
   }
@@ -2526,12 +2630,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   internal func maybeGet(_ key: Key) -> Value? {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
-      return nil
-    }
-
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     if found {
       return self.value(at: i.offset)
     }
@@ -2575,24 +2674,23 @@ extension _NativeDictionaryBuffer where Key: Hashable
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
-    -> Buffer
-  {
+  internal static func fromArray(
+    _ elements: [SequenceElementWithoutLabels]
+  ) -> Buffer {
     if elements.isEmpty {
       return Buffer()
     }
 
-    var nativeBuffer = Buffer(minimumCapacity: elements.count)
+    var buffer = Buffer(minimumCapacity: elements.count)
 
     for (key, value) in elements {
-      let (i, found) =
-        nativeBuffer._find(key, startBucket: nativeBuffer._bucket(key))
+      let (i, found) = buffer._find(key)
       _precondition(!found, "Dictionary literal contains duplicate keys")
-      nativeBuffer.initializeKey(key, value: value, at: i.offset)
+      buffer.initializeKey(key, value: value, at: i.offset)
+      buffer.count += 1
     }
-    nativeBuffer.count = elements.count
-
-    return nativeBuffer
+    _sanityCheck(buffer.count == elements.count)
+    return buffer
   }
 }
 
@@ -2903,8 +3001,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (i, found) = nativeBuffer._find(
-      nativeKey, startBucket: nativeBuffer._bucket(nativeKey))
+    let (i, found) = nativeBuffer._find(nativeKey)
     if found {
       bridgeEverything()
       return bridgedBuffer.value(at: i.offset)
@@ -3202,45 +3299,99 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
 #endif
   }
 
-  @inline(__always)
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func ensureUniqueNativeBufferNative(
-    withBucketCount desiredBucketCount: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
-    let oldBucketCount = asNative.bucketCount
-    if oldBucketCount >= desiredBucketCount && isUniquelyReferenced() {
-      return (reallocated: false, capacityChanged: false)
-    }
-
-    let oldNativeBuffer = asNative
-    var newNativeBuffer = NativeBuffer(bucketCount: desiredBucketCount)
-    let newBucketCount = newNativeBuffer.bucketCount
-    for i in 0..<oldBucketCount {
-      if oldNativeBuffer.isInitializedEntry(at: i) {
-        if oldBucketCount == newBucketCount {
-          let key = oldNativeBuffer.key(at: i)
-          let value = oldNativeBuffer.value(at: i)
-          newNativeBuffer.initializeKey(key, value: value , at: i)
+  @usableFromInline // blacklisted
+  @effects(releasenone)
+  internal func _rehashNativeBuffer(
+    bucketCount: Int,
+    movingEntries: Bool
+  ) -> NativeBuffer {
+    let oldBuffer = asNative
+    var newBuffer = NativeBuffer(bucketCount: bucketCount)
+    _sanityCheck(oldBuffer.bucketCount != newBuffer.bucketCount)
+    for i in 0..<oldBuffer.bucketCount {
+      if oldBuffer.isInitializedEntry(at: i) {
+        let j = newBuffer._findNew(oldBuffer.key(at: i))
+        if movingEntries {
+          newBuffer.moveEntry(from: oldBuffer, at: i, to: j)
         } else {
-          let key = oldNativeBuffer.key(at: i)
-          newNativeBuffer.unsafeAddNew(
-            key: key,
-            value: oldNativeBuffer.value(at: i))
+          newBuffer.initializeKey(
+            oldBuffer.key(at: i),
+            value: oldBuffer.value(at: i),
+            at: j)
         }
+        newBuffer.count += 1
       }
     }
-    newNativeBuffer.count = oldNativeBuffer.count
-
-    self = .native(newNativeBuffer)
-    return (reallocated: true,
-      capacityChanged: oldBucketCount != newBucketCount)
+    _sanityCheck(newBuffer.count == oldBuffer.count)
+    if movingEntries { oldBuffer._storage.count = 0 }
+    return newBuffer
   }
+
+  @usableFromInline // blacklisted
+  @effects(releasenone)
+  internal func _copyNativeBuffer() -> NativeBuffer {
+    let oldBuffer = asNative
+    var newBuffer = NativeBuffer(_exactBucketCount: oldBuffer.bucketCount)
+    for i in 0..<oldBuffer.bucketCount {
+      if oldBuffer.isInitializedEntry(at: i) {
+          newBuffer.initializeKey(
+            oldBuffer.key(at: i),
+            value: oldBuffer.value(at: i),
+            at: i)
+      }
+    }
+    newBuffer.count = oldBuffer.count
+    return newBuffer
+  }
+
+  @inline(__always)
+  @inlinable // whitelisted
+  internal mutating func ensureUniqueNativeBufferNative(
+    withBucketCount desiredBucketCount: Int
+  ) -> (reallocated: Bool, rehashed: Bool) {
+    let oldBucketCount = asNative.bucketCount
+    let hasEnoughBuckets = oldBucketCount >= desiredBucketCount
+    let isUnique = isUniquelyReferenced()
+    if hasEnoughBuckets && isUnique {
+      return (reallocated: false, rehashed: false)
+    } else if !hasEnoughBuckets {
+      self = .native(_rehashNativeBuffer(
+          bucketCount: desiredBucketCount,
+          movingEntries: isUnique))
+      return (reallocated: true, rehashed: true)
+    } else {
+      self = .native(_copyNativeBuffer())
+      return (reallocated: true, rehashed: false)
+    }
+  }
+
+#if _runtime(_ObjC)
+  @usableFromInline // blacklisted
+  internal mutating func ensureUniqueNativeBufferCocoa(
+    withBucketCount desiredBucketCount: Int
+  ) -> (reallocated: Bool, rehashed: Bool) {
+    let oldBuffer = asCocoa
+    let cocoaDictionary = oldBuffer.cocoaDictionary
+    var newBuffer = NativeBuffer(bucketCount: desiredBucketCount)
+    let oldIterator = _CocoaDictionaryIterator(cocoaDictionary)
+    while let (key, value) = oldIterator.next() {
+      let k = _forceBridgeFromObjectiveC(key, Key.self)
+      let i = newBuffer._findNew(k)
+      let v = _forceBridgeFromObjectiveC(value, Value.self)
+      newBuffer.initializeKey(k, value: v, at: i)
+      newBuffer.count += 1
+    }
+    _sanityCheck(newBuffer.count == cocoaDictionary.count)
+    self = .native(newBuffer)
+    return (reallocated: true, rehashed: true)
+  }
+#endif
 
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func ensureUniqueNativeBuffer(
     withCapacity minimumCapacity: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
+  ) -> (reallocated: Bool, rehashed: Bool) {
     let bucketCount = NativeBuffer.bucketCount(
       forCapacity: minimumCapacity,
       maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
@@ -3249,10 +3400,10 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
 
   /// Ensure this we hold a unique reference to a native buffer
   /// having at least `minimumCapacity` elements.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // whitelisted
   internal mutating func ensureUniqueNativeBuffer(
     withBucketCount desiredBucketCount: Int
-  ) -> (reallocated: Bool, capacityChanged: Bool) {
+  ) -> (reallocated: Bool, rehashed: Bool) {
 #if _runtime(_ObjC)
     // This is a performance optimization that was put in to ensure that we did
     // not make a copy of self to call _isNative over the entire if region
@@ -3268,26 +3419,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     if n {
       return ensureUniqueNativeBufferNative(withBucketCount: desiredBucketCount)
     }
-
-    switch self {
-    case .native:
-      fatalError("This should have been handled earlier")
-    case .cocoa(let cocoaBuffer):
-      let cocoaDictionary = cocoaBuffer.cocoaDictionary
-      var newNativeBuffer = NativeBuffer(bucketCount: desiredBucketCount)
-      let oldCocoaIterator = _CocoaDictionaryIterator(cocoaDictionary)
-
-      while let (key, value) = oldCocoaIterator.next() {
-        newNativeBuffer.unsafeAddNew(
-          key: _forceBridgeFromObjectiveC(key, Key.self),
-          value: _forceBridgeFromObjectiveC(value, Value.self))
-      }
-
-      newNativeBuffer.count = cocoaDictionary.count
-
-      self = .native(newNativeBuffer)
-      return (reallocated: true, capacityChanged: true)
-    }
+    return ensureUniqueNativeBufferCocoa(withBucketCount: desiredBucketCount)
 #else
     return ensureUniqueNativeBufferNative(withBucketCount: desiredBucketCount)
 #endif
@@ -3323,8 +3455,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   internal var capacity: Int {
     switch self {
     case .native:
-      return Int(Double(asNative.bucketCount) /
-        _hashContainerDefaultMaxLoadFactorInverse)
+      return asNative.capacity
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
       return cocoaBuffer.count
@@ -3510,7 +3641,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   internal mutating func nativeUpdateValue(
     _ value: Value, forKey key: Key
   ) -> Value? {
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
 
     let minBuckets = found
       ? asNative.bucketCount
@@ -3518,10 +3649,9 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
           forCapacity: asNative.count + 1,
           maxLoadFactorInverse: _hashContainerDefaultMaxLoadFactorInverse)
 
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withBucketCount: minBuckets)
-    if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+    let (_, rehashed) = ensureUniqueNativeBuffer(withBucketCount: minBuckets)
+    if rehashed {
+      i = asNative._find(key).pos
     }
 
     let oldValue: Value? = found ? asNative.value(at: i.offset) : nil
@@ -3604,18 +3734,17 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     forKey key: Key, insertingDefault defaultValue: () -> Value
   ) -> (inserted: Bool, pointer: UnsafeMutablePointer<Value>) {
 
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
     if found {
       let pointer = nativePointerToValue(at: ._native(i))
       return (inserted: false, pointer: pointer)
     }
 
     let minCapacity = asNative.count + 1
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withCapacity: minCapacity)
+    let (_, rehashed) = ensureUniqueNativeBuffer(withCapacity: minCapacity)
 
-    if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+    if rehashed {
+      i = asNative._find(key).pos
     }
 
     asNative.initializeKey(key, value: defaultValue(), at: i.offset)
@@ -3636,17 +3765,16 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
 
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (i, found) = asNative._find(key)
     if found {
       return (inserted: false, memberAfterInsert: asNative.value(at: i.offset))
     }
 
     let minCapacity = asNative.count + 1
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withCapacity: minCapacity)
+    let (_, rehashed) = ensureUniqueNativeBuffer(withCapacity: minCapacity)
 
-    if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+    if rehashed {
+      i = asNative._find(key).pos
     }
 
     asNative.initializeKey(key, value: value, at: i.offset)
@@ -3721,7 +3849,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
     for (key, value) in keysAndValues {
-      var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+      var (i, found) = asNative._find(key)
 
       if found {
         // This is a performance optimization that was put in to ensure that we
@@ -3742,10 +3870,9 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
         }
       } else {
         let minCapacity = asNative.count + 1
-        let (_, capacityChanged) = ensureUniqueNativeBuffer(
-          withCapacity: minCapacity)
-        if capacityChanged {
-          i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+        let (_, rehashed) = ensureUniqueNativeBuffer(withCapacity: minCapacity)
+        if rehashed {
+          i = asNative._find(key).pos
         }
 
         asNative.initializeKey(key, value: value, at: i.offset)
@@ -3771,15 +3898,14 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     defer { _fixLifetime(asNative) }
     for value in values {
       let key = try keyForValue(value)
-      var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+      var (i, found) = asNative._find(key)
       if found {
         asNative.values[i.offset].append(value)
       } else {
         let minCapacity = asNative.count + 1
-        let (_, capacityChanged) = ensureUniqueNativeBuffer(
-          withCapacity: minCapacity)
-        if capacityChanged {
-          i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+        let (_, rehashed) = ensureUniqueNativeBuffer(withCapacity: minCapacity)
+        if rehashed {
+          i = asNative._find(key).pos
         }
 
         asNative.initializeKey(key, value: [value], at: i.offset)
@@ -3795,8 +3921,9 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   internal mutating func nativeDelete(
     _ nativeBuffer: NativeBuffer, idealBucket: Int, offset: Int
   ) {
-    _sanityCheck(
-        nativeBuffer.isInitializedEntry(at: offset), "expected initialized entry")
+    _sanityCheck(!nativeBuffer.isSmall)
+    _sanityCheck(nativeBuffer.isInitializedEntry(at: offset),
+      "expected initialized entry")
 
     var nativeBuffer = nativeBuffer
 
@@ -3810,7 +3937,9 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
 
     // Find the first bucket in the contiguous chain
     var start = idealBucket
-    while nativeBuffer.isInitializedEntry(at: nativeBuffer._prev(start)) {
+    while nativeBuffer.isInitializedEntry(
+      at: nativeBuffer._bucket(before: start)
+    ) {
       start = nativeBuffer._bucket(before: start)
     }
 
@@ -3847,18 +3976,31 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
       }
 
       // Move the found element into the hole
-      nativeBuffer.moveInitializeEntry(
-        from: nativeBuffer,
-        at: b,
-        toEntryAt: hole)
+      nativeBuffer.moveEntry(from: b, to: hole)
       hole = b
     }
   }
 
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func nativeRemoveObject(forKey key: Key) -> Value? {
+    guard asNative.isSmall else { return _nativeLargeRemoveObject(forKey: key) }
+    let (index, found) = asNative._find(key)
+    guard found else { return nil }
+
+    let bucketCount = asNative.bucketCount
+    _ = ensureUniqueNativeBufferNative(withBucketCount: bucketCount)
+    var buffer = asNative
+    let oldValue = buffer.destroyEntryReturningValue(at: index.offset)
+    let firstBucket = bucketCount - buffer.count
+    buffer.moveEntry(from: firstBucket, to: index.offset)
+    buffer.count -= 1
+    return oldValue
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal mutating func _nativeLargeRemoveObject(forKey key: Key) -> Value? {
     var idealBucket = asNative._bucket(key)
-    var (index, found) = asNative._find(key, startBucket: idealBucket)
+    var (index, found) = asNative._find(key)
 
     // Fast path: if the key is not present, we will not mutate the set,
     // so don't force unique buffer.
@@ -3875,10 +4017,9 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     //
     // SR-6437
     let bucketCount = asNative.bucketCount
-    let (_, capacityChanged) = ensureUniqueNativeBuffer(
-      withBucketCount: bucketCount)
+    let (_, rehashed) = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
     let nativeBuffer = asNative
-    if capacityChanged {
+    if rehashed {
       idealBucket = nativeBuffer._bucket(key)
       (index, found) = nativeBuffer._find(key, startBucket: idealBucket)
       _sanityCheck(found, "key was lost during buffer migration")
@@ -3890,7 +4031,21 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemove(
+  internal mutating func nativeRemove(at i: NativeIndex) -> SequenceElement {
+    guard asNative.isSmall else { return _nativeLargeRemove(at: i) }
+    _sanityCheck(asNative.isInitializedEntry(at: i.offset))
+    let bucketCount = asNative.bucketCount
+    _ = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
+    var buffer = asNative
+    let oldElement = buffer.destroyAndReturnEntry(at: i.offset)
+    let firstBucket = bucketCount - buffer.count
+    buffer.moveEntry(from: firstBucket, to: i.offset)
+    buffer.count -= 1
+    return oldElement
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal mutating func _nativeLargeRemove(
     at nativeIndex: NativeIndex
   ) -> SequenceElement {
     // This is a performance optimization that was put in to ensure that we did
@@ -3902,8 +4057,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
     //
     // SR-6437
     let bucketCount = asNative.bucketCount
-    // The provided index should be valid, so we will always mutating the
-    // set buffer.  Request unique buffer.
+    // The provided index should be valid, so we will always mutate the storage.
     _ = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
     let nativeBuffer = asNative
 
@@ -4593,41 +4747,23 @@ extension Dictionary: CustomReflectable {
 public struct _DictionaryBuilder<Key: Hashable, Value> {
 
   @usableFromInline // FIXME(sil-serialize-all)
-  internal var _result: Dictionary<Key, Value>
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _nativeBuffer: _NativeDictionaryBuffer<Key, Value>
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal let _requestedCount: Int
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _actualCount: Int
+  internal var _buffer: _NativeDictionaryBuffer<Key, Value>
 
   @inlinable // FIXME(sil-serialize-all)
   public init(count: Int) {
-    _result = Dictionary<Key, Value>(minimumCapacity: count)
-    _nativeBuffer = _result._variantBuffer.asNative
-    _requestedCount = count
-    _actualCount = 0
+    _buffer = _NativeDictionaryBuffer(minimumCapacity: count)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public mutating func add(key newKey: Key, value: Value) {
-    _nativeBuffer.unsafeAddNew(key: newKey, value: value)
-    _actualCount += 1
+  public mutating func add(key: Key, value: Value) {
+    let i = _buffer._findNew(key)
+    _buffer.initializeKey(key, value: value, at: i)
+    _buffer.count += 1
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public mutating func take() -> Dictionary<Key, Value> {
-    _precondition(_actualCount >= 0,
-      "Cannot take the result twice")
-    _precondition(_actualCount == _requestedCount,
-      "The number of members added does not match the promised count")
-
-    // Finish building the `Dictionary`.
-    _nativeBuffer.count = _requestedCount
-
-    // Prevent taking the result twice.
-    _actualCount = -1
-    return _result
+  public __consuming func take() -> Dictionary<Key, Value> {
+    return Dictionary(_nativeBuffer: _buffer)
   }
 }
 
@@ -4730,3 +4866,89 @@ extension Dictionary {
   }
 }
 #endif
+
+extension _NativeDictionaryBuffer {
+  @usableFromInline
+  @inline(never)
+  internal func _dump() {
+    let small = isSmall ? " #small" : ""
+    print("Dictionary<\(Key.self), \(Value.self)> #native\(small)")
+    print("  count: \(count)")
+    print("  capacity: \(capacity)")
+    print("  bucketCount: \(bucketCount)")
+    for i in 0 ..< bucketCount {
+      if isInitializedEntry(at: i) {
+        print("  * [\(i)] - \(key(at: i)): \(value(at: i))")
+      } else {
+        print("  . [\(i)]")
+      }
+    }
+  }
+}
+
+extension Dictionary {
+  // FIXME: Remove
+  @inlinable
+  @inline(__always)
+  public func _dump() {
+    switch _variantBuffer {
+    case .native(let buffer):
+      buffer._dump()
+    case .cocoa(_):
+      print("Dictionary<\(Key.self), \(Value.self)>, #cocoa")
+    }
+  }
+}
+
+extension _NativeDictionaryBuffer where Key: Hashable {
+  @inline(never)
+  @usableFromInline
+  internal func _validate() {
+    if isSmall {
+      _precondition(count <= bucketCount)
+      for bucket in 0 ..< bucketCount - count {
+        _precondition(!isInitializedEntry(at: bucket))
+      }
+      for bucket in bucketCount - count ..< bucketCount {
+        _precondition(isInitializedEntry(at: bucket))
+      }
+      for bucket in bucketCount - count ..< bucketCount {
+        for b in bucket + 1 ..< bucketCount {
+          _precondition(self.key(at: b) != self.key(at: bucket))
+        }
+      }
+    } else {
+      _precondition(count < bucketCount)
+      if count > capacity {
+        _dump()
+        _precondition(count <= capacity)
+      }
+      var found = 0
+      for bucket in 0 ..< bucketCount {
+        if isInitializedEntry(at: bucket) {
+          found += 1
+          let key = self.key(at: bucket)
+          var b = _bucket(key)
+          while b != bucket {
+            _precondition(isInitializedEntry(at: b), "Misbucketed key")
+            b = _bucket(after: b)
+          }
+          for b in bucket + 1 ..< bucketCount {
+            if isInitializedEntry(at: b) {
+              _precondition(self.key(at: b) != key, "Duplicate key")
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+extension Dictionary {
+  @inline(__always)
+  @inlinable
+  public func _validate() {
+    guard _variantBuffer._isNative else { return }
+    _variantBuffer.asNative._validate()
+  }
+}
