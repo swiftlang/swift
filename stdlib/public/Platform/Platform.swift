@@ -395,7 +395,7 @@ public func sem_open(
 // Some platforms don't have `extern char** environ` imported from C.
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
-  return _stdlib_getEnviron()
+  return _stdlib_getEnviron() ?? UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>(nil)
 }
 #elseif os(Linux)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
