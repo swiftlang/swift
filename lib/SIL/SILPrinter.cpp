@@ -1842,6 +1842,7 @@ public:
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
@@ -1852,12 +1853,14 @@ public:
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getSource()) << ", " 
           << getIDAndType(BAI->getBuffer());
   }
   void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
-    *this << (EAI->isAborting() ? "[abort] " : "")
-          << '[' << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+    *this << (EAI->isAborting() ? "[abort] " : "") << '['
+          << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+          << (EAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(EAI->getOperand());
   }
 

@@ -1663,6 +1663,29 @@ bb0(%0 : $A):
   return %20 : $()
 }
 
+// CHECK-LABEL: sil @test_builtin_access : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: begin_access [read] [dynamic] [builtin]
+// CHECK: begin_unpaired_access [read] [dynamic] [builtin]
+// CHECK: end_unpaired_access [dynamic] [builtin]
+// CHECK-LABEL: } // end sil function 'test_builtin_access'
+sil @test_builtin_access : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.property
+  %6 = begin_access [read] [dynamic] [builtin] %2 : $*Any
+  copy_addr %6 to %1 : $*Any
+  end_access %6 : $*Any
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [builtin] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  end_unpaired_access [dynamic] [builtin] %9 : $*Builtin.UnsafeValueBuffer
+  destroy_addr %1 : $*Any
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
+}
+
 struct EmptyStruct {}
 
 sil @test_empty_destructure : $@convention(thin) () -> () {
