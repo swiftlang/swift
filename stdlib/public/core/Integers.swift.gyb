@@ -2566,40 +2566,31 @@ extension ${Range}
     guard !isEmpty else {
       return nil
     }
-    let isLowerNegative = Bound.isSigned && lowerBound < 0
-    let sameSign = !Bound.isSigned || isLowerNegative == (upperBound < 0)
-%   if 'Closed' not in Range:
-    let delta: Bound.Magnitude
-%   else:
-    var delta: Bound.Magnitude
-%   end
-    if isLowerNegative {
-      delta = sameSign
-        ? lowerBound.magnitude - upperBound.magnitude
-        : lowerBound.magnitude + upperBound.magnitude
-    } else {
-      delta = upperBound.magnitude - lowerBound.magnitude
-    }
+    // Compute delta, the distance between the lower and upper bounds. This
+    // value may not representable by the type Bound if Bound is signed, but
+    // is always representable as Bound.Magnitude.
+    var delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
 %   if 'Closed' in Range:
+    // Subtle edge case: if the range is the whole set of representable values,
+    // then adding one to delta to account for a closed range will overflow.
+    // If we used &+ instead, the result would be zero, which isn't helpful,
+    // so we actually need to handle this case separately.
     if delta == Bound.Magnitude.max {
       return Bound(truncatingIfNeeded: generator.next() as Bound.Magnitude)
     }
+    // Need to widen delta to account for the right-endpoint of a closed range.
     delta += 1
 %   end
-    let randomMagnitude = generator.next(upperBound: delta)
-    if sameSign {
-      return lowerBound + Bound(randomMagnitude)
-    } else {
-%     if 'Closed' not in Range:
-      return randomMagnitude < upperBound.magnitude
-        ? Bound(randomMagnitude)
-        : -1 - Bound(randomMagnitude - upperBound.magnitude)
-%     else:
-      return Bound.isSigned && randomMagnitude <= upperBound.magnitude
-        ? Bound(randomMagnitude)
-        : 0 - Bound(randomMagnitude - upperBound.magnitude)
-%     end
-    }
+    // The mathematical result we want is lowerBound plus a random value in
+    // 0 ..< delta. We need to be slightly careful about how we do this
+    // arithmetic; the Bound type cannot generally represent the random value,
+    // so we use a wrapping addition on Bound.Magnitude. This will often
+    // overflow, but produces the correct bit pattern for the result when
+    // converted back to Bound.
+    return Bound(truncatingIfNeeded:
+      Bound.Magnitude(truncatingIfNeeded: lowerBound) &+
+      generator.next(upperBound: delta)
+    )
   }
   
   /// Returns a random element of the range, using the given generator as
