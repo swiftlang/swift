@@ -235,13 +235,18 @@ RandomTests.test("different random number generators") {
 func chi2Test(_ samples: [Double]) -> Bool {
   precondition(samples.count == 50, "confidence interval requires 50 samples")
   let expected = samples.reduce(0, +) / Double(samples.count)
-  let cvLow = 23.983 // 0.1% with a degree of freedom of (50 - 1)
-  let cvHigh = 85.351 // 99.9% with a degree of freedom of (50 - 1)
+  // Right tail for 0.0001% (1e-6) with a degree of freedom of (50 -
+  // 1).  With hundreds of builds a day, this has to be very low to not get too
+  // many spurious failures, but obvious problems should still be detected
+  // (e.g. an off-by-one that means samples[0] == 0 will result in chi2 =
+  // (0-expected)**2/expected + ... > expected, so as long as we've generated
+  // more than samples.count * cvHigh (~5500) values, we'll catch it).
+  let cvHigh = 111.1
   let chi2 = samples.map {
     (($0 - expected) * ($0 - expected)) / expected
   }.reduce(0, +)
 
-  if chi2 < cvLow || chi2 > cvHigh {
+  if chi2 > cvHigh {
     return false
   }else {
     return true
