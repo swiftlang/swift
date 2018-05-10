@@ -194,8 +194,8 @@ public extension PythonObject {
 
 /// An error produced by a failable Python operation.
 @_fixed_layout
-public enum PythonError : Error {
-  /// A Python runtime exception, produced by calling Python functions.
+public enum PythonError : Error, Equatable {
+  /// A Python runtime exception, produced by calling a Python function.
   case exception(PythonObject)
 
   /// A failed call on a `PythonObject`.
@@ -211,21 +211,6 @@ public enum PythonError : Error {
 
   /// A module import error.
   case invalidModule(String)
-}
-
-extension PythonError : Equatable {
-  public static func == (lhs: PythonError, rhs: PythonError) -> Bool {
-    switch (lhs, rhs) {
-    case let (.invalidCall(left), .invalidCall(right)),
-         let (.exception(left), .exception(right)):
-      return left == right
-    case let (.invalidModule(left), .invalidModule(right)),
-         let (.invalidMember(left), .invalidMember(right)):
-      return left == right
-    default:
-      return false
-    }
-  }
 }
 
 extension PythonError : CustomStringConvertible {
@@ -357,6 +342,7 @@ public struct ThrowingPythonObject {
   // Call a member with the specified arguments.
   /// - Precondition: `self` must be a Python callable.
   /// - Parameters:
+  ///   - name: The name of the member.
   ///   - args: Positional arguments for the Python callable.
   ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
   ///     `kwargs` in Python.
@@ -370,6 +356,7 @@ public struct ThrowingPythonObject {
                           kwargs: kwargs)
   }
 
+  /// Converts to a 2-tuple, if possible.
   public var tuple2: (PythonObject, PythonObject)? {
     let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1] else {
@@ -378,6 +365,7 @@ public struct ThrowingPythonObject {
     return (elt0, elt1)
   }
 
+  /// Converts to a 2-tuple, if possible.
   public var tuple3: (PythonObject, PythonObject, PythonObject)? {
     let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1], let elt2 = ct[2] else {
@@ -386,6 +374,7 @@ public struct ThrowingPythonObject {
     return (elt0, elt1, elt2)
   }
 
+  /// Converts to a 2-tuple, if possible.
   public var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject)? {
     let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1],
@@ -436,7 +425,7 @@ public struct CheckingPythonObject {
 
   /// Access the element corresponding to the specified `PythonConvertible`
   /// values representing a key.
-  /// - Note: this is equivalent to `object[key]` in Python.
+  /// - Note: This is equivalent to `object[key]` in Python.
   public subscript(key: [PythonConvertible]) -> PythonObject? {
     get {
       let keyObject = flattenedSubscriptIndices(key)
@@ -474,7 +463,7 @@ public struct CheckingPythonObject {
 
   /// Access the element corresponding to the specified `PythonConvertible`
   /// values representing a key.
-  /// - Note: this is equivalent to `object[key]` in Python.
+  /// - Note: This is equivalent to `object[key]` in Python.
   public subscript(key: PythonConvertible...) -> PythonObject? {
     get {
       return self[key]
@@ -545,7 +534,7 @@ public extension PythonObject {
 
   /// Access the element corresponding to the specified `PythonConvertible`
   /// values representing a key.
-  /// - Note: this is equivalent to `object[key]` in Python.
+  /// - Note: This is equivalent to `object[key]` in Python.
   subscript(key: PythonConvertible...) -> PythonObject {
     get {
       return self.checking[key]!
@@ -639,7 +628,7 @@ public extension PythonObject {
 /// The global Python interface.
 ///
 /// You can import Python modules and access Python builtin types and functions
-/// via `Python`.
+/// via the `Python` global variable.
 ///
 ///     import Python
 ///     // Import modules.
