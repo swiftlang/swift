@@ -23,10 +23,4 @@
 
 
 func test(x: SomeType) {
- // CHECK-MAIN-DAG: serialized-diagnostics-batch-mode.swift:[[@LINE]]:3: error: use of unresolved identifier 'nonexistent'
-  // CHECK-STDERR-DAG: serialized-diagnostics-batch-mode.swift:[[@LINE-1]]:3: error: use of unresolved identifier 'nonexistent'
-
-  // The other file has a similar call.
-  // CHECK-HELPER-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: use of unresolved identifier 'nonexistent'
-  // CHECK-STDERR-DAG: serialized-diagnostics-batch-mode-helper.swift:{{[0-9]+}}:3: error: use of unresolved identifier 'nonexistent'
 }

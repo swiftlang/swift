@@ -373,9 +373,18 @@ bool FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
 
 bool FrontendInputsAndOutputs::forEachInputNotProducingSupplementaryOutput(
     llvm::function_ref<bool(const InputFile &)> fn) const {
-  // If no primary inputs, compiler is in whole-module-optimzation mode, and
-  // every input can produce supplementary outputs.
-  return hasPrimaryInputs() ? forEachNonPrimaryInput(fn) : false;
+  if (hasPrimaryInputs())
+    return forEachNonPrimaryInput(fn);
+  // If no primary inputs, compiler is in whole-module-optimization mode, and
+  // only the first input can produce supplementary outputs, although all
+  // inputs may contribute.
+  bool isFirst = true;
+  return forEachNonPrimaryInput([&](const InputFile &f) -> bool {
+    if (!isFirst)
+      return fn(f);
+    isFirst = false;
+    return false;
+  });
 }
 
 bool FrontendInputsAndOutputs::hasSupplementaryOutputPath(

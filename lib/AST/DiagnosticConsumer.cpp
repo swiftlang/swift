@@ -71,8 +71,7 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     Optional<unsigned> bufferID = SM.getIDForBufferIdentifier(pair.first);
     assert(bufferID.hasValue() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
-    ConsumersOrderedByRange.emplace_back(range, pair.second ? pair.second.get()
-                                                            : nullptr);
+    ConsumersOrderedByRange.emplace_back(range, pair.second.get());
   }
 
   // Sort the "map" by buffer /end/ location, for use with std::lower_bound
@@ -186,9 +185,8 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     }
   } else if (DiagnosticConsumer *c = specificConsumer.getValue())
     c->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
-  else {
-    /// suppress non-primary diagnostic in batch mode
-  }
+  else
+    ; // Suppress non-primary diagnostic in batch mode.
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
