@@ -5145,7 +5145,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
         // can reproduce.
         if (!substArgTI->isFixedSize(layoutScope)) {
           alwaysFixedSize = IsNotFixedSize;
-          allowFixedLayoutOptimizations = false;
+          assert(!allowFixedLayoutOptimizations);
         }
       }
     }
