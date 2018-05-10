@@ -182,8 +182,10 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
 
   if (!specificConsumer.hasValue()) {
     for (auto &subConsumer : SubConsumers) {
-      subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
-                                           FormatArgs, Info);
+      if (subConsumer.second) {
+        subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
+                                             FormatArgs, Info);
+      }
     }
   } else if (DiagnosticConsumer *c = specificConsumer.getValue())
     c->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
