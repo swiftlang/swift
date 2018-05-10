@@ -40,6 +40,8 @@ except ImportError:
         sys.path.append(site_packages)
         import lldb
 
+lldb_target = None
+known_memmap = {}
 
 def process_ldd(lddoutput):
     dyn_libs = {}
@@ -53,30 +55,19 @@ def process_ldd(lddoutput):
     return dyn_libs
 
 
-def create_lldb_target(binary, memmap):
-    lldb_debugger = lldb.SBDebugger.Create()
-    lldb_target = lldb_debugger.CreateTargetWithFileAndArch(
-        binary, lldb.LLDB_ARCH_DEFAULT)
-    module = lldb_target.GetModuleAtIndex(0)
+def setup_lldb_target(binary, memmap):
+    global lldb_target
+    if not lldb_target:
+        lldb_debugger = lldb.SBDebugger.Create()
+        lldb_target = lldb_debugger.CreateTargetWithFileAndArch(
+            binary, lldb.LLDB_ARCH_DEFAULT)
+        module = lldb_target.GetModuleAtIndex(0)
     for dynlib_path in memmap:
         module = lldb_target.AddModule(
             dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
         text_section = module.FindSection(".text")
         slide = text_section.GetFileAddress() - text_section.GetFileOffset()
         lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path] - slide)
-    return lldb_target
-
-
-def add_lldb_target_modules(lldb_target, memmap):
-    for dynlib_path in memmap:
-        module = lldb_target.AddModule(
-            dynlib_path, lldb.LLDB_ARCH_DEFAULT, None, None)
-        lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path])
-
-
-lldb_target = None
-known_memmap = {}
-
 
 def check_base_address(dynlib_path, dynlib_baseaddr, memmap):
     global known_memmap
@@ -151,10 +142,7 @@ def process_stack(binary, dyn_libs, stack):
         full_stack.append(
             {"line": line, "framePC": framePC, "dynlib_fname": dynlib_fname})
 
-    if lldb_target is None:
-        lldb_target = create_lldb_target(binary, memmap)
-    else:
-        add_lldb_target_modules(lldb_target, memmap)
+    setup_lldb_target(binary, memmap)
     frame_idx = 0
     for frame in full_stack:
         frame_addr = frame["framePC"]
