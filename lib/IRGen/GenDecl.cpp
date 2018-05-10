@@ -4066,8 +4066,10 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
-  if (Types.isCompletelyFragile())
+  if (expansion == ResilienceExpansion::Maximal &&
+      Types.isCompletelyFragile()) {
     return false;
+  }
   return D->isResilient(getSwiftModule(), expansion);
 }
 
