@@ -59,3 +59,5 @@ public class ToplevelType {
   public init() {}
   public init(recordName: String) {}
 }
+
+public var GlobalAttribute: String = ""

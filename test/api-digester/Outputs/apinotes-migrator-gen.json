@@ -231,6 +231,25 @@
     "ModuleName": "APINotesTest"
   },
   {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "SimpleStringRepresentableUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@globalAttributeName",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "AnimalAttributeName",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@globalAttributeName",
+    "OldPrintedName": "globalAttributeName",
+    "OldTypeName": "",
+    "NewPrintedName": "globalAttributeName",
+    "NewTypeName": "AnimalAttributeName"
+  },
+  {
     "DiffItemKind": "TypeMemberDiffItem",
     "Usr": "c:@ANTGlobalValue",
     "OldPrintedName": "oldMember",
