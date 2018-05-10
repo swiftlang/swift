@@ -300,6 +300,7 @@ sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
 /// on \p BatchJob, to build the \c InvocationInfo.
 std::unique_ptr<Job>
 ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
+                             Job::PID &NextQuasiPID,
                              Compilation &C) const {
   if (unsortedJobs.empty())
     return nullptr;
@@ -329,5 +330,5 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),
-      std::move(invocationInfo.FilelistInfos), sortedJobs);
+      std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID);
 }
