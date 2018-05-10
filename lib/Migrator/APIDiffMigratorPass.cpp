@@ -309,7 +309,15 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                       const MigratorOptions &Opts):
     ASTMigratorPass(Editor, SF, Opts),
-    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {}
+    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {
+      SmallVector<Decl*, 16> TopDecls;
+      SF->getTopLevelDecls(TopDecls);
+      for (auto *D: TopDecls) {
+        if (auto *FD = dyn_cast<FuncDecl>(D)) {
+          InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
+        }
+      }
+    }
 
   void run() {
     if (Opts.APIDigesterDataStorePaths.empty())
