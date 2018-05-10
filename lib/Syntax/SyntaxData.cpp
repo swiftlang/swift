@@ -78,6 +78,21 @@ RC<SyntaxData> SyntaxData::getNextNode() const {
   return nullptr;
 }
 
+RC<SyntaxData> SyntaxData::getFirstToken() const {
+  for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
+    if (auto Child = getChild(I)) {
+      if (!Child->getRaw()->isMissing()) {
+        return Child->getFirstToken();
+      }
+    }
+  }
+
+  // Get a reference counted version of this
+  assert(getRaw()->isToken() && "Leaf node that is no token?");
+  assert(hasParent() && "The syntax tree should not conisist only of the root");
+  return getParent()->getChild(getIndexInParent());
+}
+
 AbsolutePosition SyntaxData::getAbsolutePositionWithLeadingTrivia() const {
   if (PositionCache.hasValue())
     return *PositionCache;

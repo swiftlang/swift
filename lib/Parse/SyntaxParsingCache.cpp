@@ -15,49 +15,6 @@
 using namespace swift;
 using namespace swift::syntax;
 
-ArrayRef<TriviaPiece> getNextChildsLeadingTrivia(const Syntax *Node) {
-  // Find the next parent with a successor child
-  while (true) {
-    auto Parent = Node->getParent();
-    if (!Parent.hasValue()) {
-      return {};
-    }
-
-    bool FoundSuccessor = false;
-    for (size_t I = Node->getIndexInParent() + 1; I < Parent->getNumChildren();
-         ++I) {
-      if (Parent->getChild(I)) {
-        Node = Parent->getChild(I).getPointer();
-        FoundSuccessor = true;
-        break;
-      }
-    }
-    if (FoundSuccessor)
-      break;
-
-    // Continue traversing up the tree
-    Node = Parent.getPointer();
-  }
-  // Find the first token of the successor node
-  while (true) {
-    bool LeafReached = true;
-    for (size_t I = 0; I < Node->getNumChildren(); ++I) {
-      if (Node->getChild(I)) {
-        Node = Node->getChild(I).getPointer();
-        LeafReached = false;
-        break;
-      }
-    }
-    if (LeafReached) {
-      if (Node->isToken()) {
-        return Node->getRaw()->getLeadingTrivia();
-      } else {
-        return {};
-      }
-    }
-  }
-}
-
 bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
                                          SyntaxKind Kind) const {
   auto NodeStart = Node.getAbsolutePositionWithLeadingTrivia().getOffset();
@@ -66,25 +23,27 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
   if (Node.getKind() != Kind)
     return false;
 
-  // Calculate the leading trivia of the next node. Node can also not be reused
-  // if an edit has been made in the next token's leading trivia
-  auto NextNodeTrivia = getNextChildsLeadingTrivia(&Node);
-  size_t TriviaLength = 0;
-  for (auto TriviaPiece : NextNodeTrivia) {
-    TriviaLength += TriviaPiece.getTextLength();
+  // Node can also not be reused if an edit has been made in the next token's
+  // text, e.g. because `private struct Foo {}` parses as a CodeBlockItem with a
+  // StructDecl inside and `private struc Foo {}` parses as two CodeBlockItems
+  // one for `private` and one for `struc Foo {}`
+  size_t NextLeafNodeLength = 0;
+  if (auto NextNode = Node.getData().getNextNode()) {
+    auto NextLeafNode = NextNode->getFirstToken();
+    auto NextRawNode = NextLeafNode->getRaw();
+    NextLeafNodeLength += NextRawNode->getTokenText().size();
+    for (auto TriviaPiece : NextRawNode->getLeadingTrivia()) {
+      NextLeafNodeLength += TriviaPiece.getTextLength();
+    }
   }
 
   auto NodeEnd = NodeStart + Node.getTextLength();
   for (auto Edit : Edits) {
     // Check if this node or the trivia of the next node has been edited. If it
     // has, we cannot reuse it.
-    if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd + TriviaLength)) {
+    if (Edit.intersectsOrTouchesRange(NodeStart, NodeEnd + NextLeafNodeLength))
       return false;
-    }
   }
-
-  // FIXME: Node can also not be reused if an edit has been made in the next
-  // token's leading trivia
 
   return true;
 }

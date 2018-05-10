@@ -27,7 +27,7 @@
                     },
                     {
                       "kind": "LineComment",
-                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_struct_decl.json"
+                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_struct_decl.json -u"
                     },
                     {
                       "kind": "Newline",
@@ -378,6 +378,7 @@
               ],
               "presence": "Present"
             },
+            null,
             null
           ],
           "presence": "Present"

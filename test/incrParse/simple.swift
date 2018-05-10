@@ -10,11 +10,16 @@
 // RUN: %incparse-test %s --test-case MULTI_EDIT_SAME_LINE
 // RUN: %incparse-test %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
 // RUN: %incparse-test %s --test-case REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER
+// RUN: %incparse-test %s --test-case LAST_CHARACTER_OF_STRUCT
+// RUN: %incparse-test %s --test-case ADD_ARRAY_CLOSE_BRACKET
 
+func start() {}
+
+<reparse REPLACE>
 func foo() {
 }
 
-<reparse REPLACE>_ = <<REPLACE<6|||7>>></reparse REPLACE>
+_ = <<REPLACE<6|||7>>></reparse REPLACE>
 _ = <<REPLACE_BY_LONGER<6|||"Hello World">>>
 _ = <<REPLACE_BY_SHORTER<"Hello again"|||"a">>>
 <<INSERT<|||foo()>>>
@@ -34,3 +39,11 @@ _ = 1
 
 let x = "<<REPLACE_WITH_MULTI_BYTE_CHAR<a|||👨‍👩‍👧‍👦>>>"
 let x = "<<REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER<👨‍👩‍👧‍👦|||🎉>>>"
+
+private struc<<LAST_CHARACTER_OF_STRUCT<|||t>>> MyStruct {
+}
+
+var computedVar: [Int] {
+  return [1
+  <<ADD_ARRAY_CLOSE_BRACKET<|||]>>>
+}
