@@ -1304,7 +1304,7 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto TRangeBegin = TypedRange.begin();
   auto TRangeIter = TRangeBegin;
   auto TRangeEnd = TypedRange.end();
-  assert(MVResults.size() == unsigned(std::distance(VRangeBegin, VRangeEnd)));
+  assert(MVResults.size() == unsigned(std::distance(TRangeBegin, TRangeEnd)));
   for (unsigned i : indices(MVResults)) {
     assert(SILValue(&MVResults[i]) == (*this)[i]);
     assert(SILValue(&MVResults[i])->getType() == (*this)[i]->getType());
