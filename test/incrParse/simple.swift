@@ -12,6 +12,7 @@
 // RUN: %incparse-test %s --test-case REPLACE_MULTI_BYTE_CHAR_WITH_SHORTER
 // RUN: %incparse-test %s --test-case LAST_CHARACTER_OF_STRUCT
 // RUN: %incparse-test %s --test-case ADD_ARRAY_CLOSE_BRACKET
+// RUN: %incparse-test %s --test-case ADD_IF_OPEN_BRACE
 
 func start() {}
 
@@ -46,4 +47,8 @@ private struc<<LAST_CHARACTER_OF_STRUCT<|||t>>> MyStruct {
 var computedVar: [Int] {
   return [1
   <<ADD_ARRAY_CLOSE_BRACKET<|||]>>>
+}
+
+if true <<ADD_IF_OPEN_BRACE<|||{>>>
+  _ = 5
 }

@@ -448,10 +448,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     if (NeedParseErrorRecovery) {
-      SyntaxContext->createNodeInPlace(SyntaxKind::CodeBlockItem);
-      SyntaxContext->setTransparent();
-
-      SyntaxParsingContext ItemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
       SyntaxParsingContext TokenListCtxt(SyntaxContext,
                                          SyntaxKind::NonEmptyTokenList);
       // If we had a parse error, skip to the start of the next stmt, decl or
