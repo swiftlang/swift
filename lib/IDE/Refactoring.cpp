@@ -2612,7 +2612,14 @@ bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok
     
 bool RefactoringActionDocCommentBoilerplate::performChange() {
 #warning Implement here
-    return false;
+    if(CursorInfo.ValueD->getKind() == DeclKind::Func) {
+        swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
+        EditConsumer.accept(SM, startLocation, "/**\n  <#Function Summary#>\n */\n");
+        return false;
+    }
+    
+    return true;
+    
 }
 
 static CharSourceRange
