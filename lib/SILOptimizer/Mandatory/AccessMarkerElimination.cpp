@@ -31,7 +31,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/Strings.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -190,12 +189,6 @@ struct AccessMarkerEliminationPass : SILModuleTransform {
   void run() override {
     auto &M = *getModule();
     for (auto &F : M) {
-      if (F.hasSemanticsAttr(OPTIMIZE_SIL_PRESERVE_EXCLUSIVITY)) {
-        DEBUG(llvm::dbgs() << "Skipping " << F.getName() << ". Found "
-                           << OPTIMIZE_SIL_PRESERVE_EXCLUSIVITY << " tag!\n");
-        continue;
-      }
-
       bool removedAny = AccessMarkerElimination(&F).stripMarkers();
 
       // Only invalidate analyses if we removed some markers.
