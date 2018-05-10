@@ -373,6 +373,8 @@ bool FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
 
 bool FrontendInputsAndOutputs::forEachInputNotProducingSupplementaryOutput(
     llvm::function_ref<bool(const InputFile &)> fn) const {
+  // If no primary inputs, compiler is in whole-module-optimzation mode, and
+  // every input can produce supplementary outputs.
   return hasPrimaryInputs() ? forEachNonPrimaryInput(fn) : false;
 }
 
