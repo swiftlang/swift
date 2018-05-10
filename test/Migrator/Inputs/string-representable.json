@@ -197,4 +197,23 @@
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "SimpleStringRepresentableUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities15GlobalAttributeSSvp",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "NewAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities15GlobalAttributeSSvp",
+    "OldPrintedName": "GlobalAttribute",
+    "OldTypeName": "",
+    "NewPrintedName": "NewAttribute",
+    "NewTypeName": "AttributeWrapper"
+  },
 ]
