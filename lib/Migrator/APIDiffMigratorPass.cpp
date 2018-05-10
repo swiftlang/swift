@@ -229,6 +229,9 @@ public:
 };
 
 static ValueDecl* getReferencedDecl(Expr *E) {
+  // Get the syntactic expression out of an implicit expression.
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
+    E = ICE->getSyntacticSubExpr();
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     return DRE->getDecl();
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
@@ -675,6 +678,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  void replaceExpr(Expr* E, StringRef Text) {
+    Editor.replace(CharSourceRange(SM, E->getStartLoc(),
+      Lexer::getLocForEndOfToken(SM, E->getEndLoc())), Text);
+  }
+
   bool wrapAttributeReference(Expr* Reference, Expr* WrapperTarget,
                               bool FromString) {
     auto *RD = getReferencedDecl(Reference);
@@ -699,18 +707,26 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
     Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
     if (!Rename.empty()) {
-      auto Range = CharSourceRange(SM, Reference->getStartLoc(),
-        Lexer::getLocForEndOfToken(SM, Reference->getEndLoc()));
-      Editor.replace(Range, Rename);
+      replaceExpr(Reference, Rename);
     }
     return true;
   }
 
   bool handleAssignDestMigration(Expr *E) {
+    Editor.disableCache();
+    SWIFT_DEFER { Editor.enableCache(); };
     auto *ASE = dyn_cast<AssignExpr>(E);
     if (!ASE || !ASE->getDest() || !ASE->getSrc())
       return false;
-    return wrapAttributeReference(ASE->getDest(), ASE->getSrc(), true);
+    auto *Dest = ASE->getDest();
+    auto Src = ASE->getSrc();
+    if (wrapAttributeReference(Dest, Src, true)) {
+      // We should handle the assignment source here since we won't visit
+      // the children with present changes.
+      handleAttributeReference(Src);
+      return true;
+    }
+    return false;
   }
 
   bool handleAttributeReference(Expr *E) {
