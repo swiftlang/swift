@@ -181,7 +181,7 @@ int swift::_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr) {
 
 #if defined(__FreeBSD__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *swift::_stdlib_getEnviron() {
+char * _Nullable * _Null_unspecified swift::_stdlib_getEnviron() {
   extern char **environ;
   return environ;
 }
