@@ -308,13 +308,18 @@ ExclusiveAccessTestSuite.test("SequentialKeyPathWritesDontOverlap") {
   c[keyPath: getF] += c[keyPath: getF] + 1 // no-trap
 }
 
-// This does not trap, for now, because the standard library (and thus KeyPath) is
-// compiled in Swift 3 mode and we currently log rather than trap in Swift mode.
 ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathWriteClassStoredProp")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a modification) started at")
+  .code
 {
   let getF = \ClassWithStoredProperty.f
   let c = ClassWithStoredProperty()
 
+  expectCrashLater()
   modifyAndPerform(&c[keyPath: getF]) {
     c[keyPath: getF] = 12
   }
@@ -322,10 +327,18 @@ ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathWriteClassStoredProp")
 
 // This does not currently trap because the standard library is compiled in Swift 3 mode,
 // which logs.
-ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathReadClassStoredProp") {
+ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathReadClassStoredProp")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a read) started at")
+  .code
+{
   let getF = \ClassWithStoredProperty.f
   let c = ClassWithStoredProperty()
 
+  expectCrashLater()
   modifyAndPerform(&c[keyPath: getF]) {
     let y = c[keyPath: getF]
     _blackHole(y)

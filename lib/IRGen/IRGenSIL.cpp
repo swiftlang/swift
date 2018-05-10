@@ -4228,11 +4228,12 @@ static ExclusivityFlags getExclusivityAction(SILAccessKind kind) {
 
 static ExclusivityFlags getExclusivityFlags(SILModule &M,
                                             SILAccessKind kind,
-                                            bool noNestedConflict) {
+                                            bool noNestedConflict,
+                                            bool fromBuiltin) {
   auto flags = getExclusivityAction(kind);
 
   // In old Swift compatibility modes, downgrade this to a warning.
-  if (M.getASTContext().LangOpts.isSwiftVersion3())
+  if (!fromBuiltin && M.getASTContext().LangOpts.isSwiftVersion3())
     flags |= ExclusivityFlags::WarningOnly;
 
   if (!noNestedConflict)
@@ -4264,7 +4265,7 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
 template <class BeginAccessInst>
 static ExclusivityFlags getExclusivityFlags(BeginAccessInst *i) {
   return getExclusivityFlags(i->getModule(), i->getAccessKind(),
-                             i->hasNoNestedConflict());
+                             i->hasNoNestedConflict(), i->isFromBuiltin());
 }
 
 void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {

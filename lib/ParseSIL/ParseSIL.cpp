@@ -3447,6 +3447,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ParsedEnum<SILAccessEnforcement> enforcement;
     ParsedEnum<bool> aborting;
     ParsedEnum<bool> noNestedConflict;
+    ParsedEnum<bool> fromBuiltin;
 
     bool isBeginAccess = (Opcode == SILInstructionKind::BeginAccessInst ||
                           Opcode == SILInstructionKind::BeginUnpairedAccessInst);
@@ -3478,6 +3479,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       auto setNoNestedConflict = [&](bool value) {
         maybeSetEnum(isBeginAccess, noNestedConflict, value, attr, identLoc);
       };
+      auto setFromBuiltin = [&](bool value) {
+        maybeSetEnum(Opcode != SILInstructionKind::EndAccessInst, fromBuiltin,
+                     value, attr, identLoc);
+      };
 
       if (attr == "unknown") {
         setEnforcement(SILAccessEnforcement::Unknown);
@@ -3499,6 +3504,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         setAborting(true);
       } else if (attr == "no_nested_conflict") {
         setNoNestedConflict(true);
+      } else if (attr == "builtin") {
+        setFromBuiltin(true);
       } else {
         P.diagnose(identLoc, diag::unknown_attribute, attr);
       }
@@ -3522,6 +3529,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     if (isBeginAccess && !noNestedConflict.isSet())
       noNestedConflict.Value = false;
+
+    if (!fromBuiltin.isSet())
+      fromBuiltin.Value = false;
 
     SILValue addrVal;
     SourceLoc addrLoc;
@@ -3547,16 +3557,16 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (Opcode == SILInstructionKind::BeginAccessInst) {
       ResultVal =
           B.createBeginAccess(InstLoc, addrVal, *kind, *enforcement,
-                              *noNestedConflict);
+                              *noNestedConflict, *fromBuiltin);
     } else if (Opcode == SILInstructionKind::EndAccessInst) {
       ResultVal = B.createEndAccess(InstLoc, addrVal, *aborting);
     } else if (Opcode == SILInstructionKind::BeginUnpairedAccessInst) {
       ResultVal = B.createBeginUnpairedAccess(InstLoc, addrVal, bufferVal,
                                               *kind, *enforcement,
-                                              *noNestedConflict);
+                                              *noNestedConflict, *fromBuiltin);
     } else {
-      ResultVal = B.createEndUnpairedAccess(InstLoc, addrVal,
-                                            *enforcement, *aborting);
+      ResultVal = B.createEndUnpairedAccess(InstLoc, addrVal, *enforcement,
+                                            *aborting, *fromBuiltin);
     }
     break;
   }
