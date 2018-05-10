@@ -1,6 +1,7 @@
 /**
-  <# Function Summary #>
+  <#Function Summary#>
  */
 func funcWithNoParamsNoReturnNoThrow() {
     
 }
+
