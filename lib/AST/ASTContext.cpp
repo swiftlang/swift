@@ -435,9 +435,9 @@ static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
 }
 
 inline ASTContext::Implementation &ASTContext::getImpl() const {
-  auto end = reinterpret_cast<void*>(const_cast<ASTContext*>(this) + 1);
-  auto impl = llvm::alignAddr(end, alignof(Implementation));
-  return *reinterpret_cast<Implementation*>(impl);
+  auto pointer = reinterpret_cast<char*>(const_cast<ASTContext*>(this));
+  auto offset = llvm::alignAddr((void*)sizeof(*this), alignof(Implementation));
+  return *reinterpret_cast<Implementation*>(pointer + offset);
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
