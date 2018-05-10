@@ -3105,7 +3105,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     // This check is potentially removable by the optimizer
     if source.bitWidth >= Self.bitWidth {
       _precondition(source <= Self.max,
-        "Not enough bits to represent a signed value")
+        "Not enough bits to represent the passed value")
     }
     self.init(truncatingIfNeeded: source)
   }
@@ -3215,7 +3215,7 @@ extension SignedInteger where Self : FixedWidthInteger {
     if (source.bitWidth > Self.bitWidth) ||
        (source.bitWidth == Self.bitWidth && !T.isSigned) {
       _precondition(source <= Self.max,
-        "Not enough bits to represent a signed value")
+        "Not enough bits to represent the passed value")
     }
     self.init(truncatingIfNeeded: source)
   }
