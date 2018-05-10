@@ -2087,7 +2087,8 @@ static void rewriteFunction(StructLoweringState &pass,
       auto *convInstr = cast<BeginAccessInst>(instr);
       newInstr = resultTyBuilder.createBeginAccess(
           Loc, convInstr->getOperand(), convInstr->getAccessKind(),
-          convInstr->getEnforcement(), convInstr->hasNoNestedConflict());
+          convInstr->getEnforcement(), convInstr->hasNoNestedConflict(),
+          convInstr->isFromBuiltin());
       break;
     }
     case SILInstructionKind::EnumInst: {
