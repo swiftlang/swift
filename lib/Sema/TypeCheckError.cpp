@@ -140,6 +140,9 @@ public:
       // Look through base-ignored qualified references (Module.methodName).
       } else if (auto baseIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
         fn = baseIgnored->getRHS();
+      // Look through closure capture lists.
+      } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
+        fn = captureList->getClosureBody();
       } else {
         break;
       }
