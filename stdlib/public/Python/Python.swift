@@ -34,9 +34,9 @@ public typealias OwnedPyObjectPointer = UnsafeMutablePointer<PyObject>
 /// A `PyReference` instance has ownership of its underlying `PyObject`, which
 /// must be non-null.
 ///
-/// - Note: When Swift has ownership, `PyReference` should be removed.
-///   `PythonObject` will be a Swift struct with copy constructors, move
-///   operators, etc.
+// - Note: When Swift has ownership, `PyReference` should be removed.
+//   `PythonObject` will define copy constructors, move constructors, etc. to
+//   implement move semantics.
 @_versioned @_fixed_layout
 final class PyReference {
   private var pointer: OwnedPyObjectPointer
@@ -70,15 +70,14 @@ final class PyReference {
 
 /// A Python object.
 ///
-/// `PythonObject` is a wrapper around a `PyReference`.
+/// `PythonObject` is a wrapper around a `PyObject`.
 ///
 /// `PythonObject` is passed to and returned from all Python function calls and
-/// member references, and is overloaded to support the standard Python
-/// operations.
+/// member references. It supports standard Python arithmetic and comparison
+/// operators.
 ///
-/// - Note: `PyReference` is an implementation detail for `PythonObject`.
-///   When Swift has ownership, `PyReference` will be removed and `PythonObject`
-///   will directly wrap a `PyObject` pointer.
+// - Note: When Swift has ownership, `PythonObject` will define copy
+//   constructors, move constructors, etc. to implement move semantics.
 @dynamicMemberLookup
 @_fixed_layout
 public struct PythonObject {
@@ -717,17 +716,17 @@ private func pyTuple<T : Collection>(_ vals: T) -> OwnedPyObjectPointer
 }
 
 public extension PythonObject {
-  /// FIXME: This should be subsumed by Swift ranges and strides. Python has a
-  /// very extravagant model though, it isn't clear how best to represent this
-  /// in Swift.
-  ///
-  /// Initial thoughts are that we should sugar the obvious cases (so you can
-  /// use 0...100 in a subscript) but then provide this method for the fully
-  /// general case.
-  ///
-  /// We also need conditional conformances to allow range if PythonObject is to
-  /// be a Slice. We can probably get away with a bunch of overloads for now
-  /// given that slices are typically used with concrete operands.
+  // FIXME: This should be subsumed by Swift ranges and strides. Python has a
+  // very extravagant model though, it isn't clear how best to represent this
+  // in Swift.
+  //
+  // Initial thoughts are that we should sugar the obvious cases (so you can
+  // use 0...100 in a subscript) but then provide this method for the fully
+  // general case.
+  //
+  // We also need conditional conformances to allow range if PythonObject is to
+  // be a Slice. We can probably get away with a bunch of overloads for now
+  // given that slices are typically used with concrete operands.
   init(sliceStart start: PythonConvertible?,
                   stop: PythonConvertible?,
                   step: PythonConvertible? = nil) {
