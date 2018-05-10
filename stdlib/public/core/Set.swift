@@ -2043,13 +2043,13 @@ extension _NativeSetBuffer where Element: Hashable
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func _index(after bucket: Int) -> Int {
+  internal func _bucket(after bucket: Int) -> Int {
     // Bucket is within 0 and bucketCount. Therefore adding 1 does not overflow.
     return (bucket &+ 1) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func _prev(_ bucket: Int) -> Int {
+  internal func _bucket(before bucket: Int) -> Int {
     // Bucket is not negative. Therefore subtracting 1 does not overflow.
     return (bucket &- 1) & _bucketMask
   }
@@ -2075,7 +2075,7 @@ extension _NativeSetBuffer where Element: Hashable
       if self.key(at: bucket) == key {
         return (Index(offset: bucket), true)
       }
-      bucket = _index(after: bucket)
+      bucket = _bucket(after: bucket)
     }
   }
 
@@ -3122,16 +3122,18 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
 
     // Find the first bucket in the contiguous chain
     var start = idealBucket
-    while nativeBuffer.isInitializedEntry(at: nativeBuffer._prev(start)) {
-      start = nativeBuffer._prev(start)
+    while nativeBuffer.isInitializedEntry(
+      at: nativeBuffer._bucket(before: start)
+    ) {
+      start = nativeBuffer._bucket(before: start)
     }
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole
-    var b = nativeBuffer._index(after: lastInChain)
+    var b = nativeBuffer._bucket(after: lastInChain)
     while nativeBuffer.isInitializedEntry(at: b) {
       lastInChain = b
-      b = nativeBuffer._index(after: b)
+      b = nativeBuffer._bucket(after: b)
     }
 
     // Relocate out-of-place elements in the chain, repeating until
@@ -3151,7 +3153,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
         if start <= hole ? (c0 && c1) : (c0 || c1) {
           break // Found it
         }
-        b = nativeBuffer._prev(b)
+        b = nativeBuffer._bucket(before: b)
       }
 
       if b == hole { // No out-of-place elements found; we're done adjusting
