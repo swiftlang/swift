@@ -167,7 +167,7 @@ struct MissingTrait;
 template <class T>
 struct has_ScalarEnumerationTraits
 {
-  typedef void (*Signature_enumeration)(class Output&, T&);
+  using Signature_enumeration = void (*)(class Output &, T &);
 
   template <typename U>
   static char test(SameType<Signature_enumeration, &U::enumeration>*);
@@ -185,7 +185,7 @@ public:
 template <class T>
 struct has_ScalarBitSetTraits
 {
-  typedef void (*Signature_bitset)(class Output&, T&);
+  using Signature_bitset = void (*)(class Output &, T &);
 
   template <typename U>
   static char test(SameType<Signature_bitset, &U::bitset>*);
@@ -202,8 +202,8 @@ public:
 template <class T>
 struct has_ScalarTraits
 {
-  typedef void (*Signature_output)(const T&, llvm::raw_ostream&);
-  typedef bool (*Signature_mustQuote)(StringRef);
+  using Signature_output = void (*)(const T &, llvm::raw_ostream &);
+  using Signature_mustQuote = bool (*)(StringRef);
 
   template <typename U>
   static char test(SameType<Signature_output, &U::output> *,
@@ -222,7 +222,7 @@ public:
 template <class T>
 struct has_ObjectTraits
 {
-  typedef void (*Signature_mapping)(class Output&, T&);
+  using Signature_mapping = void (*)(class Output &, T &);
 
   template <typename U>
   static char test(SameType<Signature_mapping, &U::mapping>*);
@@ -238,7 +238,7 @@ public:
 template <class T>
 struct has_ObjectValidateTraits
 {
-  typedef StringRef (*Signature_validate)(class Output&, T&);
+  using Signature_validate = StringRef (*)(class Output &, T &);
 
   template <typename U>
   static char test(SameType<Signature_validate, &U::validate>*);
@@ -256,7 +256,7 @@ public:
 template <class T>
 struct has_ArrayMethodTraits
 {
-  typedef size_t (*Signature_size)(class Output&, T&);
+  using Signature_size = size_t (*)(class Output &, T &);
 
   template <typename U>
   static char test(SameType<Signature_size, &U::size>*);
@@ -277,7 +277,7 @@ struct has_ArrayTraits : public std::integral_constant<bool,
 template <class T>
 struct has_NullableTraits
 {
-  typedef bool (*Signature_isNull)(T&);
+  using Signature_isNull = bool (*)(T &);
 
   template <typename U>
   static char test(SameType<Signature_isNull, &U::isNull> *);

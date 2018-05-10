@@ -3,6 +3,6 @@ func testStringConcatenation() {
   let bornYear = "1888"
   let _ = "Mr. " + firstName + bornYear
 }
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -strings-concatenation-to-interpolation -source-filename %s -pos=4:11 -end-pos=4:40 > %t.result/L4.swift
 // RUN: diff -u %S/Outputs/basic/L4.swift.expected %t.result/L4.swift

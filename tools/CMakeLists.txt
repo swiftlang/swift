@@ -30,6 +30,10 @@ add_swift_tool_subdirectory(swift-api-digester)
 add_swift_tool_subdirectory(swift-syntax-test)
 add_swift_tool_subdirectory(swift-refactor)
 
+if(LLVM_USE_SANITIZE_COVERAGE)
+add_swift_tool_subdirectory(swift-demangle-fuzzer)
+endif()
+
 if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
   set(BUILD_FOUNDATION TRUE)
 else()

@@ -179,7 +179,7 @@ extension NSDogcow {
   @NSManaged var woof: Int
 }
 
-// CHECK: @"$SSo8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWP" =
+// CHECK: @"$SSo8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWp" =
 
 class SwiftSubGizmo : SwiftBaseGizmo {
 

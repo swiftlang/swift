@@ -9,7 +9,8 @@ set(generated_include_sources
     SyntaxNodes.h.gyb
     SyntaxBuilders.h.gyb
     SyntaxFactory.h.gyb
-    SyntaxVisitor.h.gyb)
+    SyntaxVisitor.h.gyb
+    Trivia.h.gyb)
 
 add_gyb_target(swift-syntax-generated-headers
     "${generated_include_sources}")

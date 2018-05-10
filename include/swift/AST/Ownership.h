@@ -19,6 +19,8 @@
 #ifndef SWIFT_OWNERSHIP_H
 #define SWIFT_OWNERSHIP_H
 
+#include "swift/Basic/InlineBitfield.h"
+#include "llvm/Support/raw_ostream.h"
 #include <stdint.h>
 
 namespace swift {
@@ -38,16 +40,27 @@ enum class ReferenceOwnership : uint8_t {
 
   /// \brief an 'unowned(unsafe)' reference
   Unmanaged,
+
+  Last_Kind = Unmanaged
 };
+
+enum : unsigned { NumReferenceOwnershipBits =
+  countBitsUsed(static_cast<unsigned>(ReferenceOwnership::Last_Kind)) };
+
+/// Diagnostic printing of \c StaticSpellingKind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ReferenceOwnership RO);
 
 /// Different kinds of value ownership supported by Swift.
 enum class ValueOwnership : uint8_t {
-  /// \brief the default ownership (owned)
+  /// \brief the context-dependent default ownership (sometimes shared,
+  /// sometimes owned)
   Default,
   /// \brief an 'inout' mutating pointer-like value
   InOut,
   /// \brief a '__shared' non-mutating pointer-like value
-  Shared
+  Shared,
+  /// \brief an '__owned' value
+  Owned
 };
 
 } // end namespace swift

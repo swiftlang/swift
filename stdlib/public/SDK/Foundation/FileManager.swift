@@ -27,7 +27,7 @@ extension FileManager {
     }
 
     @available(swift, obsoleted: 4)
-    @available(OSX 10.6, iOS 4.0, *)
+    @available(macOS 10.6, iOS 4.0, *)
     public func replaceItemAt(_ originalItemURL: URL, withItemAt newItemURL: URL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> NSURL? {
         var error: NSError?
         guard let result = __NSFileManagerReplaceItemAtURL(self, originalItemURL, newItemURL , backupItemName, options, &error) else { throw error! }
@@ -35,14 +35,14 @@ extension FileManager {
     }
     
     @available(swift, introduced: 4)
-    @available(OSX 10.6, iOS 4.0, *)
+    @available(macOS 10.6, iOS 4.0, *)
     public func replaceItemAt(_ originalItemURL: URL, withItemAt newItemURL: URL, backupItemName: String? = nil, options: FileManager.ItemReplacementOptions = []) throws -> URL? {
         var error: NSError?
         guard let result = __NSFileManagerReplaceItemAtURL(self, originalItemURL, newItemURL , backupItemName, options, &error) else { throw error! }
         return result
     }
 
-    @available(OSX 10.6, iOS 4.0, *)
+    @available(macOS 10.6, iOS 4.0, *)
     @nonobjc
     public func enumerator(at url: URL, includingPropertiesForKeys keys: [URLResourceKey]?, options mask: FileManager.DirectoryEnumerationOptions = [], errorHandler handler: ((URL, Error) -> Bool)? = nil) -> FileManager.DirectoryEnumerator? {
         return __NSFileManagerEnumeratorAtURL(self, url, keys, mask, { (url, error) in

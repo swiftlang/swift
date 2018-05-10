@@ -3,10 +3,12 @@
 // RUN: not %target-swift-frontend -swift-version 4 -typecheck %s 2> %t.4.txt
 // RUN: %FileCheck -check-prefix=CHECK-4 -check-prefix=CHECK-%target-runtime-4 %s < %t.4.txt
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
-#else
+#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
   import Glibc
+#elseif os(Windows)
+  import MSVCRT
 #endif
 
 func test() {
@@ -27,7 +29,7 @@ func test() {
   // CHECK-4: [[@LINE-2]]:16: error: cannot convert value of type '({{.+}}) -> Int'{{( [(]aka .+[)])?}} to specified type 'Int'
 }
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 // These functions aren't consistently available across platforms, so only
 // test for them on Apple platforms.
 func testApple() {

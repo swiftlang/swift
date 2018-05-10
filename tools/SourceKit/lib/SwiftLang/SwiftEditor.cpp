@@ -25,6 +25,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Frontend/Frontend.h"
@@ -46,6 +47,31 @@ using namespace SourceKit;
 using namespace swift;
 using namespace ide;
 
+static std::vector<unsigned> getSortedBufferIDs(
+    const llvm::DenseMap<unsigned, std::vector<DiagnosticEntryInfo>> &Map) {
+  std::vector<unsigned> bufferIDs;
+  bufferIDs.reserve(Map.size());
+  for (auto I = Map.begin(), E = Map.end(); I != E; ++I) {
+    bufferIDs.push_back(I->getFirst());
+  }
+  llvm::array_pod_sort(bufferIDs.begin(), bufferIDs.end());
+  return bufferIDs;
+}
+
+void EditorDiagConsumer::getAllDiagnostics(
+    SmallVectorImpl<DiagnosticEntryInfo> &Result) {
+
+  Result.append(InvalidLocDiagnostics.begin(), InvalidLocDiagnostics.end());
+
+  // Note: we cannot reuse InputBufIds because there may be diagnostics outside
+  // the inputs.  Instead, sort the extant buffers.
+  auto bufferIDs = getSortedBufferIDs(BufferDiagnostics);
+  for (unsigned bufferID : bufferIDs) {
+    const auto &diags = BufferDiagnostics[bufferID];
+    Result.append(diags.begin(), diags.end());
+  }
+}
+
 void EditorDiagConsumer::handleDiagnostic(
     SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
@@ -55,16 +81,11 @@ void EditorDiagConsumer::handleDiagnostic(
     HadAnyError = true;
   }
 
-  // Filter out lexer errors for placeholders.
-  if (Info.ID == diag::lex_editor_placeholder.ID)
+  // Filter out benign diagnostics for editing.
+  if (Info.ID == diag::lex_editor_placeholder.ID ||
+      Info.ID == diag::error_doing_code_completion.ID)
     return;
 
-  if (Loc.isInvalid()) {
-    if (Kind == DiagnosticKind::Error)
-      HadInvalidLocError = true;
-    clearLastDiag();
-    return;
-  }
   bool IsNote = (Kind == DiagnosticKind::Note);
 
   if (IsNote && !haveLastDiag())
@@ -87,20 +108,18 @@ void EditorDiagConsumer::handleDiagnostic(
   }
   SKInfo.Description = Text.str();
 
-  unsigned BufferID = SM.findBufferContainingLoc(Loc);
+  Optional<unsigned> BufferIDOpt;
+  if (Loc.isValid()) {
+    BufferIDOpt =  SM.findBufferContainingLoc(Loc);
+  }
 
-  if (!isInputBufferID(BufferID)) {
+  if (BufferIDOpt && !isInputBufferID(*BufferIDOpt)) {
     if (Info.ID == diag::error_from_clang.ID ||
         Info.ID == diag::warning_from_clang.ID ||
-        Info.ID == diag::note_from_clang.ID) {
+        Info.ID == diag::note_from_clang.ID ||
+        !IsNote) {
       // Handle it as other diagnostics.
     } else {
-      if (!IsNote) {
-        LOG_WARN_FUNC("got swift diagnostic not pointing at input file, "
-                      "buffer name: " << SM.getIdentifierForBuffer(BufferID));
-        return;
-      }
-
       // FIXME: This is a note pointing to a synthesized declaration buffer for
       // a declaration coming from a module.
       // We should include the Decl* in the DiagnosticInfo and have a way for
@@ -110,7 +129,7 @@ void EditorDiagConsumer::handleDiagnostic(
       // buffer identifier and append it to the diagnostic message.
       auto &LastDiag = getLastDiag();
       SKInfo.Description += " (";
-      SKInfo.Description += SM.getIdentifierForBuffer(BufferID);
+      SKInfo.Description += SM.getIdentifierForBuffer(*BufferIDOpt);
       SKInfo.Description += ")";
       SKInfo.Offset = LastDiag.Offset;
       SKInfo.Line = LastDiag.Line;
@@ -121,34 +140,38 @@ void EditorDiagConsumer::handleDiagnostic(
     }
   }
 
-  SKInfo.Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
-  std::tie(SKInfo.Line, SKInfo.Column) = SM.getLineAndColumn(Loc, BufferID);
-  SKInfo.Filename = SM.getIdentifierForBuffer(BufferID);
+  if (BufferIDOpt.hasValue()) {
+    unsigned BufferID = *BufferIDOpt;
 
-  for (auto R : Info.Ranges) {
-    if (R.isInvalid() || SM.findBufferContainingLoc(R.getStart()) != BufferID)
-      continue;
-    unsigned Offset = SM.getLocOffsetInBuffer(R.getStart(), BufferID);
-    unsigned Length = R.getByteLength();
-    SKInfo.Ranges.push_back({ Offset, Length });
-  }
+    SKInfo.Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
+    std::tie(SKInfo.Line, SKInfo.Column) = SM.getLineAndColumn(Loc, BufferID);
+    SKInfo.Filename = SM.getIdentifierForBuffer(BufferID);
 
-  for (auto F : Info.FixIts) {
-    if (F.getRange().isInvalid() ||
-        SM.findBufferContainingLoc(F.getRange().getStart()) != BufferID)
-      continue;
-    unsigned Offset = SM.getLocOffsetInBuffer(F.getRange().getStart(),
-                                              BufferID);
-    unsigned Length = F.getRange().getByteLength();
-    SKInfo.Fixits.push_back({ Offset, Length, F.getText() });
+    for (auto R : Info.Ranges) {
+      if (R.isInvalid() || SM.findBufferContainingLoc(R.getStart()) != BufferID)
+        continue;
+      unsigned Offset = SM.getLocOffsetInBuffer(R.getStart(), BufferID);
+      unsigned Length = R.getByteLength();
+      SKInfo.Ranges.push_back({Offset, Length});
+    }
+
+    for (auto F : Info.FixIts) {
+      if (F.getRange().isInvalid() ||
+          SM.findBufferContainingLoc(F.getRange().getStart()) != BufferID)
+        continue;
+      unsigned Offset =
+          SM.getLocOffsetInBuffer(F.getRange().getStart(), BufferID);
+      unsigned Length = F.getRange().getByteLength();
+      SKInfo.Fixits.push_back({Offset, Length, F.getText()});
+    }
+  } else {
+    SKInfo.Filename = "<unknown>";
   }
 
   if (IsNote) {
     getLastDiag().Notes.push_back(std::move(SKInfo));
     return;
   }
-
-  DiagnosticsTy &Diagnostics = BufferDiagnostics[BufferID];
 
   switch (Kind) {
     case DiagnosticKind::Error:
@@ -161,6 +184,15 @@ void EditorDiagConsumer::handleDiagnostic(
     case DiagnosticKind::Remark:
       llvm_unreachable("already covered");
   }
+
+  if (!BufferIDOpt) {
+    InvalidLocDiagnostics.push_back(std::move(SKInfo));
+    clearLastDiag();
+    return;
+  }
+
+  unsigned BufferID = *BufferIDOpt;
+  DiagnosticsTy &Diagnostics = BufferDiagnostics[BufferID];
 
   if (Diagnostics.empty() || Diagnostics.back().Offset <= SKInfo.Offset) {
     Diagnostics.push_back(std::move(SKInfo));
@@ -649,23 +681,8 @@ public:
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
   }
 
-  void initArgsAndPrimaryFile(trace::SwiftInvocation &Info) {
-    Info.Args.PrimaryFile = PrimaryFile;
-    Info.Args.Args = Args;
-  }
-
   void parse() {
     auto &P = Parser->getParser();
-
-    trace::TracedOperation TracedOp;
-    if (trace::enabled()) {
-      trace::SwiftInvocation Info;
-      initArgsAndPrimaryFile(Info);
-      auto Text = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID)->getBuffer();
-      Info.Files.push_back(std::make_pair(PrimaryFile, Text));
-      TracedOp.start(trace::OperationKind::SimpleParse, Info);
-    }
-
     bool Done = false;
     while (!Done) {
       P.parseTopLevel();
@@ -956,20 +973,9 @@ public:
     }
     unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
 
-    trace::TracedOperation TracedOp;
-    if (trace::enabled()) {
-      trace::SwiftInvocation SwiftArgs;
-      SemaInfoRef->getInvocation()->raw(SwiftArgs.Args.Args,
-                                        SwiftArgs.Args.PrimaryFile);
-      trace::initTraceFiles(SwiftArgs, CompIns);
-      TracedOp.start(trace::OperationKind::AnnotAndDiag, SwiftArgs);
-    }
-
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
     Annotator.walk(AstUnit->getPrimarySourceFile());
     SemaToks = std::move(Annotator.SemaToks);
-
-    TracedOp.finish();
 
     SemaInfoRef->
       updateSemanticInfo(std::move(SemaToks),
@@ -1034,22 +1040,7 @@ struct SwiftEditorDocument::Implementation {
     : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
       SemanticInfo = new SwiftDocumentSemanticInfo(FilePath, LangSupport);
   }
-
-  void buildSwiftInv(trace::SwiftInvocation &Inv);
 };
-
-void SwiftEditorDocument::Implementation::buildSwiftInv(
-                                                  trace::SwiftInvocation &Inv) {
-  if (SemanticInfo->getInvocation()) {
-    std::string PrimaryFile; // Ignored, FilePath will be used
-    SemanticInfo->getInvocation()->raw(Inv.Args.Args, PrimaryFile);
-  }
-  Inv.Args.PrimaryFile = FilePath;
-  auto &SM = SyntaxInfo->getSourceManager();
-  auto ID = SyntaxInfo->getBufferID();
-  auto Text = SM.getLLVMSourceMgr().getMemoryBuffer(ID)->getBuffer();
-  Inv.Files.push_back(std::make_pair(FilePath, Text));
-}
 
 namespace  {
 
@@ -1784,13 +1775,6 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
 void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation Info;
-    Impl.buildSwiftInv(Info);
-    TracedOp.start(trace::OperationKind::ReadSyntaxInfo, Info);
-  }
-
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
   ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
@@ -1798,7 +1782,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   if (Consumer.syntaxTreeEnabled()) {
     std::string SyntaxContent;
     llvm::raw_string_ostream OS(SyntaxContent);
-    json::Output JsonOut(OS);
+    json::Output JsonOut(OS, /*PrettyPrint=*/false);
     auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
     JsonOut << *Root;
     Consumer.handleSerializedSyntaxTree(OS.str());
@@ -1836,13 +1820,6 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                                            EditorConsumer& Consumer) {
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation Info;
-    Impl.buildSwiftInv(Info);
-    TracedOp.start(trace::OperationKind::ReadSemanticInfo, Info);
-  }
-
   std::vector<SwiftSemanticToken> SemaToks;
   Optional<std::vector<DiagnosticEntryInfo>> SemaDiags;
   Impl.SemanticInfo->readSemanticInfo(Snapshot, SemaToks, SemaDiags,
@@ -1897,26 +1874,6 @@ void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
   auto SyntaxInfo = Impl.getSyntaxInfo();
   SourceFile &SF = SyntaxInfo->getSourceFile();
   SourceManager &SM = SyntaxInfo->getSourceManager();
-  unsigned BufID = SyntaxInfo->getBufferID();
-
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    // Compiler arguments do not matter
-    auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);
-    SwiftArgs.Args.PrimaryFile = Buf->getBufferIdentifier();
-    SwiftArgs.addFile(SwiftArgs.Args.PrimaryFile, Buf->getBuffer());
-    trace::StringPairs OpArgs = {
-      std::make_pair("Line", std::to_string(Line)),
-      std::make_pair("Length", std::to_string(Length)),
-      std::make_pair("IndentWidth",
-                     std::to_string(Impl.FormatOptions.IndentWidth)),
-      std::make_pair("TabWidth",
-                     std::to_string(Impl.FormatOptions.TabWidth)),
-      std::make_pair("UseTabs",
-                     std::to_string(Impl.FormatOptions.UseTabs))};
-    TracedOp.start(trace::OperationKind::FormatText, SwiftArgs, OpArgs);
-  }
 
   LineRange inputRange = LineRange(Line, Length);
   CodeFormatOptions Options = getFormatOptions();
@@ -1947,18 +1904,6 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
   if (Length < (PlaceholderStartLen + PlaceholderEndLen)) {
     Consumer.handleRequestError("Invalid Length parameter");
     return;
-  }
-
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SyntaxInfo->initArgsAndPrimaryFile(SwiftArgs);
-    auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(BufID);
-    SwiftArgs.addFile(Buf->getBufferIdentifier(), Buf->getBuffer());
-    trace::StringPairs OpArgs = {
-      std::make_pair("Offset", std::to_string(Offset)),
-      std::make_pair("Length", std::to_string(Length))};
-    TracedOp.start(trace::OperationKind::ExpandPlaceholder, SwiftArgs, OpArgs);
   }
 
   PlaceholderExpansionScanner Scanner(SM);

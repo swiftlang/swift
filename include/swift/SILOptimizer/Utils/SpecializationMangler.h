@@ -127,6 +127,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     Dead=32,
     OwnedToGuaranteed=64,
     SROA=128,
+    GuaranteedToOwned=256,
     First_OptionSetEntry=32, LastOptionSetEntry=32768,
   };
 
@@ -149,6 +150,7 @@ public:
                               ThinToThickFunctionInst *TTTFI);
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
+  void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);
   void setArgumentSROA(unsigned OrigArgIdx);
   void setArgumentBoxToValue(unsigned OrigArgIdx);
   void setArgumentBoxToStack(unsigned OrigArgIdx);

@@ -37,8 +37,7 @@ let replacementCharacter = Character(replacementScalar)
 // UTF16, grapheme clusters composed of multiple Unicode scalars, and
 // invalid UTF16 that should be replaced with replacement characters.
 let winterUTF16 = Array("🏂☃❅❆❄︎⛄️❄️".utf16) + [0xD83C, 0x0020, 0xDF67, 0xD83C]
-var winter = ""
-winter._guts.append(contentsOf: winterUTF16)
+var winter = _StringGuts._createStringFromUTF16(winterUTF16)
 let winterInvalidUTF8: [UTF8.CodeUnit] = replacementUTF8 + ([0x20] as [UTF8.CodeUnit]) + replacementUTF8 + replacementUTF8
 let winterUTF8: [UTF8.CodeUnit] = [
   0xf0, 0x9f, 0x8f, 0x82, 0xe2, 0x98, 0x83, 0xe2, 0x9d, 0x85, 0xe2,

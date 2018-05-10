@@ -141,7 +141,7 @@ bool extractParameterOutline(
     L->setChildren(NormalItems);
   }
 
-  return NormalItems.size() == 0;
+  return NormalItems.empty();
 }
 
 bool extractSeparatedParams(
@@ -205,7 +205,7 @@ bool extractSeparatedParams(
   if (NormalItems.size() != Children.size())
     L->setChildren(NormalItems);
 
-  return NormalItems.size() == 0;
+  return NormalItems.empty();
 }
 
 bool extractSimpleField(
@@ -280,7 +280,7 @@ bool extractSimpleField(
   if (NormalItems.size() != Children.size())
     L->setChildren(NormalItems);
 
-  return NormalItems.size() == 0;
+  return NormalItems.empty();
 }
 
 swift::markup::CommentParts

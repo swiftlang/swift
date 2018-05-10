@@ -7,8 +7,8 @@
 // CHECK: func unknown()
 
 // CHECK: struct X {
-// CHECK-NEXT:  @_versioned
-// CHECK-NEXT:  @_inlineable func test()
+// CHECK-NEXT:  @usableFromInline
+// CHECK-NEXT:  @inlinable func test()
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
 
@@ -31,8 +31,8 @@
 // SIB-CHECK: func unknown()
 
 // SIB-CHECK: struct X {
-// SIB-CHECK-NEXT:  @_versioned
-// SIB-CHECK-NEXT:  @_inlineable func test()
+// SIB-CHECK-NEXT:  @usableFromInline
+// SIB-CHECK-NEXT:  @inlinable func test()
 // SIB-CHECK-NEXT:  init
 // SIB-CHECK-NEXT: }
 
@@ -52,8 +52,8 @@
 public func unknown() -> ()
 
 public struct X {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   func test() {
     unknown()
   }

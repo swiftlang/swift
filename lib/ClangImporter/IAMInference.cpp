@@ -212,7 +212,8 @@ private:
   IAMResult importAsTypeID(const clang::QualType typeIDTy,
                            EffectiveClangContext effectiveDC) {
     ++SuccessImportAsTypeID;
-    return {formDeclName("typeID"), IAMAccessorKind::Getter, effectiveDC};
+    return {formDeclName("typeID", /*isInitializer=*/false),
+            IAMAccessorKind::Getter, effectiveDC};
   }
 
   // Init
@@ -245,7 +246,7 @@ private:
 
       assert(didDrop != 0 && "specifier not present?");
     }
-    return {formDeclName("init", params, prefix), effectiveDC};
+    return {formDeclName("init", true, params, prefix), effectiveDC};
   }
 
   // Instance computed property
@@ -259,7 +260,8 @@ private:
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
     assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
 
-    return {formDeclName(name), kind, selfIdx, effectiveDC};
+    return {formDeclName(name, /*isInitializer=*/false),
+            kind, selfIdx, effectiveDC};
   }
 
   // Instance method
@@ -268,14 +270,15 @@ private:
                          ArrayRef<const clang::ParmVarDecl *> nonSelfParams,
                          EffectiveClangContext effectiveDC) {
     ++SuccessImportAsInstanceMethod;
-    return {formDeclName(name, nonSelfParams), selfIdx, effectiveDC};
+    return {formDeclName(name, /*isInitializer=*/false, nonSelfParams),
+            selfIdx, effectiveDC};
   }
 
   // Static stored property
   IAMResult importAsStaticProperty(StringRef name,
                                    EffectiveClangContext effectiveDC) {
     ++SuccessImportAsStaticProperty;
-    return {formDeclName(name), effectiveDC};
+    return {formDeclName(name, /*isInitializer=*/false), effectiveDC};
   }
 
   // Static computed property
@@ -289,7 +292,8 @@ private:
         propSpec == "Get" ? IAMAccessorKind::Getter : IAMAccessorKind::Setter;
     assert(kind == IAMAccessorKind::Getter || pairedAccessor && "no set-only");
 
-    return {formDeclName(name), kind, effectiveDC};
+    return {formDeclName(name, /*isInitializer=*/false),
+            kind, effectiveDC};
   }
 
   // Static method
@@ -298,7 +302,8 @@ private:
                        ArrayRef<const clang::ParmVarDecl *> nonSelfParams,
                        EffectiveClangContext effectiveDC) {
     ++SuccessImportAsStaticMethod;
-    return {formDeclName(name, nonSelfParams), effectiveDC};
+    return {formDeclName(name, /*isInitializer=*/false, nonSelfParams),
+            effectiveDC};
   }
 
   Identifier getIdentifier(StringRef str) {
@@ -379,18 +384,20 @@ private:
     return clangLookupFunction(pairName);
   }
 
-  Identifier getHumbleIdentifier(StringRef name) {
+  DeclBaseName getHumbleBaseName(StringRef name, bool isInitializer) {
     // Lower-camel-case the incoming name
     NameBuffer buf;
     formHumbleCamelName(name, buf);
+    if (isInitializer && buf == "init")
+      return DeclBaseName::createConstructor();
     return getIdentifier(buf);
   }
 
-  DeclName formDeclName(StringRef baseName) {
-    return {getHumbleIdentifier(baseName)};
+  DeclName formDeclName(StringRef baseName, bool isInitializer) {
+    return {getHumbleBaseName(baseName, isInitializer)};
   }
 
-  DeclName formDeclName(StringRef baseName,
+  DeclName formDeclName(StringRef baseName, bool isInitializer,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         StringRef firstPrefix = "") {
 
@@ -402,7 +409,7 @@ private:
       // We need to form an argument label, despite there being no argument
       NameBuffer paramName;
       formHumbleCamelName(firstPrefix, paramName);
-      return {context, getHumbleIdentifier(baseName),
+      return {context, getHumbleBaseName(baseName, isInitializer),
               getIdentifier(paramName)};
     }
 
@@ -426,7 +433,9 @@ private:
       SmallVector<Identifier, 8> argLabels;
       for (auto str : argStrs)
         argLabels.push_back(getIdentifier(str));
-      DEBUG((beforeOmit = {context, getHumbleIdentifier(baseName), argLabels}));
+      DEBUG((beforeOmit = {context,
+                           getHumbleBaseName(baseName, isInitializer),
+                           argLabels}));
     }
 
     SmallVector<OmissionTypeName, 8> paramTypeNames;
@@ -435,8 +444,8 @@ private:
           clangSema.getASTContext(), param->getType()));
     }
 
-    auto humbleBaseName = getHumbleIdentifier(baseName);
-    baseName = humbleBaseName.str();
+    auto humbleBaseName = getHumbleBaseName(baseName, isInitializer);
+    baseName = humbleBaseName.userFacingName();
     bool didOmit =
         omitNeedlessWords(baseName, argStrs, "", "", "", paramTypeNames, false,
                           false, nullptr, scratch);
@@ -444,7 +453,9 @@ private:
     for (auto str : argStrs)
       argLabels.push_back(getIdentifier(str));
 
-    DeclName ret = {context, getHumbleIdentifier(baseName), argLabels};
+    DeclName ret(context,
+                 getHumbleBaseName(baseName, isInitializer),
+                 argLabels);
 
     if (didOmit) {
       ++OmitNumTimes;

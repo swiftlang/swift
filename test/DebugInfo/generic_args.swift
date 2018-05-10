@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -verify -g -o - | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name generic_args -primary-file %s -emit-ir -verify -g -o - | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -45,7 +46,7 @@ struct Wrapper<T: AProtocol> {
   }
 }
 
-// CHECK-DAG: ![[FNTY:.*]] = !DICompositeType({{.*}}identifier: "$S12generic_args5apply_1fq_x_q_xXEtr0_lFQq_AaB_ACq_x_q_xXEtr0_lFQq0_Igir_D"
+// CHECK-DAG: ![[FNTY:.*]] = !DICompositeType({{.*}}identifier: "$S12generic_args5apply_1fq_x_q_xXEtr0_lFQq_AaB_ACq_x_q_xXEtr0_lFQq0_Ignr_D"
 // CHECK-DAG: !DILocalVariable(name: "f", {{.*}}, line: [[@LINE+1]], type: ![[FNTY]])
 func apply<T, U> (_ x: T, f: (T) -> (U)) -> U {
   return f(x)

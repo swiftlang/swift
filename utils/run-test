@@ -42,6 +42,7 @@ TEST_SUBSETS = [
     'all',
     'only_validation',
     'only_long',
+    'only_stress',
 ]
 
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')

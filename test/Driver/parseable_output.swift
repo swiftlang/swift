@@ -7,6 +7,15 @@
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "command": "{{.*}}/swift{{c?}} -frontend -c -primary-file {{.*}}/parseable_output.swift {{.*}} -o {{.*}}/parseable_output-[[OUTPUT:.*]].o",
+// CHECK-NEXT:   "command_executable": "{{.*}}/swift{{c?}}",
+// CHECK-NEXT:   "command_arguments": [
+// CHECK-NEXT:     "-frontend",
+// CHECK-NEXT:     "-c",
+// CHECK-NEXT:     "-primary-file",
+// CHECK-NEXT:     "{{.*}}/parseable_output.swift",
+// CHECK:          "-o",
+// CHECK-NEXT:     "{{.*}}/parseable_output-[[OUTPUT:.*]].o"
+// CHECK-NEXT:   ],
 // CHECK-NEXT:   "inputs": [
 // CHECK-NEXT:     "{{.*}}/parseable_output.swift"
 // CHECK-NEXT:   ],
@@ -49,6 +58,15 @@
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
 // CHECK-NEXT:   "command": "{{.*}}/swift{{c?}} -frontend -merge-modules -emit-module {{.*}}/parseable_output-[[OUTPUT]].swiftmodule {{.*}} -o {{.*}}/parseable_output.swift.tmp.swiftmodule",
+// CHECK-NEXT:   "command_executable": "{{.*}}/swift{{c?}}",
+// CHECK-NEXT:   "command_arguments": [
+// CHECK-NEXT:     "-frontend",
+// CHECK-NEXT:     "-merge-modules",
+// CHECK-NEXT:     "-emit-module",
+// CHECK-NEXT:     "{{.*}}/parseable_output-[[OUTPUT]].swiftmodule",
+// CHECK:          "-o",
+// CHECK-NEXT:     "{{.*}}/parseable_output.swift.tmp.swiftmodule"
+// CHECK-NEXT:   ],
 // CHECK-NEXT:   "inputs": [
 // CHECK-NEXT:     "{{.*}}/parseable_output-[[OUTPUT]].o"
 // CHECK-NEXT:   ],
@@ -83,6 +101,12 @@
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "link",
 // CHECK-NEXT:   "command": "{{.*}}/ld{{(\\")?}} {{.*}}/parseable_output-[[OUTPUT]].o {{.*}} -o {{.*}}/parseable_output.swift.tmp.out",
+// CHECK-NEXT:   "command_executable": "{{.*}}/ld{{(\\")?}}",
+// CHECK-NEXT:   "command_arguments": [
+// CHECK-NEXT:     "{{.*}}/parseable_output-[[OUTPUT]].o",
+// CHECK:          "-o",
+// CHECK-NEXT:     "{{.*}}/parseable_output.swift.tmp.out"
+// CHECK-NEXT:   ],
 // CHECK-NEXT:   "inputs": [
 // CHECK-NEXT:     "{{.*}}/parseable_output-[[OUTPUT]].o"
 // CHECK-NEXT:   ],

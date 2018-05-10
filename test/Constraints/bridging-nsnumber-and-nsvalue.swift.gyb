@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/bridging-nsnumber-and-nsvalue.swift
 // RUN: %target-swift-frontend -typecheck -verify %t/bridging-nsnumber-and-nsvalue.swift -swift-version 4
 

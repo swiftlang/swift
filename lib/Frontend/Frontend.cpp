@@ -614,13 +614,22 @@ void CompilerInstance::parseAndCheckTypes(
                               TypeCheckOptions);
   }
 
+  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
+    auto *SF = dyn_cast<SourceFile>(File);
+    if (!SF)
+      return true;
+    return SF->ASTStage >= SourceFile::NameBound;
+  }) && "some files have not yet had their imports resolved");
+  MainModule->setHasResolvedImports();
+
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF, PersistentState.getTopLevelContext(),
                         TypeCheckOptions, /*curElem*/ 0,
                         options.WarnLongFunctionBodies,
                         options.WarnLongExpressionTypeChecking,
-                        options.SolverExpressionTimeThreshold);
+                        options.SolverExpressionTimeThreshold,
+                        options.SwitchCheckingInvocationThreshold);
   });
 
   // Even if there were no source files, we should still record known
@@ -646,16 +655,11 @@ void CompilerInstance::parseLibraryFile(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  auto *DelayedCB = SecondaryDelayedCB;
-  if (isPrimaryInput(BufferID)) {
-    DelayedCB = PrimaryDelayedCB;
-  }
-  if (isWholeModuleCompilation())
-    DelayedCB = PrimaryDelayedCB;
+  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
+  auto *DelayedCB = IsPrimary ? PrimaryDelayedCB : SecondaryDelayedCB;
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -748,12 +752,18 @@ void CompilerInstance::parseAndTypeCheckMainFile(
                           TypeCheckOptions, CurTUElem,
                           options.WarnLongFunctionBodies,
                           options.WarnLongExpressionTypeChecking,
-                          options.SolverExpressionTimeThreshold);
+                          options.SolverExpressionTimeThreshold,
+                          options.SwitchCheckingInvocationThreshold);
     }
     CurTUElem = MainFile.Decls.size();
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
+
+  if (mainIsPrimary && !Context->hadError() &&
+      Invocation.getFrontendOptions().DebuggerTestingTransform) {
+    performDebuggerTestingTransform(MainFile);
+  }
 
   if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().PCMacro) {

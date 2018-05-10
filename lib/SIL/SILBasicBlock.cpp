@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/STLExtras.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILArgument.h"
@@ -335,20 +336,18 @@ bool SILBasicBlock::isEntry() const {
 }
 
 SILBasicBlock::PHIArgumentArrayRefTy SILBasicBlock::getPHIArguments() const {
-  using FuncTy = std::function<SILPHIArgument *(SILArgument *)>;
-  FuncTy F = [](SILArgument *A) -> SILPHIArgument * {
+  return PHIArgumentArrayRefTy(getArguments(),
+                               [](SILArgument *A) -> SILPHIArgument * {
     return cast<SILPHIArgument>(A);
-  };
-  return makeTransformArrayRef(getArguments(), F);
+  });
 }
 
 SILBasicBlock::FunctionArgumentArrayRefTy
 SILBasicBlock::getFunctionArguments() const {
-  using FuncTy = std::function<SILFunctionArgument *(SILArgument *)>;
-  FuncTy F = [](SILArgument *A) -> SILFunctionArgument * {
+  return FunctionArgumentArrayRefTy(getArguments(),
+                                    [](SILArgument *A) -> SILFunctionArgument* {
     return cast<SILFunctionArgument>(A);
-  };
-  return makeTransformArrayRef(getArguments(), F);
+  });
 }
 
 /// Returns true if this block ends in an unreachable or an apply of a
@@ -379,4 +378,11 @@ bool SILBasicBlock::isTrampoline() const {
 
 bool SILBasicBlock::isLegalToHoistInto() const {
   return true;
+}
+
+const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
+  for (auto &Inst : *this)
+    if (Inst.isMetaInstruction())
+      return Inst.getDebugScope();
+  return begin()->getDebugScope();
 }

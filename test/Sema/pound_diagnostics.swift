@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -c -verify %s -o /dev/null
 
 #warning("this should be a warning") // expected-warning {{this should be a warning}}
 #error("this should be an error") // expected-error {{this should be an error}}
@@ -60,4 +61,14 @@ func foo() {
   #endif
   default: break
   }
+}
+
+public // expected-error @+1 {{expected declaration}}
+#warning("public warning") // expected-warning {{public warning}}
+func bar() {}
+
+class C { // expected-note {{in declaration of 'C'}}
+  private // expected-error @+1 {{expected declaration}}
+  #error("private error") // expected-error  {{private error}}
+  func bar() {}
 }

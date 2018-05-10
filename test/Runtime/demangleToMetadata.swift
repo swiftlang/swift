@@ -68,7 +68,7 @@ DemangleToMetadataTests.test("function types") {
 
   // Ownership parameters.
   expectEqual(type(of: f1_shared), _typeByMangledName("yyyXlhc")!)
-  expectEqual(type(of: f1_owned), _typeByMangledName("yyyXlc")!)
+  expectEqual(type(of: f1_owned), _typeByMangledName("yyyXlnc")!)
 
   // Mix-and-match.
   expectEqual(type(of: f2_variadic_inout), _typeByMangledName("yyytd_ytztc")!)

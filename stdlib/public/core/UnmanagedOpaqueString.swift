@@ -22,26 +22,25 @@ public protocol _OpaqueString: class {
     into dest: UnsafeMutablePointer<UInt16>)
 }
 
-@_versioned
+@usableFromInline
 @_fixed_layout
 internal struct _UnmanagedOpaqueString {
 #if _runtime(_ObjC) // FIXME unify
-  @_versioned
+  @usableFromInline
   unowned(unsafe) let object: _CocoaString
 #else
-  @_versioned
+  @usableFromInline
   unowned(unsafe) let object: _OpaqueString
 #endif
 
-  @_versioned
+  @usableFromInline
   let range: Range<Int>
 
-  @_versioned
+  @usableFromInline
   let isSlice: Bool
 
 #if _runtime(_ObjC) // FIXME unify
-  @_inlineable
-  @_versioned
+  @inlinable
   init(_ object: _CocoaString, range: Range<Int>, isSlice: Bool) {
     self.object = object
     self.range = range
@@ -54,14 +53,12 @@ internal struct _UnmanagedOpaqueString {
     self.init(object, count: count)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   init(_ object: _CocoaString, count: Int) {
     self.init(object, range: 0..<count, isSlice: false)
   }
 #else
-  @_inlineable
-  @_versioned
+  @inlinable
   init(_ object: _OpaqueString, range: Range<Int>, isSlice: Bool) {
     self.object = object
     self.range = range
@@ -73,8 +70,7 @@ internal struct _UnmanagedOpaqueString {
     self.init(object, count: object.length)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   init(_ object: _OpaqueString, count: Int) {
     self.init(object, range: 0..<count, isSlice: false)
   }
@@ -84,49 +80,45 @@ internal struct _UnmanagedOpaqueString {
 extension _UnmanagedOpaqueString : Sequence {
   typealias Element = UTF16.CodeUnit
 
-  @_inlineable
-  @_versioned
+  @inlinable
   func makeIterator() -> Iterator {
     return Iterator(self, startingAt: range.lowerBound)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func makeIterator(startingAt position: Int) -> Iterator {
     return Iterator(self, startingAt: position)
   }
 
-  @_versioned
+  @usableFromInline
   @_fixed_layout
   struct Iterator : IteratorProtocol {
     internal typealias Element = UTF16.CodeUnit
 
 #if _runtime(_ObjC) // FIXME unify
-    @_versioned
+    @usableFromInline
     internal let _object: _CocoaString
 #else
-    @_versioned
+    @usableFromInline
     internal let _object: _OpaqueString
 #endif
 
-    @_versioned
+    @usableFromInline
     internal var _range: Range<Int>
 
-    @_versioned
+    @usableFromInline
     internal var _buffer = _FixedArray16<Element>()
 
-    @_versioned
+    @usableFromInline
     internal var _bufferIndex: Int8 = 0
 
-    @_inlineable
-    @_versioned
+    @inlinable
     init(_ string: _UnmanagedOpaqueString, startingAt start: Int) {
       self._object = string.object
       self._range = start..<string.range.upperBound
     }
 
-    @_inlineable
-    @_versioned
+    @inlinable
     @inline(__always)
     mutating func next() -> Element? {
       if _fastPath(_bufferIndex < _buffer.count) {
@@ -138,7 +130,7 @@ extension _UnmanagedOpaqueString : Sequence {
       return _nextOnSlowPath()
     }
 
-    @_versioned
+    @usableFromInline
     @inline(never)
     mutating func _nextOnSlowPath() -> Element {
       // Fill buffer
@@ -167,53 +159,46 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
   internal typealias SubSequence = _UnmanagedOpaqueString
 
   @_fixed_layout
-  @_versioned
+  @usableFromInline
   struct Index : Strideable {
-    @_versioned
+    @usableFromInline
     internal var _value: Int
 
-    @_versioned
-    @_inlineable
+    @inlinable
     @inline(__always)
     init(_ value: Int) {
       self._value = value
     }
 
-    @_versioned
-    @_inlineable
+    @inlinable
     @inline(__always)
     func distance(to other: Index) -> Int {
       return other._value - self._value
     }
 
-    @_versioned
-    @_inlineable
+    @inlinable
     @inline(__always)
     func advanced(by n: Int) -> Index {
       return Index(_value + n)
     }
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   var startIndex: Index {
     return Index(range.lowerBound)
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   var endIndex: Index {
     return Index(range.upperBound)
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   var count: Int {
     return range.count
   }
 
-  @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   subscript(position: Index) -> UTF16.CodeUnit {
     _sanityCheck(position._value >= range.lowerBound)
     _sanityCheck(position._value < range.upperBound)
@@ -224,8 +209,7 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
 #endif
   }
 
-  @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   subscript(bounds: Range<Index>) -> _UnmanagedOpaqueString {
     _sanityCheck(bounds.lowerBound._value >= range.lowerBound)
     _sanityCheck(bounds.upperBound._value <= range.upperBound)
@@ -239,22 +223,19 @@ extension _UnmanagedOpaqueString : _StringVariant {
   internal typealias Encoding = Unicode.UTF16
   internal typealias CodeUnit = Encoding.CodeUnit
 
-  @_inlineable
-  @_versioned
+  @inlinable
   var isASCII: Bool {
     @inline(__always) get { return false }
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   func _boundsCheck(_ i: Index) {
     _precondition(i._value >= range.lowerBound && i._value < range.upperBound,
       "String index is out of bounds")
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   func _boundsCheck(_ range: Range<Index>) {
     _precondition(
@@ -263,24 +244,21 @@ extension _UnmanagedOpaqueString : _StringVariant {
       "String index range is out of bounds")
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   func _boundsCheck(offset: Int) {
     _precondition(offset >= 0 && offset < range.count,
       "String index is out of bounds")
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   func _boundsCheck(offsetRange range: Range<Int>) {
     _precondition(range.lowerBound >= 0 && range.upperBound <= count,
       "String index range is out of bounds")
   }
 
-  @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   subscript(offset: Int) -> UTF16.CodeUnit {
     _sanityCheck(offset >= 0 && offset < count)
 #if _runtime(_ObjC) // FIXME unify
@@ -290,8 +268,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
 #endif
   }
 
-  @_versioned
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   subscript(offsetRange: Range<Int>) -> _UnmanagedOpaqueString {
     _sanityCheck(offsetRange.lowerBound >= 0)
     _sanityCheck(offsetRange.upperBound <= range.count)
@@ -302,8 +279,37 @@ extension _UnmanagedOpaqueString : _StringVariant {
     return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound <= range.count)
+    let b: Range<Int> =
+      range.lowerBound ..<
+      range.lowerBound + offsetRange.upperBound
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.upperBound <= range.count)
+    let b: Range<Int> =
+      range.lowerBound ..<
+      range.lowerBound + offsetRange.upperBound + 1
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
+    _sanityCheck(offsetRange.lowerBound < range.count)
+    let b: Range<Int> =
+      range.lowerBound + offsetRange.lowerBound ..<
+      range.upperBound
+    let newSlice = self.isSlice || b.count != range.count
+    return _UnmanagedOpaqueString(object, range: b, isSlice: newSlice)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
   internal func _copy(
     into dest: UnsafeMutableBufferPointer<UTF16.CodeUnit>
   ) {
@@ -319,8 +325,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
 #endif
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _copy<TargetCodeUnit>(
     into dest: UnsafeMutableBufferPointer<TargetCodeUnit>
   )
@@ -339,18 +344,19 @@ extension _UnmanagedOpaqueString : _StringVariant {
 #endif
   }
 
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
+  @_fixed_layout // FIXME(resilience)
   internal struct UnicodeScalarIterator : IteratorProtocol {
     var _base: _UnmanagedOpaqueString.Iterator
     var _peek: UTF16.CodeUnit?
 
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     init(_ base: _UnmanagedOpaqueString) {
       self._base = base.makeIterator()
       self._peek = _base.next()
     }
 
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     mutating func next() -> Unicode.Scalar? {
       if _slowPath(_peek == nil) { return nil }
       let u0 = _peek._unsafelyUnwrappedUnchecked
@@ -369,7 +375,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
     }
   }
 
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   @inline(never)
   func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
     return UnicodeScalarIterator(self)
@@ -378,7 +384,7 @@ extension _UnmanagedOpaqueString : _StringVariant {
 
 #if _runtime(_ObjC)
 extension _UnmanagedOpaqueString {
-  @_versioned
+  @usableFromInline
   @inline(never)
   internal func cocoaSlice() -> _CocoaString {
     guard isSlice else { return object }

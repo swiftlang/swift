@@ -12,17 +12,17 @@ func b() {}
 // CHECK-NEXT:(Token equal
 // CHECK-NEXT: (text="=")
 // CHECK-NEXT: (trivia space 1)
-// CHECK-NEXT: (trivia garbage_text \000))
+// CHECK-NEXT: (trivia garbageText \000))
 
 // CHECK-LABEL: 4:10
 // CHECK-NEXT:(Token integer_literal
 // CHECK-NEXT: (text="3")
-// CHECK-NEXT: (trivia garbage_text \000)
+// CHECK-NEXT: (trivia garbageText \000)
 // CHECK-NEXT: (trivia space 1))
 
 // CHECK-LABEL: 5:1
 // CHECK-NEXT:(Token kw_func
-// CHECK-NEXT: (trivia line_comment // nul(\000))
+// CHECK-NEXT: (trivia lineComment // nul(\000))
 // CHECK-NEXT: (trivia newline 1)
 // CHECK-NEXT: (text="func")
 // CHECK-NEXT: (trivia space 1))

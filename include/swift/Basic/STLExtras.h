@@ -259,7 +259,7 @@ class IteratorRange {
   Iterator First, Last;
 
 public:
-  typedef Iterator iterator;
+  using iterator = Iterator;
 
   IteratorRange(Iterator first, Iterator last) : First(first), Last(last) { }
   iterator begin() const { return First; }
@@ -305,12 +305,12 @@ public:
   /// satisfies the predicate.
   enum PrimedT { Primed };
 
-  typedef std::forward_iterator_tag iterator_category;
-  typedef typename std::iterator_traits<Iterator>::value_type value_type;
-  typedef typename std::iterator_traits<Iterator>::reference  reference;
-  typedef typename std::iterator_traits<Iterator>::pointer    pointer;
-  typedef typename std::iterator_traits<Iterator>::difference_type
-    difference_type;
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = typename std::iterator_traits<Iterator>::value_type;
+  using reference = typename std::iterator_traits<Iterator>::reference;
+  using pointer = typename std::iterator_traits<Iterator>::pointer;
+  using difference_type =
+      typename std::iterator_traits<Iterator>::difference_type;
 
   /// Construct a new filtering iterator for the given iterator range
   /// and predicate.
@@ -370,13 +370,13 @@ makeFilterIterator(Iterator current, Iterator end, Predicate pred) {
 /// A range filtered by a specific predicate.
 template<typename Range, typename Predicate>
 class FilterRange {
-  typedef typename Range::iterator Iterator;
+  using Iterator = typename Range::iterator;
 
   Iterator First, Last;
   Predicate Pred;
 
 public:
-  typedef FilterIterator<Iterator, Predicate> iterator;
+  using iterator = FilterIterator<Iterator, Predicate>;
 
   FilterRange(Range range, Predicate pred)
     : First(range.begin()), Last(range.end()), Pred(pred) 
@@ -488,7 +488,7 @@ class TransformRange {
   Operation Op;
 
 public:
-  typedef TransformIterator<typename Range::iterator, Operation> iterator;
+  using iterator = TransformIterator<typename Range::iterator, Operation>;
 
   TransformRange(Range range, Operation op)
     : Rng(range), Op(op) { }
@@ -533,11 +533,11 @@ class OptionalTransformIterator {
       ++Current;
   }
 
-  typedef typename std::iterator_traits<Iterator>::reference
-    UnderlyingReference;
-  
-  typedef typename std::result_of<OptionalTransform(UnderlyingReference)>::type 
-    ResultReference;
+  using UnderlyingReference =
+      typename std::iterator_traits<Iterator>::reference;
+
+  using ResultReference =
+      typename std::result_of<OptionalTransform(UnderlyingReference)>::type;
 
 public:
   /// Used to indicate when the current iterator has already been
@@ -545,12 +545,12 @@ public:
   /// satisfies the transform.
   enum PrimedT { Primed };
 
-  typedef std::forward_iterator_tag iterator_category;
-  typedef typename ResultReference::value_type reference;
-  typedef typename ResultReference::value_type value_type;
-  typedef void pointer; // FIXME: should add a proxy here.
-  typedef typename std::iterator_traits<Iterator>::difference_type
-    difference_type;
+  using iterator_category = std::forward_iterator_tag;
+  using reference = typename ResultReference::value_type;
+  using value_type = typename ResultReference::value_type;
+  using pointer = void; // FIXME: should add a proxy here.
+  using difference_type =
+      typename std::iterator_traits<Iterator>::difference_type;
 
   /// Construct a new optional transform iterator for the given
   /// iterator range and operation.
@@ -618,7 +618,7 @@ class OptionalTransformRange {
   OptionalTransform Op;
 
 public:
-  typedef OptionalTransformIterator<Iterator, OptionalTransform> iterator;
+  using iterator = OptionalTransformIterator<Iterator, OptionalTransform>;
 
   OptionalTransformRange(Range range, OptionalTransform op)
     : First(range.begin()), Last(range.end()), Op(op) 
@@ -690,7 +690,7 @@ template<typename Subclass, typename Range>
 class DowncastFilterRange 
   : public OptionalTransformRange<Range, DowncastAsOptional<Subclass>> {
 
-  typedef OptionalTransformRange<Range, DowncastAsOptional<Subclass>> Inherited;
+  using Inherited = OptionalTransformRange<Range, DowncastAsOptional<Subclass>>;
 
 public:
   DowncastFilterRange(Range range) 

@@ -61,7 +61,7 @@ ERROR(error_cannot_specify__o_for_multiple_outputs,none,
       "cannot specify -o when generating multiple output files", ())
 
 ERROR(error_unable_to_load_output_file_map, none,
-      "unable to load output file map", ())
+      "unable to load output file map '%1': %0", (StringRef, StringRef))
 
 ERROR(error_no_output_file_map_specified,none,
       "no output file map specified", ())
@@ -126,6 +126,9 @@ ERROR(error_input_changed_during_build,none,
 ERROR(error_conflicting_options, none,
       "conflicting options '%0' and '%1'",
       (StringRef, StringRef))
+ERROR(error_option_not_supported, none,
+      "'%0' is not supported with '%1'",
+      (StringRef, StringRef))
 
 WARNING(warn_ignore_embed_bitcode, none,
         "ignoring -embed-bitcode since no object file is being generated", ())
@@ -140,6 +143,13 @@ WARNING(warn_opt_remark_disabled, none,
         "Emission of optimization records has been disabled, because it "
         "requires a single compiler invocation: consider enabling the "
         "-whole-module-optimization flag", ())
+
+WARNING(warn_ignoring_batch_mode,none,
+"ignoring '-enable-batch-mode' because '%0' was also specified", (StringRef))
+
+WARNING(warn_use_filelists_deprecated, none,
+        "the option '-driver-use-filelists' is deprecated; use "
+        "'-driver-filelist-threshold=0' instead", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

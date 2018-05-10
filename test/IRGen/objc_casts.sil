@@ -7,6 +7,11 @@
 import Swift
 import Foundation
 
+class SwiftClass {}
+sil_vtable SwiftClass {}
+
+protocol ClassProto : class {}
+
 // CHECK-LABEL: define hidden swiftcc %TSo8NSObjectC* @checkedClassBoundCast(%swift.type*, %TSo8NSObjectC*, %swift.type* %T) #0 {
 // CHECK: [[OPAQUE_OBJ:%.+]] = bitcast %TSo8NSObjectC* %1 to i8*
 // CHECK: [[OPAQUE_CLASS:%.+]] = bitcast %swift.type* %T to i8*
@@ -28,7 +33,7 @@ bb0(%unused : $@thick T.Type, %obj : $NSObject):
 // CHECK:       [[T0:%.*]] = call %objc_object* @swift_dynamicCastMetatypeToObjectUnconditional(%swift.type* %0)
 //   TODO: is this really necessary? also, this really shouldn't use a direct reference
 // CHECK-NEXT:  [[T1:%.*]] = bitcast %objc_object* [[T0]] to i8*
-// CHECK-NEXT:  [[T2a:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_Foo"
+// CHECK-NEXT:  [[T2a:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_Foo"
 // CHECK-NEXT:  [[T2:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T2a]])
 // CHECK-NEXT:  [[T3:%.*]] = bitcast %objc_class* [[T2]] to i8*
 // CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]])
@@ -44,7 +49,7 @@ bb0(%metatype : $@thick T.Type):
 // CHECK:       [[T0:%.*]] = call %objc_object* @swift_dynamicCastMetatypeToObjectUnconditional(%swift.type* [[ARG]])
 //   TODO: is this really necessary? also, this really shouldn't use a direct reference
 // CHECK-NEXT:  [[T1:%.*]] = bitcast %objc_object* [[T0]] to i8*
-// CHECK-NEXT:  [[T2a:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_Foo"
+// CHECK-NEXT:  [[T2a:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_Foo"
 // CHECK-NEXT:  [[T2:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T2a]])
 // CHECK-NEXT:  [[T3:%.*]] = bitcast %objc_class* [[T2]] to i8*
 // CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]])
@@ -53,4 +58,28 @@ bb0(%metatype : $Optional<@thick T.Type>):
   %result = unconditional_checked_cast %metatype : $Optional<@thick T.Type> to $Foo
   %tuple = tuple ()
   return %tuple : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc { %objc_object*, i8** } @swift_class_bounded_to_cp
+// CHECK-SAME:    ([[SWIFTCLASS:%T10objc_casts10SwiftClassC]]*, %swift.type* %T)
+// CHECK:       [[T0:%.*]] = bitcast [[SWIFTCLASS]]* %0 to %swift.type**
+// CHECK-NEXT:  [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]],
+// CHECK-NEXT:  [[T0:%.*]] = bitcast [[SWIFTCLASS]]* %0 to i8*
+// CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], %swift.protocol* @"$S10objc_casts10ClassProtoMp")
+sil hidden @swift_class_bounded_to_cp : $@convention(thin) <T: SwiftClass> (@owned T) -> @owned ClassProto {
+entry(%a : $T):
+  %0 = unconditional_checked_cast %a : $T to $ClassProto
+  return %0 : $ClassProto
+}
+
+// CHECK-LABEL: define hidden swiftcc { %objc_object*, i8** } @objc_class_bounded_to_cp
+// CHECK-SAME:    ([[OBJCCLASS:%TSo8NSObjectC]]*, %swift.type* %T)
+// CHECK:       [[T0:%.*]] = bitcast [[OBJCCLASS]]* %0 to %objc_object*
+// CHECK-NEXT:  [[TYPE:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* [[T0]])
+// CHECK-NEXT:  [[T0:%.*]] = bitcast [[OBJCCLASS]]* %0 to i8*
+// CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], %swift.protocol* @"$S10objc_casts10ClassProtoMp")
+sil hidden @objc_class_bounded_to_cp : $@convention(thin) <T: NSObject> (@owned T) -> @owned ClassProto {
+entry(%a : $T):
+  %0 = unconditional_checked_cast %a : $T to $ClassProto
+  return %0 : $ClassProto
 }

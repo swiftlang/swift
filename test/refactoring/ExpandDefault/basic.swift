@@ -17,6 +17,6 @@ func foo(e: E) -> Int {
   }
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -expand-default -source-filename %s -pos=15:8 >> %t.result/L15.swift
 // RUN: diff -u %S/Outputs/basic/L15.swift.expected %t.result/L15.swift

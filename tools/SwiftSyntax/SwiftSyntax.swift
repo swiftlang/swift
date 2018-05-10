@@ -22,9 +22,23 @@ import Glibc
 
 /// A list of possible errors that could be encountered while parsing a
 /// Syntax tree.
-public enum ParserError: Error {
+public enum ParserError: Error, CustomStringConvertible {
   case swiftcFailed(Int, String)
   case invalidFile
+
+  public var description: String {
+    switch self{
+    case let .swiftcFailed(exitCode, stderr):
+      let stderrLines = stderr.split(separator: "\n")
+      return """
+      swiftc returned with non-zero exit code \(exitCode)
+      stderr:
+        \(stderrLines.joined(separator: "\n  "))
+      """
+    case .invalidFile:
+      return "swiftc created an invalid syntax file"
+    }
+  }
 }
 
 extension Syntax {

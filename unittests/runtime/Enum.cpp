@@ -58,47 +58,45 @@ OpaqueValue *asOpaque(void *v) {
 }
 
 int test_getEnumCaseSinglePayload(std::initializer_list<uint8_t> repr,
-                                   const FullOpaqueMetadata &metadata,
-                                   unsigned numEmptyCases) {
+                                       const FullOpaqueMetadata &metadata,
+                                       unsigned numEmptyCases) {
   return swift_getEnumCaseSinglePayload(asOpaque(repr.begin()),
                                          &metadata.base, numEmptyCases);
 }
 
 TEST(EnumTest, getEnumCaseSinglePayload) {
   // Test with no XI.
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({0, 0}, METADATA_SYM(Bi8_), 512));
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({255, 0}, METADATA_SYM(Bi8_), 512));
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({0, 0}, METADATA_SYM(Bi8_), 512));
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({255, 0}, METADATA_SYM(Bi8_), 512));
 
-  ASSERT_EQ(0, test_getEnumCaseSinglePayload({0, 1}, METADATA_SYM(Bi8_), 512));
-  ASSERT_EQ(255, test_getEnumCaseSinglePayload({255, 1}, METADATA_SYM(Bi8_), 512));
-  ASSERT_EQ(511, test_getEnumCaseSinglePayload({255, 2}, METADATA_SYM(Bi8_), 512));
+  ASSERT_EQ(1, test_getEnumCaseSinglePayload({0, 1}, METADATA_SYM(Bi8_), 512));
+  ASSERT_EQ(256, test_getEnumCaseSinglePayload({255, 1}, METADATA_SYM(Bi8_), 512));
+  ASSERT_EQ(512, test_getEnumCaseSinglePayload({255, 2}, METADATA_SYM(Bi8_), 512));
 
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({0, 0, 0}, METADATA_SYM(Bi8_),
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({0, 0, 0}, METADATA_SYM(Bi8_),
                                                128*1024));
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({255, 0, 0}, METADATA_SYM(Bi8_),
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({255, 0, 0}, METADATA_SYM(Bi8_),
                                                128*1024));
 #if defined(__BIG_ENDIAN__)
-  ASSERT_EQ(65535 - 255,
-            test_getEnumCaseSinglePayload({0, 1, 0}, METADATA_SYM(Bi8_),
-                                           128*1024));
+  ASSERT_EQ(65535 - 255 + 1, test_getEnumCaseSinglePayload(
+                                 {0, 1, 0}, METADATA_SYM(Bi8_), 128 * 1024));
 #else
-  ASSERT_EQ(65535 - 255,
-            test_getEnumCaseSinglePayload({0, 0, 1}, METADATA_SYM(Bi8_),
-                                           128*1024));
+  ASSERT_EQ(65535 - 255 + 1, test_getEnumCaseSinglePayload(
+                                 {0, 0, 1}, METADATA_SYM(Bi8_), 128 * 1024));
 #endif
 
   // Test with XI.
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({0}, XI_TMBi8_, 2));
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({253}, XI_TMBi8_, 2));
-  ASSERT_EQ(0, test_getEnumCaseSinglePayload({254}, XI_TMBi8_, 2));
-  ASSERT_EQ(1, test_getEnumCaseSinglePayload({255}, XI_TMBi8_, 2));
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({0}, XI_TMBi8_, 2));
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({253}, XI_TMBi8_, 2));
+  ASSERT_EQ(1, test_getEnumCaseSinglePayload({254}, XI_TMBi8_, 2));
+  ASSERT_EQ(2, test_getEnumCaseSinglePayload({255}, XI_TMBi8_, 2));
 
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({0, 0}, XI_TMBi8_, 4));
-  ASSERT_EQ(-1, test_getEnumCaseSinglePayload({253, 0}, XI_TMBi8_, 4));
-  ASSERT_EQ(0, test_getEnumCaseSinglePayload({254, 0}, XI_TMBi8_, 4));
-  ASSERT_EQ(1, test_getEnumCaseSinglePayload({255, 0}, XI_TMBi8_, 4));
-  ASSERT_EQ(2, test_getEnumCaseSinglePayload({0, 1}, XI_TMBi8_, 4));
-  ASSERT_EQ(3, test_getEnumCaseSinglePayload({1, 1}, XI_TMBi8_, 4));
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({0, 0}, XI_TMBi8_, 4));
+  ASSERT_EQ(0, test_getEnumCaseSinglePayload({253, 0}, XI_TMBi8_, 4));
+  ASSERT_EQ(1, test_getEnumCaseSinglePayload({254, 0}, XI_TMBi8_, 4));
+  ASSERT_EQ(2, test_getEnumCaseSinglePayload({255, 0}, XI_TMBi8_, 4));
+  ASSERT_EQ(3, test_getEnumCaseSinglePayload({0, 1}, XI_TMBi8_, 4));
+  ASSERT_EQ(4, test_getEnumCaseSinglePayload({1, 1}, XI_TMBi8_, 4));
 }
 
 bool test_storeEnumTagSinglePayload(std::initializer_list<uint8_t> after,
@@ -123,51 +121,51 @@ bool test_storeEnumTagSinglePayload(std::initializer_list<uint8_t> after,
 TEST(EnumTest, storeEnumTagSinglePayload) {
   // Test with no XI.
   ASSERT_TRUE(test_storeEnumTagSinglePayload({219, 0}, {219, 123},
-                                              METADATA_SYM(Bi8_), -1, 512));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 1}, {219, 123},
                                               METADATA_SYM(Bi8_), 0, 512));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 1}, {219, 123},
+                                              METADATA_SYM(Bi8_), 1, 512));
   ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 1}, {219, 123},
-                                              METADATA_SYM(Bi8_), 255, 512));
+                                              METADATA_SYM(Bi8_), 256, 512));
   ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 2}, {219, 123},
-                                              METADATA_SYM(Bi8_), 511, 512));
+                                              METADATA_SYM(Bi8_), 512, 512));
 
   ASSERT_TRUE(test_storeEnumTagSinglePayload({219, 0, 0}, {219, 123, 77},
-                                              METADATA_SYM(Bi8_), -1, 128*1024));
+                                              METADATA_SYM(Bi8_), 0, 128*1024));
 #if defined(__BIG_ENDIAN__)
   ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 0, 1}, {219, 123, 77},
-                                              METADATA_SYM(Bi8_), 0, 128*1024));
+                                              METADATA_SYM(Bi8_), 1, 128*1024));
   ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 0, 1}, {219, 123, 77},
-                                              METADATA_SYM(Bi8_), 255, 128*1024));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 0, 2}, {219, 123, 77},
                                               METADATA_SYM(Bi8_), 256, 128*1024));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 0, 2}, {219, 123, 77},
+                                              METADATA_SYM(Bi8_), 257, 128*1024));
   ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 2, 0}, {219, 123, 77},
-                                              METADATA_SYM(Bi8_), 128*1024 - 1, 128*1024));
+                                              METADATA_SYM(Bi8_), 128*1024, 128*1024));
 #else
   ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 1, 0}, {219, 123, 77},
-                                              METADATA_SYM(Bi8_), 0, 128*1024));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 1, 0}, {219, 123, 77},
-                                              METADATA_SYM(Bi8_), 255, 128*1024));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 2, 0}, {219, 123, 77},
+                                              METADATA_SYM(Bi8_), 1, 128*1024));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 1, 0}, {219, 124, 77},
                                               METADATA_SYM(Bi8_), 256, 128*1024));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 0, 2}, {219, 123, 77},
-                                              METADATA_SYM(Bi8_), 128*1024 - 1, 128*1024));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 2, 0}, {219, 123, 77},
+                                              METADATA_SYM(Bi8_), 257, 128*1024));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload(
+      {255, 0, 2}, {219, 123, 77}, METADATA_SYM(Bi8_), 128 * 1024, 128 * 1024));
 #endif
 
   // Test with XI.
   ASSERT_TRUE(test_storeEnumTagSinglePayload({219}, {219},
-                                              XI_TMBi8_, -1, 2));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({254}, {219},
                                               XI_TMBi8_, 0, 2));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({255}, {219},
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({254}, {219},
                                               XI_TMBi8_, 1, 2));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({255}, {219},
+                                              XI_TMBi8_, 2, 2));
   ASSERT_TRUE(test_storeEnumTagSinglePayload({219, 0}, {219, 123},
-                                              XI_TMBi8_, -1, 4));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({254, 0}, {219, 123},
                                               XI_TMBi8_, 0, 4));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 0}, {219, 123},
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({254, 0}, {219, 123},
                                               XI_TMBi8_, 1, 4));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 1}, {219, 123},
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({255, 0}, {219, 123},
                                               XI_TMBi8_, 2, 4));
-  ASSERT_TRUE(test_storeEnumTagSinglePayload({1, 1}, {219, 123},
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({0, 1}, {219, 123},
                                               XI_TMBi8_, 3, 4));
+  ASSERT_TRUE(test_storeEnumTagSinglePayload({1, 1}, {219, 123},
+                                              XI_TMBi8_, 4, 4));
 }

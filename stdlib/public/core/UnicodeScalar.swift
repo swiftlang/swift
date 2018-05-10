@@ -34,13 +34,12 @@ extension Unicode {
   ///     // Prints "✈︎"
   @_fixed_layout
   public struct Scalar {    
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned
+    @inlinable // FIXME(sil-serialize-all)
     internal init(_value: UInt32) {
       self._value = _value
     }
 
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var _value: UInt32
   }
 }
@@ -49,10 +48,10 @@ extension Unicode.Scalar :
     _ExpressibleByBuiltinUnicodeScalarLiteral,
     ExpressibleByUnicodeScalarLiteral {
   /// A numeric representation of the Unicode scalar.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var value: UInt32 { return _value }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self._value = UInt32(value)
@@ -69,7 +68,7 @@ extension Unicode.Scalar :
   ///
   /// In this example, the assignment to the `letterK` constant is handled by
   /// this initializer behind the scenes.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(unicodeScalarLiteral value: Unicode.Scalar) {
     self = value
@@ -98,7 +97,7 @@ extension Unicode.Scalar :
   ///   initializer succeeds if `v` is a valid Unicode scalar value---that is,
   ///   if `v` is in the range `0...0xD7FF` or `0xE000...0x10FFFF`. If `v` is
   ///   an invalid Unicode scalar value, the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init?(_ v: UInt32) {
     // Unicode 6.3.0:
     //
@@ -140,7 +139,7 @@ extension Unicode.Scalar :
   ///   initializer succeeds if `v` is a valid Unicode scalar value, in the
   ///   range `0...0xD7FF` or `0xE000...0x10FFFF`. If `v` is an invalid
   ///   unicode scalar value, the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init?(_ v: UInt16) {
     self.init(UInt32(v))
   }
@@ -156,13 +155,13 @@ extension Unicode.Scalar :
   ///     // Prints "7"
   ///
   /// - Parameter v: The code point to use for the scalar.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ v: UInt8) {
     self._value = UInt32(v)
   }
 
   /// Creates a duplicate of the given Unicode scalar.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ v: Unicode.Scalar) {
     // This constructor allows one to provide necessary type context to
     // disambiguate between function overloads on 'String' and 'Unicode.Scalar'.
@@ -194,7 +193,7 @@ extension Unicode.Scalar :
   /// - Parameter forceASCII: Pass `true` if you need the result to use only
   ///   ASCII characters; otherwise, pass `false`.
   /// - Returns: A string representation of the scalar.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func escaped(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(_ v: UInt32) -> String {
       let nibble = v & 15
@@ -267,20 +266,19 @@ extension Unicode.Scalar :
   ///     // Prints "ñ false 241"
   ///     // Prints "ó false 243"
   ///     // Prints "n true 110"
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var isASCII: Bool {
     return value <= 127
   }
 
   // FIXME: Is there a similar term of art in Unicode?
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var _isASCIIDigit: Bool {
     return self >= "0" && self <= "9"
   }
 
   // FIXME: Unicode makes this interesting.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var _isPrintableASCII: Bool {
     return (self >= Unicode.Scalar(0o040) && self <= Unicode.Scalar(0o176))
   }
@@ -288,23 +286,21 @@ extension Unicode.Scalar :
 
 extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the Unicode scalar.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
-    return String._fromWellFormedCodeUnitSequence(
-      UTF32.self,
-      input: repeatElement(self.value, count: 1))
+    return String(self)
   }
 
   /// An escaped textual representation of the Unicode scalar, suitable for
   /// debugging.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "\"\(escaped(asASCII: true))\""
   }
 }
 
 extension Unicode.Scalar : LosslessStringConvertible {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init?(_ description: String) {
     let scalars = description.unicodeScalars
     guard let v = scalars.first, scalars.count == 1 else {
@@ -315,13 +311,9 @@ extension Unicode.Scalar : LosslessStringConvertible {
 }
 
 extension Unicode.Scalar : Hashable {
-  /// The Unicode scalar's hash value.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @_inlineable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return Int(self.value)
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.value)
   }
 }
 
@@ -349,7 +341,7 @@ extension Unicode.Scalar {
   ///     } else {
   ///       // Do something else
   ///     }
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init?(_ v: Int) {
     if let us = Unicode.Scalar(UInt32(v)) {
       self = us
@@ -363,7 +355,7 @@ extension UInt8 {
   /// Construct with value `v.value`.
   ///
   /// - Precondition: `v.value` can be represented as ASCII (0..<128).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(ascii v: Unicode.Scalar) {
     _precondition(v.value < 128,
         "Code point value does not fit into ASCII")
@@ -372,28 +364,28 @@ extension UInt8 {
 }
 extension UInt32 {
   /// Construct with value `v.value`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ v: Unicode.Scalar) {
     self = v.value
   }
 }
 extension UInt64 {
   /// Construct with value `v.value`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ v: Unicode.Scalar) {
     self = UInt64(v.value)
   }
 }
 
 extension Unicode.Scalar : Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func == (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
     return lhs.value == rhs.value
   }
 }
 
 extension Unicode.Scalar : Comparable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func < (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
     return lhs.value < rhs.value
   }
@@ -402,16 +394,15 @@ extension Unicode.Scalar : Comparable {
 extension Unicode.Scalar {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF16View {
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)    
     internal init(value: Unicode.Scalar) {
       self.value = value
     }
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var value: Unicode.Scalar
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var utf16: UTF16View {
     return UTF16View(value: self)
   }
@@ -422,7 +413,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
   public typealias Indices = Range<Int>
 
   /// The position of the first code unit.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Int {
     return 0
   }
@@ -431,7 +422,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
   /// greater than the last valid subscript argument.
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Int {
     return 0 + UTF16.width(value)
   }
@@ -441,7 +432,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the collection that is not equal to the
   ///   `endIndex` property.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Int) -> UTF16.CodeUnit {
     return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
@@ -450,7 +441,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
 }
 
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public // SPI(SwiftExperimental)
 func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
@@ -458,8 +449,7 @@ func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
 }
 
 extension Unicode.Scalar {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal static var _replacementCharacter: Unicode.Scalar {
     return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
   }

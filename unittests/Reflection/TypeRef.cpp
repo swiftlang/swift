@@ -148,9 +148,10 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   // Test parameter with and without inout/shared/variadic and/or label.
   ParameterFlags paramFlags;
-  auto inoutFlags = paramFlags.withInOut(true);
+  auto inoutFlags = paramFlags.withValueOwnership(ValueOwnership::InOut);
   auto variadicFlags = paramFlags.withVariadic(true);
-  auto sharedFlags = paramFlags.withShared(true);
+  auto sharedFlags = paramFlags.withValueOwnership(ValueOwnership::Shared);
+  auto ownedFlags = paramFlags.withValueOwnership(ValueOwnership::Owned);
 
   auto F6 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
                                        FunctionTypeFlags());
@@ -170,17 +171,27 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
                                          Result, FunctionTypeFlags());
   EXPECT_EQ(F8, F8_1);
 
-  auto F9 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
-  auto F9_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
+  auto F9 = Builder.createFunctionType({Param1.withFlags(ownedFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F9_1 = Builder.createFunctionType({Param1.withFlags(ownedFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F9, F9_1);
+
+  auto F10 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
+  auto F10_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
                                          FunctionTypeFlags());
-  EXPECT_NE(F9, F9_1);
+  EXPECT_NE(F10, F10_1);
 
   EXPECT_NE(F6, F7);
   EXPECT_NE(F6, F8);
   EXPECT_NE(F6, F9);
+  EXPECT_NE(F6, F10);
   EXPECT_NE(F7, F8);
   EXPECT_NE(F7, F9);
+  EXPECT_NE(F7, F10);
   EXPECT_NE(F8, F9);
+  EXPECT_NE(F8, F10);
+  EXPECT_NE(F9, F10);
 
   auto VoidVoid1 =
       Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());
@@ -191,14 +202,14 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   EXPECT_NE(VoidVoid1, F1);
 
   // Test escaping.
-  auto F10 = Builder.createFunctionType(Parameters1, Result,
-                                        FunctionTypeFlags().withEscaping(true));
   auto F11 = Builder.createFunctionType(Parameters1, Result,
                                         FunctionTypeFlags().withEscaping(true));
-  auto F12 = Builder.createFunctionType(
+  auto F12 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F13 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withEscaping(false));
-  EXPECT_EQ(F10, F11);
-  EXPECT_NE(F10, F12);
+  EXPECT_EQ(F11, F12);
+  EXPECT_NE(F11, F13);
 }
 
 TEST(TypeRefTest, UniqueProtocolTypeRef) {

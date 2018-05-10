@@ -41,7 +41,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   // Derive the tuple type from the elements.
   SmallVector<TupleTypeElt, 4> eltTypes;
   for (auto elt : elts)
-    eltTypes.push_back(elt->getType().getSwiftRValueType());
+    eltTypes.push_back(elt->getType().getASTType());
   auto tupleType = SILType::getPrimitiveObjectType(
       CanType(TupleType::get(eltTypes, getASTContext())));
 
@@ -117,6 +117,7 @@ SILBuilder::createClassifyBridgeObject(SILLocation Loc, SILValue value) {
 // Create the appropriate cast instruction based on result type.
 SingleValueInstruction *
 SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
+  assert(Ty.isLoadableOrOpaque(getModule()));
   if (Ty.isTrivial(getModule()))
     return insert(UncheckedTrivialBitCastInst::create(
         getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
@@ -520,4 +521,22 @@ void SILBuilder::emitShallowDestructureAddressOperation(
             [&](const Projection &P) -> SILValue {
               return P.createAddressProjection(*this, Loc, V).get();
             });
+}
+
+DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
+                                             SILDebugVariable Var) {
+  assert(src->getType().isLoadableOrOpaque(getModule()));
+  // Debug location overrides cannot apply to debug value instructions.
+  DebugLocOverrideRAII LocOverride{*this, None};
+  return insert(
+      DebugValueInst::create(getSILDebugLocation(Loc), src, getModule(), Var));
+}
+
+DebugValueAddrInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
+                                                     SILValue src,
+                                                     SILDebugVariable Var) {
+  // Debug location overrides cannot apply to debug addr instructions.
+  DebugLocOverrideRAII LocOverride{*this, None};
+  return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
+                                           getModule(), Var));
 }

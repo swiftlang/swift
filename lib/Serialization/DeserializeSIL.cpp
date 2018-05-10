@@ -387,6 +387,19 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                                               StringRef name,
                                               bool declarationOnly,
                                               bool errorIfEmptyBody) {
+  // We can't deserialize function bodies after IRGen lowering passes have
+  // happened since other definitions in the module will no longer be in
+  // canonical SIL form.
+  switch (SILMod.getStage()) {
+  case SILStage::Raw:
+  case SILStage::Canonical:
+    break;
+    
+  case SILStage::Lowered:
+    llvm_unreachable("cannot deserialize into a module that has entered "
+                     "Lowered stage");
+  }
+  
   if (FID == 0)
     return nullptr;
   assert(FID <= Funcs.size() && "invalid SILFunction ID");
@@ -798,8 +811,7 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     }
     
     indices = MF->getContext().AllocateCopy(indicesBuf);
-    if (!indices.empty() &&
-        kind != KeyPathComponentKindEncoding::External) {
+    if (!indices.empty()) {
       auto indicesEqualsName = MF->getIdentifier(ListOfValues[nextValue++]);
       auto indicesHashName = MF->getIdentifier(ListOfValues[nextValue++]);
       indicesEquals = getFuncForReference(indicesEqualsName.str());
@@ -843,15 +855,11 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::External: {
     auto declID = ListOfValues[nextValue++];
     auto decl = cast<AbstractStorageDecl>(MF->getDecl(declID));
-    auto numComponentSubstitutions = ListOfValues[nextValue++];
-    SmallVector<Substitution, 4> subs;
-    while (numComponentSubstitutions-- > 0) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      subs.push_back(*sub);
-    }
+    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
     handleComputedIndices();
-    return KeyPathPatternComponent::forExternal(decl,
-        MF->getContext().AllocateCopy(subs), indices, type);
+    return KeyPathPatternComponent::forExternal(decl, subMap, indices,
+                                                indicesEquals, indicesHash,
+                                                type);
   }
   }
 }
@@ -890,6 +898,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
                                     TyID, TyCategory, ValID);
     break;
+  case SIL_ONE_OPERAND_EXTRA_ATTR:
+    SILOneOperandExtraAttributeLayout::readRecord(scratch, RawOpCode, Attr,
+                                                  TyID, TyCategory, ValID);
+    break;
   case SIL_ONE_TYPE_ONE_OPERAND:
     SILOneTypeOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
                                            TyID, TyCategory,
@@ -918,6 +930,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILTwoOperandsLayout::readRecord(scratch, RawOpCode, Attr,
                                      TyID, TyCategory, ValID,
                                      TyID2, TyCategory2, ValID2);
+    break;
+  case SIL_TWO_OPERANDS_EXTRA_ATTR:
+    SILTwoOperandsExtraAttributeLayout::readRecord(scratch, RawOpCode, Attr,
+                                                   TyID, TyCategory, ValID,
+                                                   TyID2, TyCategory2, ValID2);
     break;
   case SIL_TAIL_ADDR:
     SILTailAddrLayout::readRecord(scratch, RawOpCode,
@@ -1066,7 +1083,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
-  ONEOPERAND_ONETYPE_INST(ConvertEscapeToNoEscape)
   ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
@@ -1080,6 +1096,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2)),
                   TyID);
+    break;
+  }
+  case  SILInstructionKind::ConvertEscapeToNoEscapeInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    bool isLifetimeGuaranteed = Attr & 0x01;
+    bool isEscaped = Attr & 0x02;
+    ResultVal = Builder.createConvertEscapeToNoEscape(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory), isEscaped,
+        isLifetimeGuaranteed);
     break;
   }
 
@@ -1232,22 +1261,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
       Args.push_back(getLocalValue(ListOfValues[I],
                                    substConventions.getSILArgumentType(I)));
-    unsigned NumSub = NumSubs;
-
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
+    SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
     if (OpCode == SILInstructionKind::ApplyInst) {
       ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
-                                      Substitutions, Args,
+                                      Substitutions.toList(), Args,
                                       IsNonThrowingApply != 0);
     } else {
       ResultVal = Builder.createBeginApply(Loc, getLocalValue(ValID, FnTy),
-                                           Substitutions, Args,
+                                           Substitutions.toList(), Args,
                                            IsNonThrowingApply != 0);
     }
     break;
@@ -1275,17 +1297,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
       Args.push_back(getLocalValue(ListOfValues[I],
                                    substConventions.getSILArgumentType(I)));
-    unsigned NumSub = NumSubs;
-
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
+    SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
     ResultVal = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
-                                       Substitutions, Args, normalBB, errorBB);
+                                       Substitutions.toList(), Args, normalBB,
+                                       errorBB);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1294,14 +1310,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType FnTy = getSILType(Ty, SILValueCategory::Object);
     SILType closureTy = getSILType(Ty2, SILValueCategory::Object);
 
-    unsigned NumSub = NumSubs;
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
-    
+    SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
+
     auto SubstFnTy = SILType::getPrimitiveObjectType(
       FnTy.castTo<SILFunctionType>()
         ->substGenericArgs(Builder.getModule(), Substitutions));
@@ -1321,7 +1331,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(
-        Loc, FnVal, Substitutions, Args,
+        Loc, FnVal, Substitutions.toList(), Args,
         closureTy.castTo<SILFunctionType>()->getCalleeConvention());
     break;
   }
@@ -1335,13 +1345,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                               (SILValueCategory)(unsigned)ListOfValues[i+2]);
       Args.push_back(getLocalValue(ListOfValues[i], ArgTy));
     }
-    unsigned NumSub = NumSubs;
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
+    SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
     Identifier Name = MF->getIdentifier(ValID);
     
     ResultVal = Builder.createBuiltin(Loc, Name, ResultTy, Substitutions,
@@ -1422,6 +1426,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                       getSILType(Ty,  (SILValueCategory)TyCategory)),
         getLocalValue(ValID2,
                       getSILType(Ty2,  (SILValueCategory)TyCategory2)));
+    break;
+  }
+  case SILInstructionKind::CopyBlockWithoutEscapingInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultVal = Builder.createCopyBlockWithoutEscaping(
+        Loc, getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory)),
+        getLocalValue(ValID2, getSILType(Ty2, (SILValueCategory)TyCategory2)));
     break;
   }
   case SILInstructionKind::IndexAddrInst: {
@@ -1579,6 +1591,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
+  case SILInstructionKind::IsEscapingClosureInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned verificationType = Attr;
+    ResultVal = Builder.createIsEscapingClosure(
+        Loc,
+        getLocalValue(
+            ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory)),
+        verificationType);
+    break;
+  }
+
   case SILInstructionKind::DestructureTupleInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     SILValue Operand = getLocalValue(
@@ -1666,8 +1689,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement(Attr >> 2);
-    ResultVal = Builder.createBeginAccess(Loc, op, accessKind, enforcement);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x3);
+    bool noNestedConflict = Attr >> 4;
+    ResultVal =
+        Builder.createBeginAccess(Loc, op, accessKind, enforcement,
+                                  noNestedConflict);
     break;
   }
   case SILInstructionKind::EndAccessInst: {
@@ -1683,9 +1709,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue buffer = getLocalValue(
         ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement(Attr >> 2);
-    ResultVal = Builder.createBeginUnpairedAccess(Loc, source, buffer,
-                                                  accessKind, enforcement);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x03);
+    bool noNestedConflict = Attr >> 4;
+    ResultVal = Builder.createBeginUnpairedAccess(
+        Loc, source, buffer, accessKind, enforcement, noNestedConflict);
     break;
   }
   case SILInstructionKind::EndUnpairedAccessInst: {
@@ -2254,17 +2281,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue invoke
       = getLocalValue(ListOfValues[2], invokeTy);
     
-    unsigned NumSub = ListOfValues[4];
+    auto SubMap = MF->getSubstitutionMap(ListOfValues[4]);
 
-    SmallVector<Substitution, 4> Substitutions;
-    while (NumSub--) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      assert(sub.hasValue() && "missing substitution");
-      Substitutions.push_back(*sub);
-    }
-    
     ResultVal = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
-                                                     blockTy, Substitutions);
+                                                     blockTy, SubMap);
     break;
   }
   case SILInstructionKind::UnreachableInst: {
@@ -2301,7 +2321,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto valueTy = MF->getType(ListOfValues[nextValue++]);
     auto numComponents = ListOfValues[nextValue++];
     auto numOperands = ListOfValues[nextValue++];
-    auto numSubstitutions = ListOfValues[nextValue++];
+    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
     auto objcString = MF->getIdentifier(ListOfValues[nextValue++]).str();
     auto numGenericParams = ListOfValues[nextValue++];
     
@@ -2319,12 +2339,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     
     SmallVector<Requirement, 4> requirements;
     MF->readGenericRequirements(requirements, SILCursor);
-    
-    SmallVector<Substitution, 4> substitutions;
-    while (numSubstitutions-- > 0) {
-      auto sub = MF->maybeReadSubstitution(SILCursor);
-      substitutions.push_back(*sub);
-    }
     
     CanGenericSignature sig = nullptr;
     if (!genericParams.empty() || !requirements.empty())
@@ -2347,8 +2361,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       operands.push_back(getLocalValue(opValue, getSILType(opTy, opCat)));
     }
     
-    ResultVal = Builder.createKeyPath(Loc, pattern,
-                                      substitutions, operands, kpTy);
+    ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
     break;
   }
   case SILInstructionKind::MarkUninitializedBehaviorInst:
@@ -2607,7 +2620,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind != SIL_VTABLE && kind != SIL_WITNESS_TABLE &&
          kind != SIL_DEFAULT_WITNESS_TABLE &&
-         kind != SIL_FUNCTION) {
+         kind != SIL_FUNCTION &&
+         kind != SIL_PROPERTY) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
@@ -2787,6 +2801,14 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     wT = SILWitnessTable::create(SILMod, *Linkage, theConformance);
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
+  }
+  
+  // We may see multiple shared-linkage definitions of the same witness table
+  // for the same conformance.
+  if (wT->isDefinition() && hasSharedVisibility(*Linkage)
+      && hasSharedVisibility(wT->getLinkage())) {
+    wTableOrOffset.set(wT, /*fully deserialized*/ true);
+    return wT;
   }
 
   assert(wT->isDeclaration() && "Our witness table at this point must be a "

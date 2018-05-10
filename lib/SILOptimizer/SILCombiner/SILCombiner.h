@@ -283,6 +283,9 @@ private:
                                                SILValue ConcreteTypeDef,
                                                ProtocolConformanceRef Conformance,
                                                ArchetypeType *OpenedArchetype);
+
+  FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
+
   SILInstruction *
   propagateConcreteTypeOfInitExistential(FullApplySite AI,
       ProtocolDecl *Protocol,

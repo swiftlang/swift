@@ -138,13 +138,13 @@ func testProtocolGeneric<Impl: P>(_ type: Impl.Type) {
 
 func testWeakTypes() -> [Any.Type] {
   // FIXME: These should be weak.
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper5WeakSVMa"()
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper5WeakEOMa"()
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper5WeakCCMa"()
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper5WeakSVMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper5WeakEOMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper5WeakCCMa"
   // CHECK-DAG: @"$S25weak_import_native_helper5WeakPMp" = extern_weak global %swift.protocol
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper8GenericSVMa"
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper8GenericEOMa"
-  // CHECK-DAG: declare %swift.type* @"$S25weak_import_native_helper8GenericCCMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper8GenericSVMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper8GenericEOMa"
+  // CHECK-DAG: declare swiftcc %swift.metadata_response @"$S25weak_import_native_helper8GenericCCMa"
   return [WeakS.self, WeakE.self, WeakC.self, WeakP.self, GenericS<Int>.self, GenericE<Int>.self, GenericC<Int>.self]
 }
 

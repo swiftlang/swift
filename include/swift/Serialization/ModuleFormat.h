@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 402; // Last change: effects(releasenone)
+const uint16_t VERSION_MINOR = 417; // Last change: revert @usableFromInline imports
 
 using DeclIDField = BCFixed<31>;
 
@@ -87,6 +87,11 @@ using GenericSignatureIDField = DeclIDField;
 // same way.
 using GenericEnvironmentID = DeclID;
 using GenericEnvironmentIDField = DeclIDField;
+
+// SubstitutionMapID must be the same as DeclID because it is stored in the
+// same way.
+using SubstitutionMapID = DeclID;
+using SubstitutionMapIDField = DeclIDField;
 
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
@@ -210,9 +215,10 @@ enum class VarDeclSpecifier : uint8_t {
   Var,
   InOut,
   Shared,
+  Owned,
 };
-using VarDeclSpecifierField = BCFixed<2>;
-  
+using VarDeclSpecifierField = BCFixed<3>;
+
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class ParameterConvention : uint8_t {
@@ -325,6 +331,7 @@ enum ValueOwnership : uint8_t {
   Default = 0,
   InOut,
   Shared,
+  Owned
 };
 using ValueOwnershipField = BCFixed<2>;
 
@@ -378,6 +385,7 @@ using OptionalTypeKindField = BCFixed<2>;
 enum class DeclNameKind: uint8_t {
   Normal,
   Subscript,
+  Constructor,
   Destructor
 };
 
@@ -392,6 +400,8 @@ enum SpecialIdentifierID : uint8_t {
   OBJC_HEADER_MODULE_ID,
   /// Special value for the special subscript name
   SUBSCRIPT_ID,
+  /// Special value for the special constructor name
+  CONSTRUCTOR_ID,
   /// Special value for the special destructor name
   DESTRUCTOR_ID,
 
@@ -578,7 +588,7 @@ namespace input_block {
     LINK_LIBRARY,
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
-    MODULE_FLAGS,
+    MODULE_FLAGS, // [unused]
     SEARCH_PATH
   };
 
@@ -611,11 +621,6 @@ namespace input_block {
     BCBlob
   >;
 
-  using ModuleFlagsLayout = BCRecordLayout<
-    MODULE_FLAGS,
-    BCFixed<1> // has underlying module? [[UNUSED]]
-  >;
-
   using SearchPathLayout = BCRecordLayout<
     SEARCH_PATH,
     BCFixed<1>, // framework?
@@ -636,10 +641,18 @@ namespace decls_block {
 #include "swift/Serialization/DeclTypeRecordNodes.def"
   };
 
-  using NameAliasTypeLayout = BCRecordLayout<
-    NAME_ALIAS_TYPE,
+  using BuiltinAliasTypeLayout = BCRecordLayout<
+    BUILTIN_ALIAS_TYPE,
     DeclIDField, // typealias decl
     TypeIDField  // canonical type (a fallback)
+  >;
+
+  using NameAliasTypeLayout = BCRecordLayout<
+    NAME_ALIAS_TYPE,
+    DeclIDField,      // typealias decl
+    TypeIDField,      // parent type
+    TypeIDField,      // underlying type
+    SubstitutionMapIDField // substitution map
   >;
 
   using GenericTypeParamTypeLayout = BCRecordLayout<
@@ -738,13 +751,6 @@ namespace decls_block {
     BCArray<TypeIDField> // generic arguments
   >;
 
-  using BoundGenericSubstitutionLayout = BCRecordLayout<
-    BOUND_GENERIC_SUBSTITUTION,
-    TypeIDField,  // replacement
-    BCVBR<5>
-    // Trailed by protocol conformance info (if any)
-  >;
-
   using GenericFunctionTypeLayout = BCRecordLayout<
     GENERIC_FUNCTION_TYPE,
     TypeIDField,         // input
@@ -786,8 +792,8 @@ namespace decls_block {
 
   using SILBoxTypeLayout = BCRecordLayout<
     SIL_BOX_TYPE,
-    SILLayoutIDField     // layout
-                         // trailing substitutions
+    SILLayoutIDField,     // layout
+    SubstitutionMapIDField // substitutions
   >;
 
   template <unsigned Code>
@@ -882,7 +888,8 @@ namespace decls_block {
     DeclContextIDField,// context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // requires stored property initial values
+    BCFixed<1>,        // requires stored property initial values?
+    BCFixed<1>,        // inherits convenience initializers from its superclass?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,       // superclass
     AccessLevelField, // access level
@@ -1069,14 +1076,19 @@ namespace decls_block {
 
   using EnumElementLayout = BCRecordLayout<
     ENUM_ELEMENT_DECL,
-    IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // interface type
-    BCFixed<1>,  // has argument type?
     BCFixed<1>,  // implicit?
+    BCFixed<1>,  // has payload?
     EnumElementRawValueKindField,  // raw value kind
     BCFixed<1>,  // negative raw value?
-    BCBlob       // raw value
+    IdentifierIDField, // raw value
+    BCFixed<1>,   // default argument resilience expansion
+    BCVBR<5>, // number of parameter name components
+    BCArray<IdentifierIDField> // name components,
+
+    // The record is trailed by:
+    // - its argument parameters, if any
   >;
 
   using SubscriptLayout = BCRecordLayout<
@@ -1205,6 +1217,14 @@ namespace decls_block {
     BCArray<TypeIDField>         // generic parameter types
   >;
 
+  using SubstitutionMapLayout = BCRecordLayout<
+    SUBSTITUTION_MAP,
+    GenericSignatureIDField,     // generic signature
+    BCVBR<5>,                    // # of conformances
+    BCArray<TypeIDField>         // replacement types
+    // Conformances trail the record.
+  >;
+
   using SILGenericEnvironmentLayout = BCRecordLayout<
     SIL_GENERIC_ENVIRONMENT,
     BCArray<TypeIDField>         // (generic parameter name, sugared interface
@@ -1259,9 +1279,9 @@ namespace decls_block {
 
   using SpecializedProtocolConformanceLayout = BCRecordLayout<
     SPECIALIZED_PROTOCOL_CONFORMANCE,
-    TypeIDField,         // conforming type
-    BCVBR<5>             // # of substitutions for the conformance
-    // followed by substitution records for the conformance
+    TypeIDField,           // conforming type
+    SubstitutionMapIDField // substitution map
+    // trailed by the underlying conformance
   >;
 
   using InheritedProtocolConformanceLayout = BCRecordLayout<
@@ -1580,7 +1600,8 @@ namespace index_block {
     DECL_MEMBER_NAMES,
 
     GENERIC_SIGNATURE_OFFSETS,
-    LastRecordKind = GENERIC_SIGNATURE_OFFSETS,
+    SUBSTITUTION_MAP_OFFSETS,
+    LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
   };
   
   constexpr const unsigned RecordIDFieldWidth = 5;

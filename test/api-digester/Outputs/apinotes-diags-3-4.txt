@@ -1,0 +1,19 @@
+
+/* RawRepresentable Changes */
+APINotesTest(APINotesTest.h): TypeAlias AnimalAttributeName(NSString) is now String representable
+
+/* Removed Decls */
+
+/* Moved Decls */
+
+/* Renamed Decls */
+
+/* Type Changes */
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [String : Any] to [AnimalAttributeName : Any]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [String] to [AnimalAttributeName]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [String : Any]? to [AnimalAttributeName : Any]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributesArray(_:) has parameter 0 type change from [String]? to [AnimalAttributeName]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleAttribute(_:) has parameter 0 type change from String to AnimalAttributeName
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleOptionalAttribute(_:) has parameter 0 type change from String? to AnimalAttributeName?
+
+/* Decl Attribute changes */

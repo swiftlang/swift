@@ -189,6 +189,52 @@ class WeakReference;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
+/// The result of requesting type metadata.  Generally the return value of
+/// a function.
+///
+/// For performance, functions returning this type should use SWIFT_CC so
+/// that the components are returned as separate values.
+struct MetadataResponse {
+  /// The requested metadata.
+  const Metadata *Value;
+
+  /// The current state of the metadata returned.  Always use this
+  /// instead of trying to inspect the metadata directly to see if it
+  /// satisfies the request.  An incomplete metadata may be getting
+  /// initialized concurrently.  But this can generally be ignored if
+  /// the metadata request was for abstract metadata or if the request
+  /// is blocking.
+  MetadataState State;
+};
+
+/// A dependency on the metadata progress of other type, indicating that
+/// initialization of a metadata cannot progress until another metadata
+/// reaches a particular state.
+///
+/// For performance, functions returning this type should use SWIFT_CC so
+/// that the components are returned as separate values.
+struct MetadataDependency {
+  /// Either null, indicating that initialization was successful, or
+  /// a metadata on which initialization depends for further progress.
+  const Metadata *Value;
+
+  /// The state that Metadata needs to be in before initialization
+  /// can continue.
+  MetadataState Requirement;
+
+  MetadataDependency() : Value(nullptr) {}
+  MetadataDependency(const Metadata *metadata, MetadataState requirement)
+    : Value(metadata), Requirement(requirement) {}
+
+  explicit operator bool() const { return Value != nullptr; }
+
+  bool operator==(MetadataDependency other) const {
+    assert(Value && other.Value);
+    return Value == other.Value &&
+           Requirement == other.Requirement;
+  }
+};
+
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
 /// Storage for an arbitrary value.  In C/C++ terms, this is an
@@ -243,124 +289,6 @@ constexpr inline bool canBeInline() {
 
 struct ValueWitnessTable;
 
-/// Flags stored in the value-witness table.
-class ValueWitnessFlags {
-  typedef size_t int_type;
-  
-  // The polarity of these bits is chosen so that, when doing struct layout, the
-  // flags of the field types can be mostly bitwise-or'ed together to derive the
-  // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
-  // still require additional fixup.)
-  enum : int_type {
-    AlignmentMask = 0x0000FFFF,
-    IsNonPOD =      0x00010000,
-    IsNonInline =   0x00020000,
-    HasExtraInhabitants = 0x00040000,
-    HasSpareBits =  0x00080000,
-    IsNonBitwiseTakable = 0x00100000,
-    HasEnumWitnesses = 0x00200000,
-    // Everything else is reserved.
-  };
-  int_type Data;
-
-  constexpr ValueWitnessFlags(int_type data) : Data(data) {}
-public:
-  constexpr ValueWitnessFlags() : Data(0) {}
-
-  /// The required alignment of the first byte of an object of this
-  /// type, expressed as a mask of the low bits that must not be set
-  /// in the pointer.
-  ///
-  /// This representation can be easily converted to the 'alignof'
-  /// result by merely adding 1, but it is more directly useful for
-  /// performing dynamic structure layouts, and it grants an
-  /// additional bit of precision in a compact field without needing
-  /// to switch to an exponent representation.
-  ///
-  /// For example, if the type needs to be 8-byte aligned, the
-  /// appropriate alignment mask should be 0x7.
-  size_t getAlignmentMask() const {
-    return (Data & AlignmentMask);
-  }
-  constexpr ValueWitnessFlags withAlignmentMask(size_t alignMask) const {
-    return ValueWitnessFlags((Data & ~AlignmentMask) | alignMask);
-  }
-
-  size_t getAlignment() const { return getAlignmentMask() + 1; }
-  constexpr ValueWitnessFlags withAlignment(size_t alignment) const {
-    return withAlignmentMask(alignment - 1);
-  }
-
-  /// True if the type requires out-of-line allocation of its storage.
-  bool isInlineStorage() const { return !(Data & IsNonInline); }
-  constexpr ValueWitnessFlags withInlineStorage(bool isInline) const {
-    return ValueWitnessFlags((Data & ~IsNonInline) |
-                               (isInline ? 0 : IsNonInline));
-  }
-
-  /// True if values of this type can be copied with memcpy and
-  /// destroyed with a no-op.
-  bool isPOD() const { return !(Data & IsNonPOD); }
-  constexpr ValueWitnessFlags withPOD(bool isPOD) const {
-    return ValueWitnessFlags((Data & ~IsNonPOD) |
-                               (isPOD ? 0 : IsNonPOD));
-  }
-  
-  /// True if values of this type can be taken with memcpy. Unlike C++ 'move',
-  /// 'take' is a destructive operation that invalidates the source object, so
-  /// most types can be taken with a simple bitwise copy. Only types with side
-  /// table references, like @weak references, or types with opaque value
-  /// semantics, like imported C++ types, are not bitwise-takable.
-  bool isBitwiseTakable() const { return !(Data & IsNonBitwiseTakable); }
-  constexpr ValueWitnessFlags withBitwiseTakable(bool isBT) const {
-    return ValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
-                               (isBT ? 0 : IsNonBitwiseTakable));
-  }
-  /// True if this type's binary representation has extra inhabitants, that is,
-  /// bit patterns that do not form valid values of the type.
-  ///
-  /// If true, then the extra inhabitant value witness table entries are
-  /// available in this type's value witness table.
-  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
-  /// True if this type's binary representation is that of an enum, and the
-  /// enum value witness table entries are available in this type's value
-  /// witness table.
-  bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
-  constexpr ValueWitnessFlags
-  withExtraInhabitants(bool hasExtraInhabitants) const {
-    return ValueWitnessFlags((Data & ~HasExtraInhabitants) |
-                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
-  }
-  constexpr ValueWitnessFlags
-  withEnumWitnesses(bool hasEnumWitnesses) const {
-    return ValueWitnessFlags((Data & ~HasEnumWitnesses) |
-                             (hasEnumWitnesses ? HasEnumWitnesses : 0));
-  }
-};
-  
-/// Flags stored in a value-witness table with extra inhabitants.
-class ExtraInhabitantFlags {
-  typedef size_t int_type;
-  enum : int_type {
-    NumExtraInhabitantsMask = 0x7FFFFFFFU,
-  };
-  int_type Data;
-  
-  constexpr ExtraInhabitantFlags(int_type data) : Data(data) {}
-
-public:
-  constexpr ExtraInhabitantFlags() : Data(0) {}
-  
-  /// The number of extra inhabitants in the type's representation.
-  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
-  
-  constexpr ExtraInhabitantFlags
-  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
-    return ExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
-                                  numExtraInhabitants);
-  }
-};
-
 namespace value_witness_types {
 
 // Note that, for now, we aren't strict about 'const'.
@@ -409,6 +337,11 @@ struct ValueWitnessTable {
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
   value_witness_types::LOWER_ID LOWER_ID;
 #include "swift/ABI/ValueWitness.def"
+
+  /// Is the external type layout of this type incomplete?
+  bool isIncomplete() const {
+    return flags.isIncomplete();
+  }
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
@@ -486,6 +419,14 @@ struct ValueWitnessTable {
   const TypeLayout *getTypeLayout() const {
     return reinterpret_cast<const TypeLayout *>(&size);
   }
+
+  /// Check whether this metadata is complete.
+  bool checkIsComplete() const;
+
+  /// "Publish" the layout of this type to other threads.  All other stores
+  /// to the value witness table (including its extended header) should have
+  /// happened before this is called.
+  void publishLayout(const TypeLayout &layout);
 };
   
 /// A value-witness table with extra inhabitants entry points.
@@ -562,6 +503,15 @@ private:
 
   void _static_assert_layout();
 public:
+  TypeLayout() = default;
+  constexpr TypeLayout(value_witness_types::size size,
+                       value_witness_types::flags flags,
+                       value_witness_types::stride stride,
+                       value_witness_types::extraInhabitantFlags eiFlags =
+                         value_witness_types::extraInhabitantFlags())
+    : size(size), flags(flags), stride(stride),
+      extraInhabitantFlags(eiFlags) {}
+
   value_witness_types::extraInhabitantFlags getExtraInhabitantFlags() const {
     assert(flags.hasExtraInhabitants());
     return extraInhabitantFlags;
@@ -587,6 +537,25 @@ inline void TypeLayout::_static_assert_layout() {
   CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantFlags);
 
   #undef CHECK_TYPE_LAYOUT_OFFSET
+}
+
+inline void ValueWitnessTable::publishLayout(const TypeLayout &layout) {
+  size = layout.size;
+  stride = layout.stride;
+
+  // Currently there is nothing in the runtime or ABI which tries to
+  // asynchronously check completion, so we can just do a normal store here.
+  //
+  // If we decide to start allowing that (to speed up checkMetadataState,
+  // maybe), we'll have to:
+  //   - turn this into an store-release,
+  //   - turn the load in checkIsComplete() into a load-acquire, and
+  //   - do something about getMutableVWTableForInit.
+  flags = layout.flags;
+}
+
+inline bool ValueWitnessTable::checkIsComplete() const {
+  return !flags.isIncomplete();
 }
 
 inline const ExtraInhabitantsValueWitnessTable *
@@ -930,7 +899,7 @@ public:
     getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
   }
 
-  int vw_getEnumTag(const OpaqueValue *value) const {
+  unsigned vw_getEnumTag(const OpaqueValue *value) const {
     return getValueWitnesses()->_asEVWT()->getEnumTag(const_cast<OpaqueValue*>(value), this);
   }
   void vw_destructiveProjectEnumData(OpaqueValue *value) const {
@@ -1612,20 +1581,10 @@ struct TargetForeignTypeMetadata : public TargetMetadata<Runtime> {
     /// flag is set.
     RelativeDirectPointer<InitializationFunction_t> InitializationFunction;
     
-    /// The uniquing key for the metadata record. Metadata records with the
-    /// same Name string are considered equivalent by the runtime, and the
-    /// runtime will pick one to be canonical.
-    RelativeDirectPointer<const char> Name;
-
     mutable std::atomic<CacheValue> Cache;
   };
 
   struct HeaderType : HeaderPrefix, TargetTypeMetadataHeader<Runtime> {};
-
-  TargetPointer<Runtime, const char> getName() const {
-    return reinterpret_cast<TargetPointer<Runtime, const char>>(
-      asFullMetadata(this)->Name.get());
-  }
 
   CacheValue getCacheValue() const {
     /// NB: This can be a relaxed-order load if there is no initialization
@@ -1747,12 +1706,12 @@ struct TargetStructMetadata : public TargetValueMetadata<Runtime> {
   // argument array.
 
   /// Get a pointer to the field offset vector, if present, or null.
-  const StoredPointer *getFieldOffsets() const {
+  const uint32_t *getFieldOffsets() const {
     auto offset = getDescription()->FieldOffsetVectorOffset;
     if (offset == 0)
       return nullptr;
     auto asWords = reinterpret_cast<const void * const*>(this);
-    return reinterpret_cast<const StoredPointer *>(asWords + offset);
+    return reinterpret_cast<const uint32_t *>(asWords + offset);
   }
 
   static constexpr int32_t getGenericArgumentOffset() {
@@ -1909,6 +1868,10 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     OpaqueValue *findIn(OpaqueValue *tuple) const {
       return (OpaqueValue*) (((char*) tuple) + Offset);
     }
+
+    const TypeLayout *getTypeLayout() const {
+      return Type->getTypeLayout();
+    }
   };
 
   Element *getElements() {
@@ -1941,7 +1904,7 @@ const
   FullMetadata<TupleTypeMetadata> METADATA_SYM(EMPTY_TUPLE_MANGLING);
 
 template <typename Runtime> struct TargetProtocolDescriptor;
-  
+
 /// An array of protocol descriptors with a header and tail-allocated elements.
 template <typename Runtime>
 struct TargetProtocolDescriptorList {
@@ -1994,10 +1957,26 @@ struct TargetLiteralProtocolDescriptorList
 };
 using LiteralProtocolDescriptorList = TargetProtocolDescriptorList<InProcess>;
 
+/// A protocol requirement descriptor. This describes a single protocol
+/// requirement in a protocol descriptor. The index of the requirement in
+/// the descriptor determines the offset of the witness in a witness table
+/// for this protocol.
 template <typename Runtime>
 struct TargetProtocolRequirement {
   ProtocolRequirementFlags Flags;
   // TODO: name, type
+
+  /// A function pointer to a global symbol which is used by client code
+  /// to invoke the protocol requirement from a witness table. This pointer
+  /// is also to uniquely identify the requirement in resilient witness
+  /// tables, which is why it appears here.
+  ///
+  /// This forms the basis of our mechanism to hide witness table offsets
+  /// from clients, both when calling protocol requirements and when
+  /// defining witness tables.
+  ///
+  /// Will be null if the protocol is not resilient.
+  RelativeDirectPointer<void, /*nullable*/ true> Function;
 
   /// The optional default implementation of the protocol.
   RelativeDirectPointer<void, /*nullable*/ true> DefaultImplementation;
@@ -2036,14 +2015,11 @@ struct TargetProtocolDescriptor {
   /// Additional flags.
   ProtocolDescriptorFlags Flags;
 
-  /// The number of non-defaultable requirements in the protocol.
-  uint16_t NumMandatoryRequirements;
-
   /// The number of requirements described by the Requirements array.
   /// If any requirements beyond MinimumWitnessTableSizeInWords are present
   /// in the witness table template, they will be not be overwritten with
   /// defaults.
-  uint16_t NumRequirements;
+  uint32_t NumRequirements;
 
   /// Requirement descriptions.
   RelativeDirectPointer<TargetProtocolRequirement<Runtime>> Requirements;
@@ -2056,10 +2032,6 @@ struct TargetProtocolDescriptor {
   /// as the requirements.
   RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
 
-  void *getDefaultWitness(unsigned index) const {
-    return Requirements.get()[index].DefaultImplementation.get();
-  }
-
   // This is only used in unittests/Metadata.cpp.
   constexpr TargetProtocolDescriptor<Runtime>(const char *Name,
                       const TargetProtocolDescriptorList<Runtime> *Inherited,
@@ -2071,7 +2043,6 @@ struct TargetProtocolDescriptor {
       _ObjC_InstanceProperties(nullptr),
       DescriptorSize(sizeof(TargetProtocolDescriptor<Runtime>)),
       Flags(Flags),
-      NumMandatoryRequirements(0),
       NumRequirements(0),
       Requirements(nullptr),
       Superclass(nullptr),
@@ -2106,6 +2077,16 @@ using TargetWitnessTablePointer =
 
 using WitnessTablePointer = TargetWitnessTablePointer<InProcess>;
 
+using AssociatedTypeAccessFunction =
+  SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                  const Metadata *self,
+                                  const WitnessTable *selfConformance);
+
+using AssociatedWitnessTableAccessFunction =
+  SWIFT_CC(swift) WitnessTable *(const Metadata *associatedType,
+                                 const Metadata *self,
+                                 const WitnessTable *selfConformance);
+
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {
   /// The type uses an opaque existential representation.
@@ -2131,6 +2112,10 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     : TargetMetadata<Runtime>(MetadataKind::Existential),
       Flags(ExistentialTypeFlags()), Protocols() {}
   
+  explicit constexpr TargetExistentialTypeMetadata(ExistentialTypeFlags Flags)
+    : TargetMetadata<Runtime>(MetadataKind::Existential),
+      Flags(Flags), Protocols() {}
+
   /// Get the representation form this existential type uses.
   ExistentialTypeRepresentation getRepresentation() const;
   
@@ -2191,6 +2176,17 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
 };
 using ExistentialTypeMetadata
   = TargetExistentialTypeMetadata<InProcess>;
+
+/// The standard metadata for the empty protocol composition type, Any.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANY_MANGLING);
+
+/// The standard metadata for the empty class-constrained protocol composition
+/// type, AnyObject.
+SWIFT_RUNTIME_EXPORT
+const
+  FullMetadata<ExistentialTypeMetadata> METADATA_SYM(ANYOBJECT_MANGLING);
 
 /// The basic layout of an existential metatype type.
 template <typename Runtime>
@@ -2298,6 +2294,57 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
 using GenericBoxHeapMetadata = TargetGenericBoxHeapMetadata<InProcess>;
 
 /// \brief The control structure of a generic or resilient protocol
+/// conformance witness.
+///
+/// Resilient conformances must use a pattern where new requirements
+/// with default implementations can be added and the order of existing
+/// requirements can be changed.
+///
+/// This is accomplished by emitting an order-independent series of
+/// relative pointer pairs, consisting of a protocol requirement together
+/// with a witness. The requirement is identified by an indirect relative
+/// pointer to the protocol dispatch thunk.
+template <typename Runtime>
+struct TargetResilientWitness {
+  RelativeIndirectPointer<void> Function;
+  RelativeDirectPointer<void> Witness;
+};
+using ResilientWitness = TargetResilientWitness<InProcess>;
+
+template <typename Runtime>
+struct TargetResilientWitnessTable final
+  : public swift::ABI::TrailingObjects<
+             TargetResilientWitnessTable<Runtime>,
+             TargetResilientWitness<Runtime>> {
+  uint32_t NumWitnesses;
+
+  using TrailingObjects = swift::ABI::TrailingObjects<
+                             TargetResilientWitnessTable<Runtime>,
+                             TargetResilientWitness<Runtime>>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(
+                        OverloadToken<TargetResilientWitness<Runtime>>) const {
+    return NumWitnesses;
+  }
+
+  llvm::ArrayRef<TargetResilientWitness<Runtime>>
+  getWitnesses() const {
+    return {this->template getTrailingObjects<TargetResilientWitness<Runtime>>(),
+            NumWitnesses};
+  }
+
+  const TargetResilientWitness<Runtime> &
+  getWitness(unsigned i) const {
+    return getWitnesses()[i];
+  }
+};
+using ResilientWitnessTable = TargetResilientWitnessTable<InProcess>;
+
+/// \brief The control structure of a generic or resilient protocol
 /// conformance.
 ///
 /// Witness tables need to be instantiated at runtime in these cases:
@@ -2325,6 +2372,10 @@ struct TargetGenericWitnessTable {
 
   /// The pattern.
   RelativeDirectPointer<const TargetWitnessTable<Runtime>> Pattern;
+
+  /// The resilient witness table, if any.
+  RelativeDirectPointer<const TargetResilientWitnessTable<Runtime>,
+                        /*nullable*/ true> ResilientWitnesses;
 
   /// The instantiation function, which is called after the template is copied.
   RelativeDirectPointer<void(TargetWitnessTable<Runtime> *instantiatedTable,
@@ -2654,7 +2705,7 @@ using ModuleContextDescriptor = TargetModuleContextDescriptor<InProcess>;
 
 template<typename Runtime>
 struct TargetGenericContextDescriptorHeader {
-  uint32_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
+  uint16_t NumParams, NumRequirements, NumKeyArguments, NumExtraArguments;
   
   uint32_t getNumArguments() const {
     return NumKeyArguments + NumExtraArguments;
@@ -3116,9 +3167,10 @@ struct MetadataCompletionContext {
 ///   pointer to indicate that completion is blocked on the completion of
 ///   some other type
 using MetadataCompleter =
-  Metadata *(const Metadata *type,
-             MetadataCompletionContext *context,
-             const TargetGenericMetadataPattern<InProcess> *pattern);
+  SWIFT_CC(swift)
+  MetadataDependency(const Metadata *type,
+                     MetadataCompletionContext *context,
+                     const TargetGenericMetadataPattern<InProcess> *pattern);
 
 /// An instantiation pattern for type metadata.
 template <typename Runtime>
@@ -3333,49 +3385,17 @@ struct TargetTypeGenericContextDescriptorHeader {
 };
 using TypeGenericContextDescriptorHeader =
   TargetTypeGenericContextDescriptorHeader<InProcess>;
-  
+
 /// Wrapper class for the pointer to a metadata access function that provides
 /// operator() overloads to call it with the right calling convention.
 class MetadataAccessFunction {
-  const Metadata * (*Function)(...);
+  MetadataResponse (*Function)(...);
 
   static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
                 "Need to account for change in number of direct arguments");
 
-  template<typename T>
-  const Metadata *applyN(const void *arg0,
-                         const void *arg1,
-                         const void *arg2,
-                         llvm::ArrayRef<T *> argRest) const {
-    using FnN = const Metadata *(const void *,
-                                 const void *,
-                                 const void *,
-                                 const void *);
-    return reinterpret_cast<FnN*>(Function)(arg0, arg1, arg2, argRest.data());
-  }
-  
-  template<typename...Args>
-  const Metadata *variadic_apply(const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2,
-                                 llvm::MutableArrayRef<const void *> argRest,
-                                 unsigned n,
-                                 const void *arg3,
-                                 Args...argN) const {
-    argRest[n] = arg3;
-    return variadic_apply(arg0, arg1, arg2, argRest, n+1, argN...);
-  }
-  
-  const Metadata *variadic_apply(const void *arg0,
-                                 const void *arg1,
-                                 const void *arg2,
-                                 llvm::MutableArrayRef<const void *> argRest,
-                                 unsigned n) const {
-    return applyN(arg0, arg1, arg2, argRest);
-  }
-
 public:
-  explicit MetadataAccessFunction(const Metadata * (*Function)(...))
+  explicit MetadataAccessFunction(MetadataResponse (*Function)(...))
     : Function(Function)
   {}
   
@@ -3383,52 +3403,78 @@ public:
     return Function != nullptr;
   }
   
-  // Invoke with an array of arguments.
-  template<typename T>
-  const Metadata *operator()(llvm::ArrayRef<T *> args) const {
+  /// Invoke with an array of arguments of dynamic size.
+  MetadataResponse operator()(MetadataRequest request,
+                              llvm::ArrayRef<const void *> args) const {
     switch (args.size()) {
     case 0:
-      return (*this)();
+      return operator()(request);
     case 1:
-      return (*this)(args[0]);
+      return operator()(request, args[0]);
     case 2:
-      return (*this)(args[0], args[1]);
+      return operator()(request, args[0], args[1]);
     case 3:
-      return (*this)(args[0], args[1], args[2]);
+      return operator()(request, args[0], args[1], args[2]);
     default:
-      return applyN(args[0], args[1], args[2], args);
+      return applyMany(request, args.data());
     }
   }
   
-  // Invoke with n arguments.
-  const Metadata *operator()() const {
-    using Fn0 = const Metadata *();
-    return reinterpret_cast<Fn0*>(Function)();
+  /// Invoke with exactly 0 arguments.
+  MetadataResponse operator()(MetadataRequest request) const {
+    using Fn0 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request);
+    return reinterpret_cast<Fn0*>(Function)(request);
   }
-  const Metadata *operator()(const void *arg0) const {
-    using Fn1 = const Metadata *(const void *);
-    return reinterpret_cast<Fn1*>(Function)(arg0);
+
+  /// Invoke with exactly 1 argument.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0) const {
+    using Fn1 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0);
+    return reinterpret_cast<Fn1*>(Function)(request, arg0);
 
   }
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1) const {
-    using Fn2 = const Metadata *(const void *, const void *);
-    return reinterpret_cast<Fn2*>(Function)(arg0, arg1);
+
+  /// Invoke with exactly 2 arguments.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1) const {
+    using Fn2 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0,
+                                                 const void *arg1);
+    return reinterpret_cast<Fn2*>(Function)(request, arg0, arg1);
   }
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1,
-                             const void *arg2) const {
-    using Fn3 = const Metadata *(const void *, const void *, const void *);
-    return reinterpret_cast<Fn3*>(Function)(arg0, arg1, arg2);
+
+  /// Invoke with exactly 3 arguments.
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1,
+                              const void *arg2) const {
+    using Fn3 = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void *arg0,
+                                                 const void *arg1,
+                                                 const void *arg2);
+    return reinterpret_cast<Fn3*>(Function)(request, arg0, arg1, arg2);
   }
   
+  /// Invoke with more than 3 arguments.
   template<typename...Args>
-  const Metadata *operator()(const void *arg0,
-                             const void *arg1,
-                             const void *arg2,
-                             Args...argN) const {
-    const void *args[3 + sizeof...(Args)];
-    return variadic_apply(arg0, arg1, arg2, args, 3, argN...);
+  MetadataResponse operator()(MetadataRequest request,
+                              const void *arg0,
+                              const void *arg1,
+                              const void *arg2,
+                              Args... argN) const {
+    const void *args[] = { arg0, arg1, arg2, argN... };
+    return applyMany(request, args);
+  }
+
+private:
+  /// In the more-then-max case, just pass all the arguments as an array.
+  MetadataResponse applyMany(MetadataRequest request,
+                             const void * const *args) const {
+    using FnN = SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
+                                                 const void * const *args);
+    return reinterpret_cast<FnN*>(Function)(request, args);
   }
 };
 
@@ -3444,7 +3490,7 @@ public:
   /// The function type here is a stand-in. You should use getAccessFunction()
   /// to wrap the function pointer in an accessor that uses the proper calling
   /// convention for a given number of arguments.
-  TargetRelativeDirectPointer<Runtime, const Metadata *(...),
+  TargetRelativeDirectPointer<Runtime, MetadataResponse(...),
                               /*Nullable*/ true> AccessFunctionPtr;
 
   MetadataAccessFunction getAccessFunction() const {
@@ -3462,6 +3508,8 @@ public:
   getGenericContextHeader() const {
     return getFullGenericContextHeader();
   }
+
+  llvm::ArrayRef<GenericParamDescriptor> getGenericParams() const;
 
   /// Return the offset of the start of generic arguments in the nominal
   /// type's metadata. The returned value is measured in sizeof(void*).
@@ -3600,6 +3648,7 @@ public:
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
   using TargetTypeContextDescriptor<Runtime>::getTypeContextDescriptorFlags;
 
   /// The superclass of this class.  This pointer can be interpreted
@@ -3816,6 +3865,7 @@ public:
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
 
   /// The number of stored properties in the struct.
   /// If there is a field offset vector, this is its length.
@@ -3858,6 +3908,7 @@ public:
   using TrailingGenericContextObjects::getGenericContext;
   using TrailingGenericContextObjects::getGenericContextHeader;
   using TrailingGenericContextObjects::getFullGenericContextHeader;
+  using TrailingGenericContextObjects::getGenericParams;
 
   /// The number of non-empty cases in the enum are in the low 24 bits;
   /// the offset of the payload size in the metadata record in words,
@@ -3962,28 +4013,27 @@ TargetTypeContextDescriptor<Runtime>::getFullGenericContextHeader() const {
   }
 }
 
+template <typename Runtime>
+llvm::ArrayRef<GenericParamDescriptor> 
+TargetTypeContextDescriptor<Runtime>::getGenericParams() const {
+  switch (this->getKind()) {
+  case ContextDescriptorKind::Class:
+    return llvm::cast<TargetClassDescriptor<Runtime>>(this)->getGenericParams();
+  case ContextDescriptorKind::Enum:
+    return llvm::cast<TargetEnumDescriptor<Runtime>>(this)->getGenericParams();
+  case ContextDescriptorKind::Struct:
+    return llvm::cast<TargetStructDescriptor<Runtime>>(this)->getGenericParams();
+  default:
+    swift_runtime_unreachable("Not a type context descriptor.");
+  }
+}
+
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
-///
-/// The basic algorithm for fetching a metadata object is:
-///   func swift_getGenericMetadata(header, arguments) {
-///     if (metadata = getExistingMetadata(&header.PrivateData,
-///                                        arguments[0..header.NumArguments]))
-///       return metadata
-///     metadata = malloc(superclass.MetadataSize +
-///                       numImmediateMembers * sizeof(void *))
-///     memcpy(metadata, header.MetadataTemplate, header.TemplateSize)
-///     for (i in 0..header.NumFillInstructions)
-///       metadata[header.FillInstructions[i].ToIndex]
-///         = arguments[header.FillInstructions[i].FromIndex]
-///     setExistingMetadata(&header.PrivateData,
-///                         arguments[0..header.NumArguments],
-///                         metadata)
-///     return metadata
-///   }
-SWIFT_RUNTIME_EXPORT
-const Metadata *
-swift_getGenericMetadata(const TypeContextDescriptor *description,
-                         const void *arguments);
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getGenericMetadata(MetadataRequest request,
+                         const void * const *arguments,
+                         const TypeContextDescriptor *description);
 
 /// Allocate a generic class metadata object.  This is intended to be
 /// called by the metadata instantiation function of a generic class.
@@ -4021,6 +4071,11 @@ swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const void *arguments,
                                    const GenericValueMetadataPattern *pattern,
                                    size_t extraDataSize);
+
+/// \brief Check that the given metadata has the right state.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse swift_checkMetadataState(MetadataRequest request,
+                                          const Metadata *type);
 
 /// Instantiate a resilient or generic protocol witness table.
 ///
@@ -4099,6 +4154,10 @@ swift_getObjCClassMetadata(const ClassMetadata *theClass);
 SWIFT_RUNTIME_EXPORT
 const ClassMetadata *
 swift_getObjCClassFromMetadata(const Metadata *theClass);
+
+SWIFT_RUNTIME_EXPORT
+const ClassMetadata *
+swift_getObjCClassFromObject(HeapObject *object);
 #endif
 
 /// \brief Fetch a unique type metadata object for a foreign type.
@@ -4129,21 +4188,24 @@ swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 /// \param proposedWitnesses - an optional proposed set of value witnesses.
 ///   This is useful when working with a non-dependent tuple type
 ///   where the entrypoint is just being used to unique the metadata.
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata(TupleTypeFlags flags,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata(MetadataRequest request,
+                           TupleTypeFlags flags,
                            const Metadata * const *elements,
                            const char *labels,
                            const ValueWitnessTable *proposedWitnesses);
 
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata2(MetadataRequest request,
+                            const Metadata *elt0, const Metadata *elt1,
                             const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
-SWIFT_RUNTIME_EXPORT
-const TupleTypeMetadata *
-swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getTupleTypeMetadata3(MetadataRequest request,
+                            const Metadata *elt0, const Metadata *elt1,
                             const Metadata *elt2, const char *labels,
                             const ValueWitnessTable *proposedWitnesses);
 
@@ -4154,7 +4216,7 @@ void swift_initStructMetadata(StructMetadata *self,
                               StructLayoutFlags flags,
                               size_t numFields,
                               const TypeLayout * const *fieldTypes,
-                              size_t *fieldOffsets);
+                              uint32_t *fieldOffsets);
 
 /// Relocate the metadata for a class and copy fields from the given template.
 /// The final size of the metadata is calculated at runtime from the size of
@@ -4169,10 +4231,11 @@ swift_relocateClassMetadata(ClassMetadata *self,
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
-void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                               size_t numFields,
-                                               const TypeLayout * const *fieldTypes,
-                                               size_t *fieldOffsets);
+void swift_initClassMetadata(ClassMetadata *self,
+                             ClassLayoutFlags flags,
+                             size_t numFields,
+                             const TypeLayout * const *fieldTypes,
+                             size_t *fieldOffsets);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
@@ -4325,6 +4388,12 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 void swift_getFieldAt(
     const Metadata *type, unsigned index,
     std::function<void(llvm::StringRef name, FieldType type)> callback);
+
+#if !NDEBUG
+/// Verify that the given metadata pointer correctly roundtrips its
+/// mangled name through the demangler.
+void verifyMangledNameRoundtrip(const Metadata *metadata);
+#endif
 
 } // end namespace swift
 

@@ -35,11 +35,6 @@ namespace irgen {
 /// implementing a type that has a statically known layout.
 class FixedTypeInfo : public TypeInfo {
 private:
-  /// The storage size of this type in bytes.  This may be zero even
-  /// for well-formed and complete types, such as a trivial enum or
-  /// tuple.
-  Size StorageSize;
-  
   /// The spare bit mask for this type. SpareBits[0] is the LSB of the first
   /// byte. This may be empty if the type has no spare bits.
   SpareBitVector SpareBits;
@@ -49,22 +44,26 @@ protected:
                 const SpareBitVector &spareBits,
                 Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
                 IsFixedSize_t alwaysFixedSize,
-                SpecialTypeInfoKind stik = STIK_Fixed)
+                SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
       : TypeInfo(type, align, pod, bt, alwaysFixedSize, stik),
-        StorageSize(size), SpareBits(spareBits) {
+        SpareBits(spareBits) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
+    Bits.FixedTypeInfo.Size = size.getValue();
+    assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
   }
 
   FixedTypeInfo(llvm::Type *type, Size size,
                 SpareBitVector &&spareBits,
                 Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
                 IsFixedSize_t alwaysFixedSize,
-                SpecialTypeInfoKind stik = STIK_Fixed)
+                SpecialTypeInfoKind stik = SpecialTypeInfoKind::Fixed)
       : TypeInfo(type, align, pod, bt, alwaysFixedSize, stik),
-        StorageSize(size), SpareBits(std::move(spareBits)) {
+        SpareBits(std::move(spareBits)) {
     assert(SpareBits.size() == size.getValueInBits());
     assert(isFixedSize());
+    Bits.FixedTypeInfo.Size = size.getValue();
+    assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
   }
 
 public:
@@ -73,7 +72,7 @@ public:
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {
-    return (isFixedSize(expansion) && StorageSize.isZero());
+    return (isFixedSize(expansion) && getFixedSize().isZero());
   }
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
@@ -99,7 +98,8 @@ public:
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override;
 
   void completeFixed(Size size, Alignment alignment) {
-    StorageSize = size;
+    Bits.FixedTypeInfo.Size = size.getValue();
+    assert(Bits.FixedTypeInfo.Size == size.getValue() && "truncation");
     setStorageAlignment(alignment);
   }
 
@@ -110,7 +110,7 @@ public:
 
   /// Returns the known, fixed size required to store a value of this type.
   Size getFixedSize() const {
-    return StorageSize;
+    return Size(Bits.FixedTypeInfo.Size);
   }
 
   /// Returns the (assumed fixed) stride of the storage for this
@@ -120,7 +120,7 @@ public:
   /// The stride is at least one, even for zero-sized types, like the empty
   /// tuple.
   Size getFixedStride() const {
-    Size s = StorageSize.roundUpToAlignment(getFixedAlignment());
+    Size s = getFixedSize().roundUpToAlignment(getFixedAlignment());
     if (s.isZero())
       s = Size(1);
     return s;
@@ -222,18 +222,11 @@ public:
   /// larger than this type, the trailing bits are untouched.
   static void applyFixedSpareBitsMask(SpareBitVector &mask,
                                       const SpareBitVector &spareBits);
-  
-  /// Fixed-size types never need dynamic value witness table instantiation.
-  void initializeMetadata(IRGenFunction &IGF,
-                          llvm::Value *metadata,
-                          bool isVWTMutable,
-                          SILType T) const override {}
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    return;
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    // We assume that fixed type infos generally do not require type
+    // metadata in order to perform value operations.
   }
 
   llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,

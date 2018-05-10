@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,6 +117,11 @@ namespace {
   };
 } // end anonymous namespace
 
+void Expr::setType(Type T) {
+  assert(!T || !T->hasTypeVariable());
+  Ty = T;
+}
+
 template <class T> static SourceRange getSourceRangeImpl(const T *E) {
   static_assert(isOverriddenFromExpr(&T::getSourceRange) ||
                 (isOverriddenFromExpr(&T::getStartLoc) &&
@@ -188,7 +193,7 @@ Expr *Expr::getSemanticsProvidingExpr() {
 Expr *Expr::getValueProvidingExpr() {
   Expr *E = getSemanticsProvidingExpr();
 
-  if (auto TE = dyn_cast<ForceTryExpr>(this))
+  if (auto TE = dyn_cast<ForceTryExpr>(E))
     return TE->getSubExpr()->getValueProvidingExpr();
 
   // TODO:
@@ -535,12 +540,12 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
 void Expr::
-forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
+forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    const std::function<Expr*(Expr*)> &callback;
+    llvm::function_ref<Expr *(Expr *)> callback;
     Expr *ThisNode;
     
-    ChildWalker(const std::function<Expr*(Expr*)> &callback, Expr *ThisNode)
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -571,11 +576,11 @@ forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
 /// Enumerate each immediate child expression of this node, invoking the
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
-void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
+void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    const std::function<Expr*(Expr*)> &callback;
+    llvm::function_ref<Expr *(Expr *)> callback;
 
-    ChildWalker(const std::function<Expr*(Expr*)> &callback)
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
     : callback(callback) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -1207,7 +1212,7 @@ packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Expr *> args,
 
   // If we have no other arguments, represent the trailing closure as a
   // parenthesized expression.
-  if (args.size() == 0) {
+  if (args.empty()) {
     auto arg = new (ctx) ParenExpr(lParenLoc, trailingClosure, rParenLoc,
                                    /*hasTrailingClosure=*/true);
     computeSingleArgumentType(ctx, arg, implicit, getType);
@@ -1559,8 +1564,17 @@ static ValueDecl *getCalledValue(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
+  if (auto *OCRE = dyn_cast<OtherConstructorDeclRefExpr>(E))
+    return OCRE->getDecl();
+
+  // Look through SelfApplyExpr.
+  if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
+    return SAE->getCalledValue();
+
   Expr *E2 = E->getValueProvidingExpr();
-  if (E != E2) return getCalledValue(E2);
+  if (E != E2)
+    return getCalledValue(E2);
+
   return nullptr;
 }
 

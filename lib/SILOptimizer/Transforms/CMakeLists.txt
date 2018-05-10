@@ -23,7 +23,6 @@ set(TRANSFORMS_SOURCES
   Transforms/RedundantOverflowCheckRemoval.cpp
   Transforms/ReleaseDevirtualizer.cpp
   Transforms/RemovePin.cpp
-  Transforms/SILCleanup.cpp
   Transforms/SILCodeMotion.cpp
   Transforms/SILLowerAggregateInstrs.cpp
   Transforms/SILMem2Reg.cpp

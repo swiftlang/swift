@@ -1,6 +1,7 @@
 
+/* RawRepresentable Changes */
+
 /* Removed Decls */
-APINotesTest(APINotesTest.h): Var OldType.oldMember has been removed
 APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc2() has been removed
 APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc3() has been removed
 APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.getPropertyA() has been removed
@@ -9,7 +10,14 @@ APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.getPropertyA() has be
 
 /* Renamed Decls */
 APINotesTest(APINotesTest.h): Protocol SwiftTypeWithMethodLeft has been renamed to Protocol SwiftTypeWithMethodRight
+APINotesTest(APINotesTest.h): Var OldType.oldMember has been renamed to Var NewType.newMember
 
 /* Type Changes */
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [String : Any] to [AnimalAttributeName : Any]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributesArray(_:) has parameter 0 type change from [String] to [AnimalAttributeName]
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributes(_:) has parameter 0 type change from [String : Any]? to [AnimalAttributeName : Any]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingOptionalAttributesArray(_:) has parameter 0 type change from [String]? to [AnimalAttributeName]?
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleAttribute(_:) has parameter 0 type change from String to AnimalAttributeName
+APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.animalStatusSingleOptionalAttribute(_:) has parameter 0 type change from String? to AnimalAttributeName?
 
 /* Decl Attribute changes */

@@ -12,7 +12,7 @@
 
 @_exported import OpenCL // Clang module
 
-@available(OSX, introduced: 10.7)
+@available(macOS, introduced: 10.7)
 public func clSetKernelArgsListAPPLE(
   _ kernel: cl_kernel, _ uint: cl_uint, _ args: CVarArg...
 ) -> cl_int {

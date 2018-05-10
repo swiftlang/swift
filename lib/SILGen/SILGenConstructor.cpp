@@ -34,10 +34,10 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                               AC.getIdentifier("$metatype"), SourceLoc(),
-                               AC.getIdentifier("$metatype"), Type(),
-                               DC);
+  auto VD =
+      new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                         AC.getIdentifier("$metatype"), SourceLoc(),
+                         AC.getIdentifier("$metatype"), Type(), DC);
   VD->setInterfaceType(metatype);
 
   SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
@@ -61,7 +61,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   }
 
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
                                AC.getIdentifier("$implicit_value"), Type(),
@@ -598,7 +598,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                               ctor->hasThrows());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
-  ManagedValue selfArg = B.createFunctionArgument(selfTy, selfDecl);
+  ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
@@ -886,10 +886,10 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &SGF,
     
     auto initConstantTy = initFn->getLoweredType().castTo<SILFunctionType>();
     
-    auto param = SILParameterInfo(initTy.getSwiftRValueType(),
+    auto param = SILParameterInfo(initTy.getASTType(),
                         initTy.isAddress() ? ParameterConvention::Indirect_In
                                            : ParameterConvention::Direct_Owned);
-    auto result = SILResultInfo(storageTy.getSwiftRValueType(),
+    auto result = SILResultInfo(storageTy.getASTType(),
                               storageTy.isAddress() ? ResultConvention::Indirect
                                                     : ResultConvention::Owned);
     
@@ -1021,8 +1021,9 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
       auto self = emitSelfForMemberInit(*this, var, selfDecl);
       
       auto mark = B.createMarkUninitializedBehavior(var,
-               initFn, init.getSubstitutions(), storageAddr.getValue(),
-               setterFn, getForwardingSubstitutions(), self.getValue(),
+               initFn, init.getSubstitutions(),
+               storageAddr.getValue(),
+               setterFn, getForwardingSubstitutionMap(), self.getValue(),
                getLoweredType(var->getType()).getAddressType());
       
       // The mark instruction stands in for the behavior property.

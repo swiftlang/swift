@@ -7,3 +7,13 @@ import Y
 import enum Foo.Member
 // The overlaying Swift module should not be loaded.
 import InvalidOverlay
+
+#if canImport(Swift) // To wit, true
+import Swift
+#else
+import Garbage
+#endif
+
+#if !canImport(Swift) // To wit, false
+import Garbage
+#endif

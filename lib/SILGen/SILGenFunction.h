@@ -43,7 +43,6 @@ class CalleeTypeInfo;
 class ResultPlan;
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 class ArgumentScope;
-class PostponedCleanup;
 class Scope;
 
 enum class ApplyOptions : unsigned {
@@ -247,10 +246,6 @@ public:
 
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
-
-  /// Currently active postponed cleanups.
-  PostponedCleanup *CurrentlyActivePostponedCleanup = nullptr;
-  void enterPostponedCleanup(SILValue forValue);
 
   /// \brief Values to end dynamic access enforcement on.  A hack for
   /// materializeForSet.
@@ -1147,11 +1142,6 @@ public:
                         RValue &&optionalSubscripts,
                         SILType addressType);
 
-  RValue emitApplyConversionFunction(SILLocation loc,
-                                     Expr *funcExpr,
-                                     Type resultType,
-                                     RValue &&operand);
-
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
                                  const TypeLowering &lowering);
@@ -1310,7 +1300,7 @@ public:
                    SILLocation loc, ManagedValue fn, SubstitutionList subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
-                   SGFContext evalContext, PostponedCleanup &cleanup);
+                   SGFContext evalContext);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -1456,13 +1446,13 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void
-  emitCheckedCastBranch(SILLocation loc, ConsumableManagedValue src,
-                        Type sourceType, CanType targetType, SGFContext C,
-                        std::function<void(ManagedValue)> handleTrue,
-                        std::function<void(Optional<ManagedValue>)> handleFalse,
-                        ProfileCounter TrueCount = ProfileCounter(),
-                        ProfileCounter FalseCount = ProfileCounter());
+  void emitCheckedCastBranch(
+      SILLocation loc, ConsumableManagedValue src, Type sourceType,
+      CanType targetType, SGFContext C,
+      llvm::function_ref<void(ManagedValue)> handleTrue,
+      llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
+      ProfileCounter TrueCount = ProfileCounter(),
+      ProfileCounter FalseCount = ProfileCounter());
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1470,12 +1460,13 @@ public:
   /// The main difference is that this code does not pass the old argument as a
   /// block argument in the failure case. This causes values to be double
   /// consumed.
-  void emitCheckedCastBranchOld(SILLocation loc, Expr *source, Type targetType,
-                                SGFContext ctx,
-                                std::function<void(ManagedValue)> handleTrue,
-                                std::function<void()> handleFalse,
-                                ProfileCounter TrueCount = ProfileCounter(),
-                                ProfileCounter FalseCount = ProfileCounter());
+  void
+  emitCheckedCastBranchOld(SILLocation loc, Expr *source, Type targetType,
+                           SGFContext ctx,
+                           llvm::function_ref<void(ManagedValue)> handleTrue,
+                           llvm::function_ref<void()> handleFalse,
+                           ProfileCounter TrueCount = ProfileCounter(),
+                           ProfileCounter FalseCount = ProfileCounter());
 
   /// \brief Emit a conditional checked cast branch, starting from an
   /// expression.  Terminates the current BB.
@@ -1489,13 +1480,12 @@ public:
   ///                     terminated.
   /// \param handleFalse  A callback to invoke in the failure path.  The
   ///                     current BB should be terminated.
-  void
-  emitCheckedCastBranch(SILLocation loc, Expr *src, Type targetType,
-                        SGFContext C,
-                        std::function<void(ManagedValue)> handleTrue,
-                        std::function<void(Optional<ManagedValue>)> handleFalse,
-                        ProfileCounter TrueCount = ProfileCounter(),
-                        ProfileCounter FalseCount = ProfileCounter());
+  void emitCheckedCastBranch(
+      SILLocation loc, Expr *src, Type targetType, SGFContext C,
+      llvm::function_ref<void(ManagedValue)> handleTrue,
+      llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
+      ProfileCounter TrueCount = ProfileCounter(),
+      ProfileCounter FalseCount = ProfileCounter());
 
   /// A form of checked cast branch that uses the old non-ownership preserving
   /// semantics.
@@ -1503,22 +1493,30 @@ public:
   /// The main difference is that this code does not pass the old argument as a
   /// block argument in the failure case. This causes values to be double
   /// consumed.
-  void emitCheckedCastBranchOld(SILLocation loc, ConsumableManagedValue src,
-                                Type sourceType, CanType targetType,
-                                SGFContext ctx,
-                                std::function<void(ManagedValue)> handleTrue,
-                                std::function<void()> handleFalse,
-                                ProfileCounter TrueCount = ProfileCounter(),
-                                ProfileCounter FalseCount = ProfileCounter());
+  void
+  emitCheckedCastBranchOld(SILLocation loc, ConsumableManagedValue src,
+                           Type sourceType, CanType targetType, SGFContext ctx,
+                           llvm::function_ref<void(ManagedValue)> handleTrue,
+                           llvm::function_ref<void()> handleFalse,
+                           ProfileCounter TrueCount = ProfileCounter(),
+                           ProfileCounter FalseCount = ProfileCounter());
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
   ///
-  /// NOTE: This operation does *not* consume the managed value.
+  /// NOTE: This operation does consume the managed value.
+  ManagedValue emitBindOptional(SILLocation loc,
+                                ManagedValue optionalAddrOrValue,
+                                unsigned depth);
+
+  /// Emit the control flow for an optional 'bind' operation, branching to the
+  /// active failure destination if the optional value addressed by optionalAddr
+  /// is nil, and leaving the insertion point on the success branch.
   ///
-  void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
-                        unsigned depth);
+  /// NOTE: This operation does not consume the managed address.
+  void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
+                               unsigned depth);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,
@@ -1642,7 +1640,9 @@ public:
                                     CanType &inputSubstType,
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
-                                    SubstitutionMap &interfaceSubs);
+                                    SubstitutionMap &interfaceSubs,
+                                    bool withoutActuallyEscaping=false);
+
   //===--------------------------------------------------------------------===//
   // NoEscaping to Escaping closure thunk
   //===--------------------------------------------------------------------===//
@@ -1679,6 +1679,10 @@ public:
     // No lowering support needed.
   }
   void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
+    // No lowering support needed.
+  }
+
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
     // No lowering support needed.
   }
 
@@ -1818,7 +1822,11 @@ public:
   /// Return forwarding substitutions for the archetypes in the current
   /// function.
   SubstitutionList getForwardingSubstitutions();
-  
+
+  /// Return forwarding substitutions for the archetypes in the current
+  /// function.
+  SubstitutionMap getForwardingSubstitutionMap();
+
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
 };
@@ -1856,37 +1864,6 @@ public:
     }
     SGF.CurFunctionSection = SavedSection;
   }
-};
-
-/// Utility class to facilitate posponment of cleanup of @noescape
-/// partial_apply arguments into the 'right' scope.
-///
-/// If a Postponed cleanup is active at the end of a scope. The scope will
-/// actively push the cleanup into its surrounding scope.
-class PostponedCleanup {
-  friend SILGenFunction;
-  friend Scope;
-
-  SmallVector<std::pair<CleanupHandle, SILValue>, 16> deferredCleanups;
-  CleanupsDepth depth;
-  SILGenFunction &SGF;
-  PostponedCleanup *previouslyActiveCleanup;
-  bool active;
-  bool applyRecursively;
-
-  void postponeCleanup(CleanupHandle cleanup, SILValue forValue);
-public:
-  PostponedCleanup(SILGenFunction &SGF);
-  PostponedCleanup(SILGenFunction &SGF, bool applyRecursively);
-  ~PostponedCleanup();
-
-  void end();
-
-  PostponedCleanup() = delete;
-  PostponedCleanup(const PostponedCleanup &) = delete;
-  PostponedCleanup &operator=(const PostponedCleanup &) = delete;
-  PostponedCleanup &operator=(PostponedCleanup &&other) = delete;
-  PostponedCleanup(PostponedCleanup &&) = delete;
 };
 
 } // end namespace Lowering

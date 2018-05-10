@@ -59,6 +59,7 @@ extension Decimal {
     public mutating func formTruncatingRemainder(dividingBy other: Decimal) { fatalError("Decimal does not yet fully adopt FloatingPoint") }
 
     public mutating func negate() {
+        guard _length != 0 else { return }
         _isNegative = _isNegative == 0 ? 1 : 0
     }
 

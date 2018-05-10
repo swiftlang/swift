@@ -465,8 +465,6 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[inout-to-pointer]";
   case ConversionRestrictionKind::PointerToPointer:
     return "[pointer-to-pointer]";
-  case ConversionRestrictionKind::ForceUnchecked:
-    return "[force-unchecked]";
   case ConversionRestrictionKind::ArrayUpcast:
     return "[array-upcast]";
   case ConversionRestrictionKind::DictionaryUpcast:
@@ -506,6 +504,9 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: add address-of";
   case FixKind::CoerceToCheckedCast:
     return "fix: as to as!";
+  case FixKind::ExplicitlyEscaping:
+  case FixKind::ExplicitlyEscapingToAny:
+    return "fix: add @escaping";
   }
 
   llvm_unreachable("Unhandled FixKind in switch.");
@@ -641,6 +642,25 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                 locator, typeVars);
 }
 
+Constraint *Constraint::createMemberOrOuterDisjunction(
+    ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
+    DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+    ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator) {
+  auto memberConstraint = createMember(cs, kind, first, second, member,
+                             useDC, functionRefKind, locator);
+
+  if (outerAlternatives.empty())
+    return memberConstraint;
+
+  SmallVector<Constraint *, 4> constraints;
+  constraints.push_back(memberConstraint);
+  memberConstraint->setFavored();
+  for (auto choice : outerAlternatives) {
+    constraints.push_back(
+        Constraint::createBindOverload(cs, first, choice, useDC, locator));
+  }
+  return Constraint::createDisjunction(cs, constraints, locator, ForgetChoice);
+}
 
 Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind, 
                                      Type first, Type second, DeclName member,

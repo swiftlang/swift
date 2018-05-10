@@ -1,0 +1,6 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %S/Inputs/FloatingPointConversion.swift.gyb -o %t/FloatingPointConversion.swift
+// RUN: %line-directive %t/FloatingPointConversion.swift -- %target-build-swift %t/FloatingPointConversion.swift -Xfrontend -disable-access-control -o %t/a.out_Debug -Onone
+//
+// RUN: %line-directive %t/FloatingPointConversion.swift -- %target-run %t/a.out_Debug
+// REQUIRES: executable_test

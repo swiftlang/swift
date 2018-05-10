@@ -30,7 +30,7 @@ public typealias SKColor = UIColor
 }
 
 @available(iOS, introduced: 10.0)
-@available(OSX, introduced: 10.12)
+@available(macOS, introduced: 10.12)
 @available(tvOS, introduced: 10.0)
 @available(watchOS, introduced: 3.0)
 extension SKWarpGeometryGrid {

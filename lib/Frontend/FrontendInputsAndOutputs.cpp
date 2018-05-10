@@ -134,7 +134,7 @@ bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
 }
 
 unsigned FrontendInputsAndOutputs::numberOfPrimaryInputsEndingWith(
-    const char *extension) const {
+    StringRef extension) const {
   unsigned n = 0;
   (void)forEachPrimaryInput([&](const InputFile &input) -> bool {
     if (llvm::sys::path::extension(input.file()).endswith(extension))

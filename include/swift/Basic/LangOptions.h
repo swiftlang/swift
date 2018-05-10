@@ -239,6 +239,10 @@ namespace swift {
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
 
+    /// Diagnose switches over non-frozen enums that do not have catch-all
+    /// cases.
+    bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
+
     /// Regex for the passes that should report passed and missed optimizations.
     ///
     /// These are shared_ptrs so that this class remains copyable.

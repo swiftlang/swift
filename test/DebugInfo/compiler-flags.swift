@@ -12,16 +12,6 @@
 // CHECK-EXPLICIT-NOT:            "
 // CHECK-EXPLICIT-SAME:           -resource-dir 
 
-
-// Check that we tune the debug output for LLDB.
-// Adapted from llvm/test/DebugInfo/X86/debugger-tune.ll
-// RUN: %target-swiftc_driver -emit-object -g %s -o %t
-// RUN: llvm-readobj -sections %t | %FileCheck --check-prefix=CHECK-LLDB %s
-
-// CHECK-LLDB-NOT: debug_pubnames
-// CHECK-LLDB:     apple_names
-// CHECK-LLDB-NOT: debug_pubnames
-
 // Check that we don't write temporary file names in the debug info
 // RUN: TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -o - | %FileCheck --check-prefix CHECK-TEMP %s
 // CHECK-TEMP: !DICompileUnit({{.*}} flags: "{{.*}} -I <temporary-file>

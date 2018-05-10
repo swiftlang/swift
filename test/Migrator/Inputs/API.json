@@ -19,6 +19,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SA@SomeItemSet@FI@theSimpleOldNameNotToRename",
+    "LeftComment": "theSimpleOldNameNotToRename",
+    "RightUsr": "",
+    "RightComment": "__theSimpleNewName",
+    "ModuleName": "SomeModule"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
@@ -487,5 +498,16 @@
     "NewTypeName": "example",
     "SelfIndex": 0,
     "RemovedIndex": 1
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)BarBaseNested",
+    "LeftComment": "BarBaseNested",
+    "RightUsr": "",
+    "RightComment": "BarBase.Nested",
+    "ModuleName": "bar"
   }
 ]

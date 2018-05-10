@@ -10,6 +10,7 @@
     "CharacterUnicodeScalars.swift",
     "ICU.swift",
     "NormalizedCodeUnitIterator.swift",
+    "SmallString.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
@@ -18,6 +19,7 @@
     "StringComparison.swift",
     "StringObject.swift",
     "StringGuts.swift",
+    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",  
     "StringHashable.swift",
     "StringIndex.swift",
@@ -25,6 +27,7 @@
     "StringInterpolation.swift",
     "StringLegacy.swift",
     "StringNormalization.swift",
+    "StringProtocol.swift",
     "StringRangeReplaceableCollection.swift",
     "StringStorage.swift",
     "StringSwitch.swift",
@@ -103,8 +106,9 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
-        "HashedCollections.swift",
-        "HashedCollectionsAnyHashableExtensions.swift"
+        "Dictionary.swift",
+        "HashedCollectionsAnyHashableExtensions.swift",
+        "Set.swift",
       ]
     }
   ],
@@ -131,7 +135,6 @@
     "BuiltinMath.swift",
     {
     "Integers": [
-      "DoubleWidth.swift",
       "Integers.swift",
       "IntegerParsing.swift"],
     "Floating": [
@@ -162,6 +165,7 @@
     "Interval.swift",
     "Hashing.swift",
     "SipHash.swift",
+    "Hasher.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",

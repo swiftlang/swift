@@ -80,8 +80,8 @@ enum ForDefinition_t : bool {
 /// declaration, such as uncurry levels of a function, the allocating and
 /// initializing entry points of a constructor, etc.
 struct SILDeclRef {
-  typedef llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *> Loc;
-  
+  using Loc = llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *>;
+
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
   enum class Kind : unsigned {

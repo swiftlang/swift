@@ -82,7 +82,7 @@ public:
   /// Return the first instruction of the function containing the memory object.
   SILInstruction *getFunctionEntryPoint() const;
 
-  CanType getType() const { return MemorySILType.getSwiftRValueType(); }
+  CanType getType() const { return MemorySILType.getASTType(); }
 
   SingleValueInstruction *getAddress() const {
     if (isa<MarkUninitializedInst>(MemoryInst) ||

@@ -9,6 +9,10 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/Benchmark_RuntimeLeaksRunner
   @ONLY)
 configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/Benchmark_QuickCheck.in
+  ${CMAKE_CURRENT_BINARY_DIR}/Benchmark_QuickCheck
+  @ONLY)
+configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/Benchmark_DTrace.in
   ${CMAKE_CURRENT_BINARY_DIR}/Benchmark_DTrace
   @ONLY)
@@ -20,6 +24,11 @@ file(COPY ${CMAKE_CURRENT_BINARY_DIR}/Benchmark_GuardMalloc
      GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
 file(COPY ${CMAKE_CURRENT_BINARY_DIR}/Benchmark_RuntimeLeaksRunner
+     DESTINATION "${swift-bin-dir}"
+     FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
+     GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+
+file(COPY ${CMAKE_CURRENT_BINARY_DIR}/Benchmark_QuickCheck
      DESTINATION "${swift-bin-dir}"
      FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
      GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)

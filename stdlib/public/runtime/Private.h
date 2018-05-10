@@ -196,12 +196,17 @@ public:
   /// Replace entries of a freshly-instantiated value witness table with more
   /// efficient common implementations where applicable.
   ///
+  /// All information is taken from the passed-in layout rather than the VWT.
+  /// This is so that we can delay "publishing" the flags in the actual
+  /// value witness table until all required changes have been made.
+  ///
   /// For instance, if the value witness table represents a POD type, this will
   /// insert POD value witnesses into the table. The vwtable's flags must have
   /// been initialized before calling this function.
   ///
   /// Returns true if common value witnesses were used, false otherwise.
-  void installCommonValueWitnesses(ValueWitnessTable *vwtable);
+  void installCommonValueWitnesses(const TypeLayout &layout,
+                                   ValueWitnessTable *vwtable);
 
   const Metadata *
   _matchMetadataByMangledTypeName(const llvm::StringRef metadataNameRef,

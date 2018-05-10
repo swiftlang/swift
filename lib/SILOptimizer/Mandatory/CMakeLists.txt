@@ -2,6 +2,7 @@ set(MANDATORY_SOURCES
   Mandatory/AccessEnforcementSelection.cpp
   Mandatory/AccessMarkerElimination.cpp
   Mandatory/AddressLowering.cpp
+  Mandatory/ConstantPropagation.cpp
   Mandatory/DefiniteInitialization.cpp
   Mandatory/DIMemoryUseCollector.cpp
   Mandatory/DIMemoryUseCollectorOwnership.cpp
@@ -10,8 +11,9 @@ set(MANDATORY_SOURCES
   Mandatory/DiagnoseStaticExclusivity.cpp
   Mandatory/DiagnoseUnreachable.cpp
   Mandatory/GuaranteedARCOpts.cpp
+  Mandatory/IRGenPrepare.cpp
   Mandatory/MandatoryInlining.cpp
   Mandatory/PredictableMemOpt.cpp
-  Mandatory/ConstantPropagation.cpp
   Mandatory/SemanticARCOpts.cpp
+  Mandatory/ClosureLifetimeFixup.cpp
   PARENT_SCOPE)

@@ -119,6 +119,9 @@ public:
   /// Return this Version struct with minor and sub-minor components stripped
   Version asMajorVersion() const;
 
+  /// Return this Version struct as the appropriate version string for APINotes.
+  std::string asAPINotesVersionString() const;
+
   /// Parse a version in the form used by the _compiler_version \#if condition.
   static Optional<Version> parseCompilerVersionString(StringRef VersionString,
                                                       SourceLoc Loc,
@@ -143,8 +146,8 @@ public:
 
   // List of backward-compatibility versions that we permit passing as
   // -swift-version <vers>
-  static std::array<StringRef, 3> getValidEffectiveVersions() {
-    return {{"3", "4", "5"}};
+  static std::array<StringRef, 4> getValidEffectiveVersions() {
+    return {{"3", "4", "4.2", "5"}};
   };
 };
 

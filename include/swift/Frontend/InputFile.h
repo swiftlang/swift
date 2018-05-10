@@ -95,6 +95,9 @@ public:
     return getPrimarySpecificPaths().SupplementaryOutputs
         .SerializedDiagnosticsPath;
   }
+  std::string fixItsOutputPath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.FixItsOutputPath;
+  }
 };
 } // namespace swift
 

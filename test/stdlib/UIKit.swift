@@ -1,4 +1,4 @@
-// RUN: rm -rf %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 3 %s -o %t/a.out3 && %target-run %t/a.out3
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-run %t/a.out4
 // REQUIRES: executable_test

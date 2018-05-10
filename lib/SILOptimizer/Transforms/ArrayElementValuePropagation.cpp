@@ -324,15 +324,15 @@ public:
       assert(AppendContentsOf && "Must be AppendContentsOf call");
 
       NominalTypeDecl *AppendSelfArray = AppendContentsOf.getSelf()->getType().
-        getSwiftRValueType()->getAnyNominal();
+        getASTType()->getAnyNominal();
 
       // In case if it's not an Array, but e.g. an ContiguousArray
       if (AppendSelfArray != Ctx.getArrayDecl())
         continue;
 
       SILType ArrayType = Repl.Array->getType();
-      auto *NTD = ArrayType.getSwiftRValueType()->getAnyNominal();
-      SubstitutionMap ArraySubMap = ArrayType.getSwiftRValueType()
+      auto *NTD = ArrayType.getASTType()->getAnyNominal();
+      SubstitutionMap ArraySubMap = ArrayType.getASTType()
         ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
       
       GenericSignature *Sig = NTD->getGenericSignature();

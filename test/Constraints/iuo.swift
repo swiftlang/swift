@@ -178,3 +178,48 @@ class rdar37241550 {
     f(rdar37241550.init) // no error, the failable init is not applicable
   }
 }
+
+class B {}
+class D : B {
+  var i: Int!
+}
+
+func coerceToIUO(d: D?) -> B {
+  return d as B! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+}
+
+func forcedDowncastToOptional(b: B?) -> D? {
+  return b as! D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+}
+
+func forcedDowncastToObject(b: B?) -> D {
+  return b as! D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+}
+
+func forcedDowncastToObjectIUOMember(b: B?) -> Int {
+  return (b as! D!).i // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+}
+
+func forcedUnwrapViaForcedCast(b: B?) -> B {
+  return b as! B! // expected-warning {{forced cast from 'B?' to 'B' only unwraps optionals; did you mean to use '!'?}}
+  // expected-warning@-1 {{using '!' here is deprecated and will be removed in a future release}}
+}
+
+func conditionalDowncastToOptional(b: B?) -> D? {
+  return b as? D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+}
+
+func conditionalDowncastToObject(b: B?) -> D {
+  return b as? D! // expected-error {{value of optional type 'D?' not unwrapped; did you mean to use '!' or '?'?}}
+  // expected-warning@-1 {{using '!' here is deprecated and will be removed in a future release}}
+}
+
+// Ensure that we select the overload that does *not* involve forcing an IUO.
+func sr6988(x: Int?, y: Int?) -> Int { return x! }
+func sr6988(x: Int, y: Int) -> Float { return Float(x) }
+
+var x: Int! = nil
+var y: Int = 2
+
+let r = sr6988(x: x, y: y)
+let _: Int = r

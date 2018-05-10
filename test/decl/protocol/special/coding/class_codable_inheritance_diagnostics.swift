@@ -42,9 +42,9 @@ class FailableNonDecodableSub : FailableNonDecodableSuper, Decodable { // expect
 
 // Subclasses of classes whose Decodable synthesis fails should not inherit
 // conformance.
-class FailedSynthesisDecodableSuper : Decodable { // expected-error {{type 'FailedSynthesisDecodableSuper' does not conform to protocol 'Decodable'}}
+class FailedSynthesisDecodableSuper : Decodable { // expected-error 2{{type 'FailedSynthesisDecodableSuper' does not conform to protocol 'Decodable'}}
   enum CodingKeys : String, CodingKey {
-    case nonexistent // expected-note {{CodingKey case 'nonexistent' does not match any stored properties}}
+    case nonexistent // expected-note 2{{CodingKey case 'nonexistent' does not match any stored properties}}
   }
 }
 

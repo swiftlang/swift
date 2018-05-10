@@ -91,6 +91,15 @@ try let multi1 = foo(), multi2 = bar() // expected-error {{'try' must be placed 
                                        // expected-note@-1 {{did you mean to use 'try'?}} {{18-18=try }} expected-note@-1 {{did you mean to use 'try'?}} {{34-34=try }}
                                        // expected-note@-2 {{did you mean to handle error as optional value?}} {{18-18=try? }} expected-note@-2 {{did you mean to handle error as optional value?}} {{34-34=try? }}
                                        // expected-note@-3 {{did you mean to disable error propagation?}} {{18-18=try! }} expected-note@-3 {{did you mean to disable error propagation?}} {{34-34=try! }}
+class TryDecl { // expected-note {{in declaration of 'TryDecl'}}
+  try let singleLet = foo() // expected-error {{'try' must be placed on the initial value expression}} {{3-7=}} {{23-23=try }}
+                            // expected-error @-1 {{call can throw, but errors cannot be thrown out of a property initializer}}
+  try var singleVar = foo() // expected-error {{'try' must be placed on the initial value expression}} {{3-7=}} {{23-23=try }}
+                            // expected-error @-1 {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  try // expected-error {{expected declaration}}
+  func method() {}
+}
 
 func test() throws -> Int {
   try while true { // expected-error {{'try' cannot be used with 'while'}}
@@ -142,7 +151,7 @@ struct r21432429 {
 
 // <rdar://problem/21427855> Swift 2: Omitting try from call to throwing closure in rethrowing function crashes compiler
 func callThrowingClosureWithoutTry(closure: (Int) throws -> Int) rethrows {
-  closure(0)  // expected-error {{call can throw but is not marked with 'try'}} expected-warning {{result of call is unused}}
+  closure(0)  // expected-error {{call can throw but is not marked with 'try'}} expected-warning {{result of call to function returning 'Int' is unused}}
               // expected-note@-1 {{did you mean to use 'try'?}} {{3-3=try }}
               // expected-note@-2 {{did you mean to handle error as optional value?}} {{3-3=try? }}
               // expected-note@-3 {{did you mean to disable error propagation?}} {{3-3=try! }}

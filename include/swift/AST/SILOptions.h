@@ -42,20 +42,6 @@ public:
   /// The number of threads for multi-threaded code generation.
   int NumThreads = 0;
   
-  enum LinkingMode {
-    /// Skip SIL linking.
-    LinkNone,
-
-    /// Perform normal SIL linking.
-    LinkNormal,
-
-    /// Link all functions during SIL linking.
-    LinkAll
-  };
-
-  /// Controls how to perform SIL linking.
-  LinkingMode LinkMode = LinkNormal;
-
   /// Controls whether to pull in SIL from partial modules during the
   /// merge modules step. Could perhaps be merged with the link mode
   /// above but the interactions between all the flags are tricky.
@@ -114,7 +100,7 @@ public:
   llvm::StringRef ExternalPassPipelineFilename;
 
   /// Emit normal function arguments using the +0 guaranteed convention.
-  bool EnableGuaranteedNormalArguments = false;
+  bool EnableGuaranteedNormalArguments = true;
 
   /// Don't generate code using partial_apply in SIL generation.
   bool DisableSILPartialApply = false;

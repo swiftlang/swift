@@ -226,7 +226,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     S = stripCasts(S);
 
     if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S)) {
-      if (S->getType().getSwiftRValueType()->hasDynamicSelfType())
+      if (S->getType().getASTType()->hasDynamicSelfType())
         return SILValue();
       return S;
     }
@@ -570,7 +570,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   SmallVector<Substitution, 4> Subs;
   getSubstitutionsForCallee(Mod, GenCalleeType,
-                            ClassOrMetatypeType.getSwiftRValueType(),
+                            ClassOrMetatypeType.getASTType(),
                             AI, Subs);
   CanSILFunctionType SubstCalleeType = GenCalleeType;
   if (GenCalleeType->isPolymorphic())
@@ -922,9 +922,7 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
     SAI = Builder.createTryApply(Loc, FRI, NewSubs, Arguments,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    auto PartialApplyConvention = PAI->getType()
-                                      .getSwiftRValueType()
-                                      ->getAs<SILFunctionType>()
+    auto PartialApplyConvention = PAI->getType().getAs<SILFunctionType>()
                                       ->getCalleeConvention();
     auto *NewPAI = Builder.createPartialApply(
         Loc, FRI, NewSubs, Arguments, PartialApplyConvention);

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -module-name Foundation -o %t/Foundation.swiftmodule %S/Inputs/Foundation-with-NSError.swift
 // RUN: %target-swift-frontend -I %t -typecheck -verify %s
 // UNSUPPORTED: objc_interop

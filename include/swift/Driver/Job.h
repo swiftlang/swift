@@ -15,16 +15,16 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
-#include "swift/Driver/OutputFileMap.h"
-#include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
-#include "llvm/Option/Option.h"
+#include "swift/Frontend/FileTypes.h"
+#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Option/Option.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -109,7 +109,7 @@ class CommandOutput {
 
   /// A CommandOutput designates one type of output as primary, though there
   /// may be multiple outputs of that type.
-  types::ID PrimaryOutputType;
+  file_types::ID PrimaryOutputType;
 
   /// A CommandOutput also restricts its attention regarding additional-outputs
   /// to a subset of the PrimaryOutputs associated with its PrimaryInputs;
@@ -117,11 +117,14 @@ class CommandOutput {
   /// phases (eg. autolink-extract and link both operate on the same .o file),
   /// so Jobs cannot _just_ rely on the presence of a primary output in the
   /// DerivedOutputFileMap.
-  llvm::SmallSet<types::ID, 4> AdditionalOutputTypes;
+  llvm::SmallSet<file_types::ID, 4> AdditionalOutputTypes;
 
-  /// The set of input filenames for this \c CommandOutput; combined with \c
-  /// DerivedOutputMap, specifies a set of output filenames (of which one -- the
-  /// one of type \c PrimaryOutputType) is the primary output filename.
+  /// The list of inputs for this \c CommandOutput. Each input in the list has
+  /// two names (often but not always the same), of which the second (\c
+  /// CommandInputPair::Primary) acts as a key into \c DerivedOutputMap.  Each
+  /// input thus designates an associated _set_ of outputs, one of which (the
+  /// one of type \c PrimaryOutputType) is considered the "primary output" for
+  /// the input.
   SmallVector<CommandInputPair, 1> Inputs;
 
   /// All CommandOutputs in a Compilation share the same \c
@@ -132,23 +135,21 @@ class CommandOutput {
   // If there is an entry in the DerivedOutputMap for a given (\p
   // PrimaryInputFile, \p Type) pair, return a nonempty StringRef, otherwise
   // return an empty StringRef.
-  StringRef
-  getOutputForInputAndType(StringRef PrimaryInputFile, types::ID Type) const;
+  StringRef getOutputForInputAndType(StringRef PrimaryInputFile,
+                                     file_types::ID Type) const;
 
   /// Add an entry to the \c DerivedOutputMap if it doesn't exist. If an entry
   /// already exists for \p PrimaryInputFile of type \p type, then either
   /// overwrite the entry (if \p overwrite is \c true) or assert that it has
   /// the same value as \p OutputFile.
-  void ensureEntry(StringRef PrimaryInputFile,
-                   types::ID Type,
-                   StringRef OutputFile,
-                   bool Overwrite);
+  void ensureEntry(StringRef PrimaryInputFile, file_types::ID Type,
+                   StringRef OutputFile, bool Overwrite);
 
 public:
-  CommandOutput(types::ID PrimaryOutputType, OutputFileMap &Derived);
+  CommandOutput(file_types::ID PrimaryOutputType, OutputFileMap &Derived);
 
   /// Return the primary output type for this CommandOutput.
-  types::ID getPrimaryOutputType() const;
+  file_types::ID getPrimaryOutputType() const;
 
   /// Associate a new \p PrimaryOutputFile (of type \c getPrimaryOutputType())
   /// with the provided \p Input pair of Base and Primary inputs.
@@ -183,12 +184,13 @@ public:
   /// an additional output named \p OutputFilename of type \p type with the
   /// first primary input. If the provided \p type is the primary output type,
   /// overwrite the existing entry assocaited with the first primary input.
-  void setAdditionalOutputForType(types::ID type, StringRef OutputFilename);
+  void setAdditionalOutputForType(file_types::ID type,
+                                  StringRef OutputFilename);
 
   /// Assuming (and asserting) that there are one or more input pairs, return
   /// the _additional_ (not primary) output of type \p type associated with the
   /// first primary input.
-  StringRef getAdditionalOutputForType(types::ID type) const;
+  StringRef getAdditionalOutputForType(file_types::ID type) const;
 
   /// Return a vector of additional (not primary) outputs of type \p type
   /// associated with the primary inputs.
@@ -199,15 +201,22 @@ public:
   /// length is _either_ zero, one, or equal to the size of the set of inputs,
   /// as these are the only valid arity relationships between primary and
   /// additional outputs.
-  SmallVector<StringRef, 16> getAdditionalOutputsForType(types::ID type) const;
+  SmallVector<StringRef, 16>
+  getAdditionalOutputsForType(file_types::ID type) const;
 
   /// Assuming (and asserting) that there is only one input pair, return any
   /// output -- primary or additional -- of type \p type associated with that
   /// the sole primary input.
-  StringRef getAnyOutputForType(types::ID type) const;
+  StringRef getAnyOutputForType(file_types::ID type) const;
+
+  /// Return the whole derived output map.
+  const OutputFileMap &getDerivedOutputMap() const;
 
   /// Return the BaseInput numbered by \p Index.
   StringRef getBaseInput(size_t Index) const;
+
+  /// Write a file map naming the outputs for each primary input.
+  void writeOutputFileMap(llvm::raw_ostream &out) const;
 
   void print(raw_ostream &Stream) const;
   void dump() const LLVM_ATTRIBUTE_USED;

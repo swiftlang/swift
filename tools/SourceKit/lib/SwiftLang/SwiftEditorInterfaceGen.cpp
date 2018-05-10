@@ -707,17 +707,6 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
     return;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    // NOTE: do not use primary file
-    // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenInterface, SwiftArgs,
-                   {std::make_pair("Name", Name),
-                    std::make_pair("ModuleName", ModuleName)});
-  }
-
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
 
   std::string ErrMsg;
@@ -783,16 +772,6 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
     Consumer->handleRequestError(Error.c_str());
     return;
   }
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    // NOTE: do not use primary file
-    // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenInterface, SwiftArgs,
-                   {std::make_pair("Name", Name),
-                     std::make_pair("SourceName", SourceName)});
-  }
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
@@ -805,7 +784,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
                                                  ArrayRef<const char *> Args,
                                                  bool UsingSwiftArgs,
                                                  bool SynthesizedExtensions,
-                                              Optional<unsigned> swiftVersion) {
+                                                 StringRef swiftVersion) {
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -826,21 +805,13 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
     return;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    // NOTE: do not use primary file
-    // NOTE: do not use files
-    TracedOp.start(trace::OperationKind::OpenHeaderInterface, SwiftArgs,
-                   {std::make_pair("Name", Name),
-                    std::make_pair("HeaderName", HeaderName)});
-  }
-
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
-  if (swiftVersion.hasValue()) {
-    auto swiftVer = version::Version({swiftVersion.getValue()});
-    Invocation.getLangOptions().EffectiveLanguageVersion = swiftVer;
+  if (!swiftVersion.empty()) {
+    auto swiftVer = version::Version::parseVersionString(swiftVersion,
+                                                         SourceLoc(), nullptr);
+    if (swiftVer.hasValue())
+      Invocation.getLangOptions().EffectiveLanguageVersion =
+          swiftVer.getValue();
   }
   auto IFaceGenRef = SwiftInterfaceGenContext::create(Name,
                                                       /*IsModule=*/false,

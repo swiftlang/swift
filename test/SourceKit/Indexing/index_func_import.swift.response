@@ -44,21 +44,21 @@
       key.kind: source.lang.swift.ref.function.free,
       key.name: "globalFunc()",
       key.usr: "s:11test_module10globalFuncyyF",
-      key.line: 8,
+      key.line: 7,
       key.column: 25
     },
     {
       key.kind: source.lang.swift.decl.function.free,
       key.name: "test()",
       key.usr: "s:17index_func_import4testyyF",
-      key.line: 10,
+      key.line: 9,
       key.column: 6,
       key.entities: [
         {
           key.kind: source.lang.swift.ref.function.free,
           key.name: "globalFunc()",
           key.usr: "s:11test_module10globalFuncyyF",
-          key.line: 11,
+          key.line: 10,
           key.column: 3
         }
       ]

@@ -14,23 +14,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
+#include "ASTVisitor.h"
 #include "ArgumentSource.h"
 #include "Conversion.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "Scope.h"
-#include "Initialization.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
-#include "ASTVisitor.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -228,7 +229,7 @@ ManagedValue LogicalPathComponent::materializeIntoTemporary(
   // If the RValue type has an openedExistential, then the RValue must be
   // materialized before allocating a temporary for the RValue type. In that
   // case, the RValue cannot be emitted directly into the temporary.
-  if (getTypeOfRValue().getSwiftRValueType()->hasOpenedExistential()) {
+  if (getTypeOfRValue().hasOpenedExistential()) {
     // Emit a 'get'.
     rvalue = std::move(*this).get(SGF, loc, base, SGFContext());
 
@@ -303,7 +304,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
   RValue rvalue(SGF, loc, getSubstFormalType(), temporary);
 
   // Don't consume cleanups on the base if this isn't final.
-  if (!isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
+  if (base && !isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
 
   // Clone the component if this isn't final.
   std::unique_ptr<LogicalPathComponent> clonedComponent =
@@ -464,14 +465,16 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
            "tried to enter access scope without a writeback scope!");
     if (enforcement == SILAccessEnforcement::Dynamic) {
       SGF.B.createBeginUnpairedAccess(loc, addr, unpairedAccesses->Buffer,
-                                      silAccessKind, enforcement);
+                                      silAccessKind, enforcement,
+                                      /*hasNoNestedConflict=*/false);
       unpairedAccesses->NumAccesses++;
     }
     return addr;
   }
 
   // Enter the access.
-  addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement);
+  addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
+                                 /*hasNoNestedConflict=*/false);
 
   // Push a writeback to end it.
   auto accessedMV = ManagedValue::forLValue(addr);
@@ -495,12 +498,17 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  SILValue base = findAccessedAddressBase(address);
-  if (!base || !isPossibleFormalAccessBase(base))
+  const AccessedStorage &storage = findAccessedStorage(address);
+  if (!storage) {
+    llvm::dbgs() << "Bad memory access source: " << address;
+    llvm_unreachable("Unexpected access source.");
+  }
+  if (!isPossibleFormalAccessBase(storage, &SGF.F))
     return address;
 
   auto BAI =
-      SGF.B.createBeginAccess(loc, address, kind, SILAccessEnforcement::Unsafe);
+    SGF.B.createBeginAccess(loc, address, kind, SILAccessEnforcement::Unsafe,
+                            /*hasNoNestedConflict=*/false);
   beginAccessPtr = BeginAccessPtr(BAI, DeleterCheck());
 
   return BAI;
@@ -597,7 +605,9 @@ namespace {
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
 
-      if (!IsNonAccessing) {
+      // Avoid emitting access markers completely for non-accesses or immutable
+      // declarations. Access marker verification is aware of these cases.
+      if (!IsNonAccessing && !Field->isLet()) {
         if (auto enforcement = SGF.getDynamicEnforcement(Field)) {
           result = enterAccessScope(SGF, loc, result, getTypeData(),
                                     accessKind, *enforcement);
@@ -883,7 +893,7 @@ static bool isReadNoneFunction(const Expr *e) {
   if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
     DeclName name = dre->getDecl()->getFullName();
     return (name.getArgumentNames().size() == 1 &&
-            name.getBaseName() == "init" &&
+            name.getBaseName() == DeclBaseName::createConstructor() &&
             !name.getArgumentNames()[0].empty() &&
             (name.getArgumentNames()[0].str() == "integerLiteral" ||
              name.getArgumentNames()[0].str() == "_builtinIntegerLiteral"));
@@ -1233,9 +1243,6 @@ namespace {
       SILValue buffer =
         SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
 
-      // Postpone cleanup for noescape closures.
-      PostponedCleanup postpone(SGF, true);
-
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
       std::unique_ptr<LogicalPathComponent> clonedComponent(
@@ -1293,7 +1300,6 @@ namespace {
       // access for stored properties with didSet.
       pushWriteback(SGF, loc, std::move(clonedComponent), base, materialized);
 
-      postpone.end();
       return ManagedValue::forLValue(materialized.temporary.getValue());
     }
 
@@ -2421,7 +2427,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   assert(lv.isValid());
 
   CanType substFormalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
+  lv.addMemberVarComponent(SGF, e, var,
+                           e->getMember().getSubstitutions().toList(),
                            options, e->isSuper(), accessKind,
                            e->getAccessSemantics(),
                            strategy, substFormalRValueType);
@@ -2520,7 +2527,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   RValue index = SGF.emitRValue(indexExpr);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberSubscriptComponent(SGF, e, decl, e->getDecl().getSubstitutions(),
+  lv.addMemberSubscriptComponent(SGF, e, decl,
+                                 e->getDecl().getSubstitutions().toList(),
                                  options, e->isSuper(), accessKind,
                                  accessSemantics, strategy,
                                  formalRValueType, std::move(index),
@@ -2684,7 +2692,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
 
   // Bind the value, branching to the destination address if there's no
   // value there.
-  SGF.emitBindOptional(e, optAddr, e->getDepth());
+  SGF.emitBindOptionalAddress(e, optAddr, e->getDepth());
 
   // Project out the payload on the success branch.  We can just use a
   // naked ValueComponent here; this is effectively a separate l-value.
@@ -2711,7 +2719,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   SILGenLValue sgl(*this);
   LValue lv;
 
-  auto baseType = base.getType().getSwiftRValueType();
+  auto baseType = base.getType().getASTType();
   auto subMap = baseType->getContextSubstitutionMap(
       SGM.M.getSwiftModule(), ivar->getDeclContext());
 
@@ -3436,12 +3444,18 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   if (!dest->canPerformInPlaceInitialization())
     return skipPeephole();
   auto destAddr = dest->getAddressForInPlaceInitialization(*this, loc);
-  assert(src.getTypeOfRValue().getSwiftRValueType()
-           == destAddr->getType().getSwiftRValueType());
-  
+  assert(src.getTypeOfRValue().getASTType()
+           == destAddr->getType().getASTType());
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
-  B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
+
+  UnenforcedAccess access;
+  SILValue accessAddress =
+    access.beginAccess(*this, loc, destAddr, SILAccessKind::Modify);
+  B.createCopyAddr(loc, srcAddr, accessAddress, IsNotTake, IsInitialization);
+  access.endAccess(*this);
+
   dest->finishInitialization(*this);
 }
 

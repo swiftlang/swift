@@ -1276,12 +1276,11 @@ class RefCounts {
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.
   uint32_t getWeakCount() const;
-
-
+  
   private:
   HeapObject *getHeapObject();
   
-  HeapObjectSideTableEntry* allocateSideTable();
+  HeapObjectSideTableEntry* allocateSideTable(bool failIfDeiniting);
 };
 
 typedef RefCounts<InlineRefCountBits> InlineRefCounts;
@@ -1463,6 +1462,10 @@ class HeapObjectSideTableEntry {
 
   uint32_t getWeakCount() const {
     return refCounts.getWeakCount();
+  }
+  
+  void *getSideTable() {
+    return refCounts.getSideTable();
   }
 };
 

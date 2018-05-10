@@ -60,13 +60,15 @@ namespace irgen {
   class WeakTypeInfo;
   
 /// Either a type or a forward-declaration.
-typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
+using TypeCacheEntry = llvm::PointerUnion<const TypeInfo *, llvm::Type *>;
 
 /// The helper class for generating types.
 class TypeConverter {
 public:
   IRGenModule &IGM;
 private:
+  bool CompletelyFragile = false;
+
   llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
   const TypeInfo *FirstType;
   
@@ -130,6 +132,10 @@ public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
 
+  bool isCompletelyFragile() const {
+    return CompletelyFragile;
+  }
+
   TypeCacheEntry getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
   const TypeInfo *tryGetCompleteTypeInfo(CanType type);
@@ -160,6 +166,12 @@ public:
   /// Exit a generic context.
   void popGenericContext(CanGenericSignature signature);
 
+  /// Enter a scope where all types are lowered bypassing resilience.
+  void pushCompletelyFragile();
+
+  /// Exit a completely fragile scope.
+  void popCompletelyFragile();
+
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
@@ -169,10 +181,6 @@ private:
   // Debugging aids.
 #ifndef NDEBUG
   bool isExemplarArchetype(ArchetypeType *arch) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    CanType getTypeThatLoweredTo(llvm::Type *t) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
 #endif
 
   ArchetypeType *getExemplarArchetype(ArchetypeType *t);
@@ -181,19 +189,12 @@ private:
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
     llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(TypeBase *t);
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> FragileIndependentCache;
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> FragileDependentCache;
 
-    friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
-    friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
-                                                           NominalTypeDecl *D);
-    friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
-    friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
-    friend void TypeConverter::popGenericContext(CanGenericSignature signature);
-    
-#ifndef NDEBUG
-    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
-    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
-#endif
+  public:
+    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(bool isDependent,
+                                                           bool completelyFragile);
   };
   Types_t Types;
 };
@@ -216,6 +217,26 @@ public:
   
   ~GenericContextScope() {
     TC.popGenericContext(sig);
+  }
+};
+
+/// An RAII interface for forcing types to be lowered bypassing resilience.
+class CompletelyFragileScope {
+  bool State;
+  TypeConverter &TC;
+public:
+  explicit CompletelyFragileScope(TypeConverter &TC) : TC(TC) {
+    State = TC.isCompletelyFragile();
+    if (!State)
+      TC.pushCompletelyFragile();
+  }
+
+  CompletelyFragileScope(IRGenModule &IGM)
+    : CompletelyFragileScope(IGM.Types) {}
+
+  ~CompletelyFragileScope() {
+    if (!State)
+      TC.popCompletelyFragile();
   }
 };
 

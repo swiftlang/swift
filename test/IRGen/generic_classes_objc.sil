@@ -69,6 +69,6 @@ bb0(%0 : $Int, %1 : $GenericInheritsObjC<T>):
 protocol P2 { }
 
 // CHECK: @"$S20generic_classes_objc16Generic3WithReqsCMn" = hidden constant
-// CHECK-SAME: i32 3, i32 3, i32 3, i32 2
+// CHECK-SAME: i16 3, i16 3, i16 3, i16 2
 class Generic3WithReqs<T: P1, U: P2, V: P2> { }
 sil_vtable Generic3WithReqs { }

@@ -21,6 +21,7 @@ func testPopFirst() {
   dump(charSubView)
 
   var _ = String(str.utf8) ?? "" // expected-warning{{'init' is deprecated: Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)}}
-  var _: String = String(str.utf8) // expected-error{{'init' is unavailable: Please use failable String.init?(_:UTF8View) when in Swift 3.2 mode}}
+  var _ = String(str.utf8) // expected-warning{{'init' is deprecated: Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)}}
+  var _: String = String(str.utf8) // expected-error {{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
 }
 

@@ -33,11 +33,14 @@ namespace swiftcall {
 
 namespace swift {
   class EnumElementDecl;
-  
+  enum IsInitialization_t : bool;
+  enum IsTake_t : bool;
+
 namespace irgen {
   class EnumPayload;
   class EnumPayloadSchema;
   class IRGenFunction;
+  class MetadataDependencyCollector;
   class TypeConverter;
   using clang::CodeGen::swiftcall::SwiftAggLowering;
 
@@ -212,10 +215,6 @@ public:
   /// Return a tag index in the range [0..NumElements].
   unsigned getTagIndex(EnumElementDecl *Case) const;
 
-  /// Return a tag index in the range
-  /// [-ElementsWithPayload..ElementsWithNoPayload-1].
-  int getResilientTagIndex(EnumElementDecl *Case) const;
-
   /// Map the given element to the appropriate index in the
   /// discriminator type.
   /// Returns -1 if this is not supported by the enum implementation.
@@ -373,7 +372,8 @@ public:
   virtual void initializeMetadata(IRGenFunction &IGF,
                                   llvm::Value *metadata,
                                   bool isVWTMutable,
-                                  SILType T) const = 0;
+                                  SILType T,
+                              MetadataDependencyCollector *collector) const = 0;
 
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
 
@@ -431,10 +431,24 @@ public:
   virtual llvm::Value *loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                          Address addr) const;
 
-  virtual void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const = 0;
+  void callOutlinedCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, IsInitialization_t isInit,
+                        IsTake_t isTake) const;
+
+  void callOutlinedDestroy(IRGenFunction &IGF, Address addr, SILType T) const;
+
+  virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                           SILType T) const = 0;
+
+  virtual bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                         ReferenceCounting *rc) const {
+    return false;
+  }
+
+  void emitResilientTagIndices(IRGenModule &IGM) const;
+
+protected:
+
 
 private:
   EnumImplStrategy(const EnumImplStrategy &) = delete;

@@ -4,11 +4,32 @@
 import resilient_struct
 import resilient_protocol
 
+public protocol Associate {
+  associatedtype X
+}
+
+// Dependent conformance
+// CHECK-LABEL: @"$S28protocol_conformance_records9DependentVyxGAA9AssociateAAMc" ={{ dllexport | protected | }}constant
+// -- protocol descriptor
+// CHECK-SAME:           @"$S28protocol_conformance_records9AssociateMp"
+// -- nominal type descriptor
+// CHECK-SAME:           @"$S28protocol_conformance_records9DependentVMn"
+// -- witness table accessor
+// CHECK-SAME:           @"$S28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
+// -- flags
+// CHECK-SAME:           i32 1
+// CHECK-SAME:         }
+public struct Dependent<T> {}
+
+extension Dependent : Associate {
+  public typealias X = (T, T)
+}
+
 public protocol Runcible {
   func runce()
 }
 
-// CHECK-LABEL: @"$S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL: @"$S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc" ={{ dllexport | protected | }}constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE:@"\$S28protocol_conformance_records8RuncibleMp"]]
 // -- type metadata
@@ -22,7 +43,7 @@ public struct NativeValueType: Runcible {
   public func runce() {}
 }
 
-// CHECK-LABEL:         @"$S28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL:         @"$S28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAMc" ={{ dllexport | protected | }}constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- class metadata
@@ -36,7 +57,7 @@ public class NativeClassType: Runcible {
   public func runce() {}
 }
 
-// CHECK-LABEL:         @"$S28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL:         @"$S28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAMc" ={{ dllexport | protected | }}constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- nominal type descriptor
@@ -50,7 +71,7 @@ public struct NativeGenericType<T>: Runcible {
   public func runce() {}
 }
 
-// CHECK-LABEL:         @"$SSi28protocol_conformance_records8RuncibleAAMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL:         @"$SSi28protocol_conformance_records8RuncibleAAMc" ={{ dllexport | protected | }}constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- type metadata
@@ -66,7 +87,7 @@ extension Int: Runcible {
 
 // For a resilient struct, reference the NominalTypeDescriptor
 
-// CHECK-LABEL:         @"$S16resilient_struct4SizeV28protocol_conformance_records8RuncibleADMc" ={{ protected | }}constant %swift.protocol_conformance_descriptor {
+// CHECK-LABEL:         @"$S16resilient_struct4SizeV28protocol_conformance_records8RuncibleADMc" ={{ dllexport | protected | }}constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
 // -- nominal type descriptor
@@ -85,11 +106,10 @@ extension Size: Runcible {
 // CHECK-SAME: @"$S28protocol_conformance_records8RuncibleMp"
 // CHECK-SAME: @"$S28protocol_conformance_records5SpoonMp"
 
-// TODO: conformances that need lazy initialization
 public protocol Spoon { }
 
 // Conditional conformances
-// CHECK-LABEL: {{^}}@"$S28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc" ={{ protected | }}constant
+// CHECK-LABEL: {{^}}@"$S28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc" ={{ dllexport | protected | }}constant
 // -- protocol descriptor
 // CHECK-SAME:           @"$S28protocol_conformance_records5SpoonMp"
 // -- nominal type descriptor
@@ -108,7 +128,7 @@ extension NativeGenericType : Spoon where T: Spoon {
 }
 
 // Retroactive conformance
-// CHECK-LABEL: @"$SSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc" ={{ protected | }}constant
+// CHECK-LABEL: @"$SSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc" ={{ dllexport | protected | }}constant
 // -- protocol descriptor
 // CHECK-SAME:           @"got.$S18resilient_protocol22OtherResilientProtocolMp"
 // -- nominal type descriptor

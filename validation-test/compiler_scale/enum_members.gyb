@@ -1,4 +1,4 @@
-// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select validateDecl %s
+// RUN: %scale-test --sum-multi --typecheck --begin 5 --end 16 --step 5 --select NumDeclsValidated %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

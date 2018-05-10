@@ -16,13 +16,8 @@ import Foundation
 
 #if os(iOS)
 
-public protocol _AVCapturePhotoOutputSwiftNativeTypes {
-  var __supportedFlashModes: [NSNumber] { get }
-  var __availablePhotoPixelFormatTypes: [NSNumber] { get }
-  var __availableRawPhotoPixelFormatTypes: [NSNumber] { get }
-}
-
-extension _AVCapturePhotoOutputSwiftNativeTypes {
+@available(iOS, introduced: 10.0)
+extension AVCapturePhotoOutput {
   @available(swift, obsoleted: 4.0)
   @available(iOS, introduced: 10.0)
   @nonobjc
@@ -67,15 +62,7 @@ extension _AVCapturePhotoOutputSwiftNativeTypes {
 }
 
 @available(iOS, introduced: 10.0)
-extension AVCapturePhotoOutput : _AVCapturePhotoOutputSwiftNativeTypes {
-}
-
-
-public protocol _AVCapturePhotoSettingsSwiftNativeTypes {
-  var __availablePreviewPhotoPixelFormatTypes: [NSNumber] { get }
-}
-
-extension _AVCapturePhotoSettingsSwiftNativeTypes {
+extension AVCapturePhotoSettings {
   @available(swift, obsoleted: 4.0)
   @available(iOS, introduced: 10.0)
   @nonobjc
@@ -89,10 +76,6 @@ extension _AVCapturePhotoSettingsSwiftNativeTypes {
   public var availablePreviewPhotoPixelFormatTypes: [OSType] {
     return __availablePreviewPhotoPixelFormatTypes.map { $0.uint32Value } as [OSType]
   }
-}
-
-@available(iOS, introduced: 10.0)
-extension AVCapturePhotoSettings : _AVCapturePhotoSettingsSwiftNativeTypes {
 }
 
 #endif

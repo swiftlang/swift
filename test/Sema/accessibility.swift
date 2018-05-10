@@ -430,6 +430,7 @@ class DefaultSubclassPublic : PublicClass {}
 class DefaultSubclassInternal : InternalClass {}
 class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared private or fileprivate because its superclass is private}}
 
+// expected-note@+1 * {{superclass is declared here}}
 public class PublicGenericClass<T> {}
 // expected-note@+2 * {{type declared here}}
 // expected-note@+1 * {{superclass is declared here}}
@@ -441,7 +442,10 @@ open class OpenConcreteSubclassInternal : InternalGenericClass<Int> {} // expect
 public class PublicConcreteSubclassPublic : PublicGenericClass<Int> {}
 public class PublicConcreteSubclassInternal : InternalGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is internal}}
 public class PublicConcreteSubclassPrivate : PrivateGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is private}}
-public class PublicConcreteSubclassPublicPrivateArg : PublicGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared public because its superclass is private}}
+public class PublicConcreteSubclassPublicPrivateArg : PublicGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared public because its superclass uses a private type as a generic parameter}}
+public class PublicConcreteSubclassPublicInternalArg : PublicGenericClass<InternalStruct> {} // expected-error {{class cannot be declared public because its superclass uses an internal type as a generic parameter}}
+open class OpenConcreteSubclassPublicFilePrivateArg : PublicGenericClass<FilePrivateStruct> {} // expected-error {{class cannot be declared open because its superclass uses a fileprivate type as a generic parameter}} expected-error {{superclass 'PublicGenericClass<FilePrivateStruct>' of open class must be open}}
+internal class InternalConcreteSubclassPublicFilePrivateArg : InternalGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared internal because its superclass uses a private type as a generic parameter}}
 
 open class OpenGenericSubclassInternal<T> : InternalGenericClass<T> {} // expected-error {{class cannot be declared open because its superclass is internal}} expected-error {{superclass 'InternalGenericClass<T>' of open class must be open}}
 public class PublicGenericSubclassPublic<T> : PublicGenericClass<T> {}
@@ -458,8 +462,8 @@ enum DefaultEnumPrivate {
 }
 public enum PublicEnumPI {
   case A(InternalStruct) // expected-error {{enum case in a public enum uses an internal type}}
-  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}}
-  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
+  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}} expected-error {{enum case in a public enum uses an internal type}}
+  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses an internal type}} expected-error {{enum case in a public enum uses a private type}}
 }
 enum DefaultEnumPublic {
   case A(PublicStruct) // no-warning

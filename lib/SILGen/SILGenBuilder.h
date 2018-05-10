@@ -101,7 +101,7 @@ public:
   }
 
   BuiltinInst *createBuiltin(SILLocation loc, Identifier name, SILType resultTy,
-                             SubstitutionList subs, ArrayRef<SILValue> args);
+                             SubstitutionMap subs, ArrayRef<SILValue> args);
 
   // Existential containers use the conformances needed by the existential
   // box.
@@ -236,9 +236,8 @@ public:
   ///
   /// \return an empty value if the buffer was taken from the context.
   ManagedValue bufferForExpr(SILLocation loc, SILType ty,
-                             const TypeLowering &lowering,
-                             SGFContext context,
-                             std::function<void(SILValue)> rvalueEmitter);
+                             const TypeLowering &lowering, SGFContext context,
+                             llvm::function_ref<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUncheckedEnumData;
   ManagedValue createUncheckedEnumData(SILLocation loc, ManagedValue operand,
@@ -255,7 +254,20 @@ public:
   ManagedValue createLoadCopy(SILLocation loc, ManagedValue addr,
                               const TypeLowering &lowering);
 
-  ManagedValue createFunctionArgument(SILType type, ValueDecl *decl);
+  /// Create a SILArgument for an input parameter. Asserts if used to create a
+  /// function argument for an out parameter.
+  ManagedValue createInputFunctionArgument(SILType type, ValueDecl *decl);
+
+  /// Create a SILArgument for an input parameter. Uses \p loc to create any
+  /// copies necessary. Asserts if used to create a function argument for an out
+  /// parameter.
+  ///
+  /// *NOTE* This API purposely used an Optional<SILLocation> to distinguish
+  /// this API from the ValueDecl * API in C++. This is necessary since
+  /// ValueDecl * can implicitly convert to SILLocation. The optional forces the
+  /// user to be explicit that they want to use this API.
+  ManagedValue createInputFunctionArgument(SILType type,
+                                           Optional<SILLocation> loc);
 
   using SILBuilder::createEnum;
   ManagedValue createEnum(SILLocation loc, ManagedValue payload,
@@ -263,9 +275,10 @@ public:
 
   ManagedValue createSemanticLoadBorrow(SILLocation loc, ManagedValue addr);
 
-  ManagedValue formalAccessBufferForExpr(
-      SILLocation loc, SILType ty, const TypeLowering &lowering,
-      SGFContext context, std::function<void(SILValue)> rvalueEmitter);
+  ManagedValue
+  formalAccessBufferForExpr(SILLocation loc, SILType ty,
+                            const TypeLowering &lowering, SGFContext context,
+                            llvm::function_ref<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUnconditionalCheckedCastValue;
   ManagedValue
@@ -293,9 +306,22 @@ public:
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,
                             SILType type);
 
+  using SILBuilder::tryCreateUncheckedRefCast;
+  ManagedValue tryCreateUncheckedRefCast(SILLocation loc, ManagedValue original,
+                                         SILType type);
+
+  using SILBuilder::createUncheckedTrivialBitCast;
+  ManagedValue createUncheckedTrivialBitCast(SILLocation loc,
+                                             ManagedValue original,
+                                             SILType type);
+
   using SILBuilder::createUncheckedRefCast;
   ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
                                       SILType type);
+
+  using SILBuilder::createUncheckedAddrCast;
+  ManagedValue createUncheckedAddrCast(SILLocation loc, ManagedValue op,
+                                       SILType resultTy);
 
   using SILBuilder::createUncheckedBitCast;
   ManagedValue createUncheckedBitCast(SILLocation loc, ManagedValue original,
@@ -333,6 +359,12 @@ public:
   using SILBuilder::createConvertFunction;
   ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy);
+
+  using SILBuilder::createConvertEscapeToNoEscape;
+  ManagedValue
+  createConvertEscapeToNoEscape(SILLocation loc, ManagedValue fn,
+                                SILType resultTy,
+                                bool isEscapedByUser);
 
   using SILBuilder::createStore;
   /// Forward \p value into \p address.

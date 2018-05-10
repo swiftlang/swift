@@ -307,15 +307,17 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
                        << "Parent: "
                        << CurSpecializationInfo->getParent()->getName() << "\n";
           llvm::dbgs() << "Substitutions:\n";
-          for (auto Sub: CurSpecializationInfo->getSubstitutions()) {
-            Sub.getReplacement()->dump();
+          for (auto Replacement :
+                CurSpecializationInfo->getSubstitutions()
+                  .getReplacementTypes()) {
+            Replacement->dump();
           });
 
     if (CurSpecializationInfo->getParent() == GenericFunc) {
       DEBUG(llvm::dbgs() << "Found a call graph loop, checking substitutions\n");
       // Consider if components of the substitution list gets bigger compared to
       // the previously seen specialization of the same generic function.
-      if (growingSubstitutions(CurSpecializationInfo->getSubstitutions(),
+      if (growingSubstitutions(CurSpecializationInfo->getSubstitutions().toList(),
                                Apply.getSubstitutions())) {
         DEBUG(llvm::dbgs() << "Found a generic specialization loop!\n");
         return true;
@@ -684,12 +686,19 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     if (!substConv.getSILType(PI).isLoadable(M)) {
       continue;
     }
-    if (PI.getConvention() == ParameterConvention::Indirect_In) {
+
+    switch (PI.getConvention()) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_In_Guaranteed:
       Conversions.set(IdxToInsert);
-    }
-    if ((PI.getConvention() == ParameterConvention::Indirect_In_Guaranteed) &&
-        substConv.getSILType(PI).isTrivial(M)) {
-      Conversions.set(IdxToInsert);
+      break;
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Unowned:
+    case ParameterConvention::Direct_Guaranteed:
+      break;
     }
   }
 
@@ -868,6 +877,11 @@ void ReabstractionInfo::performFullSpecializationPreparation(
   SubstitutedType = Callee->getLoweredFunctionType()->substGenericArgs(
       M, CalleeInterfaceToCallerArchetypeMap);
   ClonerParamSubs = CalleeParamSubs;
+  if (auto genericSig =
+        Callee->getLoweredFunctionType()->getGenericSignature())
+    ClonerParamSubMap = genericSig->getSubstitutionMap(CalleeParamSubs);
+  else
+    ClonerParamSubMap = SubstitutionMap();
   CallerParamSubs = {};
   createSubstitutedAndSpecializedTypes();
 }
@@ -1230,7 +1244,7 @@ public:
 
   void createSpecializedGenericSignatureWithNonGenericSubs();
 
-  void computeClonerParamSubs(SubstitutionList &ClonerParamSubs);
+  SubstitutionMap computeClonerParamSubs(SubstitutionList &ClonerParamSubs);
 
   void computeCallerParamSubs(GenericSignature *SpecializedGenericSig,
                               SubstitutionList &CallerParamSubs);
@@ -1519,8 +1533,8 @@ FunctionSignaturePartialSpecializer::
   return { GenEnv, GenSig };
 }
 
-void FunctionSignaturePartialSpecializer::computeClonerParamSubs(
-    SubstitutionList &ClonerParamSubs) {
+SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs(
+                                         SubstitutionList &ClonerParamSubs) {
   auto SubMap = CalleeGenericSig->getSubstitutionMap(
       [&](SubstitutableType *type) -> Type {
         DEBUG(llvm::dbgs() << "\ngetSubstitution for ClonerParamSubs:\n"
@@ -1538,6 +1552,8 @@ void FunctionSignaturePartialSpecializer::computeClonerParamSubs(
   CalleeGenericSig->getSubstitutions(SubMap, List);
   ClonerParamSubs = Ctx.AllocateCopy(List);
   verifySubstitutionList(ClonerParamSubs, "ClonerParamSubs");
+
+  return SubMap;
 }
 
 void FunctionSignaturePartialSpecializer::computeCallerParamSubs(
@@ -1717,7 +1733,7 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
   }
 
   // Create substitution lists for the caller and cloner.
-  FSPS.computeClonerParamSubs(ClonerParamSubs);
+  ClonerParamSubMap = FSPS.computeClonerParamSubs(ClonerParamSubs);
   FSPS.computeCallerParamSubs(SpecializedGenericSig, CallerParamSubs);
   // Create a substitution map for the caller interface substitutions.
   FSPS.computeCallerInterfaceSubs(CallerInterfaceSubs);
@@ -1880,8 +1896,8 @@ SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   linkSpecialization(M, SpecializedF);
   // Store the meta-information about how this specialization was created.
   auto *Caller = ReInfo.getApply() ? ReInfo.getApply().getFunction() : nullptr;
-  SubstitutionList Subs = Caller ? ReInfo.getApply().getSubstitutions()
-                                 : ReInfo.getClonerParamSubstitutions();
+  SubstitutionMap Subs = Caller ? ReInfo.getApply().getSubstitutionMap()
+                                : ReInfo.getClonerParamSubstitutionMap();
   SpecializedF->setSpecializationInfo(
       GenericSpecializationInformation::create(Caller, GenericFunc, Subs));
   return SpecializedF;
@@ -2333,7 +2349,7 @@ void swift::trySpecializeApplyOfGeneric(
       SILInstruction *User = Use->getUser();
       if (isa<RefCountingInst>(User))
         continue;
-      if (isDebugInst(User))
+      if (User->isDebugInstruction())
         continue;
 
       auto FAS = FullApplySite::isa(User);

@@ -19,7 +19,7 @@ public struct SmallResilientStruct {
   let x: Int32 = 0
 }
 
-// CHECK: @smallGlobal = {{(protected )?}}global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer
+// CHECK: @smallGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER:\[(12|24) x i8\]]] zeroinitializer
 sil_global [let] @smallGlobal : $SmallResilientStruct
 
 //
@@ -33,7 +33,7 @@ public struct LargeResilientStruct {
   let z: Int64 = 0
 }
 
-// CHECK: @largeGlobal = {{(protected )?}}global [[BUFFER]] zeroinitializer
+// CHECK: @largeGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER]] zeroinitializer
 sil_global [let] @largeGlobal : $LargeResilientStruct
 
 //
@@ -49,10 +49,10 @@ sil_global hidden @fixedGlobal : $LargeResilientStruct
 // management.
 //
 
-// CHECK: @otherGlobal = {{(protected )?}}global [[BUFFER]] zeroinitializer
+// CHECK: @otherGlobal = {{(dllexport )?}}{{(protected )?}}global [[BUFFER]] zeroinitializer
 sil_global [let] @otherGlobal : $Size
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testSmallGlobal()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testSmallGlobal()
 sil @testSmallGlobal : $@convention(thin) () -> () {
 bb0:
   // This is just a no-op
@@ -70,7 +70,7 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testLargeGlobal()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testLargeGlobal()
 sil @testLargeGlobal : $@convention(thin) () -> () {
 bb0:
   // CHECK: [[ALLOC:%.*]] = call noalias i8* @swift_slowAlloc([[INT]] 32, [[INT]] 7)
@@ -86,7 +86,7 @@ bb0:
   return %tuple : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testFixedGlobal()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testFixedGlobal()
 sil @testFixedGlobal : $@convention(thin) () -> () {
 bb0:
   alloc_global @fixedGlobal
@@ -106,11 +106,12 @@ bb0:
 // CHECK-LABEL: define {{.*}} @testOtherGlobal
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @"$S16resilient_struct4SizeVMa"()
-  // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+  // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
     alloc_global @otherGlobal
 
-  // CHECK: call %swift.opaque* @__swift_project_value_buffer(%swift.type* %0, %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
+  // CHECK: call %swift.opaque* @__swift_project_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
   %addr = global_addr @otherGlobal : $*Size
 
   %tuple = tuple ()

@@ -225,7 +225,7 @@ private:
         }
       }
     }
-    if (!inPatterns && items.size() > 0)
+    if (!inPatterns && !items.empty())
       checkPattern(items[0].getPattern(), DeclVisibilityKind::LocalVariable);
     visit(body);
   }

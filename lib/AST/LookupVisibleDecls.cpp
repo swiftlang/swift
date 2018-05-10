@@ -124,6 +124,10 @@ static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       const DeclContext *FromContext,
                                       LazyResolver *TypeResolver) {
+  // Accessors are never visible directly in the source language.
+  if (isa<AccessorDecl>(Member))
+    return false;
+
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
     TypeResolver->resolveAccessControl(Member);
@@ -805,10 +809,10 @@ public:
           OtherSignatureType = CT->getCanonicalType();
       }
 
-      if (conflicting(FoundSignature, OtherSignature, true) &&
-          (FoundSignatureType == OtherSignatureType ||
-           FoundSignature.Name.isCompoundName() !=
-             OtherSignature.Name.isCompoundName())) {
+      if (conflicting(M->getASTContext(), FoundSignature, FoundSignatureType,
+                      OtherSignature, OtherSignatureType,
+                      /*wouldConflictInSwift5*/nullptr,
+                      /*skipProtocolExtensionCheck*/true)) {
         if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);

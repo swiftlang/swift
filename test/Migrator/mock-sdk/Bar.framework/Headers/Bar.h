@@ -36,6 +36,7 @@ enum BarForwardDeclaredEnum {
 typedef struct {
   int count;
   int theSimpleOldName;
+  int theSimpleOldNameNotToRename;
 } SomeItemSet;
 
 typedef SomeItemSet SomeEnvironment;
@@ -52,3 +53,8 @@ typedef NS_ENUM(long, FooComparisonResult) {
   FooOrderedSame,
   FooOrderedDescending
 };
+
+@interface BarBase
+@end
+@interface BarBaseNested
+@end

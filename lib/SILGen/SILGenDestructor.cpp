@@ -117,10 +117,10 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   // Form a reference to the destroying destructor.
   SILDeclRef dtorConstant(dd, SILDeclRef::Kind::Destroyer);
   auto classTy = initialSelfValue->getType();
-  auto classDecl = classTy.getSwiftRValueType()->getAnyNominal();
+  auto classDecl = classTy.getASTType()->getAnyNominal();
   ManagedValue dtorValue;
   SILType dtorTy;
-  auto subMap = classTy.getSwiftRValueType()
+  auto subMap = classTy.getASTType()
     ->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                 classDecl);
   std::tie(dtorValue, dtorTy)

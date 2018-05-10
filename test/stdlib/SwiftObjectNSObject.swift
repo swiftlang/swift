@@ -40,7 +40,7 @@ func TestSwiftObjectNSObject(_ c: C, _ d: D)
 // This check is for NSLog() output from TestSwiftObjectNSObject().
 // CHECK: c ##SwiftObjectNSObject.C##
 // CHECK-NEXT: d ##SwiftObjectNSObject.D##
-// CHECK-NEXT: S ##Swift._SwiftObject##
+// CHECK-NEXT: S ##{{(Swift._)?}}SwiftObject##
 
 TestSwiftObjectNSObject(C(), D())
 // does not return

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+
+// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -172,8 +173,9 @@ func assign_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) 
 
 // CHECK: define hidden {{.*}}void @"$S8builtins16init_object_test{{[_0-9a-zA-Z]*}}F"
 func init_object_test(_ value: Builtin.NativeObject, ptr: Builtin.RawPointer) {
-  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to %swift.refcounted**
-  // CHECK-NEXT: store [[REFCOUNT]]* {{%.*}}, [[REFCOUNT]]** [[DEST]]
+  // CHECK: [[DEST:%.*]] = bitcast i8* {{%.*}} to [[REFCOUNT]]**
+  // CHECK-NEXT: call [[REFCOUNT]]* @swift_retain([[REFCOUNT]]* returned [[SRC:%.*]])
+  // CHECK-NEXT: store [[REFCOUNT]]* [[SRC]], [[REFCOUNT]]** [[DEST]]
   Builtin.initialize(value, ptr)
 }
 
@@ -408,20 +410,24 @@ func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(c) (B
 
 class C {}
 struct S {}
+#if _runtime(_ObjC)
 @objc class O {}
 @objc protocol OP1 {}
 @objc protocol OP2 {}
+#endif
 protocol P {}
 
 // CHECK-LABEL: define hidden {{.*}}void @"$S8builtins10canBeClass{{[_0-9a-zA-Z]*}}F"
 func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+#if _runtime(_ObjC)
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(O.self))
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(OP1.self))
   typealias ObjCCompo = OP1 & OP2
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(ObjCCompo.self))
+#endif
 
   // CHECK: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(S.self))
@@ -429,9 +435,11 @@ func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
   f(Builtin.canBeClass(C.self))
   // CHECK: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(P.self))
+#if _runtime(_ObjC)
   typealias MixedCompo = OP1 & P
-  // CHECK: call {{.*}}void {{%.*}}(i8 0
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(MixedCompo.self))
+#endif
 
   // CHECK: call {{.*}}void {{%.*}}(i8 2
   f(Builtin.canBeClass(T.self))
@@ -856,7 +864,7 @@ func testForceTry(_ fn: () -> ()) {
   try! createInt(fn)
 }
 
-// CHECK-LABEL: declare swiftcc void @swift_unexpectedError(%swift.error*
+// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @swift_unexpectedError(%swift.error*
 
 enum MyError : Error {
   case A, B

@@ -51,6 +51,16 @@ swift_reflection_createReflectionContext(void *ReaderContext,
                                          GetStringLengthFunction GetStringLength,
                                          GetSymbolAddressFunction GetSymbolAddress);
 
+/// \returns An opaque reflection context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+SwiftReflectionContextRef
+swift_reflection_createReflectionContextWithDataLayout(void *ReaderContext,
+                                     QueryDataLayoutFunction DataLayout,
+                                     FreeBytesFunction Free,
+                                     ReadBytesFunction ReadBytes,
+                                     GetStringLengthFunction GetStringLength,
+                                     GetSymbolAddressFunction GetSymbolAddress);
+
 /// Destroys an opaque reflection context.
 SWIFT_REMOTE_MIRROR_LINKAGE
 void
@@ -99,6 +109,15 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
 SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object);
+
+/// Returns whether the given address is within an image added to this
+/// library. Images must be added using swift_reflection_addImage, not
+/// swift_reflection_addReflectionInfo, for this function to work
+/// properly. If addReflectionInfo is used, the return value will always
+/// be false.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int
+swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Address);
 
 /// Returns the metadata pointer for a given object.
 SWIFT_REMOTE_MIRROR_LINKAGE

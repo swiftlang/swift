@@ -642,7 +642,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
                                             OrigFTI->getGenericSignature());
         paramTy = boxTy->getFieldType(Orig->getModule(), 0);
       }
-      auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
+      auto promotedParam = SILParameterInfo(paramTy.getASTType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
     } else {

@@ -20,7 +20,7 @@ import _SwiftCoreFoundationOverlayShims
 /// A `Measurement` is a model type that holds a `Double` value associated with a `Unit`.
 ///
 /// Measurements support a large set of operators, including `+`, `-`, `*`, `/`, and a full set of comparison operators.
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public struct Measurement<UnitType : Unit> : ReferenceConvertible, Comparable, Equatable {
     public typealias ReferenceType = NSMeasurement
 
@@ -41,7 +41,7 @@ public struct Measurement<UnitType : Unit> : ReferenceConvertible, Comparable, E
     }
 }
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension Measurement : CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var description: String {
         return "\(value) \(unit.symbol)"
@@ -61,7 +61,7 @@ extension Measurement : CustomStringConvertible, CustomDebugStringConvertible, C
 
 
 /// When a `Measurement` contains a `Dimension` unit, it gains the ability to convert between the kinds of units in that dimension.
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension Measurement where UnitType : Dimension {
     /// Returns a new measurement created by converting to the specified unit.
     ///
@@ -117,7 +117,7 @@ extension Measurement where UnitType : Dimension {
     }
 }
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension Measurement {
     /// Add two measurements of the same Unit.
     /// - precondition: The `unit` of `lhs` and `rhs` must be `isEqual`.
@@ -212,7 +212,7 @@ internal typealias MeasurementBridgeType = _ObjectTypeBridgeable
 internal typealias MeasurementBridgeType = _ObjectiveCBridgeable
 #endif
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension Measurement : MeasurementBridgeType {
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSMeasurement {
@@ -238,7 +238,7 @@ extension Measurement : MeasurementBridgeType {
     }
 }
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension NSMeasurement : _HasCustomAnyHashableRepresentation {
     // Must be @nonobjc to avoid infinite recursion during bridging.
     @nonobjc
@@ -252,7 +252,7 @@ extension NSMeasurement : _HasCustomAnyHashableRepresentation {
 }
 
 // This workaround is required for the time being, because Swift doesn't support covariance for Measurement (26607639)
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension MeasurementFormatter {
     public func string<UnitType>(from measurement: Measurement<UnitType>) -> String {
         if let result = string(for: measurement) {
@@ -263,7 +263,7 @@ extension MeasurementFormatter {
     }
 }
 
-// @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+// @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 // extension Unit : Codable {
 //     public convenience init(from decoder: Decoder) throws {
 //         let container = try decoder.singleValueContainer()
@@ -277,7 +277,7 @@ extension MeasurementFormatter {
 //     }
 // }
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 extension Measurement : Codable {
     private enum CodingKeys : Int, CodingKey {
         case value

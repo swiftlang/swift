@@ -51,7 +51,7 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
 
   // arm64 requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
-    "mov\tfp, fp\t\t# marker for objc_retainAutoreleaseReturnValue";
+    "mov\tfp, fp\t\t// marker for objc_retainAutoreleaseReturnValue";
 
   // arm64 requires ISA-masking.
   target.ObjCUseISAMask = true;
@@ -100,7 +100,7 @@ static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
                          SwiftTargetInfo &target) {
   // ARM requires marker assembly for objc_retainAutoreleasedReturnValue.
   target.ObjCRetainAutoreleasedReturnValueMarker =
-    "mov\tr7, r7\t\t@ marker for objc_retainAutoreleaseReturnValue";
+    "mov\tr7, r7\t\t// marker for objc_retainAutoreleaseReturnValue";
 
   // armv7k has opaque ISAs which must go through the ObjC runtime.
   if (triple.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7k)

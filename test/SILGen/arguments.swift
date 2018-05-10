@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name Swift -enable-sil-ownership -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name Swift -enable-sil-ownership -parse-stdlib %s | %FileCheck %s
 
 struct Int {}
 struct Float {}

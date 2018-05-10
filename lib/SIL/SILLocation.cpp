@@ -125,14 +125,7 @@ DeclContext *SILLocation::getAsDeclContext() const {
   if (!isASTNode())
     return nullptr;
   if (auto *D = getAsASTNode<Decl>())
-    switch (D->getKind()) {
-    // These four dual-inherit from DeclContext.
-    case DeclKind::Func:        return cast<FuncDecl>(D);
-    case DeclKind::Constructor: return cast<ConstructorDecl>(D);
-    case DeclKind::Extension:   return cast<ExtensionDecl>(D);
-    case DeclKind::Destructor:  return cast<DestructorDecl>(D);
-    default:                    return D->getDeclContext();
-    }
+    return D->getInnermostDeclContext();
   if (auto *E = getAsASTNode<Expr>())
     if (auto *DC = dyn_cast<AbstractClosureExpr>(E))
       return DC;

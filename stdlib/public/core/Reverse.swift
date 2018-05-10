@@ -22,7 +22,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
   ///   collection.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func reverse() {
     if isEmpty { return }
     var f = startIndex
@@ -49,8 +49,6 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// * `c.reversed()` does not create new storage
 /// * `c.reversed().map(f)` maps eagerly and returns a new array
 /// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
-///
-/// - See also: `ReversedRandomAccessCollection`
 @_fixed_layout
 public struct ReversedCollection<Base: BidirectionalCollection> {
   public let _base: Base
@@ -59,8 +57,7 @@ public struct ReversedCollection<Base: BidirectionalCollection> {
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  @_versioned
-  @_inlineable
+  @inlinable
   internal init(_base: Base) {
     self._base = _base
   }
@@ -70,12 +67,12 @@ extension ReversedCollection {
   // An iterator that can be much faster than the iterator of a reversed slice.
   @_fixed_layout
   public struct Iterator {
-    @_versioned
+    @usableFromInline
     internal let _base: Base
-    @_versioned
+    @usableFromInline
     internal var _position: Base.Index
 
-    @_inlineable
+    @inlinable
     @inline(__always)
     /// Creates an iterator over the given collection.
     public /// @testable
@@ -85,11 +82,11 @@ extension ReversedCollection {
     }
   }
 }
- 
+
 extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
   
-  @_inlineable
+  @inlinable
   @inline(__always)
   public mutating func next() -> Element? {
     guard _fastPath(_position != _base.startIndex) else { return nil }
@@ -105,7 +102,7 @@ extension ReversedCollection: Sequence {
   /// "past the end" position that's not valid for use as a subscript.
   public typealias Element = Base.Element
 
-  @_inlineable
+  @inlinable
   @inline(__always)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base)
@@ -132,7 +129,7 @@ extension ReversedCollection {
     ///
     ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
     ///         let reversedNumbers = numbers.reversed()
-    ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
+    ///         guard let i = reversedNumbers.firstIndex(where: { $0 % 2 == 0 })
     ///             else { return nil }
     ///
     ///         return numbers.index(before: i.base)
@@ -155,7 +152,7 @@ extension ReversedCollection {
     /// `"a"` character in a string's character view.
     ///
     ///     let name = "Horatio"
-    ///     let aIndex = name.index(of: "a")!
+    ///     let aIndex = name.firstIndex(of: "a")!
     ///     // name[aIndex] == "a"
     ///
     ///     let reversedName = name.reversed()
@@ -166,7 +163,7 @@ extension ReversedCollection {
     /// `"r"`, the character before `"a"` in the `name` string.
     ///
     /// - Parameter base: The position after the element to create an index for.
-    @_inlineable
+    @inlinable
     public init(_ base: Base.Index) {
       self.base = base
     }
@@ -174,7 +171,7 @@ extension ReversedCollection {
 }
 
 extension ReversedCollection.Index: Comparable {
-  @_inlineable
+  @inlinable
   public static func == (
     lhs: ReversedCollection<Base>.Index,
     rhs: ReversedCollection<Base>.Index
@@ -183,7 +180,7 @@ extension ReversedCollection.Index: Comparable {
     return lhs.base == rhs.base
   }
 
-  @_inlineable
+  @inlinable
   public static func < (
     lhs: ReversedCollection<Base>.Index,
     rhs: ReversedCollection<Base>.Index
@@ -194,39 +191,40 @@ extension ReversedCollection.Index: Comparable {
 }
 
 extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
-  public var hashValue: Int {
-    return base.hashValue
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(base)
   }
 }
 
 extension ReversedCollection: BidirectionalCollection {  
-  @_inlineable
+  @inlinable
   public var startIndex: Index {
     return Index(_base.endIndex)
   }
 
-  @_inlineable
+  @inlinable
   public var endIndex: Index {
     return Index(_base.startIndex)
   }
 
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     return Index(_base.index(before: i.base))
   }
 
-  @_inlineable
+  @inlinable
   public func index(before i: Index) -> Index {
     return Index(_base.index(after: i.base))
   }
 
-  @_inlineable
+  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     // FIXME: swift-3-indexing-model: `-n` can trap on Int.min.
     return Index(_base.index(i.base, offsetBy: -n))
   }
 
-  @_inlineable
+  @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
@@ -235,18 +233,29 @@ extension ReversedCollection: BidirectionalCollection {
                 .map(Index.init)
   }
 
-  @_inlineable
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     return _base.distance(from: end.base, to: start.base)
   }
 
-  @_inlineable
+  @inlinable
   public subscript(position: Index) -> Element {
     return _base[_base.index(before: position.base)]
   }
 }
 
 extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }
+
+extension ReversedCollection {
+  /// Reversing a reversed collection returns the original collection.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  @available(swift, introduced: 4.2)
+  public func reversed() -> Base {
+    return _base
+  }
+}
 
 extension BidirectionalCollection {
   /// Returns a view presenting the elements of the collection in reverse
@@ -274,7 +283,7 @@ extension BidirectionalCollection {
   ///     // Prints "sdrawkcaB"
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func reversed() -> ReversedCollection<Self> {
     return ReversedCollection(_base: self)
   }
@@ -288,7 +297,7 @@ extension LazyCollectionProtocol
   /// Returns the elements of the collection in reverse order.
   ///
   /// - Complexity: O(1)
-  @_inlineable
+  @inlinable
   public func reversed() -> LazyCollection<ReversedCollection<Elements>> {
     return ReversedCollection(_base: elements).lazy
   }
