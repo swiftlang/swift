@@ -669,10 +669,11 @@ public:
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
-                                     bool noNestedConflict) {
+                                     bool noNestedConflict,
+                                     bool fromBuiltin) {
     return insert(new (getModule()) BeginAccessInst(
         getSILDebugLocation(loc), address, accessKind, enforcement,
-        noNestedConflict));
+        noNestedConflict, fromBuiltin));
   }
 
   EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
@@ -685,18 +686,19 @@ public:
   createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
                             SILAccessKind accessKind,
                             SILAccessEnforcement enforcement,
-                            bool noNestedConflict) {
+                            bool noNestedConflict,
+                            bool fromBuiltin) {
     return insert(new (getModule()) BeginUnpairedAccessInst(
         getSILDebugLocation(loc), address, buffer, accessKind, enforcement,
-        noNestedConflict));
+        noNestedConflict, fromBuiltin));
   }
 
-  EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
-                                                 SILValue buffer,
-                                              SILAccessEnforcement enforcement,
-                                                 bool aborted) {
+  EndUnpairedAccessInst *
+  createEndUnpairedAccess(SILLocation loc, SILValue buffer,
+                          SILAccessEnforcement enforcement, bool aborted,
+                          bool fromBuiltin) {
     return insert(new (getModule()) EndUnpairedAccessInst(
-        getSILDebugLocation(loc), buffer, enforcement, aborted));
+        getSILDebugLocation(loc), buffer, enforcement, aborted, fromBuiltin));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {

@@ -44,34 +44,3 @@ class C {
 var c = C()
 withUnsafePointer(to: &c.f) { _ = fputs(String(format: "c.f: 0x%lx\n", Int(bitPattern: $0)), stderr) }
 // CHECK: c.f: [[C_F_ADDR:0x.*]]
-
-// Key path accesses are performed in the Standard Library. The Standard Library
-// is currently compiled in Swift 3 mode and the compiler currently logs conflicts
-// (rather than trapping on them) code compiled in Swift 3 mode. For this reason
-// conflicts where the second conflicting access is via a key path will log rather than
-// trap.
-
-fputs("Overlapping Key Path Write Accesses\n", stderr);
-writeAndPerform(&c[keyPath: \C.f]) {
-  c[keyPath: \C.f] = 8
-  // CHECK-LABEL: Overlapping Key Path Write Accesses
-  // CHECK: Simultaneous accesses to [[C_F_ADDR]], but modification requires exclusive access.
-  // CHECK: Previous access (a modification)
-  // CHECK: Current access (a modification)
-  // CHECK: a.out {{.*}} closure
-  // CHECK: a.out {{.*}} writeAndPerform
-  // CHECK: a.out {{.*}} main
-}
-
-fputs("Overlapping Key Path Write Access and Key Path Read Access\n", stderr);
-writeAndPerform(&c[keyPath: \C.f]) {
-  let x = c[keyPath: \C.f]
-  _blackHole(x)
-  // CHECK-LABEL: Overlapping Key Path Write Access and Key Path Read Access
-  // CHECK: Simultaneous accesses to [[C_F_ADDR]], but modification requires exclusive access.
-  // CHECK: Previous access (a modification)
-  // CHECK: Current access (a read)
-  // CHECK: a.out {{.*}} closure
-  // CHECK: a.out {{.*}} writeAndPerform
-  // CHECK: a.out {{.*}} main
-}

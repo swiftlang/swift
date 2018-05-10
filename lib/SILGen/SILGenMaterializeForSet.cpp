@@ -794,7 +794,8 @@ MaterializeForSetEmitter::createEndUnpairedAccessesCallback(SILFunction &F,
            "multiple unpaired accesses not supported");
     SGF.B.createEndUnpairedAccess(loc, callbackStorage,
                                   SILAccessEnforcement::Dynamic,
-                                  /*aborting*/ false);
+                                  /*aborting*/ false,
+                                  /*fromBuiltin*/ false);
   });
 }
 

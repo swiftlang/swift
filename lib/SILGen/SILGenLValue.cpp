@@ -466,7 +466,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
     if (enforcement == SILAccessEnforcement::Dynamic) {
       SGF.B.createBeginUnpairedAccess(loc, addr, unpairedAccesses->Buffer,
                                       silAccessKind, enforcement,
-                                      /*hasNoNestedConflict=*/false);
+                                      /*hasNoNestedConflict=*/false,
+                                      /*fromBuiltin=*/false);
       unpairedAccesses->NumAccesses++;
     }
     return addr;
@@ -474,7 +475,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
 
   // Enter the access.
   addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
-                                 /*hasNoNestedConflict=*/false);
+                                 /*hasNoNestedConflict=*/false,
+                                 /*fromBuiltin=*/false);
 
   // Push a writeback to end it.
   auto accessedMV = ManagedValue::forLValue(addr);
@@ -508,7 +510,8 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
 
   auto BAI =
     SGF.B.createBeginAccess(loc, address, kind, SILAccessEnforcement::Unsafe,
-                            /*hasNoNestedConflict=*/false);
+                            /*hasNoNestedConflict=*/false,
+                            /*fromBuiltin=*/false);
   beginAccessPtr = BeginAccessPtr(BAI, DeleterCheck());
 
   return BAI;

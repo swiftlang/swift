@@ -413,7 +413,7 @@ namespace sil_block {
   using SILOneOperandExtraAttributeLayout = BCRecordLayout<
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<5>, // Optional attributes
+    BCFixed<6>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 
@@ -433,7 +433,7 @@ namespace sil_block {
   using SILTwoOperandsExtraAttributeLayout = BCRecordLayout<
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<5>,          // Optional attributes
+    BCFixed<6>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,
