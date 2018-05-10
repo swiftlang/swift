@@ -186,19 +186,24 @@ class SILLayout; // From SIL
 /// DispatchQueues. Summary: if you think you need a global or static variable,
 /// you probably need to put it here instead.
 
-class ASTContext {
+class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
+
+  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
-  Implementation &Impl;
-  
+  Implementation &getImpl() const;
+
   friend ConstraintCheckerArenaRAII;
-public:
-  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-             SourceManager &SourceMgr, DiagnosticEngine &Diags);
+
+  static ASTContext *get(LangOptions &langOpts,
+                         SearchPathOptions &SearchPathOpts,
+                         SourceManager &SourceMgr,
+                         DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// \brief The language options used for translation.
