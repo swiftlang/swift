@@ -524,7 +524,6 @@ public:
       auto &astField = astFields[i];
       // Compute the field's type info.
       auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
-      assert(fieldTI.isComplete());
       fieldTypesForLayout.push_back(&fieldTI);
 
       fields.push_back(FieldImpl(asImpl()->getFieldInfo(i, astField, fieldTI)));

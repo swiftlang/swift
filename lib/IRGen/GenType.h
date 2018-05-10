@@ -138,7 +138,6 @@ public:
 
   TypeCacheEntry getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
-  const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
