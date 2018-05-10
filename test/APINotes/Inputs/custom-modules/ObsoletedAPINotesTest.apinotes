@@ -1,0 +1,10 @@
+Name: M
+Classes:
+- Name: FooID
+  SwiftName: Foo_ID
+
+SwiftVersions:
+- Version: 4
+  Classes:
+  - Name: FooID
+    SwiftName: FooID
