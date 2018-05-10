@@ -371,22 +371,6 @@ bool FrontendInputsAndOutputs::forEachInputProducingSupplementaryOutput(
                             : hasInputs() ? fn(firstInput()) : false;
 }
 
-bool FrontendInputsAndOutputs::forEachInputNotProducingSupplementaryOutput(
-    llvm::function_ref<bool(const InputFile &)> fn) const {
-  if (hasPrimaryInputs())
-    return forEachNonPrimaryInput(fn);
-  // If no primary inputs, compiler is in whole-module-optimization mode, and
-  // only the first input can produce supplementary outputs, although all
-  // inputs may contribute.
-  bool isFirst = true;
-  return forEachNonPrimaryInput([&](const InputFile &f) -> bool {
-    if (!isFirst)
-      return fn(f);
-    isFirst = false;
-    return false;
-  });
-}
-
 bool FrontendInputsAndOutputs::hasSupplementaryOutputPath(
     llvm::function_ref<const std::string &(const SupplementaryOutputPaths &)>
         extractorFn) const {

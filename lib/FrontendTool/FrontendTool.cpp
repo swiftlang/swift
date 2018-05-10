@@ -1538,7 +1538,7 @@ createDispatchingDiagnosticConsumerIfNeeded(
   // To avoid introducing bugs into WMO or single-file modes, test for multiple
   // primaries.
   if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
-    inputsAndOutputs.forEachInputNotProducingSupplementaryOutput(
+    inputsAndOutputs.forEachNonPrimaryInput(
         [&](const InputFile &input) -> bool {
           subConsumers.emplace_back(input.file(), nullptr);
           return false;
