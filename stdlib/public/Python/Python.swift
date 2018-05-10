@@ -1196,8 +1196,7 @@ extension PythonObject : MutableCollection {
 extension PythonObject : ExpressibleByBooleanLiteral,
                          ExpressibleByIntegerLiteral,
                          ExpressibleByFloatLiteral,
-                         ExpressibleByStringLiteral,
-                         ExpressibleByNilLiteral {
+                         ExpressibleByStringLiteral {
   public init(booleanLiteral value: Bool) {
     self.init(value)
   }
@@ -1209,9 +1208,6 @@ extension PythonObject : ExpressibleByBooleanLiteral,
   }
   public init(stringLiteral value: String) {
     self.init(value)
-  }
-  public init(nilLiteral: ()) {
-    self.init(Python.None)
   }
 }
 
