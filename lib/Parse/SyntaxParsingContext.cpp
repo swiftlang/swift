@@ -359,6 +359,7 @@ void SyntaxParsingContext::synthesize(SyntaxKind Kind) {
 }
 
 void SyntaxParsingContext::dumpStorage() const  {
+  llvm::errs() << "======================\n";
   for (auto Node : Storage) {
     Node->dump();
     llvm::errs() << "\n--------------\n";

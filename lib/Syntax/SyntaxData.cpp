@@ -49,7 +49,10 @@ bool SyntaxData::isUnknown() const {
 
 void SyntaxData::dump(llvm::raw_ostream &OS) const {
   Raw->dump(OS, 0);
+  OS << '\n';
 }
+
+void SyntaxData::dump() const { dump(llvm::errs()); }
 
 RC<SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
