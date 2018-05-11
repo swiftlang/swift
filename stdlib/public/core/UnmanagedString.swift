@@ -55,6 +55,23 @@ func memcpy_trunc<
   }
 }
 
+@inlinable
+@inline(__always)
+internal
+func memcpy_<
+  Source: FixedWidthInteger & UnsignedInteger
+>(
+  dst: UnsafeMutablePointer<Source>, src: UnsafePointer<Source>, count: Int
+) {
+  // Don't use the for-in-range syntax to avoid precondition checking in Range.
+  // This enables vectorization of the memcpy loop.
+  var i = 0
+  while i < count {
+    dst[i] = src[i]
+    i = i &+ 1
+  }
+}
+
 @_fixed_layout
 @usableFromInline
 internal
