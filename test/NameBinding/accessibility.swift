@@ -172,3 +172,7 @@ public class TestablePublicSub: InternalBase {} // expected-error {{undeclared t
 // <unknown>:0: error: unexpected note produced: 'method()' declared here
 // <unknown>:0: error: unexpected note produced: 'method' declared here
 // <unknown>:0: error: unexpected note produced: 'method' declared here
+
+class AccessMemberOfInternalProtocol : ImplementsInternalProtocol {
+  func testProperty() { let _ = i } // expected-error {{'i' is inaccessible due to 'internal' protection level}}
+}
