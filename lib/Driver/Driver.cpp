@@ -667,8 +667,6 @@ Driver::buildCompilation(const ToolChain &TC,
   }
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
-  bool ContinueBuildingAfterErrors =
-    ArgList->hasArg(options::OPT_continue_building_after_errors);
   bool ShowDriverTimeCompilation =
     ArgList->hasArg(options::OPT_driver_time_compilation);
 
@@ -702,6 +700,21 @@ Driver::buildCompilation(const ToolChain &TC,
   bool BatchMode = false;
   OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
+
+  // Note: Batch mode handling of serialized diagnostics requires that all
+  // batches get to run, in order to make sure that all diagnostics emitted
+  // during the compilation end up in at least one serialized diagnostic file.
+  // Therefore, treat batch mode as implying -continue-building-after-errors.
+  // (This behavior could be limited to only when serialized diagnostics are
+  // being emitted, but this seems more consistent and less surprising for
+  // users.)
+  // FIXME: We don't really need (or want) a full ContinueBuildingAfterErrors.
+  // If we fail to precompile a bridging header, for example, there's no need
+  // to go on to compilation of source files, and if compilation of source files
+  // fails, we shouldn't try to link. Instead, we'd want to let all jobs finish
+  // but not schedule any new ones.
+  const bool ContinueBuildingAfterErrors =
+      BatchMode || ArgList->hasArg(options::OPT_continue_building_after_errors);
 
   if (Diags.hadAnyError())
     return nullptr;
