@@ -15,6 +15,7 @@ s.
 // RUN: %sourcekitd-test -req=complete -pos=2:3 %s -- -use-ld=blah %s | %FileCheck %s
 // RUN: %sourcekitd-test -req=complete -pos=2:3 %s -- -incremental %s | %FileCheck %s
 // RUN: %sourcekitd-test -req=complete -pos=2:3 %s -- -driver-time-compilation %s | %FileCheck %s
+// RUN: %sourcekitd-test -req=complete -pos=2:3 %s -- -sanitize=address,fuzzer -sanitize-coverage=func %s | %FileCheck %s
 
 
 // Mode flags
