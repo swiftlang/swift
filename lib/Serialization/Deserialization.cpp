@@ -1687,8 +1687,11 @@ giveUpFastPath:
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
         paramList = alias->getGenericParams();
-      } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
+      } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base)) {
         paramList = fn->getGenericParams();
+      } else if (auto subscript = dyn_cast<SubscriptDecl>(base)) {
+        paramList = subscript->getGenericParams();
+      }
 
       if (!paramList) {
         return llvm::make_error<XRefError>(
