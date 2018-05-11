@@ -221,6 +221,13 @@ class RawSyntax final
                                     TriviaPiece> {
   friend TrailingObjects;
 
+  /// The ID that shall be used for the next node that is created and does not
+  /// have a manually specified id
+  static unsigned NextFreeNodeId;
+
+  /// An ID of this node that is stable across incremental parses
+  unsigned NodeId;
+
   union {
     uint64_t OpaqueBits;
     struct {
@@ -272,13 +279,17 @@ class RawSyntax final
   }
 
   /// Constructor for creating layout nodes
+  /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
+  /// the caller needs to assure that the node ID has not been used yet.
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-            SourcePresence Presence, bool ManualMemory);
+            SourcePresence Presence, bool ManualMemory,
+            llvm::Optional<unsigned> NodeId);
   /// Constructor for creating token nodes
-  RawSyntax(tok TokKind, OwnedString Text,
-            ArrayRef<TriviaPiece> LeadingTrivia,
-            ArrayRef<TriviaPiece> TrailingTrivia,
-            SourcePresence Presence, bool ManualMemory);
+  /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
+  /// the caller needs to assure that the NodeId has not been used yet.
+  RawSyntax(tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
+            ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
+            bool ManualMemory, llvm::Optional<unsigned> NodeId);
 
 public:
   ~RawSyntax();
@@ -300,14 +311,16 @@ public:
   /// Make a raw "layout" syntax node.
   static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                             SourcePresence Presence,
-                            SyntaxArena *Arena = nullptr);
+                            SyntaxArena *Arena = nullptr,
+                            llvm::Optional<unsigned> NodeId = llvm::None);
 
   /// Make a raw "token" syntax node.
   static RC<RawSyntax> make(tok TokKind, OwnedString Text,
                             ArrayRef<TriviaPiece> LeadingTrivia,
                             ArrayRef<TriviaPiece> TrailingTrivia,
                             SourcePresence Presence,
-                            SyntaxArena *Arena = nullptr);
+                            SyntaxArena *Arena = nullptr,
+                            llvm::Optional<unsigned> NodeId = llvm::None);
 
   /// Make a missing raw "layout" syntax node.
   static RC<RawSyntax> missing(SyntaxKind Kind, SyntaxArena *Arena = nullptr) {
@@ -334,6 +347,9 @@ public:
   SyntaxKind getKind() const {
     return static_cast<SyntaxKind>(Bits.Common.Kind);
   }
+
+  /// Get an ID for this node that is stable across incremental parses
+  unsigned getId() const { return NodeId; }
 
   /// Returns true if the node is "missing" in the source (i.e. it was
   /// expected (or optional) but not written.
