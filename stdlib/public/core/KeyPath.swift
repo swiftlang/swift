@@ -157,8 +157,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     return try f(KeyPathBuffer(base: base))
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var _storedInlineOffset: Int? {
     return withBuffer {
       var buffer = $0
