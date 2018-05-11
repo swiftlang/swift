@@ -5,7 +5,7 @@
 }
 
 - (id)init {
-  _bar = (__bridge_retained CFTypeRef)[[NSNumber alloc] initWithInt:1234567891];
+  _bar = (__bridge_retained CFTypeRef)[@"1234567891" mutableCopy];
   return self;
 }
 
