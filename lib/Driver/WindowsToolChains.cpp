@@ -168,5 +168,8 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {Clang, Arguments};
+  InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
 }

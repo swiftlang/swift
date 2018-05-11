@@ -116,9 +116,9 @@ std::unique_ptr<Job> ToolChain::constructJob(
 
   const char *responseFilePath = nullptr;
   llvm::opt::ArgStringList responseFileArg = {};
-  if (!llvm::sys::commandLineFitsWithinSystemLimits(executablePath,
-                                                    invocationInfo.Arguments)
-      && JA.allowsResponseFiles()) {
+  if (invocationInfo.allowsResponseFiles &&
+      !llvm::sys::commandLineFitsWithinSystemLimits(
+          executablePath, invocationInfo.Arguments)) {
     responseFilePath = context.getTemporaryFilePath("arguments", "resp");
     responseFileArg.push_back(
         C.getArgs().MakeArgString(Twine("@") + responseFilePath));

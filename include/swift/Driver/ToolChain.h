@@ -121,6 +121,7 @@ protected:
     llvm::opt::ArgStringList Arguments;
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
     std::vector<FilelistInfo> FilelistInfos;
+    bool allowsResponseFiles = false;
 
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
