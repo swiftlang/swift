@@ -557,15 +557,12 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
     if (SpecializedSubstFnTy != SpecializedCalleeSubstFnTy) {
       llvm::dbgs() << "SpecializedFnTy:\n" << SpecializedFnTy << "\n";
       llvm::dbgs() << "SpecializedSubstFnTy:\n" << SpecializedSubstFnTy << "\n";
-      for (auto Sub : getCallerParamSubstitutions()) {
-        llvm::dbgs() << "Sub:\n";
-        Sub.dump();
-      }
+      getCallerParamSubstitutionMap().getCanonical().dump(llvm::dbgs());
       llvm::dbgs() << "\n\n";
 
       llvm::dbgs() << "CalleeFnTy:\n" << CalleeFnTy << "\n";
       llvm::dbgs() << "SpecializedCalleeSubstFnTy:\n" << SpecializedCalleeSubstFnTy << "\n";
-      ParamSubs.dump(llvm::dbgs());
+      ParamSubs.getCanonical().dump(llvm::dbgs());
       llvm::dbgs() << "\n\n";
       assert(SpecializedSubstFnTy == SpecializedCalleeSubstFnTy &&
              "Substituted function types should be the same");
@@ -595,20 +592,13 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
           llvm::dbgs() << "Callee generic function type:\n"
                        << Callee->getLoweredFunctionType() << "\n\n";
           llvm::dbgs() << "Callee's call substitution:\n";
-          for (auto Sub : getCalleeParamSubstitutions()) {
-            llvm::dbgs() << "Sub:\n";
-            Sub.dump();
-            llvm::dbgs() << "\n";
-          }
+          getCalleeParamSubstitutionMap().getCanonical().dump(llvm::dbgs());
 
           llvm::dbgs() << "Partially specialized generic function type:\n"
                        << getSpecializedType() << "\n\n";
           llvm::dbgs() << "\nSpecialization call substitution:\n";
-          for (auto Sub : getCallerParamSubstitutions()) {
-            llvm::dbgs() << "Sub:\n";
-            Sub.dump();
-            llvm::dbgs() << "\n";
-          });
+          getCallerParamSubstitutionMap().getCanonical().dump(llvm::dbgs());
+          );
   }
 }
 

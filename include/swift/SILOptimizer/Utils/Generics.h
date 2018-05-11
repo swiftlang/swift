@@ -206,24 +206,12 @@ public:
     return SpecializedGenericSig;
   }
 
-  SubstitutionList getCallerParamSubstitutions() const {
-    return CallerParamSubMap.toList();
-  }
-
   SubstitutionMap getCallerParamSubstitutionMap() const {
     return CallerParamSubMap;
   }
 
-  SubstitutionList getClonerParamSubstitutions() const {
-    return ClonerParamSubMap.toList();
-  }
-
   SubstitutionMap getClonerParamSubstitutionMap() const {
     return ClonerParamSubMap;
-  }
-
-  SubstitutionList getCalleeParamSubstitutions() const {
-    return CalleeParamSubMap.toList();
   }
 
   SubstitutionMap getCalleeParamSubstitutionMap() const {
