@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "accessed-storage"
+#define DEBUG_TYPE "sil-sea"
 
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -94,42 +94,57 @@ bool FunctionAccessedStorage::updateUnidentifiedAccess(
   return updateAccessKind(unidentifiedAccess.getValue(), accessKind);
 }
 
+// Merge the given FunctionAccessedStorage in `other` into this
+// FunctionAccessedStorage. Use the given `transformStorage` to map `other`
+// AccessedStorage into this context. If `other` is from a callee, argument
+// substitution will be performed if possible. However, there's no guarantee
+// that the merged access values will belong to this function.
+//
+// Note that we may have `this` == `other` for self-recursion. We still need to
+// propagate and merge in that case in care arguments are recursively dependent.
 bool FunctionAccessedStorage::mergeAccesses(
-    const FunctionAccessedStorage &RHS,
+    const FunctionAccessedStorage &other,
     std::function<AccessedStorage(const AccessedStorage &)> transformStorage) {
 
   bool changed = false;
+  bool restart;
+  do {
+    restart = false;
+    for (auto &accessEntry : other.storageAccessMap) {
 
-  for (auto &accessEntry : RHS.storageAccessMap) {
+      const AccessedStorage &storage = transformStorage(accessEntry.first);
+      // transformStorage returns invalid storage object for local storage
+      // that should not be merged with the caller.
+      if (!storage)
+        continue;
 
-    const AccessedStorage &storage = transformStorage(accessEntry.first);
-    // transformStorage returns invalid storage object for local storage
-    // that should not be merged with the caller.
-    if (!storage)
-      continue;
-
-    if (storage.getKind() == AccessedStorage::Unidentified)
-      changed |= updateUnidentifiedAccess(accessEntry.second.accessKind);
-    else {
-      auto result = storageAccessMap.try_emplace(storage, accessEntry.second);
-      if (result.second)
-        changed = true;
-      else
-        changed |= result.first->second.mergeFrom(accessEntry.second);
+      if (storage.getKind() == AccessedStorage::Unidentified)
+        changed |= updateUnidentifiedAccess(accessEntry.second.accessKind);
+      else {
+        auto result = storageAccessMap.try_emplace(storage, accessEntry.second);
+        if (result.second) {
+          changed = true;
+          // Insertion in DenseMap invalidates the iterator (if `this` ==
+          // `other`. Break out of the loop and start over.
+          restart = true;
+          break;
+        } else
+          changed |= result.first->second.mergeFrom(accessEntry.second);
+      }
     }
-  }
+  } while (restart);
 
-  if (RHS.unidentifiedAccess != None)
-    changed |= updateUnidentifiedAccess(RHS.unidentifiedAccess.getValue());
+  if (other.unidentifiedAccess != None)
+    changed |= updateUnidentifiedAccess(other.unidentifiedAccess.getValue());
 
   return changed;
 }
 
-bool FunctionAccessedStorage::mergeFrom(const FunctionAccessedStorage &RHS) {
-  // Merge accesses from RHS. Both `this` and `RHS` are either from the same
+bool FunctionAccessedStorage::mergeFrom(const FunctionAccessedStorage &other) {
+  // Merge accesses from other. Both `this` and `other` are either from the same
   // function or are both callees of the same call site, so their parameters
   // indices coincide. transformStorage is the identity function.
-  return mergeAccesses(RHS, [](const AccessedStorage &s) { return s; });
+  return mergeAccesses(other, [](const AccessedStorage &s) { return s; });
 }
 
 /// Returns the argument of the full apply or partial apply corresponding to the
@@ -184,8 +199,12 @@ static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
   case AccessedStorage::Argument: {
     // Transitively search for the storage base in the caller.
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
-    assert(argVal && "AccessedStorage argument missing?");
-    return findAccessedStorageOrigin(argVal);
+    if (argVal)
+      return findAccessedStorageOrigin(argVal);
+
+    // If the argument can't be transformed, demote it to an unidentified
+    // access.
+    return AccessedStorage(storage.getValue(), AccessedStorage::Unidentified);
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
@@ -198,9 +217,8 @@ static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
 
 bool FunctionAccessedStorage::mergeFromApply(
     const FunctionAccessedStorage &calleeAccess, FullApplySite fullApply) {
-  // Merge accesses from RHS using the identity transform on it's
-  // AccessedStorage. Transform any Argument type AccessedStorage into the
-  // caller context to be added to `this` storage map.
+  // Merge accesses from calleeAccess. Transform any Argument type
+  // AccessedStorage into the caller context to be added to `this` storage map.
   return mergeAccesses(calleeAccess, [&fullApply](const AccessedStorage &s) {
     return transformCalleeStorage(s, fullApply);
   });
