@@ -96,8 +96,10 @@ DECL_NODES = [
                    is_optional=True),
              Child('Elements', kind='Syntax',
                    node_choices=[
-                      Child('Statements', kind='CodeBlockItemList'),
-                      Child('SwitchCases', kind='SwitchCaseList')]),
+                       Child('Statements', kind='CodeBlockItemList'),
+                       Child('SwitchCases', kind='SwitchCaseList'),
+                       Child('Decls', kind='MemberDeclList'),
+                   ]),
          ]),
 
     Node('IfConfigClauseList', kind='SyntaxCollection',
@@ -137,9 +139,11 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating', 'indirect',
+                       'mutating', 'nonmutating', 'indirect', '__consuming'
                    ]),
-             Child('Detail', kind='TokenList', is_optional=True),
+             Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
+             Child('Detail', kind='IdentifierToken', is_optional=True),
+             Child('DetailRightParen', kind='RightParenToken', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
@@ -245,13 +249,26 @@ DECL_NODES = [
     Node('MemberDeclBlock', kind='Syntax', traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('Members', kind='DeclList'),
+             Child('Members', kind='MemberDeclList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
-    # decl-list = decl decl-list?
-    Node('DeclList', kind='SyntaxCollection',
-         element='Decl'),
+    # member-decl-list = member-decl member-decl-list?
+    Node('MemberDeclList', kind='SyntaxCollection',
+         element='MemberDeclListItem'),
+
+    # member-decl = decl ';'?
+    Node('MemberDeclListItem', kind='Syntax',
+         description='''
+         A member declaration of a type consisting of a declaration and an \
+         optional semicolon;
+         ''',
+         children=[
+             Child('Decl', kind='Decl', 
+                   description='The declaration of the type member.'),
+             Child('Semicolon', kind='SemicolonToken', is_optional=True,
+                   description='An optional trailing semicolon.'),
+         ]),
 
     # source-file = code-block-item-list eof
     Node('SourceFile', kind='Syntax',
@@ -459,7 +476,12 @@ DECL_NODES = [
              Child('Modifier', kind='DeclModifier', is_optional=True),
              Child('AccessorKind', kind='Token',
                    text_choices=[
-                      'get', 'set', 'didSet', 'willSet',
+                      'get', 'set', 'didSet', 'willSet', 'unsafeAddress', 
+                      'addressWithOwner', 'addressWithNativeOwner', 
+                      'addressWithPinnedNativeOwner', 'unsafeMutableAddress', 
+                      'mutableAddressWithOwner', 
+                      'mutableAddressWithNativeOwner', 
+                      'mutableAddressWithPinnedNativeOwner',
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
              Child('Body', kind='CodeBlock', is_optional=True),

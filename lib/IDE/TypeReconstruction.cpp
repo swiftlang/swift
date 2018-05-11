@@ -596,7 +596,7 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
         // FIXME: Need a more complete/robust lookup mechanism that can handle
         // declarations in sub-stmts, etc.
         UnqualifiedLookup lookup(name, FD, ast->getLazyResolver(),
-                                 /*IsKnownPrivate=*/false, FD->getEndLoc());
+                                 FD->getEndLoc());
         if (!lookup.isSuccess()) {
           result._error = "no decl found in function";
         } else {

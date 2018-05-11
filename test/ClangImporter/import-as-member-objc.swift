@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/../IDE/Inputs/custom-modules %s -verify
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/../IDE/Inputs/custom-modules %s -verify -enable-objc-interop
 
 import ImportAsMember.Class
 

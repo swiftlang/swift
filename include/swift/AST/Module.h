@@ -206,6 +206,7 @@ private:
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
     unsigned ResilienceStrategy : 1;
+    unsigned HasResolvedImports : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);
@@ -255,6 +256,13 @@ public:
   }
   void setFailedToLoad(bool failed = true) {
     Flags.FailedToLoad = failed;
+  }
+
+  bool hasResolvedImports() const {
+    return Flags.HasResolvedImports;
+  }
+  void setHasResolvedImports() {
+    Flags.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
@@ -400,23 +408,17 @@ public:
   ///
   /// \param topLevelAccessPath If present, include the top-level module in the
   ///        results, with the given access path.
-  /// \param includePrivateTopLevelImports If true, imports listed in all
-  ///        file units within this module are traversed. Otherwise (the
-  ///        default), only re-exported imports are traversed.
   /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
   ///        Return \c false to abort iteration.
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             llvm::function_ref<bool(ImportedModule)> fn);
 
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             llvm::function_ref<void(ImportedModule)> fn) {
     return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
                                 [=](const ImportedModule &import) -> bool {
       fn(import);
       return true;
@@ -425,19 +427,10 @@ public:
 
   template <typename Fn>
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             Fn &&fn) {
     using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
     llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
-    return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
-                                wrapped);
-  }
-
-  template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath, Fn &&fn) {
-    return forAllVisibleModules(topLevelAccessPath, false,
-                                std::forward<Fn>(fn));
+    return forAllVisibleModules(topLevelAccessPath, wrapped);
   }
 
   /// @}

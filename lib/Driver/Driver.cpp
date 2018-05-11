@@ -119,86 +119,131 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
   return Args;
 }
 
-static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
-  if (Args.hasArgNoClaim(options::OPT_import_underlying_module) &&
-      Args.hasArgNoClaim(options::OPT_import_objc_header)) {
+static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
+                                       const ArgList &args) {
+  if (args.hasArgNoClaim(options::OPT_import_underlying_module) &&
+      args.hasArgNoClaim(options::OPT_import_objc_header)) {
     diags.diagnose({}, diag::error_framework_bridging_header);
   }
+}
+
+static void validateDeploymentTarget(DiagnosticEngine &diags,
+                                     const ArgList &args) {
+  const Arg *A = args.getLastArg(options::OPT_target);
+  if (!A)
+    return;
 
   // Check minimum supported OS versions.
-  if (const Arg *A = Args.getLastArg(options::OPT_target)) {
-    llvm::Triple triple(llvm::Triple::normalize(A->getValue()));
-    if (triple.isMacOSX()) {
-      if (triple.isMacOSXVersionLT(10, 9))
+  llvm::Triple triple(llvm::Triple::normalize(A->getValue()));
+  if (triple.isMacOSX()) {
+    if (triple.isMacOSXVersionLT(10, 9))
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "OS X 10.9");
+  } else if (triple.isiOS()) {
+    if (triple.isTvOS()) {
+      if (triple.isOSVersionLT(9, 0)) {
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                       "OS X 10.9");
-    } else if (triple.isiOS()) {
-      if (triple.isTvOS()) {
-        if (triple.isOSVersionLT(9, 0)) {
-          diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                         "tvOS 9.0");
-          return;
-        }
-      }
-      if (triple.isOSVersionLT(7))
-        diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                       "iOS 7");
-      if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
-        diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
-                       triple.getOSMajorVersion());
-      }
-    } else if (triple.isWatchOS()) {
-      if (triple.isOSVersionLT(2, 0)) {
-          diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                         "watchOS 2.0");
-          return;
+                       "tvOS 9.0");
+        return;
       }
     }
+    if (triple.isOSVersionLT(7))
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "iOS 7");
+    if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
+      diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
+                     triple.getOSMajorVersion());
+    }
+  } else if (triple.isWatchOS()) {
+    if (triple.isOSVersionLT(2, 0)) {
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "watchOS 2.0");
+      return;
+    }
   }
+}
 
-  // Check for conflicting warning control flags
-  if (Args.hasArg(options::OPT_suppress_warnings) &&
-      Args.hasArg(options::OPT_warnings_as_errors)) {
+static void validateWarningControlArgs(DiagnosticEngine &diags,
+                                       const ArgList &args) {
+  if (args.hasArg(options::OPT_suppress_warnings) &&
+      args.hasArg(options::OPT_warnings_as_errors)) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-warnings-as-errors", "-suppress-warnings");
   }
+}
 
-  // Check for conflicting profiling flags
-  const Arg *ProfileGenerate = Args.getLastArg(options::OPT_profile_generate);
-  const Arg *ProfileUse = Args.getLastArg(options::OPT_profile_use);
-  if (ProfileGenerate && ProfileUse)
+static void validateProfilingArgs(DiagnosticEngine &diags,
+                                  const ArgList &args) {
+  const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
+  const Arg *ProfileUse = args.getLastArg(options::OPT_profile_use);
+  if (ProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-profile-generate", "-profile-use");
-
-  // Check if the profdata is missing
-  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue()))
-    diags.diagnose(SourceLoc(), diag::error_profile_missing,
-                  ProfileUse->getValue());
-
-  // Check for missing debug option when verifying debug info.
-  if (Args.hasArg(options::OPT_verify_debug_info)) {
-    bool hasDebugOption = true;
-    Arg *Arg = Args.getLastArg(swift::options::OPT_g_Group);
-    if (!Arg || Arg->getOption().matches(swift::options::OPT_gnone))
-      hasDebugOption = false;
-    if (!hasDebugOption)
-      diags.diagnose(SourceLoc(),
-                     diag::verify_debug_info_requires_debug_option);
   }
 
-  for (const Arg *A : Args.filtered(options::OPT_D)) {
+  // Check if the profdata is missing
+  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue())) {
+    diags.diagnose(SourceLoc(), diag::error_profile_missing,
+                   ProfileUse->getValue());
+  }
+}
+
+static void validateDebugInfoArgs(DiagnosticEngine &diags,
+                                  const ArgList &args) {
+  // Check for missing debug option when verifying debug info.
+  if (args.hasArg(options::OPT_verify_debug_info)) {
+    Arg *debugOpt = args.getLastArg(swift::options::OPT_g_Group);
+    if (!debugOpt || debugOpt->getOption().matches(swift::options::OPT_gnone)) {
+      diags.diagnose(SourceLoc(),
+                     diag::verify_debug_info_requires_debug_option);
+    }
+  }
+}
+
+static void validateCompilationConditionArgs(DiagnosticEngine &diags,
+                                             const ArgList &args) {
+  for (const Arg *A : args.filtered(options::OPT_D)) {
     StringRef name = A->getValue();
-    if (name.find('=') != StringRef::npos)
+    if (name.find('=') != StringRef::npos) {
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
                      name);
-    else if (name.startswith("-D"))
+    } else if (name.startswith("-D")) {
       diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
-    else if (!Lexer::isIdentifier(name))
+    } else if (!Lexer::isIdentifier(name)) {
       diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
                      name);
+    }
   }
+}
+
+static void validateAutolinkingArgs(DiagnosticEngine &diags,
+                                    const ArgList &args) {
+  auto *forceLoadArg = args.getLastArg(options::OPT_autolink_force_load);
+  if (!forceLoadArg)
+    return;
+  auto *incrementalArg = args.getLastArg(options::OPT_incremental);
+  if (!incrementalArg)
+    return;
+
+  // Note: -incremental can itself be overridden by other arguments later
+  // on, but since -autolink-force-load is a rare and not-really-recommended
+  // option it's not worth modeling that complexity here (or moving the
+  // check somewhere else).
+  diags.diagnose(SourceLoc(), diag::error_option_not_supported,
+                 forceLoadArg->getSpelling(), incrementalArg->getSpelling());
+}
+
+/// Perform miscellaneous early validation of arguments.
+static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
+  validateBridgingHeaderArgs(diags, args);
+  validateDeploymentTarget(diags, args);
+  validateWarningControlArgs(diags, args);
+  validateProfilingArgs(diags, args);
+  validateDebugInfoArgs(diags, args);
+  validateCompilationConditionArgs(diags, args);
+  validateAutolinkingArgs(diags, args);
 }
 
 std::unique_ptr<ToolChain>
@@ -622,8 +667,6 @@ Driver::buildCompilation(const ToolChain &TC,
   }
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
-  bool ContinueBuildingAfterErrors =
-    ArgList->hasArg(options::OPT_continue_building_after_errors);
   bool ShowDriverTimeCompilation =
     ArgList->hasArg(options::OPT_driver_time_compilation);
 
@@ -657,6 +700,21 @@ Driver::buildCompilation(const ToolChain &TC,
   bool BatchMode = false;
   OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
+
+  // Note: Batch mode handling of serialized diagnostics requires that all
+  // batches get to run, in order to make sure that all diagnostics emitted
+  // during the compilation end up in at least one serialized diagnostic file.
+  // Therefore, treat batch mode as implying -continue-building-after-errors.
+  // (This behavior could be limited to only when serialized diagnostics are
+  // being emitted, but this seems more consistent and less surprising for
+  // users.)
+  // FIXME: We don't really need (or want) a full ContinueBuildingAfterErrors.
+  // If we fail to precompile a bridging header, for example, there's no need
+  // to go on to compilation of source files, and if compilation of source files
+  // fails, we shouldn't try to link. Instead, we'd want to let all jobs finish
+  // but not schedule any new ones.
+  const bool ContinueBuildingAfterErrors =
+      BatchMode || ArgList->hasArg(options::OPT_continue_building_after_errors);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -826,7 +884,7 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
   return A;
 }
 
-using RemainingArgsHandler = std::function<void(InputArgList &, unsigned)>;
+using RemainingArgsHandler = llvm::function_ref<void(InputArgList &, unsigned)>;
 
 std::unique_ptr<InputArgList>
 parseArgsUntil(const llvm::opt::OptTable& Opts,
@@ -1787,7 +1845,8 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
       OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
-                   llvm::toString(std::move(Err)));
+                   llvm::toString(std::move(Err)), A->getValue());
+    return None;
   }
   return *OFM;
 }
@@ -2752,7 +2811,8 @@ void Driver::printHelp(bool ShowHidden) const {
     ExcludedFlagsBitmask |= HelpHidden;
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
-                      IncludedFlagsBitmask, ExcludedFlagsBitmask);
+                      IncludedFlagsBitmask, ExcludedFlagsBitmask,
+                      /*ShowAllAliases*/false);
 }
 
 bool OutputInfo::mightHaveExplicitPrimaryInputs(

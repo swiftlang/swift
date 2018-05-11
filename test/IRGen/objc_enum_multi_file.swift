@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | %FileCheck %s
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
 
 #if IMPORT

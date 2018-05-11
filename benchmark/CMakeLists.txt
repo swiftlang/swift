@@ -63,9 +63,11 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest2
     single-source/DictTest3
     single-source/DictTest4
+    single-source/DictTest4Legacy
     single-source/DictionaryBridge
     single-source/DictionaryCopy
     single-source/DictionaryGroup
+    single-source/DictionaryKeysContains
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
@@ -122,6 +124,8 @@ set(SWIFT_BENCH_MODULES
     single-source/Queue
     single-source/RC4
     single-source/RGBHistogram
+    single-source/RandomShuffle
+    single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
     single-source/RangeReplaceableCollectionPlusDefault

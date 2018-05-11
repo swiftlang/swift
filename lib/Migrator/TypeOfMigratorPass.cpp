@@ -44,7 +44,6 @@ class TypeOfMigratorPass: public ASTMigratorPass,
       { SF->getASTContext().getIdentifier("type") },
       ContextStack.empty() ? SF->getModuleScopeContext() : ContextStack.back(),
       /*TypeResolver=*/SF->getASTContext().getLazyResolver(),
-      /*IsKnownPrivate=*/false,
       DTE->getLoc()
     };
     auto isShadowing = [&]() -> bool {

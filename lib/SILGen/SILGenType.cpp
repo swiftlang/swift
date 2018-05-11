@@ -604,8 +604,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Mapping from the requirement's generic signature to the witness
   // thunk's generic signature.
-  auto reqtSubs = witness.getRequirementToSyntheticSubs();
-  auto reqtSubMap = reqtOrigTy->getGenericSignature()->getSubstitutionMap(reqtSubs);
+  auto reqtSubMap = witness.getRequirementToSyntheticSubs();
 
   // The generic environment for the witness thunk.
   auto *genericEnv = witness.getSyntheticEnvironment();
@@ -613,6 +612,20 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
   auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
+
+  // If there's something to map to for the witness thunk, the conformance
+  // should be phrased in the same terms. This particularly applies to classes
+  // where a thunk for a method in a conformance like `extension Class: P where
+  // T: Q` will go from its native signature of `<τ_0_0 where τ_0_0: Q>` (with T
+  // canonicalised to τ_0_0), to `<τ_0_0, τ_1_0 where τ_0_0: Class<τ_1_0>,
+  // τ_1_0: Q>` (with T now represented by τ_1_0). Find the right conformance by
+  // looking for the conformance of 'Self'.
+  if (reqtSubMap) {
+    auto requirement = conformance.getRequirement();
+    auto self = requirement->getProtocolSelfType()->getCanonicalType();
+
+    conformance = *reqtSubMap.lookupConformance(self, requirement);
+  }
 
   CanAnyFunctionType reqtSubstTy;
   if (genericEnv) {
@@ -683,7 +696,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       if (SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
                                               selfInterfaceType, selfType,
                                               genericEnv, reqFn, witnessFn,
-                                              witnessSubs))
+                                              witnessSubs.toList()))
         return f;
 
       // Proceed down the normal path.
@@ -692,7 +705,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
                           requirement, witnessRef,
-                          witnessSubs, isFree);
+                          witnessSubs.toList(), isFree);
 
   return f;
 }

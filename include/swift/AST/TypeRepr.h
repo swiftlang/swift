@@ -1105,6 +1105,7 @@ private:
 };
 
 inline bool TypeRepr::isSimple() const {
+  // NOTE: Please keep this logic in sync with TypeBase::hasSimpleTypeRepr().
   switch (getKind()) {
   case TypeReprKind::Attributed:
   case TypeReprKind::Error:

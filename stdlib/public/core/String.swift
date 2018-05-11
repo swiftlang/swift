@@ -362,7 +362,7 @@ extension String {
 /// that point:
 ///
 ///     let name = "Marie Curie"
-///     let firstSpace = name.index(of: " ") ?? name.endIndex
+///     let firstSpace = name.firstIndex(of: " ") ?? name.endIndex
 ///     let firstName = name[..<firstSpace]
 ///     // firstName == "Marie"
 ///
@@ -513,7 +513,7 @@ extension String {
 /// of the string up to that point.
 ///
 ///     let name = "Marie Curie"
-///     let firstSpace = name.index(of: " ") ?? name.endIndex
+///     let firstSpace = name.firstIndex(of: " ") ?? name.endIndex
 ///     let firstName = name[..<firstSpace]
 ///     print(firstName)
 ///     // Prints "Marie"
@@ -911,7 +911,6 @@ extension String {
 
   // TODO(SSO): Consider small-checking version
   @inlinable // FIXME(sil-serialize-all)
-  public
   init<CodeUnit>(_largeStorage storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _guts = _StringGuts(_large: storage)

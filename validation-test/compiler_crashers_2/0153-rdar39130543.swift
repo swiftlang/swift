@@ -1,4 +1,5 @@
 // RUN: not --crash %target-swift-frontend %s -emit-ir
+// REQUIRES: asserts
 
 protocol P20 { }
 

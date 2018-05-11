@@ -338,12 +338,12 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     if (auto existing =
           IGM.Module.getNamedGlobal("swift_keyPathGenericWitnessTable"))
       return existing;
-    
-    auto linkInfo = LinkInfo::get(IGM, "swift_keyPathGenericWitnessTable",
-                                  SILLinkage::PublicExternal,
-                                  NotForDefinition,
+
+    auto linkInfo = LinkInfo::get(UniversalLinkageInfo(IGM),
+                                  "swift_keyPathGenericWitnessTable",
+                                  SILLinkage::PublicExternal, NotForDefinition,
                                   /*weak imported*/ false);
-    
+
     return createVariable(IGM, linkInfo,
                           IGM.Int8PtrTy, IGM.getPointerAlignment());
   }
@@ -753,8 +753,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     SmallVector<llvm::Constant*, 4> descriptorArgs;
     auto componentSig = component.getExternalDecl()->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-    auto subs = componentSig->getSubstitutionMap(
-                                        component.getExternalSubstitutions());
+    auto subs = component.getExternalSubstitutions();
     enumerateGenericSignatureRequirements(
       componentSig->getCanonicalSignature(),
       [&](GenericRequirement reqt) {

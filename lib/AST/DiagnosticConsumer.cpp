@@ -99,7 +99,7 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
          "overlapping ranges despite having distinct files");
 }
 
-DiagnosticConsumer *
+Optional<DiagnosticConsumer *>
 FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
                                                     SourceLoc loc) const {
   // If there's only one consumer, we'll use it no matter what, because...
@@ -111,7 +111,7 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
 
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
-    return nullptr;
+    return None;
 
   // This map is generated on first use and cached, to allow the
   // FileSpecificDiagnosticConsumer to be set up before the source files are
@@ -121,7 +121,7 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
     // It's possible to get here while a bridging header PCH is being
     // attached-to, if there's some sort of AST-reader warning or error, which
     // happens before CompilerInstance::setUpInputs(), at which point _no_
-    // source buffers are loaded in yet. In that case we return nullptr, rather
+    // source buffers are loaded in yet. In that case we return None, rather
     // than trying to build a nonsensical map (and actually crashing since we
     // can't find buffers for the inputs).
     assert(!SubConsumers.empty());
@@ -129,7 +129,7 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
       assert(llvm::none_of(SubConsumers, [&](const ConsumerPair &pair) {
             return SM.getIDForBufferIdentifier(pair.first).hasValue();
           }));
-      return nullptr;
+      return None;
     }
     auto *mutableThis = const_cast<FileSpecificDiagnosticConsumer*>(this);
     mutableThis->computeConsumersOrderedByRange(SM);
@@ -155,7 +155,7 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
     return possiblyContainingRangeIter->second;
   }
 
-  return nullptr;
+  return None;
 }
 
 void FileSpecificDiagnosticConsumer::handleDiagnostic(
@@ -163,7 +163,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
 
-  DiagnosticConsumer *specificConsumer;
+  Optional<DiagnosticConsumer *> specificConsumer;
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
@@ -176,15 +176,17 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     break;
   }
 
-  if (specificConsumer) {
-    specificConsumer->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                       Info);
-  } else {
+  if (!specificConsumer.hasValue()) {
     for (auto &subConsumer : SubConsumers) {
-      subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
-                                           FormatArgs, Info);
+      if (subConsumer.second) {
+        subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
+                                             FormatArgs, Info);
+      }
     }
-  }
+  } else if (DiagnosticConsumer *c = specificConsumer.getValue())
+    c->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+  else
+    ; // Suppress non-primary diagnostic in batch mode.
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
@@ -192,7 +194,7 @@ bool FileSpecificDiagnosticConsumer::finishProcessing() {
   // behavior.
   bool hadError = false;
   for (auto &subConsumer : SubConsumers)
-    hadError |= subConsumer.second->finishProcessing();
+    hadError |= subConsumer.second && subConsumer.second->finishProcessing();
   return hadError;
 }
 

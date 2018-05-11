@@ -1906,7 +1906,7 @@ public:
       OS << '\n';
       printRec(E->getArgument());
     }
-    OS << "')";
+    OS << ")";
   }
   void visitDotSelfExpr(DotSelfExpr *E) {
     printCommon(E, "dot_self_expr");
@@ -1960,6 +1960,7 @@ public:
     if (auto semaE = E->getSemanticExpr()) {
       OS << '\n';
       printRec(semaE);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
       return;
     }
     for (auto elt : E->getElements()) {
@@ -2051,7 +2052,6 @@ public:
     if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
       OS << " default_args_owner=";
       defaultArgsOwner.dump(OS);
-      dump(defaultArgsOwner.getSubstitutions());
     }
 
     OS << "\n";
@@ -2905,10 +2905,7 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
     auto conf = cast<SpecializedProtocolConformance>(this);
     printCommon("specialized");
     out << '\n';
-    for (auto sub : conf->getGenericSubstitutions()) {
-      sub.dump(out, indent + 2);
-      out << '\n';
-    }
+    conf->getSubstitutionMap().dump(out);
     for (auto subReq : conf->getConditionalRequirements()) {
       out.indent(indent + 2);
       subReq.dump(out);

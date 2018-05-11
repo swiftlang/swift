@@ -2094,7 +2094,15 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
 
   // We're only going to warn for BoundGenericStructType with a single
   // type argument that is not Int!
-  auto inputTy = fnTy->getInput()->getAs<BoundGenericStructType>();
+  auto params = fnTy->getParams();
+  if (params.size() != 1)
+    return false;
+
+  const auto &param = params.front();
+  if (param.hasLabel() || param.isVariadic())
+    return false;
+
+  auto inputTy = param.getType()->getAs<BoundGenericStructType>();
   if (!inputTy)
     return false;
 

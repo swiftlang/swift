@@ -296,6 +296,17 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   llvm_unreachable("bad StaticSpellingKind");
 }
 
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     ReferenceOwnership RO) {
+  switch (RO) {
+  case ReferenceOwnership::Strong: return OS << "'strong'";
+  case ReferenceOwnership::Weak: return OS << "'weak'";
+  case ReferenceOwnership::Unowned: return OS << "'unowned'";
+  case ReferenceOwnership::Unmanaged: return OS << "'unowned(unsafe)'";
+  }
+  llvm_unreachable("bad ReferenceOwnership kind");
+}
+
 DeclContext *Decl::getInnermostDeclContext() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return const_cast<AbstractFunctionDecl*>(func);
@@ -1669,6 +1680,16 @@ bool ValueDecl::needsCapture() const {
   return !isa<TypeDecl>(this);
 }
 
+unsigned ValueDecl::getLocalDiscriminator() const {
+  return LocalDiscriminator;
+}
+
+void ValueDecl::setLocalDiscriminator(unsigned index) {
+  assert(getDeclContext()->isLocalContext());
+  assert(LocalDiscriminator == 0 && "LocalDiscriminator is set multiple times");
+  LocalDiscriminator = index;
+}
+
 ValueDecl *ValueDecl::getOverriddenDecl() const {
   if (auto fd = dyn_cast<FuncDecl>(this))
     return fd->getOverriddenDecl();
@@ -2084,6 +2105,9 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 }
 
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
+  if (isImplicit())
+    return SourceLoc();
+
   if (auto var = dyn_cast<VarDecl>(this)) {
     // [attrs] var ...
     // The attributes are part of the VarDecl, but the 'var' is part of the PBD.

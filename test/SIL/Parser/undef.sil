@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -assume-parsing-unqualified-ownership-sil | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil %s | %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil | %FileCheck %s
 sil_stage raw
 
 import Builtin
@@ -98,6 +98,9 @@ bb0:
   is_unique_or_pinned undef : $C
   // CHECK: copy_block undef : $@convention(block) () -> ()
   copy_block undef : $@convention(block) () -> ()
+
+  // CHECK: copy_block_without_escaping undef : $@convention(block) () -> () withoutEscaping undef : $@noescape () -> ()
+  copy_block_without_escaping undef : $@convention(block) () -> () withoutEscaping undef : $@noescape () -> ()
 
   // Dynamic dispatch
 

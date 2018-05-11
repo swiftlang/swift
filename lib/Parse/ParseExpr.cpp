@@ -582,7 +582,6 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   // Consume '\'.
   SourceLoc backslashLoc = consumeToken(tok::backslash);
   llvm::SaveAndRestore<SourceLoc> slashLoc(SwiftKeyPathSlashLoc, backslashLoc);
-  SyntaxParsingContext ExprCtx(SyntaxContext, SyntaxContextKind::Expr);
 
   // FIXME: diagnostics
   ParserResult<Expr> rootResult, pathResult;
@@ -598,14 +597,19 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   if (startsWithSymbol(Tok, '.')) {
     llvm::SaveAndRestore<Expr*> S(SwiftKeyPathRoot, rootResult.getPtrOrNull());
 
+    SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
+
     auto dotLoc = Tok.getLoc();
     // For uniformity, \.foo is parsed as if it were MAGIC.foo, so we need to
     // make sure the . is there, but parsing the ? in \.? as .? doesn't make
     // sense. This is all made more complicated by .?. being considered an
     // operator token, and a single one at that (which means
     // peekToken().is(tok::identifier) is incorrect: it is true for .?.foo).
-    if (Tok.getLength() != 1 || !peekToken().is(tok::identifier))
+    if (Tok.getLength() != 1 || !peekToken().is(tok::identifier)) {
+      SyntaxParsingContext KeyPathBaseContext(SyntaxContext,
+                                              SyntaxKind::KeyPathBaseExpr);
       consumeStartingCharacterOfCurrentToken(tok::period);
+    }
 
     auto inner = makeParserResult(new (Context) KeyPathDotExpr(dotLoc));
     bool unusedHasBindOptional = false;
@@ -2727,6 +2731,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   if (params) {
     // Add the parameters into scope.
     addParametersToScope(params);
+    setLocalDiscriminatorToParamList(params);
   } else {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
@@ -2966,7 +2971,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     Expr *SubExpr = nullptr;
     if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
       SyntaxParsingContext operatorContext(SyntaxContext,
-                                           SyntaxContextKind::Expr);
+                                           SyntaxKind::IdentifierExpr);
       SourceLoc Loc;
       Identifier OperName;
       if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
@@ -3475,6 +3480,8 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 ///     "swift" version-tuple
 ParserResult<LanguageVersionConstraintAvailabilitySpec>
 Parser::parseLanguageVersionConstraintSpec() {
+  SyntaxParsingContext VersionRestrictionContext(
+      SyntaxContext, SyntaxKind::AvailabilityVersionRestriction);
   SourceLoc SwiftLoc;
   clang::VersionTuple Version;
   SourceRange VersionRange;
@@ -3498,6 +3505,9 @@ Parser::parseLanguageVersionConstraintSpec() {
 ///     identifier version-comparison version-tuple
 ParserResult<PlatformVersionConstraintAvailabilitySpec>
 Parser::parsePlatformVersionConstraintSpec() {
+  SyntaxParsingContext VersionRestrictionContext(
+      SyntaxContext, SyntaxKind::AvailabilityVersionRestriction);
+
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3554,8 +3564,13 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
   // DynamicTypeExpr.
   SyntaxParsingContext CallCtxt(SyntaxContext, SyntaxKind::FunctionCallExpr);
 
-  // Consume 'type'
-  SourceLoc keywordLoc = consumeToken();
+  SourceLoc keywordLoc;
+  {
+    SyntaxParsingContext IdentifierExprContext(SyntaxContext,
+                                               SyntaxKind::IdentifierExpr);
+    // Consume 'type'
+    keywordLoc = consumeToken();
+  }
 
   // Parse the leading '('.
   SourceLoc lParenLoc = consumeToken(tok::l_paren);

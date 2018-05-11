@@ -229,7 +229,7 @@ ManagedValue LogicalPathComponent::materializeIntoTemporary(
   // If the RValue type has an openedExistential, then the RValue must be
   // materialized before allocating a temporary for the RValue type. In that
   // case, the RValue cannot be emitted directly into the temporary.
-  if (getTypeOfRValue().getSwiftRValueType()->hasOpenedExistential()) {
+  if (getTypeOfRValue().hasOpenedExistential()) {
     // Emit a 'get'.
     rvalue = std::move(*this).get(SGF, loc, base, SGFContext());
 
@@ -466,7 +466,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
     if (enforcement == SILAccessEnforcement::Dynamic) {
       SGF.B.createBeginUnpairedAccess(loc, addr, unpairedAccesses->Buffer,
                                       silAccessKind, enforcement,
-                                      /*hasNoNestedConflict=*/false);
+                                      /*hasNoNestedConflict=*/false,
+                                      /*fromBuiltin=*/false);
       unpairedAccesses->NumAccesses++;
     }
     return addr;
@@ -474,7 +475,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
 
   // Enter the access.
   addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
-                                 /*hasNoNestedConflict=*/false);
+                                 /*hasNoNestedConflict=*/false,
+                                 /*fromBuiltin=*/false);
 
   // Push a writeback to end it.
   auto accessedMV = ManagedValue::forLValue(addr);
@@ -508,7 +510,8 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
 
   auto BAI =
     SGF.B.createBeginAccess(loc, address, kind, SILAccessEnforcement::Unsafe,
-                            /*hasNoNestedConflict=*/false);
+                            /*hasNoNestedConflict=*/false,
+                            /*fromBuiltin=*/false);
   beginAccessPtr = BeginAccessPtr(BAI, DeleterCheck());
 
   return BAI;
@@ -2427,7 +2430,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   assert(lv.isValid());
 
   CanType substFormalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberVarComponent(SGF, e, var, e->getMember().getSubstitutions(),
+  lv.addMemberVarComponent(SGF, e, var,
+                           e->getMember().getSubstitutions().toList(),
                            options, e->isSuper(), accessKind,
                            e->getAccessSemantics(),
                            strategy, substFormalRValueType);
@@ -2526,7 +2530,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   RValue index = SGF.emitRValue(indexExpr);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberSubscriptComponent(SGF, e, decl, e->getDecl().getSubstitutions(),
+  lv.addMemberSubscriptComponent(SGF, e, decl,
+                                 e->getDecl().getSubstitutions().toList(),
                                  options, e->isSuper(), accessKind,
                                  accessSemantics, strategy,
                                  formalRValueType, std::move(index),
@@ -2717,7 +2722,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   SILGenLValue sgl(*this);
   LValue lv;
 
-  auto baseType = base.getType().getSwiftRValueType();
+  auto baseType = base.getType().getASTType();
   auto subMap = baseType->getContextSubstitutionMap(
       SGM.M.getSwiftModule(), ivar->getDeclContext());
 
@@ -3442,8 +3447,8 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   if (!dest->canPerformInPlaceInitialization())
     return skipPeephole();
   auto destAddr = dest->getAddressForInPlaceInitialization(*this, loc);
-  assert(src.getTypeOfRValue().getSwiftRValueType()
-           == destAddr->getType().getSwiftRValueType());
+  assert(src.getTypeOfRValue().getASTType()
+           == destAddr->getType().getASTType());
 
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();

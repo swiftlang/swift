@@ -18,6 +18,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -500,6 +501,10 @@ Parser::~Parser() {
   delete SyntaxContext;
 }
 
+bool Parser::allowTopLevelCode() const {
+  return SF.isScriptMode();
+}
+
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
@@ -879,7 +884,7 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
-                  std::function<ParserStatus()> callback) {
+                  llvm::function_ref<ParserStatus()> callback) {
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
   if (Kind == SyntaxKind::Unknown)
@@ -974,7 +979,7 @@ struct ParserUnit::Implementation {
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticEngine Diags;
-  ASTContext Ctx;
+  ASTContext &Ctx;
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
@@ -982,7 +987,7 @@ struct ParserUnit::Implementation {
                  const LangOptions &Opts, StringRef ModuleName)
     : LangOpts(Opts),
       Diags(SM),
-      Ctx(LangOpts, SearchPathOpts, SM, Diags),
+      Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,

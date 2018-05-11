@@ -1657,6 +1657,9 @@ class HasIBOutlet {
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
+  // expected-error@-2 {{@IBOutlet property has non-optional type 'PlainStruct'}}
+  // expected-note@-3 {{add '?' to form the optional type 'PlainStruct?'}}
+  // expected-note@-4 {{add '!' to form an implicitly unwrapped optional}}
   // CHECK-LABEL: {{^}}  @IBOutlet var badOutlet: PlainStruct
 }
 

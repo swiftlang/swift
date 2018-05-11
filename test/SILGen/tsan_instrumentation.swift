@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sanitize=thread -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sanitize=thread %s | %FileCheck %s
 // REQUIRES: tsan_runtime
 
 func takesInout(_ p: inout Int) { }

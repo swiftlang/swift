@@ -390,7 +390,7 @@ extension String {
   /// another string's `utf8` view.
   ///
   ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf8.index(of: 32) {
+  ///     if let i = picnicGuest.utf8.firstIndex(of: 32) {
   ///         let adjective = String(picnicGuest.utf8[..<i])
   ///         print(adjective)
   ///     }
@@ -472,6 +472,11 @@ extension String.UTF8View.Iterator : IteratorProtocol {
     self._nextOffset = 0
     self._buffer = _OutputBuffer()
     self._endOffset = utf8._guts.count
+  }
+
+  internal mutating func _clear() {
+    self._nextOffset = self._endOffset
+    self._buffer = _OutputBuffer()
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -583,7 +588,7 @@ extension String.UTF8View.Index {
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let utf16Index = cafe.utf16.index(of: 32)!
+  ///     let utf16Index = cafe.utf16.firstIndex(of: 32)!
   ///     let utf8Index = String.UTF8View.Index(utf16Index, within: cafe.utf8)!
   ///
   ///     print(Array(cafe.utf8[..<utf8Index]))
@@ -729,5 +734,44 @@ extension String.UTF8View {
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String.UTF8View {
     return self[bounds.relative(to: self)]
+  }
+}
+
+extension String.UTF8View {
+  /// Copies `self` into the supplied buffer.
+  ///
+  /// - Precondition: The memory in `self` is uninitialized. The buffer must
+  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  ///
+  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
+  ///   initialized.
+  public func _copyContents(
+    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    guard var ptr = buffer.baseAddress else {
+        _preconditionFailure(
+          "Attempt to copy string contents into nil buffer pointer")
+    }
+    var it = self.makeIterator()
+
+    if _guts.isASCII {
+      defer { _fixLifetime(_guts) }
+      let asciiView = _guts._unmanagedASCIIView
+      _precondition(asciiView.count <= buffer.count,
+        "Insufficient space allocated to copy string contents")
+      ptr.initialize(from: asciiView.start, count: asciiView.count)
+      it._clear()
+      return (it, buffer.index(buffer.startIndex, offsetBy: asciiView.count))
+    }
+    else {
+      for idx in buffer.startIndex..<buffer.count {
+        guard let x = it.next() else {
+          return (it, idx)
+        }
+        ptr.initialize(to: x)
+        ptr += 1
+      }
+      return (it,buffer.endIndex)
+    }
   }
 }

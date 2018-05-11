@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,6 +86,28 @@ public struct Bool {
   public init(_ value: Bool) {
     self = value
   }
+
+  /// Returns a random Boolean value
+  ///
+  /// - Parameter generator: The random number generator to use when getting a
+  ///   random Boolean.
+  /// - Returns: A random Boolean value.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Bool {
+    return (generator.next() >> 17) & 1 == 0
+  }
+  
+  /// Returns a random Boolean value
+  ///
+  /// - Returns: A random Boolean value.
+  ///
+  /// This uses the standard library's default random number generator.
+  @inlinable
+  public static func random() -> Bool {
+    return Bool.random(using: &Random.default)
+  }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
@@ -144,28 +166,18 @@ extension Bool : CustomStringConvertible {
 public // COMPILER_INTRINSIC
 func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
-extension Bool : Equatable, Hashable {
-  /// The hash value for the Boolean value.
-  ///
-  /// Two values that are equal always have equal hash values.
-  ///
-  /// - Note: The hash value is not guaranteed to be stable across different
-  ///   invocations of the same program. Do not persist the hash value across
-  ///   program runs.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append((self ? 1 : 0) as UInt8)
-  }
-
+extension Bool: Equatable {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Bool, rhs: Bool) -> Bool {
     return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
+  }
+}
+
+extension Bool: Hashable {
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine((self ? 1 : 0) as UInt8)
   }
 }
 

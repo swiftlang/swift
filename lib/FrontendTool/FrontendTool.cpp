@@ -948,9 +948,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError = printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError =
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
+        printAsObjCIfNeeded(
+            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+            moduleIsPublic);
 
     const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
 
@@ -1527,6 +1531,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
       subConsumers.emplace_back(input.file(), std::move(subConsumer));
     return false;
   });
+  // For batch mode, the compiler must swallow diagnostics pertaining to
+  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // multiple times. So, create a diagnostic "eater" for those non-primary
+  // files.
+  // To avoid introducing bugs into WMO or single-file modes, test for multiple
+  // primaries.
+  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
+    inputsAndOutputs.forEachNonPrimaryInput(
+        [&](const InputFile &input) -> bool {
+          subConsumers.emplace_back(input.file(), nullptr);
+          return false;
+        });
+  }
 
   if (subConsumers.empty())
     return nullptr;
@@ -1696,7 +1713,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
-                       ExcludedFlagsBitmask);
+                       ExcludedFlagsBitmask, /*ShowAllAliases*/false);
     return finishDiagProcessing(0);
   }
 

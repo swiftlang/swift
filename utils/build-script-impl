@@ -1201,16 +1201,16 @@ PRODUCTS=("${PRODUCTS[@]}" swift)
 if [[ ! "${SKIP_BUILD_LLDB}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" lldb)
 fi
-if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" llbuild)
-fi
+# LLBuild, SwiftPM and XCTest are dependent on Foundation, so Foundation must be
+# added to the list of build products first.
 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libdispatch)
 fi
-# SwiftPM and XCTest are dependent on Foundation, so Foundation must be
-# added to the list of build products first.
 if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" foundation)
+fi
+if [[ ! "${SKIP_BUILD_LLBUILD}" ]] ; then
+     PRODUCTS=("${PRODUCTS[@]}" llbuild)
 fi
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" playgroundsupport)
@@ -2016,6 +2016,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_ANDROID_NDK_PATH:STRING="${ANDROID_NDK}"
                         -DSWIFT_ANDROID_NDK_GCC_VERSION:STRING="${ANDROID_NDK_GCC_VERSION}"
                         -DSWIFT_ANDROID_SDK_PATH:STRING="${ANDROID_NDK}/platforms/android-${ANDROID_API_LEVEL}/arch-arm"
+                        -DSWIFT_ANDROID_API_LEVEL:STRING="${ANDROID_API_LEVEL}"
                         -DSWIFT_ANDROID_armv7_ICU_UC:STRING="${ANDROID_ICU_UC}"
                         -DSWIFT_ANDROID_armv7_ICU_UC_INCLUDE:STRING="${ANDROID_ICU_UC_INCLUDE}"
                         -DSWIFT_ANDROID_armv7_ICU_I18N:STRING="${ANDROID_ICU_I18N}"
@@ -2373,6 +2374,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
+                    -DSWIFTC_EXECUTABLE:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                    -DFOUNDATION_BUILD_DIR:PATH="$(build_directory ${host} foundation)"
+                    -DLIBDISPATCH_BUILD_DIR:PATH="$(build_directory ${host} libdispatch)"
+                    -DLIBDISPATCH_SOURCE_DIR:PATH="${LIBDISPATCH_SOURCE_DIR}"
+                    -DLLBUILD_SUPPORT_BINDINGS:=Swift
                 )
                 ;;
             swiftpm)
@@ -3131,7 +3137,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_LLBUILD}" ]] ; then
                     continue
                 fi
-                INSTALL_TARGETS=install-swift-build-tool
+                INSTALL_TARGETS="install-swift-build-tool"
                 ;;
             # Products from this here install themselves; they don't fall-through.
             lldb)
@@ -3483,7 +3489,7 @@ function build_and_test_installable_package() {
             fi
 
             LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
-            FILECHECK_EXECUTABLE_PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
+            LLVM_BIN_DIR="$(build_directory_bin ${LOCAL_HOST} llvm)"
             echo "-- Test Installable Package --"
             call rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
             call mkdir -p "${PKG_TESTS_SANDBOX}"
@@ -3491,7 +3497,7 @@ function build_and_test_installable_package() {
                 call tar xzf "${package_for_host}"
 
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}" --param test-exec-root="${PKG_TESTS_TEMPS}"
+                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}"
         fi
     fi
 }

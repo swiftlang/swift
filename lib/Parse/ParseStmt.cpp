@@ -637,8 +637,11 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 
   ParserStatus Status = parseBraceItems(Entries, BraceItemListKind::Brace,
                                         BraceItemListKind::Brace);
-  parseMatchingToken(tok::r_brace, RBLoc,
-                     diag::expected_rbrace_in_brace_stmt, LBLoc);
+  if (parseMatchingToken(tok::r_brace, RBLoc,
+                         diag::expected_rbrace_in_brace_stmt, LBLoc)) {
+    // Synthesize a r-brace if the source doesn't have any.
+    LocalContext.synthesize(tok::r_brace);
+  }
 
   return makeParserResult(Status,
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
@@ -972,6 +975,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     // represents tuples and var patterns as tupleexprs and
     // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
+      P.setLocalDiscriminator(VD);
       if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
@@ -993,6 +997,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       for (auto previous : boundDecls) {
         if (previous->hasName() && previous->getName() == VD->getName()) {
           found = true;
+          // Use the same local discriminator.
+          VD->setLocalDiscriminator(previous->getLocalDiscriminator());
           break;
         }
       }
@@ -1150,11 +1156,15 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
 ParserStatus
 Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
+  SyntaxParsingContext AvailabilitySpecContext(
+      SyntaxContext, SyntaxKind::AvailabilitySpecList);
   ParserStatus Status = makeParserSuccess();
 
   // We don't use parseList() because we want to provide more specific
   // diagnostics disallowing operators in version specs.
   while (1) {
+    SyntaxParsingContext AvailabilityEntryContext(
+        SyntaxContext, SyntaxKind::AvailabilityArgument);
     auto SpecResult = parseAvailabilitySpec();
     if (auto *Spec = SpecResult.getPtrOrNull()) {
       Specs.push_back(Spec);
@@ -1390,6 +1400,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   // Add variable bindings from the pattern to our current scope and mark
   // them as being having a non-pattern-binding initializer.
   ThePattern.get()->forEachVariable([&](VarDecl *VD) {
+    setLocalDiscriminator(VD);
     if (VD->hasName())
       addToScope(VD);
     VD->setHasNonPatternBindingInit();
@@ -1605,7 +1616,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   for (auto &elt : Condition)
     if (auto pattern = elt.getPatternOrNull())
       pattern->collectVariables(Vars);
-
+  Vars.append(DisabledVars.begin(), DisabledVars.end());
   llvm::SaveAndRestore<decltype(DisabledVars)>
   RestoreCurVars(DisabledVars, Vars);
 

@@ -205,11 +205,9 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
 }
 
 bool swift::immediate::IRGenImportedModules(
-    CompilerInstance &CI,
-    llvm::Module &Module,
-    llvm::SmallPtrSet<swift::ModuleDecl *, 8> &ImportedModules,
-    SmallVectorImpl<llvm::Function*> &InitFns,
-    IRGenOptions &IRGenOpts,
+    CompilerInstance &CI, llvm::Module &Module,
+    llvm::SmallPtrSetImpl<swift::ModuleDecl *> &ImportedModules,
+    SmallVectorImpl<llvm::Function *> &InitFns, IRGenOptions &IRGenOpts,
     const SILOptions &SILOpts) {
   swift::ModuleDecl *M = CI.getMainModule();
 
@@ -219,16 +217,7 @@ bool swift::immediate::IRGenImportedModules(
     AllLinkLibraries.push_back(linkLib);
   };
 
-  M->forAllVisibleModules({}, /*includePrivateTopLevelImports=*/true,
-                          [&](ModuleDecl::ImportedModule import) {
-    import.second->collectLinkLibraries(addLinkLibrary);
-  });
-
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  for (const auto &linkLib :
-          irgen::collectLinkLibrariesFromExternals(CI.getASTContext())) {
-    addLinkLibrary(linkLib);
-  }
+  M->collectLinkLibraries(addLinkLibrary);
 
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
                    CI.getDiags());

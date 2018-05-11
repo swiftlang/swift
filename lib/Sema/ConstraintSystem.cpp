@@ -295,12 +295,13 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
   // If there's anything to remove, filter it out now.
   if (anyRemovals) {
-    result->filter([&](LookupResultEntry entry) -> bool {
+    result->filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto *decl = entry.getValueDecl();
 
       // Remove invalid declarations so the constraint solver doesn't need to
       // cope with them.
-      if (decl->isInvalid()) return false;
+      if (decl->isInvalid())
+        return false;
 
       return known[getDynamicResultSignature(decl)] == decl;
     });
@@ -460,13 +461,13 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   }
         
   // Map the generic parameters to their corresponding type variables.
-  llvm::SmallVector<TypeLoc, 4> arguments;
+  llvm::SmallVector<Type, 2> arguments;
   for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
     auto found = replacements.find(
       cast<GenericTypeParamType>(gp->getCanonicalType()));
     assert(found != replacements.end() &&
            "Missing generic parameter?");
-    arguments.push_back(TypeLoc::withoutLoc(found->second));
+    arguments.push_back(found->second);
   }
 
   // FIXME: For some reason we can end up with unbound->getDecl()
@@ -476,7 +477,6 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   return TC.applyUnboundGenericArguments(
       unbound, unboundDecl,
       SourceLoc(), DC, arguments,
-      /*options*/TypeResolutionOptions(),
       /*resolver*/nullptr,
       /*unsatisfiedDependency*/nullptr);
 }
@@ -533,20 +533,15 @@ static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
   auto fnType = type->getAs<FunctionType>();
 
   // Drop argument labels from the input type.
-  Type inputType = fnType->getInput();
-  if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
-    SmallVector<TupleTypeElt, 4> elements;
-    elements.reserve(tupleTy->getNumElements());
-    for (const auto &elt : tupleTy->getElements()) {
-      elements.push_back(elt.getWithoutName());
-    }
-    inputType = TupleType::get(elements, type->getASTContext());
-  }
+  llvm::SmallVector<AnyFunctionType::Param, 4> unlabeledParams;
+  unlabeledParams.reserve(fnType->getNumParams());
+  for (const auto &param : fnType->getParams())
+    unlabeledParams.push_back(param.getWithoutLabel());
 
-  return FunctionType::get(inputType,
-                           removeArgumentLabels(fnType->getResult(),
-                                                numArgumentLabels - 1),
-                           fnType->getExtInfo());
+  return FunctionType::get(
+      unlabeledParams,
+      removeArgumentLabels(fnType->getResult(), numArgumentLabels - 1),
+      fnType->getExtInfo());
 }
 
 Type ConstraintSystem::openFunctionType(
@@ -568,14 +563,21 @@ Type ConstraintSystem::openFunctionType(
                 locator,
                 replacements);
 
-    // Transform the input and output types.
-    auto inputTy = openType(genericFn->getInput(), replacements);
+    // Transform the parameters and output type.
+    llvm::SmallVector<AnyFunctionType::Param, 4> openedParams;
+    openedParams.reserve(genericFn->getNumParams());
+    for (const auto &param : genericFn->getParams()) {
+      auto type = openType(param.getPlainType(), replacements);
+      openedParams.push_back(AnyFunctionType::Param(type, param.getLabel(),
+                                                    param.getParameterFlags()));
+    }
+
     auto resultTy = openType(genericFn->getResult(), replacements);
 
     // Build the resulting (non-generic) function type.
-    funcType = FunctionType::get(inputTy, resultTy,
-                                 FunctionType::ExtInfo().
-                                   withThrows(genericFn->throws()));
+    funcType = FunctionType::get(
+        openedParams, resultTy,
+        FunctionType::ExtInfo().withThrows(genericFn->throws()));
   }
 
   return removeArgumentLabels(funcType, numArgumentLabelsToRemove);
@@ -747,7 +749,7 @@ Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                              const DeclRefExpr *base,
                                              bool wantInterfaceType) {
   validateDecl(value);
-  if (value->isInvalid())
+  if (!value->hasValidSignature() || value->isInvalid())
     return ErrorType::get(Context);
 
   Type requestedType = (wantInterfaceType
@@ -896,7 +898,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // DynamicSelf with the actual object type.
     if (!func->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
       if (func->hasDynamicSelf()) {
-        Type selfTy = openedFnType->getInput()->getRValueInstanceType();
+        auto params = openedFnType->getParams();
+        assert(params.size() == 1);
+        Type selfTy = params.front().getType()->getRValueInstanceType();
         openedType = openedType->replaceCovariantResultType(
                        selfTy,
                        func->getNumParameterLists());
@@ -1357,7 +1361,10 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Constrain the 'self' object type.
   auto openedFnType = openedType->castTo<FunctionType>();
-  Type selfObjTy = openedFnType->getInput()->getRValueInstanceType();
+  auto openedParams = openedFnType->getParams();
+  assert(openedParams.size() == 1);
+
+  Type selfObjTy = openedParams.front().getType()->getRValueInstanceType();
   if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
@@ -1471,11 +1478,12 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
                                       ConstraintLocator *locator,
-                                      OverloadChoice *favoredChoice) {
+                                      OverloadChoice *favoredChoice,
+                                      ArrayRef<OverloadChoice> outerAlternatives) {
   assert(!choices.empty() && "Empty overload set");
 
   // If there is a single choice, add the bind overload directly.
-  if (choices.size() == 1) {
+  if (choices.size() == 1 && outerAlternatives.empty()) {
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
@@ -1511,7 +1519,26 @@ void ConstraintSystem::addOverloadSet(Type boundType,
                                                        useDC, locator));
   }
 
-  addDisjunctionConstraint(overloads, locator, ForgetChoice, favoredChoice);
+  auto innerDisjunction = Constraint::createDisjunction(*this, overloads,
+                                                        locator, ForgetChoice);
+  if (outerAlternatives.empty()) {
+    if (favoredChoice)
+      innerDisjunction->setFavored();
+
+    addUnsolvedConstraint(innerDisjunction);
+    return;
+  }
+
+  SmallVector<Constraint *, 4> outerConstraints;
+  outerConstraints.push_back(innerDisjunction);
+  innerDisjunction->setFavored();
+  for (auto choice : outerAlternatives) {
+    outerConstraints.push_back(Constraint::createBindOverload(
+                                 *this, boundType, choice,
+                                   useDC, locator));
+  }
+
+  addDisjunctionConstraint(outerConstraints, locator, ForgetChoice, favoredChoice);
 }
 
 /// If we're resolving an overload set with a decl that has special type
@@ -1866,10 +1893,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         
       if (boundFunctionType &&
           CD->hasThrows() != boundFunctionType->throws()) {
-        boundType = FunctionType::get(boundFunctionType->getInput(),
-                                      boundFunctionType->getResult(),
-                                      boundFunctionType->getExtInfo().
-                                                          withThrows());
+        boundType = boundFunctionType->withExtInfo(
+            boundFunctionType->getExtInfo().withThrows());
       }
     }
   }

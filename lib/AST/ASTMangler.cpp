@@ -837,20 +837,23 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Struct:
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct:
+    case TypeKind::BoundGenericStruct: {
+      // We can't use getAnyNominal here because this can be TypeAliasDecl only
+      // in case of UnboundGenericType. Such mangling happens in, for instance,
+      // SourceKit 'cursorinfo' request.
+      auto *Decl = type->getAnyGeneric();
       if (type->isSpecialized()) {
         // Try to mangle the entire name as a substitution.
-        if (tryMangleSubstitution(type.getPointer()))
+        if (tryMangleSubstitution(tybase))
           return;
 
-        NominalTypeDecl *NDecl = type->getAnyNominal();
-        if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
+        if (isStdlibType(Decl) && Decl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0]);
           appendOperator("Sg");
         } else {
-          appendAnyGenericType(NDecl);
+          appendAnyGenericType(Decl);
           bool isFirstArgList = true;
           appendBoundGenericArgs(type, isFirstArgList);
           appendRetroactiveConformances(type);
@@ -859,8 +862,9 @@ void ASTMangler::appendType(Type type) {
         addSubstitution(type.getPointer());
         return;
       }
-      appendAnyGenericType(tybase->getAnyNominal());
+      appendAnyGenericType(Decl);
       return;
+    }
 
     case TypeKind::SILFunction:
       return appendImplFunctionType(cast<SILFunctionType>(tybase));
@@ -982,8 +986,8 @@ void ASTMangler::appendType(Type type) {
 
       if (auto sig = layout->getGenericSignature()) {
         fieldsList.clear();
-        for (auto &arg : box->getGenericArgs()) {
-          fieldsList.push_back(TupleTypeElt(arg.getReplacement()));
+        for (Type type : box->getSubstitutions().getReplacementTypes()) {
+          fieldsList.push_back(TupleTypeElt(type));
         }
         appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
                          ->getCanonicalType());

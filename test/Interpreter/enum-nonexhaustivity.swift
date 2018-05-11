@@ -173,6 +173,7 @@ EnumTestSuite.test("UnexpectedOkayNested2/LyingExhaustive") {
 }
 
 
+#if _runtime(_ObjC)
 @objc enum SwiftEnum : Int32 {
   case A, B, C
 
@@ -358,5 +359,6 @@ EnumTestSuite.test("TrapOnUnexpected/NestedSwiftExhaustive")
   }
   expectUnreachable()
 }
+#endif
 
 runAllTests()

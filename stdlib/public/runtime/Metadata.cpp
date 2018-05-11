@@ -876,6 +876,9 @@ public:
 
 class TupleCache : public MetadataCache<TupleCacheEntry, false, TupleCache> {
 public:
+// FIXME: https://bugs.swift.org/browse/SR-1155
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
   resolveExistingEntry(const TupleTypeMetadata *metadata) {
     // The correctness of this arithmetic is verified by an assertion in
@@ -885,6 +888,7 @@ public:
     auto entry = reinterpret_cast<const TupleCacheEntry*>(bytes);
     return const_cast<TupleCacheEntry*>(entry);
   }
+#pragma clang diagnostic pop
 };
 
 } // end anonymous namespace
@@ -3914,3 +3918,29 @@ bool Metadata::satisfiesClassConstraint() const {
   // or it's a class.
   return isAnyClass();
 }
+
+#if !NDEBUG
+void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
+  // Enable verification when a special environment variable is set.
+  // Some metatypes crash when going through the mangler or demangler. A
+  // lot of tests currently trigger those crashes, resulting in failing
+  // tests which are still usefully testing something else. This
+  // variable lets us easily turn on verification to find and fix these
+  // bugs. Remove this and leave it permanently on once everything works
+  // with it enabled.
+  bool verificationEnabled =
+    SWIFT_LAZY_CONSTANT((bool)getenv("SWIFT_ENABLE_MANGLED_NAME_VERIFICATION"));
+  
+  if (!verificationEnabled) return;
+  
+  Demangle::Demangler Dem;
+  auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
+  auto mangledName = Demangle::mangleNode(node);
+  auto result = _getTypeByMangledName(mangledName,
+                                      [](unsigned, unsigned){ return nullptr; });
+  if (metadata != result)
+    swift::warning(RuntimeErrorFlagNone,
+                   "Metadata mangled name failed to roundtrip: %p -> %s -> %p",
+                   metadata, mangledName.c_str(), (const Metadata *)result);
+}
+#endif

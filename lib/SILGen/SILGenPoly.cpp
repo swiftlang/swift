@@ -2077,7 +2077,7 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
       auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
       SILType outerObjectType =
           SGF.getSILType(outerResult).getOptionalObjectType();
-      SILResultInfo outerObjectResult(outerObjectType.getSwiftRValueType(),
+      SILResultInfo outerObjectResult(outerObjectType.getASTType(),
                                       outerResult.getConvention());
 
       // Plan to leave the tuple elements as a single direct outer result.
@@ -2121,7 +2121,7 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
   for (auto eltIndex : indices(innerSubstType.getElementTypes())) {
     auto outerEltType =
         SGF.getSILType(outerResult).getTupleElementType(eltIndex);
-    SILResultInfo outerEltResult(outerEltType.getSwiftRValueType(),
+    SILResultInfo outerEltResult(outerEltType.getASTType(),
                                  outerResult.getConvention());
 
     planIntoDirectResult(innerOrigType.getTupleElementType(eltIndex),
@@ -2185,7 +2185,7 @@ ResultPlanner::planScalarIntoIndirectResult(AbstractionPattern innerOrigType,
   assert(!outerOrigType.isTuple());
 
   bool hasAbstractionDifference =
-    (innerResult.getType() != outerResultAddr->getType().getSwiftRValueType());
+    (innerResult.getType() != outerResultAddr->getType().getASTType());
 
   // If the inner result is indirect, we need some memory to emit it into.
   if (SGF.silConv.isSILIndirect(innerResult)) {
@@ -2322,7 +2322,7 @@ ResultPlanner::planScalarFromIndirectResult(AbstractionPattern innerOrigType,
   assert(SGF.silConv.isSILIndirect(outerResult) == bool(optOuterResultAddr));
 
   bool hasAbstractionDifference =
-    (innerResultAddr->getType().getSwiftRValueType() != outerResult.getType());
+    (innerResultAddr->getType().getASTType() != outerResult.getType());
 
   // The outer result can be indirect, and it doesn't necessarily have an
   // abstraction difference.  Note that we should only end up in this path

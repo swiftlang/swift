@@ -24,8 +24,8 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
 @inline(never)
+@usableFromInline
 internal func _abstract(
   file: StaticString = #file,
   line: UInt = #line
@@ -349,6 +349,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
   func _customIndexOfEquatableElement(element: Element) -> Index??
+  func _customLastIndexOfEquatableElement(element: Element) -> Index??
   */
 
   @inlinable // FIXME(sil-serialize-all)

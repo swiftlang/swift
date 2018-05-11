@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %utils/chex.py < %s > %t/generic_structs.sil
+// RUN: %{python} %utils/chex.py < %s > %t/generic_structs.sil
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %t/generic_structs.sil -emit-ir | %FileCheck %t/generic_structs.sil
 
 // REQUIRES: CPU=x86_64
@@ -132,7 +132,7 @@ struct Stringly {
   var size : Builtin.Int64
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i64, i32 } @concrete_instances(i64, i32) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i32 } @concrete_instances(i64, i32) {{.*}} {
 // CHECK: entry:
 // CHECK:   %2 = trunc i32 %1 to i21
 // CHECK:   %3 = zext i21 %2 to i32
@@ -155,7 +155,7 @@ struct ComplexDynamic<U, V> {
   var d : Chareth
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @explode_complex_dynamic
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @explode_complex_dynamic
 sil @explode_complex_dynamic : $<A, B> (@in ComplexDynamic<A, B>, @inout Byteful, @inout A, @inout B, @inout Chareth) -> () {
 entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Chareth):
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.a2

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -O -parse-as-library %s | %FileCheck %s
 
 // Test the absence of a 'strict' flag.
 // CHECK-LABEL: $S18unsafe_pointer_gen13test_raw_load2rpSiSV_tF

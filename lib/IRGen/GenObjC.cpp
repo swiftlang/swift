@@ -687,7 +687,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   if (auto searchType = methodInfo.getSearchType()) {
     receiverValue =
       emitSuperArgument(IGF, isInstanceMethod, selfValue,
-                        searchType.getSwiftRValueType());
+                        searchType.getASTType());
   } else {
     receiverValue = selfValue;
   }
@@ -1064,7 +1064,7 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
   assert(getter);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
   return IGM.getClangType(
-      methodTy->getFormalCSemanticResult().getSwiftRValueType());
+      methodTy->getFormalCSemanticResult().getASTType());
 }
 
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
@@ -1096,7 +1096,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
 
   // Return type.
   {
-    auto clangType = IGM.getClangType(resultType.getSwiftRValueType());
+    auto clangType = IGM.getClangType(resultType.getASTType());
     if (clangType.isNull())
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     HelperGetObjCEncodingForType(clangASTContext, clangType, encodingString,

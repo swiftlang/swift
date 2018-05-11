@@ -94,6 +94,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   Dead = 1 << 6,
   OwnedToGuaranteed = 1 << 7,
   SROA = 1 << 8,
+  GuaranteedToOwned = 1 << 9,
 };
 
 /// The pass that caused the specialization to occur. We use this to make sure
@@ -465,6 +466,14 @@ void mangleIdentifier(const char *data, size_t length,
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
+
+using SymbolicResolver = llvm::function_ref<Demangle::NodePointer (const void *)>;
+
+/// \brief Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
+///
+/// This should always round-trip perfectly with demangleSymbolAsNode.
+std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
 
 /// Remangle in the old mangling scheme.
 ///

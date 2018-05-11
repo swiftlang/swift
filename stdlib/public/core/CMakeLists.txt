@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -66,6 +66,7 @@ set(SWIFTLIB_ESSENTIAL
   AnyHashable.swift
   # END WORKAROUND
   HashedCollectionsAnyHashableExtensions.swift
+  Hasher.swift
   Hashing.swift
   HeapBuffer.swift
   ICU.swift
@@ -96,6 +97,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   PrefixWhile.swift
   Print.swift
+  Random.swift
   RandomAccessCollection.swift
   Range.swift
   RangeReplaceableCollection.swift
@@ -105,7 +107,7 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
-  SipHash.swift.gyb
+  SipHash.swift
   SentinelCollection.swift
   Sequence.swift
   SequenceAlgorithms.swift
@@ -250,7 +252,7 @@ endif()
 
 set(shared_only_libs)
 if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-   list(APPEND shared_only_libs swiftImageInspectionShared)
+   list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
 endif()
 
 add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

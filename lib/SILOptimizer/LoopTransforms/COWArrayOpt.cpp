@@ -1394,11 +1394,11 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         // Checking
         // that all types are the same make guarantees that this cannot happen.
         if (SameTy.isNull()) {
-          SameTy = Sem.getSelf()->getType().getSwiftRValueType();
+          SameTy = Sem.getSelf()->getType().getASTType();
           continue;
         }
         
-        if (Sem.getSelf()->getType().getSwiftRValueType() != SameTy) {
+        if (Sem.getSelf()->getType().getASTType() != SameTy) {
           DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
           return ReturnWithCleanup(false);
         }

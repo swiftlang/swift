@@ -20,7 +20,6 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
@@ -1023,7 +1022,7 @@ class BreakStmt : public Stmt {
   SourceLoc Loc;
   Identifier TargetName; // Named target statement, if specified in the source.
   SourceLoc TargetLoc;
-  LabeledStmt *Target;  // Target stmt, wired up by Sema.
+  LabeledStmt *Target = nullptr;  // Target stmt, wired up by Sema.
 public:
   BreakStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
             Optional<bool> implicit = None)
@@ -1058,7 +1057,7 @@ class ContinueStmt : public Stmt {
   SourceLoc Loc;
   Identifier TargetName; // Named target statement, if specified in the source.
   SourceLoc TargetLoc;
-  LabeledStmt *Target;
+  LabeledStmt *Target = nullptr;
 
 public:
   ContinueStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,

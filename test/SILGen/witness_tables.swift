@@ -1,9 +1,9 @@
 
-// RUN: %target-swift-frontend -module-name witness_tables -emit-silgen -enable-sil-ownership -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module > %t.sil
+// RUN: %target-swift-emit-silgen -module-name witness_tables  -enable-sil-ownership -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop > %t.sil
 // RUN: %FileCheck -check-prefix=TABLE -check-prefix=TABLE-ALL %s < %t.sil
 // RUN: %FileCheck -check-prefix=SYMBOL %s < %t.sil
 
-// RUN: %target-swift-frontend -module-name witness_tables -emit-silgen -enable-sil-ownership -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-testing > %t.testable.sil
+// RUN: %target-swift-emit-silgen -module-name witness_tables  -enable-sil-ownership -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-testing > %t.testable.sil
 // RUN: %FileCheck -check-prefix=TABLE-TESTABLE -check-prefix=TABLE-ALL %s < %t.testable.sil
 // RUN: %FileCheck -check-prefix=SYMBOL-TESTABLE %s < %t.testable.sil
 

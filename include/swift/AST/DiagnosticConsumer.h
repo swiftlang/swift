@@ -131,6 +131,8 @@ public:
   /// be associated with. An empty string means that a consumer is not
   /// associated with any particular buffer, and should only receive diagnostics
   /// that are not in any of the other consumers' files.
+  /// A null pointer for the DiagnosticConsumer means that diagnostics for this
+  /// file should not be emitted.
   using ConsumerPair =
       std::pair<std::string, std::unique_ptr<DiagnosticConsumer>>;
 
@@ -138,6 +140,8 @@ private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
   const SmallVector<ConsumerPair, 4> SubConsumers;
 
+  /// The DiagnosticConsumer may be empty if those diagnostics are not to be
+  /// emitted.
   using ConsumersOrderedByRangeEntry =
     std::pair<CharSourceRange, DiagnosticConsumer *>;
 
@@ -157,8 +161,9 @@ private:
   /// Notes are always considered attached to the error, warning, or remark
   /// that was most recently emitted.
   ///
-  /// If null, Note diagnostics are sent to every consumer.
-  DiagnosticConsumer *ConsumerForSubsequentNotes = nullptr;
+  /// If None, Note diagnostics are sent to every consumer.
+  /// If null, diagnostics are suppressed.
+  Optional<DiagnosticConsumer *> ConsumerForSubsequentNotes = None;
 
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
@@ -178,8 +183,12 @@ public:
 
 private:
   void computeConsumersOrderedByRange(SourceManager &SM);
-  DiagnosticConsumer *consumerForLocation(SourceManager &SM,
-                                          SourceLoc loc) const;
+
+  /// Returns nullptr if diagnostic is to be suppressed,
+  /// None if diagnostic is to be distributed to every consumer,
+  /// a particular consumer if diagnostic goes there.
+  Optional<DiagnosticConsumer *> consumerForLocation(SourceManager &SM,
+                                                     SourceLoc loc) const;
 };
   
 } // end namespace swift

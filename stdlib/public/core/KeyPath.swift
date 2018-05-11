@@ -52,14 +52,14 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  final public func hash(into hasher: inout Hasher) {
     return withBuffer {
       var buffer = $0
       while true {
         let (component, type) = buffer.next()
-        hasher.append(component.value)
+        hasher.combine(component.value)
         if let type = type {
-          hasher.append(unsafeBitCast(type, to: Int.self))
+          hasher.combine(unsafeBitCast(type, to: Int.self))
         } else {
           break
         }
@@ -155,6 +155,27 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     
     let base = UnsafeRawPointer(Builtin.projectTailElems(self, Int32.self))
     return try f(KeyPathBuffer(base: base))
+  }
+
+  @_inlineable // FIXME(sil-serialize-all)
+  @_versioned // FIXME(sil-serialize-all)
+  internal var _storedInlineOffset: Int? {
+    return withBuffer {
+      var buffer = $0
+      var offset = 0
+      while true {
+        let (rawComponent, optNextType) = buffer.next()
+        switch rawComponent.header.kind {
+        case .struct:
+          offset += rawComponent._structOrClassOffset
+
+        case .class, .computed, .optionalChain, .optionalForce, .optionalWrap:
+          return .none
+        }
+
+        if optNextType == nil { return .some(offset) }
+      }
+    }
   }
 }
 
@@ -441,15 +462,10 @@ internal struct ComputedPropertyID: Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(value)
-    hasher.append(isStoredProperty)
-    hasher.append(isTableOffset)
+  internal func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+    hasher.combine(isStoredProperty)
+    hasher.combine(isTableOffset)
   }
 }
 
@@ -466,7 +482,7 @@ internal struct ComputedArgumentWitnesses {
     (_ xInstanceArguments: UnsafeRawPointer,
      _ yInstanceArguments: UnsafeRawPointer,
      _ size: Int) -> Bool
-  // FIXME(hasher) Append to an inout _Hasher instead
+  // FIXME(hasher) Combine to an inout Hasher instead
   internal typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
      _ size: Int) -> Int
@@ -574,12 +590,7 @@ internal enum KeyPathComponent: Hashable {
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  internal var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func _hash(into hasher: inout _Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
@@ -592,56 +603,105 @@ internal enum KeyPathComponent: Hashable {
         // hash value of the overall key path.
         // FIXME(hasher): hash witness should just mutate hasher directly
         if hash != 0 {
-          hasher.append(hash)
+          hasher.combine(hash)
         }
       }
     }
     switch self {
     case .struct(offset: let a):
-      hasher.append(0)
-      hasher.append(a)
+      hasher.combine(0)
+      hasher.combine(a)
     case .class(offset: let b):
-      hasher.append(1)
-      hasher.append(b)
+      hasher.combine(1)
+      hasher.combine(b)
     case .optionalChain:
-      hasher.append(2)
+      hasher.combine(2)
     case .optionalForce:
-      hasher.append(3)
+      hasher.combine(3)
     case .optionalWrap:
-      hasher.append(4)
+      hasher.combine(4)
     case .get(id: let id, get: _, argument: let argument):
-      hasher.append(5)
-      hasher.append(id)
+      hasher.combine(5)
+      hasher.combine(id)
       appendHashFromArgument(argument)
     case .mutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hasher.append(6)
-      hasher.append(id)
+      hasher.combine(6)
+      hasher.combine(id)
       appendHashFromArgument(argument)
     case .nonmutatingGetSet(id: let id, get: _, set: _, argument: let argument):
-      hasher.append(7)
-      hasher.append(id)
+      hasher.combine(7)
+      hasher.combine(id)
       appendHashFromArgument(argument)
     }
   }
 }
 
 // A class that maintains ownership of another object while a mutable projection
-// into it is underway.
+// into it is underway. The lifetime of the instance of this class is also used
+// to begin and end exclusive 'modify' access to the projected address.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-internal final class ClassHolder {
+internal final class ClassHolder<ProjectionType> {
+
+  /// The type of the scratch record passed to the runtime to record
+  /// accesses to guarantee exlcusive access.
+  internal typealias AccessRecord = Builtin.UnsafeValueBuffer
+
   @usableFromInline // FIXME(sil-serialize-all)
-  internal let previous: AnyObject?
+  internal var previous: AnyObject?
   @usableFromInline // FIXME(sil-serialize-all)
-  internal let instance: AnyObject
+  internal var instance: AnyObject
 
   @inlinable // FIXME(sil-serialize-all)
   internal init(previous: AnyObject?, instance: AnyObject) {
     self.previous = previous
     self.instance = instance
   }
+
   @inlinable // FIXME(sil-serialize-all)
-  deinit {}
+  internal final class func _create(
+      previous: AnyObject?,
+      instance: AnyObject,
+      accessingAddress address: UnsafeRawPointer,
+      type: ProjectionType.Type
+  ) -> ClassHolder {
+
+    // Tail allocate the UnsafeValueBuffer used as the AccessRecord.
+    // This avoids a second heap allocation since there is no source-level way to
+    // initialize a Builtin.UnsafeValueBuffer type and thus we cannot have a
+    // stored property of that type.
+    let holder: ClassHolder = Builtin.allocWithTailElems_1(self,
+                                                          1._builtinWordValue,
+                                                          AccessRecord.self)
+
+    // Initialize the ClassHolder's instance variables. This is done via
+    // withUnsafeMutablePointer(to:) because the instance was just allocated with
+    // allocWithTailElems_1 and so we need to make sure to use an initialization
+    // rather than an assignment.
+    withUnsafeMutablePointer(to: &holder.previous) {
+      $0.initialize(to: previous)
+    }
+
+    withUnsafeMutablePointer(to: &holder.instance) {
+      $0.initialize(to: instance)
+    }
+
+    let accessRecordPtr = Builtin.projectTailElems(holder, AccessRecord.self)
+
+    // Begin a 'modify' access to the address. This access is ended in
+    // ClassHolder's deinitializer.
+    Builtin.beginUnpairedModifyAccess(address._rawValue, accessRecordPtr, type)
+
+    return holder
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  deinit {
+    let accessRecordPtr = Builtin.projectTailElems(self, AccessRecord.self)
+
+    // Ends the access begun in _create().
+    Builtin.endUnpairedAccess(accessRecordPtr)
+  }
 }
 
 // A class that triggers writeback to a pointer when destroyed.
@@ -1185,7 +1245,15 @@ internal struct RawKeyPathComponent {
       let baseObj = unsafeBitCast(base, to: AnyObject.self)
       let basePtr = UnsafeRawPointer(Builtin.bridgeToRawPointer(baseObj))
       defer { _fixLifetime(baseObj) }
-      return .continue(basePtr.advanced(by: offset)
+
+      let offsetAddress = basePtr.advanced(by: offset)
+
+      // Perform an instaneous record access on the address in order to
+      // ensure that the read will not conflict with an already in-progress
+      // 'modify' access.
+      Builtin.performInstantaneousReadAccess(offsetAddress._rawValue,
+        NewValue.self)
+      return .continue(offsetAddress
         .assumingMemoryBound(to: NewValue.self)
         .pointee)
 
@@ -1244,12 +1312,16 @@ internal struct RawKeyPathComponent {
       // AnyObject memory can alias any class reference memory, so we can
       // assume type here
       let object = base.assumingMemoryBound(to: AnyObject.self).pointee
-      // The base ought to be kept alive for the duration of the derived access
-      keepAlive = keepAlive == nil
-        ? object
-        : ClassHolder(previous: keepAlive, instance: object)
-      return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
+      let offsetAddress = UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
             .advanced(by: offset)
+
+      // Keep the  base alive for the duration of the derived access and also
+      // enforce exclusive access to the address.
+      keepAlive = ClassHolder._create(previous: keepAlive, instance: object,
+                                      accessingAddress: offsetAddress,
+                                      type: NewValue.self)
+
+      return offsetAddress
     
     case .mutatingGetSet(id: _, get: let rawGet, set: let rawSet,
                          argument: let argument):

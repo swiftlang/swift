@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/enum-objc.h -verify -enable-nonfrozen-enum-exhaustivity-diagnostics
+// RUN: %target-swift-frontend -emit-sil %s -enable-objc-interop -import-objc-header %S/Inputs/enum-objc.h -verify -enable-nonfrozen-enum-exhaustivity-diagnostics
 
 // REQUIRES: objc_interop
 

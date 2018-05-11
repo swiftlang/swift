@@ -562,7 +562,7 @@ namespace {
   /// overloads which inhibit any overload from being favored.
   void favorCallOverloads(ApplyExpr *expr,
                           ConstraintSystem &CS,
-                          std::function<bool(ValueDecl *)> isFavored,
+                          llvm::function_ref<bool(ValueDecl *)> isFavored,
                           std::function<bool(ValueDecl *)>
                               mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.
@@ -712,8 +712,9 @@ namespace {
       if (value->getDeclContext()->isTypeContext()) {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
-      
-      Type paramTy = fnTy->getInput();
+
+      Type paramTy = FunctionType::composeInput(CS.getASTContext(),
+                                                fnTy->getParams(), false);
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
@@ -787,7 +788,10 @@ namespace {
             }
           }
         }
-        Type paramTy = fnTy->getInput();
+
+        auto paramTy =
+            AnyFunctionType::composeInput(CS.getASTContext(), fnTy->getParams(),
+                                          /*canonicalVararg*/ false);
         return favoredTy->isEqual(paramTy);
       };
 
@@ -884,15 +888,14 @@ namespace {
       if (value->getDeclContext()->isTypeContext()) {
         fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
       }
-      
-      Type paramTy = fnTy->getInput();
-      auto paramTupleTy = paramTy->getAs<TupleType>();
-      if (!paramTupleTy || paramTupleTy->getNumElements() != 2)
+
+      auto params = fnTy->getParams();
+      if (params.size() != 2)
         return false;
-      
-      auto firstParamTy = paramTupleTy->getElement(0).getType();
-      auto secondParamTy = paramTupleTy->getElement(1).getType();
-      
+
+      auto firstParamTy = params[0].getType();
+      auto secondParamTy = params[1].getType();
+
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
@@ -978,7 +981,8 @@ namespace {
     /// \brief Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
-                                 FunctionRefKind functionRefKind) {
+                                 FunctionRefKind functionRefKind,
+                                 ArrayRef<ValueDecl *> outerAlternatives) {
       // The base must have a member of the given name, such that accessing
       // that member through the base returns a value convertible to the type
       // of this expression.
@@ -986,8 +990,13 @@ namespace {
       auto tv = CS.createTypeVariable(
                   CS.getConstraintLocator(expr, ConstraintLocator::Member),
                   TVO_CanBindToLValue);
-      CS.addValueMemberConstraint(baseTy, name, tv, CurDC, functionRefKind,
-        CS.getConstraintLocator(expr, ConstraintLocator::Member));
+      SmallVector<OverloadChoice, 4> outerChoices;
+      for (auto decl : outerAlternatives) {
+        outerChoices.push_back(OverloadChoice(Type(), decl, functionRefKind));
+      }
+      CS.addValueMemberConstraint(
+          baseTy, name, tv, CurDC, functionRefKind, outerChoices,
+          CS.getConstraintLocator(expr, ConstraintLocator::Member));
       return tv;
     }
 
@@ -1116,6 +1125,7 @@ namespace {
       } else {
         CS.addValueMemberConstraint(baseTy, DeclBaseName::createSubscript(),
                                     fnTy, CurDC, FunctionRefKind::DoubleApply,
+                                    /*outerAlternatives=*/{},
                                     memberLocator);
       }
 
@@ -1154,13 +1164,16 @@ namespace {
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
-      // If the expression has already been assigned a type; just use that type.
-      return E->getType();
+      if (!E->isActivated())
+        return Type();
+
+      return CS.createTypeVariable(CS.getConstraintLocator(E),
+                                   TVO_CanBindToLValue);
     }
 
     Type visitLiteralExpr(LiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
-      if (expr->getType() && !expr->getType()->hasTypeVariable())
+      if (expr->getType())
         return expr->getType();
 
       auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
@@ -1224,7 +1237,7 @@ namespace {
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
-      if (expr->getType() && !expr->getType()->hasTypeVariable())
+      if (expr->getType())
         return expr->getType();
 
       auto &tc = CS.getTypeChecker();
@@ -1496,9 +1509,12 @@ namespace {
                           TVO_PrefersSubtypeBinding);
         auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr));
         auto methodTy = FunctionType::get(argsTy, resultTy);
-        CS.addValueMemberConstraint(baseTy, expr->getName(),
-          methodTy, CurDC, expr->getFunctionRefKind(),
-          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+        CS.addValueMemberConstraint(
+            baseTy, expr->getName(), methodTy, CurDC,
+            expr->getFunctionRefKind(),
+            /*outerAlternatives=*/{},
+            CS.getConstraintLocator(expr,
+                                    ConstraintLocator::ConstructorMember));
 
         // The result of the expression is the partial application of the
         // constructor to the subexpression.
@@ -1506,7 +1522,8 @@ namespace {
       }
 
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName(),
-                                     expr->getFunctionRefKind());
+                                     expr->getFunctionRefKind(),
+                                     expr->getOuterAlternatives());
     }
     
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
@@ -1911,7 +1928,8 @@ namespace {
       Identifier name
         = context.getIdentifier(llvm::utostr(expr->getFieldNumber()));
       return addMemberRefConstraints(expr, expr->getBase(), name,
-                                     FunctionRefKind::Unapplied);
+                                     FunctionRefKind::Unapplied,
+                                     /*outerAlternatives=*/{});
     }
 
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter
@@ -2862,6 +2880,7 @@ namespace {
                                       memberTy,
                                       CurDC,
                                       refKind,
+                                      /*outerAlternatives=*/{},
                                       memberLocator);
           base = memberTy;
           break;
@@ -3537,7 +3556,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
   ConstraintSystem CS(*TC, &DC, Options);
   Parent = Parent->walk(SanitizeExpr(CS));
-  CleanupIllFormedExpressionRAII cleanup(TC->Context, Parent);
+  CleanupIllFormedExpressionRAII cleanup(Parent);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);

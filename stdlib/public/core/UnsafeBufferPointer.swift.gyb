@@ -295,7 +295,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   ///         let streetSlice = buffer[2..<buffer.endIndex]
   ///         print(Array(streetSlice))
   ///         // Prints "["Channing", "Douglas", "Evarts"]"
-  ///         let index = streetSlice.index(of: "Evarts")    // 4
+  ///         let index = streetSlice.firstIndex(of: "Evarts")    // 4
   ///         buffer[index!] = "Eustace"
   ///     }
   ///     print(streets.last!)
@@ -306,7 +306,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   ///         let streetSlice = buffer[2..<buffer.endIndex]
   ///         print(Array(streetSlice))
   ///         // Prints "["Channing", "Douglas", "Evarts"]"
-  ///         let index = streetSlice.index(of: "Evarts")    // 4
+  ///         let index = streetSlice.firstIndex(of: "Evarts")    // 4
   ///         print(buffer[index!])
   ///         // Prints "Evarts"
   ///     }
@@ -361,7 +361,7 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
     let pj = (_position! + j)
     let tmp = pi.move()
     pi.moveInitialize(from: pj, count: 1)
-    pj.initialize(to: tmp, count: 1)
+    pj.initialize(to: tmp)
   }
 % end # mutable
 }

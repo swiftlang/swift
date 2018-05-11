@@ -78,7 +78,7 @@ bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
 }
 
 bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) {
-  unsigned Options = getOptions(DAK);
+  auto Options = getOptions(DAK);
   switch (DK) {
 #define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
 #include "swift/AST/DeclNodes.def"
@@ -538,7 +538,7 @@ void DeclAttribute::print(llvm::raw_ostream &OS, const Decl *D) const {
   print(P, PrintOptions(), D);
 }
 
-unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
+uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("getOptions needs a valid attribute");

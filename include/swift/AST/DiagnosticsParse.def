@@ -121,6 +121,8 @@ ERROR(lex_invalid_curly_quote,none,
 NOTE(lex_confusable_character,none,
       "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
       (StringRef, StringRef))
+WARNING(lex_nonbreaking_space,none,
+        "non-breaking space (U+00A0) used instead of regular space", ())
 
 ERROR(lex_unterminated_block_comment,none,
       "unterminated '/*' comment", ())
@@ -362,6 +364,8 @@ ERROR(expected_lbrace_class,PointsToFirstBadToken,
       "expected '{' in class", ())
 ERROR(expected_rbrace_class,none,
       "expected '}' in class", ())
+ERROR(expected_colon_class, PointsToFirstBadToken,
+      "expected ':' to begin inheritance clause",())
 
 // Protocol
 ERROR(generic_arguments_protocol,PointsToFirstBadToken,
@@ -1583,8 +1587,8 @@ ERROR(availability_query_repeated_platform, none,
 //------------------------------------------------------------------------------
 // syntax parsing diagnostics
 //------------------------------------------------------------------------------
-WARNING(unknown_syntax_entity, PointsToFirstBadToken,
-        "unknown %0 syntax exists in the source", (StringRef))
+ERROR(unknown_syntax_entity, PointsToFirstBadToken,
+      "unknown %0 syntax exists in the source", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

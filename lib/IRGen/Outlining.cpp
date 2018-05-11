@@ -35,7 +35,7 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return;
   }
 
-  CanType formalType = type.getSwiftRValueType();
+  auto formalType = type.getASTType();
   if (isa<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(formalType))) {
     return;
   }
@@ -47,7 +47,7 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return collectFormalTypeMetadata(formalType);
   }
 
-  auto key = LocalTypeDataKey(type.getSwiftRValueType(),
+  auto key = LocalTypeDataKey(type.getASTType(),
                             LocalTypeDataKind::forRepresentationTypeMetadata());
   if (Values.count(key)) return;
 
@@ -100,7 +100,7 @@ void OutliningMetadataCollector::bindMetadataParameters(IRGenFunction &IGF,
 
 std::pair<CanType, CanGenericSignature>
 irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
-  auto loweredType = type.getSwiftRValueType();
+  auto loweredType = type.getASTType();
   if (loweredType->hasArchetype()) {
     GenericEnvironment *env = nullptr;
     loweredType.findIf([&env](Type t) -> bool {

@@ -54,3 +54,10 @@ public class Container {
   public func getSingleAttr() -> String { return "" }
   public func getOptionalSingleAttr() -> String? { return nil }
 }
+
+public class ToplevelType {
+  public init() {}
+  public init(recordName: String) {}
+}
+
+public var GlobalAttribute: String = ""

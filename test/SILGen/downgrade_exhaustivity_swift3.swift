@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 3 -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 3 -enable-sil-ownership %s | %FileCheck %s
 
 enum Downgradable {
   case spoon

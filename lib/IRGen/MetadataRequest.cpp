@@ -297,18 +297,6 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
   return addr;
 }
 
-// FIXME: willBeRelativelyAddressed is only needed to work around an ld64 bug
-// resolving relative references to coalesceable symbols.
-// It should be removed when fixed. rdar://problem/22674524
-llvm::Constant *irgen::getTypeRef(IRGenModule &IGM, CanType type) {
-  IRGenMangler Mangler;
-  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, type,
-                                                    IGM.getSwiftModule(),
-                                                    /*single-field box*/ false);
-  
-  return IGM.getAddrOfStringForTypeRef(SymbolicName);
-}
-
 llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
                                                    llvm::Value *classPtr) {
   assert(IGF.IGM.Context.LangOpts.EnableObjCInterop);
@@ -2058,7 +2046,7 @@ llvm::Value *
 IRGenFunction::emitTypeMetadataRefForLayout(SILType type,
                                             DynamicMetadataRequest request) {
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType(),
+  return EmitTypeMetadataRefForLayout(*this).visit(type.getASTType(),
                                                    request);
 }
 
@@ -2157,7 +2145,7 @@ namespace {
       // to the aggregate's.
       if (SILType singletonFieldTy = getSingletonAggregateFieldType(IGF.IGM,
                                              silTy, ResilienceExpansion::Maximal))
-        return visit(singletonFieldTy.getSwiftRValueType(), request);
+        return visit(singletonFieldTy.getASTType(), request);
 
       // If the type is fixed-layout, emit a copy of its layout.
       if (auto fixed = dyn_cast<FixedTypeInfo>(&ti))
@@ -2339,7 +2327,7 @@ llvm::Value *irgen::emitTypeLayoutRef(IRGenFunction &IGF, SILType type,
     DynamicMetadataRequest::getNonBlocking(MetadataState::LayoutComplete,
                                            collector);
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeLayoutRef(IGF).visit(type.getSwiftRValueType(), request);
+  return EmitTypeLayoutRef(IGF).visit(type.getASTType(), request);
 }
 
 /// Given a class metatype, produce the necessary heap metadata

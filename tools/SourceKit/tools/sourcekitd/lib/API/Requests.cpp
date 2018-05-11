@@ -2711,7 +2711,7 @@ void CompileTrackingConsumer::operationStarted(
   Dict.set(KeyCompileID, std::to_string(OpId));
   Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
   // FIXME: OperationKind
-  Dict.set(KeyCompilerArgs, Inv.Args.Args);
+  Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 

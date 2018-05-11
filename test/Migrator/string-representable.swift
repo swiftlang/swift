@@ -34,5 +34,7 @@ func foo(_ c: Container) -> String {
   c.adding(attributes: c.attrDict)
   _ = Container(optionalAttrArray: c.attrArr)
   c.adding(optionalAttributes: c.optionalAttrDict)
+  _ = GlobalAttribute
+  c.Value = GlobalAttribute
   return c.Value
 }

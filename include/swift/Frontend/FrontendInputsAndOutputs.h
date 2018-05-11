@@ -13,7 +13,6 @@
 #ifndef SWIFT_FRONTEND_FRONTENDINPUTS_H
 #define SWIFT_FRONTEND_FRONTENDINPUTS_H
 
-#include "swift/AST/Module.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "swift/Frontend/InputFile.h"
@@ -28,6 +27,8 @@ class MemoryBuffer;
 }
 
 namespace swift {
+
+class DiagnosticEngine;
 
 /// Information about all the inputs and outputs to the frontend.
 
@@ -102,6 +103,10 @@ public:
   /// If \p fn returns true, exit early and return true.
   bool
   forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+
+  /// If \p fn returns true, exit early and return true.
+  bool
+  forEachNonPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
   unsigned primaryInputCount() const { return PrimaryInputsInOrder.size(); }
 

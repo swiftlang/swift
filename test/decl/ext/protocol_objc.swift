@@ -16,7 +16,7 @@ class OC1 : OP1 {
 
 func testOP1(_ oc1: OC1, ao: AnyObject) {
   _ = oc1.extOP1a()
-  // expected-warning @+1 {{result of call is unused}}
+  // expected-warning @+1 {{result of call to function returning 'Bool' is unused}}
   ao.reqOP1a!() // okay
 
   // Extension of @objc protocol does not have @objc members.

@@ -145,7 +145,7 @@ ConstraintGraphNode::getAdjacency(TypeVariableType *typeVar) {
 
 void ConstraintGraphNode::modifyAdjacency(
        TypeVariableType *typeVar,
-       std::function<void(Adjacency& adj)> modify) {
+       llvm::function_ref<void(Adjacency& adj)> modify) {
    // Find the adjacency information.
   auto pos = AdjacencyInfo.find(typeVar);
   assert(pos != AdjacencyInfo.end() && "Type variables not adjacent");

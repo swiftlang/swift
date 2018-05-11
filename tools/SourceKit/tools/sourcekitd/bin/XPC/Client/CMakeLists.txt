@@ -9,7 +9,7 @@ set(EXPORTED_SYMBOL_FILE "${SOURCEKITD_SOURCE_DIR}/bin/sourcekitd.exports")
 
 add_sourcekit_framework(sourcekitd
   ${public_headers}
-  sourcekitd.cpp tracer.cpp
+  sourcekitd.cpp
   LINK_LIBS sourcekitdAPI
   LLVM_COMPONENT_DEPENDS support
   MODULEMAP module.modulemap

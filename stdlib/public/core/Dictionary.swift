@@ -328,11 +328,11 @@ import SwiftShims
 /// provides, see the `DictionaryLiteral` type for an alternative.
 ///
 /// You can search a dictionary's contents for a particular value using the
-/// `contains(where:)` or `index(where:)` methods supplied by default
+/// `contains(where:)` or `firstIndex(where:)` methods supplied by default
 /// implementation. The following example checks to see if `imagePaths` contains
 /// any paths in the `"/glyphs"` directory:
 ///
-///     let glyphIndex = imagePaths.index { $0.value.hasPrefix("/glyphs") }
+///     let glyphIndex = imagePaths.firstIndex(where: { $0.value.hasPrefix("/glyphs") })
 ///     if let index = glyphIndex {
 ///         print("The '\(imagesPaths[index].key)' image is a glyph.")
 ///     } else {
@@ -668,10 +668,10 @@ extension Dictionary: Collection {
   /// this subscript with the resulting value.
   ///
   /// For example, to find the key for a particular value in a dictionary, use
-  /// the `index(where:)` method.
+  /// the `firstIndex(where:)` method.
   ///
   ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     if let index = countryCodes.index(where: { $0.value == "Japan" }) {
+  ///     if let index = countryCodes.firstIndex(where: { $0.value == "Japan" }) {
   ///         print(countryCodes[index])
   ///         print("Japan's country code is '\(countryCodes[index].key)'.")
   ///     } else {
@@ -1254,12 +1254,18 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-      return _variantBuffer.index(forKey: element) != nil
+      return _variantBuffer.containsKey(element)
     }
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customIndexOfEquatableElement(_ element: Element) -> Index?? {
       return Optional(_variantBuffer.index(forKey: element))
+    }
+
+    @inlinable // FIXME(sil-serialize-all)
+    public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
+      // The first and last elements are the same because each element is unique.
+      return _customIndexOfEquatableElement(element)
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -1444,20 +1450,17 @@ extension Dictionary: Equatable where Value: Equatable {
 
 extension Dictionary: Hashable where Value: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
-      var elementHasher = _Hasher()
-      elementHasher.append(k)
-      elementHasher.append(v)
-      commutativeHash ^= elementHasher.finalize()
+      // Note that we use a copy of our own hasher here. This makes hash values
+      // dependent on its state, eliminating static collision patterns.
+      var elementHasher = hasher
+      elementHasher.combine(k)
+      elementHasher.combine(v)
+      commutativeHash ^= elementHasher._finalize()
     }
-    hasher.append(commutativeHash)
+    hasher.combine(commutativeHash)
   }
 }
 
@@ -2161,7 +2164,7 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
     //
     // FIXME: Use an approximation of true per-instance seeding. We can't just
     // use the base address, because COW copies need to share the same seed.
-    let seed = _Hasher._seed
+    let seed = Hasher._seed
     let perturbation = bucketCount
     _storage.seed = (seed.0 ^ UInt64(truncatingIfNeeded: perturbation), seed.1)
   }
@@ -2436,9 +2439,7 @@ extension _NativeDictionaryBuffer where Key: Hashable
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
   internal func _bucket(_ k: Key) -> Int {
-    var hasher = _Hasher(seed: _storage.seed)
-    hasher.append(k)
-    return hasher.finalize() & _bucketMask
+    return k._rawHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3293,8 +3294,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaDictionaryBuffer
   ) {
@@ -3419,6 +3420,23 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func containsKey(_ key: Key) -> Bool {
+    if _fastPath(guaranteedNative) {
+      return asNative.index(forKey: key) != nil
+    }
+
+    switch self {
+    case .native:
+      return asNative.index(forKey: key) != nil
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
+      return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key) != nil
+#endif
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
   internal func assertingGet(_ i: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return asNative.assertingGet(i._nativeIndex)
@@ -3458,8 +3476,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Key
   ) -> Value? {
@@ -4327,19 +4345,24 @@ extension Dictionary.Index {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
+  public func hash(into hasher: inout Hasher) {
+  #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
-      return _nativeIndex.offset
+      hasher.combine(0 as UInt8)
+      hasher.combine(_nativeIndex.offset)
+      return
     }
-
     switch _value {
     case ._native(let nativeIndex):
-      return nativeIndex.offset
-  #if _runtime(_ObjC)
+      hasher.combine(0 as UInt8)
+      hasher.combine(nativeIndex.offset)
     case ._cocoa(let cocoaIndex):
-      return cocoaIndex.currentKeyIndex
-  #endif
+      hasher.combine(1 as UInt8)
+      hasher.combine(cocoaIndex.currentKeyIndex)
     }
+  #else
+    hasher.combine(_nativeIndex.offset)
+  #endif
   }
 }
 

@@ -503,7 +503,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   // common, because most of the recursion involves the requirements
   // of the generic type.
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    type = FunctionType::get(genericFn->getInput(),
+    type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
                              genericFn->getExtInfo());
   }
@@ -877,7 +877,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
 
   // Can we derive conformances for this protocol and adoptee?
   NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
-  if (!DerivedConformance::derivesProtocolConformance(tc, derivingTypeDecl,
+  if (!DerivedConformance::derivesProtocolConformance(tc, dc, derivingTypeDecl,
                                                       proto))
     return Type();
 

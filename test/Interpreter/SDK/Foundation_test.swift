@@ -163,8 +163,8 @@ FoundationTestSuite.test("RangeConversion") {
   expectEqual("{0, 5}", NSStringFromRange(nsrFromPartial))
 
   let s = "Hello, 🌎!"
-  let b = s.index(of: ",")!
-  let e = s.index(of: "!")!
+  let b = s.firstIndex(of: ",")!
+  let e = s.firstIndex(of: "!")!
   let nsr = NSRange(b..<e, in: s)
   expectEqual(nsr.location, 5)
   expectEqual(nsr.length, 4)

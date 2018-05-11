@@ -12,10 +12,11 @@
 
 #define DEBUG_TYPE "sil-sea"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 
@@ -187,6 +188,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
 
 // Instantiate template members.
 template class swift::GenericFunctionEffectAnalysis<FunctionSideEffects>;
+template class swift::GenericFunctionEffectAnalysis<FunctionAccessedStorage>;
 
 // -----------------------------------------------------------------------------
 // FunctionSideEffects

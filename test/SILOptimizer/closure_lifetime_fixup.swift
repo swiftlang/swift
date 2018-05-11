@@ -82,3 +82,15 @@ public protocol P {
 public func testMaterializeForSet<T : P>(p: inout T) where T.Element == String {
   p[{Int($0)!}, {String($0)}] += 1
 }
+
+public func dontCrash<In, Out>(test: Bool, body: @escaping ((In) -> Out, In) -> Out ) -> (In) -> Out {
+  var result: ((In) -> Out)!
+  result = { (x: In) in
+    if test {
+      return body(result, x)
+    }
+    let r = body(result, x)
+    return r
+  }
+  return result
+}

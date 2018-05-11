@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name protocol_extensions -disable-objc-attr-requires-foundation-module -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name protocol_extensions -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 public protocol P1 {
   func reqP1a()

@@ -1065,7 +1065,6 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
   }
-  PrimaryIGM->emitCoverageMapping();
   
   // Emit SIL functions.
   for (SILFunction &f : PrimaryIGM->getSILModule()) {
@@ -1099,6 +1098,9 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
     IGM->emitSILProperty(&prop);
   }
   
+  // Emit code coverage mapping data.
+  PrimaryIGM->emitCoverageMapping();
+
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
     IGM->finishEmitAfterTopLevel();
@@ -1838,7 +1840,8 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
 
 LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
-  return LinkInfo::get(IGM, IGM.getSwiftModule(), entity, isDefinition);
+  return LinkInfo::get(UniversalLinkageInfo(IGM), IGM.getSwiftModule(), entity,
+                       isDefinition);
 }
 
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
@@ -1847,27 +1850,21 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   LinkInfo result;
 
   entity.mangle(result.Name);
-
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
-                   isDefinition, entity.isWeakImported(swiftModule));
-
+      getIRLinkage(linkInfo, entity.getLinkage(isDefinition), isDefinition,
+                   entity.isWeakImported(swiftModule));
   result.ForDefinition = isDefinition;
-
   return result;
 }
 
-LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
-                       StringRef name,
-                       SILLinkage linkage,
-                       ForDefinition_t isDefinition,
+LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
+                       SILLinkage linkage, ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
 
   result.Name += name;
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-    getIRLinkage(linkInfo, linkage,
-                 isDefinition, isWeakImported);
+      getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported);
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -1948,7 +1945,7 @@ bool LinkInfo::isUsed(llvm::GlobalValue::LinkageTypes Linkage,
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
     Alignment alignment, DebugTypeInfo DbgTy, Optional<SILLocation> DebugLoc,
-    StringRef DebugName) {
+    StringRef DebugName, bool inFixedBuffer) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
   if (existingValue) {
@@ -1980,7 +1977,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
   if (IGM.DebugInfo && !DbgTy.isNull() && linkInfo.isForDefinition())
     IGM.DebugInfo->emitGlobalVariableDeclaration(
         var, DebugName.empty() ? name : DebugName, name, DbgTy,
-        var->hasInternalLinkage(), DebugLoc);
+        var->hasInternalLinkage(), inFixedBuffer, DebugLoc);
 
   return var;
 }
@@ -2116,6 +2113,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   llvm::Type *storageType;
   Size fixedSize;
   Alignment fixedAlignment;
+  bool inFixedBuffer = false;
 
   if (var->isInitializedObject()) {
     assert(ti.isFixedSize(expansion));
@@ -2145,6 +2143,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   } else {
     // Allocate a fixed-size buffer and possibly heap-allocate a payload at
     // runtime if the runtime size of the type does not fit in the buffer.
+    inFixedBuffer = true;
     storageType = getFixedBufferTy();
     fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
     fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
@@ -2175,20 +2174,21 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       gvar = createVariable(*this, link, storageTypeWithContainer,
                             fixedAlignment);
     } else {
-      auto DbgTy = DebugTypeInfo::getGlobal(var, storageTypeWithContainer,
-                                            fixedSize, fixedAlignment);
+      StringRef name;
+      Optional<SILLocation> loc;
       if (var->getDecl()) {
-        // If we have the VarDecl, use it for more accurate debugging information.
-        gvar = createVariable(*this, link, storageTypeWithContainer,
-                              fixedAlignment, DbgTy, SILLocation(var->getDecl()),
-                              var->getDecl()->getName().str());
+        // Use the VarDecl for more accurate debugging information.
+        loc = var->getDecl();
+        name = var->getDecl()->getName().str();
       } else {
-        Optional<SILLocation> loc;
         if (var->hasLocation())
           loc = var->getLocation();
-        gvar = createVariable(*this, link, storageTypeWithContainer,
-                              fixedAlignment, DbgTy, loc, var->getName());
+        name = var->getName();
       }
+      auto DbgTy = DebugTypeInfo::getGlobal(var, storageTypeWithContainer,
+                                            fixedSize, fixedAlignment);
+      gvar = createVariable(*this, link, storageTypeWithContainer,
+                            fixedAlignment, DbgTy, loc, name, inFixedBuffer);
     }
     /// Add a zero initializer.
     if (forDefinition)
@@ -2310,11 +2310,19 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  if (f->getInlineStrategy() == NoInline) {
+  switch (f->getInlineStrategy()) {
+  case NoInline:
     attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,
                                llvm::Attribute::NoInline);
+    break;
+  case AlwaysInline:
+    // FIXME: We do not currently transfer AlwaysInline since doing so results
+    // in test failures, which must be investigated first.
+  case InlineDefault:
+    break;
   }
+
   if (isReadOnlyFunction(f)) {
     attrs = attrs.addAttribute(signature.getType()->getContext(),
                                llvm::AttributeList::FunctionIndex,
@@ -4056,8 +4064,10 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
-  if (Types.isCompletelyFragile())
+  if (expansion == ResilienceExpansion::Maximal &&
+      Types.isCompletelyFragile()) {
     return false;
+  }
   return D->isResilient(getSwiftModule(), expansion);
 }
 

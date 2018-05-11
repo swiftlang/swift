@@ -437,7 +437,13 @@ BatchJob::BatchJob(const JobAction &Source,
                    const char *Executable, llvm::opt::ArgStringList Arguments,
                    EnvironmentVector ExtraEnvironment,
                    std::vector<FilelistInfo> Infos,
-                   ArrayRef<const Job *> Combined)
+                   ArrayRef<const Job *> Combined, int64_t &NextQuasiPID)
     : Job(Source, std::move(Inputs), std::move(Output), Executable, Arguments,
           ExtraEnvironment, Infos),
-      CombinedJobs(Combined.begin(), Combined.end()) {}
+      CombinedJobs(Combined.begin(), Combined.end()),
+      QuasiPIDBase(NextQuasiPID) {
+
+  assert(QuasiPIDBase < 0);
+  NextQuasiPID -= CombinedJobs.size();
+  assert(NextQuasiPID < 0);
+}

@@ -357,6 +357,8 @@ public:
     noteUseOfTypeGlobals(type, false, requireMetadata);
   }
 
+  void noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type);
+
 private:
   void noteUseOfTypeGlobals(NominalTypeDecl *type,
                             bool isUseOfMetadata,
@@ -970,6 +972,7 @@ public:
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;
 
+  llvm::Constant *getTypeRef(CanType type);
   llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling);
   llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling);
   llvm::Constant *getAddrOfFieldName(StringRef Name);

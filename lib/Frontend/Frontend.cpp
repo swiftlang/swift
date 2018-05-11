@@ -149,9 +149,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(new ASTContext(Invocation.getLangOptions(),
-                               Invocation.getSearchPathOptions(), SourceMgr,
-                               Diagnostics));
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
 
   if (setUpModuleLoaders())
     return true;
@@ -614,13 +614,22 @@ void CompilerInstance::parseAndCheckTypes(
                               TypeCheckOptions);
   }
 
+  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
+    auto *SF = dyn_cast<SourceFile>(File);
+    if (!SF)
+      return true;
+    return SF->ASTStage >= SourceFile::NameBound;
+  }) && "some files have not yet had their imports resolved");
+  MainModule->setHasResolvedImports();
+
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF, PersistentState.getTopLevelContext(),
                         TypeCheckOptions, /*curElem*/ 0,
                         options.WarnLongFunctionBodies,
                         options.WarnLongExpressionTypeChecking,
-                        options.SolverExpressionTimeThreshold);
+                        options.SolverExpressionTimeThreshold,
+                        options.SwitchCheckingInvocationThreshold);
   });
 
   // Even if there were no source files, we should still record known
@@ -743,7 +752,8 @@ void CompilerInstance::parseAndTypeCheckMainFile(
                           TypeCheckOptions, CurTUElem,
                           options.WarnLongFunctionBodies,
                           options.WarnLongExpressionTypeChecking,
-                          options.SolverExpressionTimeThreshold);
+                          options.SolverExpressionTimeThreshold,
+                          options.SwitchCheckingInvocationThreshold);
     }
     CurTUElem = MainFile.Decls.size();
   } while (!Done);

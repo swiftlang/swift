@@ -152,6 +152,9 @@ public:
   /// Enables resilient class layout.
   unsigned EnableClassResilience : 1;
 
+  /// Bypass resilience when accessing resilient frameworks.
+  unsigned EnableResilienceBypass : 1;
+
   /// Should we try to build incrementally by not emitting an object file if it
   /// has the same IR hash as the module that we are preparing to emit?
   ///
@@ -185,8 +188,8 @@ public:
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableClassResilience(false),
-        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
-        GenerateProfile(false), CmdArgs(),
+        EnableResilienceBypass(false), UseIncrementalLLVMCodeGen(true),
+        UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()) {}
 
   // Get a hash of all options which influence the llvm compilation but are not

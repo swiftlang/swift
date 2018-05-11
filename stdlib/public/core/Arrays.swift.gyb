@@ -137,12 +137,12 @@ if True:
 /// tasked with finding the first two days with absences in the session. To
 /// find the indices of the two days in question, follow these steps:
 ///
-/// 1) Call `index(where:)` to find the index of the first element in the
+/// 1) Call `firstIndex(where:)` to find the index of the first element in the
 ///    `absences` array that is greater than zero.
 /// 2) Create a slice of the `absences` array starting after the index found in
 ///    step 1.
-/// 3) Call `index(where:)` again, this time on the slice created in step 2.
-///    Where in some languages you might pass a starting index into an
+/// 3) Call `firstIndex(where:)` again, this time on the slice created in step
+///    2. Where in some languages you might pass a starting index into an
 ///    `indexOf` method to find the second day, in Swift you perform the same
 ///    operation on a slice of the original array.
 /// 4) Print the results using the indices found in steps 1 and 3 on the
@@ -150,9 +150,9 @@ if True:
 ///
 /// Here's an implementation of those steps:
 ///
-///     if let i = absences.index(where: { $0 > 0 }) {                      // 1
+///     if let i = absences.firstIndex(where: { $0 > 0 }) {                 // 1
 ///         let absencesAfterFirst = absences[(i + 1)...]                   // 2
-///         if let j = absencesAfterFirst.index(where: { $0 > 0 }) {        // 3
+///         if let j = absencesAfterFirst.firstIndex(where: { $0 > 0 }) {   // 3
 ///             print("The first day with absences had \(absences[i]).")    // 4
 ///             print("The second day with absences had \(absences[j]).")
 ///         }
@@ -293,7 +293,7 @@ if True:
 /// You can replace an existing element with a new value by assigning the new
 /// value to the subscript.
 ///
-///     if let i = students.index(of: "Maxime") {
+///     if let i = students.firstIndex(of: "Maxime") {
 ///         students[i] = "Max"
 ///     }
 ///     // ["Ivy", "Jordell", "Liam", "Max", "Shakia"]
@@ -533,7 +533,7 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   /// safe to use with `endIndex`. For example:
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let i = numbers.index(of: 30) {
+  ///     if let i = numbers.firstIndex(of: 30) {
   ///         print(numbers[i ..< numbers.endIndex])
   ///     }
   ///     // Prints "[30, 40, 50]"
@@ -784,7 +784,7 @@ extension ${Self}: RandomAccessCollection, MutableCollection {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let i = streetsSlice.index(of: "Evarts")    // 4
+  ///     let i = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[i!])
   ///     // Prints "Evarts"
   ///
@@ -1115,8 +1115,8 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
     }
   }
 
-  @inlinable
   @inline(never)
+  @usableFromInline
   internal static func _allocateBufferUninitialized(
     minimumCapacity: Int
   ) -> _Buffer {
@@ -1337,8 +1337,8 @@ extension ${Self} : RangeReplaceableCollection, ArrayProtocol {
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
@@ -1875,7 +1875,7 @@ internal struct _InitializeMemoryFromCollection<
 }
 
 extension _ArrayBufferProtocol {
-  @inlinable
+  @inlinable // FIXME @useableFromInline https://bugs.swift.org/browse/SR-7588
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
     _ bounds: Range<Int>,
@@ -1989,8 +1989,8 @@ extension _ArrayBufferProtocol {
   /// The formula used to compute the new buffers capacity is:
   ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
   ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal func _forceCreateUniqueMutableBuffer(
     newCount: Int, requiredCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
@@ -2005,8 +2005,8 @@ extension _ArrayBufferProtocol {
   /// The formula used to compute the new buffers capacity is:
   ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
   ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal func _forceCreateUniqueMutableBuffer(
     countForNewBuffer: Int, minNewCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
@@ -2054,8 +2054,8 @@ extension _ArrayBufferProtocol {
   ///
   /// As an optimization, may move elements out of source rather than
   /// copying when it isUniquelyReferenced.
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
     _ dest: inout _ContiguousArrayBuffer<Element>,
     _ headCount: Int, // Count of initial source elements to copy/move
@@ -2138,8 +2138,8 @@ internal struct _IgnorePointer<T> : _PointerFunction {
 }
 
 extension _ArrayBufferProtocol {
-  @inlinable
   @inline(never)
+  @usableFromInline
   internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
 
     if _fastPath(
@@ -2264,15 +2264,22 @@ extension ${Self} : Equatable where Element : Equatable {
 
 extension ${Self}: Hashable where Element: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(count) // discriminator
+    for element in self {
+      hasher.combine(element)
+    }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    var hasher = Hasher(_seed: seed)
+    // Note that we don't need to use delimiters/discriminators for top-level
+    // hashing.
     for element in self {
-      hasher.append(element)
+      hasher.combine(element)
     }
+    return hasher._finalize()
   }
 }
 

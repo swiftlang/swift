@@ -414,10 +414,14 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
-                                             ArrayRef<const char *> Args,
+                                             ArrayRef<const char *> OrigArgs,
                                              DiagnosticEngine &Diags,
                                              StringRef UnresolvedPrimaryFile,
                                              std::string &Error) {
+  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  Args.push_back("-resource-dir");
+  Args.push_back(Impl.RuntimeResourcePath.c_str());
+
   if (auto driverInvocation = driver::createCompilerInvocation(Args, Diags)) {
     Invocation = *driverInvocation;
   } else {
@@ -425,8 +429,6 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-
-  Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
 
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
@@ -795,19 +797,14 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
   trace::SwiftInvocation TraceInfo;
   if (TracedOp.enabled()) {
-    TraceInfo.Args.PrimaryFile = InvokRef->Impl.Opts.PrimaryFile;
-    TraceInfo.Args.Args = InvokRef->Impl.Opts.Args;
+    trace::initTraceInfo(TraceInfo, InvokRef->Impl.Opts.PrimaryFile,
+                         InvokRef->Impl.Opts.Args);
   }
 
   ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
   for (auto &Content : Contents) {
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
-
-    if (TracedOp.enabled()) {
-      TraceInfo.addFile(Content.Buffer->getBufferIdentifier(),
-                        Content.Buffer->getBuffer());
-    }
   }
   auto &CompIns = ASTRef->Impl.CompInst;
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;

@@ -15,6 +15,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -200,10 +201,7 @@ FileUnit *SerializedModuleLoader::loadAST(
                        isFramework, loadedModuleFile,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
-    // In LLDB always use the default resilience strategy, so IRGen can query
-    // the size of resilient types.
-    if (!Ctx.LangOpts.DebuggerSupport)
-      M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
@@ -316,6 +314,25 @@ FileUnit *SerializedModuleLoader::loadAST(
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
     }
+    break;
+  }
+
+  case serialization::Status::CircularDependency: {
+    auto circularDependencyIter =
+        llvm::find_if(loadedModuleFile->getDependencies(),
+                      [](const ModuleFile::Dependency &next) {
+      return !next.Import.second->hasResolvedImports();
+    });
+    assert(circularDependencyIter != loadedModuleFile->getDependencies().end()
+           && "circular dependency reported, but no module with unresolved "
+              "imports found");
+
+    // FIXME: We should include the path of the circularity as well, but that's
+    // hard because we're discovering this /while/ resolving imports, which
+    // means the problematic modules haven't been recorded yet.
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_circular_dependency,
+                       circularDependencyIter->getPrettyPrintedPath(),
+                       M.getName());
     break;
   }
 
@@ -437,6 +454,7 @@ ModuleDecl *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   auto M = ModuleDecl::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first] = M;
+  SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
                std::move(moduleDocInputBuffer), isFramework)) {

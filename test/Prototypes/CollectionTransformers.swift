@@ -680,7 +680,7 @@ final public class ForkJoinPool {
       _runningThreadsMutex.withLock {
         _submissionQueuesMutex.withLock {
           _workDequesMutex.withLock {
-            let i = _runningThreads.index { $0 === thread }!
+            let i = _runningThreads.firstIndex { $0 === thread }!
             ForkJoinPool._threadRegistry[thread._tid!] = nil
             _runningThreads.remove(at: i)
             _submissionQueues.remove(at: i)

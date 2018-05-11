@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name generic_property_base_lifetime -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name generic_property_base_lifetime %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership | %FileCheck %s
 
 protocol ProtocolA: class {
     var intProp: Int { get set }

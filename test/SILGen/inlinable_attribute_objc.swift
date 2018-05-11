@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name inlinable_attribute_objc -Xllvm -sil-full-demangle -primary-file %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name inlinable_attribute_objc -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

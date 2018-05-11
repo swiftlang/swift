@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -161,7 +161,7 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// that position.
 ///
 ///     let text = "Buffalo buffalo buffalo buffalo."
-///     if let firstSpace = text.index(of: " ") {
+///     if let firstSpace = text.firstIndex(of: " ") {
 ///         print(text[..<firstSpace])
 ///     }
 ///     // Prints "Buffalo"
@@ -226,7 +226,7 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// You can retrieve the same slice using the string's ranged subscript, which
 /// takes a range expression.
 ///
-///     if let firstSpace = text.index(of: " ") {
+///     if let firstSpace = text.firstIndex(of: " ") {
 ///         print(text[..<firstSpace]
 ///         // Prints "Buffalo"
 ///     }
@@ -373,7 +373,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// safe to use with `endIndex`. For example:
   ///
   ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let index = numbers.index(of: 30) {
+  ///     if let index = numbers.firstIndex(of: 30) {
   ///         print(numbers[index ..< numbers.endIndex])
   ///     }
   ///     // Prints "[30, 40, 50]"
@@ -439,7 +439,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// original collection. This example searches `streetsSlice` for one of the
   /// strings in the slice, and then uses that index in the original array.
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")!    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")!    // 4
   ///     print(streets[index])
   ///     // "Evarts"
   ///
@@ -497,7 +497,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(upTo: i))
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -512,7 +512,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// half-open range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(upTo:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[..<i])
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -532,7 +532,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.suffix(from: i))
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -547,7 +547,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// from the index as the collection's subscript. The subscript notation is
   /// preferred over `suffix(from:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[i...])
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -568,7 +568,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(through: i))
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -577,7 +577,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// closed range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(through:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -621,14 +621,27 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   of the collection.
   var count: Int { get }
   
-  // The following requirement enables dispatching for index(of:) when
-  // the element type is Equatable.
+  // The following requirements enable dispatching for firstIndex(of:) and
+  // lastIndex(of:) when the element type is Equatable.
+
   /// Returns `Optional(Optional(index))` if an element was found
   /// or `Optional(nil)` if an element was determined to be missing;
   /// otherwise, `nil`.
   ///
   /// - Complexity: O(*n*)
   func _customIndexOfEquatableElement(_ element: Element) -> Index??
+
+  /// Customization point for `Collection.lastIndex(of:)`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(*n*) by exploiting collection-specific knowledge.
+  ///
+  /// - Returns: `nil` if a linear search should be attempted instead,
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
+  ///
+  /// - Complexity: Hopefully less than O(`count`).
+  func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
 
   /// The first element of the collection.
   ///
@@ -789,6 +802,25 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
+
+  /// Returns a random element of the collection, using the given generator as
+  /// a source for randomness.
+  ///
+  /// You use this method to select a random element from a collection when you
+  /// are using a custom random number generator. For example, call
+  /// `randomElement(using:)` to select a random element from an array of names.
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement(using: &myGenerator)!
+  ///     // randomName == "Amani" (maybe)
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
+  ///   a random element.
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element?
 
   @available(*, deprecated, message: "all index distances are now of type Int")
   typealias IndexDistance = Int
@@ -1003,6 +1035,54 @@ extension Collection {
     return count
   }
 
+  /// Returns a random element of the collection, using the given generator as
+  /// a source for randomness.
+  ///
+  /// You use this method to select a random element from a collection when you
+  /// are using a custom random number generator. For example, call
+  /// `randomElement(using:)` to select a random element from an array of names.
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement(using: &myGenerator)!
+  ///     // randomName == "Amani" (maybe)
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
+  ///   a random element.
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  @inlinable
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element? {
+    guard !isEmpty else { return nil }
+    let random = generator.next(upperBound: UInt(count))
+    let index = self.index(
+      startIndex,
+      offsetBy: numericCast(random)
+    )
+    return self[index]
+  }
+
+  /// Returns a random element of the collection.
+  ///
+  /// For example, call `randomElement()` to select a random element from an
+  /// array of names.
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement()!
+  ///     // randomName == "Amani" (perhaps)
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `names.randomElement()` above is equivalent to calling
+  /// `names.randomElement(using: &Random.default)`.
+  ///
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  @inlinable
+  public func randomElement() -> Element? {
+    return randomElement(using: &Random.default)
+  }
+
   /// Do not use this method directly; call advanced(by: n) instead.
   @inlinable
   @inline(__always)
@@ -1067,7 +1147,7 @@ extension Collection where SubSequence == Slice<Self> {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // Prints "Evarts"
   ///
@@ -1180,7 +1260,7 @@ extension Collection {
   }
 
   // TODO: swift-3-indexing-model - rename the following to _customIndexOfEquatable(element)?
-  /// Customization point for `Collection.index(of:)`.
+  /// Customization point for `Collection.firstIndex(of:)`.
   ///
   /// Define this method if the collection can find an element in less than
   /// O(*n*) by exploiting collection-specific knowledge.
@@ -1189,10 +1269,26 @@ extension Collection {
   ///   `Optional(nil)` if the element was not found, or
   ///   `Optional(Optional(index))` if an element was found.
   ///
-  /// - Complexity: O(`count`).
+  /// - Complexity: Hopefully less than O(`count`).
   @inlinable
   public // dispatching
   func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
+    return nil
+  }
+
+  /// Customization point for `Collection.lastIndex(of:)`.
+  ///
+  /// Define this method if the collection can find an element in less than
+  /// O(*n*) by exploiting collection-specific knowledge.
+  ///
+  /// - Returns: `nil` if a linear search should be attempted instead,
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
+  ///
+  /// - Complexity: Hopefully less than O(`count`).
+  @inlinable
+  public // dispatching
+  func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
     return nil
   }
 }
@@ -1402,7 +1498,7 @@ extension Collection {
   /// but not including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(upTo: i))
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -1417,7 +1513,7 @@ extension Collection {
   /// half-open range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(upTo:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[..<i])
   ///     }
   ///     // Prints "[10, 20, 30]"
@@ -1440,7 +1536,7 @@ extension Collection {
   /// that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.suffix(from: i))
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -1455,7 +1551,7 @@ extension Collection {
   /// from the index as the collection's subscript. The subscript notation is
   /// preferred over `suffix(from:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[i...])
   ///     }
   ///     // Prints "[40, 50, 60]"
@@ -1479,7 +1575,7 @@ extension Collection {
   /// including, that index:
   ///
   ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers.prefix(through: i))
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
@@ -1488,7 +1584,7 @@ extension Collection {
   /// closed range as the collection's subscript. The subscript notation is
   /// preferred over `prefix(through:)`.
   ///
-  ///     if let i = numbers.index(of: 40) {
+  ///     if let i = numbers.firstIndex(of: 40) {
   ///         print(numbers[...i])
   ///     }
   ///     // Prints "[10, 20, 30, 40]"

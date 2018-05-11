@@ -217,4 +217,12 @@ extension _ValidUTF8Buffer {
   public static var encodedReplacementCharacter : _ValidUTF8Buffer {
     return _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
   }
+
+  @inlinable
+  internal var _bytes: (bytes: UInt64, count: Int) {
+    let count = self.count
+    let mask: UInt64 = 1 &<< (UInt64(truncatingIfNeeded: count) &<< 3) &- 1
+    let unbiased = UInt64(truncatingIfNeeded: _biasedBits) &- 0x0101010101010101
+    return (unbiased & mask, count)
+  }
 }

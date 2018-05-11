@@ -93,7 +93,7 @@ func protocolExtCollection1a<C : Collection>(_ a: C) {
 // PRIVATE_NOMINAL_MEMBERS_2A: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_2A-DAG: map({#(transform): (C.Element) throws -> T##(C.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_2A: End completions
-// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2A-NOT: Decl{{.*}}: last
+// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2A-NOT: Decl{{.*}}: index({#before: Comparable#})
 
 func protocolExtCollection1b(_ a: Collection) {
   a.#^PRIVATE_NOMINAL_MEMBERS_2B^#
@@ -102,7 +102,7 @@ func protocolExtCollection1b(_ a: Collection) {
 // PRIVATE_NOMINAL_MEMBERS_2B: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_2B-DAG: map({#(transform): (Collection.Element) throws -> T##(Collection.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_2B: End completions
-// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2B-NOT: Decl{{.*}}: last
+// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2B-NOT: Decl{{.*}}: index({#before: Comparable#})
 
 func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_ a: C) {
   a.#^PRIVATE_NOMINAL_MEMBERS_3^#
@@ -111,9 +111,9 @@ func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_
 // PRIVATE_NOMINAL_MEMBERS_3: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:         map({#(transform): (C.Element) throws -> T##(C.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceVar]/Super:            lazy[#LazySequence<Collection>#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_3-DAG: index({#where: (C.Element) throws -> Bool##(C.Element) throws -> Bool#})[' rethrows'][#Comparable?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_3-DAG: firstIndex({#where: (C.Element) throws -> Bool##(C.Element) throws -> Bool#})[' rethrows'][#Comparable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3: End completions
-// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3-NOT: Decl{{.*}}:         index({#({{.*}}): Self.Iterator.Element
+// NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3-NOT: Decl{{.*}}:         firstIndex({#({{.*}}): Self.Iterator.Element
 
 func protocolExtArray<T : Equatable>(_ a: [T]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_4^#
@@ -121,8 +121,8 @@ func protocolExtArray<T : Equatable>(_ a: [T]) {
 // PRIVATE_NOMINAL_MEMBERS_4: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         map({#(transform): (Equatable) throws -> T##(Equatable) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceVar]/Super:            last[#Equatable?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         index({#of: Equatable#})[#Int?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         index({#where: (Equatable) throws -> Bool##(Equatable) throws -> Bool#})[' rethrows'][#Int?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         firstIndex({#of: Equatable#})[#Int?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         firstIndex({#where: (Equatable) throws -> Bool##(Equatable) throws -> Bool#})[' rethrows'][#Int?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4: End completions
 
 func testArchetypeReplacement1<FOO : Equatable>(_ a: [FOO]) {

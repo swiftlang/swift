@@ -217,9 +217,9 @@ func testStructDefaultInit() {
 
 func testArrays() {
   nonnullArrayParameters([], [], [])
-  nonnullArrayParameters(nil, [], []) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<Int8>'}}
-  nonnullArrayParameters([], nil, []) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<UnsafeMutableRawPointer?>'}}
-  nonnullArrayParameters([], [], nil) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<Int32>'}}
+  nonnullArrayParameters(nil, [], []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int8>'}}
+  nonnullArrayParameters([], nil, []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafeMutableRawPointer?>'}}
+  nonnullArrayParameters([], [], nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int32>'}}
 
   nullableArrayParameters([], [], [])
   nullableArrayParameters(nil, nil, nil)
@@ -234,7 +234,7 @@ func testVaList() {
   withVaList([]) {
     hasVaList($0) // okay
   }
-  hasVaList(nil) // expected-error {{nil is not compatible with expected argument type 'CVaListPointer'}}
+  hasVaList(nil) // expected-error {{'nil' is not compatible with expected argument type 'CVaListPointer'}}
 }
 
 func testNestedForwardDeclaredStructs() {
