@@ -79,8 +79,8 @@ extension Unicode.UTF16 : Unicode.Encoding {
     return EncodedScalar(_storage: r, _bitCount: 32)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+  @_specialize(where FromEncoding == Unicode.UTF8)
+  @_specialize(where FromEncoding == Unicode.UTF16)
   public static func transcode<FromEncoding : Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {

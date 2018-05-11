@@ -391,7 +391,8 @@ internal func _float${bits}ToStringImpl(
   _ debug: Bool
 ) -> UInt
 
-@inlinable // FIXME(sil-serialize-all)
+
+@usableFromInline // FIXME(sil-serialize-all)
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> String {
@@ -399,7 +400,8 @@ internal func _float${bits}ToString(
   var buffer = _Buffer32()
   return buffer.withBytes { (bufferPtr) in
     let actualLength = _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
-    return String._fromASCII(
+      _onFastPath()
+      return String._fromASCII(
       UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
   }
 }

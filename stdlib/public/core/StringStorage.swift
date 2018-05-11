@@ -198,7 +198,7 @@ extension _SwiftStringStorage {
 extension _SwiftStringStorage {
   // Append operations
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<OtherCodeUnit>(
     _ other: _UnmanagedString<OtherCodeUnit>
@@ -210,7 +210,7 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _UnmanagedOpaqueString) {
     let otherCount = Int(other.count)
@@ -219,7 +219,7 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<C: Collection>(contentsOf other: C)
   where C.Element == CodeUnit {
@@ -232,7 +232,7 @@ extension _SwiftStringStorage {
     count += otherCount
   }
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
+  @usableFromInline
   @_specialize(where C == Character._SmallUTF16, CodeUnit == UInt8)
   @nonobjc
   internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)
@@ -250,7 +250,7 @@ extension _SwiftStringStorage {
 }
 
 extension _SwiftStringStorage {
-  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
     if _slowPath(other._isOpaque) {
@@ -281,7 +281,7 @@ extension _SwiftStringStorage {
     _appendInPlace(other._asOpaque()[range])
   }
 
-  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
     if _slowPath(other._isOpaque) {
@@ -310,13 +310,13 @@ extension _SwiftStringStorage {
     _appendInPlace(other._asOpaque())
   }
 
-  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace(_ other: String) {
     self._appendInPlace(other._guts)
   }
 
-  @inlinable
+  @usableFromInline
   @nonobjc
   internal final func _appendInPlace<S : StringProtocol>(_ other: S) {
     self._appendInPlace(

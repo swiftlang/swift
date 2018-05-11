@@ -625,6 +625,8 @@ extension _StringGuts {
   // Use the existing buffer if possible; otherwise copy the string into a
   // new buffer.
   @usableFromInline
+  @_specialize(where CodeUnit == UInt8)
+  @_specialize(where CodeUnit == UInt16)
   internal
   func _extractNativeStorage<CodeUnit>(
     of codeUnit: CodeUnit.Type = CodeUnit.self
@@ -637,7 +639,6 @@ extension _StringGuts {
     return _copyToNativeStorage(of: CodeUnit.self, from: 0..<count)
   }
 
-  @inlinable
   @_specialize(where CodeUnit == UInt8)
   @_specialize(where CodeUnit == UInt16)
   internal
@@ -655,8 +656,7 @@ extension _StringGuts {
     return storage
   }
 
-  @inlinable
-  public // @testable
+  //public // @testable
   func _extractSlice(_ range: Range<Int>) -> _StringGuts {
     if range.isEmpty { return _StringGuts() }
     if range == 0..<count { return self }
@@ -686,7 +686,6 @@ extension _StringGuts {
       _large: _copyToNativeStorage(of: UTF16.CodeUnit.self, from: range))
   }
 
-  @inlinable
   internal mutating func allocationParametersForMutableStorage<CodeUnit>(
     of type: CodeUnit.Type,
     unusedCapacity: Int
@@ -717,7 +716,7 @@ extension _StringGuts {
 
   // Convert ourselves (if needed) to a native string with the specified storage
   // parameters and call `body` on the resulting native storage.
-  @inlinable
+//  @usableFromInline
   internal
   mutating func withMutableStorage<CodeUnit, R>(
     of type: CodeUnit.Type = CodeUnit.self,
@@ -747,8 +746,6 @@ extension _StringGuts {
     return result
   }
 
-  @inlinable
-  @inline(__always)
   internal
   mutating func withMutableASCIIStorage<R>(
     unusedCapacity: Int,
@@ -758,8 +755,6 @@ extension _StringGuts {
       of: UInt8.self, unusedCapacity: unusedCapacity, body)
   }
 
-  @inlinable
-  @inline(__always)
   internal
   mutating func withMutableUTF16Storage<R>(
     unusedCapacity: Int,
@@ -887,7 +882,6 @@ extension _StringGuts {
 
 
   // Copy code units from a slice of this string into a buffer.
-  @inlinable // FIXME(sil-serialize-all)
   internal func _copy<CodeUnit>(
     range: Range<Int>,
     into dest: UnsafeMutableBufferPointer<CodeUnit>)
@@ -907,7 +901,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline // @opaque
   internal func _opaqueCopy<CodeUnit>(
     range: Range<Int>,
     into dest: UnsafeMutableBufferPointer<CodeUnit>)
@@ -923,8 +916,8 @@ extension _StringGuts {
     _asOpaque()[range]._copy(into: dest)
   }
 
-  @inlinable
-  public // TODO(StringGuts): for testing
+//  public // TODO(StringGuts): for testing
+  @usableFromInline
   mutating func reserveUnusedCapacity(
     _ unusedCapacity: Int,
     ascii: Bool = false
@@ -955,8 +948,7 @@ extension _StringGuts {
     _invariantCheck()
   }
 
-  @inlinable
-  public // TODO(StringGuts): for testing
+//  public // TODO(StringGuts): for testing
   mutating func reserveCapacity(_ capacity: Int) {
     if _fastPath(_isUniqueNative()) {
       if _fastPath(_object.nativeRawStorage.capacity >= capacity) {
@@ -982,7 +974,6 @@ extension _StringGuts {
     _invariantCheck()
   }
 
-  @inlinable
   internal
   mutating func append(_ other: _UnmanagedASCIIString) {
     guard other.count > 0 else { return  }
@@ -1004,7 +995,6 @@ extension _StringGuts {
     }
   }
 
-  @inlinable
   internal
   mutating func append(_ other: _UnmanagedUTF16String) {
     guard other.count > 0 else { return  }
@@ -1013,7 +1003,6 @@ extension _StringGuts {
     }
   }
 
-  @inlinable
   internal
   mutating func append(_ other: _UnmanagedOpaqueString) {
     guard other.count > 0 else { return  }
@@ -1022,13 +1011,15 @@ extension _StringGuts {
     }
   }
 
-  @inlinable
   internal
   mutating func append<S: StringProtocol>(_ other: S) {
     self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
 
-  public // TODO(StringGuts): for testing only
+//  public // TODO(StringGuts): for testing only
+//  @usableFromInline
+  @usableFromInline
+  internal
   mutating func append(_ other: _StringGuts) {
     // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
     if _isEmptySingleton || self.count == 0 && !_object.isNative {
@@ -1053,7 +1044,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline // @opaque
   mutating func _opaqueAppend(opaqueOther other: _StringGuts) {
     if other._isSmall {
       // TODO: Fix the visitation pattern for append here. For now, we funnel
@@ -1069,8 +1059,10 @@ extension _StringGuts {
     self.append(other._asOpaque())
   }
 
-  @inlinable
-  public // TODO(StringGuts): for testing only
+//  public // TODO(StringGuts): for testing only
+//  @usableFromInline
+  @usableFromInline
+  internal
   mutating func append(_ other: _StringGuts, range: Range<Int>) {
     _sanityCheck(range.lowerBound >= 0 && range.upperBound <= other.count)
     guard range.count > 0 else { return }
@@ -1091,7 +1083,6 @@ extension _StringGuts {
     }
   }
 
-  @usableFromInline // @opaque
   mutating func _opaqueAppend(opaqueOther other: _StringGuts, range: Range<Int>) {
     if other._isSmall {
       other._smallUTF8String.withUnmanagedASCII {
@@ -1109,8 +1100,8 @@ extension _StringGuts {
   // FIXME (TODO JIRA): Appending a character onto the end of a string should
   // really have a less generic implementation, then we can drop @specialize.
   //
+  @usableFromInline
   @_specialize(where C == Character._SmallUTF16)
-  @inlinable
   mutating func append<C : RandomAccessCollection>(contentsOf other: C)
   where C.Element == UInt16 {
     if self._isSmall {
@@ -1358,7 +1349,7 @@ extension _SwiftStringStorage {
   /// Returns true iff `input` was found to contain invalid code units in the
   /// specified encoding. If any invalid sequences are found, they are replaced
   /// with REPLACEMENT CHARACTER (U+FFFD).
-  @inlinable // FIXME(sil-serialize-all)
+//  @usableFromInline
   internal
   func _initialize<Encoding: _UnicodeEncoding>(
     fromCodeUnits input: UnsafeBufferPointer<Encoding.CodeUnit>,
