@@ -1,5 +1,10 @@
 # Swift for TensorFlow
 
+| | **Swift + TensorFlow** |
+|---|:---:|
+|**macOS**        |![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg)|
+|**Linux**        ||
+
 Welcome to Swift for TensorFlow!
 
 
