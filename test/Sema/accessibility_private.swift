@@ -118,18 +118,21 @@ protocol VeryImportantProto {
 }
 
 private struct VIPPrivateType : VeryImportantProto {
-  private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}}
+  private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
+  // expected-note@-1 {{mark the type alias as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
   var value: Int
 }
 
 private struct VIPPrivateProp : VeryImportantProto {
   typealias Assoc = Int
-  private var value: Int // expected-error {{property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+  private var value: Int // expected-error {{property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
+  // expected-note@-1 {{mark the var as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 
 private struct VIPPrivateSetProp : VeryImportantProto {
   typealias Assoc = Int
-  private(set) var value: Int // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+  private(set) var value: Int // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}}
+  // expected-note@-1 {{mark the var as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 
 private class VIPPrivateSetBase {
@@ -140,9 +143,11 @@ private class VIPPrivateSetSub : VIPPrivateSetBase, VeryImportantProto { // expe
 }
 
 private class VIPPrivateSetPropBase {
-  private(set) var value: Int = 0 // expected-error {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{3-10=fileprivate}}
+  private(set) var value: Int = 0
+  // expected-note@-1 {{mark the var as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 private class VIPPrivateSetPropSub : VIPPrivateSetPropBase, VeryImportantProto {
+  // expected-error@-1 {{setter for property 'value' must be as accessible as its enclosing type because it matches a requirement in protocol 'VeryImportantProto'}} {{none}}
   typealias Assoc = Int
 }
 
