@@ -68,16 +68,19 @@ final class PyReference {
 // `PythonObject` definition
 //===----------------------------------------------------------------------===//
 
-/// A Python object.
-///
-/// `PythonObject` is a wrapper around a `PyObject`.
+// - Note: When Swift has ownership, `PythonObject` will define copy
+//   constructors, move constructors, etc. to implement move semantics.
+
+/// `PythonObject` represents an object in Python and supports dynamic member
+/// lookup. Any member access like `object.foo` will dynamically request the
+/// Python runtime for a member with the specified name in this object.
 ///
 /// `PythonObject` is passed to and returned from all Python function calls and
 /// member references. It supports standard Python arithmetic and comparison
 /// operators.
 ///
-// - Note: When Swift has ownership, `PythonObject` will define copy
-//   constructors, move constructors, etc. to implement move semantics.
+/// Internally, `PythonObject` is implemented as a reference-counted pointer to
+/// a Python C API `PyObject`.
 @dynamicMemberLookup
 @_fixed_layout
 public struct PythonObject {
@@ -110,7 +113,7 @@ public struct PythonObject {
 
 /// Make `print(python)` print a pretty form of the `PythonObject`.
 extension PythonObject : CustomStringConvertible {
-  /// A textual description of this Python object, produced by `Python.str`.
+  /// A textual description of this `PythonObject`, produced by `Python.str`.
   public var description: String {
     // The `str` function is used here because it is designed to return
     // human-readable descriptions of Python objects. The Python REPL also uses
