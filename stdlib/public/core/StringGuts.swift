@@ -1299,16 +1299,13 @@ extension _StringGuts : Sequence {
 
 extension _StringGuts {
   // TODO: Drop or unify with String._fromCodeUnits
-  //
-  @inlinable // FIXME(sil-serialize-all)
   internal
-  static func fromCodeUnits<Input : Sequence, Encoding : _UnicodeEncoding>(
-    _ input: Input,
+  static func fromCodeUnits<Encoding : _UnicodeEncoding>(
+    _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
     encoding: Encoding.Type,
     repairIllFormedSequences: Bool,
     minimumCapacity: Int = 0
-  ) -> (_StringGuts?, hadError: Bool)
-  where Input.Element == Encoding.CodeUnit {
+  ) -> (_StringGuts?, hadError: Bool) {
     // Determine how many UTF-16 code units we'll need
     guard let (utf16Count, isASCII) = UTF16.transcodedLength(
       of: input.makeIterator(),
@@ -1349,8 +1346,7 @@ extension _StringGuts {
   // There should be an eventual API on String to accomplish something similar.
   public // @_testable
   static
-  func _createStringFromUTF16<C: RandomAccessCollection>(_ cus: C) -> String
-  where C.Element == UInt16 {
+  func _createStringFromUTF16(_ cus: UnsafeBufferPointer<UInt16>) -> String {
     let storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
       capacity: cus.count, count: cus.count)
     _ = storage._initialize(fromCodeUnits: cus, encoding: UTF16.self)
@@ -1368,11 +1364,10 @@ extension _SwiftStringStorage {
   /// with REPLACEMENT CHARACTER (U+FFFD).
   @inlinable // FIXME(sil-serialize-all)
   internal
-  func _initialize<Input : Sequence, Encoding: _UnicodeEncoding>(
-    fromCodeUnits input: Input,
+  func _initialize<Encoding: _UnicodeEncoding>(
+    fromCodeUnits input: UnsafeBufferPointer<Encoding.CodeUnit>,
     encoding: Encoding.Type
-  ) -> Bool
-  where Input.Element == Encoding.CodeUnit {
+  ) -> Bool {
     var p = self.start
     let hadError = transcode(
       input.makeIterator(),

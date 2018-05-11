@@ -1102,7 +1102,7 @@ StringTests.test("toInt") {
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(&chars)
-    let str = String._fromWellFormedUTF8CodeUnitSequence(chars)
+    let str = String(decoding: chars, as: UTF8.self)
     expectNil(Int(str))
   }
 

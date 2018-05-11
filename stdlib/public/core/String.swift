@@ -625,38 +625,46 @@ extension String {
   }
 }
 
+internal func _isAllASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
+  for byte in input {
+    guard byte <= 0x7F else { return false }
+  }
+  return true
+}
+
 extension String {
-  @inlinable
-  static func _fromUTF8CodeUnitSequence<C : RandomAccessCollection>(
-    _ input: C, repair: Bool
-  ) -> String? where C.Element == UInt8 {
+  static func _fromUTF8CodeUnitSequence(
+    _ input: UnsafeBufferPointer<UInt8>, repair: Bool
+  ) -> String? {
+    if _isAllASCII(input) {
+      return _fromASCII(input)
+    }
+
     if let smol = _SmallUTF8String(input) {
       return String(_StringGuts(smol))
     }
+
     return String._fromCodeUnits(
       input, encoding: UTF8.self, repairIllFormedSequences: repair)
   }
 
-  @inlinable
-  static func _fromASCII<C : RandomAccessCollection>(
-    _ input: C
-  ) -> String where C.Element == UInt8 {
+  @usableFromInline
+  static func _fromASCII(_ input: UnsafeBufferPointer<UInt8>) -> String {
     if let smol = _SmallUTF8String(input) {
       return String(_StringGuts(smol))
     }
     let storage = _SwiftStringStorage<UInt8>.create(
       capacity: input.count, count: input.count)
-    var (itr, end) = input._copyContents(initializing: storage.usedBuffer)
-    _sanityCheck(itr.next() == nil)
-    _sanityCheck(end == storage.usedBuffer.endIndex)
+    _sanityCheck(storage.count == input.count)
+    storage.start.initialize(
+      from: input.baseAddress._unsafelyUnwrappedUnchecked, count: input.count)
     return String(_StringGuts(_large: storage))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public // FIXME: @usableFromInline, currently public because testing...
-  static func _fromWellFormedUTF8CodeUnitSequence<C : RandomAccessCollection>(
-    _ input: C, repair: Bool = false
-  ) -> String where C.Element == UTF8.CodeUnit {
+  @usableFromInline
+  static func _fromWellFormedUTF8CodeUnitSequence(
+    _ input: UnsafeBufferPointer<UInt8>, repair: Bool = false
+  ) -> String {
     return String._fromUTF8CodeUnitSequence(input, repair: repair)!
   }
 }
@@ -674,9 +682,7 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
     //
     // TODO: All scalars are small
     if scalar.value <= 0x7f {
-      if let small = _SmallUTF8String(
-        Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
-      ) {
+      if let small = _SmallUTF8String(scalar) {
         self = String(_StringGuts(small))
         return
       } else {
