@@ -69,12 +69,15 @@ repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
 repositories and will update them instead.
 
-**TensorFlow Support:** To build with TensorFlow support, the `update-checkout-config-tensorflow.json` configuration file must be specified when cloning sources. The configuration file pins specific versions of every Swift companion directory and is updated with every upstream merge from the Apple Swift repositories.
+**TensorFlow Support:** To build with TensorFlow support, the `tensorflow`
+scheme must be specified when cloning sources. The `tensorflow` scheme pins
+specific versions of every Swift companion directory and is updated with every
+upstream merge from the master branch.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
     git clone https://github.com/apple/swift.git -b tensorflow
-    ./swift/utils/update-checkout --clone --config swift/utils/update-checkout-config-tensorflow.json
+    ./swift/utils/update-checkout --clone --scheme tensorflow
     cd swift
 
 **Via SSH**  For those who plan on regularly making direct commits,
@@ -82,7 +85,7 @@ cloning over SSH may provide a better experience (which requires
 [uploading SSH keys to GitHub](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/)):
 
     git clone git@github.com:apple/swift.git -b tensorflow
-    ./swift/utils/update-checkout --clone-with-ssh --config swift/utils/update-checkout-config-tensorflow.json
+    ./swift/utils/update-checkout --clone-with-ssh --scheme tensorflow
     cd swift
 
 ### Building Swift with TensorFlow support
@@ -223,7 +226,8 @@ tests):
 
 Swift for TensorFlow adds the following new test suites:
 
-- [test/AutoDiff](test/AutoDiff): tests for [automatic differentiation](https://github.com/tensorflow/swift/blob/master/docs/AutomaticDifferentiation.md).
+- [test/AutoDiff](test/AutoDiff): tests for
+  [automatic differentiation](https://github.com/tensorflow/swift/blob/master/docs/AutomaticDifferentiation.md).
 - [test/TensorFlow](test/TensorFlow): TensorFlow infrastructure tests that don't
   depend on the TensorFlow runtime.
 - [test/TensorFlowRuntime](test/TensorFlowRuntime): TensorFlow runtime tests.
@@ -275,4 +279,6 @@ next to the other projects and it will be bootstrapped automatically:
 ### Bazel
 [Bazel](https://bazel.build) is the build tool used to build TensorFlow. Installing Bazel is necessary for building Swift with TensorFlow support.
 
-The Bazel website has detailed installation instructions for [macOS](https://docs.bazel.build/versions/master/install-os-x.html) and [Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
+The Bazel website has detailed installation instructions for
+[macOS](https://docs.bazel.build/versions/master/install-os-x.html) and
+[Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
