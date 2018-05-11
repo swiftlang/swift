@@ -886,7 +886,8 @@ public:
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
   bool diagnoseContextualConversionError(Expr *expr, Type contextualType,
-                                         ContextualTypePurpose CTP);
+                                         ContextualTypePurpose CTP,
+                                         Type suggestedType = Type());
 
   /// For an expression being type checked with a CTP_CalleeResult contextual
   /// type, try to diagnose a problem.
@@ -2780,7 +2781,8 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError(
-    Expr *expr, Type contextualType, ContextualTypePurpose CTP) {
+    Expr *expr, Type contextualType, ContextualTypePurpose CTP,
+    Type suggestedType) {
   // If the constraint system has a contextual type, then we can test to see if
   // this is the problem that prevents us from solving the system.
   if (!contextualType) {
@@ -2799,8 +2801,12 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (contextualType->is<InOutType>())
     options |= TCC_AllowLValue;
 
-  auto recheckedExpr = typeCheckChildIndependently(expr, options);
+  auto *recheckedExpr = typeCheckChildIndependently(expr, options);
   auto exprType = recheckedExpr ? CS.getType(recheckedExpr) : Type();
+
+  // If there is a suggested type and re-typecheck failed, let's use it.
+  if (!exprType)
+    exprType = suggestedType;
 
   // If it failed and diagnosed something, then we're done.
   if (!exprType)
@@ -5402,7 +5408,11 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   // If type-checking with contextual type didn't produce any results
   // it means that we have a contextual mismatch.
   if (withContextual.empty()) {
-    return diagnoseContextualConversionError(callExpr, contextualType, CTP);
+    // If there is just a single choice, we can hit contextual diagnostics
+    // about it in case re-typecheck fails.
+    Type exprType = withoutContextual.size() == 1 ? *withoutContextual.begin() : Type();
+    return diagnoseContextualConversionError(callExpr, contextualType, CTP,
+                                             exprType);
   }
 
   // If call produces a single type when type-checked with contextual
