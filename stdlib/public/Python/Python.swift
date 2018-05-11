@@ -364,7 +364,7 @@ public struct ThrowingPythonObject {
     return (elt0, elt1)
   }
 
-  /// Converts to a 2-tuple, if possible.
+  /// Converts to a 3-tuple, if possible.
   public var tuple3: (PythonObject, PythonObject, PythonObject)? {
     let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1], let elt2 = ct[2] else {
@@ -373,7 +373,7 @@ public struct ThrowingPythonObject {
     return (elt0, elt1, elt2)
   }
 
-  /// Converts to a 2-tuple, if possible.
+  /// Converts to a 4-tuple, if possible.
   public var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject)? {
     let ct = base.checking
     guard let elt0 = ct[0], let elt1 = ct[1],
