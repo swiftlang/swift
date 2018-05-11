@@ -1372,9 +1372,14 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
       // Set up the datastructure used to collect the uses of the allocation.
       SmallVector<DIMemoryUse, 16> Uses;
       SmallVector<SILInstruction*, 4> Releases;
-      
-      // Walk the use list of the pointer, collecting them.
-      collectDIElementUsesFrom(MemInfo, Uses, Releases);
+
+      // Walk the use list of the pointer, collecting them. If we are not able
+      // to optimize, skip this value. *NOTE* We may still scalarize values
+      // inside the value.
+      if (!collectDIElementUsesFrom(MemInfo, Uses, Releases)) {
+        ++I;
+        continue;
+      }
 
       Changed |= AllocOptimize(Alloc, Uses, Releases).doIt();
       

@@ -247,35 +247,45 @@ namespace {
 
     /// This is the main entry point for the use walker.  It collects uses from
     /// the address and the refcount result of the allocation.
-    void collectFrom() {
-      if (auto *ABI = TheMemory.getContainer())
-        collectContainerUses(ABI);
-      else
-        collectUses(TheMemory.getAddress(), 0);
-
-      // Collect information about the retain count result as well.
-      for (auto UI : TheMemory.MemoryInst->getUses()) {
-        auto *User = UI->getUser();
-
-        // If this is a release or dealloc_stack, then remember it as such.
-        if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-            isa<DeallocBoxInst>(User)) {
-          Releases.push_back(User);
-        }
-      }
-    }
+    LLVM_NODISCARD bool collectFrom();
 
   private:
-    void collectUses(SILValue Pointer, unsigned BaseEltNo);
-    void collectContainerUses(AllocBoxInst *ABI);
+    LLVM_NODISCARD bool collectUses(SILValue Pointer, unsigned BaseEltNo);
+    LLVM_NODISCARD bool collectContainerUses(AllocBoxInst *ABI);
     void addElementUses(unsigned BaseEltNo, SILType UseTy,
                         SILInstruction *User, DIUseKind Kind);
-    void collectTupleElementUses(TupleElementAddrInst *TEAI,
-                                 unsigned BaseEltNo);
-    void collectStructElementUses(StructElementAddrInst *SEAI,
-                                  unsigned BaseEltNo);
+    LLVM_NODISCARD bool collectTupleElementUses(TupleElementAddrInst *TEAI,
+                                                unsigned BaseEltNo);
+    LLVM_NODISCARD bool collectStructElementUses(StructElementAddrInst *SEAI,
+                                                 unsigned BaseEltNo);
   };
 } // end anonymous namespace
+
+bool ElementUseCollector::collectFrom() {
+  bool shouldOptimize = false;
+
+  if (auto *ABI = TheMemory.getContainer()) {
+    shouldOptimize = collectContainerUses(ABI);
+  } else {
+    shouldOptimize = collectUses(TheMemory.getAddress(), 0);
+  }
+
+  if (!shouldOptimize)
+    return false;
+
+  // Collect information about the retain count result as well.
+  for (auto UI : TheMemory.MemoryInst->getUses()) {
+    auto *User = UI->getUser();
+
+    // If this is a release or dealloc_stack, then remember it as such.
+    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
+        isa<DeallocBoxInst>(User)) {
+      Releases.push_back(User);
+    }
+  }
+
+  return true;
+}
 
 /// addElementUses - An operation (e.g. load, store, inout use, etc) on a value
 /// acts on all of the aggregate elements in that value.  For example, a load
@@ -295,8 +305,8 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
 /// Given a tuple_element_addr or struct_element_addr, compute the new
 /// BaseEltNo implicit in the selected member, and recursively add uses of
 /// the instruction.
-void ElementUseCollector::
-collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
+bool ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
+                                                  unsigned BaseEltNo) {
 
   // If we're walking into a tuple within a struct or enum, don't adjust the
   // BaseElt.  The uses hanging off the tuple_element_addr are going to be
@@ -314,20 +324,20 @@ collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo) {
       BaseEltNo += getElementCountRec(Module, EltTy);
     }
   }
-  
-  collectUses(TEAI, BaseEltNo);
+
+  return collectUses(TEAI, BaseEltNo);
 }
 
-void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
+bool ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
                                                    unsigned BaseEltNo) {
   // Generally, we set the "InStructSubElement" flag and recursively process
   // the uses so that we know that we're looking at something within the
   // current element.
   llvm::SaveAndRestore<bool> X(InStructSubElement, true);
-  collectUses(SEAI, BaseEltNo);
+  return collectUses(SEAI, BaseEltNo);
 }
 
-void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
+bool ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
   for (Operand *UI : ABI->getUses()) {
     auto *User = UI->getUser();
 
@@ -340,16 +350,21 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
       continue;
 
     if (auto project = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(project, project->getFieldIndex());
+      if (!collectUses(project, project->getFieldIndex()))
+        return false;
       continue;
     }
 
     // Other uses of the container are considered escapes of the values.
-    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
+    for (unsigned field :
+         indices(ABI->getBoxType()->getLayout()->getFields())) {
       addElementUses(field,
                      ABI->getBoxType()->getFieldType(ABI->getModule(), field),
                      User, DIUseKind::Escape);
+    }
   }
+
+  return true;
 }
 
 // Returns true when the instruction represents added instrumentation for
@@ -367,7 +382,7 @@ static bool isSanitizerInstrumentation(SILInstruction *Instruction,
   return false;
 }
 
-void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
+bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   assert(Pointer->getType().isAddress() &&
          "Walked through the pointer to the value?");
   SILType PointeeType = Pointer->getType().getObjectType();
@@ -383,19 +398,22 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // struct_element_addr P, #field indexes into the current element.
     if (auto *SEAI = dyn_cast<StructElementAddrInst>(User)) {
-      collectStructElementUses(SEAI, BaseEltNo);
+      if (!collectStructElementUses(SEAI, BaseEltNo))
+        return false;
       continue;
     }
 
     // Instructions that compute a subelement are handled by a helper.
     if (auto *TEAI = dyn_cast<TupleElementAddrInst>(User)) {
-      collectTupleElementUses(TEAI, BaseEltNo);
+      if (!collectTupleElementUses(TEAI, BaseEltNo))
+        return false;
       continue;
     }
 
     // Look through begin_access.
     if (auto I = dyn_cast<BeginAccessInst>(User)) {
-      collectUses(I, BaseEltNo);
+      if (!collectUses(I, BaseEltNo))
+        return false;
       continue;
     }
 
@@ -439,7 +457,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (auto *SWI = dyn_cast<StoreWeakInst>(User))
+    if (auto *SWI = dyn_cast<StoreWeakInst>(User)) {
       if (UI->getOperandNumber() == 1) {
         DIUseKind Kind;
         if (InStructSubElement)
@@ -451,8 +469,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
         continue;
       }
+    }
 
-    if (auto *SUI = dyn_cast<StoreUnownedInst>(User))
+    if (auto *SUI = dyn_cast<StoreUnownedInst>(User)) {
       if (UI->getOperandNumber() == 1) {
         DIUseKind Kind;
         if (InStructSubElement)
@@ -464,6 +483,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
         continue;
       }
+    }
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't
@@ -505,7 +525,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       // If this is an out-parameter, it is like a store.
       unsigned NumIndirectResults = substConv.getNumIndirectSILResults();
       if (ArgumentNumber < NumIndirectResults) {
-        assert(!InStructSubElement && "We're initializing sub-members?");
+        // We do not support initializing sub members. This is an old
+        // restriction from when this code was used by Definite
+        // Initialization. With proper code review, we can remove this, but for
+        // now, lets be conservative.
+        if (InStructSubElement) {
+          return false;
+        }
         addElementUses(BaseEltNo, PointeeType, User,
                        DIUseKind::Initialization);
         continue;
@@ -550,20 +576,27 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // be explicitly initialized by a copy_addr or some other use of the
     // projected address).
     if (auto I = dyn_cast<InitEnumDataAddrInst>(User)) {
-      assert(!InStructSubElement &&
-             "init_enum_data_addr shouldn't apply to struct subelements");
+      // If we are in a struct already, bail. With proper analysis, we should be
+      // able to do this optimization.
+      if (InStructSubElement) {
+        return false;
+      }
+
       // Keep track of the fact that we're inside of an enum.  This informs our
       // recursion that tuple stores are not scalarized outside, and that stores
       // should not be treated as partial stores.
       llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      collectUses(I, BaseEltNo);
+      if (!collectUses(I, BaseEltNo))
+        return false;
       continue;
     }
 
     // init_existential_addr is modeled as an initialization store.
     if (isa<InitExistentialAddrInst>(User)) {
-      assert(!InStructSubElement &&
-             "init_existential_addr should not apply to struct subelements");
+      // init_existential_addr should not apply to struct subelements.
+      if (InStructSubElement) {
+        return false;
+      }
       Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
                                  BaseEltNo, 1));
       continue;
@@ -571,8 +604,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     
     // inject_enum_addr is modeled as an initialization store.
     if (isa<InjectEnumAddrInst>(User)) {
-      assert(!InStructSubElement &&
-             "inject_enum_addr the subelement of a struct unless in a ctor");
+      // inject_enum_addr the subelement of a struct unless in a ctor.
+      if (InStructSubElement) {
+        return false;
+      }
       Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
                                  BaseEltNo, 1));
       continue;
@@ -667,16 +702,22 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     // Now that we've scalarized some stuff, recurse down into the newly created
     // element address computations to recursively process it.  This can cause
     // further scalarization.
-    for (auto EltPtr : ElementAddrs)
-      collectTupleElementUses(cast<TupleElementAddrInst>(EltPtr), BaseEltNo);
+    if (llvm::any_of(ElementAddrs, [&](SILValue V) {
+          return !collectTupleElementUses(cast<TupleElementAddrInst>(V),
+                                          BaseEltNo);
+        })) {
+      return false;
+    }
   }
+
+  return true;
 }
 
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
-void swift::collectDIElementUsesFrom(
+bool swift::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, SmallVectorImpl<DIMemoryUse> &Uses,
     SmallVectorImpl<SILInstruction *> &Releases) {
-  ElementUseCollector(MemoryInfo, Uses, Releases).collectFrom();
+  return ElementUseCollector(MemoryInfo, Uses, Releases).collectFrom();
 }
