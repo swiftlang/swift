@@ -2628,10 +2628,6 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
         }
     }
     
-    if(allParamDecls.size() == 1) {
-        EditConsumer.accept(SM, startLocation, "///  - Parameter\n");
-    }
-    
     if(allParamDecls.size() > 1) {
         EditConsumer.accept(SM, startLocation, "///  - Parameters\n");
     }
@@ -2639,7 +2635,14 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
     for (auto paramDecl : allParamDecls) {
         const char *parameterName = paramDecl->getName().get();
         
-        EditConsumer.accept(SM, startLocation, "///    - ");
+        if(allParamDecls.size() == 1) {
+            EditConsumer.accept(SM, startLocation, "///  - Parameter ");
+        }
+        
+        if(allParamDecls.size() > 1) {
+            EditConsumer.accept(SM, startLocation, "///    - ");
+        }
+        
         EditConsumer.accept(SM, startLocation, parameterName);
         EditConsumer.accept(SM, startLocation, ": <#Parameter ");
         EditConsumer.accept(SM, startLocation, parameterName);
