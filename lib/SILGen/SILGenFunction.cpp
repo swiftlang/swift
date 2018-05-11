@@ -658,7 +658,6 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
       B.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
   B.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                   SGM.Types.getEmptyTupleType(), {}, Args);
-  SP->recordCounterUpdate();
 }
 
 ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {
