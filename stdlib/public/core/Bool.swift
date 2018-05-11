@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -85,6 +85,28 @@ public struct Bool {
   @inlinable // FIXME(sil-serialize-all)
   public init(_ value: Bool) {
     self = value
+  }
+
+  /// Returns a random Boolean value
+  ///
+  /// - Parameter generator: The random number generator to use when getting a
+  ///   random Boolean.
+  /// - Returns: A random Boolean value.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Bool {
+    return (generator.next() >> 17) & 1 == 0
+  }
+  
+  /// Returns a random Boolean value
+  ///
+  /// - Returns: A random Boolean value.
+  ///
+  /// This uses the standard library's default random number generator.
+  @inlinable
+  public static func random() -> Bool {
+    return Bool.random(using: &Random.default)
   }
 }
 
