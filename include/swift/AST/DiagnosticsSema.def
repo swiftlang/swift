@@ -1553,6 +1553,9 @@ ERROR(type_witness_objc_generic_parameter,none,
       "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
       "used for associated type %3 of protocol %4",
       (Type, Type, bool, DeclName, DeclName))
+NOTE(witness_fix_access,none,
+     "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
+     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 
 ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{"
@@ -3792,9 +3795,6 @@ ERROR(availability_protocol_requires_version,
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
-
-NOTE(availability_conformance_introduced_here, none,
-     "conformance introduced here", ())
 
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked

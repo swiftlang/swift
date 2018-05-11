@@ -45,6 +45,15 @@ extension C2c : P1 {
   convenience init() { self.init(x: 0) } // expected-error{{initializer requirement 'init()' can only be satisfied by a 'required' initializer in the definition of non-final class 'C2c'}}
 }
 
+class C2d { 
+  init(x: Int) { }
+  convenience init() { self.init(x: 0) } // expected-note {{'init()' declared here}} {{3-3=required }}
+}
+
+extension C2d : P1 { // expected-error{{initializer requirement 'init()' can only be satisfied by a 'required' initializer in non-final class 'C2d'}}
+}
+
+
 // rdar://problem/24575507
 protocol P2 {
   init()
