@@ -2612,34 +2612,43 @@ bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok
     
 bool RefactoringActionDocCommentBoilerplate::performChange() {
 #warning Implement here
-    if(CursorInfo.ValueD->getKind() == DeclKind::Func) {
-        swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
-        
-        if(isa<FuncDecl>(CursorInfo.ValueD)) {
-            SmallVector<StringRef, 5> outputLines;
-            EditConsumer.accept(SM, startLocation, "/**\n<#Function Summary#>\n");
-            
-            FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
-            for (auto paramLists : funcDecl->getParameterLists()) {
-                auto paramDecls = paramLists->getArray();
-                for(auto paramDecl : paramDecls) {
-                    const char *parameterName = paramDecl->getName().get();
-                    
-                    EditConsumer.accept(SM, startLocation, "  - Parameter ");
-                    EditConsumer.accept(SM, startLocation, parameterName);
-                    EditConsumer.accept(SM, startLocation, ": <#Parameter ");
-                    EditConsumer.accept(SM, startLocation, parameterName);
-                    EditConsumer.accept(SM, startLocation, "#>\n");
-                }
-            }
-            
-            EditConsumer.accept(SM, startLocation," */\n");
+    if(CursorInfo.ValueD->getKind() != DeclKind::Func) return true;
+    
+    if(!isa<FuncDecl>(CursorInfo.ValueD)) return true;
+    
+    swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
+    EditConsumer.accept(SM, startLocation, "///<#Function Summary#>\n");
+    
+    SmallVector<ParamDecl *, 5> allParamDecls;
+    FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
+    for (auto paramLists : funcDecl->getParameterLists()) {
+        auto paramDecls = paramLists->getArray();
+        for(auto paramDecl : paramDecls) {
+            allParamDecls.push_back(paramDecl);
         }
-        return false;
     }
     
-    return true;
+    if(allParamDecls.size() == 1) {
+        EditConsumer.accept(SM, startLocation, "///  - Parameter\n");
+    }
     
+    if(allParamDecls.size() > 1) {
+        EditConsumer.accept(SM, startLocation, "///  - Parameters\n");
+    }
+    
+    for (auto paramDecl : allParamDecls) {
+        const char *parameterName = paramDecl->getName().get();
+        
+        EditConsumer.accept(SM, startLocation, "///    - ");
+        EditConsumer.accept(SM, startLocation, parameterName);
+        EditConsumer.accept(SM, startLocation, ": <#Parameter ");
+        EditConsumer.accept(SM, startLocation, parameterName);
+        EditConsumer.accept(SM, startLocation, "#>\n");
+    }
+    
+    EditConsumer.accept(SM, startLocation,"///\n");
+    
+    return false;
 }
 
 static CharSourceRange
