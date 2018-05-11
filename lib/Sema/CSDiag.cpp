@@ -2803,7 +2803,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   auto exprType = recheckedExpr ? CS.getType(recheckedExpr) : Type();
 
   // If it failed and diagnosed something, then we're done.
-  if (!exprType) return true;
+  if (!exprType)
+    return CS.TC.Diags.hadAnyError();
 
   // If we contextually had an inout type, and got a non-lvalue result, then
   // we fail with a mutability error.
@@ -5263,7 +5264,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     }
   };
 
-  SmallVector<Type, 4> possibleTypes;
+  SmallPtrSet<TypeBase *, 4> possibleTypes;
   auto currentType = CS.getType(fnExpr);
 
   // If current type has type variables or unresolved types
@@ -5283,10 +5284,10 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
       return diagnoseContextualConversionError(callExpr, contextualType,
                                                CS.getContextualTypePurpose());
   } else {
-    possibleTypes.push_back(currentType);
+    possibleTypes.insert(currentType.getPointer());
   }
 
-  for (auto type : possibleTypes) {
+  for (Type type : possibleTypes) {
     auto *fnType = type->getAs<AnyFunctionType>();
     if (!fnType)
       continue;
@@ -5377,7 +5378,7 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   auto *DC = CS.DC;
 
   auto typeCheckExpr = [](TypeChecker &TC, Expr *expr, DeclContext *DC,
-                          SmallVectorImpl<Type> &types,
+                          SmallPtrSetImpl<TypeBase *> &types,
                           Type contextualType = Type()) {
     CalleeListener listener(contextualType);
     TC.getPossibleTypesOfExpressionWithoutApplying(
@@ -5387,7 +5388,7 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   // First let's type-check expression without contextual type, and
   // see if that's going to produce a type, if so, let's type-check
   // again, this time using given contextual type.
-  SmallVector<Type, 4> withoutContextual;
+  SmallPtrSet<TypeBase *, 4> withoutContextual;
   typeCheckExpr(TC, callExpr, DC, withoutContextual);
 
   // If there are no types returned, it means that problem was
@@ -5396,12 +5397,13 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   if (withoutContextual.empty())
     return false;
 
-  SmallVector<Type, 4> withContextual;
+  SmallPtrSet<TypeBase *, 4> withContextual;
   typeCheckExpr(TC, callExpr, DC, withContextual, contextualType);
   // If type-checking with contextual type didn't produce any results
   // it means that we have a contextual mismatch.
-  if (withContextual.empty())
+  if (withContextual.empty()) {
     return diagnoseContextualConversionError(callExpr, contextualType, CTP);
+  }
 
   // If call produces a single type when type-checked with contextual
   // expression, it means that the problem is elsewhere, any other
@@ -5420,7 +5422,7 @@ static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
   if (!isa<UnresolvedDotExpr>(fnExpr))
     return true;
 
-  SmallVector<Type, 4> fnTypes;
+  SmallPtrSet<TypeBase *, 4> fnTypes;
   TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, DC, fnTypes,
                                        FreeTypeVariableBinding::UnresolvedType);
 
@@ -5428,7 +5430,7 @@ static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
     // Some member types depend on the arguments to produce a result type,
     // type-checking such expressions without associated arguments is
     // going to produce unrelated diagnostics.
-    if (auto fn = fnTypes[0]->getAs<AnyFunctionType>()) {
+    if (auto fn = (*fnTypes.begin())->getAs<AnyFunctionType>()) {
       auto resultType = fn->getResult();
       if (resultType->hasUnresolvedType() || resultType->hasTypeVariable())
         return false;
@@ -5483,7 +5485,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     isa<UnresolvedDotExpr>(callExpr->getFn())) {
     fnExpr = callExpr->getFn();
 
-    SmallVector<Type, 4> types;
+    SmallPtrSet<TypeBase *, 4> types;
     CS.TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, CS.DC, types);
 
     auto isFunctionType = [getFuncType](Type type) -> bool {
