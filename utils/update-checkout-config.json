@@ -29,7 +29,9 @@
         "swift-xcode-playground-support": {
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
-            "remote": { "id": "ninja-build/ninja" } }
+            "remote": { "id": "ninja-build/ninja" } },
+        "tensorflow": {
+            "remote": { "id": "tensorflow/tensorflow" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -281,6 +283,26 @@
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release"
+            }
+        },
+        "tensorflow": {
+            "aliases": ["tensorflow"],
+            "repos": {
+                "llvm" : "04bdb56f3d90c394508b7259f86d5cca3c0edc15",
+                "clang" : "b44dbbdf44bf2b29967ab6a435dffcb280c8cfdc",
+                "swift" : "tensorflow",
+                "lldb" : "tensorflow",
+                "cmark": "d875488a6a95d5487b7c675f79a8dafef210a65f",
+                "llbuild": "1d48457963e550022393bab298688777b5ce3515",
+                "swiftpm": "232e413dff26525937e8ba13d3569be771de9c5b",
+                "compiler-rt": "db785ee6e527aae21aeec12ecfed6e06acaf8123",
+                "swift-corelibs-xctest": "01e6126d1cd1c5a81e7a1695487c09d57261577c",
+                "swift-corelibs-foundation" : "5ecb86c5ab6fe842e9fbbd2da052861fb57394c6",
+                "swift-corelibs-libdispatch" : "9295346d20e52c9ff4d82906fd85287d8636c542",
+                "swift-integration-tests": "01eecd5a83279635823e78101a538132784bc628",
+                "swift-xcode-playground-support": "4cca45ecd5050ef579bbb55076cd5d6ca4e60fbc",
+                "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
+                "tensorflow": "master"
             }
         }
     }
