@@ -2614,34 +2614,26 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
 #warning Implement here
     if(CursorInfo.ValueD->getKind() == DeclKind::Func) {
         swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
-
-        SmallVector<StringRef, 5> outputLines;
-        StringRef header = "/**\n<#Function Summary#>\n";
-        outputLines.push_back(header);
+        
         if(isa<FuncDecl>(CursorInfo.ValueD)) {
+            SmallVector<StringRef, 5> outputLines;
+            EditConsumer.accept(SM, startLocation, "/**\n<#Function Summary#>\n");
+            
             FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
             for (auto paramLists : funcDecl->getParameterLists()) {
                 auto paramDecls = paramLists->getArray();
                 for(auto paramDecl : paramDecls) {
-                    StringRef paramLineOpening = "  - Parameter ";
-                    StringRef parameterName = paramDecl->getName().get();
-                    StringRef paramLineClosing = ": <#Parameter ";
-                    StringRef paramLineClosing2 = "#>\n";
+                    const char *parameterName = paramDecl->getName().get();
                     
-                    outputLines.push_back(paramLineOpening);
-                    outputLines.push_back(parameterName);
-                    outputLines.push_back(paramLineClosing);
-                    outputLines.push_back(parameterName);
-                    outputLines.push_back(paramLineClosing2);
+                    EditConsumer.accept(SM, startLocation, "  - Parameter ");
+                    EditConsumer.accept(SM, startLocation, parameterName);
+                    EditConsumer.accept(SM, startLocation, ": <#Parameter ");
+                    EditConsumer.accept(SM, startLocation, parameterName);
+                    EditConsumer.accept(SM, startLocation, "#>\n");
                 }
             }
             
-            outputLines.push_back(" */\n");
-            
-            for (auto x : outputLines) {
-                EditConsumer.accept(SM, startLocation, x.data());
-
-            }
+            EditConsumer.accept(SM, startLocation," */\n");
         }
         return false;
     }
