@@ -1221,7 +1221,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto SubstCalleeFunctionTy = CalleeFunctionTy;
   if (PAI->hasSubstitutions())
     SubstCalleeFunctionTy =
-        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutions());
+        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
   SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
@@ -1261,7 +1261,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Create a new partial apply with the new arguments.
   auto *NewPAI = B.createPartialApply(
-      PAI->getLoc(), FnVal, PAI->getSubstitutions(), Args,
+      PAI->getLoc(), FnVal, PAI->getSubstitutionMap(), Args,
       PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();

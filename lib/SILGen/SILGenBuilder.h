@@ -76,24 +76,24 @@ public:
   using SILBuilder::createApply;
 
   ApplyInst *createApply(SILLocation loc, SILValue fn, SILType SubstFnTy,
-                         SILType result, SubstitutionList subs,
+                         SILType result, SubstitutionMap subs,
                          ArrayRef<SILValue> args);
 
   TryApplyInst *createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
-                               SubstitutionList subs,
+                               SubstitutionMap subs,
                                ArrayRef<SILValue> args, SILBasicBlock *normalBB,
                                SILBasicBlock *errorBB);
 
   PartialApplyInst *createPartialApply(SILLocation loc, SILValue fn,
-                                       SILType substFnTy, SubstitutionList subs,
+                                       SILType substFnTy, SubstitutionMap subs,
                                        ArrayRef<SILValue> args,
                                        SILType closureTy);
   ManagedValue createPartialApply(SILLocation loc, SILValue fn,
-                                  SILType substFnTy, SubstitutionList subs,
+                                  SILType substFnTy, SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
                                   SILType closureTy);
   ManagedValue createPartialApply(SILLocation loc, ManagedValue fn,
-                                  SILType substFnTy, SubstitutionList subs,
+                                  SILType substFnTy, SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
                                   SILType closureTy) {
     return createPartialApply(loc, fn.getValue(), substFnTy, subs, args,

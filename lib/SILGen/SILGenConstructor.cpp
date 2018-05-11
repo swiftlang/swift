@@ -516,7 +516,6 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer.
   SubstitutionMap subMap;
-  SmallVector<Substitution, 4> subs;
   if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
     auto *genericSig = genericEnv->getGenericSignature();
     subMap = genericSig->getSubstitutionMap(
@@ -525,14 +524,13 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
           t->castTo<GenericTypeParamType>());
       },
       MakeAbstractConformanceForGenericType());
-    genericSig->getSubstitutions(subMap, subs);
   }
 
   std::tie(initVal, initTy)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, subMap);
 
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
-                                                  initTy, subs, args);
+                                                  initTy, subMap, args);
 
   emitProfilerIncrement(ctor->getBody());
 

@@ -609,7 +609,7 @@ namespace {
 
     bool visitApplyInst(ApplyInst *RHS) {
       auto *X = cast<ApplyInst>(LHS);
-      return X->getSubstitutions() == RHS->getSubstitutions();
+      return X->getSubstitutionMap() == RHS->getSubstitutionMap();
     }
 
     bool visitBuiltinInst(BuiltinInst *RHS) {

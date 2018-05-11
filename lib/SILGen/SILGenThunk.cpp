@@ -86,7 +86,7 @@ SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
 static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
                                            SILDeclRef thunk,
                                            ManagedValue selfArg,
-                                           SubstitutionList curriedSubs) {
+                                           SubstitutionMap curriedSubs) {
   auto *vd = thunk.getDecl();
 
   // Reference the next uncurrying level of the function.
@@ -122,11 +122,9 @@ static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
           == SILFunctionTypeRepresentation::WitnessMethod) {
       auto protocol =
         func->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-      auto subMap = func->getGenericSignature()
-        ->getSubstitutionMap(curriedSubs);
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
-      auto substSelfType = origSelfType.subst(subMap)->getCanonicalType();
-      auto conformance = subMap.lookupConformance(origSelfType, protocol);
+      auto substSelfType = origSelfType.subst(curriedSubs)->getCanonicalType();
+      auto conformance = curriedSubs.lookupConformance(origSelfType, protocol);
       auto result = SGF.B.createWitnessMethod(loc, substSelfType, *conformance,
                                               next, constantInfo.getSILType());
       return ManagedValue::forUnmanaged(result);
@@ -157,7 +155,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
     B.createInputFunctionArgument(getLoweredType(selfTy), SILLocation(vd));
 
   // Forward substitutions.
-  auto subs = F.getForwardingSubstitutions();
+  auto subs = F.getForwardingSubstitutionMap();
 
   ManagedValue toFn = getNextUncurryLevelRef(*this, vd, thunk, selfArg, subs);
 

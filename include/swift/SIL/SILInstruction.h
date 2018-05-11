@@ -1688,7 +1688,7 @@ class ApplyInstBase<Impl, Base, false> : public Base {
 protected:
   template <class... As>
   ApplyInstBase(SILInstructionKind kind, SILDebugLocation DebugLoc, SILValue callee,
-                SILType substCalleeType, SubstitutionList subs,
+                SILType substCalleeType, SubstitutionMap subs,
                 ArrayRef<SILValue> args,
                 ArrayRef<SILValue> typeDependentOperands,
                 const GenericSpecializationInformation *specializationInfo,
@@ -1696,7 +1696,8 @@ protected:
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo),
         NonThrowing(false), NumCallArguments(args.size()),
-        NumTypeDependentOperands(typeDependentOperands.size()) {
+        NumTypeDependentOperands(typeDependentOperands.size()),
+        Substitutions(subs) {
 
     // Initialize the operands.
     auto allOperands = getAllOperands();
@@ -1707,13 +1708,6 @@ protected:
     for (size_t i : indices(typeDependentOperands)) {
       new (&allOperands[NumStaticOperands + args.size() + i])
         Operand(this, typeDependentOperands[i]);
-    }
-
-    // Initialize the substitutions.
-    if (!subs.empty()) {
-      if (auto genericSig = getOrigCalleeType()->getGenericSignature()) {
-        Substitutions = genericSig->getSubstitutionMap(subs);
-      }
     }
   }
 
@@ -1794,7 +1788,9 @@ public:
   }
 
   /// True if this application has generic substitutions.
-  bool hasSubstitutions() const { return !Substitutions.empty(); }
+  bool hasSubstitutions() const {
+    return Substitutions.hasAnySubstitutableParams();
+  }
 
   /// The substitutions used to bind the generic arguments of this function.
   SubstitutionList getSubstitutions() const { return Substitutions.toList(); }
@@ -1996,7 +1992,7 @@ class ApplyInst final
 
   ApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
             SILType SubstCalleeType, SILType ReturnType,
-            SubstitutionList Substitutions,
+            SubstitutionMap Substitutions,
             ArrayRef<SILValue> Args,
             ArrayRef<SILValue> TypeDependentOperands,
             bool isNonThrowing,
@@ -2004,7 +2000,7 @@ class ApplyInst final
 
   static ApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee,
-         SubstitutionList Substitutions, ArrayRef<SILValue> Args,
+         SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
          bool isNonThrowing, Optional<SILModuleConventions> ModuleConventions,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
@@ -2028,7 +2024,7 @@ class PartialApplyInst final
 
   PartialApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
                    SILType SubstCalleeType,
-                   SubstitutionList Substitutions,
+                   SubstitutionMap Substitutions,
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
                    SILType ClosureType,
@@ -2036,7 +2032,7 @@ class PartialApplyInst final
 
   static PartialApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee, ArrayRef<SILValue> Args,
-         SubstitutionList Substitutions, ParameterConvention CalleeConvention,
+         SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
 
@@ -2097,7 +2093,7 @@ class BeginApplyInst final
                  SILType substCalleeType,
                  ArrayRef<SILType> allResultTypes,
                  ArrayRef<ValueOwnershipKind> allResultOwnerships,
-                 SubstitutionList substitutions,
+                 SubstitutionMap substitutions,
                  ArrayRef<SILValue> args,
                  ArrayRef<SILValue> typeDependentOperands,
                  bool isNonThrowing,
@@ -2105,7 +2101,7 @@ class BeginApplyInst final
 
   static BeginApplyInst *
   create(SILDebugLocation debugLoc, SILValue Callee,
-         SubstitutionList substitutions, ArrayRef<SILValue> args,
+         SubstitutionMap substitutions, ArrayRef<SILValue> args,
          bool isNonThrowing, Optional<SILModuleConventions> moduleConventions,
          SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
          const GenericSpecializationInformation *specializationInfo);
@@ -2775,7 +2771,7 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return !Substitutions.empty();
+    return Substitutions.hasAnySubstitutableParams();
   }
 
   /// Return the type parameters to the builtin.
@@ -7556,7 +7552,7 @@ class TryApplyInst final
   friend SILBuilder;
 
   TryApplyInst(SILDebugLocation DebugLoc, SILValue callee,
-               SILType substCalleeType, SubstitutionList substitutions,
+               SILType substCalleeType, SubstitutionMap substitutions,
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> TypeDependentOperands,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
@@ -7564,7 +7560,7 @@ class TryApplyInst final
 
   static TryApplyInst *
   create(SILDebugLocation DebugLoc, SILValue callee,
-         SubstitutionList substitutions, ArrayRef<SILValue> args,
+         SubstitutionMap substitutions, ArrayRef<SILValue> args,
          SILBasicBlock *normalBB, SILBasicBlock *errorBB, SILFunction &F,
          SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);

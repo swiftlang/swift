@@ -601,12 +601,12 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   SILType ResultType = NewF->getConventions().getSILResultType();
   auto GenCalleeType = NewF->getLoweredFunctionType();
   auto SubstCalleeSILType = LoweredType;
-  ArrayRef<Substitution> Subs;
+  SubstitutionMap Subs;
   // Handle generic functions.
   if (GenCalleeType->isPolymorphic()) {
     // Produce a substitutions list and a set of substituted SIL types
     // required for creating a new SIL function.
-    Subs = F->getForwardingSubstitutions();
+    Subs = F->getForwardingSubstitutionMap();
     auto SubstCalleeType =
         GenCalleeType->substGenericArgs(M, Subs);
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);

@@ -1019,12 +1019,12 @@ public:
   }
 
   /// Check the substitutions passed to an apply or partial_apply.
-  CanSILFunctionType checkApplySubstitutions(SubstitutionList subs,
+  CanSILFunctionType checkApplySubstitutions(SubstitutionMap subs,
                                              SILType calleeTy) {
     auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
 
     // If there are substitutions, verify them and apply them to the callee.
-    if (subs.empty()) {
+    if (!subs.hasAnySubstitutableParams()) {
       require(!fnTy->isPolymorphic(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;
@@ -1034,8 +1034,8 @@ public:
 
     // Each archetype occurring in the substitutions list should belong to the
     // current function.
-    for (auto sub : subs) {
-      sub.getReplacement()->getCanonicalType().visit([&](CanType t) {
+    for (auto replacementType : subs.getReplacementTypes()) {
+      replacementType->getCanonicalType().visit([&](CanType t) {
         auto A = dyn_cast<ArchetypeType>(t);
         if (!A)
           return;
@@ -1118,7 +1118,7 @@ public:
 
     // Then make sure that we have a type that can be substituted for the
     // callee.
-    auto substTy = checkApplySubstitutions(site.getSubstitutions(),
+    auto substTy = checkApplySubstitutions(site.getSubstitutionMap(),
                                            site.getCallee()->getType());
     require(site.getOrigCalleeType()->getRepresentation() ==
             site.getSubstCalleeType()->getRepresentation(),
@@ -1271,7 +1271,7 @@ public:
 
     checkApplyTypeDependentArguments(PAI);
 
-    auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
+    auto substTy = checkApplySubstitutions(PAI->getSubstitutionMap(),
                                         PAI->getCallee()->getType());
 
     require(!PAI->getSubstCalleeType()->isPolymorphic(),
@@ -4040,7 +4040,7 @@ public:
             invokeTy->getExtInfo().isPseudogeneric(),
             "invoke function must not take reified generic parameters");
     
-    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions().toList(),
+    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions(),
                                     SILType::getPrimitiveObjectType(invokeTy));
     
     auto storageParam = invokeTy->getParameters()[0];

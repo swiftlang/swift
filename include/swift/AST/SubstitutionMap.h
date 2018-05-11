@@ -133,7 +133,12 @@ public:
   lookupConformance(CanType type, ProtocolDecl *proto) const;
 
   /// Whether the substitution map is empty.
-  bool empty() const { return getGenericSignature() == nullptr; }
+  bool empty() const;
+
+  /// Whether the substitution has any substitutable parameters, i.e.,
+  /// it is non-empty and at least one of the type parameters can be
+  /// substituted (i.e., is not mapped to a concrete type).
+  bool hasAnySubstitutableParams() const;
 
   /// Whether the substitution map is non-empty.
   explicit operator bool() const { return !empty(); }

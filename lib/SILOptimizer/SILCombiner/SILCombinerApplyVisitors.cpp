@@ -308,7 +308,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   }
 
   auto Callee = PAI->getCallee();
-  SubstitutionList Subs = PAI->getSubstitutions();
+  SubstitutionMap Subs = PAI->getSubstitutionMap();
 
   // The partial_apply might be substituting in an open existential type.
   Builder.addOpenedArchetypeOperands(PAI);
@@ -501,10 +501,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NAI = Builder.createTryApply(AI.getLoc(), FRI, 
-                                 SubstitutionList(), Args,
+                                 SubstitutionMap(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   else {
-    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionList(), Args,
+    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
                               cast<ApplyInst>(AI)->isNonThrowing());
     assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
            AI.getSubstCalleeType()->getAllResultsType() &&
@@ -803,11 +803,11 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
   // Form a new set of substitutions where Self is
   // replaced by a concrete type.
-  SmallVector<Substitution, 8> Substitutions;
+  SubstitutionMap Substitutions;
   if (FnTy->isPolymorphic()) {
     auto FnSubsMap =
         FnTy->getGenericSignature()->getSubstitutionMap(AI.getSubstitutions());
-    auto FinalSubsMap = FnSubsMap.subst(
+    Substitutions = FnSubsMap.subst(
         [&](SubstitutableType *type) -> Type {
           if (type == OpenedArchetype)
             return ConcreteType;
@@ -821,7 +821,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
           }
           return ProtocolConformanceRef(proto->getDecl());
         });
-    FnTy->getGenericSignature()->getSubstitutions(FinalSubsMap, Substitutions);
+    
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
@@ -1366,11 +1366,11 @@ FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
   Builder.addOpenedArchetypeOperands(apply.getInstruction());
   if (auto *TAI = dyn_cast<TryApplyInst>(apply)) {
     return Builder.createTryApply(TAI->getLoc(), callee,
-                                  TAI->getSubstitutions(), arguments,
+                                  TAI->getSubstitutionMap(), arguments,
                                   TAI->getNormalBB(), TAI->getErrorBB());
   } else {
-    return Builder.createApply(apply.getLoc(), callee, apply.getSubstitutions(),
-                               arguments,
+    return Builder.createApply(apply.getLoc(), callee,
+                               apply.getSubstitutionMap(), arguments,
                                cast<ApplyInst>(apply)->isNonThrowing());
   }
 }

@@ -405,7 +405,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   FullApplySite NewAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     NewAI = Builder.createTryApply(AI.getLoc(), FRI,
-                                   SubstitutionList(), NewArgs,
+                                   SubstitutionMap(), NewArgs,
                                    TAI->getNormalBB(), TAI->getErrorBB());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
@@ -420,7 +420,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   } else {
     auto oldApply = cast<ApplyInst>(AI);
     auto newApply = Builder.createApply(oldApply->getLoc(), FRI,
-                                        SubstitutionList(),
+                                        SubstitutionMap(),
                                         NewArgs, oldApply->isNonThrowing());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
