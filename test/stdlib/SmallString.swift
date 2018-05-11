@@ -68,6 +68,15 @@ SmallStringTests.test("FitsInSmall") {
   //
   expectThrows("Didn't fit", { try runTest("0123456789abcdef") })
   expectThrows("Didn't fit", { try runTest("👩‍👦‍👦") })
+
+  for cu in (0 as UInt32)...(0x10FFFF as UInt32) {
+    // TODO: Iterate over all scalars when we support UTF-8, and possibly move
+    // this to validation suite.
+    guard let scalar = Unicode.Scalar(cu) else { continue }
+    guard cu <= 0x7F else { break }
+    expectDoesNotThrow({ try runTest(String(scalar)) })
+  }
+
 }
 
 SmallStringTests.test("Bridging") {
