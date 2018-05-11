@@ -153,13 +153,16 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
+static const TypeContextDescriptor *
+_findNominalTypeDescriptor(Demangle::NodePointer node);
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
-  if (node->getKind() == Demangle::Node::Kind::Type)
-    node = node->getChild(0);
-
   while (context) {
+    if (node->getKind() == Demangle::Node::Kind::Type)
+      node = node->getChild(0);
+    
     // We can directly match symbolic references to the current context.
     if (node && node->getKind() == Demangle::Node::Kind::SymbolicReference) {
       if (equalContexts(context, reinterpret_cast<const ContextDescriptor *>(
@@ -182,8 +185,56 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
     }
     
     case ContextDescriptorKind::Extension: {
-      // TODO: Check whether the extension context constraints match.
-      return false;
+      auto extension = cast<ExtensionContextDescriptor>(context);
+      
+      // Check whether the extension context matches the mangled context.
+      if (node->getKind() != Demangle::Node::Kind::Extension)
+        return false;
+      if (node->getNumChildren() < 2)
+        return false;
+      
+      // Check that the context being extended matches as well.
+      auto extendedContextNode = node->getChild(1);
+      auto extendedContextMangledName = extension->getMangledExtendedContext();
+      auto demangler = getDemanglerForRuntimeTypeResolution();
+      auto extendedContextDemangled =
+         demangler.demangleType(extendedContextMangledName);
+      if (!extendedContextDemangled)
+        return false;
+      if (extendedContextDemangled->getKind() == Node::Kind::Type) {
+        if (extendedContextDemangled->getNumChildren() < 1)
+          return false;
+        extendedContextDemangled = extendedContextDemangled->getChild(0);
+      }
+      extendedContextDemangled =
+        stripGenericArgsFromContextNode(extendedContextDemangled, demangler);
+      
+      auto extendedDescriptorFromNode =
+        _findNominalTypeDescriptor(extendedContextNode);
+      auto extendedDescriptorFromDemangled =
+        _findNominalTypeDescriptor(extendedContextDemangled);
+      
+      if (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled ||
+          !equalContexts(extendedDescriptorFromNode,
+                         extendedDescriptorFromDemangled))
+        return false;
+      
+      // Check whether the generic signature of the extension matches the
+      // mangled constraints, if any.
+
+      if (node->getNumChildren() >= 3) {
+        // NB: If we ever support extensions with independent generic arguments
+        // like `extension <T> Array where Element == Optional<T>`, we'd need
+        // to look at the mangled context name to match up generic arguments.
+        // That would probably need a new extension mangling form, though.
+        
+        // TODO
+      }
+      
+      // The parent context of the extension should match in the mangling and
+      // context descriptor.
+      node = node->getChild(0);
+      break;
     }
     
     default:
