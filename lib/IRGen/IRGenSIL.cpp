@@ -719,6 +719,32 @@ public:
     }
   }
 
+  /// To make it unambiguous whether a `var` binding has been initialized,
+  /// zero-initialize the first pointer-sized field. LLDB uses this to
+  /// recognize to detect uninitizialized variables. This can be removed once
+  /// swiftc switches to @llvm.dbg.addr() intrinsics.
+  void zeroInit(llvm::AllocaInst *AI) {
+    if (!AI)
+      return;
+
+    // Only do this at -Onone.
+    if (IGM.IRGen.Opts.shouldOptimize())
+      return;
+
+    auto &DL = IGM.DataLayout;
+    if (DL.getTypeSizeInBits(AI->getAllocatedType()) <
+        DL.getPointerSizeInBits())
+      return;
+
+    llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
+    ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
+    auto *BC =
+        ZeroInitBuilder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
+    ZeroInitBuilder.CreateAlignedStore(
+        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
+        IGM.getPointerAlignment().getValue());
+  }
+
   /// Account for bugs in LLVM.
   ///
   /// - The LLVM type legalizer currently doesn't update debug
@@ -742,6 +768,7 @@ public:
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
     if (!Alloca.isValid())
       Alloca = createAlloca(Storage->getType(), Align, Name+".addr");
+    zeroInit(dyn_cast<llvm::AllocaInst>(Alloca.getAddress()));
 
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
@@ -4000,31 +4027,10 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   if (!Decl)
     return;
 
-  // To make it unambiguous whether a `var` binding has been initialized,
-  // zero-initialize the first pointer-sized field. LLDB uses this to
-  // recognize to detect uninitizialized variables. This can be removed once
-  // swiftc switches to @llvm.dbg.addr() intrinsics.
-  auto zeroInit = [&]() {
-    if (IGM.IRGen.Opts.shouldOptimize())
-      return;
-    Type Desugared = Decl->getType()->getDesugaredType();
-    if (!Desugared->getClassOrBoundGenericClass() &&
-        !Desugared->getStructOrBoundGenericStruct())
-      return;
-
-    auto *AI = dyn_cast<llvm::AllocaInst>(addr.getAddress().getAddress());
-    if (!AI)
-      return;
-
-    auto &DL = IGM.DataLayout;
-    if (DL.getTypeSizeInBits(AI->getAllocatedType()) < DL.getPointerSizeInBits())
-      return;
-
-    auto *BC = Builder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
-    Builder.CreateStore(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
-                        IGM.getPointerAlignment());
-  };
-  zeroInit();
+  Type Desugared = Decl->getType()->getDesugaredType();
+  if (Desugared->getClassOrBoundGenericClass() ||
+      Desugared->getStructOrBoundGenericStruct())
+    zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress().getAddress()));
   emitDebugInfoForAllocStack(i, type, addr.getAddress().getAddress());
 }
 
