@@ -3547,13 +3547,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         auto equalsResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           equalsInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        SmallVector<Substitution, 1> equatableSubListBuf;
-        equatableProtocol->getGenericSignature()
-          ->getSubstitutions(equatableSub, equatableSubListBuf);
         isEqual = subSGF
           .emitApply(std::move(equalsResultPlan), std::move(argScope),
                      loc, ManagedValue::forUnmanaged(equalsWitness),
-                     C.AllocateCopy(equatableSubListBuf),
+                     equatableSub.toList(),
                      {lhsArg, rhsArg, metatyValue},
                      equalsInfo, ApplyOptions::None, SGFContext())
           .getUnmanagedSingleValue(subSGF, loc);
@@ -3648,23 +3645,28 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       
       auto formalTy = index.FormalType;
       auto hashable = index.Hashable;
+      SubstitutionMap hashableSubsMap;
       if (genericEnv) {
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
           LookUpConformanceInSignature(*genericSig));
+
+        hashableSubsMap =
+            genericEnv->getGenericSignature()->getSubstitutionMap(
+              [&](SubstitutableType *type) -> Type { return formalTy; },
+              [&](CanType dependentType, Type replacementType,
+                  ProtocolType *protoType)->Optional<ProtocolConformanceRef> {
+                return hashable;
+              });
       }
       
-      // Get the Equatable conformance from the Hashable conformance
-      auto hashableSub = Substitution(formalTy,
-                   C.AllocateCopy(ArrayRef<ProtocolConformanceRef>(hashable)));
-
       auto hashWitness = subSGF.B.createWitnessMethod(loc,
         formalTy, hashable,
         hashRef, hashTy);
       
       auto hashSubstTy = hashTy.castTo<SILFunctionType>()
-        ->substGenericArgs(SGM.M, hashableSub);
+        ->substGenericArgs(SGM.M, hashableSubsMap);
       auto hashInfo = CalleeTypeInfo(hashSubstTy,
                                      AbstractionPattern(intTy), intTy,
                                      None,
@@ -3687,7 +3689,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         hashCode =
             subSGF
                 .emitApply(std::move(hashResultPlan), std::move(argScope), loc,
-                           ManagedValue::forUnmanaged(hashWitness), hashableSub,
+                           ManagedValue::forUnmanaged(hashWitness),
+                           hashableSubsMap.toList(),
                            {arg}, hashInfo, ApplyOptions::None, SGFContext())
                 .getUnmanagedSingleValue(subSGF, loc);
       }

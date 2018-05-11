@@ -4802,9 +4802,6 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                    bool isSuper,
                                    bool isDirectUse)
 {
-  // Convert the substitution list into a substitution map.
-  auto origAccessType = SGF.SGM.Types.getConstantInfo(constant).FormalType;
-
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
