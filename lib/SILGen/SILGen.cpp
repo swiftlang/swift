@@ -1383,14 +1383,6 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   usedConformances.insert(root);
 }
 
-void
-SILGenModule::useConformancesFromSubstitutions(SubstitutionList subs) {
-  for (auto &sub : subs) {
-    for (auto conformance : sub.getConformances())
-      useConformance(conformance);
-  }
-}
-
 void SILGenModule::useConformancesFromSubstitutions(
                                                 const SubstitutionMap subs) {
   for (auto conf : subs.getConformances())
