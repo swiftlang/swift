@@ -1335,12 +1335,6 @@ public:
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
-  RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
-                                     FuncDecl *fn,
-                                     const SubstitutionList &subs,
-                                     ArrayRef<ManagedValue> args,
-                                     SGFContext ctx);
-
   SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                 SILType substFnType,
                                 SubstitutionMap subs,

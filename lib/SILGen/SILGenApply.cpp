@@ -4469,18 +4469,6 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                    finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
 }
 
-RValue
-SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
-                                            FuncDecl *fn,
-                                            const SubstitutionList &subs,
-                                            ArrayRef<ManagedValue> args,
-                                            SGFContext ctx) {
-  SubstitutionMap subMap;
-  if (auto genericSig = fn->getGenericSignature())
-    subMap = genericSig->getSubstitutionMap(subs);
-  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, ctx);
-}
-
 static StringRef
 getMagicFunctionString(SILGenFunction &SGF) {
   assert(SGF.MagicFunctionName
