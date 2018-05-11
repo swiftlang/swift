@@ -1323,6 +1323,9 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     case Node::Kind::OtherNominalType:
       kind = Node::Kind::BoundGenericOtherNominalType;
       break;
+    case Node::Kind::TypeAlias:
+      kind = Node::Kind::BoundGenericTypeAlias;
+      break;
     default:
       return nullptr;
   }
