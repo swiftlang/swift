@@ -200,6 +200,8 @@ public:
 
   friend ConstraintCheckerArenaRAII;
 
+  void operator delete(void *Data) throw();
+
   static ASTContext *get(LangOptions &langOpts,
                          SearchPathOptions &SearchPathOpts,
                          SourceManager &SourceMgr,
