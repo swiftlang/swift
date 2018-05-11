@@ -4458,14 +4458,11 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   llvm::SmallVector<ManagedValue, 8> finalArgs;
   convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(), args, loc, finalArgs);
 
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = fn->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
-
   ResultPlanPtr resultPlan =
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subs,
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, mv,
+                   subMap.toList(),
                    finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
 }
 
