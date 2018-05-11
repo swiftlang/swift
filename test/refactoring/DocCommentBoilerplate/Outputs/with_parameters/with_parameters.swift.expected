@@ -1,0 +1,9 @@
+/**
+<#Function Summary#>
+  - Parameter a: <#Parameter a#>
+  - Parameter b: <#Parameter b#>
+  - Parameter c: <#Parameter c#>
+ */
+func funcWithParamsNoReturnNoThrow(_ a: Int, b: Int, c: String) {
+    
+}
