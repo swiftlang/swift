@@ -101,6 +101,8 @@ public:
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
+
+  virtual bool hadOnlySuppressedFatalErrors() const { return false; }
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.
@@ -165,6 +167,9 @@ private:
   /// If null, diagnostics are suppressed.
   Optional<DiagnosticConsumer *> ConsumerForSubsequentNotes = None;
 
+  bool WasAFatalDiagnosticSuppressed = false;
+  bool WasAFatalDiagnosticEmitted = false;
+
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
   ///
@@ -179,7 +184,9 @@ public:
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
 
-   bool finishProcessing() override;
+  bool finishProcessing() override;
+
+  bool hadOnlySuppressedFatalErrors() const override;
 
 private:
   void computeConsumersOrderedByRange(SourceManager &SM);

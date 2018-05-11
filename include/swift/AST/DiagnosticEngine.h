@@ -768,6 +768,8 @@ namespace swift {
         ArrayRef<DiagnosticArgument> FormatArgs,
         DiagnosticFormatOptions FormatOpts = DiagnosticFormatOptions());
 
+    bool hadOnlySuppressedFatalErrors() const;
+
   private:
     /// \brief Flush the active diagnostic.
     void flushActiveDiagnostic();

@@ -176,17 +176,25 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     break;
   }
 
+  const bool isErrorFatal = Kind == DiagnosticKind::Error;
   if (!specificConsumer.hasValue()) {
     for (auto &subConsumer : SubConsumers) {
       if (subConsumer.second) {
         subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
                                              FormatArgs, Info);
+        WasAFatalDiagnosticEmitted |= isErrorFatal;
       }
     }
-  } else if (DiagnosticConsumer *c = specificConsumer.getValue())
+  } else if (DiagnosticConsumer *c = specificConsumer.getValue()) {
     c->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
-  else
-    ; // Suppress non-primary diagnostic in batch mode.
+    WasAFatalDiagnosticEmitted |= isErrorFatal;
+  } else { // Suppress non-primary diagnostic in batch mode.
+    WasAFatalDiagnosticSuppressed |= isErrorFatal;
+  }
+}
+
+bool FileSpecificDiagnosticConsumer::hadOnlySuppressedFatalErrors() const {
+  return WasAFatalDiagnosticSuppressed && !WasAFatalDiagnosticEmitted;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
