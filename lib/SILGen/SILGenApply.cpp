@@ -4797,24 +4797,19 @@ static Callee
 emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                    SILLocation loc,
                                    SILDeclRef constant,
-                                   SubstitutionList substitutions,
+                                   SubstitutionMap substitutions,
                                    ArgumentSource &selfValue,
                                    bool isSuper,
                                    bool isDirectUse)
 {
   // Convert the substitution list into a substitution map.
   auto origAccessType = SGF.SGM.Types.getConstantInfo(constant).FormalType;
-  SubstitutionMap subMap;
-  if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType)) {
-    auto genericSig = genericFnType.getGenericSignature();
-    subMap = genericSig->getSubstitutionMap(substitutions);;
-  }
 
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
                                              isSuper, isDirectUse,
-                                             subMap);
+                                             substitutions);
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
@@ -5016,7 +5011,7 @@ SILDeclRef SILGenModule::getGetterDeclRef(AbstractStorageDecl *storage) {
 /// Emit a call to a getter.
 RValue SILGenFunction::
 emitGetAccessor(SILLocation loc, SILDeclRef get,
-                SubstitutionList substitutions,
+                SubstitutionMap substitutions,
                 ArgumentSource &&selfValue,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
@@ -5053,7 +5048,7 @@ SILDeclRef SILGenModule::getSetterDeclRef(AbstractStorageDecl *storage) {
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
-                                     SubstitutionList substitutions,
+                                     SubstitutionMap substitutions,
                                      ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts,
@@ -5126,7 +5121,7 @@ SILGenModule::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
 
 MaterializedLValue SILGenFunction::
 emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                              SubstitutionList substitutions,
+                              SubstitutionMap substitutions,
                               ArgumentSource &&selfValue,
                               bool isSuper, bool isDirectUse,
                               RValue &&subscripts, SILValue buffer,
@@ -5211,7 +5206,7 @@ SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage,
 /// pointer, if applicable.
 std::pair<ManagedValue, ManagedValue> SILGenFunction::
 emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                      SubstitutionList substitutions,
+                      SubstitutionMap substitutions,
                       ArgumentSource &&selfValue,
                       bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {

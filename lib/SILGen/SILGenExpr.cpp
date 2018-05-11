@@ -1076,7 +1076,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     bool isDirectAccessorUse = (semantics == AccessSemantics::DirectToAccessor);
     return emitGetAccessor(loc, getter,
-                           SGM.getNonMemberVarDeclSubstitutions(var).toList(),
+                           SGM.getNonMemberVarDeclSubstitutions(var),
                            std::move(selfSource),
                            /*isSuper=*/false, isDirectAccessorUse,
                            RValue(), C);
@@ -1148,7 +1148,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   // The easy path here is if we don't need to use an addressor.
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor: {
-    return SGF.emitGetAccessor(loc, accessor, substitutions.toList(),
+    return SGF.emitGetAccessor(loc, accessor, substitutions,
                                std::move(baseRV), isSuper, isDirectUse,
                                std::move(subscriptRV), C);
   }
@@ -1161,7 +1161,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   SILType storageType = storageTL.getLoweredType().getAddressType();
 
   auto addressorResult =
-    SGF.emitAddressorAccessor(loc, accessor, substitutions.toList(),
+    SGF.emitAddressorAccessor(loc, accessor, substitutions,
                               std::move(baseRV), isSuper, isDirectUse,
                               std::move(subscriptRV), storageType);
 
@@ -3358,12 +3358,12 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   LValueOptions lvOptions;
   if (auto var = dyn_cast<VarDecl>(property)) {
-    lv.addMemberVarComponent(subSGF, loc, var, subs.toList(), lvOptions,
+    lv.addMemberVarComponent(subSGF, loc, var, subs, lvOptions,
                              /*super*/ false, AccessKind::Write,
                              AccessSemantics::Ordinary, strategy, propertyType);
   } else {
     auto sub = cast<SubscriptDecl>(property);
-    lv.addMemberSubscriptComponent(subSGF, loc, sub, subs.toList(), lvOptions,
+    lv.addMemberSubscriptComponent(subSGF, loc, sub, subs, lvOptions,
                                    /*super*/ false, AccessKind::Write,
                                    AccessSemantics::Ordinary, strategy, propertyType,
                                    std::move(indexValue));

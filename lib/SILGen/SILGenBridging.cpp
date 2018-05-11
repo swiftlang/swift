@@ -1245,7 +1245,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
 }
 
 static CanAnyFunctionType substGenericArgs(CanAnyFunctionType fnType,
-                                           const SubstitutionList &subs) {
+                                           SubstitutionMap subs) {
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return cast<FunctionType>(genericFnType->substGenericArgs(subs)
                                            ->getCanonicalType());
@@ -1264,7 +1264,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
                                                CanType &bridgedFormalResultTy) {
   SILDeclRef native = thunk.asForeign(false);
 
-  auto subs = SGF.F.getForwardingSubstitutions();
+  auto subs = SGF.F.getForwardingSubstitutionMap();
 
   auto objcInfo = SGF.SGM.Types.getConstantInfo(thunk);
   auto objcFnTy = objcInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs);
@@ -1550,7 +1550,6 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
                              SILLocation loc,
                              SILDeclRef foreign,
                              ArrayRef<ManagedValue> args,
-                             SubstitutionList subs,
                              const SILConstantInfo &foreignCI) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");
@@ -1752,8 +1751,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     maybeAddForeignErrorArg();
     
     // Call the original.
-    auto subs = getForwardingSubstitutions();
-    auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args, subs,
+    auto subs = getForwardingSubstitutionMap();
+    auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args,
                                            foreignCI);
 
     auto fnType = fn->getType().castTo<SILFunctionType>();
@@ -1781,8 +1780,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ArgumentScope argScope(*this, fd);
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
-                  ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
-                  ApplyOptions::None, context)
+                  ManagedValue::forUnmanaged(fn), subs.toList(), args,
+                  calleeTypeInfo, ApplyOptions::None, context)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

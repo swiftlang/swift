@@ -997,7 +997,7 @@ namespace {
     AbstractStorageDecl *decl;
     bool IsSuper;
     bool IsDirectAccessorUse;
-    std::vector<Substitution> substitutions;
+    SubstitutionMap substitutions;
 
     /// The subscript index expression.  Useless
     Expr *subscriptIndexExpr;
@@ -1032,14 +1032,14 @@ namespace {
     AccessorBasedComponent(PathComponent::KindTy kind,
                            AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           SubstitutionList substitutions,
+                           SubstitutionMap substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr,
                            RValue *optSubscripts)
       : Base(typeData, kind), decl(decl),
         IsSuper(isSuper), IsDirectAccessorUse(isDirectAccessorUse),
-        substitutions(substitutions.begin(), substitutions.end()),
+        substitutions(substitutions),
         subscriptIndexExpr(subscriptIndexExpr),
         baseFormalType(baseFormalType)
     {
@@ -1091,7 +1091,7 @@ namespace {
 
      GetterSetterComponent(AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
-                           SubstitutionList substitutions,
+                           SubstitutionMap substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr = nullptr,
@@ -1135,15 +1135,15 @@ namespace {
       dest.dropLastComponent(*this);
 
       return emitAssignWithSetter(SGF, loc, std::move(dest), baseFormalType,
-                                  isSuper, setter, isDirectAccessorUse, subs,
-                                  std::move(indices), std::move(value));
+                                  isSuper, setter, isDirectAccessorUse,
+                                  subs, std::move(indices), std::move(value));
     }
 
     static void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                                      LValue &&baseLV, CanType baseFormalType,
                                      bool isSuper, SILDeclRef setter,
                                      bool isDirectAccessorUse,
-                                     SubstitutionList subs,
+                                     SubstitutionMap subs,
                                      RValue &&indices, ArgumentSource &&value) {
       ArgumentSource self = [&] {
         if (!baseLV.isValid()) {
@@ -1157,8 +1157,8 @@ namespace {
         }
       }();
 
-      return SGF.emitSetAccessor(loc, setter, subs, std::move(self), isSuper,
-                                 isDirectAccessorUse,
+      return SGF.emitSetAccessor(loc, setter, subs, std::move(self),
+                                 isSuper, isDirectAccessorUse,
                                  std::move(indices), std::move(value));
     }
 
@@ -1284,7 +1284,8 @@ namespace {
         auto args = std::move(*this).prepareAccessorArgs(SGF, loc, borrowedBase,
                                                          materializeForSet);
         materialized = SGF.emitMaterializeForSetAccessor(
-            loc, materializeForSet, substitutions, std::move(args.base),
+            loc, materializeForSet, substitutions,
+            std::move(args.base),
             IsSuper, IsDirectAccessorUse, std::move(args.subscripts), buffer,
             callbackStorage);
 
@@ -1411,15 +1412,9 @@ namespace {
                                        materialized.temporary.getValue(),
                                        rawPointerTy);
 
-        // Convert the substitution list into a substitution map.
-        SubstitutionMap subMap;
-        if (auto genericSig = origCallbackFnType->getGenericSignature()) {
-          subMap = genericSig->getSubstitutionMap(substitutions);;
-        }
-
         // Apply the callback.
         SGF.B.createApply(loc, callback,
-                          subMap, {
+                          substitutions, {
                             temporaryPointer,
                             materialized.callbackStorage,
                             baseAddress,
@@ -1578,7 +1573,7 @@ namespace {
   public:
      AddressorComponent(AbstractStorageDecl *decl,
                         bool isSuper, bool isDirectAccessorUse,
-                        SubstitutionList substitutions,
+                        SubstitutionMap substitutions,
                         CanType baseFormalType, LValueTypeData typeData,
                         SILType substFieldType,
                         Expr *subscriptIndexExpr = nullptr,
@@ -1609,7 +1604,8 @@ namespace {
         auto args =
             std::move(*this).prepareAccessorArgs(SGF, loc, base, addressor);
         result = SGF.emitAddressorAccessor(
-            loc, addressor, substitutions, std::move(args.base), IsSuper,
+            loc, addressor, substitutions, std::move(args.base),
+            IsSuper,
             IsDirectAccessorUse, std::move(args.subscripts), SubstFieldType);
       }
       switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
@@ -2007,7 +2003,7 @@ LValue LValue::forAddress(ManagedValue address,
 
 void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                                 AbstractStorageDecl *storage,
-                                SubstitutionList subs,
+                                SubstitutionMap subs,
                                 LValueOptions options,
                                 bool isSuper,
                                 AccessKind accessKind,
@@ -2238,7 +2234,7 @@ addNonMemberVarDeclAddressorComponent(SILGenModule &SGM, VarDecl *var,
   auto typeData = getPhysicalStorageTypeData(SGM, var, formalRValueType);
   SILType storageType = SGM.Types.getLoweredType(var->getType()).getAddressType();
   lvalue.add<AddressorComponent>(var, /*isSuper=*/ false, /*direct*/ true,
-                             SGM.getNonMemberVarDeclSubstitutions(var).toList(),
+                             SGM.getNonMemberVarDeclSubstitutions(var),
                                  CanType(), typeData, storageType);
 }
 
@@ -2270,7 +2266,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
   case AccessStrategy::DirectToAccessor: {
     auto typeData = getLogicalStorageTypeData(SGF.SGM, formalRValueType);
     lv.add<GetterSetterComponent>(var, /*isSuper=*/false, /*direct*/ true,
-                         SGF.SGM.getNonMemberVarDeclSubstitutions(var).toList(),
+                                  SGF.SGM.getNonMemberVarDeclSubstitutions(var),
                                   CanType(), typeData);
     break;
   }
@@ -2437,7 +2433,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
   CanType substFormalRValueType = getSubstFormalRValueType(e);
   lv.addMemberVarComponent(SGF, e, var,
-                           e->getMember().getSubstitutions().toList(),
+                           e->getMember().getSubstitutions(),
                            options, e->isSuper(), accessKind,
                            e->getAccessSemantics(),
                            strategy, substFormalRValueType);
@@ -2446,7 +2442,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
 void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                    VarDecl *var,
-                                   SubstitutionList subs,
+                                   SubstitutionMap subs,
                                    LValueOptions options,
                                    bool isSuper,
                                    AccessKind accessKind,
@@ -2537,7 +2533,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
   CanType formalRValueType = getSubstFormalRValueType(e);
   lv.addMemberSubscriptComponent(SGF, e, decl,
-                                 e->getDecl().getSubstitutions().toList(),
+                                 e->getDecl().getSubstitutions(),
                                  options, e->isSuper(), accessKind,
                                  accessSemantics, strategy,
                                  formalRValueType, std::move(index),
@@ -2590,7 +2586,7 @@ LValue SILGenLValue::visitKeyPathApplicationExpr(KeyPathApplicationExpr *e,
 
 void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                          SubscriptDecl *decl,
-                                         SubstitutionList subs,
+                                         SubstitutionMap subs,
                                          LValueOptions options,
                                          bool isSuper,
                                          AccessKind accessKind,
@@ -2732,10 +2728,6 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   auto subMap = baseType->getContextSubstitutionMap(
       SGM.M.getSwiftModule(), ivar->getDeclContext());
 
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = ivar->getDeclContext()->getGenericSignatureOfContext())
-    genericSig->getSubstitutions(subMap, subs);
-
   LValueTypeData baseTypeData = getValueTypeData(baseFormalType,
                                                  base.getValue());
 
@@ -2757,7 +2749,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
     auto typeData = getLogicalStorageTypeData(SGM, substFormalType);
     lv.add<GetterSetterComponent>(ivar, /*super*/ false,
                                   strategy == AccessStrategy::DirectToAccessor,
-                                  subs, baseFormalType, typeData);
+                                  subMap, baseFormalType, typeData);
     return lv;
   }
 
@@ -2772,7 +2764,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   if (strategy == AccessStrategy::Addressor) {
     lv.add<AddressorComponent>(ivar, /*super*/ false, /*direct*/ true,
-                               subs, baseFormalType, typeData, varStorageType);
+                               subMap, baseFormalType, typeData, varStorageType);
   } else if (baseFormalType->hasReferenceSemantics()) {
     lv.add<RefElementComponent>(ivar, options, varStorageType, typeData);
   } else {

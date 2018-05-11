@@ -1106,13 +1106,13 @@ public:
                                         SILDeclRef accessor);
 
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
-                         SubstitutionList substitutions,
+                         SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
                          RValue &&optionalSubscripts, SGFContext C);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
-                       SubstitutionList substitutions,
+                       SubstitutionMap substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        RValue &&optionalSubscripts,
@@ -1120,7 +1120,7 @@ public:
 
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                                SubstitutionList substitutions,
+                                SubstitutionMap substitutions,
                                 ArgumentSource &&optionalSelfValue,
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
@@ -1131,12 +1131,12 @@ public:
                                        GenericEnvironment *genericEnv,
                                        AccessorDecl *requirement,
                                        AccessorDecl *witness,
-                                       SubstitutionList witnessSubs);
+                                       SubstitutionMap witnessSubs);
   void emitMaterializeForSet(AccessorDecl *decl);
 
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                        SubstitutionList substitutions,
+                        SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
                         RValue &&optionalSubscripts,
