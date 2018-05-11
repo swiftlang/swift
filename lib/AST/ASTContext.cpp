@@ -2271,6 +2271,9 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
 bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
                                    Optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {
+  if (decl->isImplicit())
+    return false;
+
   // Subscripts cannot be renamed, so handle them directly.
   if (isa<SubscriptDecl>(decl)) {
     diag.fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),

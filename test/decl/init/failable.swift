@@ -230,6 +230,11 @@ class C1b_objc : P1_objc {
   @objc required init!(string: String) { } // expected-error{{non-failable initializer requirement 'init(string:)' in Objective-C protocol cannot be satisfied by a failable initializer ('init!')}}
 }
 
+class C1c {
+  required init?(string: String) { } // expected-note {{'init(string:)' declared here}}
+}
+extension C1c: P1 {} // expected-error{{non-failable initializer requirement 'init(string:)' cannot be satisfied by a failable initializer ('init?')}}
+
 class C2a : P2 {
   required init(fail: String) { } // okay to remove failability
 }
