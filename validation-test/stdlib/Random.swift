@@ -128,7 +128,9 @@ func floatingPointRangeTest<T: BinaryFloatingPoint>(_ type: T.Type)
 RandomTests.test("random floating points in ranges") {
   floatingPointRangeTest(Float.self)
   floatingPointRangeTest(Double.self)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
   floatingPointRangeTest(Float80.self)
+#endif
 }
 
 // Random Elements from collection
