@@ -1066,7 +1066,7 @@ class FunctionSignaturePartialSpecializer {
   SubstitutionMap CallerInterfaceToSpecializedInterfaceMap;
 
   /// Maps callee's interface types to caller's contextual types.
-  /// It is computed from the original SubstitutionList.
+  /// It is computed from the original substitutions.
   SubstitutionMap CalleeInterfaceToCallerArchetypeMap;
 
   /// Maps callee's interface types to specialized functions interface types.
