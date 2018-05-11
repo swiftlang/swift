@@ -436,6 +436,10 @@ inline ASTContext::Implementation &ASTContext::getImpl() const {
   return *reinterpret_cast<Implementation*>(pointer + offset);
 }
 
+void ASTContext::operator delete(void *Data) throw() {
+  AlignedFree(Data);
+}
+
 ASTContext *ASTContext::get(LangOptions &langOpts,
                             SearchPathOptions &SearchPathOpts,
                             SourceManager &SourceMgr,

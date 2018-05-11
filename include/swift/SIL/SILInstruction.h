@@ -918,11 +918,12 @@ protected:
     if (!NumResults)
       return;
 
-    auto **ParentPtr =
-        this->template getTrailingObjects<MultipleValueInstruction *>();
+    auto **ParentPtr = this->TrailingObjects::template
+        getTrailingObjects<MultipleValueInstruction *>();
     *ParentPtr = static_cast<MultipleValueInstruction *>(Parent);
 
-    auto *DataPtr = this->template getTrailingObjects<DerivedResult>();
+    auto *DataPtr = this->TrailingObjects::template
+        getTrailingObjects<DerivedResult>();
     for (unsigned i : range(NumResults)) {
       ::new (&DataPtr[i]) DerivedResult(i, Types[i], OwnershipKinds[i],
                                         std::forward<Args>(OtherArgs)...);
@@ -935,7 +936,8 @@ protected:
   ~MultipleValueInstructionTrailingObjects() {
     if (!NumResults)
       return;
-    auto *DataPtr = this->template getTrailingObjects<DerivedResult>();
+    auto *DataPtr = this->TrailingObjects::template
+        getTrailingObjects<DerivedResult>();
     // We call the DerivedResult destructors to ensure that:
     //
     // 1. If our derived results have any stored data that need to be cleaned
@@ -949,7 +951,8 @@ protected:
 
 public:
   ArrayRef<DerivedResult> getAllResultsBuffer() const {
-    auto *ptr = this->template getTrailingObjects<DerivedResult>();
+    auto *ptr = this->TrailingObjects::template
+        getTrailingObjects<DerivedResult>();
     return { ptr, NumResults };
   }
 
