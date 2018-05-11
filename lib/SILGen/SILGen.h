@@ -344,7 +344,7 @@ public:
                               GenericEnvironment *genericEnv,
                               unsigned &baseOperand,
                               bool &needsGenericContext,
-                              SubstitutionList subs,
+                              SubstitutionMap subs,
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
