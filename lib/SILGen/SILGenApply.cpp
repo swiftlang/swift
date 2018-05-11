@@ -3707,7 +3707,7 @@ CallEmission::applyNormalCall(SGFContext C) {
   // Emit the uncurried call.
   firstLevelResult.value = SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
-      callee.getSubstitutions().toList(), uncurriedArgs, calleeTypeInfo, options,
+      callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
       uncurriedContext);
   firstLevelResult.foreignSelf = calleeTypeInfo.foreignSelf;
   return firstLevelResult;
@@ -4096,7 +4096,7 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, Expr *e) {
 /// formal type.
 RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                                  ArgumentScope &&argScope, SILLocation loc,
-                                 ManagedValue fn, SubstitutionList subs,
+                                 ManagedValue fn, SubstitutionMap subs,
                                  ArrayRef<ManagedValue> args,
                                  const CalleeTypeInfo &calleeTypeInfo,
                                  ApplyOptions options, SGFContext evalContext) {
@@ -4162,9 +4162,12 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
   auto genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
-  auto subMap = genericSig->getSubstitutionMap(subs);
+  if (genericSig != subs.getGenericSignature()) {
+    subs = genericSig->getSubstitutionMap(subs.toList());
+  }
+
   SILValue rawDirectResult = emitRawApply(
-      *this, loc, fn, subMap, args, substFnType, options, indirectResultAddrs);
+      *this, loc, fn, subs, args, substFnType, options, indirectResultAddrs);
 
   // Pop the argument scope.
   argScope.pop();
@@ -4456,13 +4459,13 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   SILFunctionConventions silConv(calleeTypeInfo.substFnType, getModule());
   llvm::SmallVector<ManagedValue, 8> finalArgs;
-  convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(), args, loc, finalArgs);
+  convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(),
+                                             args, loc, finalArgs);
 
   ResultPlanPtr resultPlan =
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, mv,
-                   subMap.toList(),
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subMap,
                    finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
 }
 

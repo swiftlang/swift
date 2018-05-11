@@ -2649,7 +2649,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs.toList(), {}, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2672,7 +2672,7 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
-                   subs.toList(), {}, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -3550,7 +3550,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         isEqual = subSGF
           .emitApply(std::move(equalsResultPlan), std::move(argScope),
                      loc, ManagedValue::forUnmanaged(equalsWitness),
-                     equatableSub.toList(),
+                     equatableSub,
                      {lhsArg, rhsArg, metatyValue},
                      equalsInfo, ApplyOptions::None, SGFContext())
           .getUnmanagedSingleValue(subSGF, loc);
@@ -3664,7 +3664,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto hashWitness = subSGF.B.createWitnessMethod(loc,
         formalTy, hashable,
         hashRef, hashTy);
-      
+
       auto hashSubstTy = hashTy.castTo<SILFunctionType>()
         ->substGenericArgs(SGM.M, hashableSubsMap);
       auto hashInfo = CalleeTypeInfo(hashSubstTy,
@@ -3690,7 +3690,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
             subSGF
                 .emitApply(std::move(hashResultPlan), std::move(argScope), loc,
                            ManagedValue::forUnmanaged(hashWitness),
-                           hashableSubsMap.toList(),
+                           hashableSubsMap,
                            {arg}, hashInfo, ApplyOptions::None, SGFContext())
                 .getUnmanagedSingleValue(subSGF, loc);
       }

@@ -1297,7 +1297,7 @@ public:
   /// result does need to be turned back into something matching a
   /// formal type.
   RValue emitApply(ResultPlanPtr &&resultPlan, ArgumentScope &&argScope,
-                   SILLocation loc, ManagedValue fn, SubstitutionList subs,
+                   SILLocation loc, ManagedValue fn, SubstitutionMap subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext);
