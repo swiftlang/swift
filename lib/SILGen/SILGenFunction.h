@@ -1083,7 +1083,7 @@ public:
                                   CanType baseFormalType,
                                   bool isSuper, AbstractStorageDecl *storage,
                                   RValue indexes,
-                                  SubstitutionList substitutions,
+                                  SubstitutionMap substitutions,
                                   AccessSemantics semantics, Type propTy,
                                   SGFContext C,
                                   bool isBaseGuaranteed = false);
@@ -1312,7 +1312,7 @@ public:
   RValue emitApplyOfStoredPropertyInitializer(
       SILLocation loc,
       const PatternBindingEntry &entry,
-      SubstitutionList subs,
+      SubstitutionMap subs,
       CanType resultType,
       AbstractionPattern origResultType,
       SGFContext C);

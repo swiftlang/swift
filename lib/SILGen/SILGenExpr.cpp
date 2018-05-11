@@ -1129,7 +1129,7 @@ static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
 static RValue
 emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                        AbstractStorageDecl *storage,
-                       SubstitutionList substitutions,
+                       SubstitutionMap substitutions,
                        ArgumentSource &&baseRV, RValue &&subscriptRV,
                        bool isSuper, AccessStrategy strategy,
                        SILDeclRef accessor,
@@ -1148,7 +1148,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   // The easy path here is if we don't need to use an addressor.
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor: {
-    return SGF.emitGetAccessor(loc, accessor, substitutions,
+    return SGF.emitGetAccessor(loc, accessor, substitutions.toList(),
                                std::move(baseRV), isSuper, isDirectUse,
                                std::move(subscriptRV), C);
   }
@@ -1161,7 +1161,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
   SILType storageType = storageTL.getLoweredType().getAddressType();
 
   auto addressorResult =
-    SGF.emitAddressorAccessor(loc, accessor, substitutions,
+    SGF.emitAddressorAccessor(loc, accessor, substitutions.toList(),
                               std::move(baseRV), isSuper, isDirectUse,
                               std::move(subscriptRV), storageType);
 
@@ -1204,7 +1204,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
 RValue SILGenFunction::emitRValueForStorageLoad(
     SILLocation loc, ManagedValue base, CanType baseFormalType,
     bool isSuper, AbstractStorageDecl *storage, RValue indexes,
-    SubstitutionList substitutions,
+    SubstitutionMap substitutions,
     AccessSemantics semantics, Type propTy, SGFContext C,
     bool isBaseGuaranteed) {
   AccessStrategy strategy =
@@ -2498,8 +2498,7 @@ private:
       SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                    Expr->isSuper(),
                                    Field, {},
-                                   Expr->getMember().getSubstitutions()
-                                     .toList(),
+                                   Expr->getMember().getSubstitutions(),
                                    Expr->getAccessSemantics(),
                                    Expr->getType(), Context);
     return result;
@@ -2541,8 +2540,7 @@ private:
         SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                      Expr->isSuper(),
                                      Field, {},
-                                     Expr->getMember().getSubstitutions()
-                                       .toList(),
+                                     Expr->getMember().getSubstitutions(),
                                      Expr->getAccessSemantics(),
                                      Expr->getType(), Context,
                                      base.isPlusZeroRValueOrTrivial());
@@ -2657,7 +2655,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
     SILLocation loc,
     const PatternBindingEntry &entry,
-    SubstitutionList subs,
+    SubstitutionMap subs,
     CanType resultType,
     AbstractionPattern origResultType,
     SGFContext C) {
@@ -2673,8 +2671,8 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C);
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
+                   subs.toList(), {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -3202,7 +3200,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto resultSubst = subSGF.emitRValueForStorageLoad(loc, baseSubstValue,
                                    baseType, /*super*/false,
                                    property, std::move(indexValue),
-                                   subs.toList(), AccessSemantics::Ordinary,
+                                   subs, AccessSemantics::Ordinary,
                                    propertyType, SGFContext())
     .getAsSingleValue(subSGF, loc);
   if (resultSubst.getType().getAddressType() != resultArg->getType())
