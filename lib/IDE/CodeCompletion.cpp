@@ -1318,7 +1318,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (!DC)
       return;
     auto *CD = DC->getAsClassOrClassExtensionContext();
-    if (CD == nullptr)
+    if (!CD)
       return;
     Type ST = CD->getSuperclass();
     if (ST.isNull() || ST->is<ErrorType>())
@@ -5317,6 +5317,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
+
+    CodeCompletionResultBuilder Builder(CompletionContext.getResultSink(),
+                                        CodeCompletionResult::ResultKind::Keyword,
+                                        SemanticContextKind::CurrentNominal, {});
+    Builder.setKeywordKind(CodeCompletionKeywordKind::kw_self);
+    Builder.addTextChunk("self");
+    Builder.addTypeAnnotation(ExprType->getString());
 
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
