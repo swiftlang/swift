@@ -89,14 +89,15 @@ namespace {
     }
 
     void InclusionDirective(clang::SourceLocation HashLoc,
-                                    const clang::Token &IncludeTok,
-                                    StringRef FileName,
-                                    bool IsAngled,
-                                    clang::CharSourceRange FilenameRange,
-                                    const clang::FileEntry *File,
-                                    StringRef SearchPath,
-                                    StringRef RelativePath,
-                                    const clang::Module *Imported) override {
+                            const clang::Token &IncludeTok,
+                            StringRef FileName,
+                            bool IsAngled,
+                            clang::CharSourceRange FilenameRange,
+                            const clang::FileEntry *File,
+                            StringRef SearchPath,
+                            StringRef RelativePath,
+                            const clang::Module *Imported,
+                            clang::SrcMgr::CharacteristicKind FileType) override {
       handleImport(Imported);
     }
 
@@ -273,7 +274,8 @@ private:
                           const clang::FileEntry *File,
                           StringRef SearchPath,
                           StringRef RelativePath,
-                          const clang::Module *Imported) override {
+                          const clang::Module *Imported,
+                          clang::SrcMgr::CharacteristicKind FileType) override{
     if (!Imported) {
       if (File)
         Impl.BridgeHeaderFiles.insert(File);
