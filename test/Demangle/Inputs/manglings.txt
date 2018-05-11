@@ -315,4 +315,5 @@ _$S3BBBBf0602365061_ ---> _$S3BBBBf0602365061_
 _$S3BBBBi0602365061_ ---> _$S3BBBBi0602365061_
 _$S3BBBBv0602365061_ ---> _$S3BBBBv0602365061_
 _T0lxxxmmmTk ---> _T0lxxxmmmTk
+$S4blah8PatatinoaySiGD -> blah.Patatino<Swift.Int>
 
