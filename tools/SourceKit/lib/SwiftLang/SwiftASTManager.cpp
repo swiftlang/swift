@@ -414,10 +414,14 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
-                                             ArrayRef<const char *> Args,
+                                             ArrayRef<const char *> OrigArgs,
                                              DiagnosticEngine &Diags,
                                              StringRef UnresolvedPrimaryFile,
                                              std::string &Error) {
+  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  Args.push_back("-resource-dir");
+  Args.push_back(Impl.RuntimeResourcePath.c_str());
+
   if (auto driverInvocation = driver::createCompilerInvocation(Args, Diags)) {
     Invocation = *driverInvocation;
   } else {
@@ -425,8 +429,6 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-
-  Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
 
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
