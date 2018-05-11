@@ -1078,10 +1078,3 @@ Optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
   }
   return it->getSecond();
 }
-
-void SILProfiler::recordCounterUpdate() {
-  // If a counter update is recorded, the profile symbol table is guaranteed
-  // to have name data needed by the coverage mapping.
-  if (CovMap)
-    CovMap->setSymtabEntryGuaranteed();
-}
