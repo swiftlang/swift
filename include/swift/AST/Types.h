@@ -255,10 +255,14 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   TypeBase(const TypeBase&) = delete;
   void operator=(const TypeBase&) = delete;
   
-  /// CanonicalType - This field is always set to the ASTContext for canonical
-  /// types, and is otherwise lazily populated by ASTContext when the canonical
-  /// form of a non-canonical type is requested.
-  llvm::PointerUnion<TypeBase *, const ASTContext *> CanonicalType;
+  /// This union contains to the ASTContext for canonical types, and is
+  /// otherwise lazily populated by ASTContext when the canonical form of a
+  /// non-canonical type is requested. The disposition of the union is stored
+  /// outside of the union for performance. See Bits.TypeBase.IsCanonical.
+  union {
+    CanType CanonicalType;
+    const ASTContext *Context;
+  };
 
   /// Returns true if the given type is a sugared type.
   ///
@@ -275,11 +279,14 @@ protected:
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
-                             RecursiveTypeProperties::BitWidth,
+                             RecursiveTypeProperties::BitWidth + 1,
     /// Kind - The discriminator that indicates what subclass of type this is.
     Kind : bitmax(NumTypeKindBits,8),
 
-    Properties : RecursiveTypeProperties::BitWidth
+    Properties : RecursiveTypeProperties::BitWidth,
+
+    /// Whether this type is canonical or not.
+    IsCanonical : 1
   );
 
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
@@ -384,12 +391,15 @@ protected:
 protected:
   TypeBase(TypeKind kind, const ASTContext *CanTypeCtx,
            RecursiveTypeProperties properties)
-    : CanonicalType((TypeBase*)nullptr) {
+    : Context(nullptr) {
     Bits.OpaqueBits = 0;
     Bits.TypeBase.Kind = static_cast<unsigned>(kind);
+    Bits.TypeBase.IsCanonical = false;
     // If this type is canonical, switch the CanonicalType union to ASTContext.
-    if (CanTypeCtx)
-      CanonicalType = CanTypeCtx;
+    if (CanTypeCtx) {
+      Bits.TypeBase.IsCanonical = true;
+      Context = CanTypeCtx;
+    }
     setRecursiveProperties(properties);
   }
 
@@ -403,7 +413,7 @@ public:
   TypeKind getKind() const { return static_cast<TypeKind>(Bits.TypeBase.Kind); }
 
   /// isCanonical - Return true if this is a canonical type.
-  bool isCanonical() const { return CanonicalType.is<const ASTContext *>(); }
+  bool isCanonical() const { return Bits.TypeBase.IsCanonical; }
   
   /// hasCanonicalTypeComputed - Return true if we've already computed a
   /// canonical version of this type.
@@ -419,7 +429,7 @@ public:
     if (isCanonical())
       return CanType(const_cast<TypeBase*>(this));
     if (hasCanonicalTypeComputed())
-      return CanType(CanonicalType.get<TypeBase*>());
+      return CanonicalType;
     return const_cast<TypeBase*>(this)->computeCanonicalType();
   }
 
@@ -434,11 +444,10 @@ public:
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {
     // If this type is canonical, it has the ASTContext in it.
-    if (CanonicalType.is<const ASTContext *>())
-      return const_cast<ASTContext&>(*CanonicalType.get<const ASTContext *>());
+    if (isCanonical())
+      return *const_cast<ASTContext*>(Context);
     // If not, canonicalize it to get the Context.
-    return const_cast<ASTContext&>(*getCanonicalType()->
-                                   CanonicalType.get<const ASTContext *>());
+    return *const_cast<ASTContext*>(getCanonicalType()->Context);
   }
   
   /// isEqual - Return true if these two types are equal, ignoring sugar.

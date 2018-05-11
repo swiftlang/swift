@@ -1243,8 +1243,7 @@ CanType TypeBase::computeCanonicalType() {
 
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
-  CanonicalType = Result;
-  return CanType(Result);
+  return CanonicalType = CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {
