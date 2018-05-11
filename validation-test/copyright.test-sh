@@ -1,35 +1,36 @@
 #!/usr/bin/env bash
-
 # This test validates that all source files have _correct_ copyright notices.
 
-DEBUG=true
+# RUN: find %swift_obj_root -type f \( -name "*.swift" -or -name "*.py" -or -name "*.gyb" \) | xargs %s
+
+VERBOSE=false
+PATCH=false
 function print() {
-	$DEBUG && echo $@
+	$VERBOSE && echo $@
 }
 
 set -euo pipefail
 
 # This is pretty general, it will match any line with the word "Copyright" and 4 numbers
-COPYRIGHT_EXISTS_PATTERN="Copyright .* \\d{4}"
+COPYRIGHT_EXISTS_PATTERN="Copyright .* \d\{4\}"
 
-COMMENT_PATTERN="(\\/\\/|\#|  *)"
-COPYRIGHT_IS_CONFORMANT_PATTERN=("$COMMENT_PATTERN This source file is part of the Swift.org open source project\n(\/\/|#) Copyright \(c\) ((\d{4})|\d{4} - \d{4}))"
-
-
+COPYRIGHT_SINGLE_YEAR_PATTERN="\(\d\{4\}\)"
+COPYRIGHT_RANGE_PATTERN="\(\d\{4\} - \d\{4\}\)"
+COPYRIGHT_LITERAL_PATTERN="Copyright (c) "
 
 # Takes a filepath as the sole argument
 function dates() {
 	local G_LOG_OUTPUT=$(git log --format="%ad" --date="format:%Y" -- $@)
 
-	local CREATED_AT=$(tail -1 <<< $G_LOG_OUTPUT)
-	local LAST_EDIT=$(head -1 <<< $G_LOG_OUTPUT)
+	EXPECTED_CREATED_AT=$(tail -1 <<< $G_LOG_OUTPUT)
+	EXPECTED_LAST_EDIT=$(head -1 <<< $G_LOG_OUTPUT)
 
-	print "created at $CREATED_AT, last edit at $LAST_EDIT"
+	print "created at $EXPECTED_CREATED_AT, last edit at $EXPECTED_LAST_EDIT"
 }
 
 # Takes a filepath as the sole argument
 function has_copyright_header() {
-	if grep --silent $COPYRIGHT_EXISTS_PATTERN $@; then
+	if grep --silent "$COPYRIGHT_EXISTS_PATTERN" $@; then
 		print "file has a copyright notice"
 	else
 		print "file doesn't have a copyright notice"
@@ -38,15 +39,107 @@ function has_copyright_header() {
 }
 
 function copyright_header_is_conformant() {
-	if grep --silent $COPYRIGHT_IS_CONFORMANT_PATTERN $@; then
-		print "copyright is formatted conformantly"
+	if grep --silent "${COPYRIGHT_LITERAL_PATTERN}${COPYRIGHT_RANGE_PATTERN}" $@; then
+		print "copyright is formatted as range of years"
+		SINGLE_YEAR=false
+
+		print "matching ${COPYRIGHT_LITERAL_PATTERN}${COPYRIGHT_RANGE_PATTERN}"
+		local GREP_OUTPUT=$(grep -o "${COPYRIGHT_LITERAL_PATTERN}${COPYRIGHT_RANGE_PATTERN}" $@)
+		echo lol
+		echo $GREP_OUTPUT
+		CREATED_AT=$(echo $GREP_OUTPUT | cut -c 15- | cut -c -4)
+		LAST_EDIT=$(echo $GREP_OUTPUT | cut -c 22-)
+
+	elif grep --silent "${COPYRIGHT_LITERAL_PATTERN}${COPYRIGHT_SINGLE_YEAR_PATTERN}" $@; then
+		print "copyright is formatted as single year"
+		SINGLE_YEAR=true
+
+		local GREP_OUTPUT=$(grep -o "${COPYRIGHT_LITERAL_PATTERN}${COPYRIGHT_SINGLE_YEAR_PATTERN}" $@)
+		echo lol
+		echo $GREP_OUTPUT
+		CREATED_AT=$(echo $GREP_OUTPUT | cut -c 15- | cut -c -4)
+		LAST_EDIT=$EXPECTED_CREATED_AT
 	else
 		print "incorrectly formatted copyright header"
 		exit 1
 	fi
 }
 
-print "testing $@"
-dates $@
-has_copyright_header $@
-copyright_header_is_conformant $@
+function patch() {
+	if [ $EXPECTED_CREATED_AT == $EXPECTED_LAST_EDIT ]; then
+		local REPLACE="Copyright (c) $EXPECTED_CREATED_AT"
+	else
+		local REPLACE="Copyright (c) $EXPECTED_CREATED_AT - $EXPECTED_LAST_EDIT"
+	fi
+	if [ $SINGLE_YEAR == true ]; then
+		local REGEX="$COPYRIGHT_LITERAL_PATTERN$COPYRIGHT_SINGLE_YEAR_PATTERN"
+		print "single year regex is $REGEX"
+	else
+		local REGEX="$COPYRIGHT_LITERAL_PATTERN$COPYRIGHT_RANGE_PATTERN"
+		print "range regex is $REGEX"
+	fi
+
+	sed -i "" -e "s/$REGEX/$REPLACE/g" $@
+}
+
+function print_description() {
+	if [ $EXPECTED_CREATED_AT == $CREATED_AT ]; then
+		if [ $EXPECTED_LAST_EDIT == $LAST_EDIT ]; then
+			print "$EXPECTED_CREATED_AT matches $CREATED_AT, and $EXPECTED_LAST_EDIT matches $LAST_EDIT"
+			return 0
+		else
+			print "Incorrect copyright header for $@! Should be $EXPECTED_CREATED_AT - $EXPECTED_LAST_EDIT. Is actually $CREATED_AT - $LAST_EDIT"
+			return 1
+		fi
+	else
+		print "Incorrect copyright header for $@! Should be $EXPECTED_CREATED_AT - $EXPECTED_LAST_EDIT. Is actually $CREATED_AT - $LAST_EDIT"
+		return 1
+	fi
+}
+function show_help() {
+	echo "Validates that the copyright headers in files are upto date"
+	echo "Accepts a -v flag to print debug information, and a -p flag to edit nonconformant files in place"
+}
+
+function cleanup() {
+	unset SINGLE_YEAR EXPECTED_LAST_EDIT EXPECTED_CREATED_AT LAST_EDIT CREATED_AT
+	set +ueo pipefail
+}
+
+function main() {
+	print "testing $@"
+	dates $@
+	has_copyright_header $@
+	copyright_header_is_conformant $@
+	if [ $PATCH == true ]; then
+		patch $@
+	fi
+	local RETCODE=print_description $@
+	if [ $RETCODE != 0 ]; then
+		if [ $VERBOSE != true ]; then
+			VERBOSE=true print_description $@
+		fi
+		cleanup
+		exit $RETCODE
+	fi
+
+	cleanup
+	exit 0
+}
+
+while getopts ":hpv" opt; do
+	case "$opt" in
+		h|\?)
+        		show_help
+        		exit 0
+        		;;
+		v)
+			VERBOSE=true
+        		;;
+    		p)
+			PATCH=true
+			;;
+	esac
+done
+shift $((OPTIND -1))    # remove the processed options 
+main $@
