@@ -1076,7 +1076,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     bool isDirectAccessorUse = (semantics == AccessSemantics::DirectToAccessor);
     return emitGetAccessor(loc, getter,
-                           SGM.getNonMemberVarDeclSubstitutions(var),
+                           SGM.getNonMemberVarDeclSubstitutions(var).toList(),
                            std::move(selfSource),
                            /*isSuper=*/false, isDirectAccessorUse,
                            RValue(), C);

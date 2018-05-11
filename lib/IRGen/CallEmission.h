@@ -75,7 +75,7 @@ public:
 
   const Callee &getCallee() const { return CurCallee; }
 
-  SubstitutionList getSubstitutions() const {
+  SubstitutionMap getSubstitutions() const {
     return CurCallee.getSubstitutions();
   }
 

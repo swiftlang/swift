@@ -435,7 +435,7 @@ public:
 
   /// Get the substitutions necessary to invoke a non-member (global or local)
   /// property.
-  SubstitutionList
+  SubstitutionMap
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
   /// Emit a property descriptor for the given storage decl if it needs one.
