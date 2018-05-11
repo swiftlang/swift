@@ -547,6 +547,11 @@ namespace driver {
                               ReturnCode);
         }
 
+        // See how ContinueBuildingAfterErrors gets set up in Driver.cpp for
+        // more info.
+        assert((Comp.ContinueBuildingAfterErrors || !Comp.EnableBatchMode) &&
+               "batch mode diagnostics require ContinueBuildingAfterErrors");
+
         return Comp.ContinueBuildingAfterErrors ?
           TaskFinishedResponse::ContinueExecution :
           TaskFinishedResponse::StopExecution;
