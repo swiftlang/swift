@@ -5262,7 +5262,13 @@ inline CanType CanType::getWithoutSpecifierTypeImpl(CanType type) {
 inline CanType CanType::getNominalParent() const {
   return cast<NominalOrBoundGenericNominalType>(*this).getParent();
 }
-  
+
+inline bool CanType::isActuallyCanonicalOrNull() const {
+  return getPointer() == nullptr ||
+         getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
+         getPointer()->isCanonical();
+}
+
 inline Type TupleTypeElt::getVarargBaseTy() const {
   TypeBase *T = getType().getPointer();
   if (auto *AT = dyn_cast<ArraySliceType>(T))
