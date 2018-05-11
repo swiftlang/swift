@@ -89,7 +89,7 @@ repositories and will update them instead.
 
 **Via HTTPS**  For those checking out sources as read-only, HTTPS works best:
 
-    git clone https://github.com/google/swift.git -b tensorflow
+    git clone https://github.com/apple/swift.git -b tensorflow
     ./swift/utils/update-checkout --clone --config swift/utils/update-checkout-config-tensorflow.json
     cd swift
 
@@ -97,7 +97,7 @@ repositories and will update them instead.
 cloning over SSH may provide a better experience (which requires
 [uploading SSH keys to GitHub](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/)):
 
-    git clone git@github.com:google/swift.git -b tensorflow
+    git clone git@github.com:apple/swift.git -b tensorflow
     ./swift/utils/update-checkout --clone-with-ssh --config swift/utils/update-checkout-config-tensorflow.json
     cd swift
 
