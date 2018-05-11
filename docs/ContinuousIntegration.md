@@ -1,4 +1,3 @@
-
 # Continuous Integration for Swift
 
 **Table of Contents**
@@ -41,12 +40,12 @@ We describe each in detail below:
 
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
-All supported platforms     | @swift-ci Please smoke test                      | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-All supported platforms     | @swift-ci Please clean smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-All supported platforms     | @swift-ci Please smoke test and merge            | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-All supported platforms     | @swift-ci Please clean smoke test and merge      | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)
-macOS platform              | @swift-ci Please smoke test OS X platform        | Swift Test OS X Platform (smoke test)
-macOS platform              | @swift-ci Please clean smoke test OS X platform  | Swift Test OS X Platform (smoke test)
+All supported platforms     | @swift-ci Please smoke test                      | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+All supported platforms     | @swift-ci Please clean smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+All supported platforms     | @swift-ci Please smoke test and merge            | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+All supported platforms     | @swift-ci Please clean smoke test and merge      | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
+macOS platform              | @swift-ci Please smoke test macOS platform        | Swift Test macOS Platform (smoke test)
+macOS platform              | @swift-ci Please clean smoke test macOS platform  | Swift Test macOS Platform (smoke test)
 Linux platform              | @swift-ci Please smoke test Linux platform       | Swift Test Linux Platform (smoke test)
 Linux platform              | @swift-ci Please clean smoke test Linux platform | Swift Test Linux Platform (smoke test)
 
@@ -76,17 +75,17 @@ A smoke test on Linux does the following:
 
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
-All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>
-All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test OS X Platform<br>
-All supported platforms     | @swift-ci Please test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
-All supported platforms     | @swift-ci Please clean test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test OS X Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test OS X Platform
-macOS platform               | @swift-ci Please test OS X platform           | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
-macOS platform               | @swift-ci Please clean test OS X platform     | Swift Test OS X Platform (smoke test)<br>Swift Test OS X Platform
-macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on OS X Platform (many runs - rigorous)
-macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark on OS X Platform (few runs - sanity)
+All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
+All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
+All supported platforms     | @swift-ci Please test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test macOS Platform
+All supported platforms     | @swift-ci Please clean test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test macOS Platform
+macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform
+macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform
+macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on macOS Platform (many runs - rigorous)
+macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark on macOS Platform (few runs - sanity)
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
-macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test OS X Platform
+macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test macOS Platform
 
 The core principles of validation testing is that:
 
@@ -121,8 +120,8 @@ A validation test on Linux does the following:
 
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
-macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on OS X Platform (many runs - rigorous)
-macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on OS X Platform (few runs - sanity)
+macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on macOS Platform (many runs - rigorous)
+macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on macOS Platform (few runs - sanity)
 
 ### Linting
 
