@@ -102,12 +102,6 @@ void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
   return ctx.Allocate(bytes, alignment, arena);
 }
 
-bool CanType::isActuallyCanonicalOrNull() const {
-  return getPointer() == nullptr ||
-         getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
-         getPointer()->isCanonical();
-}
-
 NominalTypeDecl *CanType::getAnyNominal() const {
   return dyn_cast_or_null<NominalTypeDecl>(getAnyGeneric());
 }
@@ -1249,8 +1243,7 @@ CanType TypeBase::computeCanonicalType() {
 
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
-  CanonicalType = Result;
-  return CanType(Result);
+  return CanonicalType = CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {
