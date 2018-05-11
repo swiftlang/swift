@@ -93,9 +93,6 @@ public:
     return RegionCounterMap;
   }
 
-  /// Increment the number of counter updates associated with this profiler.
-  void recordCounterUpdate();
-
 private:
   /// Map counters to ASTNodes and set them up for profiling the function.
   void assignRegionCounters();
