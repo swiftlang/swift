@@ -214,8 +214,11 @@ public:
   /// Construct a \c BatchJob that subsumes the work of a set of Jobs. Any pair
   /// of elements in \p Jobs are assumed to satisfy the equivalence relation \c
   /// jobsAreBatchCombinable, i.e. they should all be "the same" job in in all
-  /// ways other than their choices of inputs.
+  /// ways other than their choices of inputs. The provided \p NextQuasiPID
+  /// should be a negative number that persists between calls; this method will
+  /// decrement it to assign quasi-PIDs to each of the \p Jobs passed.
   std::unique_ptr<Job> constructBatchJob(ArrayRef<const Job *> Jobs,
+                                         int64_t &NextQuasiPID,
                                          Compilation &C) const;
 
   /// Return the default language type to use for the given extension.
