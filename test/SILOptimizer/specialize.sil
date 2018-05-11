@@ -644,7 +644,7 @@ bb0:
 // CHECK-LABEL: sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> ()
 // Refer to the specialized version of the function
 // CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
-// CHECK: partial_apply [[SPECIALIZED_FN]]<R>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
+// CHECK: partial_apply [[SPECIALIZED_FN]]<R, Builtin.Int64>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
 sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> () {
 bb0(%0 : $*R, %1 : $*S, %2 : $Builtin.Int64):
   %4 = integer_literal $Builtin.Int64, 100

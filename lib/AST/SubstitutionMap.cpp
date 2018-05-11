@@ -91,6 +91,17 @@ GenericSignature *SubstitutionMap::getGenericSignature() const {
   return storage ? storage->getGenericSignature() : nullptr;
 }
 
+bool SubstitutionMap::empty() const {
+  return getGenericSignature() == nullptr;
+}
+
+bool SubstitutionMap::hasAnySubstitutableParams() const {
+  auto genericSig = getGenericSignature();
+  if (!genericSig) return false;
+
+  return !genericSig->areAllParamsConcrete();
+}
+
 bool SubstitutionMap::hasArchetypes() const {
   for (Type replacementTy : getReplacementTypes()) {
     if (replacementTy && replacementTy->hasArchetype())
@@ -283,8 +294,19 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
     return replacementType;
   }
 
-  // Not known.
-  return Type();
+  // The generic parameter may not be canonical. Retrieve the canonical
+  // type, which will be dependent.
+  CanType canonicalType = genericSig->getCanonicalTypeInContext(genericParam);
+
+  // If nothing changed, we don't have a replacement.
+  if (canonicalType == type) return Type();
+
+  // If we're left with a substitutable type, substitute into that.
+  // First, set the replacement type to an error, to block infinite recursion.
+  replacementType = ErrorType::get(type);
+
+  replacementType = lookupSubstitution(cast<SubstitutableType>(canonicalType));
+  return replacementType;
 }
 
 Optional<ProtocolConformanceRef>

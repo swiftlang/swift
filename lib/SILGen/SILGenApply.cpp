@@ -1592,7 +1592,7 @@ static SILValue emitRawApply(SILGenFunction &SGF,
   SILValue result;
   if (!substFnType->hasErrorResult()) {
     result = SGF.B.createApply(loc, fnValue, calleeType,
-                               resultType, subs.toList(), argValues);
+                               resultType, subs, argValues);
 
   // Otherwise, we need to create a try_apply.
   } else {
@@ -1603,7 +1603,7 @@ static SILValue emitRawApply(SILGenFunction &SGF,
       SGF.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
                                options & ApplyOptions::DoesNotThrow);
 
-    SGF.B.createTryApply(loc, fnValue, calleeType, subs.toList(), argValues,
+    SGF.B.createTryApply(loc, fnValue, calleeType, subs, argValues,
                          normalBB, errorBB);
     SGF.B.emitBlock(normalBB);
   }
@@ -3816,7 +3816,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   }
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
-      constantInfo.getSILType(), 1, SGF.B.getModule(), subs.toList(), calleeConvention);
+      constantInfo.getSILType(), 1, SGF.B.getModule(), subs, calleeConvention);
 
   auto &module = SGF.getFunction().getModule();
 
@@ -3825,7 +3825,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
     partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
 
   ManagedValue pa = SGF.B.createPartialApply(loc, superMethod, partialApplyTy,
-                                             subs.toList(), {upcastedSelf},
+                                             subs, {upcastedSelf},
                                              closureTy);
   assert(!closureTy.castTo<SILFunctionType>()->isNoEscape());
   firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
@@ -4291,7 +4291,7 @@ RValue SILGenFunction::emitMonomorphicApply(
 /// the 'try_apply' simply branching out of all cleanups and throwing.
 SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                               SILType substFnType,
-                                              SubstitutionList subs,
+                                              SubstitutionMap subs,
                                               ArrayRef<SILValue> args) {
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);

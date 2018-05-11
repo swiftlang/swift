@@ -1092,7 +1092,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   ManagedValue result = emitClosureValue(loc, silDeclRef, refType,
-                                         declRef.getSubstitutions().toList());
+                                         declRef.getSubstitutions());
   return RValue(*this, loc, refType, result);
 }
 
@@ -2923,9 +2923,9 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   // Emit the closure body.
   SGF.SGM.emitClosure(e);
 
-  SubstitutionList subs;
+  SubstitutionMap subs;
   if (e->getCaptureInfo().hasGenericParamCaptures())
-    subs = SGF.getForwardingSubstitutions();
+    subs = SGF.getForwardingSubstitutionMap();
 
   // Generate the closure value (if any) for the closure expr's function
   // reference.

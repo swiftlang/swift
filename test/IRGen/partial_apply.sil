@@ -384,7 +384,7 @@ sil hidden_external @complex_generic_function : $@convention(thin) <T where T : 
 sil @partial_apply_complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
 bb0(%0 : $Int):
   %fn = function_ref @complex_generic_function : $@convention(thin) <T where T : P2, T.Y : P2> (Int) -> ()
-  %pa = partial_apply %fn <T, T.Y>(%0) : $@convention(thin) <T where T : P2, T.Y : P1, T.Y : P2> (Int) -> ()
+  %pa = partial_apply %fn <T>(%0) : $@convention(thin) <T where T : P2, T.Y : P1, T.Y : P2> (Int) -> ()
   %result = tuple ()
   return %result : $()
 }

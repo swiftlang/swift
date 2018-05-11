@@ -80,7 +80,6 @@ std::string GenericSpecializationMangler::mangle() {
   SILFunctionType *FTy = Function->getLoweredFunctionType();
   CanGenericSignature Sig = FTy->getGenericSignature();
 
-  auto SubMap = Sig->getSubstitutionMap(Subs);
   bool First = true;
   for (auto ParamType : Sig->getSubstitutableParams()) {
     appendType(Type(ParamType).subst(SubMap)->getCanonicalType());

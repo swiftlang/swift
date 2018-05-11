@@ -120,7 +120,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
-  auto *genericSig = dc->getGenericSignatureOfContext();
   auto typeSubMap = swiftValueType->getContextSubstitutionMap(
       SGF.SGM.SwiftModule, dc);
 
@@ -152,14 +151,10 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
     swiftValue = ManagedValue::forUnmanaged(tmp);
   }
 
-  SmallVector<Substitution, 4> subs;
-  if (genericSig)
-    genericSig->getSubstitutions(typeSubMap, subs);
-
   // Call the witness.
   SILType resultTy = SGF.getLoweredType(objcType);
   SILValue bridgedValue =
-      SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, subs,
+      SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, typeSubMap,
                         swiftValue.borrow(SGF, loc).getValue());
 
   auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
@@ -946,9 +941,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   CanSILFunctionType substFnTy = thunkTy;
 
-  SmallVector<Substitution, 4> subs;
   if (auto genericSig = thunkTy->getGenericSignature()) {
-    genericSig->getSubstitutions(interfaceSubs, subs);
     substFnTy = thunkTy->substGenericArgs(F.getModule(),
                                           interfaceSubs);
   }
@@ -956,8 +949,8 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
-      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs,
-      block,
+      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
+      interfaceSubs, block,
       SILType::getPrimitiveObjectType(loweredFuncTyWithoutNoEscape));
 
   if (!loweredFuncTy->isNoEscape()) {
@@ -1392,7 +1385,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   assert(thunk.isForeign);
   SILDeclRef native = thunk.asForeign(false);
   auto nativeInfo = getConstantInfo(native);
-  auto subs = F.getForwardingSubstitutions();
+  auto subs = F.getForwardingSubstitutionMap();
   auto substTy = nativeInfo.SILFnType->substGenericArgs(SGM.M, subs);
   SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
   SILFunctionConventions substConv(substTy, SGM.M);

@@ -1411,9 +1411,15 @@ namespace {
                                        materialized.temporary.getValue(),
                                        rawPointerTy);
 
+        // Convert the substitution list into a substitution map.
+        SubstitutionMap subMap;
+        if (auto genericSig = origCallbackFnType->getGenericSignature()) {
+          subMap = genericSig->getSubstitutionMap(substitutions);;
+        }
+
         // Apply the callback.
         SGF.B.createApply(loc, callback,
-                          substitutions, {
+                          subMap, {
                             temporaryPointer,
                             materialized.callbackStorage,
                             baseAddress,

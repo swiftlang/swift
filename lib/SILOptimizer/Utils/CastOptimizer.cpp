@@ -234,10 +234,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   Args.push_back(SrcOp);
   Args.push_back(MetaTyVal);
 
-  SmallVector<Substitution, 4> Subs;
-  Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
-
-  auto *AI = Builder.createApply(Loc, FuncRef, Subs, Args, false);
+  auto *AI = Builder.createApply(Loc, FuncRef, SubMap, Args, false);
 
   // If we have guaranteed normal arguments, insert the destroy.
   //
@@ -516,12 +513,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
     }
   }
 
-  SmallVector<Substitution, 4> Subs;
-  if (auto *Sig = Source->getAnyNominal()->getGenericSignature())
-    Sig->getSubstitutions(SubMap, Subs);
-
   // Generate a code to invoke the bridging function.
-  auto *NewAI = Builder.createApply(Loc, FnRef, Subs, Src, false);
+  auto *NewAI = Builder.createApply(Loc, FnRef, SubMap, Src, false);
 
   auto releaseSrc = [&](SILBuilder &Builder) {
     if (AddressOnlyType) {

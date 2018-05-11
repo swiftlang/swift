@@ -757,7 +757,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    CanSILFunctionType origType,
                                    CanSILFunctionType substType,
                                    CanSILFunctionType outType,
-                                   SubstitutionList subs,
+                                   SubstitutionMap subs,
                                    HeapLayout const *layout,
                                    ArrayRef<ParameterConvention> conventions) {
   auto outSig = IGM.getSignature(outType);
@@ -947,8 +947,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   Explosion polyArgs;
 
   // Emit the polymorphic arguments.
-  assert((subs.empty() != hasPolymorphicParameters(origType) ||
-         (subs.empty() && origType->getRepresentation() ==
+  assert((subs.hasAnySubstitutableParams()
+            == hasPolymorphicParameters(origType) ||
+         (!subs.hasAnySubstitutableParams() && origType->getRepresentation() ==
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
@@ -984,10 +985,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       (void)param.claimAll();
     }
 
-    SubstitutionMap subMap;
-    if (auto genericSig = origType->getGenericSignature())
-      subMap = genericSig->getSubstitutionMap(subs);
-    emitPolymorphicArguments(subIGF, origType, subMap,
+    emitPolymorphicArguments(subIGF, origType, subs,
                              &witnessMetadata, polyArgs);
   }
 
@@ -1184,10 +1182,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Now that we have bound generic parameters from the captured arguments
     // emit the polymorphic arguments.
     if (hasPolymorphicParameters(origType)) {
-      SubstitutionMap subMap;
-      if (auto genericSig = origType->getGenericSignature())
-        subMap = genericSig->getSubstitutionMap(subs);
-      emitPolymorphicArguments(subIGF, origType, subMap,
+      emitPolymorphicArguments(subIGF, origType, subs,
                                &witnessMetadata, polyArgs);
     }
   }
@@ -1333,7 +1328,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 void irgen::emitFunctionPartialApplication(
     IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fn,
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
-    SubstitutionList subs, CanSILFunctionType origType,
+    SubstitutionMap subs, CanSILFunctionType origType,
     CanSILFunctionType substType, CanSILFunctionType outType, Explosion &out,
     bool isOutlined) {
   // If we have a single Swift-refcounted context value, we can adopt it
@@ -1349,11 +1344,8 @@ void irgen::emitFunctionPartialApplication(
   assert(!outType->isNoEscape());
 
   // Reserve space for polymorphic bindings.
-  SubstitutionMap subMap;
-  if (auto genericSig = origType->getGenericSignature())
-    subMap = genericSig->getSubstitutionMap(subs);
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subMap);
+                                                            origType, subs);
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);

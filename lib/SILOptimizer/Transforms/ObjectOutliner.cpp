@@ -473,7 +473,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   FunctionRefInst *FRI = B.createFunctionRef(FindStringCall->getLoc(),
                                              replacementFunc);
   ApplyInst *NewCall = B.createApply(FindStringCall->getLoc(), FRI,
-                                     FindStringCall->getSubstitutions(),
+                                     FindStringCall->getSubstitutionMap(),
                                      { FindStringCall->getArgument(0),
                                        FindStringCall->getArgument(1),
                                        CacheAddr },
