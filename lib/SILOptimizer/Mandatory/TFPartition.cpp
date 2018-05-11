@@ -756,9 +756,12 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   // the using instruction that caused the copy.
   // TODO: Remove this as the stack matures.
   if (!isTensorProgramArgument) {
-    if (auto *inst = value->getDefiningInstruction())
-      llvm::errs() << "IMPLICIT COPY TO ACCEL OF: " << *inst;
-    llvm::errs() << "IMPLICIT COPY TO ACCEL BY: " << *user;
+    if (auto *outs = getTFDumpIntermediateStream()) {
+      if (auto *inst = value->getDefiningInstruction())
+        *outs << "IMPLICIT COPY TO ACCEL OF: " << *inst;
+      *outs << "IMPLICIT COPY TO ACCEL BY: " << *user;
+      outs->flush();
+    }
   }
 
   // Try to determine a good source location to report.
@@ -881,9 +884,12 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
   // Since we're in early development and don't support copies, we always show
   // the using instruction that caused the copy.
   // TODO: Remove this as the stack matures.
-  if (auto *inst = value->getDefiningInstruction())
-    llvm::errs() << "IMPLICIT COPY TO HOST OF: " << *inst;
-  llvm::errs() << "IMPLICIT COPY TO HOST BY: " << *user;
+  if (auto *outs = getTFDumpIntermediateStream()) {
+    if (auto *inst = value->getDefiningInstruction())
+      *outs << "IMPLICIT COPY TO HOST OF: " << *inst;
+    *outs << "IMPLICIT COPY TO HOST BY: " << *user;
+    outs->flush();
+  }
 
   auto &ctx = fn.getModule().getASTContext();
 
