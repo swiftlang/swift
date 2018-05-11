@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -489,8 +489,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
-      diagnose(Loc, diag::candidate_inaccessible,
-               Name, first->getFormalAccess());
+      diagnose(Loc, diag::candidate_inaccessible, Name,
+               first->adjustAccessLevelForProtocolExtension(
+                   first->getFormalAccess()));
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
