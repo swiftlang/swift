@@ -212,7 +212,7 @@ extension MemoryLayout {
   /// result of `offset(of:)` changes to `nil`. That kind of conversion is
   /// non-breaking in other contexts, but would trigger a runtime error if the
   /// result of `offset(of:)` is force-unwrapped.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func offset(of key: PartialKeyPath<T>) -> Int? {
     return key._storedInlineOffset
