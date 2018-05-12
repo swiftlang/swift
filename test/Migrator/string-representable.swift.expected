@@ -12,11 +12,14 @@ func foo(_ c: Container) -> String {
   c.addingAttributes(convertToCitiesContainerAttributeDictionary(["a": "b", "a": "b", "a": "b"]))
   c.adding(attributes: convertToSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
   c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(["a": 1, "a": 2, "a": 3]))
-  _ = Container(optionalAttributes: convertToOptionalSimpleAttributeDictionary(nil))
-  _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray(nil))
+  _ = Container(optionalAttributes: convertToOptionalSimpleAttributeDictionary([:]))
+  _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray([]))
+  _ = Container(optionalAttributes: nil)
+  _ = Container(optionalAttrArray: nil)
   c.adding(attrArray: convertToSimpleAttributeArray(["key1", "key2"]))
   c.add(single: convertToSimpleAttribute(""))
-  c.add(singleOptional: convertToOptionalSimpleAttribute(nil))
+  c.add(singleOptional: convertToOptionalSimpleAttribute(""))
+  c.add(singleOptional: nil)
   _ = convertFromSimpleAttributeDictionary(c.getAttrDictionary())
   _ = convertFromOptionalSimpleAttributeDictionary(c.getOptionalAttrDictionary())
   _ = convertFromSimpleAttribute(c.getSingleAttr())
@@ -36,6 +39,7 @@ func foo(_ c: Container) -> String {
   c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(convertFromOptionalSimpleAttributeDictionary(c.optionalAttrDict)))
   _ = convertFromNewAttribute(AttributeWrapper.NewAttribute)
   c.Value = convertToNewAttribute(convertFromNewAttribute(AttributeWrapper.NewAttribute))
+  c.optionalAttrDict = nil
   return convertFromNewAttribute(c.Value)
 }
 
