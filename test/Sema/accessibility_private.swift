@@ -171,8 +171,10 @@ extension Container {
 extension Container {
   private struct VeryPrivateStruct { // expected-note * {{type declared here}}
     private typealias VeryPrivateType = Int // expected-note * {{type declared here}}
+    private struct VeryPrivateInnerStruct {}
     var privateVar: VeryPrivateType { fatalError() } // expected-error {{property must be declared private because its type uses a private type}}
     var privateVar2 = VeryPrivateType() // expected-error {{property must be declared private because its type 'Container.VeryPrivateStruct.VeryPrivateType' (aka 'Int') uses a private type}}
+    var privateVar3 = VeryPrivateInnerStruct() // expected-error {{property must be declared private because its type 'Container.VeryPrivateStruct.VeryPrivateInnerStruct' uses a private type}}
     typealias PrivateAlias = VeryPrivateType // expected-error {{type alias must be declared private because its underlying type uses a private type}}
     subscript(_: VeryPrivateType) -> Void { return () } // expected-error {{subscript must be declared private because its index uses a private type}}
     func privateMethod(_: VeryPrivateType) -> Void {} // expected-error {{method must be declared private because its parameter uses a private type}} {{none}}
