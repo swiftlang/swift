@@ -2456,23 +2456,6 @@ SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
 /// type, except using the original conventions.
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  SubstitutionList subs) {
-  if (subs.empty()) {
-    assert(
-        (!isPolymorphic() || getGenericSignature()->areAllParamsConcrete()) &&
-        "no args for non-concrete polymorphic substitution");
-    return CanSILFunctionType(this);
-  }
-
-  auto subMap = GenericSig->getSubstitutionMap(subs);
-  return substGenericArgs(silModule, subMap);
-}
-
-/// Apply a substitution to this polymorphic SILFunctionType so that
-/// it has the form of the normal SILFunctionType for the substituted
-/// type, except using the original conventions.
-CanSILFunctionType
-SILFunctionType::substGenericArgs(SILModule &silModule,
                                   const SubstitutionMap &subs) {
   if (!isPolymorphic()) {
     return CanSILFunctionType(this);

@@ -475,7 +475,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 /// It returns None if the decision cannot be made without a more complex
 /// analysis.
 static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
-  assert(!AI.getSubstitutions().empty() &&
+  assert(AI.hasSubstitutions() &&
          "Expected a generic apply");
 
   SILFunction *Callee = AI.getReferencedFunction();
@@ -516,7 +516,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
     FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
     int &NumCallerBlocks,
     const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
-  if (!AI.getSubstitutions().empty()) {
+  if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
     if (ShouldInlineGeneric.hasValue())
@@ -540,7 +540,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
 /// Return true if inlining this call site into a cold block is profitable.
 bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
                                               SILFunction *Callee) {
-  if (!AI.getSubstitutions().empty()) {
+  if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
     if (ShouldInlineGeneric.hasValue())

@@ -1081,8 +1081,8 @@ public:
     };
 
     // Search for opened archetypes and dynamic self.
-    for (auto &Sub : AS.getSubstitutions()) {
-      Sub.getReplacement()->getCanonicalType().visit(HandleType);
+    for (auto Replacement : AS.getSubstitutionMap().getReplacementTypes()) {
+      Replacement->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 

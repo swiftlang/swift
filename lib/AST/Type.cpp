@@ -2766,11 +2766,6 @@ bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(SubstitutionList args) {
-  return substGenericArgs(getGenericSignature()->getSubstitutionMap(args));
-}
-
-FunctionType *
 GenericFunctionType::substGenericArgs(const SubstitutionMap &subs) {
   Type input = getInput().subst(subs);
   Type result = getResult().subst(subs);

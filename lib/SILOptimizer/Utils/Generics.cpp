@@ -290,9 +290,8 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
                      << "Caller: " << Caller->getName() << "\n"
                      << "Callee: " << Callee->getName() << "\n";
         llvm::dbgs() << "Substitutions:\n";
-        for (auto Sub: Apply.getSubstitutions()) {
-          Sub.getReplacement()->dump();
-        });
+        Apply.getSubstitutionMap().dump(llvm::dbgs());
+        );
 
   auto *CurSpecializationInfo = Apply.getSpecializationInfo();
   if (CurSpecializationInfo) {

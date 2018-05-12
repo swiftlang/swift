@@ -1793,9 +1793,6 @@ public:
   }
 
   /// The substitutions used to bind the generic arguments of this function.
-  SubstitutionList getSubstitutions() const { return Substitutions.toList(); }
-
-  /// The substitutions used to bind the generic arguments of this function.
   SubstitutionMap getSubstitutionMap() const { return Substitutions; }
 
   /// Return the total number of operands of this instruction.
@@ -1892,7 +1889,6 @@ public:
   using super::getSubstCalleeType;
   using super::getSubstCalleeConv;
   using super::hasSubstitutions;
-  using super::getSubstitutions;
   using super::getNumArguments;
   using super::getArgument;
   using super::getArguments;
@@ -7701,23 +7697,8 @@ public:
   }
 
   /// The substitutions used to bind the generic arguments of this function.
-  SubstitutionList getSubstitutions() const {
-    FOREACH_IMPL_RETURN(getSubstitutions());
-  }
-
-  /// The substitutions used to bind the generic arguments of this function.
   SubstitutionMap getSubstitutionMap() const {
     FOREACH_IMPL_RETURN(getSubstitutionMap());
-  }
-
-  /// Return a begin iterator for the substitution array.
-  auto subs_begin() const -> decltype(getSubstitutions().begin()) {
-    return getSubstitutions().begin();
-  }
-
-  /// Return an end iterator for the substitution array.
-  auto subs_end() const -> decltype(getSubstitutions().end()) {
-    return getSubstitutions().end();
   }
 
   /// The arguments passed to this instruction.

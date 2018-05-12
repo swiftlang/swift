@@ -441,9 +441,7 @@ getSubstitutionsForCallee(SILModule &M,
         M.getSwiftModule(), baseClassDecl);
   }
 
-  SubstitutionMap origSubMap;
-  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature())
-    origSubMap = origCalleeSig->getSubstitutionMap(AI.getSubstitutions());
+  SubstitutionMap origSubMap = AI.getSubstitutionMap();
 
   Type calleeSelfType = AI.getOrigCalleeType()->getSelfParameter().getType();
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
