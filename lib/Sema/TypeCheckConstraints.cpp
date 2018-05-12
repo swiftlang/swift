@@ -1994,7 +1994,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 }
 
 void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
-    Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
+    Expr *&expr, DeclContext *dc, SmallVectorImpl<Type> &types,
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
@@ -2028,7 +2028,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   for (auto &solution : viable) {
     auto exprType = solution.simplifyType(cs.getType(expr));
     assert(exprType && !exprType->hasTypeVariable());
-    types.insert(exprType.getPointer());
+    types.push_back(exprType);
   }
 }
 
