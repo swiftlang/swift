@@ -927,8 +927,8 @@ ConformanceAndConcreteType::ConformanceAndConcreteType(
   auto ExistentialSig = Ctx.getExistentialSignature(ExistentialType,
                                                     AI.getModule().getSwiftModule());
 
-  Substitution ConcreteSub(ConcreteType, Conformances);
-  auto SubMap = ExistentialSig->getSubstitutionMap({&ConcreteSub, 1});
+  auto SubMap = SubstitutionMap::get(ExistentialSig, { ConcreteType },
+                                     Conformances);
 
   // If the requirement is in a base protocol that is refined by the
   // conforming protocol, fish out the exact conformance for the base

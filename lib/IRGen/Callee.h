@@ -25,7 +25,6 @@
 #include "Signature.h"
 
 namespace swift {
-  class Substitution;
 
 namespace irgen {
   class Callee;

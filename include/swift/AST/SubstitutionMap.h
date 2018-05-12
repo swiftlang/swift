@@ -31,12 +31,8 @@ namespace swift {
 
 class GenericSignature;
 class GenericEnvironment;
-class Substitution;
 class SubstitutableType;
 typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
-
-// FIXME: Soon this will go away.
-using SubstitutionList = ArrayRef<Substitution>;
 
 template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
@@ -109,10 +105,9 @@ public:
   }
 
   /// Build an interface type substitution map for the given generic
-  /// signature and a vector of Substitutions that correspond to the
-  /// requirements of this generic signature.
+  /// signature using the mapping in the given substitutions.
   static SubstitutionMap get(GenericSignature *genericSig,
-                             SubstitutionList substitutions);
+                             SubstitutionMap substitutions);
 
   /// Build an interface type substitution map for the given generic signature
   /// from a type substitution function and conformance lookup function.
@@ -195,14 +190,6 @@ public:
                            GenericSignature *baseSig,
                            GenericSignature *derivedSig,
                            Optional<SubstitutionMap> derivedSubs);
-
-  /// Produce a substitution list for the given substitution map.
-  ///
-  /// Note: we are moving away from using Substitutions, so this should only
-  /// be used at the edges where part of the compiler is still working
-  /// directly with Substitution/SubstitutionList and hasn't been converted
-  /// to SubstitutionMap.
-  SubstitutionList toList() const;
 
   /// Combine two substitution maps as follows.
   ///

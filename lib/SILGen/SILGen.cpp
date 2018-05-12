@@ -1264,7 +1264,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
     return;
   }
   
-  SubstitutionMap subs = {};
+  SubstitutionMap subs;
   if (genericEnv)
     subs = genericEnv->getForwardingSubstitutionMap();
   
