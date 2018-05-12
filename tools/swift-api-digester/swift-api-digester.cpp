@@ -622,7 +622,8 @@ void SDKNode::removeChild(NodePtr C) {
 }
 
 void SDKNode::annotate(NodeAnnotation Anno, StringRef Comment) {
-  assert(!isAnnotatedAs(Anno) && "already annotated");
+  assert(!Comment.empty());
+  assert(!isAnnotatedAs(Anno) || AnnotateComments[Anno] == Comment);
   annotate(Anno);
   AnnotateComments[Anno] = Comment;
 }
@@ -2357,8 +2358,8 @@ static void detectFuncDeclChange(NodePtr L, NodePtr R) {
 }
 
 static void detectRename(NodePtr L, NodePtr R) {
-  assert(L->getKind() == R->getKind());
-  if (isa<SDKNodeDecl>(L) && L->getPrintedName() != R->getPrintedName()) {
+  if (L->getKind() == R->getKind() && isa<SDKNodeDecl>(L) &&
+      L->getPrintedName() != R->getPrintedName()) {
     L->annotate(NodeAnnotation::Rename);
     L->annotate(NodeAnnotation::RenameOldName, L->getPrintedName());
     L->annotate(NodeAnnotation::RenameNewName, R->getPrintedName());
