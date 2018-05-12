@@ -174,7 +174,10 @@ extension _SwiftStringStorage {
   @inlinable
   @nonobjc
   var unusedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
-    return UnsafeMutableBufferPointer(start: end, count: capacity - count)
+    @inline(__always)
+    get {
+      return UnsafeMutableBufferPointer(start: end, count: capacity - count)
+    }
   }
 
   @inlinable
