@@ -18,6 +18,7 @@
 #include "ConstraintGraph.h"
 #include "ConstraintGraphScope.h"
 #include "ConstraintSystem.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -26,6 +27,8 @@
 
 using namespace swift;
 using namespace constraints;
+
+#define DEBUG_TYPE "ConstraintGraph"
 
 #pragma mark Graph construction/destruction
 
@@ -650,7 +653,9 @@ static bool shouldContractEdge(ConstraintKind kind) {
 
 bool ConstraintGraph::contractEdges() {
   SmallVector<Constraint *, 16> constraints;
-  CS.findConstraints(constraints, [](const Constraint &constraint) {
+  CS.findConstraints(constraints, [&](const Constraint &constraint) {
+    // Track how many constraints did contraction algorithm iterated over.
+    incrementConstraintsPerContractionCounter();
     return shouldContractEdge(constraint.getKind());
   });
 
@@ -765,6 +770,14 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
 void ConstraintGraph::optimize() {
   // Merge equivalence classes until a fixed point is reached.
   while (contractEdges()) {}
+}
+
+void ConstraintGraph::incrementConstraintsPerContractionCounter() {
+  SWIFT_FUNC_STAT;
+  auto &context = CS.getASTContext();
+  if (context.Stats)
+    context.Stats->getFrontendCounters()
+        .NumConstraintsConsideredForEdgeContraction++;
 }
 
 #pragma mark Debugging output
