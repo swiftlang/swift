@@ -179,13 +179,6 @@ bool SILType::isAddressOnly(SILModule &M) const {
 }
 
 SILType SILType::substGenericArgs(SILModule &M,
-                                  SubstitutionList Subs) const {
-  auto fnTy = castTo<SILFunctionType>();
-  auto canFnTy = CanSILFunctionType(fnTy->substGenericArgs(M, Subs));
-  return SILType::getPrimitiveObjectType(canFnTy);
-}
-
-SILType SILType::substGenericArgs(SILModule &M,
                                   const SubstitutionMap &SubMap) const {
   auto fnTy = castTo<SILFunctionType>();
   auto canFnTy = CanSILFunctionType(fnTy->substGenericArgs(M, SubMap));

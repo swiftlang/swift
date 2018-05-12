@@ -3707,7 +3707,7 @@ CallEmission::applyNormalCall(SGFContext C) {
   // Emit the uncurried call.
   firstLevelResult.value = SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
-      callee.getSubstitutions().toList(), uncurriedArgs, calleeTypeInfo, options,
+      callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
       uncurriedContext);
   firstLevelResult.foreignSelf = calleeTypeInfo.foreignSelf;
   return firstLevelResult;
@@ -4096,7 +4096,7 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, Expr *e) {
 /// formal type.
 RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                                  ArgumentScope &&argScope, SILLocation loc,
-                                 ManagedValue fn, SubstitutionList subs,
+                                 ManagedValue fn, SubstitutionMap subs,
                                  ArrayRef<ManagedValue> args,
                                  const CalleeTypeInfo &calleeTypeInfo,
                                  ApplyOptions options, SGFContext evalContext) {
@@ -4162,9 +4162,12 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
   auto genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
-  auto subMap = genericSig->getSubstitutionMap(subs);
+  if (genericSig != subs.getGenericSignature()) {
+    subs = genericSig->getSubstitutionMap(subs.toList());
+  }
+
   SILValue rawDirectResult = emitRawApply(
-      *this, loc, fn, subMap, args, substFnType, options, indirectResultAddrs);
+      *this, loc, fn, subs, args, substFnType, options, indirectResultAddrs);
 
   // Pop the argument scope.
   argScope.pop();
@@ -4456,29 +4459,14 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   SILFunctionConventions silConv(calleeTypeInfo.substFnType, getModule());
   llvm::SmallVector<ManagedValue, 8> finalArgs;
-  convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(), args, loc, finalArgs);
-
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = fn->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
+  convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(),
+                                             args, loc, finalArgs);
 
   ResultPlanPtr resultPlan =
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subs,
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subMap,
                    finalArgs, calleeTypeInfo, ApplyOptions::None, ctx);
-}
-
-RValue
-SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
-                                            FuncDecl *fn,
-                                            const SubstitutionList &subs,
-                                            ArrayRef<ManagedValue> args,
-                                            SGFContext ctx) {
-  SubstitutionMap subMap;
-  if (auto genericSig = fn->getGenericSignature())
-    subMap = genericSig->getSubstitutionMap(subs);
-  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, ctx);
 }
 
 static StringRef
@@ -4809,24 +4797,16 @@ static Callee
 emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                    SILLocation loc,
                                    SILDeclRef constant,
-                                   SubstitutionList substitutions,
+                                   SubstitutionMap substitutions,
                                    ArgumentSource &selfValue,
                                    bool isSuper,
                                    bool isDirectUse)
 {
-  // Convert the substitution list into a substitution map.
-  auto origAccessType = SGF.SGM.Types.getConstantInfo(constant).FormalType;
-  SubstitutionMap subMap;
-  if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType)) {
-    auto genericSig = genericFnType.getGenericSignature();
-    subMap = genericSig->getSubstitutionMap(substitutions);;
-  }
-
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
                                              isSuper, isDirectUse,
-                                             subMap);
+                                             substitutions);
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
@@ -5028,7 +5008,7 @@ SILDeclRef SILGenModule::getGetterDeclRef(AbstractStorageDecl *storage) {
 /// Emit a call to a getter.
 RValue SILGenFunction::
 emitGetAccessor(SILLocation loc, SILDeclRef get,
-                SubstitutionList substitutions,
+                SubstitutionMap substitutions,
                 ArgumentSource &&selfValue,
                 bool isSuper, bool isDirectUse,
                 RValue &&subscripts, SGFContext c) {
@@ -5065,7 +5045,7 @@ SILDeclRef SILGenModule::getSetterDeclRef(AbstractStorageDecl *storage) {
 }
 
 void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
-                                     SubstitutionList substitutions,
+                                     SubstitutionMap substitutions,
                                      ArgumentSource &&selfValue,
                                      bool isSuper, bool isDirectUse,
                                      RValue &&subscripts,
@@ -5138,7 +5118,7 @@ SILGenModule::getMaterializeForSetDeclRef(AbstractStorageDecl *storage) {
 
 MaterializedLValue SILGenFunction::
 emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                              SubstitutionList substitutions,
+                              SubstitutionMap substitutions,
                               ArgumentSource &&selfValue,
                               bool isSuper, bool isDirectUse,
                               RValue &&subscripts, SILValue buffer,
@@ -5223,7 +5203,7 @@ SILDeclRef SILGenModule::getAddressorDeclRef(AbstractStorageDecl *storage,
 /// pointer, if applicable.
 std::pair<ManagedValue, ManagedValue> SILGenFunction::
 emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                      SubstitutionList substitutions,
+                      SubstitutionMap substitutions,
                       ArgumentSource &&selfValue,
                       bool isSuper, bool isDirectUse,
                       RValue &&subscripts, SILType addressType) {

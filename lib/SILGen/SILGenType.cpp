@@ -696,7 +696,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       if (SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
                                               selfInterfaceType, selfType,
                                               genericEnv, reqFn, witnessFn,
-                                              witnessSubs.toList()))
+                                              witnessSubs))
         return f;
 
       // Proceed down the normal path.

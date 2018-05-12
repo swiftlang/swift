@@ -2655,8 +2655,7 @@ buildThunkSignature(SILGenFunction &SGF,
   if (openedExistential == nullptr) {
     auto genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = SGF.F.getGenericEnvironment();
-    auto subsArray = SGF.F.getForwardingSubstitutions();
-    interfaceSubs = genericSig->getSubstitutionMap(subsArray);
+    interfaceSubs = SGF.F.getForwardingSubstitutionMap();
     contextSubs = interfaceSubs;
     return genericSig;
   }
@@ -3015,7 +3014,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   }
 
   CanSILFunctionType substFnType = thunkType->substGenericArgs(
-      F.getModule(), thunk->getForwardingSubstitutions());
+      F.getModule(), thunk->getForwardingSubstitutionMap());
 
   // Create it in our current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);

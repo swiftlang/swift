@@ -232,19 +232,21 @@ public:
 
 } // anonymous namespace
 
-/// Checks if a second substitution list is an expanded version of
-/// the first substitution list.
+/// Checks if a second substitution map is an expanded version of
+/// the first substitution map.
 /// This is the case if at least one of the substitution type in Subs2 is
 /// "bigger" than the corresponding substitution type in Subs1.
 /// Type T2 is "smaller" than type T1 if T2 is structurally contained in T1.
-static bool growingSubstitutions(SubstitutionList Subs1,
-                                 SubstitutionList Subs2) {
-  assert(Subs1.size() == Subs2.size());
+static bool growingSubstitutions(SubstitutionMap Subs1,
+                                 SubstitutionMap Subs2) {
+  auto Replacements1 = Subs1.getReplacementTypes();
+  auto Replacements2 = Subs2.getReplacementTypes();
+  assert(Replacements1.size() == Replacements2.size());
   TypeComparator TypeCmp;
   // Perform component-wise comparisions for substitutions.
-  for (unsigned idx = 0, e = Subs1.size(); idx < e; ++idx) {
-    auto Type1 = Subs1[idx].getReplacement()->getCanonicalType();
-    auto Type2 = Subs2[idx].getReplacement()->getCanonicalType();
+  for (unsigned idx : indices(Replacements1)) {
+    auto Type1 = Replacements1[idx]->getCanonicalType();
+    auto Type2 = Replacements2[idx]->getCanonicalType();
     // If types are the same, the substitution type does not grow.
     if (TypeCmp.isEqual(Type2, Type1))
       continue;
@@ -255,7 +257,7 @@ static bool growingSubstitutions(SubstitutionList Subs1,
     if (TypeCmp.isPartiallyContainedIn(Type1, Type2)) {
       DEBUG(llvm::dbgs() << "Type:\n"; Type1.dump();
             llvm::dbgs() << "is (partially) contained in type:\n"; Type2.dump();
-            llvm::dbgs() << "SubstitutionList[" << idx
+            llvm::dbgs() << "Replacements[" << idx
                          << "] has got bigger since last time.\n");
       return true;
     }
@@ -288,9 +290,8 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
                      << "Caller: " << Caller->getName() << "\n"
                      << "Callee: " << Callee->getName() << "\n";
         llvm::dbgs() << "Substitutions:\n";
-        for (auto Sub: Apply.getSubstitutions()) {
-          Sub.getReplacement()->dump();
-        });
+        Apply.getSubstitutionMap().dump(llvm::dbgs());
+        );
 
   auto *CurSpecializationInfo = Apply.getSpecializationInfo();
   if (CurSpecializationInfo) {
@@ -317,8 +318,8 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
       DEBUG(llvm::dbgs() << "Found a call graph loop, checking substitutions\n");
       // Consider if components of the substitution list gets bigger compared to
       // the previously seen specialization of the same generic function.
-      if (growingSubstitutions(CurSpecializationInfo->getSubstitutions().toList(),
-                               Apply.getSubstitutions())) {
+      if (growingSubstitutions(CurSpecializationInfo->getSubstitutions(),
+                               Apply.getSubstitutionMap())) {
         DEBUG(llvm::dbgs() << "Found a generic specialization loop!\n");
         return true;
       }
@@ -346,11 +347,11 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 // =============================================================================
 
 static bool shouldNotSpecializeCallee(SILFunction *Callee,
-                                      SubstitutionList Subs = {}) {
+                                      SubstitutionMap Subs = {}) {
   if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
     return true;
 
-  if (!Subs.empty() &&
+  if (Subs.hasAnySubstitutableParams() &&
       Callee->hasSemanticsAttr("optimize.sil.specialize.generic.partial.never"))
     return true;
 
@@ -467,7 +468,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       return false;
 
     // Bail if the callee should not be partially specialized.
-    if (shouldNotSpecializeCallee(Callee, ParamSubs.toList()))
+    if (shouldNotSpecializeCallee(Callee, ParamSubs))
       return false;
   }
 
@@ -978,7 +979,6 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature *Sig,
 /// really used?
 static bool
 shouldBePartiallySpecialized(Type Replacement,
-                             ArrayRef<ProtocolConformanceRef> Conformances,
                              GenericSignature *Sig, GenericEnvironment *Env) {
   // If replacement is a concrete type, this substitution
   // should participate.
@@ -1024,8 +1024,8 @@ shouldBePartiallySpecialized(Type Replacement,
 
   if (OptimizeGenericSubstitutions) {
     // Is it an unconstrained generic parameter?
-    if (Conformances.empty()) {
-      if (Replacement->is<ArchetypeType>()) {
+    if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
+      if (Archetype->getConformsTo().empty()) {
         // TODO: If Replacement add a new layout constraint, then
         // it may be still useful to perform the partial specialization.
         return false;
@@ -1066,7 +1066,7 @@ class FunctionSignaturePartialSpecializer {
   SubstitutionMap CallerInterfaceToSpecializedInterfaceMap;
 
   /// Maps callee's interface types to caller's contextual types.
-  /// It is computed from the original SubstitutionList.
+  /// It is computed from the original substitutions.
   SubstitutionMap CalleeInterfaceToCallerArchetypeMap;
 
   /// Maps callee's interface types to specialized functions interface types.
@@ -1128,7 +1128,7 @@ class FunctionSignaturePartialSpecializer {
   /// Take into account only those archetypes that occur in the
   /// substitutions of generic parameters which will be partially
   /// specialized. Ignore all others.
-  void collectUsedCallerArchetypes(SubstitutionList ParamSubs);
+  void collectUsedCallerArchetypes(SubstitutionMap ParamSubs);
 
   /// Create a new generic parameter.
   GenericTypeParamType *createGenericParam();
@@ -1139,15 +1139,14 @@ public:
                                       GenericEnvironment *CallerGenericEnv,
                                       GenericSignature *CalleeGenericSig,
                                       GenericEnvironment *CalleeGenericEnv,
-                                      SubstitutionList ParamSubs)
+                                      SubstitutionMap ParamSubs)
       : CallerGenericSig(CallerGenericSig), CallerGenericEnv(CallerGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
         Builder(Ctx) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
-    CalleeInterfaceToCallerArchetypeMap =
-      CalleeGenericSig->getSubstitutionMap(ParamSubs);
+    CalleeInterfaceToCallerArchetypeMap = ParamSubs;
   }
 
   /// This constructor is used by when processing @_specialize.
@@ -1194,7 +1193,7 @@ public:
     return SpecializedGenericEnv;
   }
 
-  void createSpecializedGenericSignature(SubstitutionList ParamSubs);
+  void createSpecializedGenericSignature(SubstitutionMap ParamSubs);
 
   void createSpecializedGenericSignatureWithNonGenericSubs();
 
@@ -1217,16 +1216,15 @@ FunctionSignaturePartialSpecializer::createGenericParam() {
 
 /// Collect all used caller's archetypes from all the substitutions.
 void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
-    SubstitutionList ParamSubs) {
-  for (auto Sub : ParamSubs) {
-    auto Replacement = Sub.getReplacement();
+    SubstitutionMap ParamSubs) {
+  for (auto Replacement : ParamSubs.getReplacementTypes()) {
     if (!Replacement->hasArchetype())
       continue;
 
     // If the substitution will not be performed in the specialized
     // function, there is no need to check for any archetypes inside
     // the replacement.
-    if (!shouldBePartiallySpecialized(Replacement, Sub.getConformances(),
+    if (!shouldBePartiallySpecialized(Replacement,
                                       CallerGenericSig, CallerGenericEnv))
       continue;
 
@@ -1350,7 +1348,7 @@ void FunctionSignaturePartialSpecializer::
     DEBUG(llvm::dbgs() << "Replacement found:\n"; Replacement->dump());
 
     bool ShouldSpecializeGP = shouldBePartiallySpecialized(
-        Replacement, {}, CallerGenericSig, CallerGenericEnv);
+        Replacement, CallerGenericSig, CallerGenericEnv);
 
     if (ShouldSpecializeGP) {
       DEBUG(llvm::dbgs() << "Should be partially specialized.\n");
@@ -1559,7 +1557,7 @@ void FunctionSignaturePartialSpecializer::
 }
 
 void FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
-    SubstitutionList ParamSubs) {
+    SubstitutionMap ParamSubs) {
   // Collect all used caller's archetypes from all the substitutions.
   collectUsedCallerArchetypes(ParamSubs);
 
@@ -1644,11 +1642,11 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
   FunctionSignaturePartialSpecializer FSPS(M,
                                            CallerGenericSig, CallerGenericEnv,
                                            CalleeGenericSig, CalleeGenericEnv,
-                                           ParamSubs.toList());
+                                           ParamSubs);
 
   // Create the partially specialized generic signature and generic environment.
   if (SupportGenericSubstitutions)
-    FSPS.createSpecializedGenericSignature(ParamSubs.toList());
+    FSPS.createSpecializedGenericSignature(ParamSubs);
   else
     FSPS.createSpecializedGenericSignatureWithNonGenericSubs();
 

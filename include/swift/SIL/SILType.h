@@ -439,13 +439,6 @@ public:
   ///
   /// Only call this with function types!
   SILType substGenericArgs(SILModule &M,
-                           SubstitutionList Subs) const;
-
-  /// Transform the function type SILType by replacing all of its interface
-  /// generic args with the appropriate item from the substitution.
-  ///
-  /// Only call this with function types!
-  SILType substGenericArgs(SILModule &M,
                            const SubstitutionMap &SubMap) const;
 
   /// If the original type is generic, pass the signature as genericSig.

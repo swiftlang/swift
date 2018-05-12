@@ -225,15 +225,6 @@ SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
     MakeAbstractConformanceForGenericType());
 }
 
-SubstitutionList
-GenericEnvironment::getForwardingSubstitutions() const {
-  auto *genericSig = getGenericSignature();
-
-  SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(getForwardingSubstitutionMap(), result);
-  return genericSig->getASTContext().AllocateCopy(result);
-}
-
 std::pair<Type, ProtocolConformanceRef>
 GenericEnvironment::mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
                                            Type conformingType,

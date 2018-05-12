@@ -41,13 +41,13 @@ namespace irgen {
 
     /// The archetype substitutions under which the function is being
     /// called.
-    std::vector<Substitution> Substitutions;
+    SubstitutionMap Substitutions;
 
     CalleeInfo(CanSILFunctionType origFnType,
                CanSILFunctionType substFnType,
-               SubstitutionList substitutions)
+               SubstitutionMap substitutions)
       : OrigFnType(origFnType), SubstFnType(substFnType),
-        Substitutions(substitutions.begin(), substitutions.end()) {
+        Substitutions(substitutions) {
     }
   };
 
@@ -159,8 +159,11 @@ namespace irgen {
       return Info.SubstFnType;
     }
 
-    bool hasSubstitutions() const { return !Info.Substitutions.empty(); }
-    SubstitutionList getSubstitutions() const { return Info.Substitutions; }
+    bool hasSubstitutions() const {
+      return Info.Substitutions.hasAnySubstitutableParams();
+    }
+    
+    SubstitutionMap getSubstitutions() const { return Info.Substitutions; }
 
     const FunctionPointer &getFunctionPointer() const { return Fn; }
 

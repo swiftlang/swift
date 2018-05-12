@@ -322,13 +322,6 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 
-bool swift::hasArchetypes(SubstitutionList Subs) {
-  // Check whether any of the substitutions are dependent.
-  return llvm::any_of(Subs, [](const Substitution &S) {
-    return S.getReplacement()->hasArchetype();
-  });
-}
-
 bool swift::mayBindDynamicSelf(SILFunction *F) {
   if (!F->hasSelfMetadataParam())
     return false;

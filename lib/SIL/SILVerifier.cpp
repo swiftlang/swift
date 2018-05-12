@@ -1081,8 +1081,8 @@ public:
     };
 
     // Search for opened archetypes and dynamic self.
-    for (auto &Sub : AS.getSubstitutions()) {
-      Sub.getReplacement()->getCanonicalType().visit(HandleType);
+    for (auto Replacement : AS.getSubstitutionMap().getReplacementTypes()) {
+      Replacement->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 
@@ -2440,7 +2440,7 @@ public:
 
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
-      auto subs = env->getForwardingSubstitutions();
+      auto subs = env->getForwardingSubstitutionMap();
       methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
