@@ -3057,10 +3057,6 @@ public:
                               
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  FunctionType *substGenericArgs(SubstitutionList subs);
-
-  /// Substitute the given generic arguments into this generic
-  /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(const SubstitutionMap &subs);
 
   /// Substitute the given generic arguments into this generic
@@ -4036,8 +4032,6 @@ public:
   ABICompatibilityCheckResult
   isABICompatibleWith(CanSILFunctionType other) const;
 
-  CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      SubstitutionList subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       const SubstitutionMap &subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,

@@ -372,14 +372,14 @@ void SILDeclRef::dump() const {
 static void printGenericSpecializationInfo(
     raw_ostream &OS, StringRef Kind, StringRef Name,
     const GenericSpecializationInformation *SpecializationInfo,
-    SubstitutionList Subs = SubstitutionList()) {
+    SubstitutionMap Subs = { }) {
   if (!SpecializationInfo)
     return;
 
-  auto PrintSubstitutions = [&](SubstitutionList Subs) {
+  auto PrintSubstitutions = [&](SubstitutionMap Subs) {
     OS << '<';
-    interleave(Subs,
-               [&](const Substitution &s) { OS << s.getReplacement(); },
+    interleave(Subs.getReplacementTypes(),
+               [&](Type type) { OS << type; },
                [&] { OS << ", "; });
     OS << '>';
   };
@@ -396,7 +396,7 @@ static void printGenericSpecializationInfo(
     OS << "// Caller: " << SpecializationInfo->getCaller()->getName() << '\n';
     OS << "// Parent: " << SpecializationInfo->getParent()->getName() << '\n';
     OS << "// Substitutions: ";
-    PrintSubstitutions(SpecializationInfo->getSubstitutions().toList());
+    PrintSubstitutions(SpecializationInfo->getSubstitutions());
     OS << '\n';
     OS << "//\n";
     if (!SpecializationInfo->getCaller()->isSpecialization())
@@ -638,7 +638,7 @@ public:
           if (AI.getSpecializationInfo() && AI.getCalleeFunction())
             printGenericSpecializationInfo(
                 PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
-                AI.getSpecializationInfo(), AI.getSubstitutions());
+                AI.getSpecializationInfo(), AI.getSubstitutionMap());
       }
       print(&I);
     }

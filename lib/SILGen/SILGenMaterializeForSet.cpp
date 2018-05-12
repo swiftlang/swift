@@ -235,7 +235,7 @@ struct MaterializeForSetEmitter {
   AccessorDecl *Witness;
   AbstractStorageDecl *WitnessStorage;
   AbstractionPattern WitnessStoragePattern;
-  SubstitutionList WitnessSubs;
+  SubstitutionMap WitnessSubs;
 
   CanGenericSignature GenericSig;
   GenericEnvironment *GenericEnv;
@@ -261,7 +261,7 @@ struct MaterializeForSetEmitter {
 private:
   MaterializeForSetEmitter(
       SILGenModule &SGM, SILLinkage linkage, AccessorDecl *witness,
-      SubstitutionList subs, GenericEnvironment *genericEnv,
+      SubstitutionMap subs, GenericEnvironment *genericEnv,
       Type selfInterfaceType, Type selfType,
       SILFunctionTypeRepresentation callbackRepresentation,
       Optional<ProtocolConformanceRef> witnessMethodConformance)
@@ -306,7 +306,7 @@ public:
   forWitnessThunk(SILGenModule &SGM, ProtocolConformanceRef conformance,
                   SILLinkage linkage, Type selfInterfaceType, Type selfType,
                   GenericEnvironment *genericEnv, AccessorDecl *requirement,
-                  AccessorDecl *witness, SubstitutionList witnessSubs) {
+                  AccessorDecl *witness, SubstitutionMap witnessSubs) {
     MaterializeForSetEmitter emitter(
         SGM, linkage, witness, witnessSubs, genericEnv, selfInterfaceType,
         selfType, SILFunctionTypeRepresentation::WitnessMethod, conformance);
@@ -330,7 +330,7 @@ public:
   static MaterializeForSetEmitter
   forConcreteImplementation(SILGenModule &SGM,
                             AccessorDecl *witness,
-                            SubstitutionList witnessSubs) {
+                            SubstitutionMap witnessSubs) {
     auto *dc = witness->getDeclContext();
     Type selfInterfaceType = dc->getSelfInterfaceType();
     Type selfType = witness->mapTypeIntoContext(selfInterfaceType);
@@ -530,8 +530,8 @@ public:
   /// substitution according to the witness substitutions.
   CanType getSubstWitnessInterfaceType(CanType type) {
     if (auto *witnessSig = Witness->getGenericSignature()) {
-      auto subMap = witnessSig->getSubstitutionMap(WitnessSubs);
-      return type.subst(subMap, SubstFlags::UseErrorType)->getCanonicalType();
+      return type.subst(WitnessSubs, SubstFlags::UseErrorType)
+          ->getCanonicalType();
     }
 
     return type;
@@ -1029,7 +1029,7 @@ bool SILGenFunction::maybeEmitMaterializeForSetThunk(
     ProtocolConformanceRef conformance, SILLinkage linkage,
     Type selfInterfaceType, Type selfType, GenericEnvironment *genericEnv,
     AccessorDecl *requirement, AccessorDecl *witness,
-    SubstitutionList witnessSubs) {
+    SubstitutionMap witnessSubs) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forWitnessThunk(
@@ -1051,6 +1051,6 @@ void SILGenFunction::emitMaterializeForSet(AccessorDecl *decl) {
 
   MaterializeForSetEmitter emitter
     = MaterializeForSetEmitter::forConcreteImplementation(
-        SGM, decl, getForwardingSubstitutions());
+        SGM, decl, getForwardingSubstitutionMap());
   emitter.emit(*this);
 }

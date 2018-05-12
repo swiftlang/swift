@@ -441,9 +441,7 @@ getSubstitutionsForCallee(SILModule &M,
         M.getSwiftModule(), baseClassDecl);
   }
 
-  SubstitutionMap origSubMap;
-  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature())
-    origSubMap = origCalleeSig->getSubstitutionMap(AI.getSubstitutions());
+  SubstitutionMap origSubMap = AI.getSubstitutionMap();
 
   Type calleeSelfType = AI.getOrigCalleeType()->getSelfParameter().getType();
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
@@ -765,7 +763,7 @@ swift::tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
 /// \param conformanceRef The (possibly-specialized) conformance
 /// \param requirementSig The generic signature of the requirement
 /// \param witnessThunkSig The generic signature of the witness method
-/// \param origSubs The substitutions from the call instruction
+/// \param origSubMap The substitutions from the call instruction
 /// \param isDefaultWitness True if this is a default witness method
 /// \param classWitness The ClassDecl if this is a class witness method
 static SubstitutionMap
@@ -774,14 +772,12 @@ getWitnessMethodSubstitutions(
     ProtocolConformanceRef conformanceRef,
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
-    SubstitutionList origSubs,
+    SubstitutionMap origSubMap,
     bool isDefaultWitness,
     ClassDecl *classWitness) {
 
   if (witnessThunkSig == nullptr)
     return SubstitutionMap();
-
-  auto origSubMap = requirementSig->getSubstitutionMap(origSubs);
 
   if (isDefaultWitness)
     return origSubMap;
@@ -841,7 +837,7 @@ getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
   auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
   auto witnessThunkSig = witnessFnTy->getGenericSignature();
 
-  SubstitutionList origSubs = AI.getSubstitutions();
+  SubstitutionMap origSubs = AI.getSubstitutionMap();
 
   auto *mod = Module.getSwiftModule();
   bool isDefaultWitness =

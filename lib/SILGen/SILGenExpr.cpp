@@ -1129,7 +1129,7 @@ static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
 static RValue
 emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                        AbstractStorageDecl *storage,
-                       SubstitutionList substitutions,
+                       SubstitutionMap substitutions,
                        ArgumentSource &&baseRV, RValue &&subscriptRV,
                        bool isSuper, AccessStrategy strategy,
                        SILDeclRef accessor,
@@ -1204,7 +1204,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
 RValue SILGenFunction::emitRValueForStorageLoad(
     SILLocation loc, ManagedValue base, CanType baseFormalType,
     bool isSuper, AbstractStorageDecl *storage, RValue indexes,
-    SubstitutionList substitutions,
+    SubstitutionMap substitutions,
     AccessSemantics semantics, Type propTy, SGFContext C,
     bool isBaseGuaranteed) {
   AccessStrategy strategy =
@@ -2498,8 +2498,7 @@ private:
       SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                    Expr->isSuper(),
                                    Field, {},
-                                   Expr->getMember().getSubstitutions()
-                                     .toList(),
+                                   Expr->getMember().getSubstitutions(),
                                    Expr->getAccessSemantics(),
                                    Expr->getType(), Context);
     return result;
@@ -2541,8 +2540,7 @@ private:
         SGF.emitRValueForStorageLoad(Expr, base, baseFormalType,
                                      Expr->isSuper(),
                                      Field, {},
-                                     Expr->getMember().getSubstitutions()
-                                       .toList(),
+                                     Expr->getMember().getSubstitutions(),
                                      Expr->getAccessSemantics(),
                                      Expr->getType(), Context,
                                      base.isPlusZeroRValueOrTrivial());
@@ -2651,13 +2649,13 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs.toList(), {}, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
     SILLocation loc,
     const PatternBindingEntry &entry,
-    SubstitutionList subs,
+    SubstitutionMap subs,
     CanType resultType,
     AbstractionPattern origResultType,
     SGFContext C) {
@@ -2673,8 +2671,8 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C);
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
+                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -2999,8 +2997,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
                       SILLocation loc,
                       SILValue paramArg,
                       CanType &baseType,
-                      SubstitutionList &subs,
-                      SmallVectorImpl<Substitution> &subsBuf) {
+                      SubstitutionMap subs) {
   // If the storage is at global scope, then the base value () is a formality.
   // There no real argument to pass to the underlying accessors.
   if (!storage->getDeclContext()->isTypeContext())
@@ -3026,7 +3023,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     if (storage->getDeclContext()->getAsClassOrClassExtensionContext()) {
       opened = ArchetypeType::getOpened(baseType);
     } else {
-      opened = subs[0].getReplacement()->castTo<ArchetypeType>();
+      opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
     }
     assert(opened->isOpenedExistential());
     
@@ -3104,7 +3101,7 @@ static RValue loadIndexValuesForKeyPathComponent(SILGenFunction &SGF,
 static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          SILLocation loc,
                          AbstractStorageDecl *property,
-                         SubstitutionList subs,
+                         SubstitutionMap subs,
                          AccessStrategy strategy,
                          GenericEnvironment *genericEnv,
                          ArrayRef<IndexTypePair> indexes,
@@ -3152,10 +3149,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   
   // Find the function and see if we already created it.
   SmallVector<CanType, 2> interfaceSubs;
-  for (auto &sub : subs) {
+  for (auto replacement : subs.getReplacementTypes()) {
     interfaceSubs.push_back(
-      sub.getReplacement()->mapTypeOutOfContext()
-      ->getCanonicalType());
+        replacement->mapTypeOutOfContext()->getCanonicalType());
   }
   auto name = Mangle::ASTMangler()
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
@@ -3193,11 +3189,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   
   Scope scope(subSGF, loc);
   
-  SmallVector<Substitution, 2> subsBuf;
-  
   auto baseSubstValue = emitKeyPathRValueBase(subSGF, property,
                                                loc, baseArg,
-                                               baseType, subs, subsBuf);
+                                               baseType, subs);
   
   RValue indexValue = loadIndexValuesForKeyPathComponent(subSGF, loc,
                                                          indexes,
@@ -3225,7 +3219,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           SILLocation loc,
                           AbstractStorageDecl *property,
-                          SubstitutionList subs,
+                          SubstitutionMap subs,
                           AccessStrategy strategy,
                           GenericEnvironment *genericEnv,
                           ArrayRef<IndexTypePair> indexes,
@@ -3280,10 +3274,9 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   SmallString<64> nameBuf;
   
   SmallVector<CanType, 2> interfaceSubs;
-  for (auto &sub : subs) {
+  for (Type replacement : subs.getReplacementTypes()) {
     interfaceSubs.push_back(
-      sub.getReplacement()->mapTypeOutOfContext()
-      ->getCanonicalType());
+        replacement->mapTypeOutOfContext()->getCanonicalType());
   }
   auto name = Mangle::ASTMangler().mangleKeyPathSetterThunkHelper(property,
                                                                 genericSig,
@@ -3338,12 +3331,11 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                                                 propertyType);
   
   LValue lv;
-  SmallVector<Substitution, 2> subsBuf;
 
   if (!property->isSetterMutating()) {
     auto baseSubst = emitKeyPathRValueBase(subSGF, property,
                                            loc, baseArg,
-                                           baseType, subs, subsBuf);
+                                           baseType, subs);
 
     lv = LValue::forValue(baseSubst, baseType);
   } else {
@@ -3354,7 +3346,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     
     // Open an existential lvalue, if necessary.
     if (baseType->isAnyExistentialType()) {
-      auto opened = subs[0].getReplacement()->castTo<ArchetypeType>();
+      auto opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
       assert(opened->isOpenedExistential());
       baseType = opened->getCanonicalType();
       lv = subSGF.emitOpenExistentialLValue(loc, std::move(lv),
@@ -3555,13 +3547,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         auto equalsResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           equalsInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        SmallVector<Substitution, 1> equatableSubListBuf;
-        equatableProtocol->getGenericSignature()
-          ->getSubstitutions(equatableSub, equatableSubListBuf);
         isEqual = subSGF
           .emitApply(std::move(equalsResultPlan), std::move(argScope),
                      loc, ManagedValue::forUnmanaged(equalsWitness),
-                     C.AllocateCopy(equatableSubListBuf),
+                     equatableSub,
                      {lhsArg, rhsArg, metatyValue},
                      equalsInfo, ApplyOptions::None, SGFContext())
           .getUnmanagedSingleValue(subSGF, loc);
@@ -3656,23 +3645,31 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       
       auto formalTy = index.FormalType;
       auto hashable = index.Hashable;
+      SubstitutionMap hashableSubsMap;
       if (genericEnv) {
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
           LookUpConformanceInSignature(*genericSig));
       }
-      
-      // Get the Equatable conformance from the Hashable conformance
-      auto hashableSub = Substitution(formalTy,
-                   C.AllocateCopy(ArrayRef<ProtocolConformanceRef>(hashable)));
+
+      if (auto genericSig =
+              hashTy.castTo<SILFunctionType>()->getGenericSignature()) {
+        hashableSubsMap =
+            genericSig->getSubstitutionMap(
+              [&](SubstitutableType *type) -> Type { return formalTy; },
+              [&](CanType dependentType, Type replacementType,
+                  ProtocolType *protoType)->Optional<ProtocolConformanceRef> {
+                return hashable;
+              });
+      }
 
       auto hashWitness = subSGF.B.createWitnessMethod(loc,
         formalTy, hashable,
         hashRef, hashTy);
-      
+
       auto hashSubstTy = hashTy.castTo<SILFunctionType>()
-        ->substGenericArgs(SGM.M, hashableSub);
+        ->substGenericArgs(SGM.M, hashableSubsMap);
       auto hashInfo = CalleeTypeInfo(hashSubstTy,
                                      AbstractionPattern(intTy), intTy,
                                      None,
@@ -3695,7 +3692,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         hashCode =
             subSGF
                 .emitApply(std::move(hashResultPlan), std::move(argScope), loc,
-                           ManagedValue::forUnmanaged(hashWitness), hashableSub,
+                           ManagedValue::forUnmanaged(hashWitness),
+                           hashableSubsMap,
                            {arg}, hashInfo, ApplyOptions::None, SGFContext())
                 .getUnmanagedSingleValue(subSGF, loc);
       }
@@ -3741,7 +3739,7 @@ lowerKeyPathSubscriptIndexTypes(
                  SILGenModule &SGM,
                  SmallVectorImpl<IndexTypePair> &indexPatterns,
                  SubscriptDecl *subscript,
-                 SubstitutionList subscriptSubs,
+                 SubstitutionMap subscriptSubs,
                  bool &needsGenericContext) {
   // Capturing an index value dependent on the generic context means we
   // need the generic context captured in the key path.
@@ -3749,15 +3747,14 @@ lowerKeyPathSubscriptIndexTypes(
   SubstitutionMap subMap;
   auto sig = subscript->getGenericSignature();
   if (sig) {
-    subMap = sig->getSubstitutionMap(subscriptSubs);
-    subscriptSubstTy = subscriptSubstTy.subst(subMap);
+    subscriptSubstTy = subscriptSubstTy.subst(subscriptSubs);
   }
   needsGenericContext |= subscriptSubstTy->hasArchetype();
 
   for (auto *index : *subscript->getIndices()) {
     auto indexTy = index->getInterfaceType();
     if (sig) {
-      indexTy = indexTy.subst(subMap);
+      indexTy = indexTy.subst(subscriptSubs);
     }
     auto indexLoweredTy = SGM.Types.getLoweredType(
                                                 AbstractionPattern::getOpaque(),
@@ -3796,7 +3793,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 GenericEnvironment *genericEnv,
                                 unsigned &baseOperand,
                                 bool &needsGenericContext,
-                                SubstitutionList subs,
+                                SubstitutionMap subs,
                                 AbstractStorageDecl *storage,
                                 ArrayRef<ProtocolConformanceRef> indexHashables,
                                 CanType baseTy,
@@ -3823,8 +3820,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       auto componentObjTy = componentTy->getWithoutSpecifierType();
       if (genericEnv)
         componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-      auto storageTy = Types.getSubstitutedStorageType(var,
-                                                           componentObjTy);
+      auto storageTy = Types.getSubstitutedStorageType(var, componentObjTy);
       auto opaqueTy = Types
         .getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
       
@@ -4008,7 +4004,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         auto sub = cast<SubscriptDecl>(component.getDeclRef().getDecl());
         lowerKeyPathSubscriptIndexTypes(
                           SGF.SGM, indexTypes, sub,
-                          component.getDeclRef().getSubstitutions().toList(),
+                          component.getDeclRef().getSubstitutions(),
                           needsGenericContext);
         lowerKeyPathSubscriptIndexPatterns(indices, indexTypes,
              component.getSubscriptIndexHashableConformances(),
@@ -4044,7 +4040,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                               SGF.F.getGenericEnvironment(),
                               numOperands,
                               needsGenericContext,
-                    component.getDeclRef().getSubstitutions().toList(),
+                              component.getDeclRef().getSubstitutions(),
                               decl,
                               component.getSubscriptIndexHashableConformances(),
                               baseTy,
@@ -4124,25 +4120,25 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 
   auto keyPathDecl = E->getKeyPath()->getType()->getAnyNominal();
   FuncDecl *projectFn;
-  SmallVector<Substitution, 4> subs;
-  
+
+  SmallVector<Type, 2> replacementTypes;
   if (keyPathDecl == SGF.getASTContext().getAnyKeyPathDecl()) {
     // Invoke projectKeyPathAny with the type of the base value.
     // The result is always `Any?`.
     projectFn = SGF.getASTContext().getProjectKeyPathAny(nullptr);
-    subs.push_back(Substitution(E->getBase()->getType(), {}));
+    replacementTypes.push_back(E->getBase()->getType());
   } else {
     auto keyPathTy = E->getKeyPath()->getType()->castTo<BoundGenericType>();
     if (keyPathDecl == SGF.getASTContext().getPartialKeyPathDecl()) {
       // Invoke projectKeyPathPartial with the type of the base value.
       // The result is always `Any`.
       projectFn = SGF.getASTContext().getProjectKeyPathPartial(nullptr);
-      subs.push_back(Substitution(keyPathTy->getGenericArgs()[0], {}));
+      replacementTypes.push_back(keyPathTy->getGenericArgs()[0]);
     } else {
       projectFn = SGF.getASTContext().getProjectKeyPathReadOnly(nullptr);
       // Get the root and leaf type from the key path type.
-      subs.push_back(Substitution(keyPathTy->getGenericArgs()[0], {}));
-      subs.push_back(Substitution(keyPathTy->getGenericArgs()[1], {}));
+      replacementTypes.push_back(keyPathTy->getGenericArgs()[0]);
+      replacementTypes.push_back(keyPathTy->getGenericArgs()[1]);
 
       // Upcast the keypath to KeyPath<T, U> if it isn't already.
       if (keyPathTy->getDecl() != SGF.getASTContext().getKeyPathDecl()) {
@@ -4157,8 +4153,15 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
     }
   }
 
-  auto genericArgsMap =
-    projectFn->getGenericSignature()->getSubstitutionMap(subs);
+  auto projectionGenericSig = projectFn->getGenericSignature();
+  auto genericArgsMap = projectionGenericSig->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        auto genericParam = cast<GenericTypeParamType>(type);
+        auto index =
+            projectionGenericSig->getGenericParamOrdinal(genericParam);
+        return replacementTypes[index];
+      },
+      LookUpConformanceInSignature(*projectionGenericSig));
 
   return SGF.emitApplyOfLibraryIntrinsic(SILLocation(E),
                         projectFn, genericArgsMap, {root, keyPath}, C);

@@ -121,9 +121,6 @@ private:
   /// Only set if this function is a specialization of another function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// The forwarding substitutions, lazily computed.
-  Optional<SubstitutionList> ForwardingSubs;
-
   /// The forwarding substitution map, lazily computed.
   SubstitutionMap ForwardingSubMap;
 
@@ -683,10 +680,6 @@ public:
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration();
-
-  /// Return the identity substitutions necessary to forward this call if it is
-  /// generic.
-  SubstitutionList getForwardingSubstitutions();
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.

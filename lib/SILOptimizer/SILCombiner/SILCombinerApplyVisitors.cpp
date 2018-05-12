@@ -805,8 +805,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   // replaced by a concrete type.
   SubstitutionMap Substitutions;
   if (FnTy->isPolymorphic()) {
-    auto FnSubsMap =
-        FnTy->getGenericSignature()->getSubstitutionMap(AI.getSubstitutions());
+    auto FnSubsMap = AI.getSubstitutionMap();
     Substitutions = FnSubsMap.subst(
         [&](SubstitutableType *type) -> Type {
           if (type == OpenedArchetype)

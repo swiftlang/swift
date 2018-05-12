@@ -98,13 +98,13 @@ static void collectTypeDependentOperands(
                       SILOpenedArchetypesState &OpenedArchetypesState,
                       SILFunction &F,
                       CanType Ty,
-                      SubstitutionList subs = SubstitutionList()) {
+                      SubstitutionMap subs = { }) {
   SmallVector<CanArchetypeType, 4> openedArchetypes;
   bool hasDynamicSelf = false;
   collectDependentTypeInfo(Ty, openedArchetypes, hasDynamicSelf);
-  for (auto sub : subs) {
+  for (Type replacement : subs.getReplacementTypes()) {
     // Substitutions in SIL should really be canonical.
-    auto ReplTy = sub.getReplacement()->getCanonicalType();
+    auto ReplTy = replacement->getCanonicalType();
     collectDependentTypeInfo(ReplTy, openedArchetypes, hasDynamicSelf);
   }
   buildTypeDependentOperands(openedArchetypes, hasDynamicSelf,
@@ -427,7 +427,7 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               SubstCalleeSILTy.getASTType(), Subs.toList());
+                               SubstCalleeSILTy.getASTType(), Subs);
   void *Buffer =
     allocateTrailingInst<ApplyInst, Operand>(
       F, getNumAllOperands(Args, TypeDependentOperands));
@@ -487,7 +487,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
-                               substCalleeType, subs.toList());
+                               substCalleeType, subs);
   void *buffer =
     allocateTrailingInst<BeginApplyInst, Operand,
                          MultipleValueInstruction*, BeginApplyResult>(
@@ -531,7 +531,7 @@ PartialApplyInst *PartialApplyInst::create(
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               SubstCalleeTy.getASTType(), Subs.toList());
+                               SubstCalleeTy.getASTType(), Subs);
   void *Buffer =
     allocateTrailingInst<PartialApplyInst, Operand>(
       F, getNumAllOperands(Args, TypeDependentOperands));
@@ -568,7 +568,7 @@ TryApplyInst *TryApplyInst::create(
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
                                substCalleeTy.getASTType(),
-                               subs.toList());
+                               subs);
   void *buffer =
     allocateTrailingInst<TryApplyInst, Operand>(
       F, getNumAllOperands(args, typeDependentOperands));

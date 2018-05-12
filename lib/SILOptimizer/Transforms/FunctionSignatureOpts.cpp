@@ -285,9 +285,9 @@ static bool usesGenerics(SILFunction *F,
       }
       // Scan all substitutions of apply instructions.
       if (auto AI = ApplySite::isa(&I)) {
-        auto Subs = AI.getSubstitutions();
-        for (auto Sub : Subs) {
-          Sub.getReplacement().visit(FindArchetypesAndGenericTypes);
+        auto Subs = AI.getSubstitutionMap();
+        for (auto Replacement : Subs.getReplacementTypes()) {
+          Replacement.visit(FindArchetypesAndGenericTypes);
         }
       }
       // Scan all substitutions of builtin instructions.

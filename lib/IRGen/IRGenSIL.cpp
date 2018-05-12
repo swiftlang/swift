@@ -2078,7 +2078,7 @@ static llvm::Value *getObjCClassForValue(IRGenFunction &IGF,
 
 static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
                                               CanSILFunctionType origCalleeType,
-                                              SubstitutionList subs) {
+                                              SubstitutionMap subs) {
   llvm::Value *wtable;
 
   if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol()) {
@@ -2087,11 +2087,9 @@ static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
     //
     // We recover the witness table from the substitution that was used to
     // produce the substituted callee type.
-    auto subMap = origCalleeType->getGenericSignature()
-      ->getSubstitutionMap(subs);
     auto origSelfType = proto->getSelfInterfaceType()->getCanonicalType();
-    auto substSelfType = origSelfType.subst(subMap)->getCanonicalType();
-    auto conformance = *subMap.lookupConformance(origSelfType, proto);
+    auto substSelfType = origSelfType.subst(subs)->getCanonicalType();
+    auto conformance = *subs.lookupConformance(origSelfType, proto);
 
     llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
     wtable = emitWitnessTableRef(IGF, substSelfType, &argMetadata,
@@ -2193,7 +2191,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                          CanSILFunctionType substCalleeType,
                                          const LoweredValue &lv,
                                          llvm::Value *selfValue,
-                                         const SubstitutionList &substitutions,
+                                         SubstitutionMap substitutions,
                                          WitnessMetadata *witnessMetadata,
                                          Explosion &args) {
   Callee callee = lv.getCallee(IGF, selfValue,
@@ -2282,7 +2280,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   WitnessMetadata witnessMetadata;
   CallEmission emission =
     getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
-                                   calleeLV, selfValue, site.getSubstitutions(),
+                                   calleeLV, selfValue,
+                                   site.getSubstitutionMap(),
                                    &witnessMetadata, llArgs);
 
   // Lower the arguments and return value in the callee's generic context.
@@ -2398,7 +2397,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 /// applying to 'v'.
 static std::tuple<FunctionPointer, llvm::Value*, CanSILFunctionType>
 getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
-                              SubstitutionList subs) {
+                              SubstitutionMap subs) {
   LoweredValue &lv = IGF.getLoweredValue(v);
   auto fnType = v->getType().castTo<SILFunctionType>();
 
@@ -2507,7 +2506,7 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   // Get the function value.
   auto result = getPartialApplicationFunction(*this, i->getCallee(),
-                                              i->getSubstitutions());
+                                              i->getSubstitutionMap());
   FunctionPointer calleeFn = std::get<0>(result);
   llvm::Value *innerContext = std::get<1>(result);
   CanSILFunctionType origCalleeTy = std::get<2>(result);
