@@ -1788,21 +1788,12 @@ static void checkTypeAccessImpl(
 /// TypeRepr representing the offending part of \p TL.
 ///
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
-/// part of the type that caused the problem could not be found. The DeclContext
-/// is never null. The DowngradeToWarning parameter is a hack to deal with
-/// early versions of Swift 3 not diagnosing certain access violations.
+/// part of the type that caused the problem could not be found.
 static void checkTypeAccess(
     TypeChecker &TC, TypeLoc TL, const ValueDecl *context,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+  assert(!isa<ParamDecl>(context));
   const DeclContext *DC = context->getDeclContext();
-  if (isa<ParamDecl>(context)) {
-    context = dyn_cast<AbstractFunctionDecl>(DC);
-    if (!context)
-      context = dyn_cast<SubscriptDecl>(DC);
-    if (!context)
-      context = cast<EnumDecl>(DC);
-    DC = context->getDeclContext();
-  }
 
   AccessScope contextAccessScope = context->getFormalAccessScope();
   checkTypeAccessImpl(TC, TL, contextAccessScope, DC,
@@ -1945,8 +1936,8 @@ static void checkGenericParamAccess(TypeChecker &TC,
                           owner->getFormalAccess());
 }
 
-/// Checks the given declaration's access to make sure it is valid given the way
-/// it is defined.
+/// Checks the given declaration's signature does not reference any other
+/// declarations that are less visible than the declaration itself.
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
 static void checkAccessControl(TypeChecker &TC, const Decl *D) {
@@ -2283,7 +2274,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     bool problemIsElement = false;
 
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccess(TC, P->getTypeLoc(), P,
+      checkTypeAccess(TC, P->getTypeLoc(), SD,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -2355,7 +2346,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
 
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
-        checkTypeAccess(TC, P->getTypeLoc(), P,
+        checkTypeAccess(TC, P->getTypeLoc(), fn,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *thisComplainRepr,
                             DowngradeToWarning downgradeDiag) {
@@ -2419,7 +2410,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
-      checkTypeAccess(TC, P->getTypeLoc(), P,
+      checkTypeAccess(TC, P->getTypeLoc(), EED,
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *complainRepr,
                                  DowngradeToWarning downgradeToWarning) {
