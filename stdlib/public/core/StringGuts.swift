@@ -799,16 +799,19 @@ extension _StringGuts {
   @usableFromInline
   internal
   var _nonStoredCount: Int {
-    if _object.isSmall {
-      return _object.smallUTF8Count
-    }
+    @effects(readonly)
+    get {
+      if _object.isSmall {
+        return _object.smallUTF8Count
+      }
 #if _runtime(_ObjC)
-    _sanityCheck(_object.isCocoa)
-    return _cocoaCount
+      _sanityCheck(_object.isCocoa)
+      return _cocoaCount
 #else
-    _sanityCheck(_object.isOpaque)
-    return _opaqueCount
+      _sanityCheck(_object.isOpaque)
+      return _opaqueCount
 #endif
+    }
   }
 
   @inlinable
