@@ -4209,7 +4209,7 @@ public:
         // Stored type variables in a generic context need to logically
         // occur once per instantiation, which we don't yet handle.
         } else if (DC->getAsProtocolExtensionContext()) {
-            unimplementedStatic(ProtocolExtensions);
+          unimplementedStatic(ProtocolExtensions);
         } else if (DC->isGenericContext()
                && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
           unimplementedStatic(GenericTypes);
@@ -8307,7 +8307,7 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
     }
 
     resultType = NameAliasType::get(typealias, parentType, subMap,
-                                         resultType);
+                                    resultType);
   }
 
   return resultType;
