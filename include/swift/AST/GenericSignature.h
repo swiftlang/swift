@@ -209,12 +209,7 @@ public:
 
   /// Check if the generic signature makes all generic parameters
   /// concrete.
-  bool areAllParamsConcrete() const {
-    return !enumeratePairedRequirements(
-      [](Type, ArrayRef<Requirement>) -> bool {
-        return true;
-      });
-  }
+  bool areAllParamsConcrete() const { return getSubstitutableParams().empty(); }
 
   /// Compute the number of conformance requirements in this signature.
   unsigned getNumConformanceRequirements() const {
@@ -224,20 +219,6 @@ public:
         ++result;
     }
 
-    return result;
-  }
-
-  /// Return the size of a SubstitutionList built from this signature.
-  ///
-  /// Don't add new calls of this -- the representation of SubstitutionList
-  /// will be changing soon.
-  unsigned getSubstitutionListSize() const {
-    unsigned result = 0;
-    enumeratePairedRequirements(
-      [&](Type, ArrayRef<Requirement>) -> bool {
-        result++;
-        return false;
-      });
     return result;
   }
 

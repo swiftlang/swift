@@ -192,37 +192,31 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
     return SubstitutionMap();
   }
 
-  SmallVector<Type, 4> replacementTypes(genericSig->getGenericParams().size(),
-                                        Type());
-  SmallVector<ProtocolConformanceRef, 4> storedConformances;
+  // Form the replacement types.
+  SmallVector<Type, 4> replacementTypes;
+  replacementTypes.reserve(genericSig->getGenericParams().size());
+  for (auto gp : genericSig->getGenericParams()) {
+    Type replacement = Type(gp).subst(subs, lookupConformance,
+                                      SubstFlags::UseErrorType);
+    replacementTypes.push_back(replacement);
+  }
 
-  // Enumerate all of the requirements that require substitution.
-  genericSig->enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqs) {
-      auto canTy = depTy->getCanonicalType();
+  // Form the stored conformances.
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance) continue;
 
-      // Compute the replacement type.
-      Type currentReplacement = depTy.subst(subs, lookupConformance,
-                                            SubstFlags::UseErrorType);
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy)) {
-        replacementTypes[genericSig->getGenericParamOrdinal(paramTy)] =
-          currentReplacement;
-      }
+    CanType depTy = req.getFirstType()->getCanonicalType();
+    auto replacement = depTy.subst(subs, lookupConformance,
+                                   SubstFlags::UseErrorType);
+    auto protoType = req.getSecondType()->castTo<ProtocolType>();
+    auto proto = protoType->getDecl();
+    auto conformance = lookupConformance(depTy, replacement, protoType)
+                         .getValueOr(ProtocolConformanceRef(proto));
+    conformances.push_back(conformance);
+  }
 
-      // Collect the conformances.
-      for (auto req: reqs) {
-        assert(req.getKind() == RequirementKind::Conformance);
-        auto protoType = req.getSecondType()->castTo<ProtocolType>();
-        auto conformance =
-          lookupConformance(canTy, currentReplacement, protoType)
-            .getValueOr(ProtocolConformanceRef(protoType->getDecl()));
-        storedConformances.push_back(conformance);
-      }
-
-      return false;
-    });
-
-  return SubstitutionMap(genericSig, replacementTypes, storedConformances);
+  return SubstitutionMap(genericSig, replacementTypes, conformances);
 }
 
 Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {

@@ -100,13 +100,40 @@ GenericSignature::getInnermostGenericParams() const {
 
 SmallVector<GenericTypeParamType *, 2>
 GenericSignature::getSubstitutableParams() const {
-  SmallVector<GenericTypeParamType *, 2> result;
+  // Figure out which generic parameters are concrete or same-typed to another
+  // generic parameter.
+  auto genericParams = getGenericParams();
+  auto genericParamsAreNotSubstitutable =
+    SmallVector<bool, 4>(genericParams.size(), false);
+  for (auto req : getRequirements()) {
+    if (req.getKind() != RequirementKind::SameType) continue;
 
-  enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement>) -> bool {
-    if (auto *paramTy = depTy->getAs<GenericTypeParamType>())
-      result.push_back(paramTy);
-    return false;
-  });
+    GenericTypeParamType *gp;
+    if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
+      // If two generic parameters are same-typed, then the left-hand one
+      // is canonical.
+      gp = secondGP;
+    } else {
+      // If an associated type is same-typed, it doesn't constrain the generic
+      // parameter itself.
+      if (req.getSecondType()->isTypeParameter()) continue;
+
+      // Otherwise, the generic parameter is concrete.
+      gp = req.getFirstType()->getAs<GenericTypeParamType>();
+      if (!gp) continue;
+    }
+
+    unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
+    genericParamsAreNotSubstitutable[index] = true;
+  }
+
+  // Collect the generic parameters that are substitutable.
+  SmallVector<GenericTypeParamType *, 2> result;
+  for (auto index : indices(genericParams)) {
+    auto gp = genericParams[index];
+    if (!genericParamsAreNotSubstitutable[index])
+      result.push_back(gp);
+  }
 
   return result;
 }
