@@ -171,7 +171,6 @@ public:
   Type getSugaredType(Type type) const;
 
   SubstitutionMap getForwardingSubstitutionMap() const;
-  SubstitutionList getForwardingSubstitutions() const;
 
   void dump(raw_ostream &os) const;
 

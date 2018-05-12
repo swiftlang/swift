@@ -1815,10 +1815,6 @@ public:
 
   /// Return forwarding substitutions for the archetypes in the current
   /// function.
-  SubstitutionList getForwardingSubstitutions();
-
-  /// Return forwarding substitutions for the archetypes in the current
-  /// function.
   SubstitutionMap getForwardingSubstitutionMap();
 
   /// Get the _Pointer protocol used for pointer argument operations.

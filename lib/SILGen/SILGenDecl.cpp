@@ -144,10 +144,6 @@ namespace {
   };
 } // end anonymous namespace
 
-SubstitutionList SILGenFunction::getForwardingSubstitutions() {
-  return F.getForwardingSubstitutions();
-}
-
 SubstitutionMap SILGenFunction::getForwardingSubstitutionMap() {
   return F.getForwardingSubstitutionMap();
 }

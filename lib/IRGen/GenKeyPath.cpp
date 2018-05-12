@@ -230,8 +230,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     // Use the bound generic metadata to form a call to the original generic
     // accessor.
     WitnessMetadata ignoreWitnessMetadata;
-    auto forwardingSubs = genericEnv->getGenericSignature()->getSubstitutionMap(
-      genericEnv->getForwardingSubstitutions());
+    auto forwardingSubs = genericEnv->getForwardingSubstitutionMap();
     emitPolymorphicArguments(IGF, accessor->getLoweredFunctionType(),
                              forwardingSubs,
                              &ignoreWitnessMetadata,

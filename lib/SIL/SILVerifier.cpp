@@ -2440,7 +2440,7 @@ public:
 
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
-      auto subs = env->getForwardingSubstitutions();
+      auto subs = env->getForwardingSubstitutionMap();
       methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
