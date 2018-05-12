@@ -2616,11 +2616,13 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
     
     if(!isa<FuncDecl>(CursorInfo.ValueD)) return true;
     
+    FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
+    
     swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
     EditConsumer.accept(SM, startLocation, "///<#Function Summary#>\n");
     
+    //-----[Start] This section processes parameters -----
     SmallVector<ParamDecl *, 5> allParamDecls;
-    FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
     for (auto paramLists : funcDecl->getParameterLists()) {
         auto paramDecls = paramLists->getArray();
         for(auto paramDecl : paramDecls) {
@@ -2648,6 +2650,17 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
         EditConsumer.accept(SM, startLocation, parameterName);
         EditConsumer.accept(SM, startLocation, "#>\n");
     }
+    //-----[End] This section processes parameters -----
+    
+    //-----[Start] This section processes return type -----
+    Type returnType = funcDecl->getReturnTypeLoc().getType();
+    if (!returnType.isNull()) {
+        EditConsumer.accept(SM, startLocation, "///\n///  - Returns: <#");
+        EditConsumer.accept(SM, startLocation, returnType.getString());
+        EditConsumer.accept(SM, startLocation, "#>\n");
+    }
+    
+    //-----[End] This section processes return type -----
     
     EditConsumer.accept(SM, startLocation,"///\n");
     

@@ -1,0 +1,7 @@
+///<#Function Summary#>
+///
+///  - Returns: <#[Int]#>
+///
+func funcWithReturnNoParamsNoThrow() -> [Int]{
+    
+}

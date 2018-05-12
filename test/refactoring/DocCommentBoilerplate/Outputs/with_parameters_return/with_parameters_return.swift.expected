@@ -4,6 +4,8 @@
 ///    - b: <#Parameter b#>
 ///    - c: <#Parameter c#>
 ///
-func funcWithParamsNoReturnNoThrow(_ a: Int, b: Int, c: String) {
+///  - Returns: <#(a: Int, b: String)#>
+///
+func funcWithParamsReturnNoThrow(_ a: Int, b: Int, c: String) -> (a: Int, b: String) {
     
 }
