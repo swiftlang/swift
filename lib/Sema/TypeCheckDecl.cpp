@@ -1410,8 +1410,7 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
       return Action::Stop;
 
     if (!CanonicalizeParentTypes) {
-      return isa<NameAliasType>(T.getPointer()) ? Action::SkipChildren
-                                                     : Action::Continue;
+      return Action::Continue;
     }
     
     Type nominalParentTy;
