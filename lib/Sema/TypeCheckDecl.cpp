@@ -1917,7 +1917,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
 
   bool isExplicit =
     owner->getAttrs().hasAttribute<AccessControlAttr>() ||
-    owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+    isa<ProtocolDecl>(owner->getDeclContext());
   auto diagID = diag::generic_param_access;
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::generic_param_access_warn;
@@ -1992,7 +1992,8 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                             DowngradeToWarning downgradeToWarning) {
           auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
           bool isExplicit =
-            theVar->getAttrs().hasAttribute<AccessControlAttr>();
+            theVar->getAttrs().hasAttribute<AccessControlAttr>() ||
+            isa<ProtocolDecl>(theVar->getDeclContext());
           auto theVarAccess = isExplicit
             ? theVar->getFormalAccess()
             : typeAccessScope.requiredAccessForDiagnostics();
@@ -2033,7 +2034,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
         bool isExplicit =
           anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
-          anyVar->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+          isa<ProtocolDecl>(anyVar->getDeclContext());
         auto diagID = diag::pattern_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::pattern_type_access_warn;
@@ -2061,12 +2062,17 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
       auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-      bool isExplicit = TAD->getAttrs().hasAttribute<AccessControlAttr>();
+      bool isExplicit =
+        TAD->getAttrs().hasAttribute<AccessControlAttr>() ||
+        isa<ProtocolDecl>(TAD->getDeclContext());
       auto diagID = diag::type_alias_underlying_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::type_alias_underlying_type_access_warn;
+      auto aliasAccess = isExplicit
+        ? TAD->getFormalAccess()
+        : typeAccessScope.requiredAccessForDiagnostics();
       auto diag = TC.diagnose(TAD, diagID,
-                              isExplicit, TAD->getFormalAccess(),
+                              isExplicit, aliasAccess,
                               typeAccess, isa<FileUnit>(TAD->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     });
@@ -2155,8 +2161,11 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         auto diagID = diag::enum_raw_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::enum_raw_type_access_warn;
+        auto enumDeclAccess = isExplicit
+          ? ED->getFormalAccess()
+          : typeAccessScope.requiredAccessForDiagnostics();
         auto diag = TC.diagnose(ED, diagID, isExplicit,
-                                ED->getFormalAccess(), typeAccess,
+                                enumDeclAccess, typeAccess,
                                 isa<FileUnit>(ED->getDeclContext()));
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -2215,8 +2224,11 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         if (downgradeToWarning == DowngradeToWarning::Yes ||
             outerDowngradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::class_super_access_warn;
+        auto classDeclAccess = isExplicit
+          ? CD->getFormalAccess()
+          : typeAccessScope.requiredAccessForDiagnostics();
 
-        auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
+        auto diag = TC.diagnose(CD, diagID, isExplicit, classDeclAccess,
                                 typeAccess,
                                 isa<FileUnit>(CD->getDeclContext()),
                                 superclassLocIter->getTypeRepr() != complainRepr);
@@ -2306,7 +2318,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       bool isExplicit =
         SD->getAttrs().hasAttribute<AccessControlAttr>() ||
-        SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+        isa<ProtocolDecl>(SD->getDeclContext());
       auto diagID = diag::subscript_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::subscript_type_access_warn;
@@ -2385,7 +2397,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         : isTypeContext ? FK_Method : FK_Function;
       bool isExplicit =
         fn->getAttrs().hasAttribute<AccessControlAttr>() ||
-        fn->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+        isa<ProtocolDecl>(fn->getDeclContext());
       auto diagID = diag::function_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::function_type_access_warn;
