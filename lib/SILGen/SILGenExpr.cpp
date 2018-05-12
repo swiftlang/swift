@@ -3651,16 +3651,19 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
           LookUpConformanceInSignature(*genericSig));
+      }
 
+      if (auto genericSig =
+              hashTy.castTo<SILFunctionType>()->getGenericSignature()) {
         hashableSubsMap =
-            genericEnv->getGenericSignature()->getSubstitutionMap(
+            genericSig->getSubstitutionMap(
               [&](SubstitutableType *type) -> Type { return formalTy; },
               [&](CanType dependentType, Type replacementType,
                   ProtocolType *protoType)->Optional<ProtocolConformanceRef> {
                 return hashable;
               });
       }
-      
+
       auto hashWitness = subSGF.B.createWitnessMethod(loc,
         formalTy, hashable,
         hashRef, hashTy);
@@ -4117,25 +4120,25 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
 
   auto keyPathDecl = E->getKeyPath()->getType()->getAnyNominal();
   FuncDecl *projectFn;
-  SmallVector<Substitution, 4> subs;
-  
+
+  SmallVector<Type, 2> replacementTypes;
   if (keyPathDecl == SGF.getASTContext().getAnyKeyPathDecl()) {
     // Invoke projectKeyPathAny with the type of the base value.
     // The result is always `Any?`.
     projectFn = SGF.getASTContext().getProjectKeyPathAny(nullptr);
-    subs.push_back(Substitution(E->getBase()->getType(), {}));
+    replacementTypes.push_back(E->getBase()->getType());
   } else {
     auto keyPathTy = E->getKeyPath()->getType()->castTo<BoundGenericType>();
     if (keyPathDecl == SGF.getASTContext().getPartialKeyPathDecl()) {
       // Invoke projectKeyPathPartial with the type of the base value.
       // The result is always `Any`.
       projectFn = SGF.getASTContext().getProjectKeyPathPartial(nullptr);
-      subs.push_back(Substitution(keyPathTy->getGenericArgs()[0], {}));
+      replacementTypes.push_back(keyPathTy->getGenericArgs()[0]);
     } else {
       projectFn = SGF.getASTContext().getProjectKeyPathReadOnly(nullptr);
       // Get the root and leaf type from the key path type.
-      subs.push_back(Substitution(keyPathTy->getGenericArgs()[0], {}));
-      subs.push_back(Substitution(keyPathTy->getGenericArgs()[1], {}));
+      replacementTypes.push_back(keyPathTy->getGenericArgs()[0]);
+      replacementTypes.push_back(keyPathTy->getGenericArgs()[1]);
 
       // Upcast the keypath to KeyPath<T, U> if it isn't already.
       if (keyPathTy->getDecl() != SGF.getASTContext().getKeyPathDecl()) {
@@ -4150,8 +4153,15 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
     }
   }
 
-  auto genericArgsMap =
-    projectFn->getGenericSignature()->getSubstitutionMap(subs);
+  auto projectionGenericSig = projectFn->getGenericSignature();
+  auto genericArgsMap = projectionGenericSig->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        auto genericParam = cast<GenericTypeParamType>(type);
+        auto index =
+            projectionGenericSig->getGenericParamOrdinal(genericParam);
+        return replacementTypes[index];
+      },
+      LookUpConformanceInSignature(*projectionGenericSig));
 
   return SGF.emitApplyOfLibraryIntrinsic(SILLocation(E),
                         projectFn, genericArgsMap, {root, keyPath}, C);

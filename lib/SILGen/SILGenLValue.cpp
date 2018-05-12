@@ -1705,14 +1705,16 @@ namespace {
         llvm_unreachable("not a writable key path type?!");
       }
       
-      Substitution args[] = {
-        Substitution(keyPathTy->getGenericArgs()[0], {}),
-        Substitution(keyPathTy->getGenericArgs()[1], {}),
-      };
-      
-      auto subMap = projectionFunction->getGenericSignature()
-        ->getSubstitutionMap(args);
-      
+      auto projectionGenericSig = projectionFunction->getGenericSignature();
+      auto subMap = projectionGenericSig->getSubstitutionMap(
+          [&](SubstitutableType *type) -> Type {
+            auto genericParam = cast<GenericTypeParamType>(type);
+            auto index =
+                projectionGenericSig->getGenericParamOrdinal(genericParam);
+            return keyPathTy->getGenericArgs()[index];
+          },
+          LookUpConformanceInSignature(*projectionGenericSig));
+
       // The projection function behaves like an owning addressor, returning
       // a pointer to the projected value and an owner reference that keeps
       // it alive.
@@ -1761,13 +1763,17 @@ namespace {
                 SILType::getPrimitiveObjectType(keyPathTy->getCanonicalType()));
       }
       
-      Substitution args[] = {
-        Substitution(keyPathTy->getGenericArgs()[0], {}),
-        Substitution(keyPathTy->getGenericArgs()[1], {}),
-      };
       auto projectFn = C.getProjectKeyPathReadOnly(nullptr);
-      auto subMap = projectFn->getGenericSignature()
-        ->getSubstitutionMap(args);
+
+      auto projectionGenericSig = projectFn->getGenericSignature();
+      auto subMap = projectionGenericSig->getSubstitutionMap(
+          [&](SubstitutableType *type) -> Type {
+            auto genericParam = cast<GenericTypeParamType>(type);
+            auto index =
+                projectionGenericSig->getGenericParamOrdinal(genericParam);
+            return keyPathTy->getGenericArgs()[index];
+          },
+          LookUpConformanceInSignature(*projectionGenericSig));
 
       // Allocate a temporary to own the projected value.
       auto &resultTL = SGF.getTypeLowering(keyPathTy->getGenericArgs()[1]);
