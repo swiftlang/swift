@@ -168,41 +168,19 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
 
 
 SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
-                                     SubstitutionList substitutions) {
+                                     SubstitutionMap substitutions) {
   if (!genericSig) {
-    assert(substitutions.empty() && "Shouldn't have substitutions here");
+    assert(!substitutions.hasAnySubstitutableParams() &&
+           "Shouldn't have substitutions here");
     return SubstitutionMap();
   }
 
-  SmallVector<Type, 4> replacementTypes(genericSig->getGenericParams().size(),
-                                        Type());
-  SmallVector<ProtocolConformanceRef, 4> storedConformances;
-
-  genericSig->enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
-      auto sub = substitutions.front();
-      substitutions = substitutions.slice(1);
-
-      auto canTy = depTy->getCanonicalType();
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy)) {
-        replacementTypes[genericSig->getGenericParamOrdinal(paramTy)] =
-          sub.getReplacement();
-      }
-
-      auto conformances = sub.getConformances();
-      assert(reqts.size() == conformances.size());
-
-      for (auto i : indices(conformances)) {
-        assert(reqts[i].getSecondType()->getAnyNominal() ==
-               conformances[i].getRequirement());
-        storedConformances.push_back(conformances[i]);
-      }
-
-      return false;
-    });
-
-  assert(substitutions.empty() && "did not use all substitutions?!");
-  return SubstitutionMap(genericSig, replacementTypes, storedConformances);
+  return SubstitutionMap::get(genericSig,
+           [&](SubstitutableType *type) -> Type {
+             return substitutions.lookupSubstitution(
+                      CanSubstitutableType(type));
+           },
+           LookUpConformanceInSubstitutionMap(substitutions));
 }
 
 /// Build an interface type substitution map for the given generic signature
@@ -675,20 +653,5 @@ void SubstitutionMap::dump() const {
 
 void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   id.AddPointer(storage);
-}
-
-SubstitutionList SubstitutionMap::toList() const {
-  if (empty()) return { };
-
-  // If we don't yet have cached flat substitutions, cache them now.
-  if (storage->flatSubstitutions.empty()) {
-    SmallVector<Substitution, 4> subs;
-    getGenericSignature()->getSubstitutions(*this, subs);
-
-    auto &ctx = getGenericSignature()->getASTContext();
-    storage->flatSubstitutions = ctx.AllocateCopy(subs);
-  }
-
-  return storage->flatSubstitutions;
 }
 

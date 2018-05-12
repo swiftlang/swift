@@ -2630,7 +2630,6 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                            MetatypeRepresentation::Thick));
   ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
 
-  Substitution sub{switchedValueSwiftType, /*Conformances*/None};
   auto diagnoseSignature = diagnoseFailure->getGenericSignature();
   auto genericArgsMap = diagnoseSignature->getSubstitutionMap(
       [&](SubstitutableType *type) -> Type { return switchedValueSwiftType; },

@@ -76,7 +76,6 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
 
       auto subMap = t->getContextSubstitutionMap(getSILGenModule().SwiftModule,
                                                  decl);
-      SmallVector<Substitution, 4> subs;
       getSILGenModule().useConformancesFromSubstitutions(subMap);
       return false;
     });

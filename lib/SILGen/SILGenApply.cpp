@@ -4163,7 +4163,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   auto genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
   if (genericSig != subs.getGenericSignature()) {
-    subs = genericSig->getSubstitutionMap(subs.toList());
+    subs = genericSig->getSubstitutionMap(subs);
   }
 
   SILValue rawDirectResult = emitRawApply(

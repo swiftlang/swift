@@ -14,7 +14,6 @@
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Substitution.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"

@@ -1937,7 +1937,6 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
   } else if (componentKind.str() == "external") {
     ValueDecl *externalDecl;
     SmallVector<ParsedSubstitution, 4> parsedSubs;
-    SmallVector<Substitution, 4> subs;
     SmallVector<KeyPathPatternComponent::Index, 4> indexes;
     CanType ty;
 

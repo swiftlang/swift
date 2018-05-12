@@ -21,7 +21,6 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
@@ -95,7 +94,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class Substitution;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;

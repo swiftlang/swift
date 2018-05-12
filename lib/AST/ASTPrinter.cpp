@@ -4176,11 +4176,6 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   }
 }
 
-void Substitution::print(llvm::raw_ostream &os,
-                         const PrintOptions &PO) const {
-  Replacement->print(os, PO);
-}
-
 void swift::printEnumElementsAsCases(
     llvm::DenseSet<EnumElementDecl *> &UnhandledElements,
     llvm::raw_ostream &OS) {

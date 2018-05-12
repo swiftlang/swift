@@ -2817,32 +2817,6 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   return wtable;
 }
 
-/// Emit the witness table references required for the given type
-/// substitution.
-void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
-                                 const Substitution &sub,
-                                 llvm::Value **metadataCache,
-                                 SmallVectorImpl<llvm::Value*> &out) {
-  auto conformances = sub.getConformances();
-
-  // We don't need to do anything if we have no protocols to conform to.
-  if (conformances.empty()) return;
-
-  // Look at the replacement type.
-  CanType replType = sub.getReplacement()->getCanonicalType();
-
-  for (auto &conformance : conformances) {
-    auto *proto = conformance.getRequirement();
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-      continue;
-
-    auto wtable = emitWitnessTableRef(IGF, replType, metadataCache,
-                                      conformance);
-
-    out.push_back(wtable);
-  }
-}
-
 static CanType getSubstSelfType(CanSILFunctionType origFnType,
                                 const SubstitutionMap &subs) {
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
