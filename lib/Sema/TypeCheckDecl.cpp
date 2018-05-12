@@ -1775,6 +1775,14 @@ static void checkTypeAccessImpl(
     }
   }
 
+  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
+  // access scope represented a private or fileprivate level.
+  if (!contextAccessScope.isPublic() &&
+      !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
+      TC.getLangOpts().isSwiftVersion3()) {
+    downgradeToWarning = DowngradeToWarning::Yes;
+  }
+
   const TypeRepr *complainRepr =
         TypeAccessScopeDiagnoser::findTypeWithScope(
             TL.getTypeRepr(),
@@ -1794,21 +1802,8 @@ static void checkTypeAccess(
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   assert(!isa<ParamDecl>(context));
   const DeclContext *DC = context->getDeclContext();
-
   AccessScope contextAccessScope = context->getFormalAccessScope();
-  checkTypeAccessImpl(TC, TL, contextAccessScope, DC,
-                      [=, &TC](AccessScope requiredAccessScope,
-                               const TypeRepr *offendingTR,
-                               DowngradeToWarning downgradeToWarning) {
-    if (!contextAccessScope.isPublic() &&
-        !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
-        TC.getLangOpts().isSwiftVersion3()) {
-      // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
-      // access scope represented a private or fileprivate level.
-      downgradeToWarning = DowngradeToWarning::Yes;
-    }
-    diagnose(requiredAccessScope, offendingTR, downgradeToWarning);
-  });
+  checkTypeAccessImpl(TC, TL, contextAccessScope, DC, diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -1902,16 +1897,6 @@ static void checkGenericParamAccess(TypeChecker &TC,
 
   if (minAccessScope.isPublic())
     return;
-
-  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
-  // scope represented a private or fileprivate level.
-  if (downgradeToWarning == DowngradeToWarning::No) {
-    if (!accessScope.isPublic() &&
-        !isa<ModuleDecl>(accessScope.getDeclContext()) &&
-        TC.getLangOpts().isSwiftVersion3()) {
-      downgradeToWarning = DowngradeToWarning::Yes;
-    }
-  }
 
   auto minAccess = minAccessScope.accessLevelForDiagnostics();
 
