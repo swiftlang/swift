@@ -2838,23 +2838,29 @@ public:
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation,
-                  SemanticContextKind SK = SemanticContextKind::None) {
+                  SemanticContextKind SK = SemanticContextKind::None,
+                  CodeCompletionKeywordKind KeyKind
+                    = CodeCompletionKeywordKind::None) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Keyword, SK, ExpectedTypes);
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
+    Builder.setKeywordKind(KeyKind);
     if (!TypeAnnotation.isNull())
       addTypeAnnotation(Builder, TypeAnnotation);
   }
 
-  void addKeyword(StringRef Name, StringRef TypeAnnotation) {
+  void addKeyword(StringRef Name, StringRef TypeAnnotation,
+                  CodeCompletionKeywordKind KeyKind
+                    = CodeCompletionKeywordKind::None) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, ExpectedTypes);
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
+    Builder.setKeywordKind(KeyKind);
     if (!TypeAnnotation.empty())
       Builder.addTypeAnnotation(TypeAnnotation);
   }
@@ -3259,14 +3265,13 @@ public:
     ExprType = ExprType->getRValueType();
     this->ExprType = ExprType;
     if (ExprType->hasTypeParameter()) {
-      DeclContext *DC;
-      if (VD) {
+      DeclContext *DC = nullptr;
+      if (VD)
         DC = VD->getInnermostDeclContext();
-        this->ExprType = DC->mapTypeIntoContext(ExprType);
-      } else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal()) {
+      else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal())
         DC = NTD;
-        this->ExprType = DC->mapTypeIntoContext(ExprType);
-      }
+      if (DC)
+        ExprType = DC->mapTypeIntoContext(ExprType);
     }
 
     // Handle special cases
@@ -5318,12 +5323,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
 
-    CodeCompletionResultBuilder Builder(CompletionContext.getResultSink(),
-                                        CodeCompletionResult::ResultKind::Keyword,
-                                        SemanticContextKind::CurrentNominal, {});
-    Builder.setKeywordKind(CodeCompletionKeywordKind::kw_self);
-    Builder.addTextChunk("self");
-    Builder.addTypeAnnotation(ExprType->getString());
+    if (!ExprType.getValue()->getAs<ModuleType>())
+      Lookup.addKeyword("self", (*ExprType)->getRValueType(),
+                        SemanticContextKind::CurrentNominal,
+                        CodeCompletionKeywordKind::kw_self);
 
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
@@ -5373,6 +5376,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
+
+    if (!ExprType.getValue()->getAs<ModuleType>())
+      Lookup.addKeyword("self", (*ExprType)->getRValueType(),
+                        SemanticContextKind::CurrentNominal,
+                        CodeCompletionKeywordKind::kw_self);
     break;
   }
 
