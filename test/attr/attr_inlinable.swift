@@ -159,7 +159,8 @@ extension VersionedProtocol {
 }
 
 enum InternalEnum {
-// expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
+  // expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
+  // expected-note@-2 {{type declared here}}
   case apple
   case orange
 }
@@ -174,8 +175,8 @@ enum InternalEnum {
 @usableFromInline enum VersionedEnum {
   case apple
   case orange
-  // FIXME: Should this be banned?
   case pear(InternalEnum)
+  // expected-warning@-1 {{type of enum case in '@usableFromInline' enum should be '@usableFromInline' or public}}
   case persimmon(String)
 }
 

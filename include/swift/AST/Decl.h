@@ -2265,7 +2265,6 @@ public:
     if (treatUsableFromInlineAsPublic &&
         result == AccessLevel::Internal &&
         isUsableFromInline()) {
-      assert(!useDC);
       return AccessLevel::Public;
     }
     if (useDC && (result == AccessLevel::Internal ||
