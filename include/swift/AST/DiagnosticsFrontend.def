@@ -235,7 +235,7 @@ WARNING(cannot_assign_value_to_conditional_compilation_flag,none,
 ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
       (StringRef, StringRef))
 
-ERROR(error_compilation_failed,none, "compilation failed", ())
+ERROR(error_some_error_occured_in_a_file_that_was_used_in_this_one,none, "some error occured in a file that was used by this one", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

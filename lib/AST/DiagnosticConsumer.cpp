@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "swift-ast"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/STLExtras.h"
@@ -71,7 +72,8 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
     Optional<unsigned> bufferID = SM.getIDForBufferIdentifier(pair.first);
     assert(bufferID.hasValue() && "consumer registered for unknown file");
     CharSourceRange range = SM.getRangeForBuffer(bufferID.getValue());
-    ConsumersOrderedByRange.emplace_back(range, pair.second.get());
+    ConsumersOrderedByRange.emplace_back(
+        ConsumerSpecificInformation(range, pair.second.get()));
   }
 
   // Sort the "map" by buffer /end/ location, for use with std::lower_bound
@@ -79,23 +81,23 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
   // ranges must not be overlapping, but since we need to check end locations
   // later it's consistent to sort by that here.)
   std::sort(ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(),
-            [](const ConsumersOrderedByRangeEntry &left,
-               const ConsumersOrderedByRangeEntry &right) -> bool {
-    auto compare = std::less<const char *>();
-    return compare(getRawLoc(left.first.getEnd()).getPointer(),
-                   getRawLoc(right.first.getEnd()).getPointer());
-  });
+            [](const ConsumerSpecificInformation &left,
+               const ConsumerSpecificInformation &right) -> bool {
+              auto compare = std::less<const char *>();
+              return compare(getRawLoc(left.range.getEnd()).getPointer(),
+                             getRawLoc(right.range.getEnd()).getPointer());
+            });
 
   // Check that the ranges are non-overlapping. If the files really are all
   // distinct, this should be trivially true, but if it's ever not we might end
   // up mis-filing diagnostics.
   assert(ConsumersOrderedByRange.end() ==
-           std::adjacent_find(ConsumersOrderedByRange.begin(),
-                              ConsumersOrderedByRange.end(),
-                              [](const ConsumersOrderedByRangeEntry &left,
-                                 const ConsumersOrderedByRangeEntry &right) {
-                                return left.first.overlaps(right.first);
-                              }) &&
+             std::adjacent_find(ConsumersOrderedByRange.begin(),
+                                ConsumersOrderedByRange.end(),
+                                [](const ConsumerSpecificInformation &left,
+                                   const ConsumerSpecificInformation &right) {
+                                  return left.range.overlaps(right.range);
+                                }) &&
          "overlapping ranges despite having distinct files");
 }
 
@@ -139,20 +141,17 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
   // that /might/ contain 'loc'. Specifically, since the ranges are sorted
   // by end location, it's looking for the first range where the end location
   // is greater than or equal to 'loc'.
-  auto possiblyContainingRangeIter =
-      std::lower_bound(ConsumersOrderedByRange.begin(),
-                       ConsumersOrderedByRange.end(),
-                       loc,
-                       [](const ConsumersOrderedByRangeEntry &entry,
-                          SourceLoc loc) -> bool {
-    auto compare = std::less<const char *>();
-    return compare(getRawLoc(entry.first.getEnd()).getPointer(),
-                   getRawLoc(loc).getPointer());
-  });
+  auto possiblyContainingRangeIter = std::lower_bound(
+      ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(), loc,
+      [](const ConsumerSpecificInformation &entry, SourceLoc loc) -> bool {
+        auto compare = std::less<const char *>();
+        return compare(getRawLoc(entry.range.getEnd()).getPointer(),
+                       getRawLoc(loc).getPointer());
+      });
 
   if (possiblyContainingRangeIter != ConsumersOrderedByRange.end() &&
-      possiblyContainingRangeIter->first.contains(loc)) {
-    return possiblyContainingRangeIter->second;
+      possiblyContainingRangeIter->range.contains(loc)) {
+    return possiblyContainingRangeIter->consumer;
   }
 
   return None;
@@ -176,34 +175,55 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     break;
   }
 
-  const bool isErrorFatal = Kind == DiagnosticKind::Error;
   if (!specificConsumer.hasValue()) {
     for (auto &subConsumer : SubConsumers) {
       if (subConsumer.second) {
         subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
                                              FormatArgs, Info);
-        WasAFatalDiagnosticEmitted |= isErrorFatal;
       }
     }
-  } else if (DiagnosticConsumer *c = specificConsumer.getValue()) {
+  } else if (DiagnosticConsumer *c = specificConsumer.getValue())
     c->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
-    WasAFatalDiagnosticEmitted |= isErrorFatal;
-  } else { // Suppress non-primary diagnostic in batch mode.
-    WasAFatalDiagnosticSuppressed |= isErrorFatal;
-  }
-}
-
-bool FileSpecificDiagnosticConsumer::hadOnlySuppressedFatalErrors() const {
-  return WasAFatalDiagnosticSuppressed && !WasAFatalDiagnosticEmitted;
+  else
+    WasAnErrorSuppressed =
+        true; // Suppress non-primary diagnostic in batch mode.
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {
   // Deliberately don't use std::any_of here because we don't want early-exit
   // behavior.
+
+  addNonSpecificErrors();
+
   bool hadError = false;
   for (auto &subConsumer : SubConsumers)
     hadError |= subConsumer.second && subConsumer.second->finishProcessing();
   return hadError;
+}
+
+void FileSpecificDiagnosticConsumer::addNonSpecificErrors() {
+  if (!WasAnErrorSuppressed)
+    return;
+
+  SourceManager s;
+
+  Diagnostic diagnostic(
+      diag::error_some_error_occured_in_a_file_that_was_used_in_this_one);
+
+  // Stolen from DiagnosticEngine::emitDiagnostic
+  DiagnosticInfo Info;
+  Info.ID = diagnostic.getID();
+  Info.Ranges = diagnostic.getRanges();
+  Info.FixIts = diagnostic.getFixIts();
+
+  for (auto &info : ConsumersOrderedByRange) {
+    if (!info.hasAnErrorBeenEmitted && info.consumer) {
+      info.consumer->handleDiagnostic(s, SourceLoc(), DiagnosticKind::Error,
+                                      diagnosticStrings[(unsigned)Info.ID],
+                                      diagnostic.getArgs(), Info);
+      info.hasAnErrorBeenEmitted = true;
+    }
+  }
 }
 
 void NullDiagnosticConsumer::handleDiagnostic(

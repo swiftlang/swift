@@ -101,8 +101,6 @@ public:
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
-
-  virtual bool hadOnlySuppressedFatalErrors() const { return false; }
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.
@@ -142,10 +140,17 @@ private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
   const SmallVector<ConsumerPair, 4> SubConsumers;
 
-  /// The DiagnosticConsumer may be empty if those diagnostics are not to be
-  /// emitted.
-  using ConsumersOrderedByRangeEntry =
-    std::pair<CharSourceRange, DiagnosticConsumer *>;
+  struct ConsumerSpecificInformation {
+    const CharSourceRange range;
+    /// The DiagnosticConsumer may be empty if those diagnostics are not to be
+    /// emitted.
+    DiagnosticConsumer *const consumer;
+    bool hasAnErrorBeenEmitted = false;
+
+    ConsumerSpecificInformation(const CharSourceRange range,
+                                DiagnosticConsumer *const consumer)
+        : range(range), consumer(consumer) {}
+  };
 
   /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
   /// the end locations of each file so that a lookup by position can be done
@@ -156,7 +161,7 @@ private:
   /// as long as they don't have source locations.
   ///
   /// \see #consumerForLocation
-  SmallVector<ConsumersOrderedByRangeEntry, 4> ConsumersOrderedByRange;
+  SmallVector<ConsumerSpecificInformation, 4> ConsumersOrderedByRange;
 
   /// Indicates which consumer to send Note diagnostics too.
   ///
@@ -167,8 +172,7 @@ private:
   /// If null, diagnostics are suppressed.
   Optional<DiagnosticConsumer *> ConsumerForSubsequentNotes = None;
 
-  bool WasAFatalDiagnosticSuppressed = false;
-  bool WasAFatalDiagnosticEmitted = false;
+  bool WasAnErrorSuppressed = false;
 
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
@@ -186,9 +190,8 @@ public:
 
   bool finishProcessing() override;
 
-  bool hadOnlySuppressedFatalErrors() const override;
-
 private:
+  void addNonSpecificErrors();
   void computeConsumersOrderedByRange(SourceManager &SM);
 
   /// Returns nullptr if diagnostic is to be suppressed,

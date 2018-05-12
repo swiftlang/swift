@@ -259,14 +259,6 @@ bool DiagnosticEngine::finishProcessing() {
   return hadError;
 }
 
-bool DiagnosticEngine::hadOnlySuppressedFatalErrors() const {
-  for (auto &Consumer : Consumers) {
-    if (Consumer->hadOnlySuppressedFatalErrors())
-      return true;
-  }
-  return false;
-}
-
 /// \brief Skip forward to one of the given delimiters.
 ///
 /// \param Text The text to search through, which will be updated to point

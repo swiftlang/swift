@@ -1651,9 +1651,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   auto finishDiagProcessing = [&](int retValue) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
-    if (Instance->getDiags().hadOnlySuppressedFatalErrors())
-      Instance->getDiags().diagnose(SourceLoc(),
-                                    diag::error_compilation_failed);
     bool err = Instance->getDiags().finishProcessing();
     return retValue ? retValue : err;
   };
