@@ -65,7 +65,6 @@ class SILArgument;
 class SILUndef;
 class Stmt;
 class StringLiteralExpr;
-class Substitution;
 class ValueDecl;
 class VarDecl;
 class FunctionRefInst;

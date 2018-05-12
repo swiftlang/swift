@@ -77,7 +77,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             RecursiveSubs = AI.getFunction()
                                ->getLoweredFunctionType()
                                ->getGenericSignature()
-                               ->getSubstitutionMap(Subs.toList());
+                               ->getSubstitutionMap(Subs);
 
             // Use the new set of substitutions to compute the new
             // substituted callee type.

@@ -466,7 +466,7 @@ bool GenericSignature::enumeratePairedRequirements(
 }
 
 SubstitutionMap
-GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
+GenericSignature::getSubstitutionMap(SubstitutionMap subs) const {
   return SubstitutionMap::get(const_cast<GenericSignature *>(this), subs);
 }
 
@@ -478,43 +478,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
                               subs, lookupConformance);
 }
 
-void GenericSignature::
-getSubstitutions(const SubstitutionMap &subMap,
-                 SmallVectorImpl<Substitution> &result) const {
-
-  // Enumerate all of the requirements that require substitution.
-  enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {
-    auto &ctx = getASTContext();
-
-    // Compute the replacement type.
-    Type currentReplacement = depTy.subst(subMap);
-    if (!currentReplacement)
-      currentReplacement = ErrorType::get(depTy);
-
-    // Collect the conformances.
-    SmallVector<ProtocolConformanceRef, 4> currentConformances;
-    for (auto req: reqs) {
-      assert(req.getKind() == RequirementKind::Conformance);
-      auto protoDecl = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-      if (auto conformance = subMap.lookupConformance(depTy->getCanonicalType(),
-                                                      protoDecl)) {
-        currentConformances.push_back(*conformance);
-      } else {
-        if (!currentReplacement->hasError())
-          currentReplacement = ErrorType::get(currentReplacement);
-        currentConformances.push_back(ProtocolConformanceRef(protoDecl));
-      }
-    }
-
-    // Add it to the final substitution list.
-    result.push_back({
-      currentReplacement,
-      ctx.AllocateCopy(currentConformances)
-    });
-
-    return false;
-  });
-}
 
 bool GenericSignature::requiresClass(Type type) {
   if (!type->isTypeParameter()) return false;

@@ -18,7 +18,6 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"

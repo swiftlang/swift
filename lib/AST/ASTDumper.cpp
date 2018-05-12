@@ -2792,20 +2792,6 @@ void TypeRepr::dump() const {
   llvm::errs() << '\n';
 }
 
-void Substitution::dump() const {
-  dump(llvm::errs());
-}
-
-void Substitution::dump(llvm::raw_ostream &out, unsigned indent) const {
-  out.indent(indent);
-  print(out);
-  out << '\n';
-
-  for (auto &c : Conformance) {
-    c.dump(out, indent + 2);
-  }
-}
-
 void ProtocolConformanceRef::dump() const {
   dump(llvm::errs());
 }
@@ -2819,14 +2805,6 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
                        << getAbstract()->getName();
     PrintWithColorRAII(out, ParenthesisColor) << ')';
     out << '\n';
-  }
-}
-
-void swift::dump(SubstitutionList subs) {
-  unsigned i = 0;
-  for (const auto &s : subs) {
-    llvm::errs() << i++ << ": ";
-    s.dump();
   }
 }
 

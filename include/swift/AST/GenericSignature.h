@@ -19,7 +19,6 @@
 
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -32,7 +31,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
-class Substitution;
 class SubstitutionMap;
 
 /// An access path used to find a particular protocol conformance within
@@ -177,9 +175,9 @@ public:
     return Mem;
   }
 
-  /// Build an interface type substitution map from a vector of Substitutions
-  /// that correspond to the generic parameters in this generic signature.
-  SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
+  /// Build a substitution map for this generic signature by looking up
+  /// substitutions in the given substitution map.
+  SubstitutionMap getSubstitutionMap(SubstitutionMap subs) const;
 
   /// Build an interface type substitution map from a type substitution function
   /// and conformance lookup function.
@@ -192,11 +190,6 @@ public:
   /// parameters which have conformance constraints on them.
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
-
-  /// Build an array of substitutions from an interface type substitution map,
-  /// using the given function to look up conformances.
-  void getSubstitutions(const SubstitutionMap &subMap,
-                        SmallVectorImpl<Substitution> &result) const;
 
   /// Enumerate all of the dependent types in the type signature that will
   /// occur in substitution lists (in order), along with the set of

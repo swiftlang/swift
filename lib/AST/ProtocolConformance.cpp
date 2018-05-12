@@ -21,7 +21,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
@@ -893,14 +892,9 @@ SpecializedProtocolConformance::getWitnessDeclRef(
   auto specializationMap = getSubstitutionMap();
 
   auto witnessDecl = baseWitness.getDecl();
-  auto witnessSig =
-    witnessDecl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto witnessMap = baseWitness.getSubstitutions();
 
   auto combinedMap = witnessMap.subst(specializationMap);
-
-  SmallVector<Substitution, 4> substSubs;
-  witnessSig->getSubstitutions(combinedMap, substSubs);
 
   // Fast path if the substitutions didn't change.
   if (combinedMap == baseWitness.getSubstitutions())
