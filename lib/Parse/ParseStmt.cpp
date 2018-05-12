@@ -972,6 +972,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     // represents tuples and var patterns as tupleexprs and
     // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
+      P.setLocalDiscriminator(VD);
       if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
@@ -993,6 +994,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       for (auto previous : boundDecls) {
         if (previous->hasName() && previous->getName() == VD->getName()) {
           found = true;
+          // Use the same local discriminator.
+          VD->setLocalDiscriminator(previous->getLocalDiscriminator());
           break;
         }
       }
@@ -1390,6 +1393,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   // Add variable bindings from the pattern to our current scope and mark
   // them as being having a non-pattern-binding initializer.
   ThePattern.get()->forEachVariable([&](VarDecl *VD) {
+    setLocalDiscriminator(VD);
     if (VD->hasName())
       addToScope(VD);
     VD->setHasNonPatternBindingInit();
