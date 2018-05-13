@@ -384,7 +384,7 @@ void AccessConflictAnalysis::identifyBeginAccesses() {
       // gracefully ignore unrecognized source address patterns, which show up
       // here as an invalid `storage` value.
       const AccessedStorage &storage =
-          findAccessedStorageNonNested(beginAccess->getSource());
+          findDynamicAccessedStorage(beginAccess->getSource());
       if (!storage)
         continue;
 
@@ -587,13 +587,14 @@ foldNonNestedAccesses(AccessConflictAnalysis::AccessMap &accessMap) {
 ///
 /// - Stack or Box local storage could potentially be accessed via Unidentified
 ///   access. (Some Unidentified accesses are for initialization or for
-///   temporary storage instead, but those should never have Dynamic
-///   enforcement). These accesses can only be eliminated when there is no
-///   Unidentified access within the function without the [no_nested_conflict]
-///   flag.
+///   temporary storage instead, but those should always have Unsafe
+///   enforcement). If this function contains an Unidentified access without its
+///   [no_nested_conflict] flag set, then any of the function's local storage
+///   could have a nested conflict.
 static bool
 removeLocalNonNestedAccess(const AccessConflictAnalysis::Result &result,
                            const FunctionAccessedStorage &functionAccess) {
+  // Unidentified access could alias with this function's local storage.
   if (functionAccess.hasUnidentifiedAccess())
     return false;
 

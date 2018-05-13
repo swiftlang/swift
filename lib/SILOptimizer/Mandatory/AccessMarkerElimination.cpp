@@ -37,13 +37,11 @@
 using namespace swift;
 
 // This temporary option allows markers during optimization passes. Enabling
-// this flag causes this pass to preserve only dynamic checks when dynamic
-// checking is enabled. Otherwise, this pass removes all checks.
-//
-// This is currently unsupported because tail duplication results in
-// address-type block arguments.
+// this flag causes this pass to preserve static checks (as well as dynamic
+// checks) when dynamic checking is enabled. Otherwise, this pass removes all
+// static checks.
 llvm::cl::opt<bool> EnableOptimizedAccessMarkers(
-    "sil-optimized-access-markers", llvm::cl::init(true),
+    "sil-optimized-access-markers", llvm::cl::init(false),
     llvm::cl::desc("Enable memory access markers during optimization passes."));
 
 namespace {
@@ -80,13 +78,10 @@ struct AccessMarkerElimination {
 
 bool AccessMarkerElimination::shouldPreserveAccess(
     SILAccessEnforcement enforcement) {
-  if (!EnableOptimizedAccessMarkers)
-    return false;
-
   switch (enforcement) {
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
-    return false;
+    return EnableOptimizedAccessMarkers;
   case SILAccessEnforcement::Unknown:
   case SILAccessEnforcement::Dynamic:
     return Mod->getOptions().EnforceExclusivityDynamic;

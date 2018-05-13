@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -28,6 +29,14 @@ AccessedStorage::Kind AccessedStorage::classify(SILValue base) {
     return Stack;
   case ValueKind::GlobalAddrInst:
     return Global;
+  case ValueKind::ApplyInst: {
+    FullApplySite apply(cast<ApplyInst>(base));
+    if (auto *funcRef = apply.getReferencedFunction()) {
+      if (getVariableOfGlobalInit(funcRef))
+        return Global;
+    }
+    return Unidentified;
+  }
   case ValueKind::RefElementAddrInst:
     return Class;
   // A function argument is effectively a nested access, enforced
@@ -67,7 +76,19 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     paramIndex = cast<SILFunctionArgument>(base)->getIndex();
     break;
   case Global:
-    global = cast<GlobalAddrInst>(base)->getReferencedGlobal();
+    if (auto *GAI = dyn_cast<GlobalAddrInst>(base))
+      global = GAI->getReferencedGlobal();
+    else {
+      FullApplySite apply(cast<ApplyInst>(base));
+      auto *funcRef = apply.getReferencedFunction();
+      assert(funcRef);
+      global = getVariableOfGlobalInit(funcRef);
+      assert(global);
+      // Require a decl for all formally accessed globals defined in this
+      // module. (Access of globals defined elsewhere has Unidentified storage).
+      // AccessEnforcementWMO requires this.
+      assert(global->getDecl());
+    }
     break;
   case Class: {
     // Do a best-effort to find the identity of the object being projected
@@ -149,10 +170,31 @@ void AccessedStorage::print(raw_ostream &os) const {
 
 void AccessedStorage::dump() const { print(llvm::dbgs()); }
 
-// Given an address base is a block argument, verify that it is actually a box
-// projected from a switch_enum. This is a valid pattern at any SIL stage
-// resulting in a block-type phi. In later SIL stages, the optimizer may form
-// address-type phis, causing this assert if called on those cases.
+/// Return true if the given apply invokes a global addressor defined in another
+/// module.
+static bool isExternalGlobalAddressor(ApplyInst *AI) {
+  FullApplySite apply(AI);
+  auto *funcRef = apply.getReferencedFunction();
+  if (!funcRef)
+    return false;
+  
+  return funcRef->isGlobalInit() && funcRef->isExternalDeclaration();
+}
+
+/// Return true of the given SILValue produces an UnsafePointer.
+static bool isUnsafePointerProducer(SILValue ptrVal) {
+  SILType ptrTy = ptrVal->getType();
+  if (ptrTy.isAddress())
+    return false;
+
+  PointerTypeKind PTK;
+  return bool(ptrTy.getASTType()->getAnyPointerElementType(PTK));
+}
+
+/// Given an address base is a block argument, verify that it is actually a box
+/// projected from a switch_enum. This is a valid pattern at any SIL stage
+/// resulting in a block-type phi. In later SIL stages, the optimizer may form
+/// address-type phis, causing this assert if called on those cases.
 static void checkSwitchEnumBlockArg(SILPHIArgument *arg) {
   assert(!arg->getType().isAddress());
   SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
@@ -186,23 +228,64 @@ static bool isAddressForLocalInitOnly(SILValue sourceAddr) {
   }
 }
 
-AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
+// AccessEnforcementWMO makes a strong assumption that all accesses are either
+// identified or are *not* accessing a global variable or class property defined
+// in this module. Consequently, we cannot simply bail out on
+// PointerToAddressInst as an Unidentified access.
+static AccessedStorage findAccessedStorage(SILValue sourceAddr,
+                                           bool isDynamic) {
   SILValue address = sourceAddr;
   while (true) {
     AccessedStorage::Kind kind = AccessedStorage::classify(address);
-    // First handle identified cases: these are always valid as the base of a
-    // formal access.
+    // First handle identified cases: these are always valid as the base of
+    // a formal access.
     if (kind != AccessedStorage::Unidentified)
       return AccessedStorage(address, kind);
+
+    // UnsafePointers may be indirectly accessed via inout arguments.
+    // UnsafePointer access only occurs after inlining inout arguments, which
+    // must be statically enforced. Note: since the address originates from
+    // UnsafePointer, no enforcement is actually needed, but that can't be
+    // known until after inlining.
+    if (!isDynamic && isUnsafePointerProducer(address)) {
+      return AccessedStorage(address, AccessedStorage::Unidentified);
+    }
+
+    // Check for Builtin.RawPointer producers before looking through
+    // struct/tuple_extract.
+    //
+    // e.g. MaterializeForSet produces a tuple contianing a RawPointer. It may
+    // only be accessed directly after inlining an inout argument.
+    //
+    // For static access, any RawPointer is a valid address. For dynamic access,
+    // we must look through the source of the pointer and verify that it is from
+    // a known, recognizable addressor.
+    if (!isDynamic && address->getType().is<BuiltinRawPointerType>())
+      return AccessedStorage(address, AccessedStorage::Unidentified);
 
     // Handle other unidentified address sources.
     switch (address->getKind()) {
     default:
-      if (isAddressForLocalInitOnly(address))
+      if (!isDynamic && isAddressForLocalInitOnly(address))
         return AccessedStorage(address, AccessedStorage::Unidentified);
+
       return AccessedStorage();
 
-    case ValueKind::PointerToAddressInst:
+    // Addressors.
+    //
+    // Since apply does not produce addresses, this must be the source of a
+    // pointer_to_address. UnsafePointer producers are checked above. Here we
+    // check for a recognized call producing Builtin.RawPointer.
+    case ValueKind::ApplyInst:
+      // Global addressors produce the address for formal accessed.
+      if (isExternalGlobalAddressor(cast<ApplyInst>(address)))
+        return AccessedStorage(address, AccessedStorage::Unidentified);
+
+      // Since struct_extract does not produce addresses, this must be the
+      // source of a pointer_to_address. Don't allow any other pointers to be
+      // accessed.
+      return AccessedStorage();
+
     case ValueKind::SILUndef:
       return AccessedStorage(address, AccessedStorage::Unidentified);
 
@@ -233,6 +316,7 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     // Look through address casts to find the source address.
     case ValueKind::MarkUninitializedInst:
     case ValueKind::OpenExistentialAddrInst:
+    case ValueKind::PointerToAddressInst:
     case ValueKind::UncheckedAddrCastInst:
     // Inductive cases that apply to any type.
     case ValueKind::CopyValueInst:
@@ -250,8 +334,11 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       continue;
 
     // Subobject projections.
+    // Includes non-address extracts to handle pointer_to_address source.
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
+    case ValueKind::StructExtractInst:
+    case ValueKind::TupleExtractInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::RefTailAddrInst:
     case ValueKind::TailAddrInst:
@@ -262,14 +349,22 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
   }
 }
 
-AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
-  while (true) {
-    const AccessedStorage &storage = findAccessedStorage(sourceAddr);
-    if (!storage || storage.getKind() != AccessedStorage::Nested)
-      return storage;
-    
-    sourceAddr = cast<BeginAccessInst>(storage.getValue())->getSource();
-  }
+AccessedStorage swift::findUnknownAccessedStorage(SILValue sourceAddr) {
+  return findAccessedStorage(sourceAddr, /*isDynamic=*/false);
+}
+
+AccessedStorage swift::findDynamicAccessedStorage(SILValue sourceAddr) {
+  const AccessedStorage &storage =
+      findAccessedStorage(sourceAddr, /*isDynamic=*/true);
+
+  // Nested access occurs after inlining a function in which inout arguments are
+  // passed inout to a callee:
+  // e.g. foo(x: inout Int) { bar(&x) }
+  // Exclusivity rules require static enforcement of inout arguments.
+  assert(storage.getKind() != AccessedStorage::Nested
+         && "Nested dynamic access is not allowed");
+
+  return storage;
 }
 
 // Return true if the given access is on a 'let' lvalue.
@@ -340,8 +435,9 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     // checking. However, for the purpose of inserting unenforced markers and
     // performaing verification, it needs to be ignored.
     auto *BAI = cast<BeginAccessInst>(storage.getValue());
+    assert(BAI->getEnforcement() != SILAccessEnforcement::Dynamic);
     const AccessedStorage &nestedStorage =
-      findAccessedStorage(BAI->getSource());
+        findUnknownAccessedStorage(BAI->getSource());
     if (!nestedStorage)
       return false;
 

@@ -350,15 +350,19 @@ namespace swift {
 /// If `sourceAddr` is produced by a begin_access, this returns a Nested
 /// AccessedStorage kind. This is useful for exclusivity checking to distinguish
 /// between a nested access vs. a conflict.
-AccessedStorage findAccessedStorage(SILValue sourceAddr);
+AccessedStorage findUnknownAccessedStorage(SILValue sourceAddr);
 
-/// Given an address accessed by an instruction that reads or modifies
-/// memory, return an AccessedStorage that identifies the formal access, looking
-/// through any Nested access to find the original storage.
+/// Given an address that is accessed with dynamic enforcement, return
+/// an AccessedStorage object that identifies the formal access.
 ///
-/// This is identical to findAccessedStorage(), but never returns Nested
-/// storage.
-AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
+/// This has the same behavior findUnknownAccessedStorage except that dynamic
+/// access has stricter requirements. In particular, Unidentified access is only
+/// allowed for patterns that are recognized as local access. This should be
+/// used by any optimization pass that analyzes dynamic access and assumes that
+/// Global or Class access does not alias with Unidentified access.
+///
+/// The returned AccessedStorage will never be Nested.
+AccessedStorage findDynamicAccessedStorage(SILValue sourceAddr);
 
 /// Return true if the given address operand is used by a memory operation that
 /// initializes the memory at that address, implying that the previous value is

@@ -272,7 +272,7 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
     if (argVal) {
       // Remap the argument source value and inherit the old storage info.
-      return StorageAccessInfo(findAccessedStorageNonNested(argVal), storage);
+      return StorageAccessInfo(findDynamicAccessedStorage(argVal), storage);
     }
     // If the argument can't be transformed, demote it to an unidentified
     // access.
@@ -304,7 +304,7 @@ void FunctionAccessedStorage::visitBeginAccess(B *beginAccess) {
     return;
 
   const AccessedStorage &storage =
-      findAccessedStorageNonNested(beginAccess->getSource());
+      findDynamicAccessedStorage(beginAccess->getSource());
 
   if (storage.getKind() == AccessedStorage::Unidentified) {
     // This also catches invalid storage.

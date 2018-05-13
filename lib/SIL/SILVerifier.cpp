@@ -1605,10 +1605,21 @@ public:
       break;
     }
 
-    // For dynamic Read/Modify access, AccessEnforcementWMO assumes a valid
-    // AccessedStorage and runs very late in the optimizer pipeline.
-    // TODO: eventually, make this true for any kind of access.
-    findAccessedStorage(sourceOper);
+    // Verify that all formal accesses patterns are recognized as part of a
+    // whitelist. The presence of an unknown pattern means that analysis will
+    // silently fail, and the compiler may be introducing undefined behavior
+    // with no other way to detect it.
+    //
+    // For example, AccessEnforcementWMO runs very late in the
+    // pipeline and assumes valid storage for all dynamic Read/Modify access. It
+    // also requires that Unidentified access fit a whitelist on known
+    // non-internal globals or class properties.
+    if (BAI->getEnforcement() == SILAccessEnforcement::Dynamic)
+      require(findDynamicAccessedStorage(sourceOper),
+              "Unknown dynamic formal access pattern");
+    else
+      require(findUnknownAccessedStorage(sourceOper),
+              "Unknown formal access pattern");
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {

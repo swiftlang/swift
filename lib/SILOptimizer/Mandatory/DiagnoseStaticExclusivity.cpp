@@ -589,7 +589,7 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
 
 /// Look through a value to find the underlying storage accessed.
 static AccessedStorage findValidAccessedStorage(SILValue Source) {
-  const AccessedStorage &Storage = findAccessedStorage(Source);
+  const AccessedStorage &Storage = findUnknownAccessedStorage(Source);
   if (!Storage) {
     llvm::dbgs() << "Bad memory access source: " << Source;
     llvm_unreachable("Unexpected access source.");
@@ -1058,13 +1058,12 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   }
 
   // Strip off address projections, but not ref_element_addr.
-  const AccessedStorage &storage = findAccessedStorage(address);
-  // findAccessedStorage may return an invalid storage object if the address
-  // producer is not recognized by its whitelist. For the purpose of
-  // verification, we assume that this can only happen for local
-  // initialization, not a formal memory access. The strength of
-  // verification rests on the completeness of the opcode list inside
-  // findAccessedStorage.
+  const AccessedStorage &storage = findUnknownAccessedStorage(address);
+  // findUnknownAccessedStorage may return an invalid storage object if the
+  // address producer is not recognized by its whitelist. For the purpose of
+  // verification, we assume that this can only happen for local initialization,
+  // not a formal memory access. The strength of verification rests on the
+  // completeness of the opcode list inside findUnknownAccessedStorage.
   if (!storage || !isPossibleFormalAccessBase(storage, memInst->getFunction()))
     return;
 

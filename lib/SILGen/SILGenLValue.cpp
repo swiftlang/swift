@@ -500,7 +500,7 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  const AccessedStorage &storage = findAccessedStorage(address);
+  const AccessedStorage &storage = findUnknownAccessedStorage(address);
   if (!storage) {
     llvm::dbgs() << "Bad memory access source: " << address;
     llvm_unreachable("Unexpected access source.");
