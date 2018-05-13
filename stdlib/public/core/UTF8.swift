@@ -88,8 +88,9 @@ extension Unicode.UTF8 : _UnicodeEncoding {
       _biasedBits: (o | c ) &+ 0b0__1000_0001__1000_0001__1000_0001__1111_0001)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
+
+  @_specialize(where FromEncoding == Unicode.UTF8)
+  @_specialize(where FromEncoding == Unicode.UTF16)
   public static func transcode<FromEncoding : _UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
