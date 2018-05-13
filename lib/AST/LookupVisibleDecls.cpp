@@ -877,7 +877,14 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       LS = LS.withOnMetatype();
     }
 
-    GenericParamList *GenericParams = DC->getGenericParamsOfContext();
+    // Look for generic parameters in the current context. Those in parent
+    // contexts will be looked up anyways via `lookupVisibleMemberDecls`.
+    if (auto decl = DC->getAsDeclOrDeclExtensionContext()) {
+      if (auto GC = decl->getAsGenericContext()) {
+        auto params = GC->getGenericParams();
+        namelookup::FindLocalVal(SM, Loc, Consumer).checkGenericParams(params);
+      }
+    }
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
@@ -926,10 +933,6 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
                                  TypeResolver, nullptr);
     }
-
-    // Check any generic parameters for something with the given name.
-    namelookup::FindLocalVal(SM, Loc, Consumer)
-          .checkGenericParams(GenericParams);
 
     DC = DC->getParent();
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;

@@ -68,7 +68,7 @@ protocol Assoc {
 }
 
 func f1<T>(_: T) where #^FUNC_1^# {}
-// GEN_T: Decl[GenericTypeParam]/Local:       T[#T#];
+// GEN_T: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
 func f2<T>(_: T) where T.#^FUNC_2^# {}
 // GEN_T_DOT: Begin completions
 // GEN_T_DOT-DAG: Keyword/None:                       Type[#T.Type#];
