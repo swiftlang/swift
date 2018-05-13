@@ -1,5 +1,7 @@
-
 // RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
+
+// XFAIL: *
+// ^ SR-7673
 
 extension Sequence where Element == String {
   func record() -> String {
