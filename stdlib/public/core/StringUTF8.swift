@@ -696,7 +696,6 @@ extension String.UTF8View {
     return String.UTF8View.SubSequence(self, _bounds: r)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(r: Range<Index>) -> String.UTF8View {
     let wholeString = String(_guts)
@@ -728,7 +727,6 @@ extension String.UTF8View {
       legacyPartialCharacters: legacyPartialCharacters)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String.UTF8View {
     return self[bounds.relative(to: self)]

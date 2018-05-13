@@ -899,7 +899,6 @@ extension String {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
     self._guts.append(other._guts)
   }
@@ -975,12 +974,12 @@ extension Sequence where Element: StringProtocol {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
-  @inlinable // FIXME(sil-serialize-all)
+  @_specialize(where Self == Array<Substring>)
+  @_specialize(where Self == Array<String>)
   public func joined(separator: String = "") -> String {
     return _joined(separator: separator)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal func _joined(separator: String = "") -> String {
     let separatorSize = separator._guts.count
     var width = separator._guts.byteWidth
@@ -1036,7 +1035,7 @@ extension BidirectionalCollection where Iterator.Element == String {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
-  @inlinable // FIXME(sil-serialize-all)
+  @_specialize(where Self == Array<String>)
   public func joined(separator: String = "") -> String {
     return _joined(separator: separator)
   }
@@ -1051,7 +1050,6 @@ internal func _stdlib_NSStringLowercaseString(_ str: AnyObject) -> _CocoaString
 @_silgen_name("swift_stdlib_NSStringUppercaseString")
 internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 #else
-@inlinable // FIXME(sil-serialize-all)
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
 
   // TODO (TODO: JIRA): check for small
@@ -1082,7 +1080,6 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   return String(_largeStorage: storage)
 }
 
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
 
@@ -1152,7 +1149,6 @@ extension String {
   /// - Returns: A lowercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @inlinable // FIXME(sil-serialize-all)
   public func lowercased() -> String {
     if _guts.isASCII {
       var guts = _guts
@@ -1200,7 +1196,6 @@ extension String {
   /// - Returns: An uppercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @inlinable // FIXME(sil-serialize-all)
   public func uppercased() -> String {
     if _guts.isASCII {
       var guts = _guts
