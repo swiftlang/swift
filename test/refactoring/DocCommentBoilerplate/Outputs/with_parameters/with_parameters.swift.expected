@@ -7,3 +7,4 @@
 func funcWithParamsNoReturnNoThrow(_ a: Int, b: Int, c: String) {
     
 }
+

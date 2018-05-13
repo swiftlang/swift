@@ -3,3 +3,4 @@
 func funcWithNoParamsNoReturnNoThrow() {
     
 }
+
