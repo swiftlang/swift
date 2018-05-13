@@ -157,11 +157,15 @@ extension _SmallUTF8String {
   @inlinable
   public // @testable
   init?(_ scalar: Unicode.Scalar) {
+#if arch(i386) || arch(arm)
+    return nil // Never form small strings on 32-bit
+#else
     // FIXME: support transcoding
     guard scalar.value <= 0x7F else { return nil }
     self.init()
     self.count = 1
     self[0] = UInt8(truncatingIfNeeded: scalar.value)
+#endif
   }
 }
 
