@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -28,6 +29,14 @@ AccessedStorage::Kind AccessedStorage::classify(SILValue base) {
     return Stack;
   case ValueKind::GlobalAddrInst:
     return Global;
+  case ValueKind::ApplyInst: {
+    FullApplySite apply(cast<ApplyInst>(base));
+    if (auto *funcRef = apply.getReferencedFunction()) {
+      if (getVariableOfGlobalInit(funcRef))
+        return Global;
+    }
+    return Unidentified;
+  }
   case ValueKind::RefElementAddrInst:
     return Class;
   // A function argument is effectively a nested access, enforced
@@ -67,7 +76,19 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     paramIndex = cast<SILFunctionArgument>(base)->getIndex();
     break;
   case Global:
-    global = cast<GlobalAddrInst>(base)->getReferencedGlobal();
+    if (auto *GAI = dyn_cast<GlobalAddrInst>(base))
+      global = GAI->getReferencedGlobal();
+    else {
+      FullApplySite apply(cast<ApplyInst>(base));
+      auto *funcRef = apply.getReferencedFunction();
+      assert(funcRef);
+      global = getVariableOfGlobalInit(funcRef);
+      assert(global);
+      // Require a decl for all formally accessed globals defined in this
+      // module. (Access of globals defined elsewhere has Unidentified storage).
+      // AccessEnforcementWMO requires this.
+      assert(global->getDecl());
+    }
     break;
   case Class: {
     // Do a best-effort to find the identity of the object being projected
@@ -149,6 +170,17 @@ void AccessedStorage::print(raw_ostream &os) const {
 
 void AccessedStorage::dump() const { print(llvm::dbgs()); }
 
+// Return true if the given apply invokes a global addressor defined in another
+// module.
+static bool isExternalGlobalAddressor(ApplyInst *AI) {
+  FullApplySite apply(AI);
+  auto *funcRef = apply.getReferencedFunction();
+  if (!funcRef)
+    return false;
+  
+  return funcRef->isGlobalInit() && funcRef->isExternalDeclaration();
+}
+
 // Given an address base is a block argument, verify that it is actually a box
 // projected from a switch_enum. This is a valid pattern at any SIL stage
 // resulting in a block-type phi. In later SIL stages, the optimizer may form
@@ -186,12 +218,16 @@ static bool isAddressForLocalInitOnly(SILValue sourceAddr) {
   }
 }
 
+// AccessEnforcementWMO makes a strong assumption that all accesses are either
+// identified or are *not* accessing a global variable or class property defined
+// in this module. Consequently, we cannot simply bail out on
+// PointerToAddressInst as an Unidentified access.
 AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
   SILValue address = sourceAddr;
   while (true) {
     AccessedStorage::Kind kind = AccessedStorage::classify(address);
-    // First handle identified cases: these are always valid as the base of a
-    // formal access.
+    // First handle identified cases: these are always valid as the base of
+    // a formal access.
     if (kind != AccessedStorage::Unidentified)
       return AccessedStorage(address, kind);
 
@@ -202,9 +238,15 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
         return AccessedStorage(address, AccessedStorage::Unidentified);
       return AccessedStorage();
 
-    case ValueKind::PointerToAddressInst:
     case ValueKind::SILUndef:
       return AccessedStorage(address, AccessedStorage::Unidentified);
+
+    case ValueKind::ApplyInst:
+      if (isExternalGlobalAddressor(cast<ApplyInst>(address)))
+        return AccessedStorage(address, AccessedStorage::Unidentified);
+
+      // Don't currently allow any other calls to return an accessed address.
+      return AccessedStorage();
 
     // A block argument may be a box value projected out of
     // switch_enum. Address-type block arguments are not allowed.
@@ -233,6 +275,7 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     // Look through address casts to find the source address.
     case ValueKind::MarkUninitializedInst:
     case ValueKind::OpenExistentialAddrInst:
+    case ValueKind::PointerToAddressInst:
     case ValueKind::UncheckedAddrCastInst:
     // Inductive cases that apply to any type.
     case ValueKind::CopyValueInst:
