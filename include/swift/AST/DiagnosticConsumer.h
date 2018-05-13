@@ -100,7 +100,7 @@ public:
                                 const DiagnosticInfo &Info) = 0;
 
   /// \returns true if an error occurred while finishing-up.
-  virtual bool finishProcessing() { return false; }
+  virtual bool finishProcessing(SourceManager &) { return false; }
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.
@@ -140,11 +140,13 @@ private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
   const SmallVector<ConsumerPair, 4> SubConsumers;
 
+  // The commented-out consts are there because the data does not change
+  // but the swap method gets called on this structure.
   struct ConsumerSpecificInformation {
-    const CharSourceRange range;
+    /*const*/ CharSourceRange range;
     /// The DiagnosticConsumer may be empty if those diagnostics are not to be
     /// emitted.
-    DiagnosticConsumer *const consumer;
+    DiagnosticConsumer * /*const*/ consumer;
     bool hasAnErrorBeenEmitted = false;
 
     ConsumerSpecificInformation(const CharSourceRange range,
@@ -188,10 +190,11 @@ public:
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
 
-  bool finishProcessing() override;
+  bool finishProcessing(SourceManager &) override;
 
 private:
-  void addNonSpecificErrors();
+  void addNonSpecificErrors(SourceManager &SM);
+
   void computeConsumersOrderedByRange(SourceManager &SM);
 
   /// Returns nullptr if diagnostic is to be suppressed,

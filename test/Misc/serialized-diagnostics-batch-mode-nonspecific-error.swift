@@ -1,6 +1,6 @@
 // To avoid redundant diagnostics showing up in Xcode, batch-mode must suppress diagnostics in
 // non-primary files.
-// But if the only fatal errors are suppressed ones, a "compilation failed" error must be emitted
+// But if the only  errors are suppressed ones, a nonspecific error must be emitted
 // for the primary files so Xcode knows something happened.
 //
 // RUN: rm -f %t.*
@@ -16,9 +16,10 @@
 
 // Ensure the error is in the serialized diagnostics:
 
-// RUN: %FileCheck -check-prefix=COMPILATION-FAILED %s <%t.main.txt
-// RUN: %FileCheck -check-prefix=COMPILATION-FAILED %s <%t.empty.txt
-// COMPILATION-FAILED: compilation failed
+// RUN: %FileCheck -check-prefix=NONSPECIFIC-ERROR %s <%t.main.txt
+// RUN: %FileCheck -check-prefix=NONSPECIFIC-ERROR %s <%t.empty.txt
+// NONSPECIFIC-ERROR: error: some error occured in a file that was used by this one
 
 func test(x: SomeType) {
+  nonexistent()
 }

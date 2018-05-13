@@ -189,26 +189,22 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
         true; // Suppress non-primary diagnostic in batch mode.
 }
 
-bool FileSpecificDiagnosticConsumer::finishProcessing() {
+bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
+  addNonSpecificErrors(SM);
+
   // Deliberately don't use std::any_of here because we don't want early-exit
   // behavior.
 
-  addNonSpecificErrors();
-
   bool hadError = false;
   for (auto &subConsumer : SubConsumers)
-    hadError |= subConsumer.second && subConsumer.second->finishProcessing();
+    hadError |= subConsumer.second && subConsumer.second->finishProcessing(SM);
   return hadError;
 }
 
-void FileSpecificDiagnosticConsumer::addNonSpecificErrors() {
-  if (!WasAnErrorSuppressed)
-    return;
-
-  SourceManager s;
-
+static void produceNonSpecificError(DiagnosticConsumer *consumer,
+                                    SourceManager &SM) {
   Diagnostic diagnostic(
-      diag::error_some_error_occured_in_a_file_that_was_used_in_this_one);
+      diag::error_some_error_occured_in_a_file_that_was_used_by_this_one);
 
   // Stolen from DiagnosticEngine::emitDiagnostic
   DiagnosticInfo Info;
@@ -216,11 +212,18 @@ void FileSpecificDiagnosticConsumer::addNonSpecificErrors() {
   Info.Ranges = diagnostic.getRanges();
   Info.FixIts = diagnostic.getFixIts();
 
+  consumer->handleDiagnostic(
+      SM, SourceLoc(), DiagnosticKind::Error,
+      DiagnosticEngine::diagnosticStringFor(diagnostic.getID()), {}, Info);
+}
+
+void FileSpecificDiagnosticConsumer::addNonSpecificErrors(SourceManager &SM) {
+  if (!WasAnErrorSuppressed)
+    return;
+
   for (auto &info : ConsumersOrderedByRange) {
     if (!info.hasAnErrorBeenEmitted && info.consumer) {
-      info.consumer->handleDiagnostic(s, SourceLoc(), DiagnosticKind::Error,
-                                      diagnosticStrings[(unsigned)Info.ID],
-                                      diagnostic.getArgs(), Info);
+      produceNonSpecificError(info.consumer, SM);
       info.hasAnErrorBeenEmitted = true;
     }
   }
