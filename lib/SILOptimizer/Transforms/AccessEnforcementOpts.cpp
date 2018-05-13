@@ -322,7 +322,7 @@ void AccessFolding::identifyBeginAccesses() {
       // gracefully handle unrecognized source address patterns, which show up
       // here as an invalid `storage` value.
       const AccessedStorage &storage =
-          findAccessedStorageOrigin(beginAccess->getSource());
+          findAccessedStorageNonNested(beginAccess->getSource());
       if (!storage)
         continue;
 

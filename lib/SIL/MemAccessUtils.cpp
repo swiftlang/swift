@@ -262,7 +262,7 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
   }
 }
 
-AccessedStorage swift::findAccessedStorageOrigin(SILValue sourceAddr) {
+AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
   while (true) {
     const AccessedStorage &storage = findAccessedStorage(sourceAddr);
     if (!storage || storage.getKind() != AccessedStorage::Nested)

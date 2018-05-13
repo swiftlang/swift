@@ -203,7 +203,7 @@ static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
     // Transitively search for the storage base in the caller.
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
     if (argVal)
-      return findAccessedStorageOrigin(argVal);
+      return findAccessedStorageNonNested(argVal);
 
     // If the argument can't be transformed, demote it to an unidentified
     // access.
@@ -233,7 +233,7 @@ void FunctionAccessedStorage::visitBeginAccess(B *beginAccess) {
     return;
 
   const AccessedStorage &storage =
-      findAccessedStorageOrigin(beginAccess->getSource());
+      findAccessedStorageNonNested(beginAccess->getSource());
 
   if (storage.getKind() == AccessedStorage::Unidentified) {
     updateOptionalAccessKind(unidentifiedAccess, beginAccess->getAccessKind());

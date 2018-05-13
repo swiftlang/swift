@@ -320,7 +320,7 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 ///
 /// This is identical to findAccessedStorage(), but never returns Nested
 /// storage.
-AccessedStorage findAccessedStorageOrigin(SILValue sourceAddr);
+AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
 
 /// Return true if the given address operand is used by a memory operation that
 /// initializes the memory at that address, implying that the previous value is
