@@ -501,7 +501,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions; operands here have types '_' and '([Int]) -> Bool'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions;}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil

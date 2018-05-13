@@ -1745,7 +1745,7 @@ public:
       ExprTypeCheckListener *listener = nullptr);
 
   void getPossibleTypesOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, SmallVectorImpl<Type> &types,
+      Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
       FreeTypeVariableBinding allowFreeTypeVariables =
           FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
