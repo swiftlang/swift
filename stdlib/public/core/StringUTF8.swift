@@ -357,7 +357,6 @@ extension String {
   ///         print(strlen(ptr.baseAddress!))
   ///     }
   ///     // Prints "6"
-  @inlinable // FIXME(sil-serialize-all)
   public var utf8CString: ContiguousArray<CChar> {
     var result = ContiguousArray<CChar>()
     result.reserveCapacity(utf8.count + 1)
@@ -400,7 +399,6 @@ extension String {
   /// slice of the `picnicGuest.utf8` view.
   ///
   /// - Parameter utf8: A UTF-8 code sequence.
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2,
     message: "Failable initializer was removed in Swift 4. When upgrading to Swift 4, please use non-failable String.init(_:UTF8View)")
   @available(swift, obsoleted: 4.0,
