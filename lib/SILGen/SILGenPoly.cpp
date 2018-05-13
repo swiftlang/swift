@@ -3499,6 +3499,12 @@ static void translateParametersForCanonicalFunctionThunk(
     SILParameterInfo newParamInfo;
     std::tie(origParam, newParamInfo) = T;
 
+    if (newParamInfo.isIndirectInGuaranteed()) {
+      origParam = origParam.materialize(SGF, loc);
+      newParams.emplace_back(origParam);
+      continue;
+    }
+
     if (origParam.getType().isTrivial(SGF.getModule())) {
       newParams.emplace_back(origParam);
       continue;
