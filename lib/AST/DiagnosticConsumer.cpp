@@ -101,16 +101,9 @@ void FileSpecificDiagnosticConsumer::computeConsumersOrderedByRange(
          "overlapping ranges despite having distinct files");
 }
 
-Optional<DiagnosticConsumer *>
-FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
-                                                    SourceLoc loc) const {
-  // If there's only one consumer, we'll use it no matter what, because...
-  // - ...all diagnostics within the file will go to that consumer.
-  // - ...all diagnostics not within the file will not be claimed by any
-  //   consumer, and so will go to all (one) consumers.
-  if (SubConsumers.size() == 1)
-    return SubConsumers.front().second.get();
-
+Optional<FileSpecificDiagnosticConsumer::ConsumerSpecificInformation *>
+FileSpecificDiagnosticConsumer::consumerSpecificInformationForLocation(
+    SourceManager &SM, SourceLoc loc) const {
   // Diagnostics with invalid locations always go to every consumer.
   if (loc.isInvalid())
     return None;
@@ -141,17 +134,19 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
   // that /might/ contain 'loc'. Specifically, since the ranges are sorted
   // by end location, it's looking for the first range where the end location
   // is greater than or equal to 'loc'.
-  auto possiblyContainingRangeIter = std::lower_bound(
-      ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(), loc,
-      [](const ConsumerSpecificInformation &entry, SourceLoc loc) -> bool {
-        auto compare = std::less<const char *>();
-        return compare(getRawLoc(entry.range.getEnd()).getPointer(),
-                       getRawLoc(loc).getPointer());
-      });
+  const ConsumerSpecificInformation *possiblyContainingRangeIter =
+      std::lower_bound(
+          ConsumersOrderedByRange.begin(), ConsumersOrderedByRange.end(), loc,
+          [](const ConsumerSpecificInformation &entry, SourceLoc loc) -> bool {
+            auto compare = std::less<const char *>();
+            return compare(getRawLoc(entry.range.getEnd()).getPointer(),
+                           getRawLoc(loc).getPointer());
+          });
 
   if (possiblyContainingRangeIter != ConsumersOrderedByRange.end() &&
       possiblyContainingRangeIter->range.contains(loc)) {
-    return possiblyContainingRangeIter->consumer;
+    return const_cast<ConsumerSpecificInformation *>(
+        possiblyContainingRangeIter);
   }
 
   return None;
@@ -162,31 +157,36 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
 
-  Optional<DiagnosticConsumer *> specificConsumer;
+  Optional<ConsumerSpecificInformation *> consumerSpecificInfo;
   switch (Kind) {
   case DiagnosticKind::Error:
   case DiagnosticKind::Warning:
   case DiagnosticKind::Remark:
-    specificConsumer = consumerForLocation(SM, Loc);
-    ConsumerForSubsequentNotes = specificConsumer;
+    consumerSpecificInfo = consumerSpecificInformationForLocation(SM, Loc);
+    ConsumerSpecificInfoForSubsequentNotes = consumerSpecificInfo;
     break;
   case DiagnosticKind::Note:
-    specificConsumer = ConsumerForSubsequentNotes;
+    consumerSpecificInfo = ConsumerSpecificInfoForSubsequentNotes;
     break;
   }
-
-  if (!specificConsumer.hasValue()) {
+  if (!consumerSpecificInfo.hasValue()) {
     for (auto &subConsumer : SubConsumers) {
       if (subConsumer.second) {
         subConsumer.second->handleDiagnostic(SM, Loc, Kind, FormatString,
                                              FormatArgs, Info);
       }
     }
-  } else if (DiagnosticConsumer *c = specificConsumer.getValue())
-    c->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
-  else
+    return;
+  }
+  if (!consumerSpecificInfo.getValue()->consumer) {
     WasAnErrorSuppressed =
         true; // Suppress non-primary diagnostic in batch mode.
+    return;
+  }
+  consumerSpecificInfo.getValue()->consumer->handleDiagnostic(
+      SM, Loc, Kind, FormatString, FormatArgs, Info);
+  consumerSpecificInfo.getValue()->hasAnErrorBeenEmitted |=
+      Kind == DiagnosticKind::Error;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {

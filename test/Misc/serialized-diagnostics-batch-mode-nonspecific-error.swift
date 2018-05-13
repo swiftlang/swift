@@ -16,9 +16,10 @@
 
 // Ensure the error is in the serialized diagnostics:
 
-// RUN: %FileCheck -check-prefix=NONSPECIFIC-ERROR %s <%t.main.txt
+// RUN: %FileCheck -check-prefix=NO-NONSPECIFIC-ERROR %s <%t.main.txt
 // RUN: %FileCheck -check-prefix=NONSPECIFIC-ERROR %s <%t.empty.txt
 // NONSPECIFIC-ERROR: error: some error occured in a file that was used by this one
+// NO-NONSPECIFIC-ERROR-NOT: error: some error occured in a file that was used by this one
 
 func test(x: SomeType) {
   nonexistent()
