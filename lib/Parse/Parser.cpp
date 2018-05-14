@@ -970,9 +970,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
 void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   assert(New != Prev && "Cannot conflict with self");
-  diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
-  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
-           Prev->getBaseName());
+  diagnose(New->getLoc(), diag::decl_redefinition);
+  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->getBaseName());
 }
 
 struct ParserUnit::Implementation {

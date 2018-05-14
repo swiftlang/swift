@@ -509,5 +509,13 @@
     "RightUsr": "",
     "RightComment": "BarBase.Nested",
     "ModuleName": "bar"
-  }
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@F@barGlobalHoistedFuncOldName",
+    "OldPrintedName": "barGlobalHoistedFuncOldName(_:_:_:)",
+    "OldTypeName": "",
+    "NewPrintedName": "newName(is:at:for:)",
+    "NewTypeName": "AwesomeWrapper"
+  },
 ]

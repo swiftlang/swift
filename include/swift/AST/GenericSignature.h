@@ -191,30 +191,13 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
-  /// Enumerate all of the dependent types in the type signature that will
-  /// occur in substitution lists (in order), along with the set of
-  /// conformance requirements placed on that dependent type.
-  ///
-  /// \param fn Callback function that will receive each (type, requirements)
-  /// pair, in the order they occur within a list of substitutions. If this
-  /// returns \c true, the enumeration will be aborted.
-  ///
-  /// \returns true if any call to \c fn returned \c true, otherwise \c false.
-  bool enumeratePairedRequirements(
-         llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const;
-
   /// Return a vector of all generic parameters that are not subject to
   /// a concrete same-type constraint.
   SmallVector<GenericTypeParamType *, 2> getSubstitutableParams() const;
 
   /// Check if the generic signature makes all generic parameters
   /// concrete.
-  bool areAllParamsConcrete() const {
-    return !enumeratePairedRequirements(
-      [](Type, ArrayRef<Requirement>) -> bool {
-        return true;
-      });
-  }
+  bool areAllParamsConcrete() const;
 
   /// Compute the number of conformance requirements in this signature.
   unsigned getNumConformanceRequirements() const {
@@ -224,20 +207,6 @@ public:
         ++result;
     }
 
-    return result;
-  }
-
-  /// Return the size of a SubstitutionList built from this signature.
-  ///
-  /// Don't add new calls of this -- the representation of SubstitutionList
-  /// will be changing soon.
-  unsigned getSubstitutionListSize() const {
-    unsigned result = 0;
-    enumeratePairedRequirements(
-      [&](Type, ArrayRef<Requirement>) -> bool {
-        result++;
-        return false;
-      });
     return result;
   }
 

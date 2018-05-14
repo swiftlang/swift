@@ -10,6 +10,8 @@ int barGlobalVariableOldEnumElement = 1;
 
 int barGlobalFuncOldName(int a);
 
+int barGlobalHoistedFuncOldName(int a, int b, int c);
+
 @interface BarForwardDeclaredClass
 - (id _Nonnull)initWithOldLabel0:(int)frame;
 - (void) barInstanceFunc0;

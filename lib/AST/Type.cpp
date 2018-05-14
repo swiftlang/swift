@@ -1649,33 +1649,29 @@ bool TypeBase::isBindableTo(Type b) {
             moduleDecl, decl, decl->getGenericEnvironment());
 
         auto *genericSig = decl->getGenericSignature();
-        auto result = genericSig->enumeratePairedRequirements(
-          [&](Type t, ArrayRef<Requirement> reqts) -> bool {
-            auto orig = t.subst(origSubMap)->getCanonicalType();
-            auto subst = t.subst(substSubMap)->getCanonicalType();
-            if (!visit(orig, subst))
-              return true;
-
-            auto canTy = t->getCanonicalType();
-            for (auto reqt : reqts) {
-              auto *proto = reqt.getSecondType()->castTo<ProtocolType>()
-                ->getDecl();
-              auto origConf = *origSubMap.lookupConformance(canTy, proto);
-              auto substConf = *substSubMap.lookupConformance(canTy, proto);
-
-              if (origConf.isConcrete()) {
-                if (!substConf.isConcrete())
-                  return true;
-                if (origConf.getConcrete()->getRootNormalConformance()
-                    != substConf.getConcrete()->getRootNormalConformance())
-                  return true;
-              }
-            }
+        for (auto gp : genericSig->getGenericParams()) {
+          auto orig = Type(gp).subst(origSubMap)->getCanonicalType();
+          auto subst = Type(gp).subst(substSubMap)->getCanonicalType();
+          if (!visit(orig, subst))
             return false;
-          });
+        }
 
-        if (result)
-          return false;
+        for (const auto &req : genericSig->getRequirements()) {
+          if (req.getKind() != RequirementKind::Conformance) continue;
+
+          auto canTy = req.getFirstType()->getCanonicalType();
+          auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+          auto origConf = *origSubMap.lookupConformance(canTy, proto);
+          auto substConf = *substSubMap.lookupConformance(canTy, proto);
+
+          if (origConf.isConcrete()) {
+            if (!substConf.isConcrete())
+              return false;
+            if (origConf.getConcrete()->getRootNormalConformance()
+                  != substConf.getConcrete()->getRootNormalConformance())
+              return false;
+          }
+        }
 
         // Same decl should always either have or not have a parent.
         assert((bool)bgt->getParent() == (bool)substBGT->getParent());

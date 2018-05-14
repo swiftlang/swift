@@ -332,6 +332,10 @@ private:
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;
 
+  /// Increment the number of constraints considered per attempt
+  /// to contract constrant graph edges.
+  void incrementConstraintsPerContractionCounter();
+
   /// The kind of change made to the graph.
   enum class ChangeKind {
     /// Added a type variable.

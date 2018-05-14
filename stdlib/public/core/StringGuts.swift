@@ -123,8 +123,15 @@ extension _StringGuts {
   @inlinable
   public // @testable
   var isASCII: Bool {
-    // FIXME: Currently used to sometimes mean contiguous ASCII
-    return _object.isContiguousASCII
+    @inline(__always) get { return _object.isContiguousASCII }
+  }
+
+  @inlinable
+  internal
+  var _isASCIIOrSmallASCII: Bool {
+    @inline(__always) get {
+      return isASCII || _isSmall && _smallUTF8String.isASCII
+    }
   }
 
   @inlinable
@@ -1212,75 +1219,6 @@ extension _StringGuts {
     } else {
       self._replaceSubrange(bounds, with: newElements, of: UTF16.CodeUnit.self)
     }
-  }
-}
-
-extension _StringGuts : Sequence {
-  public typealias Element = UTF16.CodeUnit
-
-  @_fixed_layout
-  public struct Iterator : IteratorProtocol {
-    public typealias Element = UTF16.CodeUnit
-
-    @usableFromInline
-    internal let _guts: _StringGuts
-    @usableFromInline
-    internal let _endOffset: Int
-    @usableFromInline
-    internal var _nextOffset: Int
-    @usableFromInline
-    internal var _buffer = _FixedArray16<Element>()
-    @usableFromInline
-    internal var _bufferIndex: Int = 0
-
-    @inlinable
-    internal init(_ guts: _StringGuts, range: Range<Int>) {
-      self._guts = guts
-      self._endOffset = range.upperBound
-      self._nextOffset = range.lowerBound
-      if _fastPath(!range.isEmpty) {
-        _fillBuffer()
-      }
-    }
-
-    @inlinable
-    public mutating func next() -> Element? {
-      if _fastPath(_bufferIndex < _buffer.count) {
-        let result = _buffer[_bufferIndex]
-        _bufferIndex += 1
-        return result
-      }
-      if _nextOffset == _endOffset {
-        return nil
-      }
-      _fillBuffer()
-      _bufferIndex = 1
-      return _buffer[0]
-    }
-
-    @usableFromInline
-    @inline(never)
-    internal mutating func _fillBuffer() {
-      _sanityCheck(_buffer.count == 0)
-      _buffer.count = Swift.min(_buffer.capacity, _endOffset - _nextOffset)
-      _sanityCheck(_buffer.count > 0)
-      let guts = _guts // Make a copy to prevent overlapping access to self
-      _buffer.withUnsafeMutableBufferPointer { buffer in
-        let range: Range<Int> = _nextOffset ..< _nextOffset + buffer.count
-        guts._copy(range: range, into: buffer)
-      }
-      _nextOffset += _buffer.count
-    }
-  }
-
-  @inlinable
-  public func makeIterator() -> Iterator {
-    return Iterator(self, range: 0..<count)
-  }
-
-  @inlinable
-  internal func makeIterator(in range: Range<Int>) -> Iterator {
-    return Iterator(self, range: range)
   }
 }
 

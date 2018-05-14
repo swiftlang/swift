@@ -3053,12 +3053,10 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
           dc->getParentModule(),
           decl,
           decl->getGenericEnvironmentOfContext());
-      auto result = decl->getGenericSignature()->enumeratePairedRequirements(
-        [&](Type t, ArrayRef<Requirement> reqt) -> bool {
-          return t.subst(subMap, SubstFlags::UseErrorType)->hasError();
-        });
-      if (result)
-        return CheckTypeWitnessResult(reqProto->getDeclaredType());
+      for (auto replacement : subMap.getReplacementTypes()) {
+        if (replacement->hasError())
+          return CheckTypeWitnessResult(reqProto->getDeclaredType());
+      }
     }
   }
 
