@@ -140,6 +140,7 @@ private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
   const SmallVector<ConsumerPair, 4> SubConsumers;
 
+public:
   // The commented-out consts are there because the data does not change
   // but the swap method gets called on this structure.
   struct ConsumerSpecificInformation {
@@ -154,6 +155,7 @@ private:
         : range(range), consumer(consumer) {}
   };
 
+private:
   /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
   /// the end locations of each file so that a lookup by position can be done
   /// using binary search.

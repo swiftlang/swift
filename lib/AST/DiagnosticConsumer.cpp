@@ -201,16 +201,17 @@ bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
   return hadError;
 }
 
-static void produceNonSpecificError(DiagnosticConsumer *consumer,
-                                    SourceManager &SM) {
+static void produceNonSpecificError(
+    FileSpecificDiagnosticConsumer::ConsumerSpecificInformation &info,
+    SourceManager &SM) {
   Diagnostic diagnostic(diag::error_errors_in_other_files_halted_compilation);
 
   // Stolen from DiagnosticEngine::emitDiagnostic
   DiagnosticInfo Info;
   Info.ID = diagnostic.getID();
 
-  consumer->handleDiagnostic(
-      SM, SourceLoc(), DiagnosticKind::Error,
+  info.consumer->handleDiagnostic(
+      SM, info.range.getStart(), DiagnosticKind::Error,
       DiagnosticEngine::diagnosticStringFor(diagnostic.getID()), {}, Info);
 }
 
@@ -219,7 +220,7 @@ void FileSpecificDiagnosticConsumer::addNonSpecificErrors(SourceManager &SM) {
     return;
   for (auto &info : ConsumersOrderedByRange) {
     if (!info.hasAnErrorBeenEmitted && info.consumer) {
-      produceNonSpecificError(info.consumer, SM);
+      produceNonSpecificError(info, SM);
       info.hasAnErrorBeenEmitted = true;
     }
   }
