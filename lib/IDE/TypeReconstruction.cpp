@@ -1832,7 +1832,7 @@ static void VisitNodeInOut(
   VisitNodeResult type_result;
   VisitNode(ast, cur_node->getFirstChild(), type_result);
   if (type_result._types.size() == 1 && type_result._types[0]) {
-    result._types.push_back(Type(InOutType::get(type_result._types[0])));
+    result._types.push_back(InOutType::get(type_result._types[0]));
   } else {
     result._error = "couldn't resolve referent type";
   }
@@ -2049,16 +2049,17 @@ static void VisitNodeTupleElement(
     }
   }
 
-  if (tuple_type_result._error.empty() &&
-      tuple_type_result._types.size() == 1) {
-    if (!tuple_name.empty())
-      result._tuple_type_element =
-          TupleTypeElt(tuple_type_result._types.front().getPointer(),
-                       ast->getIdentifier(tuple_name));
-    else
-      result._tuple_type_element =
-          TupleTypeElt(tuple_type_result._types.front().getPointer());
-  }
+  if (!tuple_type_result._error.empty() || tuple_type_result._types.size() != 1)
+    return;
+
+  auto tupleType = tuple_type_result._types.front();
+  auto typeFlags = ParameterTypeFlags();
+  typeFlags = typeFlags.withInOut(tupleType->is<InOutType>());
+  if (auto *inOutTy = tupleType->getAs<InOutType>())
+    tupleType = inOutTy->getObjectType();
+  Identifier idName =
+      tuple_name.empty() ? Identifier() : ast->getIdentifier(tuple_name);
+  result._tuple_type_element = TupleTypeElt(tupleType, idName, typeFlags);
 }
 
 static void VisitNodeTypeList(
