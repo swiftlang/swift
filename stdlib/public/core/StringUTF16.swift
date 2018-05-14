@@ -322,9 +322,9 @@ extension String {
     // there is no owner and elements are dropped from the end.
     let wholeString = String(utf16._guts)
     guard
-      let start = UTF16Index(_offset: utf16._offset)
+      let start = UTF16Index(encodedOffset: utf16._offset)
         .samePosition(in: wholeString),
-      let end = UTF16Index(_offset: utf16._offset + utf16._length)
+      let end = UTF16Index(encodedOffset: utf16._offset + utf16._length)
         .samePosition(in: wholeString)
       else
     {

@@ -13,45 +13,66 @@ extension String {
   /// A position of a character or code unit in a string.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Index {
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal var _compoundOffset : UInt64
-    @usableFromInline
-    internal var _cache: _Cache
-
     internal typealias _UTF8Buffer = UTF8.EncodedScalar
-    @_frozen // FIXME(sil-serialize-all)
+
+    @usableFromInline // FIXME(sil-serialize-all)
+    internal var _codeUnitOffset: Int
+
     @usableFromInline
-    internal enum _Cache {
-    case none
-    case utf8(buffer: _UTF8Buffer)
-    case character(stride: UInt16)
-    }
+    internal var _utf8Buffer = _UTF8Buffer()
+
+    @usableFromInline
+    internal var _graphemeStrideCache: UInt16 = 0
+
+    @usableFromInline
+    internal var _transcodedOffset: Int8 = 0
   }
 }
 
 /// Convenience accessors
-extension String.Index._Cache {
+extension String.Index {
   @inlinable // FIXME(sil-serialize-all)
-  internal var utf8: String.Index._UTF8Buffer? {
-    if case .utf8(let r) = self { return r } else { return nil }
+  internal var utf8Buffer: String.Index._UTF8Buffer? {
+    guard !_utf8Buffer.isEmpty else { return nil }
+    return _utf8Buffer
   }
+
   @inlinable // FIXME(sil-serialize-all)
-  internal var character: UInt16? {
-    if case .character(let r) = self { return r } else { return nil }
+  internal var characterStride: Int? {
+    guard _graphemeStrideCache > 0 else { return nil }
+    return Int(truncatingIfNeeded: _graphemeStrideCache)
+  }
+
+  // TODO: Probably worth carving a bit for, or maybe a isSubScalar bit...
+  @inlinable // FIXME(sil-serialize-all)
+  internal var isUTF8: Bool {
+    return self.utf8Buffer != nil || self.transcodedOffset > 0
   }
 }
 
 extension String.Index : Equatable {
+  // A combined code unit and transcoded offset, for comparison purposes
+  @inlinable // FIXME(sil-serialize-all)
+  internal var _orderingValue: UInt64 {
+    let cuOffset = UInt64(truncatingIfNeeded: _codeUnitOffset)
+    _sanityCheck(
+      cuOffset & 0xFFFF_0000_0000_0000 == 0, "String length capped at 48bits")
+    let transOffset = UInt64(truncatingIfNeeded: _transcodedOffset)
+    _sanityCheck(transOffset <= 4, "UTF-8 max transcoding is 4 code units")
+
+    return cuOffset &<< 2 | transOffset
+  }
+
   @inlinable // FIXME(sil-serialize-all)
   public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._compoundOffset == rhs._compoundOffset
+    return lhs._orderingValue == rhs._orderingValue
   }
 }
 
 extension String.Index : Comparable {
   @inlinable // FIXME(sil-serialize-all)
   public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._compoundOffset < rhs._compoundOffset
+    return lhs._orderingValue < rhs._orderingValue
   }
 }
 
@@ -63,56 +84,47 @@ extension String.Index : Hashable {
   ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(_compoundOffset)
+    hasher.combine(_orderingValue)
   }
 }
 
 extension String.Index {
-  internal typealias _Self = String.Index
-  
   /// Creates a new index at the specified UTF-16 offset.
   ///
   /// - Parameter offset: An offset in UTF-16 code units.
   @inlinable // FIXME(sil-serialize-all)
   public init(encodedOffset offset: Int) {
-    _compoundOffset = UInt64(offset << _Self._strideBits)
-    _cache = .none
+    self._codeUnitOffset = offset
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal init(encodedOffset o: Int, transcodedOffset: Int = 0, _ c: _Cache) {
-    _compoundOffset = UInt64(o << _Self._strideBits | transcodedOffset)
-    _cache = c
+  internal init(
+    encodedOffset offset: Int, transcodedOffset: Int, buffer: _UTF8Buffer
+  ) {
+    _sanityCheck(transcodedOffset < Int8.max && transcodedOffset > Int8.min)
+    self._codeUnitOffset = offset
+    self._transcodedOffset = Int8(truncatingIfNeeded: transcodedOffset)
+    self._utf8Buffer = buffer
   }
-  
-  @inlinable // FIXME(sil-serialize-all)
-  internal static var _strideBits : Int { return 2 }
-  @inlinable // FIXME(sil-serialize-all)
-  internal static var _mask : UInt64 { return (1 &<< _Self._strideBits) &- 1 }
-  
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func _setEncodedOffset(_ x: Int) {
-    _compoundOffset = UInt64(x << _Self._strideBits)
+
+  @inlinable
+  internal init(encodedOffset: Int, characterStride: Int) {
+    self._codeUnitOffset = encodedOffset
+    if characterStride < UInt16.max {
+      self._graphemeStrideCache = UInt16(truncatingIfNeeded: characterStride)
+    }
   }
   
   /// The offset into a string's UTF-16 encoding for this index.
   @inlinable // FIXME(sil-serialize-all)
   public var encodedOffset : Int {
-    return Int(_compoundOffset >> _Self._strideBits)
+    return _codeUnitOffset
   }
 
   /// The offset of this index within whatever encoding this is being viewed as
   @inlinable // FIXME(sil-serialize-all)
-  internal var _transcodedOffset : Int {
-    get {
-      return Int(_compoundOffset & _Self._mask)
-    }
-    set {
-      let extended = UInt64(newValue)
-      _sanityCheck(extended <= _Self._mask)
-      _compoundOffset &= ~_Self._mask
-      _compoundOffset |= extended
-    }
+  internal var transcodedOffset: Int {
+    return Int(truncatingIfNeeded: _transcodedOffset)
   }
 }
 
@@ -130,8 +142,8 @@ extension String.Index {
   @available(swift, deprecated: 3.2)
   @available(swift, obsoleted: 4.0)
   public // SPI(Foundation)    
-  init(_offset: Int) {
-    self.init(encodedOffset: _offset)
+  init(_codeUnitOffset: Int) {
+    self.init(encodedOffset: _codeUnitOffset)
   }
   
   @inlinable // FIXME(sil-serialize-all)
