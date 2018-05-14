@@ -627,10 +627,9 @@ internal func _utf8Count(_ utf16CU: UInt16, prev: UInt16) -> Int {
 }
 
 extension String.UTF8View {
-  @usableFromInline
-  internal static func _count<Source: Sequence>(fromUTF16 source: Source) -> Int
-  where Source.Element == Unicode.UTF16.CodeUnit
-  {
+  internal static func _count<Source: RandomAccessCollection>(
+    fromUTF16 source: Source
+  ) -> Int where Source.Element == Unicode.UTF16.CodeUnit {
     var result = 0
     var prev: Unicode.UTF16.CodeUnit = 0
     for u in source {
