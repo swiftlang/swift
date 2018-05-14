@@ -2652,6 +2652,12 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
     }
     //-----[End] This section processes parameters -----
     
+    //-----[Start] This section processes throws -----
+    if (funcDecl->hasThrows()) {
+        EditConsumer.accept(SM, startLocation, "///\n///  - Throws: <#Throws#>\n");
+    }
+    //-----[End] This section processes throws -----
+    
     //-----[Start] This section processes return type -----
     Type returnType = funcDecl->getReturnTypeLoc().getType();
     if (!returnType.isNull()) {
