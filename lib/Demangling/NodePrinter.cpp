@@ -267,6 +267,7 @@ private:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
@@ -1540,6 +1541,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericOtherNominalType:
+  case Node::Kind::BoundGenericTypeAlias:
     printBoundGeneric(Node);
     return nullptr;
   case Node::Kind::DynamicSelf:
