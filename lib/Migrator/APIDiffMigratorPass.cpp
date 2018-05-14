@@ -272,7 +272,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return results;
   }
 
-  DeclNameViewer getFuncRename(ValueDecl *VD, bool &IgnoreBase) {
+  DeclNameViewer getFuncRename(ValueDecl *VD, llvm::SmallString<32> &Buffer,
+                               bool &IgnoreBase) {
     for (auto *Item: getRelatedDiffItems(VD)) {
       if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isRename()) {
@@ -286,6 +287,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           default:
             return DeclNameViewer();
           }
+        }
+      }
+      if (auto *MI = dyn_cast<TypeMemberDiffItem>(Item)) {
+        if (MI->Subkind == TypeMemberDiffItemSubKind::FuncRename) {
+          llvm::raw_svector_ostream OS(Buffer);
+          OS << MI->newTypeName << "." << MI->newPrintedName;
+          return DeclNameViewer(OS.str());
         }
       }
     }
@@ -419,7 +427,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   void handleFuncRename(ValueDecl *FD, Expr* FuncRefContainer, Expr *Arg) {
     bool IgnoreBase = false;
-    if (auto View = getFuncRename(FD, IgnoreBase)) {
+    llvm::SmallString<32> Buffer;
+    if (auto View = getFuncRename(FD, Buffer, IgnoreBase)) {
       if (!IgnoreBase) {
         ReferenceCollector Walker(FD);
         Walker.walk(FuncRefContainer);
@@ -581,7 +590,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (!Item)
       return false;
     if (Item->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement ||
-        Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement)
+        Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement ||
+        Item->Subkind == TypeMemberDiffItemSubKind::FuncRename)
       return false;
 
     if (Item->Subkind == TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty) {
@@ -630,6 +640,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
 
     switch (Item->Subkind) {
+    case TypeMemberDiffItemSubKind::FuncRename:
     case TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty:
     case TypeMemberDiffItemSubKind::SimpleReplacement:
     case TypeMemberDiffItemSubKind::QualifiedReplacement:
@@ -917,7 +928,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   void handleFuncDeclRename(AbstractFunctionDecl *AFD,
                             CharSourceRange NameRange) {
     bool IgnoreBase = false;
-    if (auto View = getFuncRename(AFD, IgnoreBase)) {
+    llvm::SmallString<32> Buffer;
+    if (auto View = getFuncRename(AFD, Buffer, IgnoreBase)) {
       if (!IgnoreBase)
         Editor.replace(NameRange, View.base());
       unsigned Index = 0;
