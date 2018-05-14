@@ -870,18 +870,22 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
     if (A.hasConvention(SILArgumentConvention::Direct_Owned) ||
         A.hasConvention(SILArgumentConvention::Indirect_In)) {
       auto Releases = ArgToReturnReleaseMap.getReleasesForArgument(A.Arg);
-      if (!Releases.empty()) {
-        // If the function has a throw block we must also find a matching
-        // release in the throw block.
-        auto ReleasesInThrow = ArgToThrowReleaseMap.getReleasesForArgument(A.Arg);
-        if (!ArgToThrowReleaseMap.hasBlock() || !ReleasesInThrow.empty()) {
-          A.CalleeRelease = Releases;
-          A.CalleeReleaseInThrowBlock = ReleasesInThrow;
-          // We can convert this parameter to a @guaranteed.
-          A.OwnedToGuaranteed = true;
-          SignatureOptimize = true;
-        }
+      if (Releases.empty()) {
+	continue;
       }
+
+      // If the function has a throw block we must also find a matching
+      // release in the throw block.
+      auto ReleasesInThrow = ArgToThrowReleaseMap.getReleasesForArgument(A.Arg);
+      if (ArgToThrowReleaseMap.hasBlock() && ReleasesInThrow.empty()) {
+	continue;
+      }
+
+      A.CalleeRelease = Releases;
+      A.CalleeReleaseInThrowBlock = ReleasesInThrow;
+      // We can convert this parameter to a @guaranteed.
+      A.OwnedToGuaranteed = true;
+      SignatureOptimize = true;
     }
 
     // Modified self argument.
