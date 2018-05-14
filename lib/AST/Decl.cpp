@@ -2148,6 +2148,10 @@ bool ValueDecl::isUsableFromInline() const {
     if (EED->getParentEnum()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
 
+  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this))
+    if (ATD->getProtocol()->getAttrs().hasAttribute<UsableFromInlineAttr>())
+      return true;
+
   return false;
 }
 

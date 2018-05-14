@@ -2162,9 +2162,6 @@ class ValueDecl : public Decl {
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
   unsigned LocalDiscriminator = 0;
 
-private:
-    bool isUsableFromInline() const;
-
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -2237,6 +2234,8 @@ public:
 
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
+
+  bool isUsableFromInline() const;
 
   bool hasAccess() const {
     return TypeAndAccess.getInt().hasValue();
