@@ -204,7 +204,8 @@ bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
 static void produceNonSpecificError(
     FileSpecificDiagnosticConsumer::ConsumerSpecificInformation &info,
     SourceManager &SM) {
-  Diagnostic diagnostic(diag::error_errors_in_other_files_halted_compilation);
+  Diagnostic diagnostic(
+      diag::error_compilation_stopped_by_errors_in_other_files);
 
   // Stolen from DiagnosticEngine::emitDiagnostic
   DiagnosticInfo Info;
