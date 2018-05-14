@@ -16,6 +16,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
@@ -407,28 +408,19 @@ void Job::printSummary(raw_ostream &os) const {
   os << "}";
 }
 
-static void
-writeResponseFile(llvm::raw_ostream &OS, const llvm::opt::ArgStringList &Arguments) {
-  // wrap arguments in quotes to ensure compatibility with Unix and Windows
+bool Job::writeArgsToResponseFile() const {
+  std::error_code EC;
+  llvm::raw_fd_ostream OS(ResponseFilePath, EC, llvm::sys::fs::F_None);
+  if (EC) {
+    return true;
+  }
   for (const char *arg : Arguments) {
-    OS << '"';
-    for (; *arg != '\0'; arg++) {
-      if (*arg == '\"' || *arg == '\\') {
-        OS << '\\'; // escape quote and backslash characters
-      }
-      OS << *arg;
-    }
+    OS << "\"";
+    escapeAndPrintString(OS, arg);
     OS << "\" ";
   }
-}
-
-void Job::writeArgsToResponseFile() const {
-  std::string responseContents;
-  llvm::raw_string_ostream SS(responseContents);
-  writeResponseFile(SS, Arguments);
-  SS.flush();
-  llvm::sys::writeFileWithEncoding(ResponseFilePath, responseContents,
-                                   llvm::sys::WEM_UTF8);
+  OS.flush();
+  return false;
 }
 
 BatchJob::BatchJob(const JobAction &Source,

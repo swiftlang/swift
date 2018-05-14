@@ -363,7 +363,7 @@ public:
 
   bool hasResponseFile() const { return ResponseFilePath != nullptr; }
 
-  void writeArgsToResponseFile() const;
+  bool writeArgsToResponseFile() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar
