@@ -247,6 +247,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   APIDiffItemStore DiffStore;
 
+  bool isNilExpr(Expr *E) {
+    auto Range = E->getSourceRange();
+    return Range.isValid() && Lexer::getCharSourceRangeFromSourceRange(
+      SF->getASTContext().SourceMgr, Range).str() == "nil";
+  }
+
   std::vector<APIDiffItem*> getRelatedDiffItems(ValueDecl *VD) {
     std::vector<APIDiffItem*> results;
     auto addDiffItems = [&](ValueDecl *VD) {
@@ -266,7 +272,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return results;
   }
 
-  DeclNameViewer getFuncRename(ValueDecl *VD, bool &IgnoreBase) {
+  DeclNameViewer getFuncRename(ValueDecl *VD, llvm::SmallString<32> &Buffer,
+                               bool &IgnoreBase) {
     for (auto *Item: getRelatedDiffItems(VD)) {
       if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isRename()) {
@@ -280,6 +287,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           default:
             return DeclNameViewer();
           }
+        }
+      }
+      if (auto *MI = dyn_cast<TypeMemberDiffItem>(Item)) {
+        if (MI->Subkind == TypeMemberDiffItemSubKind::FuncRename) {
+          llvm::raw_svector_ostream OS(Buffer);
+          OS << MI->newTypeName << "." << MI->newPrintedName;
+          return DeclNameViewer(OS.str());
         }
       }
     }
@@ -413,7 +427,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   void handleFuncRename(ValueDecl *FD, Expr* FuncRefContainer, Expr *Arg) {
     bool IgnoreBase = false;
-    if (auto View = getFuncRename(FD, IgnoreBase)) {
+    llvm::SmallString<32> Buffer;
+    if (auto View = getFuncRename(FD, Buffer, IgnoreBase)) {
       if (!IgnoreBase) {
         ReferenceCollector Walker(FD);
         Walker.walk(FuncRefContainer);
@@ -575,7 +590,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (!Item)
       return false;
     if (Item->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement ||
-        Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement)
+        Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement ||
+        Item->Subkind == TypeMemberDiffItemSubKind::FuncRename)
       return false;
 
     if (Item->Subkind == TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty) {
@@ -624,6 +640,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
 
     switch (Item->Subkind) {
+    case TypeMemberDiffItemSubKind::FuncRename:
     case TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty:
     case TypeMemberDiffItemSubKind::SimpleReplacement:
     case TypeMemberDiffItemSubKind::QualifiedReplacement:
@@ -696,24 +713,27 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     auto *RD = getReferencedDecl(Reference);
     if (!RD)
       return false;
-    std::string Func;
     std::string Rename;
+    Optional<NodeAnnotation> Kind;
+    StringRef RightComment;
     for (auto *Item: getRelatedDiffItems(RD)) {
       if (isSimpleReplacement(Item, Rename)) {
       } else if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isStringRepresentableChange() &&
             CI->NodeKind == SDKNodeKind::DeclVar) {
-          SmallString<256> Buffer;
-          Func = insertHelperFunction(CI->DiffKind, CI->RightComment, Buffer,
-            FromString);
+          Kind = CI->DiffKind;
+          RightComment = CI->RightComment;
         }
       }
     }
-    if (Func.empty())
+    if (!Kind.hasValue())
       return false;
-
-    Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
-    Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
+    if (Kind && !isNilExpr(WrapperTarget)) {
+      SmallString<256> Buffer;
+      auto Func = insertHelperFunction(*Kind, RightComment, Buffer, FromString);
+      Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
+      Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
+    }
     if (!Rename.empty()) {
       replaceExpr(Reference, Rename);
     }
@@ -838,21 +858,25 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
     if (NewAttributeType.empty())
       return;
-    SmallString<256> Buffer;
-    auto FuncName = insertHelperFunction(Kind, NewAttributeType, Buffer,
-                                         /*FromString*/ArgIdx);
+    Expr *WrapTarget = Call;
+    bool FromString = false;
     if (ArgIdx) {
       ArgIdx --;
+      FromString = true;
       auto AllArgs = getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
       if (AllArgs.size() <= ArgIdx)
         return;
-      auto Exp = AllArgs[ArgIdx].ArgExp;
-      Editor.insert(Exp->getStartLoc(), (Twine(FuncName) + "(").str());
-      Editor.insertAfterToken(Exp->getEndLoc(), ")");
-    } else {
-      Editor.insert(Call->getStartLoc(), (Twine(FuncName) + "(").str());
-      Editor.insertAfterToken(Call->getEndLoc(), ")");
+      WrapTarget = AllArgs[ArgIdx].ArgExp;
+      // Avoid wrapping nil literal.
+      if (isNilExpr(WrapTarget))
+        return;
     }
+    assert(WrapTarget);
+    SmallString<256> Buffer;
+    auto FuncName = insertHelperFunction(Kind, NewAttributeType, Buffer,
+                                         FromString);
+    Editor.insert(WrapTarget->getStartLoc(), (Twine(FuncName) + "(").str());
+    Editor.insertAfterToken(WrapTarget->getEndLoc(), ")");
   }
 
   bool walkToExprPre(Expr *E) override {
@@ -904,7 +928,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   void handleFuncDeclRename(AbstractFunctionDecl *AFD,
                             CharSourceRange NameRange) {
     bool IgnoreBase = false;
-    if (auto View = getFuncRename(AFD, IgnoreBase)) {
+    llvm::SmallString<32> Buffer;
+    if (auto View = getFuncRename(AFD, Buffer, IgnoreBase)) {
       if (!IgnoreBase)
         Editor.replace(NameRange, View.base());
       unsigned Index = 0;
