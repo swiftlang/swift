@@ -79,6 +79,8 @@ bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
   // is not used by the program itself.
   if (!Opts.shouldOptimize())
     return false;
+  if (Opts.UseJIT)
+    return false;
 
   switch (Nominal->getKind()) {
     case DeclKind::Enum:
