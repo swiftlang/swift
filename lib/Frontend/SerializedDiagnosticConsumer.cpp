@@ -140,7 +140,7 @@ public:
     assert(CalledFinishProcessing && "did not call finishProcessing()");
   }
 
-  bool finishProcessing() override {
+  bool finishProcessing(SourceManager &SM) override {
     assert(!CalledFinishProcessing &&
            "called finishProcessing() multiple times");
     CalledFinishProcessing = true;
@@ -160,8 +160,7 @@ public:
                                       llvm::sys::fs::F_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
-      SourceManager dummyMgr;
-      DiagnosticEngine DE(dummyMgr);
+      DiagnosticEngine DE(SM);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
       DE.diagnose(SourceLoc(), diag::cannot_open_serialized_file,
