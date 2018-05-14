@@ -114,6 +114,13 @@ void SyntaxClassifier::visit(TokenSyntax TokenNode) {
       break; // Inherit the default from the ContextStack
     }
     case tok::unknown:
+      if (TokenNode.getText().startswith("\"")) {
+        // Unterminated string literal
+        Classification = SyntaxClassification::StringLiteral;
+      } else {
+        Classification = SyntaxClassification::None;
+      }
+      break;
     case tok::eof:
     case tok::code_complete:
     case tok::oper_binary_unspaced:
