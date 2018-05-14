@@ -97,7 +97,7 @@ protected:
     uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                               bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+3+1,
+                               bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+3+1+1,
       /// The kind of supplemental API this type has, if any.
       Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
@@ -118,7 +118,10 @@ protected:
 
       /// Whether this type can be assumed to have a fixed size from all
       /// resilience domains.
-      AlwaysFixedSize : 1
+      AlwaysFixedSize : 1,
+
+      /// Whether this type is ABI-accessible from this SILModule.
+      ABIAccessible : 1
     );
 
     /// FixedTypeInfo will use the remaining bits for the size.
@@ -140,6 +143,7 @@ protected:
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
            IsBitwiseTakable_t bitwiseTakable,
            IsFixedSize_t alwaysFixedSize,
+           IsABIAccessible_t abiAccessible,
            SpecialTypeInfoKind stik) : StorageType(Type) {
     assert(stik >= SpecialTypeInfoKind::Fixed || !alwaysFixedSize);
     assert(!A.isZero() && "Invalid alignment");
@@ -150,6 +154,7 @@ protected:
     Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
     Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
+    Bits.TypeInfo.ABIAccessible = abiAccessible;
   }
 
   /// Change the minimum alignment of a stored value of this type.
@@ -188,6 +193,17 @@ public:
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const;
+
+  /// Whether this type is known to be ABI-accessible, i.e. whether it's
+  /// actually possible to do ABI operations on it from this current SILModule.
+  /// See SILModule::isTypeABIAccessible.
+  ///
+  /// All fixed-size types are currently ABI-accessible, although this would
+  /// not be difficult to change (e.g. if we had an archetype size constraint
+  /// that didn't say anything about triviality).
+  IsABIAccessible_t isABIAccessible() const {
+    return IsABIAccessible_t(Bits.TypeInfo.ABIAccessible);
+  }
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.

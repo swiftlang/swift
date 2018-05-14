@@ -1911,6 +1911,9 @@ namespace {
   /// not to cache the result as if it were the metadata for a formal type
   /// unless the type actually cannot possibly be a formal type, e.g. because
   /// it is one of the special lowered type kinds like SILFunctionType.
+  ///
+  /// NOTE: If you modify the special cases in this, you should update
+  /// isTypeMetadataForLayoutAccessible in SIL.cpp.
   class EmitTypeMetadataRefForLayout
     : public CanTypeVisitor<EmitTypeMetadataRefForLayout, llvm::Value *,
                             DynamicMetadataRequest> {
