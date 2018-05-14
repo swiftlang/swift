@@ -11,8 +11,8 @@
 // RUN: %FileCheck -check-prefix=NONSPECIFIC-ERROR %s <%t.empty.txt
 
 // ERROR: error:
-// NONSPECIFIC-ERROR: error: error(s) in other file(s) halted compilation
-// NO-NONSPECIFIC-ERROR-NOT: error: error(s) in other file(s) halted compilation
+// NONSPECIFIC-ERROR: error: compilation stopped by errors in other files
+// NO-NONSPECIFIC-ERROR-NOT: error: compilation stopped by errors in other files
 
 func test(x: SomeType) {
   nonexistent()

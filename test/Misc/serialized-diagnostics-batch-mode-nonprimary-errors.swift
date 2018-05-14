@@ -8,8 +8,8 @@
 
 // RUN: %FileCheck -check-prefix=NO-GENERAL-ERROR-OCCURRED %s <%t.main.txt
 // RUN: %FileCheck -check-prefix=GENERAL-ERROR-OCCURRED %s <%t.empty.txt
-// GENERAL-ERROR-OCCURRED: error(s) in other file(s) halted compilation
-// NO-GENERAL-ERROR-OCCURRED-NOT: error(s) in other file(s) halted compilation
+// GENERAL-ERROR-OCCURRED: compilation stopped by errors in other files
+// NO-GENERAL-ERROR-OCCURRED-NOT: compilation stopped by errors in other files
 
 
 func test(x: SomeType) {
