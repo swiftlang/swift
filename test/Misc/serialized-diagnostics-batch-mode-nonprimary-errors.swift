@@ -1,7 +1,4 @@
-// Batch-mode has no good place to emit diagnostics that occur in non-primary files
-// because then cannot be locatlized to a particular primary's serialized diagnostics file.
-// When such an error occurs, a nonspecific error must be emitted
-// for the primary files so Xcode knows something happened.
+// Ensure that an error in a non-primary causes an error in the errorless primary.
 //
 // RUN: rm -f %t.*
 
@@ -9,12 +6,12 @@
 // RUN: c-index-test -read-diagnostics %t.main.dia 2> %t.main.txt
 // RUN: c-index-test -read-diagnostics %t.empty.dia 2> %t.empty.txt
 
-// RUN: %FileCheck -check-prefix=NO-ERROR_OCCURRED %s <%t.main.txt
-// RUN: %FileCheck -check-prefix=ERROR_OCCURRED %s <%t.empty.txt
-// ERROR_OCCURRED: an error occurred
-// NO-ERROR_OCCURRED-NOT: an error occurred
+// RUN: %FileCheck -check-prefix=NO-GENERAL-ERROR-OCCURRED %s <%t.main.txt
+// RUN: %FileCheck -check-prefix=GENERAL-ERROR-OCCURRED %s <%t.empty.txt
+// GENERAL-ERROR-OCCURRED: error(s) in other file(s) halted compilation
+// NO-GENERAL-ERROR-OCCURRED-NOT: error(s) in other file(s) halted compilation
 
 
 func test(x: SomeType) {
-  nonexistant(); // create an error here
+    nonexistant()
 }

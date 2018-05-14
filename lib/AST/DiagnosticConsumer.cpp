@@ -203,7 +203,7 @@ bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
 
 static void produceNonSpecificError(DiagnosticConsumer *consumer,
                                     SourceManager &SM) {
-  Diagnostic diagnostic(diag::error_an_error_occurred);
+  Diagnostic diagnostic(diag::error_errors_in_other_files_halted_compilation);
 
   // Stolen from DiagnosticEngine::emitDiagnostic
   DiagnosticInfo Info;
@@ -221,7 +221,6 @@ void FileSpecificDiagnosticConsumer::addNonSpecificErrors(SourceManager &SM) {
     if (!info.hasAnErrorBeenEmitted && info.consumer) {
       produceNonSpecificError(info.consumer, SM);
       info.hasAnErrorBeenEmitted = true;
-      HasAnErrorBeenConsumed = true;
     }
   }
 }
