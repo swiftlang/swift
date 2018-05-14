@@ -1,6 +1,6 @@
-// To avoid redundant diagnostics showing up in Xcode, batch-mode must suppress diagnostics in
-// non-primary files.
-// But if the only  errors are suppressed ones, a nonspecific error must be emitted
+// Batch-mode has no good place to emit diagnostics that occur in non-primary files
+// because then cannot be locatlized to a particular primary's serialized diagnostics file.
+// When such an error occurs, a nonspecific error must be emitted
 // for the primary files so Xcode knows something happened.
 //
 // RUN: rm -f %t.*
@@ -18,8 +18,8 @@
 
 // RUN: %FileCheck -check-prefix=NO-NONSPECIFIC-ERROR %s <%t.main.txt
 // RUN: %FileCheck -check-prefix=NONSPECIFIC-ERROR %s <%t.empty.txt
-// NONSPECIFIC-ERROR: error: some error occured in a file that was used by this one
-// NO-NONSPECIFIC-ERROR-NOT: error: some error occured in a file that was used by this one
+// NONSPECIFIC-ERROR: error: an error occurred
+// NO-NONSPECIFIC-ERROR-NOT: error: an error occurred
 
 func test(x: SomeType) {
   nonexistent()

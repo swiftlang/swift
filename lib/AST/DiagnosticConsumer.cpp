@@ -157,6 +157,8 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info) {
 
+  HasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
+
   Optional<ConsumerSpecificInformation *> consumerSpecificInfo;
   switch (Kind) {
   case DiagnosticKind::Error:
@@ -178,11 +180,9 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
     }
     return;
   }
-  if (!consumerSpecificInfo.getValue()->consumer) {
-    WasAnErrorSuppressed =
-        true; // Suppress non-primary diagnostic in batch mode.
-    return;
-  }
+  if (!consumerSpecificInfo.getValue()->consumer)
+    return; // Suppress non-primary diagnostic in batch mode.
+
   consumerSpecificInfo.getValue()->consumer->handleDiagnostic(
       SM, Loc, Kind, FormatString, FormatArgs, Info);
   consumerSpecificInfo.getValue()->hasAnErrorBeenEmitted |=
@@ -203,14 +203,11 @@ bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
 
 static void produceNonSpecificError(DiagnosticConsumer *consumer,
                                     SourceManager &SM) {
-  Diagnostic diagnostic(
-      diag::error_some_error_occured_in_a_file_that_was_used_by_this_one);
+  Diagnostic diagnostic(diag::error_an_error_occurred);
 
   // Stolen from DiagnosticEngine::emitDiagnostic
   DiagnosticInfo Info;
   Info.ID = diagnostic.getID();
-  Info.Ranges = diagnostic.getRanges();
-  Info.FixIts = diagnostic.getFixIts();
 
   consumer->handleDiagnostic(
       SM, SourceLoc(), DiagnosticKind::Error,
@@ -218,13 +215,13 @@ static void produceNonSpecificError(DiagnosticConsumer *consumer,
 }
 
 void FileSpecificDiagnosticConsumer::addNonSpecificErrors(SourceManager &SM) {
-  if (!WasAnErrorSuppressed)
+  if (!HasAnErrorBeenConsumed)
     return;
-
   for (auto &info : ConsumersOrderedByRange) {
     if (!info.hasAnErrorBeenEmitted && info.consumer) {
       produceNonSpecificError(info.consumer, SM);
       info.hasAnErrorBeenEmitted = true;
+      HasAnErrorBeenConsumed = true;
     }
   }
 }

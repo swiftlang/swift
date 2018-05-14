@@ -175,7 +175,7 @@ private:
   Optional<ConsumerSpecificInformation *>
       ConsumerSpecificInfoForSubsequentNotes = None;
 
-  bool WasAnErrorSuppressed = false;
+  bool HasAnErrorBeenConsumed = false;
 
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
@@ -194,6 +194,9 @@ public:
   bool finishProcessing(SourceManager &) override;
 
 private:
+  /// In batch mode, any error causes failure for all primary files, but
+  /// Xcode will only see an error for a particular primary in that primary's
+  /// serialized diagnostics file. So, emit errors for all other primaries here.
   void addNonSpecificErrors(SourceManager &SM);
 
   void computeConsumersOrderedByRange(SourceManager &SM);
