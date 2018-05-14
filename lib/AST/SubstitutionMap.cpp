@@ -80,8 +80,12 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   if (empty()) return { };
 
   // Make sure we've filled in all of the replacement types.
-  for (auto gp : getGenericSignature()->getGenericParams()) {
-    (void)Type(gp).subst(*this);
+  if (!storage->populatedAllReplacements) {
+    for (auto gp : getGenericSignature()->getGenericParams()) {
+      (void)Type(gp).subst(*this);
+    }
+
+    storage->populatedAllReplacements = true;
   }
 
   return getReplacementTypesBuffer();
@@ -196,6 +200,13 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
   SmallVector<Type, 4> replacementTypes;
   replacementTypes.reserve(genericSig->getGenericParams().size());
   for (auto gp : genericSig->getGenericParams()) {
+    // Don't eagerly form replacements for non-canonical generic parameters.
+    if (!genericSig->isCanonicalTypeInContext(gp->getCanonicalType())) {
+      replacementTypes.push_back(Type());
+      continue;
+    }
+
+    // Record the replacement.
     Type replacement = Type(gp).subst(subs, lookupConformance,
                                       SubstFlags::UseErrorType);
     replacementTypes.push_back(replacement);
