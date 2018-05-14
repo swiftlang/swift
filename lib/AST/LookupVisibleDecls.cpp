@@ -877,8 +877,8 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       LS = LS.withOnMetatype();
     }
 
-    // Look for generic parameters in the current context. Those in parent
-    // contexts will be looked up anyways via `lookupVisibleMemberDecls`.
+    // We don't look for generic parameters if we are in the context of a
+    // nominal type: they will be looked up anyways via `lookupVisibleMemberDecls`.
     if (DC && !isa<NominalTypeDecl>(DC)) {
       if (auto *decl = DC->getAsDeclOrDeclExtensionContext()) {
         if (auto GC = decl->getAsGenericContext()) {
