@@ -632,6 +632,14 @@ public:
     PGOReader = std::move(IPR);
   }
 
+  /// Can value operations (copies and destroys) on the given lowered type
+  /// be performed in this module?
+  bool isTypeABIAccessible(SILType type);
+
+  /// Can type metadata for the given formal type be fetched in
+  /// the given module?
+  bool isTypeMetadataAccessible(CanType type);
+
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
