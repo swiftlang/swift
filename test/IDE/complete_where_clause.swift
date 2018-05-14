@@ -17,13 +17,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_2 | %FileCheck %s -check-prefix=GEN_T_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ALIAS_1 | %FileCheck %s -check-prefix=GEN_T
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ALIAS_2 | %FileCheck %s -check-prefix=GEN_T_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_1 | %FileCheck %s -check-prefix=GEN_T
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_1 | %FileCheck %s -check-prefix=GEN_T_NOMINAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_2 | %FileCheck %s -check-prefix=GEN_T_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_3 | %FileCheck %s -check-prefix=GEN_T
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_3 | %FileCheck %s -check-prefix=GEN_T_NOMINAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_4 | %FileCheck %s -check-prefix=GEN_T_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_1 | %FileCheck %s -check-prefix=GEN_T
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_1 | %FileCheck %s -check-prefix=GEN_T_NOMINAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_2 | %FileCheck %s -check-prefix=GEN_T_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_1 | %FileCheck %s -check-prefix=GEN_T
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_1 | %FileCheck %s -check-prefix=GEN_T_NOMINAL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_2 | %FileCheck %s -check-prefix=GEN_T_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_1 | %FileCheck %s -check-prefix=P2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_2 | %FileCheck %s -check-prefix=U_DOT
@@ -68,7 +68,7 @@ protocol Assoc {
 }
 
 func f1<T>(_: T) where #^FUNC_1^# {}
-// GEN_T: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
+// GEN_T: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 func f2<T>(_: T) where T.#^FUNC_2^# {}
 // GEN_T_DOT: Begin completions
 // GEN_T_DOT-DAG: Keyword/None:                       Type[#T.Type#];
@@ -101,6 +101,7 @@ class C1<T> where #^CLASS_1^# {}
 class C2<T> where T.#^CLASS_2^# {}
 enum E1<T> where #^ENUM_1^# {}
 enum E2<T> where T.#^ENUM_2^# {}
+// GEN_T_NOMINAL: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
 
 protocol P2 {
   associatedtype T where #^ASSOC_1^#
