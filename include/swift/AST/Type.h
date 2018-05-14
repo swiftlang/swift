@@ -419,6 +419,12 @@ public:
       });
   }
 
+  bool findIf(llvm::function_ref<bool (CanType)> fn) const {
+    return Type::findIf([&fn](Type t) {
+      return fn(CanType(t));
+    });
+  }
+
   // Provide a few optimized accessors that are really type-class queries.
 
   /// Do values of this type have reference semantics?
