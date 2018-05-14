@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -syntax-coloring -syntax-tree -source-filename %s | %FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s
 
 // CHECK: <#kw>#if</#kw> <#id>d</#id>

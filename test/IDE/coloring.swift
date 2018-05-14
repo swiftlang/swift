@@ -1,5 +1,6 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
-// RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-OLD
+// RUN: %target-swift-ide-test -syntax-coloring -syntax-tree -source-filename %s | %FileCheck %s --check-prefix CHECK -check-prefix CHECK-NEW
 // XFAIL: broken_std_regex
 
 #line 17 "abc.swift"
@@ -15,7 +16,8 @@ func foo() {
 enum List<T> {
   case Nil
   // rdar://21927124
-  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
+  // CHECK-OLD: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
+  // CHECK-NEW: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(<type>T</type>, <type>List</type>)
   indirect case Cons(T, List)
 }
 
@@ -91,13 +93,16 @@ class Attributes {
 // CHECK: <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v0: <type>Int</type>
   @IBOutlet var v0: Int
 
-// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> {{(<attr-builtin>)?}}v1{{(</attr-builtin>)?}}: <type>String</type>
+// CHECK-OLD: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> v1: <type>String</type>
+// CHECK-NEW: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v1: <type>String</type>
   @IBOutlet @IBOutlet var v1: String
 
-// CHECK: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v2{{(</attr-builtin>)?}}: <type>String</type>
+// CHECK-OLD: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v2: <type>String</type>
+// CHECK-NEW: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v2: <type>String</type>
   @objc @IBOutlet var v2: String
 
-// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v3{{(</attr-builtin>)?}}: <type>String</type>
+// CHECK-OLD: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> v3: <type>String</type>
+// CHECK-NEW: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> v3: <type>String</type>
   @IBOutlet @objc var v3: String
 
 // CHECK: <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f1() {}
@@ -163,18 +168,18 @@ func foo(n: Float) -> Int {
 }
 
 ///- returns: single-line, no space
-// CHECK: ///- <doc-comment-field>returns</doc-comment-field>: single-line, no space
+// CHECK-OLD: ///- <doc-comment-field>returns</doc-comment-field>: single-line, no space
 
 /// - returns: single-line, 1 space
-// CHECK: /// - <doc-comment-field>returns</doc-comment-field>: single-line, 1 space
+// CHECK-OLD: /// - <doc-comment-field>returns</doc-comment-field>: single-line, 1 space
 
 ///  - returns: single-line, 2 spaces
-// CHECK: ///  - <doc-comment-field>returns</doc-comment-field>: single-line, 2 spaces
+// CHECK-OLD: ///  - <doc-comment-field>returns</doc-comment-field>: single-line, 2 spaces
 
 ///       - returns: single-line, more spaces
-// CHECK: ///       - <doc-comment-field>returns</doc-comment-field>: single-line, more spaces
+// CHECK-OLD: ///       - <doc-comment-field>returns</doc-comment-field>: single-line, more spaces
 
-// CHECK: <kw>protocol</kw> Prot {
+// CHECK: <kw>protocol</kw> Prot
 protocol Prot {
   // CHECK: <kw>typealias</kw> Blarg
   typealias Blarg
@@ -260,7 +265,8 @@ func f(x: Int) -> Int {
    )
    """
 
-  // CHECK: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
+  // CHECK-OLD: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
+  // CHECK-NEW: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str></str>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
   "\(1)\(1)"
 }
 
@@ -311,7 +317,8 @@ func test3(o: AnyObject) {
 
 // CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
 func test4(inout a: Int) {
-  // CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
+  // CHECK-OLD: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
+  // CHECK-NEW: <kw>if</kw> <kw>#available</kw> (OSX >= <float>10.10</float>, iOS >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
   if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
 
 // CHECK: <kw>func</kw> test4b(a: <kw>inout</kw> <type>Int</type>) {{{$}}
@@ -348,35 +355,35 @@ func test_defer() {
 //    FIXME:   blah blah
 // Something something, FIXME: blah
 
-// CHECK: <comment-line>// <comment-marker>FIXME: blah.</comment-marker></comment-line>
-// CHECK: <comment-line>//    <comment-marker>FIXME:   blah blah</comment-marker></comment-line>
-// CHECK: <comment-line>// Something something, <comment-marker>FIXME: blah</comment-marker></comment-line>
+// CHECK-OLD: <comment-line>// <comment-marker>FIXME: blah.</comment-marker></comment-line>
+// CHECK-OLD: <comment-line>//    <comment-marker>FIXME:   blah blah</comment-marker></comment-line>
+// CHECK-OLD: <comment-line>// Something something, <comment-marker>FIXME: blah</comment-marker></comment-line>
 
 /* FIXME: blah*/
 
-// CHECK: <comment-block>/* <comment-marker>FIXME: blah*/</comment-marker></comment-block>
+// CHECK-OLD: <comment-block>/* <comment-marker>FIXME: blah*/</comment-marker></comment-block>
 
 /*
  * FIXME: blah
  * Blah, blah.
  */
 
-// CHECK: <comment-block>/*
-// CHECK:  * <comment-marker>FIXME: blah</comment-marker>
-// CHECK:  * Blah, blah.
-// CHECK:  */</comment-block>
+// CHECK-OLD: <comment-block>/*
+// CHECK-OLD:  * <comment-marker>FIXME: blah</comment-marker>
+// CHECK-OLD:  * Blah, blah.
+// CHECK-OLD:  */</comment-block>
 
 // TODO: blah.
 // TTODO: blah.
 // MARK: blah.
 
-// CHECK: <comment-line>// <comment-marker>TODO: blah.</comment-marker></comment-line>
-// CHECK: <comment-line>// T<comment-marker>TODO: blah.</comment-marker></comment-line>
-// CHECK: <comment-line>// <comment-marker>MARK: blah.</comment-marker></comment-line>
+// CHECK-OLD: <comment-line>// <comment-marker>TODO: blah.</comment-marker></comment-line>
+// CHECK-OLD: <comment-line>// T<comment-marker>TODO: blah.</comment-marker></comment-line>
+// CHECK-OLD: <comment-line>// <comment-marker>MARK: blah.</comment-marker></comment-line>
 
 // CHECK: <kw>func</kw> test5() -> <type>Int</type> {
 func test5() -> Int {
-  // CHECK: <comment-line>// <comment-marker>TODO: something, something.</comment-marker></comment-line>
+  // CHECK-OLD: <comment-line>// <comment-marker>TODO: something, something.</comment-marker></comment-line>
   // TODO: something, something.
   // CHECK: <kw>return</kw> <int>0</int>
   return 0
@@ -389,11 +396,11 @@ func test6<T : Prot>(x: T) {}
 /* http://whatever.com FIXME: see in http://whatever.com/fixme
   http://whatever.com */
 
-// CHECK: <comment-line>// <comment-url>http://whatever.com?ee=2&yy=1</comment-url> and <comment-url>radar://123456</comment-url></comment-line>
-// CHECK: <comment-block>/* <comment-url>http://whatever.com</comment-url> <comment-marker>FIXME: see in <comment-url>http://whatever.com/fixme</comment-url></comment-marker>
-// CHECK:  <comment-url>http://whatever.com</comment-url> */</comment-block>
+// CHECK-OLD: <comment-line>// <comment-url>http://whatever.com?ee=2&yy=1</comment-url> and <comment-url>radar://123456</comment-url></comment-line>
+// CHECK-OLD: <comment-block>/* <comment-url>http://whatever.com</comment-url> <comment-marker>FIXME: see in <comment-url>http://whatever.com/fixme</comment-url></comment-marker>
+// CHECK-OLD:  <comment-url>http://whatever.com</comment-url> */</comment-block>
 
-// CHECK: <comment-line>// <comment-url>http://whatever.com/what-ever</comment-url></comment-line>
+// CHECK-OLD: <comment-line>// <comment-url>http://whatever.com/what-ever</comment-url></comment-line>
 // http://whatever.com/what-ever
 
 // CHECK: <kw>func</kw> <placeholder><#test1#></placeholder> () {}
@@ -422,29 +429,29 @@ func <#test1#> () {}
 /// - seealso nope
 /// - returns: `x + y`
 func foo(x: Int, y: Int) -> Int { return x + y }
-// CHECK: <doc-comment-line>/// Brief.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>PaRamEteR</doc-comment-field> z-hyphen-q: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> : A strange number...
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameternope1: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameter nope2
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameter: nope3
-// CHECK: </doc-comment-line><doc-comment-line>/// -parameter nope4: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// * parameter nope5: Another number
-// CHECK: </doc-comment-line><doc-comment-line>///  - parameter nope6: Another number
-// CHECK: </doc-comment-line><doc-comment-line>///  - Parameters: nope7
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>: yes
-// CHECK: </doc-comment-line><doc-comment-line>///   - <doc-comment-field>seealso</doc-comment-field>: yes
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>:
-// CHECK: </doc-comment-line><doc-comment-line>/// -seealso: nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - seealso : nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - seealso nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
-// CHECK: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
+// CHECK-OLD: <doc-comment-line>/// Brief.
+// CHECK-OLD: </doc-comment-line><doc-comment-line>///
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// Simple case.
+// CHECK-OLD: </doc-comment-line><doc-comment-line>///
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>PaRamEteR</doc-comment-field> z-hyphen-q: Another number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> : A strange number...
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - parameternope1: Another number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - parameter nope2
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - parameter: nope3
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// -parameter nope4: Another number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// * parameter nope5: Another number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>///  - parameter nope6: Another number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>///  - Parameters: nope7
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>: yes
+// CHECK-OLD: </doc-comment-line><doc-comment-line>///   - <doc-comment-field>seealso</doc-comment-field>: yes
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>:
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// -seealso: nope
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - seealso : nope
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - seealso nope
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
+// CHECK-OLD: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
 
 
 /// Brief.
@@ -461,15 +468,15 @@ func foo(x: Int, y: Int) -> Int { return x + y }
 ///   - note: Not a Note field (not at top level)
 /// - returns: `x + y`
 func bar(x: Int, y: Int) -> Int { return x + y }
-// CHECK: <doc-comment-line>/// Brief.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>Parameters</doc-comment-field>:
-// CHECK: </doc-comment-line><doc-comment-line>/// - x: A number
-// CHECK: </doc-comment-line><doc-comment-line>/// - y: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
-// CHECK: </doc-comment-line><kw>func</kw> bar(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
+// CHECK-OLD: <doc-comment-line>/// Brief.
+// CHECK-OLD: </doc-comment-line><doc-comment-line>///
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// Simple case.
+// CHECK-OLD: </doc-comment-line><doc-comment-line>///
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>Parameters</doc-comment-field>:
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - x: A number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - y: Another number
+// CHECK-OLD: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
+// CHECK-OLD: </doc-comment-line><kw>func</kw> bar(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
 
 /**
   Does pretty much nothing.
@@ -484,53 +491,55 @@ func bar(x: Int, y: Int) -> Int { return x + y }
   Empty field, OK:
 */
 func baz() {}
-// CHECK: <doc-comment-block>/**
-// CHECK:   Does pretty much nothing.
-// CHECK:   Not a parameter list: improper indentation.
-// CHECK:     - Parameters: sdfadsf
-// CHECK:   - <doc-comment-field>WARNING</doc-comment-field>: - WARNING: Should only have one field
-// CHECK:   - $$$: Not a field.
-// CHECK:   Empty field, OK:
-// CHECK: */</doc-comment-block>
+// CHECK-OLD: <doc-comment-block>/**
+// CHECK-OLD:   Does pretty much nothing.
+// CHECK-OLD:   Not a parameter list: improper indentation.
+// CHECK-OLD:     - Parameters: sdfadsf
+// CHECK-OLD:   - <doc-comment-field>WARNING</doc-comment-field>: - WARNING: Should only have one field
+// CHECK-OLD:   - $$$: Not a field.
+// CHECK-OLD:   Empty field, OK:
+// CHECK-OLD: */</doc-comment-block>
 // CHECK: <kw>func</kw> baz() {}
 
 /***/
 func emptyDocBlockComment() {}
-// CHECK: <doc-comment-block>/***/</doc-comment-block>
+// CHECK-OLD: <doc-comment-block>/***/</doc-comment-block>
 // CHECK: <kw>func</kw> emptyDocBlockComment() {}
 
 /**
 */
 func emptyDocBlockComment2() {}
-// CHECK: <doc-comment-block>/**
-// CHECK: */
+// CHECK-OLD: <doc-comment-block>/**
+// CHECK-OLD: */
 // CHECK: <kw>func</kw> emptyDocBlockComment2() {}
 
 /**          */
 func emptyDocBlockComment3() {}
-// CHECK: <doc-comment-block>/**          */
+// CHECK-OLD: <doc-comment-block>/**          */
 // CHECK: <kw>func</kw> emptyDocBlockComment3() {}
 
 
 /**/
 func malformedBlockComment(f : () throws -> ()) rethrows {}
-// CHECK: <doc-comment-block>/**/</doc-comment-block>
-// CHECK: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <attr-builtin>rethrows</attr-builtin> {}
+// CHECK-OLD: <doc-comment-block>/**/</doc-comment-block>
+
+// CHECK-OLD: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <attr-builtin>rethrows</attr-builtin> {}
+// CHECK-NEW: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <kw>rethrows</kw> {}
 
 //: playground doc comment line
 func playgroundCommentLine(f : () throws -> ()) rethrows {}
-// CHECK: <comment-line>//: playground doc comment line</comment-line>
+// CHECK-OLD: <comment-line>//: playground doc comment line</comment-line>
 
 /*:
   playground doc comment multi-line
 */
 func playgroundCommentMultiLine(f : () throws -> ()) rethrows {}
-// CHECK: <comment-block>/*:
-// CHECK: playground doc comment multi-line
-// CHECK: */</comment-block>
+// CHECK-OLD: <comment-block>/*:
+// CHECK-OLD: playground doc comment multi-line
+// CHECK-OLD: */</comment-block>
 
 /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-// CHECK: <doc-comment-line>/// [strict weak ordering](<comment-url>http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings</comment-url>
+// CHECK-OLD: <doc-comment-line>/// [strict weak ordering](<comment-url>http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings</comment-url>
 
 func funcTakingFor(for internalName: Int) {}
 // CHECK: <kw>func</kw> funcTakingFor(for internalName: <type>Int</type>) {}
@@ -541,19 +550,23 @@ func funcTakingIn(in internalName: Int) {}
 _ = 123
 // CHECK: <int>123</int>
 _ = -123
-// CHECK: <int>-123</int>
+// CHECK-OLD: <int>-123</int>
+// CHECK-NEW: -<int>123</int>
 _ = -1
-// CHECK: <int>-1</int>
+// CHECK-OLD: <int>-1</int>
+// CHECK-NEW: -<int>1</int>
 _ = -0x123
-// CHECK: <int>-0x123</int>
+// CHECK-OLD: <int>-0x123</int>
+// CHECK-NEW: -<int>0x123</int>
 _ = -3.1e-5
-// CHECK: <float>-3.1e-5</float>
+// CHECK-OLD: <float>-3.1e-5</float>
+// CHECK-NEW: <float>3.1e-5</float>
 
 /** aaa
 
  - returns: something
  */
-// CHECK:  - <doc-comment-field>returns</doc-comment-field>: something
+// CHECK-OLD:  - <doc-comment-field>returns</doc-comment-field>: something
 
 let filename = #file
 // CHECK: <kw>let</kw> filename = <kw>#file</kw>
@@ -565,18 +578,24 @@ let function = #function
 // CHECK: <kw>let</kw> function = <kw>#function</kw>
 
 let image = #imageLiteral(resourceName: "cloud.png")
-// CHECK: <kw>let</kw> image = <object-literal>#imageLiteral(resourceName: "cloud.png")</object-literal>
+// CHECK-OLD: <kw>let</kw> image = <object-literal>#imageLiteral(resourceName: "cloud.png")</object-literal>
+// CHECK-NEW: <kw>let</kw> image = <object-literal>#imageLiteral</object-literal>(resourceName: <str>"cloud.png"</str>)
 let file = #fileLiteral(resourceName: "cloud.png")
-// CHECK: <kw>let</kw> file = <object-literal>#fileLiteral(resourceName: "cloud.png")</object-literal>
+// CHECK-OLD: <kw>let</kw> file = <object-literal>#fileLiteral(resourceName: "cloud.png")</object-literal>
+// CHECK-NEW: <kw>let</kw> file = <object-literal>#fileLiteral</object-literal>(resourceName: <str>"cloud.png"</str>)
 let black = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
-// CHECK: <kw>let</kw> black = <object-literal>#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)</object-literal>
+// CHECK-OLD: <kw>let</kw> black = <object-literal>#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)</object-literal>
+// CHECK-NEW: <kw>let</kw> black = <object-literal>#colorLiteral</object-literal>(red: <int>0</int>, green: <int>0</int>, blue: <int>0</int>, alpha: <int>1</int>)
 
 let rgb = [#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1),
            #colorLiteral(red: 0, green: 1, blue: 0, alpha: 1),
            #colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)]
-// CHECK: <kw>let</kw> rgb = [<object-literal>#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)</object-literal>,
-// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)</object-literal>,
-// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)</object-literal>]
+// CHECK-OLD: <kw>let</kw> rgb = [<object-literal>#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)</object-literal>,
+// CHECK-OLD:                     <object-literal>#colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)</object-literal>,
+// CHECK-OLD:                     <object-literal>#colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)</object-literal>]
+// CHECK-NEW: <kw>let</kw> rgb = [<object-literal>#colorLiteral</object-literal>(red: <int>1</int>, green: <int>0</int>, blue: <int>0</int>, alpha: <int>1</int>),
+// CHECK-NEW:                     <object-literal>#colorLiteral</object-literal>(red: <int>0</int>, green: <int>1</int>, blue: <int>0</int>, alpha: <int>1</int>),
+// CHECK-NEW:                     <object-literal>#colorLiteral</object-literal>(red: <int>0</int>, green: <int>0</int>, blue: <int>1</int>, alpha: <int>1</int>)]
 
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
@@ -592,7 +611,8 @@ func keywordAsLabel4(_: Int) {}
 func keywordAsLabel5(_: Int, for: Int) {}
 // CHECK: <kw>func</kw> keywordAsLabel5(<kw>_</kw>: <type>Int</type>, for: <type>Int</type>) {}
 func keywordAsLabel6(if let: Int) {}
-// CHECK: <kw>func</kw> keywordAsLabel6(if <kw>let</kw>: <type>Int</type>) {}
+// CHECK-OLD: <kw>func</kw> keywordAsLabel6(if <kw>let</kw>: <type>Int</type>) {}
+// CHECK-NEW: <kw>func</kw> keywordAsLabel6(<kw>if</kw> <kw>let</kw>: <type>Int</type>) {}
 
 func foo1() {
 // CHECK: <kw>func</kw> foo1() {
