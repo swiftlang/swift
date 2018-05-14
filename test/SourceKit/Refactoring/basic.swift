@@ -126,11 +126,15 @@ func foo7() -> String {
 // CHECK-GLOBAL: ACTIONS BEGIN
 // CHECK-GLOBAL-NEXT: source.refactoring.kind.rename.global
 // CHECK-GLOBAL-NEXT: Global Rename
+// CHECK-GLOBAL-NEXT: source.refactoring.kind.doc.comment.boilerplate
+// CHECK-GLOBAL-NEXT: Generate Documentation Comment
 // CHECK-GLOBAL-NEXT: ACTIONS END
 
 // CHECK-LOCAL: ACTIONS BEGIN
 // CHECK-LOCAL-NEXT: source.refactoring.kind.rename.local
 // CHECK-LOCAL-NEXT: Local Rename
+// CHECK-LOCAL-NEXT: source.refactoring.kind.doc.comment.boilerplate
+// CHECK-LOCAL-NEXT: Generate Documentation Comment
 // CHECK-LOCAL-NEXT: ACTIONS END
 
 // CHECK-RENAME-EXTRACT: Global Rename

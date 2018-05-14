@@ -1,4 +1,4 @@
-///<#Function Summary#>
+/// <#Function Summary#>
 ///  - Parameter a: <#Parameter a#>
 ///
 func funcWithParamNoReturnNoThrow(_ a: Int) {

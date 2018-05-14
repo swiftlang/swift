@@ -2619,7 +2619,7 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
     FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
     
     swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
-    EditConsumer.accept(SM, startLocation, "///<#Function Summary#>\n");
+    EditConsumer.accept(SM, startLocation, "/// <#Function Summary#>\n");
     
     //-----[Start] This section processes parameters -----
     SmallVector<ParamDecl *, 5> allParamDecls;
