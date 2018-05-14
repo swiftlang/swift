@@ -1,0 +1,149 @@
+%{
+  from gyb_syntax_support import *
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxFactory.cpp.gyb.
+//// Do Not Edit Directly!
+//===--------- SyntaxFactory.cpp - Syntax Factory implementations ---------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the SyntaxFactory, one of the most important client-facing
+// types in lib/Syntax and likely to be very commonly used.
+//
+// Effectively a namespace, SyntaxFactory is never instantiated, but is *the*
+// one-stop shop for making new Syntax nodes. Putting all of these into a
+// collection of static methods provides a single point of API lookup for
+// clients' convenience and also allows the library to hide all of the
+// constructors for all Syntax nodes, as the SyntaxFactory is friend to all.
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Syntax/SyntaxClassifier.h"
+
+using namespace swift;
+using namespace swift::syntax;
+
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+void SyntaxClassifier::visit(${node.name} Node) {
+%     if node.is_unknown():
+  SyntaxVisitor::visit(Node);
+%     else:
+%       for child in node.children:
+%         if child.classification:
+  visit(Node.get${child.name}(), SyntaxClassification::${child.classification});
+%         else:
+  visit(Node.get${child.name}());
+%         end
+%       end
+%     end
+}
+%   end
+% end
+
+void SyntaxClassifier::visit(TokenSyntax TokenNode) {
+  SyntaxClassification Classification = ContextStack.top();
+  switch (TokenNode.getTokenKind()) {
+#define KEYWORD(KW) case tok::kw_##KW: Classification = SyntaxClassification::Keyword; break;
+#define POUND_KEYWORD(KW) case tok::pound_##KW: Classification = SyntaxClassification::Keyword; break;
+#define POUND_OBJECT_LITERAL(KW, desc, proto) case tok::pound_##KW: Classification = SyntaxClassification::ObjectLiteral; break;
+#define POUND_DIRECTIVE_KEYWORD(KW) case tok::pound_##KW: Classification = SyntaxClassification::PoundDirectiveKeyword; break;
+#define POUND_COND_DIRECTIVE_KEYWORD(KW) case tok::pound_##KW: Classification = SyntaxClassification::PoundDirectiveKeyword; break;
+#include "swift/Syntax/TokenKinds.def"
+    // Punctuators
+    case tok::l_paren:
+    case tok::r_paren:
+    case tok::l_brace:
+    case tok::r_brace:
+    case tok::l_square:
+    case tok::r_square:
+    case tok::l_angle:
+    case tok::r_angle:
+    case tok::period:
+    case tok::period_prefix:
+    case tok::comma:
+    case tok::colon:
+    case tok::semi:
+    case tok::equal:
+    case tok::pound:
+    case tok::amp_prefix:
+    case tok::arrow:
+    case tok::backtick:
+    case tok::backslash:
+    case tok::exclaim_postfix:
+    case tok::question_postfix:
+    case tok::question_infix:
+    case tok::sil_dollar:
+    case tok::sil_exclamation:
+      Classification = SyntaxClassification::None;
+      break;
+    case tok::string_quote:
+    case tok::multiline_string_quote:
+      Classification = SyntaxClassification::StringLiteral;
+      break;
+    case tok::at_sign:
+      Classification = SyntaxClassification::Attribute;
+      break;
+
+    // Literals
+    case tok::integer_literal: 
+      Classification = SyntaxClassification::IntegerLiteral;
+      break;
+    case tok::floating_literal: 
+      Classification = SyntaxClassification::FloatingLiteral;
+      break;
+    case tok::string_literal: 
+      Classification = SyntaxClassification::StringLiteral;
+      break;
+
+    // Miscelaneous
+    case tok::identifier: {
+      if (Identifier::isEditorPlaceholder(TokenNode.getText())) {
+        Classification = SyntaxClassification::EditorPlaceholder;
+      }
+      break; // Inherit the default from the ContextStack
+    }
+    case tok::unknown:
+    case tok::eof:
+    case tok::code_complete:
+    case tok::oper_binary_unspaced:
+    case tok::oper_binary_spaced:
+    case tok::oper_postfix:
+    case tok::oper_prefix:
+      Classification = SyntaxClassification::None;
+      break;
+    case tok::dollarident:
+      Classification = SyntaxClassification::DollarIdentifier;
+      break;
+    case tok::sil_local_name:
+      Classification = SyntaxClassification::None;
+      break;
+    case tok::comment:
+      llvm_unreachable("Comments should be in trivia");
+    case tok::contextual_keyword:
+      Classification = SyntaxClassification::Keyword;
+      break;
+    case tok::string_segment:
+      Classification = SyntaxClassification::StringLiteral;
+      break;
+    case tok::string_interpolation_anchor:
+      Classification = SyntaxClassification::StringInterpolationAnchor;
+      break;
+    case tok::NUM_TOKENS:
+      llvm_unreachable("");
+  }
+
+  assert(ClassifiedTokens.count(TokenNode.getId()) == 0 &&
+         "Token already classified");
+  ClassifiedTokens[TokenNode.getId()] = Classification;
+}
