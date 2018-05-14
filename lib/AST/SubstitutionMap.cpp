@@ -49,6 +49,7 @@ SubstitutionMap::Storage::Storage(
             getReplacementTypes().data());
   std::copy(conformances.begin(), conformances.end(),
             getConformances().data());
+  populatedAllReplacements = false;
 }
 
 SubstitutionMap::SubstitutionMap(
@@ -82,7 +83,7 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   // Make sure we've filled in all of the replacement types.
   if (!storage->populatedAllReplacements) {
     for (auto gp : getGenericSignature()->getGenericParams()) {
-      (void)Type(gp).subst(*this);
+      (void)lookupSubstitution(cast<SubstitutableType>(gp->getCanonicalType()));
     }
 
     storage->populatedAllReplacements = true;

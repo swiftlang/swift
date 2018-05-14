@@ -38,7 +38,7 @@ class SubstitutionMap::Storage final
   const unsigned numConformanceRequirements : 31;
 
   /// Whether we've populated all replacement types already.
-  bool populatedAllReplacements = false;
+  unsigned populatedAllReplacements : 1;
 
   Storage() = delete;
 
