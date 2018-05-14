@@ -2175,11 +2175,6 @@ protected:
   }
 
 public:
-  /// \brief Return true if this is a definition of a decl, not a forward
-  /// declaration (e.g. of a function) that is implemented outside of the
-  /// swift code.
-  bool isDefinition() const;
-
   /// \brief Return true if this protocol member is a protocol requirement.
   ///
   /// Asserts if this is not a member of a protocol.
@@ -2378,10 +2373,6 @@ public:
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.
   bool isInstanceMember() const;
-
-  /// needsCapture - Check whether referring to this decl from a nested
-  /// function requires capturing it.
-  bool needsCapture() const;
 
   /// Retrieve the context discriminator for this local value, which
   /// is the index of this declaration in the sequence of
