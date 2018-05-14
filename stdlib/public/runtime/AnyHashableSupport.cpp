@@ -160,7 +160,7 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
           getValueFromSwiftValue(srcSwiftValue);
 
       if (auto unboxedHashableWT =
-              swift_conformsToProtocol(type, &HashableProtocolDescriptor)) {
+              swift_conformsToProtocol(unboxedType, &HashableProtocolDescriptor)) {
 #ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
         ValueBuffer unboxedCopyBuf;
         // Allocate buffer.
