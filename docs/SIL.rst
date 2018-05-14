@@ -1886,10 +1886,6 @@ Allocates uninitialized memory that is sufficiently aligned on the stack
 to contain a value of type ``T``. The result of the instruction is the address
 of the allocated memory.
 
-If a type is runtime-sized, the compiler must emit code to potentially
-dynamically allocate memory. So there is no guarantee that the allocated
-memory is really located on the stack.
-
 ``alloc_stack`` marks the start of the lifetime of the value; the
 allocation must be balanced with a ``dealloc_stack`` instruction to
 mark the end of its lifetime. All ``alloc_stack`` allocations must be
