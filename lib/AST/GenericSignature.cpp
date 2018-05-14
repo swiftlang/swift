@@ -100,15 +100,55 @@ GenericSignature::getInnermostGenericParams() const {
 
 SmallVector<GenericTypeParamType *, 2>
 GenericSignature::getSubstitutableParams() const {
-  SmallVector<GenericTypeParamType *, 2> result;
+  // Figure out which generic parameters are concrete or same-typed to another
+  // generic parameter.
+  auto genericParams = getGenericParams();
+  auto genericParamsAreNotSubstitutable =
+    SmallVector<bool, 4>(genericParams.size(), false);
+  for (auto req : getRequirements()) {
+    if (req.getKind() != RequirementKind::SameType) continue;
 
-  enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement>) -> bool {
-    if (auto *paramTy = depTy->getAs<GenericTypeParamType>())
-      result.push_back(paramTy);
-    return false;
-  });
+    GenericTypeParamType *gp;
+    if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
+      // If two generic parameters are same-typed, then the left-hand one
+      // is canonical.
+      gp = secondGP;
+    } else {
+      // If an associated type is same-typed, it doesn't constrain the generic
+      // parameter itself.
+      if (req.getSecondType()->isTypeParameter()) continue;
+
+      // Otherwise, the generic parameter is concrete.
+      gp = req.getFirstType()->getAs<GenericTypeParamType>();
+      if (!gp) continue;
+    }
+
+    unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
+    genericParamsAreNotSubstitutable[index] = true;
+  }
+
+  // Collect the generic parameters that are substitutable.
+  SmallVector<GenericTypeParamType *, 2> result;
+  for (auto index : indices(genericParams)) {
+    auto gp = genericParams[index];
+    if (!genericParamsAreNotSubstitutable[index])
+      result.push_back(gp);
+  }
 
   return result;
+}
+
+bool GenericSignature::areAllParamsConcrete() const {
+  unsigned numConcreteGenericParams = 0;
+  for (const auto &req : getRequirements()) {
+    if (req.getKind() != RequirementKind::SameType) continue;
+    if (!req.getFirstType()->is<GenericTypeParamType>()) continue;
+    if (req.getSecondType()->isTypeParameter()) continue;
+
+    ++numConcreteGenericParams;
+  }
+
+  return numConcreteGenericParams == getGenericParams().size();
 }
 
 ASTContext &GenericSignature::getASTContext(
@@ -333,136 +373,6 @@ GenericSignature::lookupConformance(CanType type, ProtocolDecl *proto) const {
     return ProtocolConformanceRef(proto);
 
   return M->lookupConformance(type, proto);
-}
-
-bool GenericSignature::enumeratePairedRequirements(
-               llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const {
-  // We'll be walking through the list of requirements.
-  ArrayRef<Requirement> reqs = getRequirements();
-  unsigned curReqIdx = 0, numReqs = reqs.size();
-
-  // ... and walking through the list of generic parameters.
-  auto genericParams = getGenericParams();
-  unsigned curGenericParamIdx = 0, numGenericParams = genericParams.size();
-
-  // Figure out which generic parameters are concrete or same-typed to another
-  // generic parameter.
-  auto genericParamsAreNonCanonical =
-    SmallVector<bool, 4>(genericParams.size(), false);
-  for (auto req : reqs) {
-    if (req.getKind() != RequirementKind::SameType) continue;
-    
-    GenericTypeParamType *gp;
-    if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
-      // If two generic parameters are same-typed, then the left-hand one
-      // is canonical.
-      gp = secondGP;
-    } else {
-      // If an associated type is same-typed, it doesn't constrain the generic
-      // parameter itself.
-      if (req.getSecondType()->isTypeParameter()) continue;
-      
-      // Otherwise, the generic parameter is concrete.
-      gp = req.getFirstType()->getAs<GenericTypeParamType>();
-      if (!gp) continue;
-    }
-
-    unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
-    genericParamsAreNonCanonical[index] = true;
-  }
-
-  /// Local function to 'catch up' to the next dependent type we're going to
-  /// visit, calling the function for each of the generic parameters in the
-  /// generic parameter list prior to this parameter.
-  auto enumerateGenericParamsUpToDependentType = [&](CanType depTy) -> bool {
-    // Figure out where we should stop when enumerating generic parameters.
-    unsigned stopDepth, stopIndex;
-    if (auto gp = dyn_cast_or_null<GenericTypeParamType>(depTy)) {
-      stopDepth = gp->getDepth();
-      stopIndex = gp->getIndex();
-    } else {
-      stopDepth = genericParams.back()->getDepth() + 1;
-      stopIndex = 0;
-    }
-
-    // Enumerate generic parameters up to the stopping point, calling the
-    // callback function for each one
-    while (curGenericParamIdx != numGenericParams) {
-      auto curGenericParam = genericParams[curGenericParamIdx];
-
-      // If the current generic parameter is before our stopping point, call
-      // the function.
-      if (curGenericParam->getDepth() < stopDepth ||
-          (curGenericParam->getDepth() == stopDepth &&
-           curGenericParam->getIndex() < stopIndex)) {
-        if (!genericParamsAreNonCanonical[curGenericParamIdx] &&
-            fn(curGenericParam, { }))
-          return true;
-
-        ++curGenericParamIdx;
-        continue;
-      }
-
-      // If the current generic parameter is at our stopping point, we're
-      // done.
-      if (curGenericParam->getDepth() == stopDepth &&
-          curGenericParam->getIndex() == stopIndex) {
-        ++curGenericParamIdx;
-        return false;
-      }
-
-      // Otherwise, there's nothing to do.
-      break;
-    }
-
-    return false;
-  };
-
-  // Walk over all of the requirements.
-  while (curReqIdx != numReqs) {
-    // "Catch up" by enumerating generic parameters up to this dependent type.
-    CanType depTy = reqs[curReqIdx].getFirstType()->getCanonicalType();
-    if (enumerateGenericParamsUpToDependentType(depTy)) return true;
-
-    // Utility to skip over non-conformance constraints that apply to this
-    // type.
-    auto skipNonConformanceConstraints = [&] {
-      while (curReqIdx != numReqs &&
-             reqs[curReqIdx].getKind() != RequirementKind::Conformance &&
-             reqs[curReqIdx].getFirstType()->getCanonicalType() == depTy) {
-        ++curReqIdx;
-      }
-    };
-
-    // First, skip past any non-conformance constraints on this type.
-    skipNonConformanceConstraints();
-
-    // Collect all of the conformance constraints for this dependent type.
-    unsigned startIdx = curReqIdx;
-    unsigned endIdx = curReqIdx;
-    while (curReqIdx != numReqs &&
-           reqs[curReqIdx].getKind() == RequirementKind::Conformance &&
-           reqs[curReqIdx].getFirstType()->getCanonicalType() == depTy) {
-      ++curReqIdx;
-      endIdx = curReqIdx;
-    }
-
-    // Skip any trailing non-conformance constraints.
-    skipNonConformanceConstraints();
-
-    // If there were any conformance constraints, or we have a generic
-    // parameter we can't skip, invoke the callback.
-    if ((startIdx != endIdx ||
-         (isa<GenericTypeParamType>(depTy) &&
-          !genericParamsAreNonCanonical[
-            GenericParamKey(cast<GenericTypeParamType>(depTy))
-              .findIndexIn(genericParams)])) &&
-        fn(depTy, reqs.slice(startIdx, endIdx-startIdx)))
-      return true;
-  }
-
-  // Catch up on any remaining generic parameters.
-  return enumerateGenericParamsUpToDependentType(CanType());
 }
 
 SubstitutionMap
