@@ -3008,9 +3008,12 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     SILFunction *F = getFunction();
     assert(F);
     auto GenericEnv = F->getGenericEnvironment();
-    assert(GenericEnv);
     interleave(getRequirements(),
                [&](Requirement req) {
+                 if (!GenericEnv) {
+                   req.print(OS, SubPrinter);
+                   return;
+                 }
                  // Use GenericEnvironment to produce user-friendly
                  // names instead of something like t_0_0.
                  auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());
