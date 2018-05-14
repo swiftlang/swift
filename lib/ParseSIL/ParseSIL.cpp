@@ -6208,11 +6208,12 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
     return true;
 
   // Parse the covered name.
-  Identifier FuncName;
-  SourceLoc FuncLoc;
-  if (State.parseSILIdentifier(FuncName, FuncLoc,
-                               diag::expected_sil_value_name))
+  if (!P.Tok.is(tok::string_literal)) {
+    P.diagnose(P.Tok, diag::sil_coverage_expected_quote);
     return true;
+  }
+  StringRef FuncName = P.Tok.getText().drop_front().drop_back();
+  P.consumeToken();
 
   // Parse the PGO func name.
   if (!P.Tok.is(tok::string_literal)) {
@@ -6221,12 +6222,6 @@ bool SILParserTUState::parseSILCoverageMap(Parser &P) {
   }
   StringRef PGOFuncName = P.Tok.getText().drop_front().drop_back();
   P.consumeToken();
-
-  SILFunction *Func = M.lookUpFunction(FuncName.str());
-  if (!Func) {
-    P.diagnose(FuncLoc, diag::sil_coverage_func_not_found, FuncName);
-    return true;
-  }
 
   uint64_t Hash;
   if (State.parseInteger(Hash, diag::sil_coverage_invalid_hash))
