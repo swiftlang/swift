@@ -473,7 +473,9 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('LeftParen', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken', 
+                   classification='StringInterpolationAnchor',
+                   force_classification=True),
              Child('Expression', kind='Expr'),
              Child('RightParen', kind='StringInterpolationAnchorToken'),
          ]),
