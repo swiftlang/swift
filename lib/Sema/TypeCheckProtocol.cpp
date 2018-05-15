@@ -4668,16 +4668,19 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         inferStaticInitializeObjCMetadata(*this, classDecl);
       }
     }
-
-    // When requested, print out information about this conformance.
-    if (Context.LangOpts.DebugGenericSignatures) {
-      dc->dumpContext();
-      conformance->dump();
-    }
   }
 
   // Check all conformances.
   groupChecker.checkAllConformances();
+
+  if (Context.LangOpts.DebugGenericSignatures) {
+    // Now that they're filled out, print out information about the conformances
+    // here, when requested.
+    for (auto conformance : conformances) {
+      dc->dumpContext();
+      conformance->dump();
+    }
+  }
 
   // Catalog all of members of this declaration context that satisfy
   // requirements of conformances in this context.
