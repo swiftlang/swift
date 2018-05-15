@@ -149,6 +149,11 @@ FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 /// expression typechecker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 
+/// Number of constraints considered per attempt to
+/// contract constraint graph edges.
+/// This is a measure of complexity of the contraction algorithm.
+FRONTEND_STATISTIC(Sema, NumConstraintsConsideredForEdgeContraction)
+
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
