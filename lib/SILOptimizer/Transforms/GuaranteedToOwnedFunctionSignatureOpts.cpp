@@ -51,10 +51,14 @@ partitionNonTrivialUses(SILFunctionArgument *arg,
 
     // We only handle direct_owned call sites right now.
     if (auto FAS = FullApplySite::isa(I)) {
-      auto Conv = FAS.getArgumentConvention(FAS.getCalleeArgIndex(*Op));
-      if (Conv == SILArgumentConvention::Direct_Owned) {
-        consumingUsers.push_back(Op->getUser());
-        continue;
+      // For now, we do not support callees. The reason why is that we would
+      // need to deal with function conversions and thunking.
+      if (FAS.getCallee() != Op->get()) {
+        auto Conv = FAS.getArgumentConvention(FAS.getCalleeArgIndex(*Op));
+        if (Conv == SILArgumentConvention::Direct_Owned) {
+          consumingUsers.push_back(Op->getUser());
+          continue;
+        }
       }
     }
 
