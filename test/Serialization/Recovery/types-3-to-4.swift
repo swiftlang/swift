@@ -32,7 +32,8 @@ public func A_renameAllTheThings(
   c: Swift3RenamedTypedef,
   d: Swift3RenamedStruct,
   e: Swift3RenamedEnum,
-  f: Swift3RenamedProtocol
+  f: Swift3RenamedProtocol,
+  g: Swift3RenamedWrappedTypedef
 ) {}
 
 // CHECK-4-LABEL: func A_renameAllTheThings(
@@ -42,6 +43,7 @@ public func A_renameAllTheThings(
 // CHECK-4-SAME: d: RenamedStruct
 // CHECK-4-SAME: e: RenamedEnum
 // CHECK-4-SAME: f: RenamedProtocol
+// CHECK-4-SAME: g: RenamedWrappedTypedef
 // CHECK-4-SAME: )
 
 
@@ -56,6 +58,7 @@ public func A_renameAllTheThings(
 // CHECK-3-SAME: d: Swift3RenamedStruct
 // CHECK-3-SAME: e: Swift3RenamedEnum
 // CHECK-3-SAME: f: Swift3RenamedProtocol
+// CHECK-3-SAME: g: Swift3RenamedWrappedTypedef
 // CHECK-3-SAME: )
 
 
