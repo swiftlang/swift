@@ -308,6 +308,21 @@ visitStrongEntranceApply(ApplyInst *AI) {
 template <class ARCState>
 typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
 TopDownDataflowRCStateVisitor<ARCState>::
+visitStrongEntrancePartialApply(PartialApplyInst *PAI) {
+  DEBUG(llvm::dbgs() << "VISITING ENTRANCE PARTIAL APPLY: " << *PAI);
+
+  // Rreturn a dataflow result containing a +1.
+  DEBUG(llvm::dbgs() << "    Initializing state.\n");
+
+  auto &State = DataflowState.getTopDownRefCountState(PAI);
+  State.initWithEntranceInst(SetFactory.get(PAI), PAI);
+
+  return DataflowResult(PAI);
+}
+
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntranceAllocRef(AllocRefInst *ARI) {
   // Alloc refs always introduce new references at +1.
   TopDownRefCountState &State = DataflowState.getTopDownRefCountState(ARI);
@@ -355,6 +370,9 @@ visitStrongEntrance(SILNode *N) {
 
   if (auto *ABI = dyn_cast<AllocBoxInst>(N))
     return visitStrongAllocBox(ABI);
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(N))
+    return visitStrongEntrancePartialApply(PAI);
 
   return DataflowResult();
 }
