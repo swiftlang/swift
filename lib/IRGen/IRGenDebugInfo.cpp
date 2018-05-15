@@ -1188,7 +1188,7 @@ private:
             ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy));
         auto PDITy = getOrCreateType(PDbgTy);
         Protocols.push_back(
-            DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, Flags));
+            DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
       }
       auto DITy = DBuilder.createStructType(
           Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
