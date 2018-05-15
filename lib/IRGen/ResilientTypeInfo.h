@@ -42,9 +42,10 @@ namespace irgen {
 template <class Impl>
 class ResilientTypeInfo : public WitnessSizedTypeInfo<Impl> {
 protected:
-  ResilientTypeInfo(llvm::Type *type)
+  ResilientTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
     : WitnessSizedTypeInfo<Impl>(type, Alignment(1),
-                                 IsNotPOD, IsNotBitwiseTakable) {}
+                                 IsNotPOD, IsNotBitwiseTakable,
+                                 abiAccessible) {}
 
 public:
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
