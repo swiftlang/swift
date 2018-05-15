@@ -153,7 +153,8 @@ static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
            bool EnableStructure, bool EnableDiagnostics, bool EnableSyntaxTree,
-           bool SyntacticOnly, ArrayRef<const char *> Args);
+           bool SyntacticOnly, bool LibSyntaxBasedProcessing,
+           ArrayRef<const char *> Args);
 
 static sourcekitd_response_t
 editorOpenInterface(StringRef Name, StringRef ModuleName,
@@ -188,7 +189,7 @@ static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
                   unsigned Length, bool EnableSyntaxMap, bool EnableStructure,
                   bool EnableDiagnostics, bool EnableSyntaxTree,
-                  bool SyntacticOnly);
+                  bool SyntacticOnly, bool LibSyntaxBasedProcessing);
 
 static void
 editorApplyFormatOptions(StringRef Name, RequestDict &FmtOptions);
@@ -429,9 +430,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
-    return Rec(editorOpen(*Name, InputBuf.get(), EnableSyntaxMap, EnableStructure,
-                          EnableDiagnostics, EnableSyntaxTree, SyntacticOnly,
-                          Args));
+    int64_t LibSyntaxBasedProcessing = false;
+    Req.getInt64(KeyLibSyntaxBasedProcessing, LibSyntaxBasedProcessing,
+                 /*isOptional=*/true);
+    return Rec(editorOpen(*Name, InputBuf.get(), EnableSyntaxMap,
+                          EnableStructure, EnableDiagnostics, EnableSyntaxTree,
+                          SyntacticOnly, LibSyntaxBasedProcessing, Args));
   }
   if (ReqUID == RequestEditorClose) {
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -465,10 +469,13 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeyEnableSyntaxTree, EnableSyntaxTree, /*isOptional=*/true);
     int64_t SyntacticOnly = false;
     Req.getInt64(KeySyntacticOnly, SyntacticOnly, /*isOptional=*/true);
+    int64_t LibSyntaxBasedProcessing = false;
+    Req.getInt64(KeyLibSyntaxBasedProcessing, LibSyntaxBasedProcessing,
+                 /*isOptional=*/true);
     return Rec(editorReplaceText(*Name, InputBuf.get(), Offset, Length,
                                  EnableSyntaxMap, EnableStructure,
                                  EnableDiagnostics, EnableSyntaxTree,
-                                 SyntacticOnly));
+                                 SyntacticOnly, LibSyntaxBasedProcessing));
   }
   if (ReqUID == RequestEditorFormatText) {
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -2068,11 +2075,13 @@ public:
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
            bool EnableStructure, bool EnableDiagnostics, bool EnableSyntaxTree,
-           bool SyntacticOnly, ArrayRef<const char *> Args) {
+           bool SyntacticOnly, bool LibSyntaxBasedProcessing,
+           ArrayRef<const char *> Args) {
   SKEditorConsumer EditC(EnableSyntaxMap, EnableStructure,
                          EnableDiagnostics, EnableSyntaxTree, SyntacticOnly);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpen(Name, Buf, EnableSyntaxMap, EditC, Args);
+  Lang.editorOpen(Name, Buf, EnableSyntaxMap, EditC, LibSyntaxBasedProcessing,
+                  Args);
   return EditC.createResponse();
 }
 
@@ -2173,11 +2182,12 @@ static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
                   unsigned Length, bool EnableSyntaxMap, bool EnableStructure,
                   bool EnableDiagnostics, bool EnableSyntaxTree,
-                  bool SyntacticOnly) {
+                  bool SyntacticOnly, bool LibSyntaxBasedProcessing) {
   SKEditorConsumer EditC(EnableSyntaxMap, EnableStructure,
                          EnableDiagnostics, EnableSyntaxTree, SyntacticOnly);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorReplaceText(Name, Buf, Offset, Length, EditC);
+  Lang.editorReplaceText(Name, Buf, Offset, Length, EditC,
+                         LibSyntaxBasedProcessing);
   return EditC.createResponse();
 }
 

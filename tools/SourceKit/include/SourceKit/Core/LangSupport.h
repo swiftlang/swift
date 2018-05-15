@@ -518,8 +518,8 @@ public:
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
   virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                          bool EnableSyntaxMap,
-                          EditorConsumer &Consumer,
+                          bool EnableSyntaxMap, EditorConsumer &Consumer,
+                          bool LibSyntaxBasedProcessing,
                           ArrayRef<const char *> Args) = 0;
 
   virtual void editorOpenInterface(EditorConsumer &Consumer,
@@ -551,7 +551,8 @@ public:
 
   virtual void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                  unsigned Offset, unsigned Length,
-                                 EditorConsumer &Consumer) = 0;
+                                 EditorConsumer &Consumer,
+                                 bool LibSyntaxBasedProcessing) = 0;
 
   virtual void editorApplyFormatOptions(StringRef Name,
                                         OptionsDictionary &FmtOptions) = 0;

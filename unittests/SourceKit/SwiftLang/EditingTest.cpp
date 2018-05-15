@@ -157,8 +157,8 @@ public:
             EditorConsumer &Consumer) {
     auto Args = makeArgs(DocName, CArgs);
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false, Consumer,
-                         Args);
+    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false,
+                         Consumer, /*LibSyntaxBasedProcessing*/ false, Args);
   }
 
   void close(const char *DocName) {
@@ -168,7 +168,8 @@ public:
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
                    StringRef Text, EditorConsumer &Consumer) {
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer);
+    getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer,
+                                LibSyntaxBasedProcessing);
   }
 
   unsigned findOffset(StringRef Val, StringRef Text) {

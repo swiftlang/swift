@@ -137,13 +137,15 @@ public:
                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
     getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false,
-                         Consumer, Args);
+                         Consumer,
+                         /*LibSyntaxBasedProcessing=*/false, Args);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
                    StringRef Text) {
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer);
+    getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer,
+                                LibSyntaxBasedProcessing);
   }
 
   TestCursorInfo getCursor(const char *DocName, unsigned Offset,

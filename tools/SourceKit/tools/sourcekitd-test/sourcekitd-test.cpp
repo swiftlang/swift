@@ -646,6 +646,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, true);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
+    sourcekitd_request_dictionary_set_int64(Req, KeyLibSyntaxBasedProcessing, true);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -712,6 +713,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                        Opts.ReplaceText.getValue().c_str());
+    sourcekitd_request_dictionary_set_int64(Req, KeyLibSyntaxBasedProcessing, true);
     break;
 
   case SourceKitRequest::PrintAnnotations:
@@ -1060,6 +1062,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                                                 EnableSubStructure);
         sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly,
                                                 !Opts.UsedSema);
+        sourcekitd_request_dictionary_set_int64(EdReq, KeyLibSyntaxBasedProcessing, true);
 
         sourcekitd_response_t EdResp = sendRequestSync(EdReq, Opts);
         sourcekitd_response_description_dump_filedesc(EdResp, STDOUT_FILENO);

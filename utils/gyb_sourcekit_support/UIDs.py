@@ -48,6 +48,7 @@ UID_KEYS = [
     KEY('SourceFile', 'key.sourcefile'),
     KEY('SerializedSyntaxTree', 'key.serialized_syntax_tree'),
     KEY('SourceText', 'key.sourcetext'),
+    KEY('LibSyntaxBasedProcessing', 'key.libsyntaxbasedprocessing'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('EnableSyntaxTree', 'key.enablesyntaxtree'),
     KEY('EnableStructure', 'key.enablesubstructure'),

@@ -38,6 +38,7 @@
 #include "swift/Subsystems.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
+#include "swift/Syntax/SyntaxClassifier.h"
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -555,6 +556,114 @@ struct SwiftSyntaxMap {
 
     return true;
   }
+};
+
+class SyntaxToSyntaxMapConverter : public SyntaxVisitor {
+  SwiftSyntaxMap &SyntaxMap;
+
+  std::map<unsigned, SyntaxClassification> TokenClassifications;
+
+public:
+  SyntaxToSyntaxMapConverter(
+      SwiftSyntaxMap &SyntaxMap,
+      std::map<unsigned, SyntaxClassification> TokenClassifications)
+      : SyntaxMap(SyntaxMap), TokenClassifications(TokenClassifications) {}
+
+private:
+  void print(Trivia Trivia) {
+    for (auto TriviaPiece : Trivia) {
+      print(TriviaPiece);
+    }
+  }
+
+  void print(TriviaPiece TriviaPiece) {
+    llvm::Optional<SyntaxNodeKind> Kind;
+    switch (TriviaPiece.getKind()) {
+    case TriviaKind::Space:
+    case TriviaKind::Tab:
+    case TriviaKind::VerticalTab:
+    case TriviaKind::Formfeed:
+    case TriviaKind::Newline:
+    case TriviaKind::CarriageReturn:
+    case TriviaKind::CarriageReturnLineFeed:
+    case swift::syntax::TriviaKind::Backtick:
+    case TriviaKind::GarbageText:
+      Kind = llvm::None;
+      break;
+    case swift::syntax::TriviaKind::LineComment:
+      Kind = SyntaxNodeKind::CommentLine;
+      break;
+    case TriviaKind::BlockComment:
+      Kind = SyntaxNodeKind::CommentBlock;
+      break;
+    case TriviaKind::DocLineComment:
+      Kind = SyntaxNodeKind::DocCommentLine;
+      break;
+    case TriviaKind::DocBlockComment:
+      Kind = SyntaxNodeKind::DocCommentBlock;
+      break;
+    }
+    // FIXME: Add the trivia to the syntax map, but we don't have the necessary
+    // location data yet
+  }
+
+  llvm::Optional<SyntaxNodeKind>
+  getKindForSyntaxClassification(SyntaxClassification Classification) const {
+    // FIXME: We should really use the same enum so that the conversion is not
+    // necessary
+    switch (Classification) {
+    case SyntaxClassification::None:
+      return llvm::None;
+    case SyntaxClassification::Keyword:
+      return SyntaxNodeKind::Keyword;
+    case SyntaxClassification::Identifier:
+      return SyntaxNodeKind::Identifier;
+    case SyntaxClassification::DollarIdentifier:
+      return SyntaxNodeKind::DollarIdent;
+    case SyntaxClassification::IntegerLiteral:
+      return SyntaxNodeKind::Integer;
+    case SyntaxClassification::FloatingLiteral:
+      return SyntaxNodeKind::Floating;
+    case SyntaxClassification::StringLiteral:
+      return SyntaxNodeKind::String;
+    case SyntaxClassification::StringInterpolationAnchor:
+      return SyntaxNodeKind::StringInterpolationAnchor;
+    case SyntaxClassification::TypeIdentifier:
+      return SyntaxNodeKind::TypeId;
+    case SyntaxClassification::BuildConfigKeyword:
+      return SyntaxNodeKind::BuildConfigKeyword;
+    case SyntaxClassification::BuildConfigId:
+      return SyntaxNodeKind::BuildConfigId;
+    case SyntaxClassification::PoundDirectiveKeyword:
+      return SyntaxNodeKind::PoundDirectiveKeyword;
+    case SyntaxClassification::Attribute:
+      return SyntaxNodeKind::AttributeBuiltin;
+    case SyntaxClassification::EditorPlaceholder:
+      return SyntaxNodeKind::EditorPlaceholder;
+    case SyntaxClassification::ObjectLiteral:
+      return SyntaxNodeKind::ObjectLiteral;
+    }
+  }
+
+  virtual void visit(TokenSyntax Token) override {
+    if (Token.isMissing())
+      return;
+
+    print(Token.getLeadingTrivia());
+
+    SyntaxClassification Classification = TokenClassifications[Token.getId()];
+    auto Kind = getKindForSyntaxClassification(Classification);
+    if (Kind.hasValue()) {
+      unsigned Start = Token.getAbsolutePosition().getOffset();
+      unsigned Length = Token.getRaw()->getTokenText().size();
+      SyntaxMap.addToken(SwiftSyntaxToken(Start, Length, Kind.getValue()));
+    }
+
+    print(Token.getTrailingTrivia());
+  }
+
+public:
+  void writeToSyntaxMap(Syntax Node) { Node.accept(*this); }
 };
 
 struct EditorConsumerSyntaxMapEntry {
@@ -1764,12 +1873,11 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   Impl.SyntaxInfo->parse();
 }
 
-void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
+void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer,
+                                         bool LibSyntaxBasedProcessing) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
-
-  ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
 
   if (Consumer.syntaxTreeEnabled()) {
     std::string SyntaxContent;
@@ -1782,11 +1890,22 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
-  SwiftEditorSyntaxWalker SyntaxWalker(NewMap,
-                                       Impl.SyntaxInfo->getSourceManager(),
-                                       Consumer,
-                                       Impl.SyntaxInfo->getBufferID());
-  ModelContext.walk(SyntaxWalker);
+  if (LibSyntaxBasedProcessing) {
+    auto SyntaxTree = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot();
+
+    SyntaxClassifier Classifier;
+    auto Classification = Classifier.classify(SyntaxTree);
+    SyntaxToSyntaxMapConverter Printer(NewMap, Classification);
+    Printer.writeToSyntaxMap(SyntaxTree);
+  } else {
+    ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
+
+    SwiftEditorSyntaxWalker SyntaxWalker(NewMap,
+                                         Impl.SyntaxInfo->getSourceManager(),
+                                         Consumer,
+                                         Impl.SyntaxInfo->getBufferID());
+    ModelContext.walk(SyntaxWalker);
+  }
 
   bool SawChanges = true;
   if (Impl.Edited) {
@@ -2029,10 +2148,12 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   bool EnableSyntaxMap,
                                   EditorConsumer &Consumer,
+                                  bool LibSyntaxBasedProcessing,
                                   ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
-  const bool BuildSyntaxTree = Consumer.syntaxTreeEnabled();
+  const bool BuildSyntaxTree =
+      Consumer.syntaxTreeEnabled() || LibSyntaxBasedProcessing;
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
@@ -2057,7 +2178,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
     EditorDoc->updateSemaInfo();
   }
 
-  EditorDoc->readSyntaxInfo(Consumer);
+  EditorDoc->readSyntaxInfo(Consumer, LibSyntaxBasedProcessing);
   EditorDoc->readSemanticInfo(Snapshot, Consumer);
 }
 
@@ -2086,7 +2207,8 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
 
 void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                          unsigned Offset, unsigned Length,
-                                         EditorConsumer &Consumer) {
+                                         EditorConsumer &Consumer,
+                                         bool LibSyntaxBasedProcessing) {
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
@@ -2098,8 +2220,10 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     Snapshot = EditorDoc->replaceText(Offset, Length, Buf,
                                       Consumer.needsSemanticInfo());
     assert(Snapshot);
-    EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
-    EditorDoc->readSyntaxInfo(Consumer);
+    bool BuildSyntaxTree =
+        Consumer.syntaxTreeEnabled() || LibSyntaxBasedProcessing;
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
+    EditorDoc->readSyntaxInfo(Consumer, LibSyntaxBasedProcessing);
   } else {
     Snapshot = EditorDoc->getLatestSnapshot();
   }
