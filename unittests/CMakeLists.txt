@@ -19,11 +19,16 @@ else()
   
   set(CMAKE_CXX_COMPILER_ARG1 "")
   set(CMAKE_C_COMPILER_ARG1 "")
-  # The sanitizers require using the same version of the compiler for
-  # everything and there are various places where we link runtime code with
-  # code built by the host compiler. Disable sanitizers for the runtime for
-  # now.
-  append("-fno-sanitize=all" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+endif()
+
+if(SWIFT_RUNTIME_USE_SANITIZERS)
+  # TODO: Refactor this
+  if("Thread" IN_LIST SWIFT_RUNTIME_USE_SANITIZERS)
+    list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-fsanitize=thread")
+    list(APPEND SWIFT_RUNTIME_LINK_FLAGS "-fsanitize=thread")
+    list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-sanitize=thread")
+    list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-fsanitize=thread")
+  endif()
 endif()
 
 include(AddSwiftUnittests)
