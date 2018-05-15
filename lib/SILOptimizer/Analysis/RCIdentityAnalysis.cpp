@@ -540,6 +540,11 @@ void RCIdentityFunctionInfo::getRCUses(SILValue InputValue,
       if (!VisitedOps.insert(Op).second)
         continue;
 
+      // If this is a type dependent operand, skip it. It is not a consuming use
+      // that matters for our purposes.
+      if (Op->getUser()->isTypeDependentOperand(*Op))
+        continue;
+
       auto *User = Op->getUser();
 
       if (auto *SVI = dyn_cast<SingleValueInstruction>(User)) {
