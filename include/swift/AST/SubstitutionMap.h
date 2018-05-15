@@ -218,8 +218,12 @@ public:
   /// Verify that this substitution map is valid.
   void verify() const;
 
+  /// Whether to dump the full substitution map, or just a minimal useful subset
+  /// (on a single line).
+  enum class DumpStyle { Minimal, Full };
   /// Dump the contents of this substitution map for debugging purposes.
-  void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
+  void dump(llvm::raw_ostream &out, DumpStyle style = DumpStyle::Full,
+            unsigned indent = 0) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
 
