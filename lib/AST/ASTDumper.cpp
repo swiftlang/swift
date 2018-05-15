@@ -2810,7 +2810,6 @@ static void dumpProtocolConformanceRefRec(
     out.indent(indent) << "(abstract_conformance protocol="
                        << conformance.getAbstract()->getName();
     PrintWithColorRAII(out, ParenthesisColor) << ')';
-    out << '\n';
   }
 }
 
@@ -2923,7 +2922,10 @@ static void dumpProtocolConformanceRec(
   PrintWithColorRAII(out, ParenthesisColor) << ')';
 }
 
-void ProtocolConformanceRef::dump() const { dump(llvm::errs()); }
+void ProtocolConformanceRef::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << '\n';
+}
 
 void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
                                   unsigned indent) const {

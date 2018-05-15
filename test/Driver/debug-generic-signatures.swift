@@ -81,9 +81,9 @@ class Super<T, U> {}
 // CHECK-NEXT:   (assoc_type req=A type=Super<T, U>.A)
 // CHECK-NEXT:   (assoc_type req=B type=Super<T, U>.B)
 // CHECK-NEXT:   (abstract_conformance protocol=P2)
-// CHECK:        (abstract_conformance protocol=P2)
-// CHECK:        conforms_to: T P2
-// CHECK:        conforms_to: U P2)
+// CHECK-NEXT:   (abstract_conformance protocol=P2)
+// CHECK-NEXT:   conforms_to: T P2
+// CHECK-NEXT:   conforms_to: U P2)
 extension Super: P2 where T: P2, U: P2 {
     typealias A = T
     typealias B = T
@@ -114,7 +114,7 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:       (assoc_type req=A type=Super<T, U>.A)
 // CHECK-NEXT:       (assoc_type req=B type=Super<T, U>.B)
 // CHECK-NEXT:       (abstract_conformance protocol=P2)
-// CHECK:            (abstract_conformance protocol=P2)
-// CHECK:            conforms_to: T P2
-// CHECK:            conforms_to: U P2)))
+// CHECK-NEXT:       (abstract_conformance protocol=P2)
+// CHECK-NEXT:       conforms_to: T P2
+// CHECK-NEXT:       conforms_to: U P2)))
 class Sub: Super<NonRecur, Recur> {}
