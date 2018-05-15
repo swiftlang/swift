@@ -33,7 +33,7 @@ protocol P3 {
 
 // CHECK-LABEL: StructDecl name=Basic
 // CHECK: (normal_conformance type=Basic protocol=P1
-// CHECK-NEXT: (assoc_type req=A type=Basic.A)
+// CHECK-NEXT: (assoc_type req=A type=Int)
 // CHECK-NEXT: (value req=f() witness=main.(file).Basic.f()@{{.*}}))
 struct Basic: P1 {
     typealias A = Int
@@ -44,8 +44,8 @@ struct Basic: P1 {
 
 // CHECK-LABEL: StructDecl name=Recur
 // CHECK-NEXT: (normal_conformance type=Recur protocol=P2
-// CHECK-NEXT:   (assoc_type req=A type=Recur.A)
-// CHECK-NEXT:   (assoc_type req=B type=Recur.B)
+// CHECK-NEXT:   (assoc_type req=A type=Recur)
+// CHECK-NEXT:   (assoc_type req=B type=Recur)
 // CHECK-NEXT:   (normal_conformance type=Recur protocol=P2 (details printed above))
 // CHECK-NEXT:   (normal_conformance type=Recur protocol=P2 (details printed above)))
 struct Recur: P2 {
@@ -57,11 +57,11 @@ struct Recur: P2 {
 
 // CHECK-LABEL: StructDecl name=NonRecur
 // CHECK-NEXT: (normal_conformance type=NonRecur protocol=P2
-// CHECK-NEXT:   (assoc_type req=A type=NonRecur.A)
-// CHECK-NEXT:   (assoc_type req=B type=NonRecur.B)
+// CHECK-NEXT:   (assoc_type req=A type=Recur)
+// CHECK-NEXT:   (assoc_type req=B type=Recur)
 // CHECK-NEXT:   (normal_conformance type=Recur protocol=P2
-// CHECK-NEXT:     (assoc_type req=A type=Recur.A)
-// CHECK-NEXT:     (assoc_type req=B type=Recur.B)
+// CHECK-NEXT:     (assoc_type req=A type=Recur)
+// CHECK-NEXT:     (assoc_type req=B type=Recur)
 // CHECK-NEXT:     (normal_conformance type=Recur protocol=P2 (details printed above))
 // CHECK-NEXT:     (normal_conformance type=Recur protocol=P2 (details printed above)))
 // CHECK-NEXT:   (normal_conformance type=Recur protocol=P2 (details printed above)))
@@ -75,7 +75,7 @@ struct NonRecur: P2 {
 struct Generic<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Generic<T>
 // CHECK-NEXT: (normal_conformance type=Generic<T> protocol=P1
-// CHECK-NEXT:   (assoc_type req=A type=Generic<T>.A)
+// CHECK-NEXT:   (assoc_type req=A type=T)
 // CHECK-NEXT:   (value req=f() witness=main.(file).Generic.f()@{{.*}})
 // CHECK-NEXT:   conforms_to: T P1)
 extension Generic: P1 where T: P1 {
@@ -88,8 +88,8 @@ extension Generic: P1 where T: P1 {
 class Super<T, U> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Super<T, U>
 // CHECK-NEXT: (normal_conformance type=Super<T, U> protocol=P2
-// CHECK-NEXT:   (assoc_type req=A type=Super<T, U>.A)
-// CHECK-NEXT:   (assoc_type req=B type=Super<T, U>.B)
+// CHECK-NEXT:   (assoc_type req=A type=T)
+// CHECK-NEXT:   (assoc_type req=B type=T)
 // CHECK-NEXT:   (abstract_conformance protocol=P2)
 // CHECK-NEXT:   (abstract_conformance protocol=P2)
 // CHECK-NEXT:   conforms_to: T P2
@@ -108,11 +108,11 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:         (substitution U -> Recur)
 // CHECK-NEXT:         (conformance type=T
 // CHECK-NEXT:            (normal_conformance type=NonRecur protocol=P2
-// CHECK-NEXT:              (assoc_type req=A type=NonRecur.A)
-// CHECK-NEXT:              (assoc_type req=B type=NonRecur.B)
+// CHECK-NEXT:              (assoc_type req=A type=Recur)
+// CHECK-NEXT:              (assoc_type req=B type=Recur)
 // CHECK-NEXT:              (normal_conformance type=Recur protocol=P2
-// CHECK-NEXT:                (assoc_type req=A type=Recur.A)
-// CHECK-NEXT:                (assoc_type req=B type=Recur.B)
+// CHECK-NEXT:                (assoc_type req=A type=Recur)
+// CHECK-NEXT:                (assoc_type req=B type=Recur)
 // CHECK-NEXT:                (normal_conformance type=Recur protocol=P2 (details printed above))
 // CHECK-NEXT:                (normal_conformance type=Recur protocol=P2 (details printed above)))
 // CHECK-NEXT:              (normal_conformance type=Recur protocol=P2 (details printed above))))
@@ -121,8 +121,8 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:     conforms_to: NonRecur P2
 // CHECK-NEXT:     conforms_to: Recur P2
 // CHECK-NEXT:     (normal_conformance type=Super<T, U> protocol=P2
-// CHECK-NEXT:       (assoc_type req=A type=Super<T, U>.A)
-// CHECK-NEXT:       (assoc_type req=B type=Super<T, U>.B)
+// CHECK-NEXT:       (assoc_type req=A type=T)
+// CHECK-NEXT:       (assoc_type req=B type=T)
 // CHECK-NEXT:       (abstract_conformance protocol=P2)
 // CHECK-NEXT:       (abstract_conformance protocol=P2)
 // CHECK-NEXT:       conforms_to: T P2
@@ -134,7 +134,7 @@ class Sub: Super<NonRecur, Recur> {}
 
 // CHECK-LABEL: StructDecl name=RecurGeneric
 // CHECK-NEXT: (normal_conformance type=RecurGeneric<T> protocol=P3
-// CHECK-NEXT:   (assoc_type req=A type=RecurGeneric<T>.A)
+// CHECK-NEXT:   (assoc_type req=A type=RecurGeneric<T>)
 // CHECK-NEXT:   (normal_conformance type=RecurGeneric<T> protocol=P3 (details printed above)))
 struct RecurGeneric<T: P3>: P3 {
     typealias A = RecurGeneric<T>
@@ -142,14 +142,14 @@ struct RecurGeneric<T: P3>: P3 {
 
 // CHECK-LABEL: StructDecl name=Specialize
 // CHECK-NEXT: (normal_conformance type=Specialize protocol=P3
-// CHECK-NEXT:   (assoc_type req=A type=Specialize.A)
+// CHECK-NEXT:   (assoc_type req=A type=RecurGeneric<Specialize>)
 // CHECK-NEXT:   (specialized_conformance type=Specialize.A protocol=P3
 // CHECK-NEXT:     (substitution_map generic_signature=<T where T : P3>
 // CHECK-NEXT:       (substitution T -> Specialize)
 // CHECK-NEXT:       (conformance type=T
 // CHECK-NEXT:         (normal_conformance type=Specialize protocol=P3 (details printed above))))
 // CHECK-NEXT:     (normal_conformance type=RecurGeneric<T> protocol=P3
-// CHECK-NEXT:       (assoc_type req=A type=RecurGeneric<T>.A)
+// CHECK-NEXT:       (assoc_type req=A type=RecurGeneric<T>)
 // CHECK-NEXT:       (normal_conformance type=RecurGeneric<T> protocol=P3 (details printed above)))))
 struct Specialize: P3 {
     typealias A = RecurGeneric<Specialize>

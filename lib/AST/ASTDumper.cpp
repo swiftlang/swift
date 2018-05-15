@@ -2857,7 +2857,7 @@ static void dumpProtocolConformanceRec(
             out.indent(indent + 2);
             PrintWithColorRAII(out, ParenthesisColor) << '(';
             out << "assoc_type req=" << req->getName() << " type=";
-            PrintWithColorRAII(out, TypeColor) << ty;
+            PrintWithColorRAII(out, TypeColor) << Type(ty->getDesugaredType());
             PrintWithColorRAII(out, ParenthesisColor) << ')';
             return false;
           });
