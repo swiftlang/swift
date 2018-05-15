@@ -1243,12 +1243,15 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
   return *EmptyTI;
 }
 
-const TypeInfo &TypeConverter::getResilientStructTypeInfo() {
-  if (ResilientStructTI) return *ResilientStructTI;
-  ResilientStructTI = convertResilientStruct();
-  ResilientStructTI->NextConverted = FirstType;
-  FirstType = ResilientStructTI;
-  return *ResilientStructTI;
+const TypeInfo &
+TypeConverter::getResilientStructTypeInfo(IsABIAccessible_t isAccessible) {
+  auto &cache = isAccessible ? AccessibleResilientStructTI
+                             : InaccessibleResilientStructTI;
+  if (cache) return *cache;
+  cache = convertResilientStruct(isAccessible);
+  cache->NextConverted = FirstType;
+  FirstType = cache;
+  return *cache;
 }
 
 /// Get the fragile type information for the given type, which may not
