@@ -1427,10 +1427,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
           sys::TaskQueue queue;
           queue.addTask(xcrunPath->c_str(), args);
           queue.execute(nullptr,
-                        [&OI](sys::ProcessId PID,
-                              int returnCode,
-                              StringRef output,
-                              StringRef errors,
+                        [&OI](sys::ProcessId PID, int returnCode,
+                              StringRef output, StringRef errors,
+                              sys::TaskProcessInformation ProcInfo,
                               void *unused) -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();

@@ -8,6 +8,8 @@
 
 #cmakedefine HAVE_UNICODE_LIBEDIT 1
 
+#cmakedefine HAVE_WAIT4 1
+
 #cmakedefine01 SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
 
 #endif // SWIFT_CONFIG_H
