@@ -5432,9 +5432,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // possible.
     fnExpr = typeCheckChildIndependently(callExpr->getFn());
     if (!fnExpr) {
+      auto hadError = [&]() {
+        return CS.TC.Diags.hadAnyError();
+      };
       auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
       if (!UDE)
-        return true;
+        return hadError();
 
       auto baseExpr = UDE->getBase();
       // Offer fix-it for using `subscript` instead of the operator.
@@ -5445,12 +5448,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         auto lookup = CS.lookupMember(baseType->getRValueType(),
                                       DeclName(DeclBaseName::createSubscript()));
         if (lookup.empty())
-          return true;
+          return hadError();
 
         auto argExpr = typeCheckChildIndependently(callExpr->getArg(), Type(),
                                                    CTP_CallArgument);
         if (!argExpr)
-          return true;
+          return hadError();
 
         SmallVector<Identifier, 2> scratch;
         ArrayRef<Identifier> argLabels = callExpr->getArgumentLabels(scratch);
@@ -5485,10 +5488,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
             auto type2 = candParams[i].getType()->
               getUnlabeledType(CS.getASTContext());
 
-            if (type1->isEqual(type2))
+            if (type1->isEqual(type2) || type2->is<GenericTypeParamType>() ||
+                CS.TC.isSubtypeOf(type1, type2, CS.DC))
               continue;
-            if (CS.TC.isSubtypeOf(type2, type1, CS.DC))
-              return {CC_GeneralMismatch, {}};
+
+            return {CC_GeneralMismatch, {}};
           }
           return {CC_ExactMatch, {}};
         });
@@ -5504,7 +5508,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         auto diag = diagnose(baseLoc, diag::did_you_mean_subscript_operator);
 
         if (candidates.closeness != CC_ExactMatch)
-          return true;
+          return hadError();
 
         diag.fixItReplace(SourceRange(argExpr->getStartLoc()), "[");
         diag.fixItRemove(nameLoc.getSourceRange());
@@ -5515,7 +5519,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         else
           diag.fixItInsertAfter(argExpr->getEndLoc(), "]");
       }
-      return true;
+      return hadError();
     }
   }
 
