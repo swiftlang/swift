@@ -424,7 +424,7 @@ namespace {
 
     void printRec(Decl *D) { D->dump(OS, Indent + 2); }
     void printRec(Expr *E) { E->print(OS, Indent + 2); }
-    void printRec(Stmt *S, const ASTContext& Ctx) { S->print(OS, &Ctx, Indent + 2); }
+    void printRec(Stmt *S, const ASTContext &Ctx) { S->print(OS, &Ctx, Indent + 2); }
     void printRec(TypeRepr *T);
     void printRec(const Pattern *P) {
       PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
@@ -552,7 +552,7 @@ namespace {
     
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
-    void printRec(Stmt *S, const ASTContext& Ctx) { S->print(OS, &Ctx, Indent+2); }
+    void printRec(Stmt *S, const ASTContext &Ctx) { S->print(OS, &Ctx, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
 
@@ -1699,7 +1699,7 @@ public:
   /// FIXME: This should use ExprWalker to print children.
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
-  void printRec(Stmt *S, const ASTContext& Ctx) { S->print(OS, &Ctx, Indent + 2); }
+  void printRec(Stmt *S, const ASTContext &Ctx) { S->print(OS, &Ctx, Indent + 2); }
   void printRec(const Pattern *P) {
     PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
   }
