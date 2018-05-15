@@ -441,6 +441,10 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
+
+  // Used for dominance checking within a basic block.
+  llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
+
   DeadEndBlocks DEBlocks;
   bool SingleFunction = true;
 
@@ -619,20 +623,32 @@ public:
     }
   }
 
+  static unsigned numInstsInFunction(const SILFunction &F) {
+    unsigned numInsts = 0;
+    for (auto &BB : F) {
+      numInsts += std::distance(BB.begin(), BB.end());
+    }
+    return numInsts;
+  }
+
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getLoweredFunctionType(), F.getModule()),
         TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
+        InstNumbers(numInstsInFunction(F)),
         DEBlocks(&F), SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
+    unsigned InstIdx = 0;
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
       require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
+      for (auto &I : BB)
+        InstNumbers[&I] = InstIdx++;
     }
 
     Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
@@ -646,6 +662,20 @@ public:
   ~SILVerifier() {
     if (Dominance)
       delete Dominance;
+  }
+
+  // Checks dominance between two instructions.
+  // This does not use DominanceInfo.properlyDominates, because for large basic
+  // blocks it would result in quadratic behavior.
+  bool properlyDominates(SILInstruction *a, SILInstruction *b) {
+    auto aBlock = a->getParent(), bBlock = b->getParent();
+
+    // If the blocks are different, it's as easy as whether A's block
+    // dominates B's block.
+    if (aBlock != bBlock)
+      return Dominance->properlyDominates(aBlock, bBlock);
+
+    return InstNumbers[a] < InstNumbers[b];
   }
 
   // FIXME: For sanity, address-type block args should be prohibited at all SIL
@@ -779,7 +809,7 @@ public:
         } else {
           require(valueI->getFunction() == &F,
                   "instruction uses value of instruction from another function");
-          require(Dominance->properlyDominates(valueI, I),
+          require(properlyDominates(valueI, I),
                   "instruction isn't dominated by its operand");
         }
       }
@@ -943,7 +973,7 @@ public:
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
         require (Def, "Opened archetype should be registered in SILFunction");
         require(I == nullptr || Def == I ||
-                Dominance->properlyDominates(cast<SILInstruction>(Def), I),
+                properlyDominates(cast<SILInstruction>(Def), I),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -1075,7 +1105,7 @@ public:
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(A);
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
-                Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
+                properlyDominates(cast<SILInstruction>(Def), AI),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
