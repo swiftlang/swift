@@ -202,7 +202,7 @@ bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
 }
 
 static void produceNonSpecificError(
-    FileSpecificDiagnosticConsumer::ConsumerSpecificInformation &info,
+    FileSpecificDiagnosticConsumer::ConsumerSpecificInformation &consumerInfo,
     SourceManager &SM) {
   Diagnostic diagnostic(
       diag::error_compilation_stopped_by_errors_in_other_files);
@@ -211,8 +211,8 @@ static void produceNonSpecificError(
   DiagnosticInfo Info;
   Info.ID = diagnostic.getID();
 
-  info.consumer->handleDiagnostic(
-      SM, info.range.getStart(), DiagnosticKind::Error,
+  consumerInfo.consumer->handleDiagnostic(
+      SM, consumerInfo.range.getStart(), DiagnosticKind::Error,
       DiagnosticEngine::diagnosticStringFor(diagnostic.getID()), {}, Info);
 }
 
