@@ -1,12 +1,13 @@
 // This file tests the guaranteed -> owned transformation in isolation.
 
-// RUN: %target-sil-opt -parse-stdlib -sil-fso-disable-owned-to-guaranteed -sil-fso-disable-dead-argument -sil-fso-disable-arg-explosion -sil-fso-enable-guaranteed-to-owned -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -sil-fso-disable-owned-to-guaranteed -sil-fso-disable-dead-argument -sil-fso-disable-arg-explosion -sil-fso-enable-guaranteed-to-owned -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
 // REQUIRES: asserts
 
 sil_stage canonical
 
 import Builtin
-import Swift
+
+public typealias AnyObject = Builtin.AnyObject
 
 enum FakeOptional<T> {
 case some(T)
