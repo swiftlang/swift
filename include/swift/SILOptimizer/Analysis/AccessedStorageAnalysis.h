@@ -42,7 +42,10 @@ struct StorageAccessInfo {
   template <typename B>
   explicit StorageAccessInfo(B *beginAccess)
       : accessKind(beginAccess->getAccessKind()),
-        noNestedConflict(beginAccess->hasNoNestedConflict()) {}
+        noNestedConflict(beginAccess->hasNoNestedConflict()) {
+    // Currently limited to dynamic Read/Modify access.
+    assert(beginAccess->getEnforcement() == SILAccessEnforcement::Dynamic);
+  }
 
   bool mergeFrom(const StorageAccessInfo &RHS);
 };

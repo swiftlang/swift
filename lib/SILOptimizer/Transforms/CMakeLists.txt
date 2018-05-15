@@ -1,5 +1,6 @@
 set(TRANSFORMS_SOURCES
   Transforms/ARCCodeMotion.cpp
+  Transforms/AccessEnforcementOpts.cpp
   Transforms/AllocBoxToStack.cpp
   Transforms/ArrayCountPropagation.cpp
   Transforms/ArrayElementValuePropagation.cpp
