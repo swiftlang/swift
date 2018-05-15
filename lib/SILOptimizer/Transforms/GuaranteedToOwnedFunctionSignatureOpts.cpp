@@ -16,6 +16,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-function-signature-opt"
 #include "FunctionSignatureOpts.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/BasicBlockUtils.h"
