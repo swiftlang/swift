@@ -31,8 +31,8 @@ using namespace swift;
 static void
 partitionNonTrivialUses(SILFunctionArgument *arg,
                         ArrayRef<Operand *> nonTrivialUsers,
-                        SmallVectorImpl<BranchPropagatedUser> &regularUsers,
-                        SmallVectorImpl<BranchPropagatedUser> &consumingUsers) {
+                        SmallVectorImpl<BranchPropagatedUser> &consumingUsers,
+                        SmallVectorImpl<BranchPropagatedUser> &regularUsers) {
 
   // TODO: Put in an assert to make sure nonTrivialUsers is sorted/uniqued. We
   // assume this.

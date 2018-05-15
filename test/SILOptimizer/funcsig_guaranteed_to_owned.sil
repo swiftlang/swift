@@ -1,9 +1,12 @@
 // This file tests the guaranteed -> owned transformation in isolation.
 
-// RUN: %target-sil-opt -sil-fso-disable-owned-to-guaranteed -sil-fso-disable-dead-argument -sil-fso-disable-arg-explosion -sil-fso-enable-guaranteed-to-owned -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -parse-stdlib -sil-fso-disable-owned-to-guaranteed -sil-fso-disable-dead-argument -sil-fso-disable-arg-explosion -sil-fso-enable-guaranteed-to-owned -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
 // REQUIRES: asserts
 
 sil_stage canonical
+
+import Builtin
+import Swift
 
 enum FakeOptional<T> {
 case some(T)
@@ -15,7 +18,12 @@ class Klass {
   init()
 }
 
-// CHECK: foo
+struct StructWithNonTrivialIVar {
+  var k: Klass
+  var v: Builtin.Int8
+}
+
+/*
 sil @return_value_test : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 bb0(%0 : $Klass):
   strong_retain %0 : $Klass
@@ -31,4 +39,21 @@ bb0(%0 : $Klass):
   dealloc_stack %1 : $*Klass
   %9999 = tuple()
   return %9999 : $()
+}
+
+// Make sure that we do not specialize this in any way. This can be seen by us not labeling this as a thunk.
+// CHECK-LABEL: sil @do_not_specialize_immediate_uses : $@convention(thin) (@guaranteed StructWithNonTrivialIVar) -> Builtin.Int8 {
+sil @do_not_specialize_immediate_uses : $@convention(thin) (@guaranteed StructWithNonTrivialIVar) -> Builtin.Int8 {
+bb0(%0 : $StructWithNonTrivialIVar):
+  %1 = struct_extract %0 : $StructWithNonTrivialIVar, #StructWithNonTrivialIVar.v
+  return %1 : $Builtin.Int8
+}
+*/
+
+// CHECK-LABEL: sil @do_not_specialize_without_consuming_uses : $@convention(thin) (@guaranteed Klass) -> Builtin.RawPointer {
+sil @do_not_specialize_without_consuming_uses : $@convention(thin) (@guaranteed Klass) -> Builtin.RawPointer {
+bb0(%0 : $Klass):
+  %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
+  %2 = ref_to_raw_pointer %1 : $AnyObject to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
 }
