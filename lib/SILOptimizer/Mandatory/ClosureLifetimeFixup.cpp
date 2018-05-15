@@ -416,10 +416,10 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
   auto &Context = NewCB->getModule().getASTContext();
   auto OptionalEscapingClosureTy =
       SILType::getOptionalType(SentinelClosure->getType());
+  auto *NoneDecl = Context.getOptionalNoneDecl();
   {
     SILBuilderWithScope B(Fn.getEntryBlock()->begin());
     Slot = B.createAllocStack(generatedLoc, OptionalEscapingClosureTy);
-    auto *NoneDecl = Context.getOptionalNoneDecl();
     // Store None to it.
     B.createStore(generatedLoc,
                   B.createEnum(generatedLoc, SILValue(), NoneDecl,
@@ -445,6 +445,11 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
                                   IsEscapingClosureInst::ObjCEscaping);
     B.createCondFail(Loc, IsEscaping);
     B.createDestroyAddr(generatedLoc, Slot);
+    // Store None to it.
+    B.createStore(generatedLoc,
+                  B.createEnum(generatedLoc, SILValue(), NoneDecl,
+                               OptionalEscapingClosureTy),
+                  Slot, StoreOwnershipQualifier::Init);
   }
 
   // Insert the dealloc_stack in all exiting blocks.
