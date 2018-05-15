@@ -3466,10 +3466,16 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return parseDeclAssociatedType(Flags, Attributes);
   }
   TmpCtxt.reset();
-  
+
+  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
+                                          /*genericParams*/nullptr,
+                                          CurDeclContext);
+
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    ContextChange CC(*this, TAD);
+
     SyntaxParsingContext InitCtx(SyntaxContext,
                                  SyntaxKind::TypeInitializerClause);
     if (Tok.is(tok::colon)) {
@@ -3477,20 +3483,15 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       // Recognize this and produce a fixit.
       diagnose(Tok, diag::expected_equal_in_typealias)
           .fixItReplace(Tok.getLoc(), " = ");
-      consumeToken(tok::colon);
+      EqualLoc = consumeToken(tok::colon);
     } else {
       EqualLoc = consumeToken(tok::equal);
     }
 
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
     Status |= UnderlyingTy;
-    if (UnderlyingTy.isNull())
-      return Status;
   }
 
-  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          /*genericParams*/nullptr,
-                                          CurDeclContext);
   TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
 
@@ -3504,8 +3505,13 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
-    diagnose(Tok, diag::expected_equal_in_typealias);
-    Status.setIsParseError();
+    // If there is an attempt to do code completion
+    // inside of typealias type, let's just return
+    // because we've seen required '=' token.
+    if (EqualLoc.isInvalid()) {
+      diagnose(Tok, diag::expected_equal_in_typealias);
+      Status.setIsParseError();
+    }
     return Status;
   }
 
