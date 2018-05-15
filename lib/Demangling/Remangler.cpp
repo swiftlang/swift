@@ -1019,7 +1019,20 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
       Buffer << 'x';
       return;
     default:
-      if (kindValue & unsigned(FunctionSigSpecializationParamKind::Dead)) {
+      if (kindValue &
+          unsigned(
+              FunctionSigSpecializationParamKind::ExistentialToGeneric)) {
+        Buffer << 'e';
+        if (kindValue & unsigned(FunctionSigSpecializationParamKind::Dead))
+          Buffer << 'D';
+        if (kindValue &
+            unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
+          Buffer << 'G';
+        if (kindValue &
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+          Buffer << 'O';
+      } else if (kindValue &
+                 unsigned(FunctionSigSpecializationParamKind::Dead)) {
         Buffer << 'd';
         if (kindValue &
             unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))

@@ -128,6 +128,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     OwnedToGuaranteed=64,
     SROA=128,
     GuaranteedToOwned=256,
+    ExistentialToGeneric=512,
     First_OptionSetEntry=32, LastOptionSetEntry=32768,
   };
 
@@ -151,6 +152,7 @@ public:
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
   void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);
+  void setArgumentExistentialToGeneric(unsigned OrigArgIdx);
   void setArgumentSROA(unsigned OrigArgIdx);
   void setArgumentBoxToValue(unsigned OrigArgIdx);
   void setArgumentBoxToStack(unsigned OrigArgIdx);
