@@ -32,7 +32,8 @@ public func A_renameAllTheThings(
   c: RenamedTypedef,
   d: RenamedStruct,
   e: RenamedEnum,
-  f: RenamedProtocol
+  f: RenamedProtocol,
+  g: RenamedWrappedTypedef
 ) {}
 
 // CHECK-LABEL: func A_renameAllTheThings(
@@ -42,6 +43,7 @@ public func A_renameAllTheThings(
 // CHECK-SAME: d: RenamedStruct
 // CHECK-SAME: e: RenamedEnum
 // CHECK-SAME: f: RenamedProtocol
+// CHECK-SAME: g: RenamedWrappedTypedef
 // CHECK-SAME: )
 
 
