@@ -518,4 +518,15 @@
     "NewPrintedName": "newName(is:at:for:)",
     "NewTypeName": "AwesomeWrapper"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:1:0:0:0",
+    "LeftUsr": "s:6Cities12ToplevelTypeC6memberyyySayypGSgcF",
+    "LeftComment": "Any",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "Cities"
+  }
 ]
