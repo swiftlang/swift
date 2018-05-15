@@ -838,7 +838,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     // the uncurry level is 1 if self has already been applied.
     unsigned uncurryLevel = 0;
     if (decl->getDeclContext()->isTypeContext() &&
-        selfAlreadyApplied)
+        selfAlreadyApplied && !isa<SubscriptDecl>(decl))
       uncurryLevel = 1;
     
     candidates.push_back({ decl, uncurryLevel });

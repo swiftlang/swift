@@ -246,9 +246,33 @@ struct MutableSubscriptInGetter {
   }
 }
 
+protocol Protocol {}
+protocol RefinedProtocol: Protocol {}
+class SuperClass {}
+class SubClass: SuperClass {}
+class SubSubClass: SubClass {}
+class ClassConformingToProtocol: Protocol {}
+class ClassConformingToRefinedProtocol: RefinedProtocol {}
+
+struct GenSubscriptFixitTest {
+  subscript<T>(_ arg: T) -> Bool { return true }
+}
+
+func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
+
+  _ = s0.subscript("hello")
+  // expected-error@-1 {{type 'GenSubscriptFixitTest' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+}
+
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
   subscript(keyword:String) -> String? {return nil }  // expected-note 2 {{found this candidate}}
+
+  subscript(arg: SubClass) -> Bool { return true }
+  subscript(arg: Protocol) -> Bool { return true }
+
+  subscript(arg: (foo: Bool, bar: (Int, baz: Int))) -> Bool { return true }
 }
 
 func testSubscript1(_ s1 : SubscriptTest1) {
@@ -256,6 +280,24 @@ func testSubscript1(_ s1 : SubscriptTest1) {
 
   if s1["hello"] {}
 
+  _ = s1.subscript((true, (5, 6)))
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{34-35=]}}
+  _ = s1.subscript(SubSubClass())
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}
+  _ = s1.subscript(ClassConformingToProtocol())
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{47-48=]}}
+  _ = s1.subscript(ClassConformingToRefinedProtocol())
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{54-55=]}}
+  _ = s1.subscript(true)
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}}
+  _ = s1.subscript(SuperClass())
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}}
   _ = s1.subscript("hello")
   // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
   // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}

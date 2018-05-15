@@ -5433,19 +5433,65 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     fnExpr = typeCheckChildIndependently(callExpr->getFn());
     if (!fnExpr) {
       auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
-
       if (!UDE)
         return true;
 
       auto baseExpr = UDE->getBase();
-
-      if (UDE->getName().getBaseName() == "subscript" && baseExpr) {
+      // Offer fix-it for using `subscript` instead of the operator.
+      // FIXME: This doesn't check generic parameters
+      if (baseExpr && UDE->getName().getBaseName() == "subscript") {
         auto baseType = CS.getType(baseExpr);
         // Look up subscript declarations and return if there are none.
-        auto SLR = CS.lookupMember(baseType->getRValueType(),
-                                   DeclName(DeclBaseName::createSubscript()));
-        if (SLR.empty())
+        auto lookup = CS.lookupMember(baseType->getRValueType(),
+                                      DeclName(DeclBaseName::createSubscript()));
+        if (lookup.empty())
           return true;
+
+        auto argExpr = typeCheckChildIndependently(callExpr->getArg(), Type(),
+                                                   CTP_CallArgument);
+        if (!argExpr)
+          return true;
+
+        SmallVector<Identifier, 2> scratch;
+        ArrayRef<Identifier> argLabels = callExpr->getArgumentLabels(scratch);
+        SmallVector<OverloadChoice, 2> choices;
+        auto hasTrailClosure = callArgHasTrailingClosure(argExpr);
+
+        for (auto candidate : lookup)
+          choices.push_back(OverloadChoice(baseType, candidate.getValueDecl(),
+                                           UDE->getFunctionRefKind()));
+
+        CalleeCandidateInfo candidates(baseType, choices,
+                                       hasTrailClosure, CS, true);
+
+        auto argType = CS.getType(argExpr);
+        auto params = swift::decomposeArgType(argType, argLabels);
+
+        using Closeness = CalleeCandidateInfo::ClosenessResultTy;
+
+        candidates.filterList([&](UncurriedCandidate candidate) -> Closeness {
+          auto candFuncType = candidate.getUncurriedFunctionType();
+          if (!candFuncType)
+            return {CC_GeneralMismatch, {}};
+
+          auto candParams = candFuncType->getParams();
+
+          if (params.size() != candParams.size())
+            return {CC_GeneralMismatch, {}};
+
+          for (unsigned i = 0, e = params.size(); i < e; i ++) {
+            auto type1 = params[i].getType()->
+              getUnlabeledType(CS.getASTContext());
+            auto type2 = candParams[i].getType()->
+              getUnlabeledType(CS.getASTContext());
+
+            if (type1->isEqual(type2))
+              continue;
+            if (CS.TC.isSubtypeOf(type2, type1, CS.DC))
+              return {CC_GeneralMismatch, {}};
+          }
+          return {CC_ExactMatch, {}};
+        });
 
         auto *locator = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
         auto memberRange = baseExpr->getSourceRange();
@@ -5454,17 +5500,17 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
         auto baseLoc = baseExpr->getLoc();
         auto nameLoc = DeclNameLoc(memberRange.Start);
-        auto argExpr = callExpr->getArg();
-
-        auto endCh = StringRef((const char *)
-                               argExpr->getEndLoc().getOpaquePointerValue(), 1);
 
         auto diag = diagnose(baseLoc, diag::did_you_mean_subscript_operator);
+
+        if (candidates.closeness != CC_ExactMatch)
+          return true;
+
         diag.fixItReplace(SourceRange(argExpr->getStartLoc()), "[");
         diag.fixItRemove(nameLoc.getSourceRange());
         diag.fixItRemove(SourceRange(UDE->getDotLoc()));
 
-        if (endCh == ")")
+        if (CS.TC.Context.SourceMgr.extractText({argExpr->getEndLoc(), 1}) == ")")
           diag.fixItReplace(SourceRange(argExpr->getEndLoc()), "]");
         else
           diag.fixItInsertAfter(argExpr->getEndLoc(), "]");
