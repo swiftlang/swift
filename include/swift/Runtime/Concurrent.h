@@ -17,6 +17,7 @@
 #include <functional>
 #include <stdint.h>
 #include "llvm/Support/Allocator.h"
+#include "Atomic.h"
 #include "Debug.h"
 #include "Mutex.h"
 
@@ -422,7 +423,22 @@ private:
   struct Storage {
     std::atomic<size_t> Count;
     typename std::aligned_storage<sizeof(ElemTy), alignof(ElemTy)>::type Elem;
-    
+
+    static Storage *allocate(size_t capacity) {
+      auto size = sizeof(Storage) + (capacity - 1) * sizeof(Storage().Elem);
+      auto *ptr = reinterpret_cast<Storage *>(malloc(size));
+      if (!ptr) swift::crash("Could not allocate memory.");
+      ptr->Count.store(0, std::memory_order_relaxed);
+      return ptr;
+    }
+
+    void deallocate() {
+      for (size_t i = 0; i < Count; i++) {
+        data()[i].~ElemTy();
+      }
+      free(this);
+    }
+
     ElemTy *data() {
       return reinterpret_cast<ElemTy *>(&Elem);
     }
@@ -434,25 +450,14 @@ private:
   Mutex WriterLock;
   std::vector<Storage *> FreeList;
   
-  Storage *allocate(size_t capacity) {
-    auto size = sizeof(Storage) + (capacity - 1) * sizeof(Storage().Elem);
-    auto *ptr = reinterpret_cast<Storage *>(malloc(size));
-    if (!ptr) swift::crash("Could not allocate memory.");
-    ptr->Count.store(0, std::memory_order_relaxed);
-    return ptr;
-  }
-  
-  void deallocate(Storage *storage) {
-    if (storage == nullptr) return;
-    
-    auto *data = storage->data();
-    for (size_t i = 0; i < storage->Count; i++) {
-      data[i].~ElemTy();
-    }
-    free(storage);
-  }
-  
 public:
+  // This type cannot be safely copied, moved, or deleted.
+  ConcurrentReadableArray(const ConcurrentReadableArray &) = delete;
+  ConcurrentReadableArray(ConcurrentReadableArray &&) = delete;
+  ConcurrentReadableArray &operator=(const ConcurrentReadableArray &) = delete;
+  
+  ConcurrentReadableArray() : Capacity(0), ReaderCount(0), Elements(nullptr) {}
+  
   void push_back(const ElemTy &elem) {
     ScopedLock guard(WriterLock);
     
@@ -460,7 +465,7 @@ public:
     auto count = storage ? storage->Count.load(std::memory_order_relaxed) : 0;
     if (count >= Capacity) {
       auto newCapacity = std::max((size_t)16, count * 2);
-      auto *newStorage = allocate(newCapacity);
+      auto *newStorage = Storage::allocate(newCapacity);
       if (storage) {
         std::copy(storage->data(), storage->data() + count, newStorage->data());
         newStorage->Count.store(count, std::memory_order_relaxed);
@@ -477,7 +482,7 @@ public:
     
     if (ReaderCount.load(std::memory_order_acquire) == 0)
       for (Storage *storage : FreeList)
-        deallocate(storage);
+        storage->deallocate();
   }
   
   /// Read the contents of the array. The parameter `f` is called with
@@ -486,9 +491,9 @@ public:
   /// `read` was called. The pointer becomes invalid after `f` returns.
   template <class F> auto read(F f) -> decltype(f(nullptr, 0)) {
     ReaderCount.fetch_add(1, std::memory_order_acquire);
-    auto *storage = Elements.load(std::memory_order_consume);
+    auto *storage = Elements.load(SWIFT_MEMORY_ORDER_CONSUME);
     auto count = storage->Count.load(std::memory_order_acquire);
-    auto *ptr = storage->data();
+    const auto *ptr = storage->data();
     
     decltype(f(nullptr, 0)) result = f(ptr, count);
     
@@ -499,7 +504,7 @@ public:
   
   /// Get the current count. It's just a snapshot and may be obsolete immediately.
   size_t count() {
-    return read([](ElemTy *ptr, size_t count) -> size_t {
+    return read([](const ElemTy *ptr, size_t count) -> size_t {
       return count;
     });
   }
