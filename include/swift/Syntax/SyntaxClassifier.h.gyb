@@ -4,13 +4,13 @@
   NODE_MAP = create_node_map()
   # Ignore the following admonition; it applies to the resulting .h file only
 }%
-//// Automatically Generated From SyntaxVisitor.h.gyb.
+//// Automatically Generated From SyntaxClassifier.h.gyb.
 //// Do Not Edit Directly!
-//===---------------- SyntaxVisitor.h - SyntaxVisitor definitions ---------===//
+//===----------- SyntaxClassifier.h - SyntaxClassifier definitions --------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -57,13 +57,22 @@ enum class SyntaxClassification {
 
 
 class SyntaxClassifier: public SyntaxVisitor {
+  struct ContextStackEntry {
+    /// The classification all identifiers shall inherit
+    SyntaxClassification Classification;
+    /// If set to \c true, all tokens will be forced to receive the above
+    /// classification, overriding their context-free classification
+    bool ForceClassification;
+  };
+
   std::map<unsigned, SyntaxClassification> ClassifiedTokens;
   /// The top classification of this stack determines the color of identifiers
-  std::stack<SyntaxClassification, llvm::SmallVector<SyntaxClassification, 4>> ContextStack;
+  std::stack<ContextStackEntry, llvm::SmallVector<ContextStackEntry, 4>> ContextStack;
 
   template<typename T>
-  void visit(T Node, SyntaxClassification Classification) {
-    ContextStack.push(Classification);
+  void visit(T Node, SyntaxClassification Classification,
+             bool ForceClassification) {
+    ContextStack.push({Classification, ForceClassification});
     visit(Node);
     ContextStack.pop();
   }
@@ -90,8 +99,8 @@ class SyntaxClassifier: public SyntaxVisitor {
 public:
   std::map<unsigned, SyntaxClassification> classify(Syntax Node) {
     // Clean up the environment
-    ContextStack = std::stack<SyntaxClassification, llvm::SmallVector<SyntaxClassification, 4>>();
-    ContextStack.push(SyntaxClassification::None);
+    ContextStack = std::stack<ContextStackEntry, llvm::SmallVector<ContextStackEntry, 4>>();
+    ContextStack.push({SyntaxClassification::None, false});
     ClassifiedTokens.clear();
 
     Node.accept(*this);
