@@ -807,7 +807,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
-  Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
+  Opts.DisableSwiftSpecificLLVMOptzns |=
+      Args.hasArg(OPT_disable_swift_specific_llvm_optzns);
   Opts.DisableLLVMSLPVectorizer |= Args.hasArg(OPT_disable_llvm_slp_vectorizer);
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
