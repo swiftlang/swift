@@ -2790,10 +2790,7 @@ private:
       if (formBindingScore(x) < formBindingScore(y))
         return true;
 
-      if (!x.hasNonDefaultableBindings())
-        return false;
-
-      if (x.FullyBound || x.SubtypeOfExistentialType)
+      if (formBindingScore(y) < formBindingScore(x))
         return false;
 
       // If the only difference is default types,
