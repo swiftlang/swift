@@ -1557,6 +1557,13 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // the specific fallback path at some point.
   checkRenamedAttr("availability", "available", DAK_Available, false);
 
+  // Check if attr is inlineable, and suggest inlinable instead
+  if (DK == DAK_Count && Tok.getText() == "inlineable") {
+    DK = DAK_Inlinable;
+    diagnose(Tok, diag::attr_name_close_match, "inlineable", "inlinable")
+        .fixItReplace(Tok.getLoc(), "inlinable");
+  }
+
   // In Swift 5 and above, these become hard errors. Otherwise, emit a
   // warning for compatibility.
   if (!Context.isSwiftVersionAtLeast(5)) {
