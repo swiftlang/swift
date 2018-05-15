@@ -4424,7 +4424,6 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     TC.checkDeclAttributesEarly(TAD);
-    TC.computeAccessLevel(TAD);
 
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
@@ -4492,7 +4491,6 @@ public:
 
   void visitEnumDecl(EnumDecl *ED) {
     TC.checkDeclAttributesEarly(ED);
-    TC.computeAccessLevel(ED);
 
     checkUnsupportedNestedType(ED);
 
@@ -4526,7 +4524,6 @@ public:
 
   void visitStructDecl(StructDecl *SD) {
     TC.checkDeclAttributesEarly(SD);
-    TC.computeAccessLevel(SD);
 
     checkUnsupportedNestedType(SD);
 
@@ -4651,7 +4648,6 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     TC.checkDeclAttributesEarly(CD);
-    TC.computeAccessLevel(CD);
 
     checkUnsupportedNestedType(CD);
 
@@ -4776,7 +4772,6 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     TC.checkDeclAttributesEarly(PD);
-    TC.computeAccessLevel(PD);
 
     checkUnsupportedNestedType(PD);
 
@@ -7208,7 +7203,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     checkDeclAttributesEarly(FD);
-    computeAccessLevel(FD);
 
     FD->setIsBeingValidated();
 
@@ -7508,7 +7502,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     CD->setIsBeingValidated();
 
     checkDeclAttributesEarly(CD);
-    computeAccessLevel(CD);
 
     // convenience initializers are only allowed on classes and in
     // extensions thereof.
@@ -7785,7 +7778,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     SD->setIsBeingValidated(false);
 
     checkDeclAttributesEarly(SD);
-    computeAccessLevel(SD);
 
     validateAttributes(*this, SD);
 
