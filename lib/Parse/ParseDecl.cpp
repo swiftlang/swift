@@ -1536,42 +1536,34 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
-
-  auto checkRenamedAttr = [&](StringRef oldName, StringRef newName,
-                              DeclAttrKind kind, bool warning) {
-    if (DK == DAK_Count && Tok.getText() == oldName) {
+  
+  auto checkInvalidAttrName = [&](StringRef invalidName, StringRef correctName,
+                              DeclAttrKind kind, Diag<StringRef, StringRef> diag) {
+    if (DK == DAK_Count && Tok.getText() == invalidName) {
       // We renamed @availability to @available, so if we see the former,
       // treat it as the latter and emit a Fix-It.
       DK = kind;
-      if (warning) {
-        diagnose(Tok, diag::attr_renamed_warning, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
-      } else {
-        diagnose(Tok, diag::attr_renamed, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
-      }
+      
+      diagnose(Tok, diag, invalidName, correctName)
+            .fixItReplace(Tok.getLoc(), correctName);
     }
   };
 
   // FIXME: This renaming happened before Swift 3, we can probably remove
   // the specific fallback path at some point.
-  checkRenamedAttr("availability", "available", DAK_Available, false);
+  checkInvalidAttrName("availability", "available", DAK_Available, diag::attr_renamed);
 
   // Check if attr is inlineable, and suggest inlinable instead
-  if (DK == DAK_Count && Tok.getText() == "inlineable") {
-    DK = DAK_Inlinable;
-    diagnose(Tok, diag::attr_name_close_match, "inlineable", "inlinable")
-        .fixItReplace(Tok.getLoc(), "inlinable");
-  }
+  checkInvalidAttrName("inlineable", "inlinable", DAK_Inlinable, diag::attr_name_close_match);
 
   // In Swift 5 and above, these become hard errors. Otherwise, emit a
   // warning for compatibility.
   if (!Context.isSwiftVersionAtLeast(5)) {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, true);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, true);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed_warning);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed_warning);
   } else {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, false);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, false);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
   }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
