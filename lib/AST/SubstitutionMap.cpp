@@ -609,48 +609,6 @@ void SubstitutionMap::verify() const {
 #endif
 }
 
-void SubstitutionMap::dump(llvm::raw_ostream &out) const {
-  auto *genericSig = getGenericSignature();
-  if (genericSig == nullptr) {
-    out << "Empty substitution map\n";
-    return;
-  }
-  out << "Generic signature: ";
-  genericSig->print(out);
-  out << "\n";
-  out << "Substitutions:\n";
-  auto genericParams = genericSig->getGenericParams();
-  auto replacementTypes = getReplacementTypesBuffer();
-  for (unsigned i : indices(genericParams)) {
-    out.indent(2);
-    genericParams[i]->print(out);
-    out << " -> ";
-    if (replacementTypes[i])
-      replacementTypes[i]->print(out);
-    else
-      out << "<<unresolved concrete type>>";
-    out << "\n";
-  }
-
-  out << "\nConformance map:\n";
-  auto conformances = getConformances();
-  for (const auto &req : genericSig->getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance) continue;
-
-    out.indent(2);
-    req.getFirstType()->print(out);
-    out << " -> ";
-    conformances.front().dump(out);
-    out << "\n";
-
-    conformances = conformances.slice(1);
-  }
-}
-
-void SubstitutionMap::dump() const {
-  return dump(llvm::errs());
-}
-
 void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   id.AddPointer(storage);
 }

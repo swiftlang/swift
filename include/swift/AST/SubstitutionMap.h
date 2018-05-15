@@ -219,7 +219,7 @@ public:
   void verify() const;
 
   /// Dump the contents of this substitution map for debugging purposes.
-  void dump(llvm::raw_ostream &out) const;
+  void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
 

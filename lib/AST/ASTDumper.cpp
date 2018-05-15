@@ -2905,7 +2905,8 @@ static void dumpProtocolConformanceRec(
       break;
 
     out << '\n';
-    conf->getSubstitutionMap().dump(out);
+    conf->getSubstitutionMap().dump(out, indent + 2);
+    out << '\n';
     for (auto subReq : conf->getConditionalRequirements()) {
       out.indent(indent + 2);
       subReq.dump(out);
@@ -2936,6 +2937,64 @@ void ProtocolConformance::dump() const {
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
   dumpProtocolConformanceRec(this, out, indent, visited);
+}
+
+void SubstitutionMap::dump(llvm::raw_ostream &out, unsigned indent) const {
+  auto *genericSig = getGenericSignature();
+  out.indent(indent);
+
+  auto printParen = [&](char p) {
+    PrintWithColorRAII(out, ParenthesisColor) << p;
+  };
+  printParen('(');
+  out << "substitution_map generic_signature=";
+  if (genericSig == nullptr) {
+    out << "<nullptr>";
+    printParen(')');
+    return;
+  }
+
+  genericSig->print(out);
+  auto genericParams = genericSig->getGenericParams();
+  auto replacementTypes = getReplacementTypesBuffer();
+  for (unsigned i : indices(genericParams)) {
+    out << "\n";
+    out.indent(indent + 2);
+    printParen('(');
+    out << "substitution ";
+    genericParams[i]->print(out);
+    out << " -> ";
+    if (replacementTypes[i])
+      replacementTypes[i]->print(out);
+    else
+      out << "<<unresolved concrete type>>";
+    printParen(')');
+  }
+
+  // We only really need to print a conformance once across this whole map.
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  auto conformances = getConformances();
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    out << "\n";
+    out.indent(indent + 2);
+    printParen('(');
+    out << "conformance type=";
+    req.getFirstType()->print(out);
+    out << "\n";
+    dumpProtocolConformanceRefRec(conformances.front(), out, indent + 4,
+                                  visited);
+
+    printParen(')');
+    conformances = conformances.slice(1);
+  }
+}
+
+void SubstitutionMap::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 //===----------------------------------------------------------------------===//

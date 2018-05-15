@@ -75,15 +75,16 @@ extension Generic: P1 where T: P1 {
 
 
 // Satisfying associated types with requirements with generic params
-class Super<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=Super<T>
-// CHECK-NEXT: (normal_conformance type=Super<T> protocol=P2
-// CHECK-NEXT:   (assoc_type req=A type=Super<T>.A)
-// CHECK-NEXT:   (assoc_type req=B type=Super<T>.B)
+class Super<T, U> {}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Super<T, U>
+// CHECK-NEXT: (normal_conformance type=Super<T, U> protocol=P2
+// CHECK-NEXT:   (assoc_type req=A type=Super<T, U>.A)
+// CHECK-NEXT:   (assoc_type req=B type=Super<T, U>.B)
 // CHECK-NEXT:   (abstract_conformance protocol=P2)
 // CHECK:        (abstract_conformance protocol=P2)
-// CHECK:        conforms_to: T P2)
-extension Super: P2 where T: P2 {
+// CHECK:        conforms_to: T P2
+// CHECK:        conforms_to: U P2)
+extension Super: P2 where T: P2, U: P2 {
     typealias A = T
     typealias B = T
 }
@@ -91,21 +92,29 @@ extension Super: P2 where T: P2 {
 // Inherited/specialized conformances.
 // CHECK-LABEL: ClassDecl name=Sub
 // CHECK-NEXT: (inherited_conformance type=Sub protocol=P2
-// CHECK-NEXT:   (specialized_conformance type=Super<Recur> protocol=P2
-// CHECK-NEXT: Generic signature: <T where T : P2>
-// CHECK-NEXT: Substitutions:
-// CHECK-NEXT:   T -> Recur
-// CHECK:      Conformance map:
-// CHECK-NEXT:   T -> (normal_conformance type=Recur protocol=P2
-// CHECK-NEXT:   (assoc_type req=A type=Recur.A)
-// CHECK-NEXT:   (assoc_type req=B type=Recur.B)
-// CHECK-NEXT:   (normal_conformance type=Recur protocol=P2 (details printed above))
-// CHECK-NEXT:   (normal_conformance type=Recur protocol=P2 (details printed above)))
+// CHECK-NEXT:   (specialized_conformance type=Super<NonRecur, Recur> protocol=P2
+// CHECK-NEXT:      (substitution_map generic_signature=<T, U where T : P2, U : P2>
+// CHECK-NEXT:         (substitution T -> NonRecur)
+// CHECK-NEXT:         (substitution U -> Recur)
+// CHECK-NEXT:         (conformance type=T
+// CHECK-NEXT:            (normal_conformance type=NonRecur protocol=P2
+// CHECK-NEXT:              (assoc_type req=A type=NonRecur.A)
+// CHECK-NEXT:              (assoc_type req=B type=NonRecur.B)
+// CHECK-NEXT:              (normal_conformance type=Recur protocol=P2
+// CHECK-NEXT:                (assoc_type req=A type=Recur.A)
+// CHECK-NEXT:                (assoc_type req=B type=Recur.B)
+// CHECK-NEXT:                (normal_conformance type=Recur protocol=P2 (details printed above))
+// CHECK-NEXT:                (normal_conformance type=Recur protocol=P2 (details printed above)))
+// CHECK-NEXT:              (normal_conformance type=Recur protocol=P2 (details printed above))))
+// CHECK-NEXT:         (conformance type=U
+// CHECK-NEXT:            (normal_conformance type=Recur protocol=P2 (details printed above))))
+// CHECK-NEXT:     conforms_to: NonRecur P2
 // CHECK-NEXT:     conforms_to: Recur P2
-// CHECK-NEXT:     (normal_conformance type=Super<T> protocol=P2
-// CHECK-NEXT:       (assoc_type req=A type=Super<T>.A)
-// CHECK-NEXT:       (assoc_type req=B type=Super<T>.B)
+// CHECK-NEXT:     (normal_conformance type=Super<T, U> protocol=P2
+// CHECK-NEXT:       (assoc_type req=A type=Super<T, U>.A)
+// CHECK-NEXT:       (assoc_type req=B type=Super<T, U>.B)
 // CHECK-NEXT:       (abstract_conformance protocol=P2)
 // CHECK:            (abstract_conformance protocol=P2)
-// CHECK:            conforms_to: T P2)))
-class Sub: Super<Recur> {}
+// CHECK:            conforms_to: T P2
+// CHECK:            conforms_to: U P2)))
+class Sub: Super<NonRecur, Recur> {}
