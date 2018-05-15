@@ -21,6 +21,16 @@ protocol P2 {
     associatedtype B: P2 where Self.A.A == Self.B.A
 }
 
+// Simpler recursion
+// CHECK: Generic signature: <Self where Self : P3>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : P3>
+// CHECK-LABEL: main.(file).P3@
+// CHECK: Requirement signature: <Self where Self.A : P3>
+// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A : P3>
+protocol P3 {
+    associatedtype A: P3
+}
+
 // CHECK-LABEL: StructDecl name=Basic
 // CHECK: (normal_conformance type=Basic protocol=P1
 // CHECK-NEXT: (assoc_type req=A type=Basic.A)
@@ -118,3 +128,29 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:       conforms_to: T P2
 // CHECK-NEXT:       conforms_to: U P2)))
 class Sub: Super<NonRecur, Recur> {}
+
+// Specialization of a recursive conformance should be okay: recursion detection
+// should work through SubstitutionMaps.
+
+// CHECK-LABEL: StructDecl name=RecurGeneric
+// CHECK-NEXT: (normal_conformance type=RecurGeneric<T> protocol=P3
+// CHECK-NEXT:   (assoc_type req=A type=RecurGeneric<T>.A)
+// CHECK-NEXT:   (normal_conformance type=RecurGeneric<T> protocol=P3 (details printed above)))
+struct RecurGeneric<T: P3>: P3 {
+    typealias A = RecurGeneric<T>
+}
+
+// CHECK-LABEL: StructDecl name=Specialize
+// CHECK-NEXT: (normal_conformance type=Specialize protocol=P3
+// CHECK-NEXT:   (assoc_type req=A type=Specialize.A)
+// CHECK-NEXT:   (specialized_conformance type=Specialize.A protocol=P3
+// CHECK-NEXT:     (substitution_map generic_signature=<T where T : P3>
+// CHECK-NEXT:       (substitution T -> Specialize)
+// CHECK-NEXT:       (conformance type=T
+// CHECK-NEXT:         (normal_conformance type=Specialize protocol=P3 (details printed above))))
+// CHECK-NEXT:     (normal_conformance type=RecurGeneric<T> protocol=P3
+// CHECK-NEXT:       (assoc_type req=A type=RecurGeneric<T>.A)
+// CHECK-NEXT:       (normal_conformance type=RecurGeneric<T> protocol=P3 (details printed above)))))
+struct Specialize: P3 {
+    typealias A = RecurGeneric<Specialize>
+}

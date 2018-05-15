@@ -71,13 +71,17 @@ private:
   /// signature nor any replacement types/conformances.
   Storage *storage = nullptr;
 
+public:
   /// Retrieve the array of replacement types, which line up with the
   /// generic parameters.
   ///
   /// Note that the types may be null, for cases where the generic parameter
   /// is concrete but hasn't been queried yet.
+  ///
+  /// Prefer \c getReplacementTypes, this is public for printing purposes.
   ArrayRef<Type> getReplacementTypesBuffer() const;
 
+private:
   MutableArrayRef<Type> getReplacementTypesBuffer();
 
   /// Retrieve a mutable reference to the buffer of conformances.
