@@ -326,7 +326,7 @@ void ConformanceState::verify() const {
   // Iterate over all of the sections and verify all of the protocol
   // descriptors.
   auto &Self = const_cast<ConformanceState &>(*this);
-  Self.SectionsToScan.read([](ConformanceSection *ptr, size_t count) -> char {
+  Self.SectionsToScan.read([](const ConformanceSection *ptr, size_t count) -> char {
     for (size_t i = 0; i < count; i++) {
       for (const auto &Record : ptr[i]) {
         Record.get()->verify();
@@ -548,7 +548,7 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   // Prepare to scan conformance records.
   size_t scannedCount;
   auto returnNull = C.SectionsToScan
-    .read([&](ConformanceSection *ptr, size_t count) -> bool {
+    .read([&](const ConformanceSection *ptr, size_t count) -> bool {
     scannedCount = count;
     // Scan only sections that were not scanned yet.
     // If we found an out-of-date negative cache entry,
@@ -658,7 +658,7 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
 
   return C.SectionsToScan
-    .read([&](ConformanceSection *ptr, size_t count) -> const TypeContextDescriptor * {
+    .read([&](const ConformanceSection *ptr, size_t count) -> const TypeContextDescriptor * {
     for (size_t i = 0; i < count; i++) {
       auto &section = ptr[i];
       for (const auto &record : section) {
