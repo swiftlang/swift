@@ -73,7 +73,8 @@ llvm::cl::opt<bool>
 static llvm::cl::opt<bool> FSODisableOwnedToGuaranteed(
     "sil-fso-disable-owned-to-guaranteed",
     llvm::cl::desc("Do not perform owned to guaranteed during FSO. Intended "
-                   "only for testing purposes."));
+                   "only for testing purposes."),
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> FSODisableDeadArgument(
     "sil-fso-disable-dead-argument",
@@ -90,7 +91,8 @@ bool swift::FSOEnableGuaranteedToOwned = false;
 static llvm::cl::opt<bool, true> FSOEnableGuaranteedToOwnedParser(
     "sil-fso-enable-guaranteed-to-owned",
     llvm::cl::desc("Enable Guaranteed To Owned Transformation"),
-    llvm::cl::Hidden, llvm::cl::location(swift::FSOEnableGuaranteedToOwned));
+    llvm::cl::Hidden, llvm::cl::location(swift::FSOEnableGuaranteedToOwned),
+    llvm::cl::init(true));
 
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
