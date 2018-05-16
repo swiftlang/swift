@@ -8,7 +8,7 @@ func concreteTanh(_ x: Tensor<Float>) -> Tensor<Float> {
 }
 
 func dConcreteTanh(_ x: Tensor<Float>, tanhx: Tensor<Float>, seed: Tensor<Float>) -> Tensor<Float> {
-  return seed.broadcast(to: tanhx) * (1 - tanhx * tanhx)
+  return seed * (1 - tanhx * tanhx)
 }
 
 _ = #gradient(of: concreteTanh)([1,2,3,4,5])

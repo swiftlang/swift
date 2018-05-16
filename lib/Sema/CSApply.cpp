@@ -7439,7 +7439,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
       // SWIFT_ENABLE_TENSORFLOW
       case DeclTypeCheckingSemantics::GradientOf: {
-        auto resultTy = cs.getType(apply);
         auto *tup = cast<TupleExpr>(apply->getArg());
         auto arg = tup->getElement(0);
         auto replacement =
@@ -7451,7 +7450,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       }
 
       case DeclTypeCheckingSemantics::ValueAndGradientOf: {
-        auto resultTy = cs.getType(apply);
         auto *tup = cast<TupleExpr>(apply->getArg());
         auto arg = tup->getElement(0);
         auto replacement =

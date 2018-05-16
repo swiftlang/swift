@@ -54,32 +54,32 @@ extension Tensor where Scalar : Numeric {
   static func _adjointAdd(
     _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
   ) -> (Tensor, Tensor) {
-    let seed = seed.broadcast(to: originalValue)
-    return (seed.unbroadcast(to: x), seed.unbroadcast(to: y))
+    let seed = seed.broadcast(like: originalValue)
+    return (seed.unbroadcast(like: x), seed.unbroadcast(like: y))
   }
 
   @_inlineable @_versioned
   static func _adjointSubtract(
     _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
   ) -> (Tensor, Tensor) {
-    let seed = seed.broadcast(to: originalValue)
-    return (seed.unbroadcast(to: x), 0 - seed.unbroadcast(to: y))
+    let seed = seed.broadcast(like: originalValue)
+    return (seed.unbroadcast(like: x), 0 - seed.unbroadcast(like: y))
   }
 
   @_inlineable @_versioned
   static func _adjointMultiply(
     _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
   ) -> (Tensor, Tensor) {
-    return ((y * seed).unbroadcast(to: x),
-            (x * seed).unbroadcast(to: y))
+    return ((y * seed).unbroadcast(like: x),
+            (x * seed).unbroadcast(like: y))
   }
 
   @_inlineable @_versioned
   static func _adjointDivide(
     _ x: Tensor, _ y: Tensor, originalValue: Tensor, seed: Tensor
   ) -> (Tensor, Tensor) {
-    return ((seed / y).unbroadcast(to: x),
-            ((0 - x) / y.squared() * seed).unbroadcast(to: y))
+    return ((seed / y).unbroadcast(like: x),
+            ((0 - x) / y.squared() * seed).unbroadcast(like: y))
   }
 }
 
@@ -90,15 +90,15 @@ func _adjointMinMax<T : Numeric & Comparable>(
   let denom = 1 + Tensor<T>(x.elementsEqual(y))
   let dfdx = seed * Tensor<T>(x.elementsEqual(originalValue)) / denom
   let dfdy = seed * Tensor<T>(y.elementsEqual(originalValue)) / denom
-  return (dfdx.unbroadcast(to: x), dfdy.unbroadcast(to: y))
+  return (dfdx.unbroadcast(like: x), dfdy.unbroadcast(like: y))
 }
 
 @_inlineable @_versioned
 func _adjointPow<T : BinaryFloatingPoint>(
   _ x: Tensor<T>, _ y: Tensor<T>, originalValue: Tensor<T>, seed: Tensor<T>
 ) -> (Tensor<T>, Tensor<T>) {
-  return ((seed * y * pow(x, y-1)).unbroadcast(to: x),
-          (seed * log(x) * originalValue).unbroadcast(to: y))
+  return ((seed * y * pow(x, y-1)).unbroadcast(like: x),
+          (seed * log(x) * originalValue).unbroadcast(like: y))
 }
 
 //===----------------------------------------------------------------------===//
@@ -110,7 +110,7 @@ extension Tensor where Scalar : SignedNumeric {
   static func _adjointNegate(
     _ x: Tensor, originalValue: Tensor, seed: Tensor
   ) -> Tensor {
-    return -seed.broadcast(to: originalValue)
+    return -seed.broadcast(like: originalValue)
   }
 }
 
@@ -199,15 +199,17 @@ extension Tensor where Scalar : Numeric {
   func _adjointDot(
     _ other: Tensor, originalValue: Tensor, seed: Tensor
   ) -> (Tensor, Tensor) {
-    let bcSeed = seed.broadcast(to: originalValue)
+    let bcSeed = seed.broadcast(like: originalValue)
     return (bcSeed.dot(other.transposed()), transposed().dot(bcSeed))
   }
+}
 
+extension Tensor {
   @_inlineable @_versioned
   func _adjointTransposed(
     _ permutations: Tensor<Int32>, originalValue: Tensor, seed: Tensor
   ) -> Tensor {
-    let seed = seed.broadcast(to: originalValue)
+    let seed = seed.broadcast(like: originalValue)
     return seed.transposed(withPermutations: permutations)
   }
 }
@@ -216,17 +218,12 @@ extension Tensor where Scalar : Numeric {
 // Shape transformations
 //===----------------------------------------------------------------------===//
 
-// FIXME: Remove #if when type checking for the trailing `where` clause in
-// `@differentiable` is implemented or when a `Broadcast` op kernel is
-// implemented, so we don't have to rely on the current "plus-zeros"
-// implementation of `Tensor.broadcast(to:)`.
-#if false
 extension Tensor {
   @_inlineable @_versioned
   func _adjointReshaped(
     toShape newShape: Tensor<Int32>, originalValue: Tensor, seed: Tensor
   ) -> Tensor {
-    let seed = seed.broadcast(to: originalValue)
+    let seed = seed.broadcast(like: originalValue)
     return seed.reshaped(toShape: shapeTensor)
   }
 
@@ -234,11 +231,10 @@ extension Tensor {
   func _adjointExpandingShape(
     at shapeIndex: Int32, originalValue: Tensor, seed: Tensor
   ) -> Tensor {
-    let seed = seed.broadcast(to: originalValue)
+    let seed = seed.broadcast(like: originalValue)
     return seed.squeezingShape(at: shapeIndex)
   }
 }
-#endif
 
 //===----------------------------------------------------------------------===//
 // Normalization

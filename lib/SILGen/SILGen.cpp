@@ -718,9 +718,8 @@ void getLoweredDifferentiationIndices(SILGenModule &SGM,
                                       const SILFunction *F,
                                       const DifferentiableAttr *DA,
                                       SmallVectorImpl<unsigned> &indices) {
-  auto conv = F->getConventions();
-  auto fnTy = AFD->getInterfaceType()->getCanonicalType()
-    ->getAs<AnyFunctionType>();
+  auto fnTy =
+    AFD->getInterfaceType()->getCanonicalType()->getAs<AnyFunctionType>();
   // We don't diff wrt `self` unless it is explicitly specified, therefore
   // dropping the last SIL parameter if it's a method.
   if (AFD->getImplicitSelfDecl())
