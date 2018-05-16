@@ -349,7 +349,7 @@ class CurriedClass {
 
 let c = CurriedClass()
 _ = c.method1
-c.method1(1)         // expected-error {{argument passed to call that takes no arguments}}
+c.method1(1)         // expected-error {{argument passed to call that takes no arguments}} {{11-12=}}
 _ = c.method2(1)
 _ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1)(2)
@@ -428,7 +428,7 @@ let _: (Int) -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missin
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
 let _: Color = .Unknown // expected-error {{member 'Unknown' expects argument of type '(description: String)'}}
 let _: Color = .Unknown(42) // expected-error {{missing argument label 'description:' in call}}
-let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
+let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}} {{26-28=}}
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
 

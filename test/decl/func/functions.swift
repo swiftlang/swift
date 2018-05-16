@@ -95,6 +95,16 @@ func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter
 }
 parenPatternInArg(0)  // expected-error {{argument passed to call that takes no arguments}}
 
+func nullaryFunctionFixit() {}
+nullaryFunctionFixit(())
+
+nullaryFunctionFixit(0, 0, "hello")
+// expected-error@-1 {{argument passed to call that takes no arguments}} {{22-35=}}
+nullaryFunctionFixit(0, 0, "hello"
+// expected-error@-1 {{argument passed to call that takes no arguments}} {{22-35=}} {{35-35=)}}
+// expected-note@-2 {{to match this opening '('}}
+
+// expected-error@+1 {{expected ')' in expression list}}
 var nullaryClosure: (Int) -> Int = {_ in 0}
 _ = nullaryClosure(0)
 

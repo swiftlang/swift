@@ -4103,19 +4103,21 @@ public:
       TC.diagnose(loc, diag::extra_trailing_closure_in_call)
           .highlight(arg->getSourceRange());
     else if (Parameters.empty()) {
-      auto Paren = dyn_cast<ParenExpr>(ArgExpr);
-      Expr *SubExpr = nullptr;
-      if (Paren) {
-        SubExpr = Paren->getSubExpr();
-      }
+      auto diag = TC.diagnose(loc, diag::extra_argument_to_nullary_call);
+      diag.highlight(ArgExpr->getSourceRange());
 
-      if (SubExpr && CandidateInfo.CS.getType(SubExpr) &&
-          CandidateInfo.CS.getType(SubExpr)->isVoid()) {
-        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-            .fixItRemove(SubExpr->getSourceRange());
+      auto lastSym =
+        Lexer::getCharSourceRangeFromSourceRange(TC.Context.SourceMgr,
+                                                 ArgExpr->getEndLoc());
+      auto rightParen = getTokenText(tok::r_paren);
+
+      if (TC.Context.SourceMgr.extractText(lastSym) == rightParen) {
+        diag.fixItRemoveChars(ArgExpr->getStartLoc().getAdvancedLoc(1),
+                              ArgExpr->getEndLoc());
       } else {
-        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-            .highlight(ArgExpr->getSourceRange());
+        diag.fixItInsertAfter(ArgExpr->getEndLoc(), rightParen);
+        diag.fixItRemove(SourceRange(ArgExpr->getStartLoc().getAdvancedLoc(1),
+                                     ArgExpr->getEndLoc()));
       }
     } else if (name.empty())
       TC.diagnose(loc, diag::extra_argument_positional)
