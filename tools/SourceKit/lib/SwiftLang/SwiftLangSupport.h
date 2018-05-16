@@ -93,7 +93,8 @@ public:
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
-             bool BuildSyntaxTree);
+             bool BuildSyntaxTree,
+             swift::SyntaxParsingCache *SyntaxCache = nullptr);
   void readSyntaxInfo(EditorConsumer &consumer, bool LibSyntaxBasedProcessing);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
@@ -106,6 +107,13 @@ public:
 
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
+
+  const llvm::Optional<swift::SourceFileSyntax> &getSyntaxTree() const;
+
+  const swift::SourceManager &getSourceManager() const;
+
+  /// Get the buffer ID of this file in its source manager
+  unsigned getBufferID() const;
 };
 
 typedef IntrusiveRefCntPtr<SwiftEditorDocument> SwiftEditorDocumentRef;

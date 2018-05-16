@@ -784,7 +784,8 @@ public:
     Parser.reset(
       new ParserUnit(SM, BufferID,
                      CompInv.getLangOptions(),
-                     CompInv.getModuleName())
+                     CompInv.getModuleName(),
+                     CompInv.getMainFileSyntaxParsingCache())
     );
 
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
@@ -1130,6 +1131,8 @@ struct SwiftEditorDocument::Implementation {
   llvm::Optional<SwiftEditorCharRange> AffectedRange;
   /// Whether the last operation was an edit rather than a document open
   bool Edited;
+  /// The syntax tree of the document
+  llvm::Optional<SourceFileSyntax> SyntaxTree;
 
   std::vector<DiagnosticEntryInfo> ParserDiagnostics;
   RefPtr<SwiftDocumentSemanticInfo> SemanticInfo;
@@ -1845,7 +1848,8 @@ void SwiftEditorDocument::updateSemaInfo() {
 }
 
 void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
-                                SwiftLangSupport &Lang, bool BuildSyntexTree) {
+                                SwiftLangSupport &Lang, bool BuildSyntexTree,
+                                SyntaxParsingCache *SyntaxCache) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   assert(Impl.SemanticInfo && "Impl.SemanticInfo must be set");
@@ -1866,6 +1870,7 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
       initCompilerInvocation(CompInv, Args, StringRef(), Error);
   }
   CompInv.getLangOptions().BuildSyntaxTree = BuildSyntexTree;
+  CompInv.setMainFileSyntaxParsingCache(SyntaxCache);
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
   Impl.SyntaxInfo.reset(
     new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
@@ -1891,12 +1896,13 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer,
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
   if (LibSyntaxBasedProcessing) {
-    auto SyntaxTree = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot();
+    auto &&SyntaxTree = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot();
 
     SyntaxClassifier Classifier;
     auto Classification = Classifier.classify(SyntaxTree);
     SyntaxToSyntaxMapConverter Printer(NewMap, Classification);
     Printer.writeToSyntaxMap(SyntaxTree);
+    Impl.SyntaxTree.emplace(SyntaxTree);
   } else {
     ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
 
@@ -1978,6 +1984,19 @@ void SwiftEditorDocument::applyFormatOptions(OptionsDictionary &FmtOptions) {
 
 const CodeFormatOptions &SwiftEditorDocument::getFormatOptions() {
   return Impl.FormatOptions;
+}
+
+const llvm::Optional<swift::SourceFileSyntax> &
+SwiftEditorDocument::getSyntaxTree() const {
+  return Impl.SyntaxTree;
+}
+
+const SourceManager &SwiftEditorDocument::getSourceManager() const {
+  return Impl.SyntaxInfo->getSourceManager();
+}
+
+unsigned SwiftEditorDocument::getBufferID() const {
+  return Impl.SyntaxInfo->getBufferID();
 }
 
 void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
@@ -2222,7 +2241,48 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     assert(Snapshot);
     bool BuildSyntaxTree =
         Consumer.syntaxTreeEnabled() || LibSyntaxBasedProcessing;
-    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree);
+
+    llvm::Optional<SyntaxParsingCache> SyntaxCache;
+    if (EditorDoc->getSyntaxTree().hasValue()) {
+      SyntaxCache.emplace(EditorDoc->getSyntaxTree().getValue());
+      SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
+      SyntaxCache->setRecordReuseInformation();
+    }
+
+    SyntaxParsingCache *SyntaxCachePtr = nullptr;
+    if (SyntaxCache.hasValue()) {
+      SyntaxCachePtr = SyntaxCache.getPointer();
+    }
+    EditorDoc->parse(Snapshot, *this, BuildSyntaxTree, SyntaxCachePtr);
+
+    // Log reuse information
+    if (SyntaxCache.hasValue() &&
+        Logger::isLoggingEnabledForLevel(Logger::Level::InfoLowPrio)) {
+      std::string Message;
+      llvm::raw_string_ostream MessageStream(Message);
+      MessageStream << "Reused ";
+
+      bool FirstIteration = true;
+      unsigned LastPrintedBufferID;
+      for (auto ReuseRegion : SyntaxCache->getReusedRanges()) {
+        if (!FirstIteration) {
+          MessageStream << ", ";
+        } else {
+          FirstIteration = false;
+        }
+
+        const SourceManager &SM = EditorDoc->getSourceManager();
+        unsigned BufferID = EditorDoc->getBufferID();
+        auto Start = SM.getLocForOffset(BufferID, ReuseRegion.first);
+        auto End = SM.getLocForOffset(BufferID, ReuseRegion.second);
+
+        Start.print(MessageStream, SM, LastPrintedBufferID);
+        MessageStream << " - ";
+        End.print(MessageStream, SM, LastPrintedBufferID);
+      }
+
+      LOG_INFO("SyntaxCache", Low, MessageStream.str());
+    }
     EditorDoc->readSyntaxInfo(Consumer, LibSyntaxBasedProcessing);
   } else {
     Snapshot = EditorDoc->getLatestSnapshot();
