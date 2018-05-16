@@ -2175,8 +2175,10 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
   @usableFromInline
   internal var capacity: Int {
-    @inline(never) // blacklisted
+    @inline(__always)
     get {
+      // FIXME: This should be stored in _storage, initialized at its creation.
+      // (Capacity calculation should not be inlinable.)
       if isSmall {
         return bucketCount
       }
@@ -2187,7 +2189,12 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
   @inlinable // FIXME(sil-serialize-all)
   internal var isSmall: Bool {
-    return bucketCount <= _smallHashTableLimit
+    @inline(__always)
+    get {
+      // FIXME: This should be a flag in _storage, initialized at its creation.
+      // (This logic should not be inlinable.)
+      return bucketCount <= _smallHashTableLimit
+    }
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2568,7 +2575,10 @@ extension _NativeDictionaryBuffer where Key: Hashable
   /// Find an empty bucket for the specified key, which must not already be in
   /// the Dictionary.
   @inline(__always)
-  @usableFromInline // blacklisted
+  // FIXME: Temporarily disabled
+  // @effects(readonly)
+  // @usableFromInline // blacklisted
+  @inlinable
   internal func _findNew(_ key: Key) -> Int {
     if isSmall {
       _sanityCheck(count < bucketCount)
