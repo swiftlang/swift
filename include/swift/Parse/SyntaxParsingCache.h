@@ -47,6 +47,13 @@ namespace swift {
 
 using namespace swift::syntax;
 
+struct SyntaxReuseRegion {
+  /// The byte offset at which the range begins
+  uintptr_t Start;
+  /// The byte offset at which the end ends
+  uintptr_t End;
+};
+
 class SyntaxParsingCache {
   /// The syntax tree prior to the edit
   SourceFileSyntax OldSyntaxTree;
@@ -61,7 +68,7 @@ class SyntaxParsingCache {
 
   /// If \c RecordReuseInformation buffer offsets of ranges that have been
   /// successfully looked up in this cache are stored.
-  std::vector<std::pair<unsigned, unsigned>> ReusedRanges;
+  std::vector<SyntaxReuseRegion> ReusedRanges;
 
 public:
   SyntaxParsingCache(SourceFileSyntax OldSyntaxTree)
@@ -85,7 +92,7 @@ public:
   /// Return the ranges of the new source file that have been successfully
   /// looked up in this cache as a (start, end) pair of byte offsets in the
   /// post-edit file.
-  std::vector<std::pair<unsigned, unsigned>> getReusedRanges() const {
+  std::vector<SyntaxReuseRegion> getReusedRanges() const {
     return ReusedRanges;
   }
 

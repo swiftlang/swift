@@ -2266,33 +2266,50 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       SyntaxCachePtr = SyntaxCache.getPointer();
     }
     EditorDoc->parse(Snapshot, *this, BuildSyntaxTree, SyntaxCachePtr);
+    EditorDoc->readSyntaxInfo(Consumer);
 
     // Log reuse information
-    if (SyntaxCache.hasValue() && LogReuseRegions) {
-      LOG_SECTION("SyntaxCache", InfoHighPrio) {
-        Log->getOS() << "Reused ";
+    if (SyntaxCache.hasValue()) {
+      // Avoid computing the reused ranges if the consumer doesn't care about
+      // them
+      if (Consumer.syntaxReuseInfoEnabled()) {
+        auto ReuseRegions = SyntaxCache->getReusedRanges();
+        std::vector<SourceFileRange> ReuseRegionOffsets;
+        ReuseRegionOffsets.reserve(ReuseRegions.size());
+        for (auto ReuseRegion : ReuseRegions) {
+          auto Start = ReuseRegion.Start;
+          auto End = ReuseRegion.End;
+          ReuseRegionOffsets.push_back({Start, End});
+        }
+        Consumer.handleSyntaxReuseRegions(ReuseRegionOffsets);
+      }
+      if (LogReuseRegions) {
+        LOG_SECTION("SyntaxCache", InfoHighPrio) {
+          Log->getOS() << "Reused ";
 
-        bool FirstIteration = true;
-        unsigned LastPrintedBufferID;
-        for (auto ReuseRegion : SyntaxCache->getReusedRanges()) {
-          if (!FirstIteration) {
-            Log->getOS() << ", ";
-          } else {
-            FirstIteration = false;
+          bool FirstIteration = true;
+          unsigned LastPrintedBufferID;
+          for (auto ReuseRegion : SyntaxCache->getReusedRanges()) {
+            if (!FirstIteration) {
+              Log->getOS() << ", ";
+            } else {
+              FirstIteration = false;
+            }
+
+            const SourceManager &SM = EditorDoc->getSourceManager();
+            unsigned BufferID = EditorDoc->getBufferID();
+            auto Start = SM.getLocForOffset(BufferID, ReuseRegion.Start);
+            auto End = SM.getLocForOffset(BufferID, ReuseRegion.End);
+
+            Start.print(Log->getOS(), SM, LastPrintedBufferID);
+            Log->getOS() << " - ";
+            End.print(Log->getOS(), SM, LastPrintedBufferID);
           }
-
-          const SourceManager &SM = EditorDoc->getSourceManager();
-          unsigned BufferID = EditorDoc->getBufferID();
-          auto Start = SM.getLocForOffset(BufferID, ReuseRegion.first);
-          auto End = SM.getLocForOffset(BufferID, ReuseRegion.second);
-
-          Start.print(Log->getOS(), SM, LastPrintedBufferID);
-          Log->getOS() << " - ";
-          End.print(Log->getOS(), SM, LastPrintedBufferID);
         }
       }
+    } else {
+      Consumer.handleSyntaxReuseRegions({});
     }
-    EditorDoc->readSyntaxInfo(Consumer);
   } else {
     Snapshot = EditorDoc->getLatestSnapshot();
   }

@@ -92,6 +92,12 @@ class NullEditorConsumer : public EditorConsumer {
   bool syntaxTreeEnabled() override { return false; }
   bool forceLibSyntaxBasedProcessing() override { return false; }
 
+  bool syntaxReuseInfoEnabled() override { return false; }
+
+  bool handleSyntaxReuseRegions(
+      std::vector<SourceFileRange> ReuseRegions) override {
+    return false;
+  }
 public:
   bool needsSema = false;
 };

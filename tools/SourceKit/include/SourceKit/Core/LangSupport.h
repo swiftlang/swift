@@ -188,6 +188,13 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
   SmallVector<DiagnosticEntryInfoBase, 1> Notes;
 };
 
+struct SourceFileRange {
+  /// The byte offset at which the range begins
+  uintptr_t Start;
+  /// The byte offset at which the end ends
+  uintptr_t End;
+};
+
 class EditorConsumer {
   virtual void anchor();
 public:
@@ -239,6 +246,10 @@ public:
 
   virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
   virtual bool syntaxTreeEnabled() = 0;
+
+  virtual bool syntaxReuseInfoEnabled() = 0;
+  virtual bool handleSyntaxReuseRegions(
+      std::vector<SourceFileRange> ReuseRegions) = 0;
 
   virtual void finished() {}
 
