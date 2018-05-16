@@ -18,7 +18,7 @@ extension String {
     @usableFromInline
     internal var _cache: _Cache
 
-    internal typealias _UTF8Buffer = _ValidUTF8Buffer<UInt64>
+    internal typealias _UTF8Buffer = _ValidUTF8Buffer<UInt32>
     @_frozen // FIXME(sil-serialize-all)
     @usableFromInline
     internal enum _Cache {
