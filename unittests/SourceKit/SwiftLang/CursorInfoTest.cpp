@@ -91,6 +91,10 @@ class NullEditorConsumer : public EditorConsumer {
   bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
   bool syntaxTreeEnabled() override { return false; }
 
+  bool handleSyntaxReuseRegions(
+      std::vector<std::pair<unsigned, unsigned>> ReuseRegions) override {
+    return false;
+  }
 public:
   bool needsSema = false;
 };
@@ -145,7 +149,7 @@ public:
                    StringRef Text) {
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
     getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer,
-                                LibSyntaxBasedProcessing);
+                                /*LibSyntaxBasedProcessing=*/false);
   }
 
   TestCursorInfo getCursor(const char *DocName, unsigned Offset,

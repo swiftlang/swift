@@ -99,6 +99,11 @@ private:
   bool handleSourceText(StringRef Text) override { return false; }
   bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
   bool syntaxTreeEnabled() override { return false; }
+
+  bool handleSyntaxReuseRegions(
+      std::vector<std::pair<unsigned, unsigned>> ReuseRegions) override {
+    return false;
+  }
 };
 
 struct DocUpdateMutexState {
@@ -169,7 +174,7 @@ public:
                    StringRef Text, EditorConsumer &Consumer) {
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
     getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer,
-                                LibSyntaxBasedProcessing);
+                                /*LibSyntaxBasedProcessing=*/false);
   }
 
   unsigned findOffset(StringRef Val, StringRef Text) {

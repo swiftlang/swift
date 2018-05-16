@@ -2256,32 +2256,36 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     EditorDoc->parse(Snapshot, *this, BuildSyntaxTree, SyntaxCachePtr);
 
     // Log reuse information
-    if (SyntaxCache.hasValue() &&
-        Logger::isLoggingEnabledForLevel(Logger::Level::InfoLowPrio)) {
-      std::string Message;
-      llvm::raw_string_ostream MessageStream(Message);
-      MessageStream << "Reused ";
+    if (SyntaxCache.hasValue()) {
+      Consumer.handleSyntaxReuseRegions(SyntaxCache->getReusedRanges());
+      if (Logger::isLoggingEnabledForLevel(Logger::Level::InfoLowPrio)) {
+        std::string Message;
+        llvm::raw_string_ostream MessageStream(Message);
+        MessageStream << "Reused ";
 
-      bool FirstIteration = true;
-      unsigned LastPrintedBufferID;
-      for (auto ReuseRegion : SyntaxCache->getReusedRanges()) {
-        if (!FirstIteration) {
-          MessageStream << ", ";
-        } else {
-          FirstIteration = false;
+        bool FirstIteration = true;
+        unsigned LastPrintedBufferID;
+        for (auto ReuseRegion : SyntaxCache->getReusedRanges()) {
+          if (!FirstIteration) {
+            MessageStream << ", ";
+          } else {
+            FirstIteration = false;
+          }
+
+          const SourceManager &SM = EditorDoc->getSourceManager();
+          unsigned BufferID = EditorDoc->getBufferID();
+          auto Start = SM.getLocForOffset(BufferID, ReuseRegion.first);
+          auto End = SM.getLocForOffset(BufferID, ReuseRegion.second);
+
+          Start.print(MessageStream, SM, LastPrintedBufferID);
+          MessageStream << " - ";
+          End.print(MessageStream, SM, LastPrintedBufferID);
         }
 
-        const SourceManager &SM = EditorDoc->getSourceManager();
-        unsigned BufferID = EditorDoc->getBufferID();
-        auto Start = SM.getLocForOffset(BufferID, ReuseRegion.first);
-        auto End = SM.getLocForOffset(BufferID, ReuseRegion.second);
-
-        Start.print(MessageStream, SM, LastPrintedBufferID);
-        MessageStream << " - ";
-        End.print(MessageStream, SM, LastPrintedBufferID);
+        LOG_INFO("SyntaxCache", Low, MessageStream.str());
       }
-
-      LOG_INFO("SyntaxCache", Low, MessageStream.str());
+    } else {
+      Consumer.handleSyntaxReuseRegions({});
     }
     EditorDoc->readSyntaxInfo(Consumer, LibSyntaxBasedProcessing);
   } else {

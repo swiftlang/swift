@@ -241,6 +241,9 @@ public:
   virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
   virtual bool syntaxTreeEnabled() = 0;
 
+  virtual bool handleSyntaxReuseRegions(
+      std::vector<std::pair<unsigned, unsigned>> ReuseRegions) = 0;
+
   virtual void finished() {}
 };
 
