@@ -9,10 +9,10 @@ func adjointId(_ x: Float, originalValue: Float, seed: Float) -> Float {
   return seed
 }
 
-_ = gradient(of: id)(2)
+_ = #gradient(of: id)(2)
 
-// CHECK: @{{.*}}id{{.*}}__grad_wrt_0
-// CHECK-LABEL: @{{.*}}id{{.*}}__grad_wrt_0_s_p
+// CHECK: @{{.*}}id{{.*}}__grad_src_0_wrt_0
+// CHECK-LABEL: @{{.*}}id{{.*}}__grad_src_0_wrt_0_s_p
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 import func Darwin.exp
@@ -41,6 +41,6 @@ let x = #gradient(of: sigmoid)(3)
 let (value: y, gradient: z) = #valueAndGradient(of: sigmoid)(4)
 print(x * z)
 
-// CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0
-// CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0_s_p
-// CHECK: @{{.*}}sigmoid{{.*}}__grad_wrt_0_p
+// CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0
+// CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_s_p
+// CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_p

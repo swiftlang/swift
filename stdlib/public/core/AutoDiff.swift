@@ -20,73 +20,66 @@
 // Compiler Protocols
 //===----------------------------------------------------------------------===//
 
-/// A type that represents a valid argument for automatic differentiation.
-///
-/// Types that conform to the `Differentiable` protocol can be differentiated
-/// with-respect-to in `#gradient` and `#valueAndGradient` expressions.
-///
-/// Example:
-///
-///     struct Vector<Scalar> {
-///         var elements: [Scalar]
-///         init(_ elements: [Scalar]) { ... }
-///     }
-///
-///     extension Vector: Numeric where Scalar: Numeric { ... }
-///
-///     extension Vector: Differentiable where Scalar: FloatingPoint {
-///         associatedtype DifferentiationCurrency = Scalar
-///
-///         init(differentiationSeed: Scalar) {
-///           self.init(differentiationSeed)
-///         }
-///
-///         func combiningAsAdjoint(with newAdjoint: Self) -> Self {
-///             return self + newAdjoint
-///         }
-///     }
-///
-public protocol Differentiable {
-  /// The currency type in the mathematical model of differentiation. For
-  /// example, the currency type of `Float` is `Float`, and the currency type
-  /// of `Vector<Float>` is still `Float`. The currency type is used to
-  /// initialize intermediate values during automatic differentiation, such as
-  /// the initial adjoint/tangent and the seed.
-  associatedtype DifferentiationCurrency : FloatingPoint
+/// A type that represents an unranked vector space. Values of this type are
+/// elements in this vector space and with a specific dimensionality.
+public protocol VectorNumeric {
+  /// The type of scalars in the real vector space.
+  associatedtype ScalarElement
 
-  /// Creates a differentiation seed from a value of the currency type.
-  ///
-  /// - Parameter differentiationSeed: The seed.
-  init(differentiationSeed: DifferentiationCurrency)
-  
-  /// Create an adjoint value to be used in differentiation from a scalar.
-  func makeAdjoint(_ value: DifferentiationCurrency) -> Self
+  /// The type whose values specifies the dimensionality of an object in the
+  /// real vector space.
+  associatedtype Dimensionality
 
-  /// Combining self with the given value as differentiated adjoint, producing
-  /// a new adjoint.
+  /// Create a scalar in the real vector space that the type represents.
   ///
-  /// - Note: This will be used by the compiler during reverse-mode automatic
-  /// differentiation, to combine back-propagated gradient values.
-  func combiningAsAdjoint(with newAdjoint: Self) -> Self
+  /// - Parameter scalar: the scalar
+  init(_ scalar: ScalarElement)
+
+  /// Create an object in the real vector space with the specified
+  /// dimensionality by repeatedly filling the object with the specified
+  /// value.
+  ///
+  /// - Parameters:
+  ///   - dimensionality: the dimensionality
+  ///   - repeatedValue: the value repeat for the specified dimensionality
+  init(dimensionality: Dimensionality, repeating repeatedValue: ScalarElement)
+
+  static func + (lhs: Self, rhs: Self) -> Self
+  static func + (lhs: Self, rhs: ScalarElement) -> Self
+  static func + (lhs: ScalarElement, rhs: Self) -> Self
+
+  static func - (lhs: Self, rhs: Self) -> Self
+  static func - (lhs: Self, rhs: ScalarElement) -> Self
+  static func - (lhs: ScalarElement, rhs: Self) -> Self
+
+  static func * (lhs: Self, rhs: Self) -> Self
+  static func * (lhs: Self, rhs: ScalarElement) -> Self
+  static func * (lhs: ScalarElement, rhs: Self) -> Self
 }
 
-public extension FloatingPoint {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  init(differentiationSeed: Self) {
-    self = differentiationSeed
+public extension VectorNumeric {
+  static func + (lhs: Self, rhs: ScalarElement) -> Self {
+    return lhs + Self(rhs)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  func makeAdjoint(_ value: Self) -> Self {
-    return value
+  static func + (lhs: ScalarElement, rhs: Self) -> Self {
+    return Self(lhs) + rhs
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_transparent
-  func combiningAsAdjoint(with newAdjoint: Self) -> Self {
-    return self + newAdjoint
+  static func - (lhs: Self, rhs: ScalarElement) -> Self {
+    return lhs - Self(rhs)
+  }
+
+  static func - (lhs: ScalarElement, rhs: Self) -> Self {
+    return Self(lhs) - rhs
+  }
+
+  static func * (lhs: Self, rhs: ScalarElement) -> Self {
+    return lhs * Self(rhs)
+  }
+
+  static func * (lhs: ScalarElement, rhs: Self) -> Self {
+    return Self(lhs) * rhs
   }
 }
 
@@ -119,7 +112,7 @@ func _valueAndGradientBodyUnreachable() {
 @_transparent
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, Result>(of function: (T) -> Result) -> (T) -> T
-  where T : Differentiable, Result : Differentiable {
+  where T : VectorNumeric, Result : VectorNumeric {
   _gradientBodyUnreachable()
 }
 
@@ -129,7 +122,8 @@ public func gradient<T, Result>(of function: (T) -> Result) -> (T) -> T
 public func gradient<T, U, Result>(
   of function: (T, U) -> Result
 ) -> (T, U) -> (T, U)
-  where T : Differentiable, U : Differentiable, Result : Differentiable {
+  where T : VectorNumeric, U : VectorNumeric, Result : VectorNumeric,
+        T.ScalarElement : FloatingPoint, U.ScalarElement : FloatingPoint {
   _gradientBodyUnreachable()
 }
 
@@ -139,8 +133,9 @@ public func gradient<T, U, Result>(
 public func gradient<T, U, V, Result>(
   of function: (T, U, V) -> Result
 ) -> (T, U, V) -> (T, U, V)
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        Result : Differentiable {
+  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
+        Result : VectorNumeric, T.ScalarElement : FloatingPoint,
+        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint {
   _gradientBodyUnreachable()
 }
 
@@ -150,8 +145,10 @@ public func gradient<T, U, V, Result>(
 public func gradient<T, U, V, W, Result>(
   of function: (T, U, V, W) -> Result
 ) -> (T, U, V, W) -> (T, U, V, W)
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        W : Differentiable, Result : Differentiable {
+  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
+        W : VectorNumeric, Result : VectorNumeric, T.ScalarElement : FloatingPoint,
+        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint,
+        W.ScalarElement : FloatingPoint {
   _gradientBodyUnreachable()
 }
 
@@ -161,7 +158,7 @@ public func gradient<T, U, V, W, Result>(
 public func valueAndGradient<T, Result>(
   of function: (T) -> Result
 ) -> (T) -> (value: Result, gradient: T)
-  where T : Differentiable, Result : Differentiable {
+  where T : VectorNumeric, Result : VectorNumeric, T.ScalarElement : FloatingPoint {
   _valueAndGradientBodyUnreachable()
 }
 
@@ -171,7 +168,8 @@ public func valueAndGradient<T, Result>(
 public func valueAndGradient<T, U, Result>(
   of function: (T, U) -> Result
 ) -> (T, U) -> (value: Result, gradient: (T, U))
-  where T : Differentiable, U : Differentiable, Result : Differentiable {
+  where T : VectorNumeric, U : VectorNumeric, Result : VectorNumeric,
+        T.ScalarElement : FloatingPoint, U.ScalarElement : FloatingPoint {
   _valueAndGradientBodyUnreachable()
 }
 
@@ -181,8 +179,9 @@ public func valueAndGradient<T, U, Result>(
 public func valueAndGradient<T, U, V, Result>(
   of function: (T, U, V) -> Result
 ) -> (T, U, V) -> (value: Result, gradient: (T, U, V))
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        Result : Differentiable {
+  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
+        Result : VectorNumeric, T.ScalarElement : FloatingPoint,
+        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint {
   _valueAndGradientBodyUnreachable()
 }
 
@@ -192,8 +191,10 @@ public func valueAndGradient<T, U, V, Result>(
 public func valueAndGradient<T, U, V, W, Result>(
   of function: (T, U, V, W) -> Result
 ) -> (T, U, V, W) -> (value: Result, gradient: (T, U, V, W))
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        W : Differentiable, Result : Differentiable {
+  where T : VectorNumeric, U : VectorNumeric, V : VectorNumeric,
+        W : VectorNumeric, Result : VectorNumeric, T.ScalarElement : FloatingPoint,
+        U.ScalarElement : FloatingPoint, V.ScalarElement : FloatingPoint,
+        W.ScalarElement : FloatingPoint {
   _valueAndGradientBodyUnreachable()
 }
 
