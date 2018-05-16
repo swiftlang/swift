@@ -48,13 +48,14 @@ struct FoundResult {
 class ChildIndexFinder : public TypeReprVisitor<ChildIndexFinder, FoundResult> {
   ArrayRef<uint8_t> ChildIndices;
   bool ParentIsOptional;
+  bool IsFunctionTypeArgument;
 
 public:
-  ChildIndexFinder(ArrayRef<uint8_t> ChildIndices) :
-    ChildIndices(ChildIndices) {}
+  ChildIndexFinder(ArrayRef<uint8_t> ChildIndices)
+      : ChildIndices(ChildIndices), ParentIsOptional(false),
+        IsFunctionTypeArgument(false) {}
 
   FoundResult findChild(AbstractFunctionDecl *Parent) {
-    ParentIsOptional = false;
     auto NextIndex = consumeNext();
     if (!NextIndex) {
       if (auto Func = dyn_cast<FuncDecl>(Parent))
@@ -119,12 +120,16 @@ public:
         Parent->getSourceRange(),
         Optional, Suffixable, /*Suffixed=*/ParentIsOptional
       };
+
     auto NextIndex = consumeNext();
     if (isUserTypeAlias(Parent))
       return {SourceRange(), false, false, false};
+
     assert(NextIndex < Children.size());
     TypeRepr *Child = Children[NextIndex];
     ParentIsOptional = Optional;
+    IsFunctionTypeArgument = NextIndex == 1 && isa<FunctionTypeRepr>(Parent);
+
     return visit(Child);
   }
 
@@ -174,12 +179,14 @@ public:
   }
 
   FoundResult visitTupleTypeRepr(TupleTypeRepr *T) {
-    // Single element TupleTypeReprs may be arbitrarily nested so don't count
-    // as their own index level
-    if (T->getNumElements() == 1) {
+    // Paren TupleTypeReprs may be arbitrarily nested so don't count as their
+    // own index level except in the case of function type argument parens
+    if (T->isParenType() && !IsFunctionTypeArgument) {
       ParentIsOptional = false;
       return visit(T->getElementType(0));
     }
+
+    IsFunctionTypeArgument = false;
     llvm::SmallVector<TypeRepr *, 8> Children;
     T->getElementTypes(Children);
     return handleParent(T, ArrayRef<TypeRepr *>(Children));
