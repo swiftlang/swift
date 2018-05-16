@@ -1193,9 +1193,9 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   }
 
   // If we have any type-adjusting attributes, apply them here.
-  if (binding->getPattern(entryNumber)->hasType())
-    if (auto var = binding->getSingleVar())
-      tc.checkTypeModifyingDeclAttributes(var);
+  assert(binding->getPattern(entryNumber)->hasType() && "Type missing?");
+  if (auto var = binding->getSingleVar())
+    tc.checkTypeModifyingDeclAttributes(var);
 }
 
 /// Validate the entries in the given pattern binding declaration.
