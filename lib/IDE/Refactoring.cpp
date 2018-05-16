@@ -2601,24 +2601,11 @@ bool RefactoringActionLocalizeString::performChange() {
   EditConsumer.insertAfter(SM, Target->getEndLoc(), ", comment: \"\")");
   return false;
 }
+
+void generateDocCommentForFunction(FuncDecl *funcDecl, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
     
-bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
-#warning Implement here
-    if (Tok.Kind != CursorInfoKind::ValueRef)
-        return false;
+    if (funcDecl == nullptr) return;
     
-    return Tok.ValueD->getKind() == DeclKind::Func;
-}
-    
-bool RefactoringActionDocCommentBoilerplate::performChange() {
-#warning Implement here
-    if(CursorInfo.ValueD->getKind() != DeclKind::Func) return true;
-    
-    if(!isa<FuncDecl>(CursorInfo.ValueD)) return true;
-    
-    FuncDecl *funcDecl = (FuncDecl *)CursorInfo.ValueD;
-    
-    swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
     EditConsumer.accept(SM, startLocation, "/// <#Function Summary#>\n");
     
     //-----[Start] This section processes parameters -----
@@ -2669,6 +2656,46 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
     //-----[End] This section processes return type -----
     
     EditConsumer.accept(SM, startLocation,"///\n");
+}
+    
+void generateDocCommentForConstructor(ConstructorDecl *constructorDecl, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
+    
+    if(constructorDecl == nullptr) return;
+    
+    assert(false);
+}
+    
+bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+#warning Implement here
+    if (Tok.Kind != CursorInfoKind::ValueRef)
+        return false;
+    
+    DeclKind tokenKind = Tok.ValueD->getKind();
+    return (tokenKind == DeclKind::Func) || (tokenKind == DeclKind::Constructor);
+}
+    
+bool RefactoringActionDocCommentBoilerplate::performChange() {
+#warning Implement here
+    DeclKind tokenKind = CursorInfo.ValueD->getKind();
+    if(tokenKind != DeclKind::Func && tokenKind != DeclKind::Constructor) return true;
+    
+    FuncDecl *funcDecl = nullptr;
+    ConstructorDecl *constructorDecl = nullptr;
+    
+    if(isa<FuncDecl>(CursorInfo.ValueD)) {
+        funcDecl = (FuncDecl *)CursorInfo.ValueD;
+    }
+    else if(isa<ConstructorDecl>(CursorInfo.ValueD)) {
+        constructorDecl = (ConstructorDecl *)CursorInfo.ValueD;
+    }
+    else {
+        return true;
+    }
+    
+    swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
+    
+    generateDocCommentForFunction(funcDecl, startLocation, EditConsumer, SM);
+    generateDocCommentForConstructor(constructorDecl, startLocation, EditConsumer, SM);
     
     return false;
 }
