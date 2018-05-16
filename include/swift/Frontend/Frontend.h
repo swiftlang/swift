@@ -336,7 +336,8 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
 
-  DependencyTracker *DepTracker = nullptr;
+  /// Null if no tracker.
+  std::unique_ptr<DependencyTracker> DepTracker;
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -408,13 +409,11 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
-  void setDependencyTracker(DependencyTracker *DT) {
+  void createDependencyTracker() {
     assert(!Context && "must be called before setup()");
-    DepTracker = DT;
+    DepTracker = llvm::make_unique<DependencyTracker>();
   }
-  DependencyTracker *getDependencyTracker() {
-    return DepTracker;
-  }
+  DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 
   /// Set the SIL module for this compilation instance.
   ///
