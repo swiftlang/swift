@@ -1756,6 +1756,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
+  // Do not move into the following block. Even though it appears to not be
+  // referenced, depTracker must live as long as this activation record.
   DependencyTracker depTracker;
   {
     const FrontendInputsAndOutputs &io =
