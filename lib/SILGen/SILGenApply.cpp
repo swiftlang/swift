@@ -4158,7 +4158,6 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // Emit the raw application.
-  loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
   SILValue rawDirectResult = emitRawApply(
       *this, loc, fn, subs, args, substFnType, options, indirectResultAddrs);
 
