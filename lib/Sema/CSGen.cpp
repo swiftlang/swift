@@ -1235,22 +1235,20 @@ namespace {
     Type handleReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
                                    bool preservingOriginalResult) {
       auto &TC = CS.getTypeChecker();
+      auto &ctx = CS.getASTContext();
       auto *originalExpr = GE->getOriginalExpr();
       auto *originalTy = CS.getType(originalExpr)->getAs<AnyFunctionType>();
       auto locator = CS.getConstraintLocator(GE);
+      ProtocolDecl *vectorNumericProto =
+        ctx.getProtocol(KnownProtocolKind::VectorNumeric);
+      ProtocolDecl *floatingPointProto =
+        ctx.getProtocol(KnownProtocolKind::FloatingPoint);
       // Original type must be a function.
       if (!originalTy) {
         TC.diagnose(originalExpr->getLoc(),
-                    diag::gradient_expr_not_a_function, CS.getType(originalExpr));
+            diag::gradient_expr_not_a_function, CS.getType(originalExpr));
         return nullptr;
       }
-
-      // Get Differentiable protocol type.
-      auto &ctx = CS.getASTContext();
-      ProtocolDecl *diffProto =
-        ctx.getProtocol(KnownProtocolKind::Differentiable);
-      assert(diffProto && "Differentiable protocol could not be found.");
-      Type diffProtoTy = diffProto->getDeclaredInterfaceType();
 
       // Compute the gradient type.
       auto originalParams = originalTy->getParams();
@@ -1324,8 +1322,9 @@ namespace {
               return nullptr;
             }
             // 'self' type must conform to either FloatingPoint or
-            // Differentiable.
-            if (!CS.TC.isConvertibleTo(selfTy, diffProtoTy, CurDC)) {
+            // VectorNumeric.
+            if (!(TC.isCompatibleWithScalarAutoDiff(selfTy, CurDC) ||
+                  TC.isCompatibleWithVectorAutoDiff(selfTy, CurDC))) {
               TC.diagnose(param.getLoc(),
                           diag::gradient_expr_parameter_not_differentiable,
                           selfTy);
@@ -1339,18 +1338,22 @@ namespace {
         }
       }
 
-      // Differentiation parameter types must conform to Differentiable.
-      // TODO: consider generalizing to aggregate types of Differentiable.
+      // Differentiation parameter types must conform to VectorNumeric or
+      // FloatingPoint.
+      // TODO: consider generalizing to aggregate types of VectorNumeric or
+      // FloatingPoint.
       for (auto &param : diffParamTypes) {
         auto paramTy = param.getType();
         // If diff parameter type does not have type variables, it must conform
-        // to Differentiable.
+        // to VectorNumeric.
         // NOTE: It is intentional that diff parameter types with type variables
-        // are not constrained to Differentiable. Instead, conformance to
-        // Differentiable is checked in CSApply to produce better diagnostics
-        // about specific non-differentiable types.
+        // are not constrained to VectorNumeric or FloatingPoint. Instead,
+        // conformance to VectorNumeric or FloatingPoint is checked in CSApply
+        // to produce better diagnostics about specific types that are
+        // incompatible with differentiation.
         if (!paramTy->hasTypeVariable() &&
-            !CS.TC.isConvertibleTo(paramTy, diffProtoTy, CurDC)) {
+            !(TC.isCompatibleWithScalarAutoDiff(paramTy, CurDC) ||
+              TC.isCompatibleWithVectorAutoDiff(paramTy, CurDC))) {
           TC.diagnose(GE->getLoc(),
                       diag::gradient_expr_parameter_not_differentiable, paramTy);
           return nullptr;
