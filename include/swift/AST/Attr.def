@@ -105,7 +105,9 @@ SIMPLE_DECL_ATTR(required, Required,
 SIMPLE_DECL_ATTR(optional, Optional,
                  OnConstructor|OnFunc|OnVar|OnSubscript|DeclModifier, 5)
 
-/// NOTE: 6 is unused
+// SWIFT_ENABLE_TENSORFLOW
+SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
+                 OnClass | OnStruct | OnEnum | OnProtocol, 6)
 
 SIMPLE_DECL_ATTR(noreturn, NoReturn, OnFunc, 7)
 
