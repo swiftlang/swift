@@ -18,14 +18,13 @@ extension String {
     @usableFromInline
     internal var _cache: _Cache
 
-    internal typealias _UTF8Buffer = _ValidUTF8Buffer<UInt64>
+    internal typealias _UTF8Buffer = UTF8.EncodedScalar
     @_frozen // FIXME(sil-serialize-all)
     @usableFromInline
     internal enum _Cache {
-    case utf16
+    case none
     case utf8(buffer: _UTF8Buffer)
     case character(stride: UInt16)
-    case unicodeScalar(value: Unicode.Scalar)
     }
   }
 }
@@ -33,20 +32,12 @@ extension String {
 /// Convenience accessors
 extension String.Index._Cache {
   @inlinable // FIXME(sil-serialize-all)
-  internal var utf16: Void? {
-    if case .utf16 = self { return () } else { return nil }
-  }
-  @inlinable // FIXME(sil-serialize-all)
   internal var utf8: String.Index._UTF8Buffer? {
     if case .utf8(let r) = self { return r } else { return nil }
   }
   @inlinable // FIXME(sil-serialize-all)
   internal var character: UInt16? {
     if case .character(let r) = self { return r } else { return nil }
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  internal var unicodeScalar: UnicodeScalar? {
-    if case .unicodeScalar(let r) = self { return r } else { return nil }
   }
 }
 
@@ -85,7 +76,7 @@ extension String.Index {
   @inlinable // FIXME(sil-serialize-all)
   public init(encodedOffset offset: Int) {
     _compoundOffset = UInt64(offset << _Self._strideBits)
-    _cache = .utf16
+    _cache = .none
   }
 
   @inlinable // FIXME(sil-serialize-all)
