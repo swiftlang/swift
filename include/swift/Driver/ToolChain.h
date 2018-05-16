@@ -121,6 +121,10 @@ protected:
     llvm::opt::ArgStringList Arguments;
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
     std::vector<FilelistInfo> FilelistInfos;
+
+    // Not all platforms and jobs support the use of response files, so assume
+    // "false" by default. This can be overridden as needed on a per
+    // platform/job basis.
     bool allowsResponseFiles = false;
 
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
