@@ -55,9 +55,10 @@ public class Container {
   public func getOptionalSingleAttr() -> String? { return nil }
 }
 
-public class ToplevelType {
+open class ToplevelType {
   public init() {}
   public init(recordName: String) {}
+  open func member(_ x: @escaping ([Any]?) -> Void) {}
 }
 
 public var GlobalAttribute: String = ""
