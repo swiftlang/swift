@@ -89,7 +89,8 @@ namespace {
 class OpaqueArchetypeTypeInfo
   : public ResilientTypeInfo<OpaqueArchetypeTypeInfo>
 {
-  OpaqueArchetypeTypeInfo(llvm::Type *type) : ResilientTypeInfo(type) {}
+  OpaqueArchetypeTypeInfo(llvm::Type *type)
+    : ResilientTypeInfo(type, IsABIAccessible) {}
 
 public:
   static const OpaqueArchetypeTypeInfo *create(llvm::Type *type) {

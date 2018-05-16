@@ -93,10 +93,12 @@ protected:
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
            IsBitwiseTakable_t bitwiseTakable,
            IsFixedSize_t alwaysFixedSize,
+           IsABIAccessible_t abiAccessible,
            SpecialTypeInfoKind stik)
     : NextConverted(0), StorageType(Type), nativeReturnSchema(nullptr),
       nativeParameterSchema(nullptr), StorageAlignment(A),
       POD(pod), BitwiseTakable(bitwiseTakable),
+      ABIAccessible(abiAccessible),
       AlwaysFixedSize(alwaysFixedSize), STIK(stik),
       SubclassKind(InvalidSubclassKind) {
     assert(STIK >= STIK_Fixed || !AlwaysFixedSize);
@@ -134,6 +136,9 @@ private:
   /// Whether this type is known to be bitwise-takable.
   unsigned BitwiseTakable : 1;
 
+  /// Whether this type is ABI-accessible from this SILModule.
+  unsigned ABIAccessible : 1;
+
   /// Whether this type can be assumed to have a fixed size from all
   /// resilience domains.
   unsigned AlwaysFixedSize : 1;
@@ -160,6 +165,17 @@ public:
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const;
+
+  /// Whether this type is known to be ABI-accessible, i.e. whether it's
+  /// actually possible to do ABI operations on it from this current SILModule.
+  /// See SILModule::isTypeABIAccessible.
+  ///
+  /// All fixed-size types are currently ABI-accessible, although this would
+  /// not be difficult to change (e.g. if we had an archetype size constraint
+  /// that didn't say anything about triviality).
+  IsABIAccessible_t isABIAccessible() const {
+    return IsABIAccessible_t(ABIAccessible);
+  }
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
