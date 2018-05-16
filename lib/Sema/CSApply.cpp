@@ -2875,11 +2875,22 @@ namespace {
 
       case OverloadChoiceKind::TupleIndex: {
         Type toType = simplifyType(cs.getType(expr));
-        
-        // If the result type is an rvalue and the base contains lvalues, need a full
-        // tuple coercion to properly load & set access kind on all underlying elements
-        // before taking a single element.
+
         auto baseTy = cs.getType(base);
+        // If the base type is not a tuple l-value, access to
+        // its elements supposed to be r-value as well.
+        //
+        // This is modeled in constraint system in a way
+        // that when member type is resolved by `resolveOverload`
+        // it would take r-value type of the element at
+        // specified index, but if it's a type variable it
+        // could still be bound to l-value later.
+        if (!baseTy->is<LValueType>())
+          toType = toType->getRValueType();
+
+        // If the result type is an rvalue and the base contains lvalues,
+        // need a full tuple coercion to properly load & set access kind
+        // on all underlying elements before taking a single element.
         if (!toType->hasLValueType() && baseTy->hasLValueType())
           base = coerceToType(base, baseTy->getRValueType(),
                               cs.getConstraintLocator(base));

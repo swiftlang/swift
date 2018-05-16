@@ -4159,7 +4159,6 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // Emit the raw application.
-  loc.decodeDebugLoc(SGM.M.getASTContext().SourceMgr);
   auto genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
   if (genericSig != subs.getGenericSignature()) {
