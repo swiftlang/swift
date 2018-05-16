@@ -173,7 +173,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccess(derived.Nominal->getFormalAccess());
-  initDecl->setValidationStarted();
+  initDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(initDecl);
 

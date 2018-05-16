@@ -1521,7 +1521,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   Parameter->setInterfaceType(SubstInterfaceTy);
   Parameter->setGenericEnvironment(genericEnv);
-  Parameter->setValidationStarted();
+  Parameter->setValidationToChecked();
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
@@ -2510,7 +2510,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   ctor->setGenericEnvironment(genericEnv);
 
   tc.configureInterfaceType(ctor, genericSig);
-  ctor->setValidationStarted();
+  ctor->setValidationToChecked();
 
   configureDesignatedInitAttributes(tc, classDecl,
                                     ctor, superclassCtor);

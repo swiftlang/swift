@@ -4006,7 +4006,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     declOrOffset.get()->getAttrs().setRawAttributeChain(DAttrs);
 
   auto decl = declOrOffset.get();
-  decl->setValidationStarted();
+  decl->setValidationToChecked();
   return decl;
 }
 
