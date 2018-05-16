@@ -295,6 +295,27 @@ ERROR(wrong_non_negative_assumption,none,
 ERROR(shifting_all_significant_bits,none,
       "shift amount is greater than or equal to type size in bits", ())
 
+// Float-point overflows and underflows
+WARNING(float_trunc_overflow, none,
+  "floating-point literal '%0' overflows %1-bit floating-point type",
+  (StringRef, unsigned int))
+
+WARNING(float_trunc_underflow, none,
+  "floating-point literal '%0' is subnormal and is not precisely "
+  "representable in a %1-bit floating-point type",
+  (StringRef, unsigned int))
+
+WARNING(float_nonrep, none, "input literal is outside the range of largest "
+  "representable floating-point literal", ())
+
+ERROR(float_to_int_overflow, none,
+  "floating-point literal '%0' overflows %1-bit %2 integer type",
+  (StringRef, unsigned int, StringRef))
+
+ERROR(negative_fp_literal_overflow_unsigned, none,
+  "cannot convert negative floating-point literal '%0' "
+  "to unsigned integer type", (StringRef))
+
 // FIXME: We won't need this as it will be replaced with user-generated strings.
 // staticReport diagnostics.
 ERROR(static_report_error, none,
