@@ -693,13 +693,10 @@ public extension Tensor {
   /// Reshape to the specified `Tensor` representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
   @_inlineable @inline(__always)
-  // FIXME: Uncomment when type checking for the trailing `where` clause is
-  // implemented or when a `Broadcast` op kernel is implemented.
-  //
-  // @differentiable(
-  //   reverse, withRespectTo: (self),
-  //   adjoint: _adjointReshaped(toShape:originalValue:seed:)
-  // )
+  @differentiable(
+    reverse, withRespectTo: (self),
+    adjoint: _adjointReshaped(toShape:originalValue:seed:)
+  )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
     return #tfop("Reshape", handle, newShape)
   }
@@ -720,13 +717,10 @@ public extension Tensor {
   /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
   /// specified shape index.
   @_inlineable @inline(__always)
-  // FIXME: Uncomment when type checking for the trailing `where` clause is
-  // implemented or when a `Broadcast` op kernel is implemented.
-  //
-  // @differentiable(
-  //   reverse, withRespectTo: (self),
-  //   adjoint: _adjointExpandingShape(at:originalValue:seed:)
-  // )
+  @differentiable(
+    reverse, withRespectTo: (self),
+    adjoint: _adjointExpandingShape(at:originalValue:seed:)
+  )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
     return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),
                  Tdim: Int32.self)

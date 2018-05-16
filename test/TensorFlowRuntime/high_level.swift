@@ -27,7 +27,7 @@ HighLevelTests.testAllBackends("ConvolutionLayer") {
   let input = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.5)
   let output = convLayer.applied(to: input)
   let (_, _) = convLayer.gradient(for: input,
-                                  backpropagating: Tensor(1).broadcast(to: output))
+                                  backpropagating: Tensor(1).broadcast(like: output))
   expectEqual(ShapedArray(shape: [1, 1, 3, 3],
                           scalars: [0.5, 1.5, 0.5,
                                     0.5, 1.5, 0.5,
