@@ -45,8 +45,8 @@ where Source.Iterator.Element == SourceEncoding.CodeUnit {
 
 extension _StringGuts {
   //
-  // TODO:(TODO: JIRA) This is all very bloated code, needs a rewrite given
-  // StringGuts' new design and the potential to run direclty on internal
+  // TODO:(TODO: JIRA) This is all very bloated code; needs a rewrite given
+  // StringGuts' new design and the potential to run directly on internal
   // storage. For now, follow a hand-coded opaque pattern.
   //
 
