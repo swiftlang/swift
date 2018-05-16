@@ -11,7 +11,7 @@ func dConcreteTanh(_ x: Tensor<Float>, tanhx: Tensor<Float>, seed: Tensor<Float>
   return seed.broadcast(to: tanhx) * (1 - tanhx * tanhx)
 }
 
-_ = gradient(of: concreteTanh)([1,2,3,4,5])
+_ = #gradient(of: concreteTanh)([1,2,3,4,5])
 
-// CHECK: @{{.*}}concreteTanh{{.*}}__grad_wrt_0_s_p
-// CHECK: @{{.*}}concreteTanh{{.*}}__grad_wrt_0
+// CHECK: @{{.*}}concreteTanh{{.*}}__grad_src_0_wrt_0_s_p
+// CHECK: @{{.*}}concreteTanh{{.*}}__grad_src_0_wrt_0

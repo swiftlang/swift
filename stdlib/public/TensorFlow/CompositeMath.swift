@@ -36,7 +36,8 @@ public func relu<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 @_inlineable @inline(__always)
 public func softmax<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   let expx = exp(x)
-  return expx / expx.sum()
+  let sum = expx.sum()
+  return expx / sum
 }
 
 /// Computes the softmax of the specified tensor along the specified axis.

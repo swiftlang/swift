@@ -2468,18 +2468,14 @@ namespace {
              "Gradient expression should've been assigned a function type");
       cs.setType(expr, gradType);
       cs.cacheExprTypes(expr);
-      // Get Differentiable protocol type.
-      auto &ctx = cs.getASTContext();
-      Type diffProtoTy = ctx.getProtocol(KnownProtocolKind::Differentiable)
-        ->getDeclaredInterfaceType();
-
-      // Verify that differentiation parameters conform to Differentiable.
+      // Verify that differentiation parameters conform to VectorNumeric.
       auto *originalExpr = expr->getOriginalExpr();
       auto originalType = cs.getType(originalExpr)->getAs<AnyFunctionType>();
       assert(originalType && "Original should have function type");
       auto gradParams = gradFnType->getParams();
       assert(gradFnType->getNumParams() == originalType->getNumParams() &&
-             "Gradient expression should have same parameter count as original");
+             "The gradient function should have same number of parameters as "
+             "original function");
       SmallVector<Type, 8> diffParamTypes;
       if (expr->getParameters().empty()) {
         for (auto &gradParam : gradParams)
@@ -2492,14 +2488,14 @@ namespace {
             diffParamTypes.push_back(gradParams[param.getIndex()].getType());
       }
       for (auto &paramTy : diffParamTypes) {
-        if (! TC.isConvertibleTo(paramTy, diffProtoTy, dc)) {
+        if (!(TC.isCompatibleWithScalarAutoDiff(paramTy, dc) ||
+              TC.isCompatibleWithVectorAutoDiff(paramTy, dc))) {
           TC.diagnose(expr->getLoc(),
                       diag::gradient_expr_parameter_not_differentiable,
                       paramTy);
           return nullptr;
         }
       }
-
       return expr;
     }
 

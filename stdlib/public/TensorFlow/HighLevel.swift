@@ -82,9 +82,9 @@ public protocol DifferentiationTapeProtocol {
 /// `DifferentiableModule` instances define a `gradient` method that computes
 /// the gradient with respect to an input and the instance's parameters.
 public protocol DifferentiableModule : Module
-  where Input : Differentiable,
-        Output : Differentiable,
-        Parameters : Differentiable {
+  where Input : VectorNumeric,
+        Output : VectorNumeric,
+        Parameters : VectorNumeric {
   associatedtype DifferentiationPrimalValues : DifferentiationTapeProtocol
     where DifferentiationPrimalValues.DifferentiationTapeResult == Output
 
@@ -271,13 +271,13 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
   @_fixed_layout
-  public struct Parameters : Differentiable, ParameterAggregate {
+  public struct Parameters : VectorNumeric, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
     // The currency type is important for initializing intermediate values
     // during automatic differentiation, such as the initial adjoint/tangent and
     // the seed.
-    public typealias DifferentiationCurrency = Scalar
+    public typealias Dimensionality = TensorShape
 
     public typealias Parameter = Tensor<Scalar>
 
@@ -292,20 +292,42 @@ public struct Convolution2DLayer<Scalar> : DifferentiableModule
     }
 
     @_inlineable @inline(__always)
-    public init(differentiationSeed: Scalar) {
-      self.filter = Tensor<Scalar>(differentiationSeed)
+    public init(_ scalar: Scalar) {
+      self.init(filter: Tensor(scalar))
     }
 
     @_inlineable @inline(__always)
-    public func makeAdjoint(_ value: Scalar) -> Parameters {
-      return Parameters(filter: Tensor(value).broadcast(to: filter))
+    public init(dimensionality: TensorShape, repeating repeatedValue: Scalar) {
+      self.init(filter: Tensor(dimensionality: dimensionality,
+                               repeating: repeatedValue))
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
     // synthesized.
     @_inlineable @inline(__always)
-    public func combiningAsAdjoint(with other: Parameters) -> Parameters {
-      return Parameters(filter: filter.combiningAsAdjoint(with: other.filter))
+    public static func +(lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(filter: lhs.filter + rhs.filter)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func -(lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(filter: lhs.filter - rhs.filter)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func *(lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(filter: lhs.filter * rhs.filter)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func /(lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(filter: lhs.filter / rhs.filter)
     }
 
     @_inlineable @inline(__always)
@@ -416,13 +438,13 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
   @_fixed_layout
-  public struct Parameters : Differentiable, ParameterAggregate {
+  public struct Parameters : VectorNumeric, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
     // The currency type is important for initializing intermediate values
     // during automatic differentiation, such as the initial adjoint/tangent and
     // the seed.
-    public typealias DifferentiationCurrency = Scalar
+    public typealias Dimensionality = TensorShape
 
     public typealias Parameter = Tensor<Scalar>
 
@@ -439,25 +461,48 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     }
 
     @_inlineable @inline(__always)
-    public init(differentiationSeed: Scalar) {
-      self.weight = Tensor<Scalar>(differentiationSeed)
-      self.bias = Tensor<Scalar>(differentiationSeed)
+    public init(_ scalar: Scalar) {
+      self.init(weight: Tensor(scalar), bias: Tensor(scalar))
     }
 
     @_inlineable @inline(__always)
-    public func makeAdjoint(_ value: Scalar) -> Parameters {
-      return Parameters(weight: Tensor(value).broadcast(to: weight),
-                        bias: Tensor(value).broadcast(to: bias))
+    public init(dimensionality: TensorShape, repeating repeatedValue: Scalar) {
+      self.init(weight: Tensor(dimensionality: dimensionality,
+                               repeating: repeatedValue),
+                bias: Tensor(dimensionality: dimensionality,
+                             repeating: repeatedValue))
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
     // synthesized.
     @_inlineable @inline(__always)
-    public func combiningAsAdjoint(with other: Parameters) -> Parameters {
-      return Parameters(
-        weight: weight.combiningAsAdjoint(with: other.weight),
-        bias: bias.combiningAsAdjoint(with: other.bias)
-      )
+    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(weight: lhs.weight + rhs.weight,
+                        bias: lhs.bias + rhs.bias)
+    }
+ 
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func - (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(weight: lhs.weight - rhs.weight,
+                        bias: lhs.bias - rhs.bias)
+    }
+ 
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func * (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(weight: lhs.weight * rhs.weight,
+                        bias: lhs.bias * rhs.bias)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func / (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(weight: lhs.weight / rhs.weight,
+                        bias: lhs.bias / rhs.bias)
     }
 
     @_inlineable @inline(__always)
@@ -583,13 +628,13 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
   // will be compiler synthesized. Remove their explicit declarations when
   // compiler synthesization is implemented.
   @_fixed_layout
-  public struct Parameters : Differentiable, ParameterAggregate {
+  public struct Parameters : VectorNumeric, ParameterAggregate {
     // The currency type of differentiation. This will be compiler synthesized
     // to be the currency type of the stored properties with least precision.
     // The currency type is important for initializing intermediate values
     // during automatic differentiation, such as the initial adjoint/tangent and
     // the seed.
-    public typealias DifferentiationCurrency = Scalar
+    public typealias Dimensionality = TensorShape
 
     public typealias Parameter = Tensor<Scalar>
 
@@ -606,25 +651,48 @@ public struct BatchNormalizationLayer<Scalar> : DifferentiableModule
     }
 
     @_inlineable @inline(__always)
-    public init(differentiationSeed: Scalar) {
-      self.offset = Tensor<Scalar>(differentiationSeed)
-      self.scale = Tensor<Scalar>(differentiationSeed)
+    public init(_ scalar: Scalar) {
+      self.init(offset: Tensor(scalar), scale: Tensor(scalar))
     }
 
     @_inlineable @inline(__always)
-    public func makeAdjoint(_ value: Scalar) -> Parameters {
-      return Parameters(offset: Tensor(value).broadcast(to: offset),
-                        scale: Tensor(value).broadcast(to: scale))
+    public init(dimensionality: TensorShape, repeating repeatedValue: Scalar) {
+      self.init(offset: Tensor(dimensionality: dimensionality,
+                               repeating: repeatedValue),
+                scale: Tensor(dimensionality: dimensionality,
+                              repeating: repeatedValue))
     }
 
     // This operator is a `Differentiable` requirement and will be compiler
     // synthesized.
     @_inlineable @inline(__always)
-    public func combiningAsAdjoint(with other: Parameters) -> Parameters {
-      return Parameters(
-        offset: offset.combiningAsAdjoint(with: other.offset),
-        scale: scale.combiningAsAdjoint(with: other.scale)
-      )
+    public static func + (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(offset: lhs.offset + rhs.offset,
+                        scale: lhs.scale + rhs.scale)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func - (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(offset: lhs.offset - rhs.offset,
+                        scale: lhs.scale - rhs.scale)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func * (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(offset: lhs.offset * rhs.offset,
+                        scale: lhs.scale * rhs.scale)
+    }
+
+    // This operator is a `Differentiable` requirement and will be compiler
+    // synthesized.
+    @_inlineable @inline(__always)
+    public static func / (lhs: Parameters, rhs: Parameters) -> Parameters {
+      return Parameters(offset: lhs.offset / rhs.offset,
+                        scale: lhs.scale / rhs.scale)
     }
 
     @_inlineable @inline(__always)
