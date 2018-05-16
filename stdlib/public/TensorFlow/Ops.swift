@@ -64,15 +64,23 @@ public extension Tensor where Scalar : Numeric {
 }
 
 //===----------------------------------------------------------------------===//
-// Element-wise binary arithmetics
+// Vector numeric properties and element-wise arithmetics
 //===----------------------------------------------------------------------===//
 
-public extension Tensor where Scalar : Numeric {
+extension Tensor : VectorNumeric where Scalar : Numeric {
+  public typealias ScalarElement = Scalar
+  public typealias Dimensionality = TensorShape
+
+  @_inlineable @inline(__always)
+  public init(dimensionality: TensorShape, repeating repeatedValue: Scalar) {
+    self.init(shape: dimensionality, repeating: repeatedValue)
+  }
+
   /// Adds two tensors and produces their sum.
   /// - Note: `+` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointAdd(_:_:originalValue:seed:))
-  static func + (lhs: Tensor, rhs: Tensor) -> Tensor {
+  public static func + (lhs: Tensor, rhs: Tensor) -> Tensor {
     return #tfop("Add", lhs, rhs)
   }
 
@@ -80,7 +88,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `-` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointSubtract(_:_:originalValue:seed:))
-  static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
+  public static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
     return #tfop("Sub", lhs, rhs)
   }
 
@@ -88,47 +96,47 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `*` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
-  static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
+  public static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
     return #tfop("Mul", lhs, rhs)
   }
 
   /// Adds the scalar to every scalar of the tensor and produces the sum.
   @_inlineable @inline(__always)
-  static func + (lhs: Scalar, rhs: Tensor) -> Tensor {
+  public static func + (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(handle: _TFMakeScalarTensor(lhs)) + rhs
   }
 
   /// Adds the scalar to every scalar of the tensor and produces the sum.
   @_inlineable @inline(__always)
-  static func + (lhs: Tensor, rhs: Scalar) -> Tensor {
+  public static func + (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs + Tensor(handle: _TFMakeScalarTensor(rhs))
   }
 
   /// Adds two tensors and stores the result in the left-hand-side variable.
   /// - Note: `+=` supports broadcasting.
   @_inlineable @inline(__always)
-  static func += (lhs: inout Tensor, rhs: Tensor) {
+  public static func += (lhs: inout Tensor, rhs: Tensor) {
     lhs = lhs + rhs
   }
 
   /// Adds the scalar to every scalar of the tensor and stores the result in the
   /// left-hand-side variable.
   @_inlineable @inline(__always)
-  static func += (lhs: inout Tensor, rhs: Scalar) {
+  public static func += (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs + rhs
   }
 
   /// Subtracts the scalar from every scalar of the tensor and produces the
   /// difference.
   @_inlineable @inline(__always)
-  static func - (lhs: Scalar, rhs: Tensor) -> Tensor {
+  public static func - (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(handle: _TFMakeScalarTensor(lhs)) - rhs
   }
 
   /// Subtracts the scalar from every scalar of the tensor and produces the
   /// difference.
   @_inlineable @inline(__always)
-  static func - (lhs: Tensor, rhs: Scalar) -> Tensor {
+  public static func - (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs - Tensor(handle: _TFMakeScalarTensor(rhs))
   }
 
@@ -136,28 +144,28 @@ public extension Tensor where Scalar : Numeric {
   /// left-hand-side variable.
   /// - Note: `-=` supports broadcasting.
   @_inlineable @inline(__always)
-  static func -= (lhs: inout Tensor, rhs: Tensor) {
+  public static func -= (lhs: inout Tensor, rhs: Tensor) {
     lhs = lhs - rhs
   }
 
   /// Subtracts the scalar from every scalar of the tensor and stores the result
   /// in the left-hand-side variable.
   @_inlineable @inline(__always)
-  static func -= (lhs: inout Tensor, rhs: Scalar) {
+  public static func -= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs - rhs
   }
 
   /// Multiplies the scalar with every scalar of the tensor and produces the
   /// product.
   @_inlineable @inline(__always)
-  static func * (lhs: Scalar, rhs: Tensor) -> Tensor {
+  public static func * (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(handle: _TFMakeScalarTensor(lhs)) * rhs
   }
 
   /// Multiplies the scalar with every scalar of the tensor and produces the
   /// product.
   @_inlineable @inline(__always)
-  static func * (lhs: Tensor, rhs: Scalar) -> Tensor {
+  public static func * (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs * Tensor(handle: _TFMakeScalarTensor(rhs))
   }
 
@@ -165,14 +173,14 @@ public extension Tensor where Scalar : Numeric {
   /// variable.
   /// - Note: `*=` supports broadcasting.
   @_inlineable @inline(__always)
-  static func *= (lhs: inout Tensor, rhs: Tensor) {
+  public static func *= (lhs: inout Tensor, rhs: Tensor) {
     lhs = lhs * rhs
   }
 
   /// Multiplies the scalar with every scalar of the tensor and stores the
   /// result in the left-hand-side variable.
   @_inlineable @inline(__always)
-  static func *= (lhs: inout Tensor, rhs: Scalar) {
+  public static func *= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs * rhs
   }
 
@@ -180,70 +188,70 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `/` supports broadcasting.
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointDivide(_:_:originalValue:seed:))
-  static func / (lhs: Tensor, rhs: Tensor) -> Tensor {
+  public static func / (lhs: Tensor, rhs: Tensor) -> Tensor {
     return #tfop("Div", lhs, rhs)
   }
 
   /// Returns the quotient of dividing the scalar by the tensor, broadcasting
   /// the scalar.
   @_inlineable @inline(__always)
-  static func / (lhs: Scalar, rhs: Tensor) -> Tensor {
+  public static func / (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(handle: _TFMakeScalarTensor(lhs)) / rhs
   }
 
   /// Returns the quotient of dividing the tensor by the scalar, broadcasting
   /// the scalar.
   @_inlineable @inline(__always)
-  static func / (lhs: Tensor, rhs: Scalar) -> Tensor {
+  public static func / (lhs: Tensor, rhs: Scalar) -> Tensor {
     return lhs / Tensor(handle: _TFMakeScalarTensor(rhs))
   }
 
   /// Divides the first tensor by the second and stores the quotient in the
   /// left-hand-side variable.
   @_inlineable @inline(__always)
-  static func /= (lhs: inout Tensor, rhs: Tensor) {
+  public static func /= (lhs: inout Tensor, rhs: Tensor) {
     lhs = lhs / rhs
   }
 
   /// Divides the tensor by the scalar, broadcasting the scalar, and stores the
   /// quotient in the left-hand-side variable.
   @_inlineable @inline(__always)
-  static func /= (lhs: inout Tensor, rhs: Scalar) {
+  public static func /= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs / rhs
   }
 
   /// Returns the remainder of dividing the first tensor by the second.
   /// - Note: `%` supports broadcasting.
   @_inlineable @inline(__always)
-  static func % (lhs: Tensor, rhs: Tensor) -> Tensor {
+  public static func % (lhs: Tensor, rhs: Tensor) -> Tensor {
     return #tfop("Mod", lhs, rhs)
   }
 
   /// Returns the remainder of dividing the tensor by the scalar, broadcasting
   /// the scalar.
   @_inlineable @inline(__always)
-  static func % (lhs: Tensor, rhs: Scalar) -> Tensor {
+  public static func % (lhs: Tensor, rhs: Scalar) -> Tensor {
     return #tfop("Mod", lhs, _TFMakeScalarTensor(rhs))
   }
 
   /// Returns the remainder of dividing the scalar by the tensor, broadcasting
   /// the scalar.
   @_inlineable @inline(__always)
-  static func % (lhs: Scalar, rhs: Tensor) -> Tensor {
+  public static func % (lhs: Scalar, rhs: Tensor) -> Tensor {
     return #tfop("Mod", _TFMakeScalarTensor(lhs), rhs)
   }
 
   /// Divides the first tensor by the second and stores the remainder in the
   /// left-hand-side variable.
   @_inlineable @inline(__always)
-  static func %= (lhs: inout Tensor, rhs: Tensor) {
+  public static func %= (lhs: inout Tensor, rhs: Tensor) {
     lhs = lhs % rhs
   }
 
   /// Divides the tensor by the scalar and stores the remainder in the
   /// left-hand-side variable.
   @_inlineable @inline(__always)
-  static func %= (lhs: inout Tensor, rhs: Scalar) {
+  public static func %= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs % rhs
   }
 }

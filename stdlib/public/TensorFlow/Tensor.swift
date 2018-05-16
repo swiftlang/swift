@@ -786,30 +786,6 @@ public extension AccelerableByTensorFlow {
 }
 
 //===----------------------------------------------------------------------===//
-// Automatic differentiation
-//===----------------------------------------------------------------------===//
-
-extension Tensor : Differentiable where Scalar : BinaryFloatingPoint {
-  /// The currency type in the mathematical model of differentiation.
-  public typealias DifferentiationCurrency = Scalar
-
-  @_inlineable @inline(__always)
-  public init(differentiationSeed: Scalar) {
-    self.init(differentiationSeed)
-  }
-
-  @_inlineable @inline(__always)
-  public func makeAdjoint(_ value: Scalar) -> Tensor {
-    return Tensor(value).broadcast(to: self)
-  }
-
-  @_inlineable @inline(__always)
-  public func combiningAsAdjoint(with other: Tensor) -> Tensor {
-    return self + other
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Equality
 //===----------------------------------------------------------------------===//
 

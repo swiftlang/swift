@@ -68,9 +68,11 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 // SWIFT_ENABLE_TENSORFLOW
 PROTOCOL(AccelerableByTensorFlow)
-PROTOCOL(Differentiable)
+PROTOCOL(Numeric)
+PROTOCOL(FloatingPoint)
 PROTOCOL(TensorProtocol)
 PROTOCOL(TensorSendableReceivable)
+PROTOCOL(VectorNumeric)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)
